@@ -1550,3 +1550,184 @@ export function fetchFastTrackMatches(params: FastTrackQueryParams = {}) {
 export function fetchFastTrackDetail(id: string) {
   return request<FastTrackDetailData>(`/fast-track/${id}`);
 }
+
+// ---------------------------------------------------------------------------
+// Knowledge Base (Phase F)
+// ---------------------------------------------------------------------------
+
+export interface KnowledgeSummaryData {
+  total_documents: number;
+  indexed_count: number;
+  processing_count: number;
+  total_chunks: number;
+  total_access_count: number;
+  collection_count: number;
+  top_documents: Array<{ id: string; title: string; access_count: number }>;
+}
+
+export interface KnowledgeCollection {
+  id: string;
+  name: string;
+  description: string;
+  document_count: number;
+  total_chunks: number;
+  last_updated: string;
+  icon: string;
+}
+
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  file_name: string;
+  file_size_bytes: number;
+  pages: number | null;
+  chunks_indexed: number;
+  uploaded_at: string;
+  indexed_at: string | null;
+  last_accessed: string | null;
+  access_count: number;
+  collection: string;
+  tags: string[];
+  metadata: {
+    agency?: string;
+    contract_number?: string;
+    naics?: string;
+    period_of_performance?: string;
+    solicitation_number?: string;
+    author?: string;
+  };
+  summary: string;
+}
+
+export interface KnowledgeSearchResult {
+  document_id: string;
+  document_title: string;
+  document_type: string;
+  collection: string;
+  chunks: Array<{
+    chunk_id: string;
+    text: string;
+    page: number | null;
+    section: string | null;
+    similarity_score?: number;
+  }>;
+  relevance_score: number;
+  highlight: string;
+}
+
+export interface KnowledgeSearchData {
+  query: string;
+  results: KnowledgeSearchResult[];
+  total_results: number;
+}
+
+export interface ChatMessageSource {
+  document_id: string;
+  document_title: string;
+  chunk_text: string;
+  page: number | null;
+  relevance: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  sources?: ChatMessageSource[];
+}
+
+export interface ChatSessionSummary {
+  id: string;
+  title: string;
+  message_count: number;
+  created_at: string;
+  last_message: string;
+}
+
+export interface ChatSessionDetail {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  created_at: string;
+  context?: string;
+}
+
+export interface ChatResponseData {
+  session_id: string;
+  message: ChatMessage;
+}
+
+export interface UploadResponseData {
+  id: string;
+  file_name: string;
+  document_type: string;
+  collection: string;
+  tags: string[];
+  status: string;
+  message: string;
+  estimated_processing_time: string;
+  pipeline: string;
+}
+
+export function fetchKnowledgeSummary() {
+  return request<KnowledgeSummaryData>("/knowledge/summary");
+}
+
+export function fetchKnowledgeCollections() {
+  return request<KnowledgeCollection[]>("/knowledge/collections");
+}
+
+export interface KnowledgeDocumentQueryParams {
+  collection?: string;
+  type?: string;
+  status?: string;
+  search?: string;
+  sort?: string;
+}
+
+export function fetchKnowledgeDocuments(params: KnowledgeDocumentQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.collection) qs.set("collection", params.collection);
+  if (params.type) qs.set("type", params.type);
+  if (params.status) qs.set("status", params.status);
+  if (params.search) qs.set("search", params.search);
+  if (params.sort) qs.set("sort", params.sort);
+  const query = qs.toString();
+  return request<KnowledgeDocument[]>(`/knowledge/documents${query ? `?${query}` : ""}`);
+}
+
+export function fetchKnowledgeDocument(id: string) {
+  return request<KnowledgeDocument>(`/knowledge/documents/${id}`);
+}
+
+export function searchKnowledge(query: string, limit = 10) {
+  const qs = new URLSearchParams({ q: query, limit: String(limit) });
+  return request<KnowledgeSearchData>(`/knowledge/search?${qs}`);
+}
+
+export function fetchChatSessions() {
+  return request<ChatSessionSummary[]>("/knowledge/chat/sessions");
+}
+
+export function fetchChatSession(id: string) {
+  return request<ChatSessionDetail>(`/knowledge/chat/sessions/${id}`);
+}
+
+export function sendChatMessage(message: string, sessionId?: string) {
+  return request<ChatResponseData>("/knowledge/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, session_id: sessionId }),
+  });
+}
+
+export function uploadDocument(fileName: string, documentType?: string, collection?: string, tags?: string[]) {
+  return request<UploadResponseData>("/knowledge/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_name: fileName, document_type: documentType, collection, tags }),
+  });
+}
