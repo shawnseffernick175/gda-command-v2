@@ -4,11 +4,13 @@ import {
   fetchQALatestFailures,
   type QAHealthData,
   type QAFailure,
+  type QACheckRow,
 } from "../api/client";
 
 export default function QACenter() {
   const [health, setHealth] = useState<QAHealthData | null>(null);
   const [failures, setFailures] = useState<QAFailure[]>([]);
+  const [source, setSource] = useState<"mock" | "live" | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +22,10 @@ export default function QACenter() {
         fetchQAHealth(),
         fetchQALatestFailures(),
       ]);
-      if (healthRes.success && healthRes.data) setHealth(healthRes.data);
+      if (healthRes.success && healthRes.data) {
+        setHealth(healthRes.data);
+        setSource(healthRes.data.source ?? null);
+      }
       if (failuresRes.success && failuresRes.data)
         setFailures(failuresRes.data.rows);
     } catch (err) {
@@ -44,6 +49,18 @@ export default function QACenter() {
         <button onClick={load} style={refreshButtonStyle}>
           Refresh
         </button>
+        {source && (
+          <span style={{
+            fontSize: 11,
+            padding: "2px 8px",
+            borderRadius: 4,
+            background: source === "live" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
+            color: source === "live" ? "var(--color-success)" : "var(--color-accent, #3b82f6)",
+            fontWeight: 500,
+          }}>
+            {source === "live" ? "Live n8n" : "Mock data"}
+          </span>
+        )}
       </div>
 
       {health && <HealthPanel health={health} />}
@@ -60,58 +77,114 @@ export default function QACenter() {
             background: "rgba(239,68,68,0.15)",
             color: "var(--color-danger)",
           }}>
-            {failures.filter((f) => !f.resolved).length} unresolved
+            {failures.length} total
           </span>
         </h2>
         {failures.length === 0 ? (
           <p style={{ color: "var(--color-text-muted)" }}>
             No recent failures recorded.
           </p>
+        ) : source === "live" ? (
+          <LiveFailuresTable failures={failures} />
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Workflow</th>
-                  <th style={thStyle}>Action</th>
-                  <th style={thStyle}>Error Code</th>
-                  <th style={thStyle}>Message</th>
-                  <th style={thStyle}>When</th>
-                  <th style={thStyle}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {failures.map((f) => (
-                  <tr key={f.id}>
-                    <td style={tdStyle}>
-                      <code style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
-                        {f.workflow}
-                      </code>
-                    </td>
-                    <td style={tdStyle}>{f.action}</td>
-                    <td style={tdStyle}>
-                      <code style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 13,
-                        color: "var(--color-danger)",
-                      }}>
-                        {f.errorCode}
-                      </code>
-                    </td>
-                    <td style={{ ...tdStyle, maxWidth: 320 }}>{f.errorMessage}</td>
-                    <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
-                      {new Date(f.occurredAt).toLocaleString()}
-                    </td>
-                    <td style={tdStyle}>
-                      <StatusPill resolved={f.resolved} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MockFailuresTable failures={failures} />
         )}
       </div>
+    </div>
+  );
+}
+
+function LiveFailuresTable({ failures }: { failures: QAFailure[] }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Workflow</th>
+            <th style={thStyle}>Failed Node</th>
+            <th style={thStyle}>Message</th>
+            <th style={thStyle}>Started</th>
+            <th style={thStyle}>Stopped</th>
+          </tr>
+        </thead>
+        <tbody>
+          {failures.map((f, i) => (
+            <tr key={f.id ?? i}>
+              <td style={tdStyle}>
+                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                  {f.workflowName ?? f.workflow ?? "—"}
+                </code>
+                {f.workflowId && (
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                    {f.workflowId}
+                  </div>
+                )}
+              </td>
+              <td style={tdStyle}>
+                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-danger)" }}>
+                  {f.failedNode ?? "—"}
+                </code>
+              </td>
+              <td style={{ ...tdStyle, maxWidth: 400 }}>
+                {f.message ?? f.errorMessage ?? "—"}
+              </td>
+              <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
+                {f.startedAt ? new Date(f.startedAt).toLocaleString() : "—"}
+              </td>
+              <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
+                {f.stoppedAt ? new Date(f.stoppedAt).toLocaleString() : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MockFailuresTable({ failures }: { failures: QAFailure[] }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Workflow</th>
+            <th style={thStyle}>Action</th>
+            <th style={thStyle}>Error Code</th>
+            <th style={thStyle}>Message</th>
+            <th style={thStyle}>When</th>
+            <th style={thStyle}>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {failures.map((f) => (
+            <tr key={f.id}>
+              <td style={tdStyle}>
+                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                  {f.workflow}
+                </code>
+              </td>
+              <td style={tdStyle}>{f.action}</td>
+              <td style={tdStyle}>
+                <code style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 13,
+                  color: "var(--color-danger)",
+                }}>
+                  {f.errorCode}
+                </code>
+              </td>
+              <td style={{ ...tdStyle, maxWidth: 320 }}>{f.errorMessage}</td>
+              <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
+                {f.occurredAt ? new Date(f.occurredAt).toLocaleString() : "—"}
+              </td>
+              <td style={tdStyle}>
+                <StatusPill resolved={f.resolved ?? false} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -119,7 +192,9 @@ export default function QACenter() {
 function HealthPanel({ health }: { health: QAHealthData }) {
   const statusColors: Record<string, string> = {
     healthy: "var(--color-success)",
+    operational: "var(--color-success)",
     degraded: "var(--color-warning)",
+    critical: "var(--color-danger)",
     down: "var(--color-danger)",
   };
 
@@ -148,6 +223,8 @@ function HealthPanel({ health }: { health: QAHealthData }) {
           borderRadius: 4,
         }}>
           {health.summary.passed}/{health.summary.total} passed
+          {(health.summary.authFails ?? 0) > 0 && ` · ${health.summary.authFails} auth fail`}
+          {(health.summary.empty ?? 0) > 0 && ` · ${health.summary.empty} empty`}
         </span>
       </div>
 
@@ -170,53 +247,90 @@ function HealthPanel({ health }: { health: QAHealthData }) {
         gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
         gap: 8,
       }}>
-        {health.rows.map((check) => (
-          <div
-            key={check.name}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "8px 12px",
-              borderRadius: 6,
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border)",
-            }}
-          >
-            <CheckIcon status={check.status} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{check.name}</div>
-              <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                {check.message}
-              </div>
-            </div>
-            <span style={{
-              fontSize: 11,
-              color: "var(--color-text-muted)",
-              fontFamily: "var(--font-mono)",
-              whiteSpace: "nowrap",
-            }}>
-              {check.durationMs}ms
-            </span>
-          </div>
+        {health.rows.map((check, i) => (
+          <CheckCard key={check.id ?? check.name ?? i} check={check} />
         ))}
       </div>
     </div>
   );
 }
 
-function CheckIcon({ status }: { status: "pass" | "fail" | "warn" }) {
-  const colors: Record<string, string> = {
-    pass: "var(--color-success)",
-    fail: "var(--color-danger)",
-    warn: "var(--color-warning)",
+function CheckCard({ check }: { check: QACheckRow }) {
+  const displayName = check.label ?? check.name ?? check.id ?? "Unknown";
+  const displayStatus = check.status;
+  const displayMs = check.ms ?? check.durationMs ?? null;
+  const displayMessage = check.error ?? check.message ?? "";
+
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 12px",
+      borderRadius: 6,
+      background: "var(--color-bg)",
+      border: "1px solid var(--color-border)",
+    }}>
+      <CheckIcon status={displayStatus} tone={check.tone} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{displayName}</div>
+        {displayMessage && (
+          <div style={{ fontSize: 12, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {displayMessage}
+          </div>
+        )}
+        {check.http !== undefined && check.http > 0 && (
+          <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+            HTTP {check.http} · {check.bytes ?? 0} bytes
+          </div>
+        )}
+      </div>
+      {displayMs !== null && (
+        <span style={{
+          fontSize: 11,
+          color: "var(--color-text-muted)",
+          fontFamily: "var(--font-mono)",
+          whiteSpace: "nowrap",
+        }}>
+          {displayMs}ms
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CheckIcon({ status, tone }: { status: string; tone?: string }) {
+  const toneColors: Record<string, string> = {
+    green: "var(--color-success)",
+    red: "var(--color-danger)",
+    orange: "var(--color-warning)",
+    gray: "#999",
   };
+  const statusColors: Record<string, string> = {
+    pass: "var(--color-success)",
+    PASS: "var(--color-success)",
+    fail: "var(--color-danger)",
+    FAIL: "var(--color-danger)",
+    ERROR: "var(--color-danger)",
+    TIMEOUT: "var(--color-danger)",
+    "AUTH FAIL": "var(--color-danger)",
+    warn: "var(--color-warning)",
+    EMPTY: "var(--color-warning)",
+    "NOT CONFIGURED": "#999",
+  };
+  const color = (tone ? toneColors[tone] : null) ?? statusColors[status] ?? "#999";
+  const letter = status === "pass" || status === "PASS" ? "P"
+    : status === "EMPTY" ? "E"
+    : status === "NOT CONFIGURED" ? "?"
+    : status === "warn" ? "W"
+    : "F";
+
   return (
     <span style={{
       width: 20,
       height: 20,
       borderRadius: "50%",
-      background: colors[status],
+      background: color,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -225,7 +339,7 @@ function CheckIcon({ status }: { status: "pass" | "fail" | "warn" }) {
       color: "#000",
       flexShrink: 0,
     }}>
-      {status === "pass" ? "P" : status === "fail" ? "F" : "W"}
+      {letter}
     </span>
   );
 }
