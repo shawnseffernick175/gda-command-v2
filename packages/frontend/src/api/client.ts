@@ -1447,3 +1447,106 @@ export interface RecentUsageData {
 export function fetchRecentUsage() {
   return request<RecentUsageData>("/prompts/usage");
 }
+
+// ---------------------------------------------------------------------------
+// Fast Track
+// ---------------------------------------------------------------------------
+export interface FastTrackSource {
+  source_id: string;
+  type: string;
+  title: string;
+  url: string | null;
+  publisher: string;
+  published_at: string;
+  retrieved_at: string;
+  claim_support: string;
+}
+
+export interface FastTrackMatch {
+  id: string;
+  status: "new" | "reviewing" | "watching" | "promoted" | "discarded";
+  signal_type: string;
+  signal_summary: string;
+  technology: string;
+  company_name: string;
+  company_role: "internal" | "partner" | "target" | "competitor" | "unknown";
+  candidate_agency: string | null;
+  candidate_requirement: string | null;
+  contract_path_hypothesis: string;
+  match_score: number;
+  recommended_next_action: string;
+  safety_lane: "read-only" | "dry-run";
+  sources: FastTrackSource[];
+  created_at: string;
+  updated_at: string;
+  technology_tags: string[];
+  company_url: string | null;
+  incumbent_or_competitor_context: string | null;
+  buyer_problem: string | null;
+  next_review_at: string | null;
+  promotion_target: string | null;
+}
+
+export interface FastTrackSummaryData {
+  new_count: number;
+  reviewing_count: number;
+  watching_count: number;
+  promoted_count: number;
+  discarded_count: number;
+  needs_attention_count: number;
+  total_count: number;
+}
+
+export interface FastTrackListData {
+  matches: FastTrackMatch[];
+  meta: { count: number; filtersApplied: Record<string, string> };
+}
+
+export interface FastTrackDetailData {
+  match: FastTrackMatch;
+  analysis: {
+    executive_summary: string;
+    why_it_matters: string;
+    risks_or_gaps: string[];
+  } | null;
+  ooda: {
+    observe: string[];
+    orient: string[];
+    decide: string;
+    act: string;
+  } | null;
+  sources: FastTrackSource[];
+  learning: {
+    notes: string[];
+    reserved: boolean;
+  };
+}
+
+export function fetchFastTrackSummary() {
+  return request<FastTrackSummaryData>("/fast-track/summary");
+}
+
+export interface FastTrackQueryParams {
+  status?: string;
+  signal_type?: string;
+  technology?: string;
+  company_role?: string;
+  min_match_score?: string;
+  search?: string;
+}
+
+export function fetchFastTrackMatches(params: FastTrackQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.signal_type) qs.set("signal_type", params.signal_type);
+  if (params.technology) qs.set("technology", params.technology);
+  if (params.company_role) qs.set("company_role", params.company_role);
+  if (params.min_match_score) qs.set("min_match_score", params.min_match_score);
+  if (params.search) qs.set("search", params.search);
+  const query = qs.toString();
+  return request<FastTrackListData>(`/fast-track/matches${query ? `?${query}` : ""}`);
+}
+
+export function fetchFastTrackDetail(id: string) {
+  return request<FastTrackDetailData>(`/fast-track/${id}`);
+}

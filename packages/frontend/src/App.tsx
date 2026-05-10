@@ -17,6 +17,7 @@ import ProposalReview from "./pages/ProposalReview";
 import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
 import PromptArchitect from "./pages/PromptArchitect";
+import FastTrack from "./pages/FastTrack";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -26,6 +27,7 @@ const NAV_GROUPS = [
     label: "BD Tools",
     items: [
       { path: "/", label: "Launchpad", icon: "🏠" },
+      { path: "/fast-track", label: "Fast Track", icon: "🚀" },
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
       { path: "/capture", label: "Capture", icon: "🎯" },
@@ -264,6 +266,7 @@ export default function App() {
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/prompts" element={<PromptArchitect />} />
+            <Route path="/fast-track" element={<FastTrack />} />
           </Routes>
         </main>
       </div>

@@ -16,6 +16,7 @@ import contactsRouter from "./routes/contacts";
 import reportsRouter from "./routes/reports";
 import enrichmentsRouter from "./routes/enrichments";
 import promptsRouter from "./routes/prompts";
+import fastTrackRouter from "./routes/fast-track";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -82,6 +83,7 @@ app.use("/api/contacts", contactsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/enrichments", enrichmentsRouter);
 app.use("/api/prompts", promptsRouter);
+app.use("/api/fast-track", fastTrackRouter);
 
 // --- Catch-all 404 ---
 app.use((_req, res) => {
