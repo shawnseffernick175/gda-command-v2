@@ -2261,3 +2261,143 @@ export function runColorReview(proposal_id: string, phase: string) {
     body: JSON.stringify({ proposal_id, phase }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Phase J — Anomaly Detection & Proactive Alerts
+// ---------------------------------------------------------------------------
+
+export interface AnomalyTrendPoint {
+  date: string;
+  value: number;
+}
+
+export interface AnomalyRow {
+  id: string;
+  category: string;
+  severity: "critical" | "high" | "medium" | "low";
+  status: "active" | "acknowledged" | "resolved" | "dismissed";
+  title: string;
+  description: string;
+  opportunity_id: string | null;
+  opportunity_title: string | null;
+  agency: string | null;
+  detected_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  metric_name: string;
+  metric_value: number;
+  baseline_value: number;
+  deviation_pct: number;
+  trend: AnomalyTrendPoint[];
+  root_cause: string | null;
+  recommended_actions: string[];
+  related_anomaly_ids: string[];
+  source_workflow: string;
+}
+
+export interface AnomalyData {
+  anomalies: AnomalyRow[];
+  total: number;
+  active: number;
+  acknowledged: number;
+  resolved: number;
+  dismissed: number;
+  critical: number;
+  high: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchAnomalies() {
+  return request<AnomalyData>("/anomaly/anomalies");
+}
+
+export interface CompetitorMovementRow {
+  id: string;
+  competitor_name: string;
+  movement_type: string;
+  title: string;
+  description: string;
+  impact_assessment: string;
+  threat_level: "critical" | "high" | "medium" | "low";
+  affected_opportunities: string[];
+  source: string;
+  source_url: string | null;
+  detected_at: string;
+  verified: boolean;
+}
+
+export interface CompetitorMovementData {
+  movements: CompetitorMovementRow[];
+  total: number;
+  competitors: number;
+  critical: number;
+  high: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchCompetitorMovements() {
+  return request<CompetitorMovementData>("/anomaly/competitor-movements");
+}
+
+export interface EscalationRuleRow {
+  id: string;
+  name: string;
+  condition: string;
+  priority: "critical" | "warning" | "info";
+}
+
+export interface EscalationRow {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  priority: "critical" | "warning" | "info";
+  status: "open" | "in_progress" | "resolved" | "overdue";
+  title: string;
+  description: string;
+  opportunity_id: string | null;
+  opportunity_title: string | null;
+  agency: string | null;
+  triggered_at: string;
+  due_date: string | null;
+  assigned_to: string | null;
+  resolution_notes: string | null;
+  resolved_at: string | null;
+  days_overdue: number;
+}
+
+export interface EscalationData {
+  escalations: EscalationRow[];
+  total: number;
+  open: number;
+  in_progress: number;
+  overdue: number;
+  resolved: number;
+  critical: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchEscalations() {
+  return request<EscalationData>("/anomaly/escalations");
+}
+
+export interface EscalationRulesData {
+  rules: EscalationRuleRow[];
+  total: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchEscalationRules() {
+  return request<EscalationRulesData>("/anomaly/escalation-rules");
+}
+
+export function acknowledgeAnomaly(anomalyId: string) {
+  return request<{ anomaly_id: string; status: string; message: string }>(`/anomaly/anomalies/${anomalyId}/acknowledge`, {
+    method: "POST",
+  });
+}
+
+export function resolveAnomaly(anomalyId: string) {
+  return request<{ anomaly_id: string; status: string; message: string }>(`/anomaly/anomalies/${anomalyId}/resolve`, {
+    method: "POST",
+  });
+}

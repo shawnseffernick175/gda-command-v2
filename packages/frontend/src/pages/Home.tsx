@@ -461,6 +461,9 @@ export default function Home() {
           <Card title="Settings" description="System configuration, connectors, and feature flags." to="/settings" statusColor="#6b7280" />
           <Card title="Knowledge Base" description="Unified past performance, proposals, compliance records — searchable by meaning with RAG." to="/knowledge" statusColor="#8b5cf6" />
           <Card title="RFP Shredder" description="AI-powered solicitation parsing — extract requirements, map compliance, generate response outlines." to="/rfp-shredder" statusColor="#7c3aed" />
+          <Card title="Predictive Analytics" description="ML Pwin models, Monte Carlo revenue forecasting, bid/no-bid optimizer, and win/loss patterns." to="/predictive" statusColor="#0ea5e9" />
+          <Card title="Color Review" description="Automated Pink/Red/Gold/Green/White team proposal scrubbing with compliance, cost, and format checks." to="/color-review" statusColor="#ec4899" />
+          <Card title="Anomaly Detection" description="Portfolio anomaly monitoring, competitor movement tracking, and smart deadline/risk escalation engine." to="/anomaly" statusColor="#dc2626" />
         </div>
       )}
     </div>

@@ -1112,3 +1112,102 @@ export interface ColorReview {
   created_at: string;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Phase J — Anomaly Detection & Proactive Alerts
+// ---------------------------------------------------------------------------
+
+export type AnomalySeverity = "critical" | "high" | "medium" | "low";
+export type AnomalyStatus = "active" | "acknowledged" | "resolved" | "dismissed";
+export type AnomalyCategory =
+  | "pwin_drop"
+  | "timeline_change"
+  | "competitor_activity"
+  | "financial_anomaly"
+  | "resource_conflict"
+  | "compliance_gap"
+  | "incumbent_change"
+  | "scoring_outlier";
+
+export interface AnomalyTrendPoint {
+  date: string;
+  value: number;
+}
+
+export interface Anomaly {
+  id: string;
+  category: AnomalyCategory;
+  severity: AnomalySeverity;
+  status: AnomalyStatus;
+  title: string;
+  description: string;
+  opportunity_id: string | null;
+  opportunity_title: string | null;
+  agency: string | null;
+  detected_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  metric_name: string;
+  metric_value: number;
+  baseline_value: number;
+  deviation_pct: number;
+  trend: AnomalyTrendPoint[];
+  root_cause: string | null;
+  recommended_actions: string[];
+  related_anomaly_ids: string[];
+  source_workflow: string;
+}
+
+export type CompetitorMovementType =
+  | "contract_win"
+  | "leadership_change"
+  | "teaming_announcement"
+  | "capability_expansion"
+  | "merger_acquisition"
+  | "hiring_surge"
+  | "protest_filed"
+  | "cpars_change";
+
+export interface CompetitorMovement {
+  id: string;
+  competitor_name: string;
+  movement_type: CompetitorMovementType;
+  title: string;
+  description: string;
+  impact_assessment: string;
+  threat_level: "critical" | "high" | "medium" | "low";
+  affected_opportunities: string[];
+  source: string;
+  source_url: string | null;
+  detected_at: string;
+  verified: boolean;
+}
+
+export type EscalationPriority = "critical" | "warning" | "info";
+export type EscalationStatus = "open" | "in_progress" | "resolved" | "overdue";
+
+export interface EscalationRule {
+  id: string;
+  name: string;
+  condition: string;
+  priority: EscalationPriority;
+}
+
+export interface Escalation {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  priority: EscalationPriority;
+  status: EscalationStatus;
+  title: string;
+  description: string;
+  opportunity_id: string | null;
+  opportunity_title: string | null;
+  agency: string | null;
+  triggered_at: string;
+  due_date: string | null;
+  assigned_to: string | null;
+  resolution_notes: string | null;
+  resolved_at: string | null;
+  days_overdue: number;
+}

@@ -21,6 +21,7 @@ import knowledgeRouter from "./routes/knowledge";
 import rfpShredderRouter from "./routes/rfp-shredder";
 import predictiveRouter from "./routes/predictive";
 import colorReviewRouter from "./routes/color-review";
+import anomalyRouter from "./routes/anomaly";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -92,6 +93,7 @@ app.use("/api/knowledge", knowledgeRouter);
 app.use("/api/rfp-shredder", rfpShredderRouter);
 app.use("/api/predictive", predictiveRouter);
 app.use("/api/color-review", colorReviewRouter);
+app.use("/api/anomaly", anomalyRouter);
 
 // --- Catch-all 404 ---
 app.use((_req, res) => {
