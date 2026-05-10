@@ -663,3 +663,83 @@ export function resolveApproval(id: string, action: "approve" | "reject", notes?
     body: JSON.stringify({ action, notes }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Compliance Matrix
+// ---------------------------------------------------------------------------
+
+export interface ComplianceRequirementRow {
+  id: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  section: string;
+  requirement: string;
+  category: string;
+  status: string;
+  evidence: string | null;
+  responsible_party: string;
+  notes: string | null;
+  related_clause_ids: string[];
+  updated_at: string;
+}
+
+export interface ComplianceSolicitation {
+  id: string;
+  title: string;
+}
+
+export interface ComplianceRequirementsData {
+  requirements: ComplianceRequirementRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    compliant: number;
+    partial: number;
+    gap: number;
+    not_applicable: number;
+    score: number;
+  };
+  solicitations: ComplianceSolicitation[];
+  categories: Record<string, number>;
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ClauseReferenceRow {
+  id: string;
+  clause_number: string;
+  title: string;
+  type: string;
+  full_text: string;
+  summary: string;
+  applicability: string[];
+  common_pitfalls: string[];
+  related_clauses: string[];
+  last_updated: string;
+}
+
+export interface ClauseLibraryData {
+  clauses: ClauseReferenceRow[];
+  total: number;
+  filtered: number;
+  typeCounts: Record<string, number>;
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ClauseDetailData {
+  clause: ClauseReferenceRow;
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchComplianceRequirements(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ComplianceRequirementsData>(`/compliance/requirements${qs}`);
+}
+
+export function fetchClauseLibrary(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ClauseLibraryData>(`/compliance/clauses${qs}`);
+}
+
+export function fetchClauseDetail(id: string) {
+  return request<ClauseDetailData>(`/compliance/clauses/${id}`);
+}

@@ -357,6 +357,12 @@ export default function Home() {
                 statusColor="#eab308"
               />
               <Card
+                title="Compliance Matrix"
+                description="Solicitation requirements, compliance tracking, and FAR/DFARS clause library."
+                to="/compliance"
+                statusColor="#10b981"
+              />
+              <Card
                 title="Financial Bible"
                 description="Drill-down behind every KPI — Orders, Sales, EBIT, ROS, Backlog, Gross Profit."
                 to="/financial-bible"
@@ -393,6 +399,7 @@ export default function Home() {
           <Card title="Intel Hub" description="Intelligence feed, morning briefings, deep research, and competitor watch." to="/intel" statusColor="#ec4899" />
           <Card title="Capture Planner" description="Capture plans, BD activities, milestones, gate reviews, and teaming." to="/capture" statusColor="#f97316" />
           <Card title="Approvals Queue" description="Human-in-the-loop approvals for qualifications, bid decisions, deployments, and more." to="/approvals" statusColor="#eab308" />
+          <Card title="Compliance Matrix" description="Solicitation requirements, compliance tracking, and FAR/DFARS clause library." to="/compliance" statusColor="#10b981" />
           <Card title="Workflows" description="Browse and manage all n8n automation workflows." to="/workflows" statusColor="#06b6d4" />
           <Card title="Settings" description="System configuration, connectors, and feature flags." to="/settings" statusColor="#6b7280" />
         </div>
