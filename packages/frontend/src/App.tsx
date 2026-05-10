@@ -15,6 +15,7 @@ import Approvals from "./pages/Approvals";
 import Compliance from "./pages/Compliance";
 import ProposalReview from "./pages/ProposalReview";
 import Contacts from "./pages/Contacts";
+import Reports from "./pages/Reports";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 
 const NAV_GROUPS = [
@@ -36,6 +37,7 @@ const NAV_GROUPS = [
       { path: "/proposals", label: "Proposals", icon: "📄" },
       { path: "/contacts", label: "Contacts", icon: "👤" },
       { path: "/financial-bible", label: "Financials", icon: "💰" },
+      { path: "/reports", label: "Reports", icon: "📑" },
     ],
   },
   {
@@ -237,6 +239,7 @@ export default function App() {
             <Route path="/compliance" element={<Compliance />} />
             <Route path="/proposals" element={<ProposalReview />} />
             <Route path="/contacts" element={<Contacts />} />
+            <Route path="/reports" element={<Reports />} />
           </Routes>
         </main>
       </div>

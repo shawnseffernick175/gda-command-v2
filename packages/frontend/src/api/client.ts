@@ -938,3 +938,173 @@ export function fetchContacts(params?: Record<string, string>) {
 export function fetchContactDetail(id: string) {
   return request<ContactDetailData>(`/contacts/${id}`);
 }
+
+// ---------------------------------------------------------------------------
+// Reports & Export
+// ---------------------------------------------------------------------------
+
+export interface ReportSection {
+  id: string;
+  title: string;
+  description: string;
+  included: boolean;
+  order: number;
+}
+
+export interface ReportTemplateRow {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  sections: ReportSection[];
+  default_format: string;
+  available_formats: string[];
+  estimated_pages: number;
+  last_used: string | null;
+  use_count: number;
+  created_by: string;
+  tags: string[];
+}
+
+export interface GeneratedReportRow {
+  id: string;
+  template_id: string;
+  template_name: string;
+  category: string;
+  title: string;
+  status: string;
+  format: string;
+  generated_at: string;
+  generated_by: string;
+  file_size_bytes: number | null;
+  page_count: number | null;
+  sections_included: string[];
+  parameters: Record<string, string>;
+  download_url: string | null;
+  expires_at: string | null;
+  notes: string | null;
+}
+
+export interface ScheduledReportRow {
+  id: string;
+  template_id: string;
+  template_name: string;
+  frequency: string;
+  next_run: string;
+  last_run: string | null;
+  recipients: string[];
+  format: string;
+  enabled: boolean;
+  created_by: string;
+}
+
+export interface ExportJobRow {
+  id: string;
+  source_page: string;
+  format: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  file_size_bytes: number | null;
+  download_url: string | null;
+  row_count: number | null;
+  correlation_id: string;
+}
+
+export interface ReportTemplatesData {
+  templates: ReportTemplateRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    categoryCounts: Record<string, number>;
+    totalUses: number;
+    categories: number;
+  };
+  source: "mock" | "n8n";
+}
+
+export interface GeneratedReportsData {
+  reports: GeneratedReportRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    statusCounts: Record<string, number>;
+    categoryCounts: Record<string, number>;
+    totalSizeBytes: number;
+  };
+  source: "mock" | "n8n";
+}
+
+export interface ScheduledReportsData {
+  schedules: ScheduledReportRow[];
+  total: number;
+  summary: { enabled: number; disabled: number };
+  source: "mock" | "n8n";
+}
+
+export interface ExportJobsData {
+  exports: ExportJobRow[];
+  total: number;
+  source: "mock" | "n8n";
+}
+
+export interface GenerateReportResult {
+  status: string;
+  correlation_id: string;
+  template_id: string;
+  template_name: string;
+  format: string;
+  sections_included: string[];
+  estimated_pages: number;
+  message: string;
+}
+
+export interface ExportResult {
+  status: string;
+  correlation_id: string;
+  source_page: string;
+  format: string;
+  message: string;
+}
+
+export function fetchReportTemplates(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ReportTemplatesData>(`/reports/templates${qs}`);
+}
+
+export function fetchReportTemplateDetail(id: string) {
+  return request<{ template: ReportTemplateRow; source: string }>(`/reports/templates/${id}`);
+}
+
+export function fetchGeneratedReports(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<GeneratedReportsData>(`/reports/generated${qs}`);
+}
+
+export function triggerReportGeneration(body: {
+  template_id: string;
+  format?: string;
+  sections?: string[];
+}) {
+  return request<GenerateReportResult>("/reports/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchScheduledReports() {
+  return request<ScheduledReportsData>("/reports/scheduled");
+}
+
+export function fetchExportJobs() {
+  return request<ExportJobsData>("/reports/exports");
+}
+
+export function triggerExport(body: { source_page: string; format: string }) {
+  return request<ExportResult>("/reports/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
