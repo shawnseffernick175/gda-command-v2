@@ -1,72 +1,86 @@
 ---
 name: testing-gda-command
-description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API endpoints, or new milestone features.
+description: Test GDA Command v2 end-to-end. Use when verifying frontend UI, backend API, or feature changes across the monorepo.
 ---
 
 # Testing GDA Command v2
 
-## Prerequisites
+## Architecture
 
-- Node v22+ with npm workspaces
-- No external services required for mock mode testing
-- For live n8n testing, `N8N_API_KEY` and `N8N_API_URL` must be set in `packages/backend/.env`
+- **Monorepo** with npm workspaces: `@gda/shared`, `@gda/backend`, `@gda/frontend`
+- **Backend**: Express on port 3001
+- **Frontend**: Vite React on port 3000, proxies `/api` and `/health` to :3001
+- **Mock fallback**: When `DATABASE_URL` is not set, backend returns in-memory mock data. The UI shows a "Mock data" badge (blue). When connected to Postgres, it shows "Live DB" (green).
+
+## Starting Dev Servers
+
+```bash
+# From repo root
+npm install
+npm run build --workspace=@gda/shared
+
+# Terminal 1 — Backend
+cd packages/backend
+node --env-file=.env node_modules/.bin/tsx watch src/server.ts
+
+# Terminal 2 — Frontend
+npm run dev --workspace=@gda/frontend
+```
+
+Backend `.env` may contain:
+- `N8N_BASE_URL` / `N8N_API_KEY` — for live n8n health checks (QA Center)
+- `DATABASE_URL` — for Postgres connectivity
+- `QUALIFY_WRITES_ENABLED=true` — to enable real qualify writes (dangerous, only for testing)
+
+Without these, everything falls back to mock data gracefully.
 
 ## Devin Secrets Needed
 
-- `N8N_API_KEY` (repo-scoped) — required only for live n8n health checks and workflow registry
-- No secrets needed for mock-mode testing
+- `N8N_API_KEY` — stored as repo-scoped secret. Used for QA Center live health checks and workflow registry.
+- No other secrets required for mock-mode testing.
 
-## Server Setup
-
-1. Build shared types first: `npm run build --workspace=@gda/shared`
-2. Start backend: `node --env-file=packages/backend/.env node_modules/.bin/tsx watch packages/backend/src/server.ts` (port 3001)
-3. Start frontend: `npm run dev --workspace=@gda/frontend` (port 3000, proxies /api to :3001)
-4. Verify backend: `curl http://localhost:3001/health`
-5. Verify frontend: `curl -s http://localhost:3000 | head -3` (should return HTML)
-
-**Important**: If testing a newly merged PR, make sure to `git checkout main && git pull` and restart both servers. Old server processes may still be running pre-merge code. Kill them with `pkill -f tsx && pkill -f vite` before restarting.
-
-## Mock Data Overview
-
-When `DATABASE_URL` is not set, the app falls back to mock data. The source badge shows "Mock data" (blue) instead of "Live DB" (green).
-
-### Opportunities (10 total)
-- **Won (1)**: opp-008 USACE FUDS $18.5M, score 95.0
-- **Pipeline (3)**: opp-001 USACE OU3 $24.5M (score 87.5), opp-004 Air Force Tyndall $42M (score 91.3), opp-010 NASA KSC $12.8M (score 82.7)
-- **Qualified (2)**: opp-006 DOE Oak Ridge $31M, opp-002 EPA Region 4 $8.9M
-- **Discovery (3)**: opp-003 Navy NAS Jacksonville $15.2M, opp-009 VA Phoenix $4.1M, opp-005 DLA CONUS $6.7M
-- **Lost (1)**: opp-007 GSA PBS Region 3 $3.2M
-
-### Expected Aggregates
-- **Ops Tracker (all 10)**: Count 10, Total $166.9M, Avg Pwin 58%, Avg Score 72.4
-- **Pipeline (3 only)**: Count 3, Total $79.3M, Avg Pwin 74%, Avg Score 87.2
-
-## Page-Specific Testing
+## Key Pages to Test
 
 ### QA Center (`/qa-center`)
-- Mock mode: 6 health checks, "degraded" status (5/6 pass), "Mock data" badge
-- Live n8n mode: 8 health checks, "Live n8n" badge, real HTTP status codes
-- Failures table columns differ between mock and live modes
+- Health check cards (8 checks when live n8n, 6 mock)
+- Failures table (different columns for live vs mock)
+- Source badge: "Live n8n" or "Mock data"
 
 ### Ops Tracker (`/ops-tracker`)
-- Default sort: Score DESC (highest first)
-- 10 rows with all statuses
-- "Qualify" buttons appear only on discovery-status rows (3 rows)
-- Qualify dry-run modal shows correlation ID starting with "GDA-"
-- Filters: search (ID/title), status dropdown, department dropdown, min Pwin
+- Table with 10 mock opportunities sorted by Score DESC by default
+- Summary strip: Count, Total Value, Avg Pwin, Avg Score
+- Filter bar: search input, status dropdown, department dropdown, min Pwin
+- "Qualify" button only on discovery-status rows (3 of 10 in mock data: opp-003, opp-005, opp-009)
+- Qualify dry-run modal: shows status transition and correlation ID (format: `GDA-{timestamp}-{random}`)
 
-### Pipeline (`/pipeline`)
-- Read-only — NO Qualify buttons, NO Actions column
-- Default sort: qualified_at DESC (opp-001 May 1 → opp-010 Apr 25 → opp-004 Apr 20)
-- 3 rows only (pipeline status)
-- Audit acknowledgement strip visible per S-008 spec
-- Filters: search, department dropdown, min Pwin (no status filter)
+## Testing Ops Tracker Specifically
 
-## Testing Tips
+1. **Verify initial load**: 10 rows, summary strip shows Count 10 / Total Value $166.9M / Avg Pwin 58% / Avg Score 72.4
+2. **Status filter**: Select "Discovery" → expect 3 rows with updated summary
+3. **Search filter**: Type "USACE" → expect 2 rows
+4. **Qualify dry-run**: Click Qualify on a discovery row → modal shows "discovery → qualified" with correlation ID
+5. **Sort**: Click column headers to toggle sort direction
 
-- Always maximize the browser window before recording: `sudo apt-get install -y wmctrl 2>/dev/null; wmctrl -r :ACTIVE: -b add,maximized_vert,maximized_horz`
-- Close browser extension popups before starting recording
-- When switching between branches for testing, always rebuild shared package and restart both servers
-- The frontend Vite proxy handles /api routing — test via frontend port (3000), not backend port (3001), for realistic E2E testing
-- Use `curl` to verify backend endpoints independently before browser testing to catch server-side issues early
-- No CI is configured on this repo, so verification is manual
+## API Verification via curl
+
+```bash
+# List all opportunities
+curl http://localhost:3001/api/opportunities
+
+# Filter by status
+curl "http://localhost:3001/api/opportunities?status=discovery"
+
+# Search
+curl "http://localhost:3001/api/opportunities?search=USACE"
+
+# Qualify dry-run
+curl -X POST http://localhost:3001/api/opportunities/opp-003/qualify \
+  -H "Content-Type: application/json" -d '{"dryRun":true}'
+```
+
+## Common Issues
+
+- If `@gda/shared` types are not found, run `npm run build --workspace=@gda/shared` first to generate dist files.
+- The frontend Vite proxy requires the backend to be running on :3001. Start backend before frontend.
+- If summary strip values seem wrong, verify against the API response — the frontend calculates from the returned data.
+- The backend sorts mock data in-memory. When using Postgres, sorting happens via SQL ORDER BY.
