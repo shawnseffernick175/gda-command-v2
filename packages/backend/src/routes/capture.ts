@@ -1,11 +1,9 @@
 import { Router } from "express";
-import { successEnvelope } from "../middleware/envelope";
+import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import {
   MOCK_CAPTURE_PLANS,
   MOCK_CAPTURE_ACTIVITIES,
 } from "../data/capture-mock";
-import type { CapturePhase } from "@gda/shared";
-
 const router = Router();
 
 // ---------------------------------------------------------------------------
@@ -91,8 +89,10 @@ router.get("/plans/:id", (req, res) => {
   const plan = MOCK_CAPTURE_PLANS.find((p) => p.id === req.params.id);
   if (!plan) {
     res.status(404).json(
-      successEnvelope("GDA.capture", "plan-detail", null, {
-        error: "Capture plan not found",
+      errorEnvelope("GDA.capture", "plan-detail", {
+        code: "NOT_FOUND",
+        message: "Capture plan not found",
+        detail: null,
       })
     );
     return;
@@ -168,8 +168,10 @@ router.post("/gate-review", (req, res) => {
 
   if (!capture_plan_id || !gate) {
     res.status(400).json(
-      successEnvelope("GDA.capture", "gate-review", null, {
-        error: "capture_plan_id and gate are required",
+      errorEnvelope("GDA.capture", "gate-review", {
+        code: "BAD_REQUEST",
+        message: "capture_plan_id and gate are required",
+        detail: null,
       })
     );
     return;
@@ -178,8 +180,10 @@ router.post("/gate-review", (req, res) => {
   const plan = MOCK_CAPTURE_PLANS.find((p) => p.id === capture_plan_id);
   if (!plan) {
     res.status(404).json(
-      successEnvelope("GDA.capture", "gate-review", null, {
-        error: "Capture plan not found",
+      errorEnvelope("GDA.capture", "gate-review", {
+        code: "NOT_FOUND",
+        message: "Capture plan not found",
+        detail: null,
       })
     );
     return;
