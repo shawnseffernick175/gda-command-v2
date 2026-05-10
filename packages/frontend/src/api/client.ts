@@ -1921,3 +1921,212 @@ export function initiateShred(fileName: string, solicitationTitle: string, agenc
     body: JSON.stringify({ file_name: fileName, solicitation_title: solicitationTitle, agency }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Phase I — Predictive Analytics
+// ---------------------------------------------------------------------------
+
+export interface PwinFeatureClient {
+  name: string;
+  value: string;
+  importance: number;
+  impact: "positive" | "negative" | "neutral";
+  benchmark: string;
+}
+
+export interface PwinImprovementClient {
+  action: string;
+  estimated_pwin_lift: number;
+  effort: "low" | "medium" | "high";
+  deadline: string | null;
+}
+
+export interface PwinModelData {
+  opp_id: string;
+  opp_title: string;
+  agency: string;
+  ml_pwin: number;
+  static_pwin: number;
+  confidence_interval: { lower: number; upper: number };
+  confidence_level: "high" | "medium" | "low";
+  model_version: string;
+  last_updated: string;
+  features: PwinFeatureClient[];
+  improvement_actions: PwinImprovementClient[];
+  similar_opps_won: number;
+  similar_opps_lost: number;
+  trend: "improving" | "stable" | "declining";
+  trend_delta: number;
+}
+
+export interface PwinModelsListData {
+  models: PwinModelData[];
+  total: number;
+}
+
+export function fetchPwinModels() {
+  return request<PwinModelsListData>("/predictive/pwin-models");
+}
+
+export function fetchPwinModel(oppId: string) {
+  return request<PwinModelData>(`/predictive/pwin-models/${oppId}`);
+}
+
+export interface MonthlyForecastClient {
+  month: string;
+  p10: number;
+  p50: number;
+  p90: number;
+  target: number;
+  actuals: number | null;
+}
+
+export interface ForecastContributorClient {
+  opp_id: string;
+  title: string;
+  agency: string;
+  value: number;
+  pwin: number;
+  weighted_value: number;
+  expected_close: string;
+  status: "pursue" | "evaluate" | "capture" | "proposal";
+}
+
+export interface ForecastRiskClient {
+  id: string;
+  risk: string;
+  impact_revenue: number;
+  probability: number;
+  mitigation: string;
+  severity: "critical" | "high" | "medium" | "low";
+}
+
+export interface ForecastScenarioClient {
+  label: string;
+  revenue: number;
+  probability: number;
+}
+
+export interface PipelineForecastData {
+  summary: {
+    total_pipeline: number;
+    weighted_pipeline: number;
+    p10_revenue: number;
+    p50_revenue: number;
+    p90_revenue: number;
+    annual_target: number;
+    gap_to_target: number;
+    pipeline_coverage_ratio: number;
+    simulations_run: number;
+    model_version: string;
+    last_updated: string;
+  };
+  monthly: MonthlyForecastClient[];
+  scenarios: ForecastScenarioClient[];
+  risk_factors: ForecastRiskClient[];
+  top_contributors: ForecastContributorClient[];
+}
+
+export function fetchPipelineForecast() {
+  return request<PipelineForecastData>("/predictive/forecast");
+}
+
+export interface BidFactorClient {
+  category: string;
+  score: number;
+  weight: number;
+  weighted_score: number;
+  notes: string;
+  signal: "green" | "amber" | "red";
+}
+
+export interface BidAssessmentData {
+  opp_id: string;
+  opp_title: string;
+  agency: string;
+  value: number;
+  recommendation: "bid" | "no_bid" | "watch";
+  overall_score: number;
+  factors: BidFactorClient[];
+  rationale: string;
+  resource_impact: string;
+  strategic_alignment: "high" | "medium" | "low";
+  assessed_at: string;
+}
+
+export interface BidAssessmentsListData {
+  assessments: BidAssessmentData[];
+  total: number;
+  bid: number;
+  no_bid: number;
+  watch: number;
+}
+
+export function fetchBidAssessments() {
+  return request<BidAssessmentsListData>("/predictive/bid-assessments");
+}
+
+export function fetchBidAssessment(oppId: string) {
+  return request<BidAssessmentData>(`/predictive/bid-assessments/${oppId}`);
+}
+
+export interface WinLossPatternClient {
+  id: string;
+  category: string;
+  insight: string;
+  detail: string;
+  confidence: number;
+  sample_size: number;
+  direction: "positive" | "negative" | "neutral";
+  actionable: boolean;
+}
+
+export interface AgencyPerfClient {
+  agency: string;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  total_value_won: number;
+  avg_pwin_accuracy: number;
+  trend: "improving" | "declining" | "stable";
+}
+
+export interface PwinCalibrationClient {
+  range: string;
+  predicted_win_rate: number;
+  actual_win_rate: number;
+  count: number;
+  calibration: "accurate" | "overconfident" | "underconfident";
+}
+
+export interface QuarterlyTrendClient {
+  quarter: string;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  avg_contract_value: number;
+  total_pipeline: number;
+}
+
+export interface WinLossAnalysisData {
+  summary: {
+    total_opportunities: number;
+    total_wins: number;
+    total_losses: number;
+    overall_win_rate: number;
+    avg_pwin_accuracy: number;
+    total_value_won: number;
+    total_value_lost: number;
+    model_calibration: "well_calibrated" | "overconfident" | "underconfident";
+    analysis_period: string;
+    last_updated: string;
+  };
+  patterns: WinLossPatternClient[];
+  agency_performance: AgencyPerfClient[];
+  pwin_calibration: PwinCalibrationClient[];
+  quarterly_trends: QuarterlyTrendClient[];
+}
+
+export function fetchWinLossAnalysis() {
+  return request<WinLossAnalysisData>("/predictive/win-loss");
+}
