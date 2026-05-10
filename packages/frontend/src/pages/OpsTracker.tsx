@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   fetchOpportunities,
   qualifyOpportunity,
@@ -41,6 +42,7 @@ function formatDate(d: string | null): string {
 }
 
 export default function OpsTracker() {
+  const navigate = useNavigate();
   const [data, setData] = useState<OpportunitiesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -421,7 +423,8 @@ export default function OpsTracker() {
               {opportunities.map((opp) => (
                 <tr
                   key={opp.id}
-                  style={{ transition: "background 0.15s" }}
+                  style={{ transition: "background 0.15s", cursor: "pointer" }}
+                  onClick={() => navigate(`/opportunities/${opp.id}`, { state: { from: "/ops-tracker" } })}
                   onMouseEnter={(e) =>
                     ((e.currentTarget as HTMLElement).style.background =
                       "rgba(255,255,255,0.03)")
@@ -521,7 +524,7 @@ export default function OpsTracker() {
                   <td style={tdStyle}>
                     {opp.status === "discovery" && (
                       <button
-                        onClick={() => handleQualifyDryRun(opp)}
+                        onClick={(e) => { e.stopPropagation(); handleQualifyDryRun(opp); }}
                         style={{
                           padding: "4px 10px",
                           borderRadius: 4,

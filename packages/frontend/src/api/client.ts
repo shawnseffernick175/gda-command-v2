@@ -213,3 +213,109 @@ export function qualifyOpportunity(id: string, dryRun = true, approve = false) {
     body: JSON.stringify({ dryRun, approve }),
   });
 }
+
+// --- Opportunity Detail (S-009) ---
+
+export interface OpportunityDetailAnalysis {
+  executive_summary: string;
+  strengths: string[];
+  risks: string[];
+  competitive_landscape: string | null;
+  relevance_rationale: string | null;
+  recommended_action: string | null;
+  confidence: number | null;
+  last_analyzed_at: string | null;
+  analyst_feedback: string | null;
+  analysis_version: string;
+}
+
+export interface OodaObserveItem {
+  label: string;
+  value: string;
+  source_ids: string[];
+}
+
+export interface OodaOrientItem {
+  label: string;
+  value: string;
+  source_ids: string[];
+  type: string;
+}
+
+export interface OodaDecideOption {
+  label: string;
+  rationale: string;
+  recommended: boolean;
+}
+
+export interface OodaActStep {
+  action: string;
+  owner: string | null;
+  due_date: string | null;
+  priority: string;
+}
+
+export interface OodaBlock {
+  observe: { summary: string; items: OodaObserveItem[] };
+  orient: { summary: string; items: OodaOrientItem[] };
+  decide: { summary: string; options: OodaDecideOption[] };
+  act: { summary: string; next_steps: OodaActStep[] };
+}
+
+export interface OpportunitySourceRow {
+  id: string;
+  title: string;
+  type: string;
+  url: string | null;
+  publisher: string | null;
+  published_at: string | null;
+  retrieved_at: string | null;
+  snippet: string | null;
+  relevance_reason: string;
+}
+
+export interface OpportunityLearningData {
+  learning_notes: string | null;
+  feedback_submitted: boolean;
+  feedback_at: string | null;
+  source_count: number;
+  coverage_gaps: string[];
+  next_review_at: string | null;
+}
+
+export interface OpportunityDetailData {
+  opportunity: OpportunityRow;
+  analysis: OpportunityDetailAnalysis;
+  ooda: OodaBlock;
+  sources: OpportunitySourceRow[];
+  learning: OpportunityLearningData;
+  source: "mock" | "db";
+}
+
+export function fetchOpportunityDetail(id: string) {
+  return request<OpportunityDetailData>(`/opportunities/${id}/detail`);
+}
+
+// --- Dashboard KPIs ---
+
+export interface DashboardFunnelStage {
+  stage: string;
+  count: number;
+  totalValue: number;
+  avgPwin: number;
+  avgScore: number;
+}
+
+export interface DashboardKPIs {
+  totalOpportunities: number;
+  totalPipelineValue: number;
+  avgPwin: number;
+  avgScore: number;
+  funnel: DashboardFunnelStage[];
+  topByScore: OpportunityRow[];
+  source: "mock" | "db";
+}
+
+export function fetchDashboardKPIs() {
+  return request<DashboardKPIs>("/dashboard/kpis");
+}

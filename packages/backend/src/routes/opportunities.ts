@@ -6,6 +6,7 @@ import {
   getMockOpportunities,
   getMockOpportunityById,
 } from "../data/opportunities-mock";
+import { getMockOpportunityDetail } from "../data/opportunity-detail-mock";
 
 const router = Router();
 
@@ -285,6 +286,57 @@ router.get("/pipeline", async (req, res) => {
       })
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/opportunities/:id/detail — S-009 opportunity detail with OODA
+// ---------------------------------------------------------------------------
+router.get("/:id/detail", async (req, res) => {
+  const { id } = req.params;
+  const requestedAt = new Date().toISOString();
+
+  const pool = getPool();
+  const detail = getMockOpportunityDetail(id);
+
+  if (!detail) {
+    return res.status(404).json(
+      errorEnvelope("gda-opportunity-detail", "read", {
+        code: "OPPORTUNITY_NOT_FOUND",
+        message: `No opportunity found for ID: ${id}`,
+        detail: null,
+      })
+    );
+  }
+
+  const respondedAt = new Date().toISOString();
+
+  return res.json(
+    successEnvelope(
+      "gda-opportunity-detail",
+      "read",
+      {
+        opportunity: detail.opportunity,
+        analysis: detail.analysis,
+        ooda: detail.ooda,
+        sources: detail.sources,
+        learning: detail.learning,
+        source: pool ? ("db" as const) : ("mock" as const),
+      },
+      {
+        requestedAt,
+        respondedAt,
+        opportunityId: id,
+        sourceCount: detail.sources.length,
+        analysisGeneratedAt: detail.analysis.last_analyzed_at,
+        coverageFlags: {
+          hasAnalysis: true,
+          hasOoda: true,
+          hasSources: detail.sources.length > 0,
+          hasLearning: true,
+        },
+      }
+    )
+  );
 });
 
 // ---------------------------------------------------------------------------

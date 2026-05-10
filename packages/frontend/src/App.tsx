@@ -3,6 +3,7 @@ import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
 import OpsTracker from "./pages/OpsTracker";
 import Pipeline from "./pages/Pipeline";
+import OpportunityDetail from "./pages/OpportunityDetail";
 
 const NAV_ITEMS = [
   { path: "/", label: "Launchpad" },
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/qa-center" element={<QACenter />} />
           <Route path="/ops-tracker" element={<OpsTracker />} />
           <Route path="/pipeline" element={<Pipeline />} />
+          <Route path="/opportunities/:id" element={<OpportunityDetail />} />
         </Routes>
       </main>
     </div>
