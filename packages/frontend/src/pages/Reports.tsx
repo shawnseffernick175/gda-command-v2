@@ -195,6 +195,8 @@ export default function Reports() {
       });
       if (env.success && env.data) {
         setGenerateResult(env.data);
+      } else {
+        setGenerateError(env.error?.message ?? "Report generation failed");
       }
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Report generation failed");
