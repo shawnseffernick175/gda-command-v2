@@ -963,7 +963,7 @@ export const MOCK_CONTACTS: Contact[] = [
       { contact_id: "CON-004", contact_name: "Robert Tanaka", relationship_type: "peer", strength: "weak", notes: "Both in AFCEC environmental program management" },
     ],
     linked_opportunities: [
-      { opportunity_id: "OPP-015", opportunity_title: "JB Charleston PFAS Response", role: "Compliance Manager", agency: "Air Force", status: "qualified", value_estimated: 18000000 },
+      { opportunity_id: "OPP-018", opportunity_title: "JB Charleston PFAS Response", role: "Compliance Manager", agency: "Air Force", status: "qualified", value_estimated: 18000000 },
     ],
     teaming_records: [],
     tags: ["Air_Force", "PFAS", "environmental", "community_engagement"],

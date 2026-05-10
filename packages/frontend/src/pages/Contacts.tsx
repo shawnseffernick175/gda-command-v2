@@ -338,8 +338,8 @@ export default function Contacts() {
                         fontWeight: 600,
                         padding: "2px 8px",
                         borderRadius: 4,
-                        background: `${STRENGTH_COLORS[selected.relationship_strength]}22`,
-                        color: STRENGTH_COLORS[selected.relationship_strength],
+                        background: `${STRENGTH_COLORS[selected.relationship_strength] ?? "#6b7280"}22`,
+                        color: STRENGTH_COLORS[selected.relationship_strength] ?? "#6b7280",
                       }}
                     >
                       {STRENGTH_LABELS[selected.relationship_strength]}
@@ -350,8 +350,8 @@ export default function Contacts() {
                         fontWeight: 600,
                         padding: "2px 8px",
                         borderRadius: 4,
-                        background: `${STATUS_COLORS[selected.status]}22`,
-                        color: STATUS_COLORS[selected.status],
+                        background: `${STATUS_COLORS[selected.status] ?? "#6b7280"}22`,
+                        color: STATUS_COLORS[selected.status] ?? "#6b7280",
                       }}
                     >
                       {STATUS_LABELS[selected.status]}
