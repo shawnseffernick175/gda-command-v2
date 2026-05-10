@@ -1,6 +1,7 @@
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
+import OpsTracker from "./pages/OpsTracker";
 
 const NAV_ITEMS = [
   { path: "/", label: "Launchpad" },
@@ -50,7 +51,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/qa-center" element={<QACenter />} />
-          <Route path="/ops-tracker" element={<Placeholder label="Ops Tracker" />} />
+          <Route path="/ops-tracker" element={<OpsTracker />} />
           <Route path="/pipeline" element={<Placeholder label="Pipeline" />} />
         </Routes>
       </main>
