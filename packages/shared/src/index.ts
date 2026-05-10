@@ -853,3 +853,153 @@ export interface ResponseOutlineSection {
   complexity: RequirementComplexity;
   status: "draft_available" | "needs_new_content" | "reuse_available";
 }
+
+// ---------------------------------------------------------------------------
+// Phase I — Predictive Analytics
+// ---------------------------------------------------------------------------
+
+export interface PwinModelOutput {
+  opp_id: string;
+  opp_title: string;
+  agency: string;
+  ml_pwin: number;
+  static_pwin: number;
+  confidence_interval: { lower: number; upper: number };
+  confidence_level: "high" | "medium" | "low";
+  model_version: string;
+  last_updated: string;
+  features: Array<{
+    name: string;
+    value: string;
+    importance: number;
+    impact: "positive" | "negative" | "neutral";
+    benchmark: string;
+  }>;
+  improvement_actions: Array<{
+    action: string;
+    estimated_pwin_lift: number;
+    effort: "low" | "medium" | "high";
+    deadline: string | null;
+  }>;
+  similar_opps_won: number;
+  similar_opps_lost: number;
+  trend: "improving" | "stable" | "declining";
+  trend_delta: number;
+}
+
+export interface PipelineForecast {
+  summary: {
+    total_pipeline: number;
+    weighted_pipeline: number;
+    p10_revenue: number;
+    p50_revenue: number;
+    p90_revenue: number;
+    annual_target: number;
+    gap_to_target: number;
+    pipeline_coverage_ratio: number;
+    simulations_run: number;
+    model_version: string;
+    last_updated: string;
+  };
+  monthly: Array<{
+    month: string;
+    p10: number;
+    p50: number;
+    p90: number;
+    target: number;
+    actuals: number | null;
+  }>;
+  scenarios: Array<{
+    label: string;
+    revenue: number;
+    probability: number;
+  }>;
+  risk_factors: Array<{
+    id: string;
+    risk: string;
+    impact_revenue: number;
+    probability: number;
+    mitigation: string;
+    severity: "critical" | "high" | "medium" | "low";
+  }>;
+  top_contributors: Array<{
+    opp_id: string;
+    title: string;
+    agency: string;
+    value: number;
+    pwin: number;
+    weighted_value: number;
+    expected_close: string;
+    status: "pursue" | "evaluate" | "capture" | "proposal";
+  }>;
+}
+
+export interface BidNoBidAssessment {
+  opp_id: string;
+  opp_title: string;
+  agency: string;
+  value: number;
+  recommendation: "bid" | "no_bid" | "watch";
+  overall_score: number;
+  factors: Array<{
+    category: string;
+    score: number;
+    weight: number;
+    weighted_score: number;
+    notes: string;
+    signal: "green" | "amber" | "red";
+  }>;
+  rationale: string;
+  resource_impact: string;
+  strategic_alignment: "high" | "medium" | "low";
+  assessed_at: string;
+}
+
+export interface WinLossAnalysis {
+  summary: {
+    total_opportunities: number;
+    total_wins: number;
+    total_losses: number;
+    overall_win_rate: number;
+    avg_pwin_accuracy: number;
+    total_value_won: number;
+    total_value_lost: number;
+    model_calibration: "well_calibrated" | "overconfident" | "underconfident";
+    analysis_period: string;
+    last_updated: string;
+  };
+  patterns: Array<{
+    id: string;
+    category: string;
+    insight: string;
+    detail: string;
+    confidence: number;
+    sample_size: number;
+    direction: "positive" | "negative" | "neutral";
+    actionable: boolean;
+  }>;
+  agency_performance: Array<{
+    agency: string;
+    wins: number;
+    losses: number;
+    win_rate: number;
+    total_value_won: number;
+    avg_pwin_accuracy: number;
+    trend: "improving" | "declining" | "stable";
+  }>;
+  pwin_calibration: Array<{
+    range: string;
+    predicted_win_rate: number;
+    actual_win_rate: number;
+    count: number;
+    calibration: "accurate" | "overconfident" | "underconfident";
+  }>;
+  quarterly_trends: Array<{
+    quarter: string;
+    wins: number;
+    losses: number;
+    win_rate: number;
+    avg_contract_value: number;
+    total_pipeline: number;
+  }>;
+}

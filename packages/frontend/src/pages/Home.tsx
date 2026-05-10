@@ -422,6 +422,12 @@ export default function Home() {
                 to="/rfp-shredder"
                 statusColor="#7c3aed"
               />
+              <Card
+                title="Predictive Analytics"
+                description="ML-powered Pwin models, Monte Carlo revenue forecasting, bid/no-bid optimizer, and win/loss pattern analysis."
+                to="/predictive"
+                statusColor="#7c3aed"
+              />
             </div>
           </div>
         </>

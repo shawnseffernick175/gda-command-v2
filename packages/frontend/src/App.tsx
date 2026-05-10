@@ -20,6 +20,7 @@ import PromptArchitect from "./pages/PromptArchitect";
 import FastTrack from "./pages/FastTrack";
 import Knowledge from "./pages/Knowledge";
 import RFPShredder from "./pages/RFPShredder";
+import Predictive from "./pages/Predictive";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -47,6 +48,7 @@ const NAV_GROUPS = [
       { path: "/financial-bible", label: "Financials", icon: "💰" },
       { path: "/reports", label: "Reports", icon: "📑" },
       { path: "/knowledge", label: "Knowledge", icon: "📚" },
+      { path: "/predictive", label: "Predictive", icon: "🧠" },
     ],
   },
   {
@@ -273,6 +275,7 @@ export default function App() {
             <Route path="/fast-track" element={<FastTrack />} />
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/rfp-shredder" element={<RFPShredder />} />
+            <Route path="/predictive" element={<Predictive />} />
           </Routes>
         </main>
       </div>
