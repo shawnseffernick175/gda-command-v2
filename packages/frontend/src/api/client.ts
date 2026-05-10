@@ -120,8 +120,10 @@ export function fetchWorkflowRegistry() {
   return request<WorkflowRegistryData>("/workflows/registry");
 }
 
-export function fetchGatewayHealth() {
-  return request<GatewayHealthData>("/health");
+export async function fetchGatewayHealth(): Promise<GDAEnvelope<GatewayHealthData>> {
+  const res = await fetch("/health");
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  return res.json() as Promise<GDAEnvelope<GatewayHealthData>>;
 }
 
 // --- Opportunities ---
