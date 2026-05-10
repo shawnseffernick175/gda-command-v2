@@ -1,0 +1,26 @@
+{
+  "action": "create_proxy_fix_manifest",
+  "findings": [
+    {
+      "module": "Deep Research",
+      "url": "https://n8n.csr-llc.tech/webhook/gda-deep-research-history",
+      "status": 403
+    },
+    {
+      "module": "Proposal Factory",
+      "url": "https://n8n.csr-llc.tech/webhook/gda-capture-plan",
+      "status": 403
+    },
+    {
+      "module": "Financial Bible",
+      "url": "https://n8n.csr-llc.tech/webhook/gda-capture-plan",
+      "status": 403
+    },
+    {
+      "module": "Intel Feed",
+      "url": "https://gda.csr-llc.tech/api/gda-action-history",
+      "error": "net::ERR_ABORTED"
+    }
+  ]
+}
+

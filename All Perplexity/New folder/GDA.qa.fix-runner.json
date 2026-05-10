@@ -1,0 +1,91 @@
+{
+  "name": "GDA.qa.fix-runner",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gda-qa-fix",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8b799596-58fd-47a3-8e8b-a7ed7b5f1111",
+      "name": "Fix Agent Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst headers = input.headers || {};\nconst body = input.body || input;\n\nfunction env(name, fallback = '') {\n  try {\n    if (typeof $env !== 'undefined' && $env[name]) return $env[name];\n  } catch (error) {}\n  try {\n    if (typeof process !== 'undefined' && process.env && process.env[name]) return process.env[name];\n  } catch (error) {}\n  return fallback;\n}\n\nfunction headerValue(name) {\n  const lower = name.toLowerCase();\n  return headers[name] || headers[lower] || headers[name.toUpperCase()] || '';\n}\n\nconst FIX_KEY = env('GDA_QA_FIX_KEY');\nif (FIX_KEY && headerValue('x-gda-fix-key') !== FIX_KEY) {\n  return [{ json: { ok: false, statusCode: 403, error: 'Unauthorized fix request. Missing or invalid x-gda-fix-key.' } }];\n}\n\nconst FIX_MODE = env('GDA_QA_FIX_MODE', 'dry-run');\nconst N8N_BASE_URL = env('GDA_QA_N8N_BASE_URL', 'https://n8n.csr-llc.tech').replace(/\\/$/, '');\nconst N8N_API_KEY = env('GDA_QA_N8N_API_KEY');\n\nasync function parseResponse(response) {\n  const text = await response.text();\n  try {\n    return JSON.parse(text);\n  } catch (error) {\n    return { rawText: text.slice(0, 4000) };\n  }\n}\n\nfunction requireApproved() {\n  if (FIX_MODE !== 'enabled') {\n    throw new Error('Fix runner is in dry-run mode. Set GDA_QA_FIX_MODE=enabled before write actions.');\n  }\n  if (body.approved !== true) {\n    throw new Error('Write action requires approved=true in the request body.');\n  }\n}\n\nasync function n8nApi(path, options = {}) {\n  if (!N8N_API_KEY) throw new Error('GDA_QA_N8N_API_KEY is not set in n8n environment.');\n  const response = await fetch(`${N8N_BASE_URL}${path}`, {\n    method: options.method || 'GET',\n    headers: {\n      'Content-Type': 'application/json',\n      'Accept': 'application/json',\n      'X-N8N-API-KEY': N8N_API_KEY,\n      ...(options.headers || {})\n    },\n    body: options.body === undefined ? undefined : JSON.stringify(options.body)\n  });\n  return { status: response.status, ok: response.ok, body: await parseResponse(response) };\n}\n\nfunction extractWebhookPath(urlOrPath) {\n  const value = String(urlOrPath || '');\n  const webhookMatch = value.match(/\\/webhook(?:-test)?\\/([^?#]+)/);\n  if (webhookMatch) return webhookMatch[1];\n  const apiMatch = value.match(/\\/api\\/([^?#]+)/);\n  if (apiMatch) return apiMatch[1];\n  return value.replace(/^\\//, '');\n}\n\nfunction suggestFix(findings = []) {\n  const suggestions = [];\n  for (const finding of findings) {\n    const url = finding.url || finding.endpoint || finding.text || '';\n    const path = extractWebhookPath(url);\n    if (String(url).includes('/webhook/')) {\n      suggestions.push({\n        type: 'react_direct_n8n_call',\n        severity: 'high',\n        module: finding.module || 'unknown',\n        problem: `Browser appears to call n8n directly: ${url}`,\n        recommendedFrontendUrl: `/api/${path}`,\n        recommendedProxyTarget: `/webhook/${path}`,\n        reason: 'Browser code should not call protected n8n webhooks directly because it cannot safely include x-gda-key.'\n      });\n    } else if (String(url).includes('/api/')) {\n      suggestions.push({\n        type: 'proxy_route_or_backend_failure',\n        severity: 'medium',\n        module: finding.module || 'unknown',\n        problem: `API route failed or aborted: ${url}`,\n        recommendedCheck: `Verify nginx /api/${path} proxy route and n8n /webhook/${path} workflow response.`,\n        recommendedProxyTarget: `/webhook/${path}`\n      });\n    }\n  }\n  return suggestions;\n}\n\nfunction createProxyFixManifest(findings = []) {\n  const suggestions = suggestFix(findings);\n  const routes = [];\n  for (const suggestion of suggestions) {\n    if (!suggestion.recommendedProxyTarget) continue;\n    const apiPath = suggestion.recommendedFrontendUrl || `/api/${extractWebhookPath(suggestion.recommendedProxyTarget)}`;\n    if (!routes.some((route) => route.apiPath === apiPath)) {\n      routes.push({\n        apiPath,\n        proxyTarget: suggestion.recommendedProxyTarget,\n        headerRequired: 'x-gda-key',\n        changeType: 'ensure_proxy_route'\n      });\n    }\n  }\n  return {\n    routes,\n    nginxIntent: 'Ensure each /api/<path> route proxies server-side to n8n /webhook/<path> and injects x-gda-key server-side.',\n    frontendIntent: 'Replace browser calls to https://n8n.csr-llc.tech/webhook/<path> with relative /api/<path> calls.'\n  };\n}\n\nasync function activateWorkflow(id) {\n  requireApproved();\n  if (!id) throw new Error('activate_workflow requires workflowId.');\n  const result = await n8nApi(`/api/v1/workflows/${encodeURIComponent(id)}/activate`, { method: 'POST' });\n  if (!result.ok) throw new Error(`activate workflow failed: HTTP ${result.status} ${JSON.stringify(result.body).slice(0, 500)}`);\n  return result.body;\n}\n\nasync function deactivateWorkflow(id) {\n  requireApproved();\n  if (!id) throw new Error('deactivate_workflow requires workflowId.');\n  const result = await n8nApi(`/api/v1/workflows/${encodeURIComponent(id)}/deactivate`, { method: 'POST' });\n  if (!result.ok) throw new Error(`deactivate workflow failed: HTTP ${result.status} ${JSON.stringify(result.body).slice(0, 500)}`);\n  return result.body;\n}\n\nasync function applyN8nWorkflowUpdate(id, workflow) {\n  requireApproved();\n  if (!id || !workflow) throw new Error('apply_n8n_workflow_update requires workflowId and workflow.');\n  const before = await n8nApi(`/api/v1/workflows/${encodeURIComponent(id)}`);\n  if (!before.ok) throw new Error(`could not read workflow backup: HTTP ${before.status} ${JSON.stringify(before.body).slice(0, 500)}`);\n  const updated = await n8nApi(`/api/v1/workflows/${encodeURIComponent(id)}`, { method: 'PUT', body: workflow });\n  if (!updated.ok) throw new Error(`workflow update failed: HTTP ${updated.status} ${JSON.stringify(updated.body).slice(0, 500)}`);\n  return {\n    updated: updated.body,\n    rollback: {\n      action: 'rollback_n8n_workflow',\n      workflowId: id,\n      approved: true,\n      backupWorkflow: before.body\n    }\n  };\n}\n\nasync function rollbackN8nWorkflow(id, backupWorkflow) {\n  requireApproved();\n  if (!id || !backupWorkflow) throw new Error('rollback_n8n_workflow requires workflowId and backupWorkflow.');\n  const result = await n8nApi(`/api/v1/workflows/${encodeURIComponent(id)}`, { method: 'PUT', body: backupWorkflow });\n  if (!result.ok) throw new Error(`rollback failed: HTTP ${result.status} ${JSON.stringify(result.body).slice(0, 500)}`);\n  return result.body;\n}\n\nasync function main() {\n  const action = body.action || 'health';\n  if (action === 'health') {\n    return {\n      ok: true,\n      agent: 'GDA.qa.fix-runner',\n      mode: FIX_MODE,\n      writeActionsEnabled: FIX_MODE === 'enabled',\n      n8nApiKeyConfigured: Boolean(N8N_API_KEY),\n      supportedActions: ['health', 'suggest_fix', 'create_proxy_fix_manifest', 'activate_workflow', 'deactivate_workflow', 'apply_n8n_workflow_update', 'rollback_n8n_workflow']\n    };\n  }\n  if (action === 'suggest_fix') {\n    return { ok: true, dryRun: true, suggestions: suggestFix(body.findings || []) };\n  }\n  if (action === 'create_proxy_fix_manifest') {\n    return { ok: true, dryRun: true, manifest: createProxyFixManifest(body.findings || []) };\n  }\n  if (action === 'activate_workflow') {\n    return { ok: true, action, result: await activateWorkflow(body.workflowId) };\n  }\n  if (action === 'deactivate_workflow') {\n    return { ok: true, action, result: await deactivateWorkflow(body.workflowId) };\n  }\n  if (action === 'apply_n8n_workflow_update') {\n    return { ok: true, action, result: await applyN8nWorkflowUpdate(body.workflowId, body.workflow) };\n  }\n  if (action === 'rollback_n8n_workflow') {\n    return { ok: true, action, result: await rollbackN8nWorkflow(body.workflowId, body.backupWorkflow) };\n  }\n  return { ok: false, statusCode: 400, error: `Unsupported action: ${action}` };\n}\n\ntry {\n  const result = await main();\n  return [{ json: result }];\n} catch (error) {\n  return [{ json: { ok: false, statusCode: 500, error: error.stack || error.message || String(error) } }];\n}\n"
+      },
+      "id": "8b799596-58fd-47a3-8e8b-a7ed7b5f2222",
+      "name": "Fix Agent Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode || 200 }}"
+        }
+      },
+      "id": "8b799596-58fd-47a3-8e8b-a7ed7b5f3333",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        20,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Fix Agent Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fix Agent Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fix Agent Router": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "GDA"
+    },
+    {
+      "name": "QA"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-26T01:13:00.000Z",
+  "versionId": "gda-qa-fix-runner-template-v1"
+}
+

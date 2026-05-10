@@ -1,0 +1,1464 @@
+{
+  "generatedAt": "2026-04-27T18:34:01.431Z",
+  "summary": {
+    "total": 159,
+    "active": 156,
+    "byCategory": {
+      "API endpoint": 84,
+      "Scheduled automation": 42,
+      "Other": 13,
+      "Agent": 3,
+      "Automated utility": 8,
+      "Batch/data ingest": 3,
+      "Event/sync": 2,
+      "Research": 1,
+      "Utility": 3
+    },
+    "byLane": {
+      "Needs classification": 75,
+      "Read-only or read-heavy": 29,
+      "Inspect before running": 31,
+      "Dry-run/test-row required": 16,
+      "Approval required - paid/external API": 5,
+      "Approval required - external send": 3
+    },
+    "byPriority": {
+      "High": 28,
+      "Medium": 127,
+      "Low": 4
+    }
+  },
+  "workflows": [
+    {
+      "id": "QgperN6cuOpfnb09",
+      "name": "GDA.api.capture-plan",
+      "active": true,
+      "nodeCount": 23,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "C7Bh7KcAl1IgSTRr",
+      "name": "GDA.api.daily-actions",
+      "active": true,
+      "nodeCount": 17,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "QmjG77dvSdNtfHc8",
+      "name": "GDA.api.daily-brief",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "upEGGfu6dYIwr0tD",
+      "name": "GDA.api.daily-brief-reader",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "A9tQjq8T2EvL4hOJ",
+      "name": "GDA.api.dashboard-intel 2",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "UYGJPu7N5YZblvEU",
+      "name": "GDA.api.dashboard-mega",
+      "active": true,
+      "nodeCount": 11,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "KIT8cj4V2cMFdSkA",
+      "name": "GDA.api.intel-feed",
+      "active": true,
+      "nodeCount": 10,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "vZE5yJhvMvhQUsXx",
+      "name": "GDA.api.intelligence-dashboard",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "vaRzM1Jl6HcXjuxs",
+      "name": "GDA.api.launchpad-funnel",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "0zVPgmYsvcqhyyo6",
+      "name": "GDA.api.morning-briefing",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "SEJLE89wZa1yfQyB",
+      "name": "GDA.api.opp-tracker 2",
+      "active": true,
+      "nodeCount": 13,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "Aw0gWh3nPap8cjrV",
+      "name": "GDA.api.ops-dashboard-data",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "f4PLgyzEu0tj3R5Y",
+      "name": "GDA.api.pipeline",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "UBgoJGxZro834RbT",
+      "name": "GDA.api.platform-health",
+      "active": true,
+      "nodeCount": 8,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "cS4SQ8tVeAvGm3ht",
+      "name": "GDA.api.risk-intel",
+      "active": true,
+      "nodeCount": 5,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "MrL0WRTornU9WdME",
+      "name": "GDA.api.semantic-search",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "XH3IhyvWMPoZzxBS",
+      "name": "GDA.api.trends",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "7gERqvfD6THg1gWf",
+      "name": "GDA.cron.auto-capture-plan",
+      "active": true,
+      "nodeCount": 7,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "High"
+    },
+    {
+      "id": "ldVAxgDGuKJx4354",
+      "name": "GDA.cron.auto-risk-generation",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "High"
+    },
+    {
+      "id": "EcZWryEoS4zyAfGD",
+      "name": "GDA.cron.comp-intel-daily-growth",
+      "active": true,
+      "nodeCount": 7,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "High"
+    },
+    {
+      "id": "D6nZ235hSF4wGMb5",
+      "name": "GDA.cron.daily-trends-collect",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "High"
+    },
+    {
+      "id": "i1aQWBr6qeG4TDOB",
+      "name": "GDA.cron.morning-intel-briefing",
+      "active": true,
+      "nodeCount": 12,
+      "category": "Scheduled automation",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "nvgjYi8wdwF7QDef",
+      "name": "GDA.cron.pipeline-coverage-check",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "High"
+    },
+    {
+      "id": "9annZcPoqw0DaPKI",
+      "name": "GDA.cron.pipeline-health-digest",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Scheduled automation",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "4szS4FHP1pW1PiG8",
+      "name": "GDA.enrichment.capture-plan-cards",
+      "active": true,
+      "nodeCount": 11,
+      "category": "Other",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "YIvCdrOgF1LGmFNL",
+      "name": "GDA.intel.morning-briefing-v1",
+      "active": true,
+      "nodeCount": 16,
+      "category": "Other",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "alHJibzND41T6p93",
+      "name": "GDA.oneshot.embed-capture-plans",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Other",
+      "testingLane": "Needs classification",
+      "priority": "High"
+    },
+    {
+      "id": "Pbj90Dg6APmYRqOO",
+      "name": "GDA.sub.dashboard-intel-deep",
+      "active": true,
+      "nodeCount": 25,
+      "category": "Other",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "High"
+    },
+    {
+      "id": "hWCP9NLXxtCOrppu",
+      "name": "GDA.agent.opp-classifier",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Agent",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "1OPkoA5e8DYVQKm1",
+      "name": "GDA.api.action-history",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "klO6sorAB03YgZJE",
+      "name": "GDA.api.action-items 2",
+      "active": true,
+      "nodeCount": 15,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "jalin8peBLddjsEa",
+      "name": "GDA.api.agentic-chat",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "qFKuS53JnToOjnZD",
+      "name": "GDA.api.ai-agent-upload",
+      "active": true,
+      "nodeCount": 13,
+      "category": "API endpoint",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "EeR3nC8l30Vdsu5b",
+      "name": "GDA.api.ai-feedback",
+      "active": true,
+      "nodeCount": 5,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "PdWaOEGY2Ukzke9i",
+      "name": "GDA.api.aop-definitions",
+      "active": true,
+      "nodeCount": 5,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "P8AfP8P84xi33auD",
+      "name": "GDA.api.aop-tracker",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "9qrsria0fy719T98",
+      "name": "GDA.api.bd-activity-log",
+      "active": true,
+      "nodeCount": 12,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "RfjdGEY7FIRpVx8w",
+      "name": "GDA.api.black-hat",
+      "active": true,
+      "nodeCount": 9,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "kZT3jlZn4lKfuhwh",
+      "name": "GDA.api.capture-hub",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "JiIiq2uxRaKUob0d",
+      "name": "GDA.api.capture-intel",
+      "active": true,
+      "nodeCount": 19,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "w3URDObLimmiHuUB",
+      "name": "GDA.api.capture-intel-modules",
+      "active": true,
+      "nodeCount": 18,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "1NQhq7rU89m23Zop",
+      "name": "GDA.api.chart-generator",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "b8ldzYA5LNM9Gz00",
+      "name": "GDA.api.chat-simple",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "AZLL3i2lyMEsARaK",
+      "name": "GDA.api.clause-library",
+      "active": true,
+      "nodeCount": 11,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "geW4zw6lvkkizF82",
+      "name": "GDA.api.comp-intel 2",
+      "active": true,
+      "nodeCount": 16,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "WXpKiNp8AXCt56bU",
+      "name": "GDA.api.competitor-field",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "8VkL656vYsWatcSz",
+      "name": "GDA.api.competitor-threat-score",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "yhJHrha9QYwUIoPc",
+      "name": "GDA.api.competitor-watchlist",
+      "active": true,
+      "nodeCount": 23,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "Qa0p2I5Qqi2lPeRN",
+      "name": "GDA.api.compliance-matrix",
+      "active": true,
+      "nodeCount": 14,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "AuwOV685PipTOXWJ",
+      "name": "GDA.api.contacts",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "19dTEr8jWnfTDtgy",
+      "name": "GDA.api.contracts",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "Fn02pKArk2YcyQp5",
+      "name": "GDA.api.data-learn",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "uefArlmFlJYeXTJv",
+      "name": "GDA.api.deep-research-history",
+      "active": true,
+      "nodeCount": 3,
+      "category": "API endpoint",
+      "testingLane": "Approval required - paid/external API",
+      "priority": "Medium"
+    },
+    {
+      "id": "FMYsT157mKuqn06v",
+      "name": "GDA.api.discussions",
+      "active": true,
+      "nodeCount": 5,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "dKibEwHO773kehFg",
+      "name": "GDA.api.doc-compare",
+      "active": true,
+      "nodeCount": 16,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "8UPZHbcTwJstPKAS",
+      "name": "GDA.api.doc-ingest",
+      "active": true,
+      "nodeCount": 17,
+      "category": "API endpoint",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "PqJgzJkHM1BFWkwl",
+      "name": "GDA.api.e2e-reports",
+      "active": true,
+      "nodeCount": 8,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "FewfFKJn6YNXsZph",
+      "name": "GDA.api.email-drafter",
+      "active": true,
+      "nodeCount": 9,
+      "category": "API endpoint",
+      "testingLane": "Approval required - external send",
+      "priority": "Medium"
+    },
+    {
+      "id": "yA4NHeu0ctVVxzYg",
+      "name": "GDA.api.embed-and-store",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "GH6XlzfhdVixIKFJ",
+      "name": "GDA.api.error-log",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "VxK95EhAJW1o48cS",
+      "name": "GDA.api.export-engine",
+      "active": true,
+      "nodeCount": 51,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "lUYEZeUk8lAvGDVg",
+      "name": "GDA.api.export-excel",
+      "active": true,
+      "nodeCount": 8,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "W8DukE5eD6GPgopq",
+      "name": "GDA.api.govtribe-cache",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "upYdxPzh2D0Qb7gx",
+      "name": "GDA.api.govwin-feed",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "f0OGkYCb5tvoOnpP",
+      "name": "GDA.api.health-scan",
+      "active": true,
+      "nodeCount": 10,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "4fhTge7p4iIEDza9",
+      "name": "GDA.api.idiq-tracker",
+      "active": true,
+      "nodeCount": 12,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "9sFee4M0W0D5O5hm",
+      "name": "GDA.api.incumbent-analysis",
+      "active": true,
+      "nodeCount": 20,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "VsNvEyaS46M8uPgB",
+      "name": "GDA.api.knowledge-base",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "o1XU0vwmF1zBSG4S",
+      "name": "GDA.api.landing-brief",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "34M99tJpcYh4Qd43",
+      "name": "GDA.api.meeting-notes 2",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "rWVp9Hp1ZthoqpfA",
+      "name": "GDA.api.naics 2",
+      "active": true,
+      "nodeCount": 13,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "afjmc6tOjffkEC3k",
+      "name": "GDA.api.ndaa-far-ingest",
+      "active": true,
+      "nodeCount": 6,
+      "category": "API endpoint",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "pkPpMhiz8IdRy7To",
+      "name": "GDA.api.ooda-loop 2",
+      "active": true,
+      "nodeCount": 19,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "4PvSyBNRFNUZEQWt",
+      "name": "GDA.api.opp-search",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "RNO9dedQRAjLHkjK",
+      "name": "GDA.api.pptx-gen",
+      "active": true,
+      "nodeCount": 13,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "LiOKixhrA9FJBdLG",
+      "name": "GDA.api.predictive-intel",
+      "active": true,
+      "nodeCount": 14,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "nLWF3YyCQEnNWo6K",
+      "name": "GDA.api.priority-score-engine",
+      "active": true,
+      "nodeCount": 8,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "wOQOmSX0fQ475nB3",
+      "name": "GDA.api.proactive-scan",
+      "active": true,
+      "nodeCount": 9,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "HyNQ5Ma2OLlCyJhv",
+      "name": "GDA.api.prompt-architect",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "thWCXJCwBduJW0Ok",
+      "name": "GDA.api.proposals",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "81m1Zl9xjM6L8HQb",
+      "name": "GDA.api.pwin-calculator",
+      "active": true,
+      "nodeCount": 13,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "rii6IYWRxh9TMNjd",
+      "name": "GDA.api.rag-query",
+      "active": true,
+      "nodeCount": 11,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "bEBgWqhY8kmF6rrp",
+      "name": "GDA.api.red-team",
+      "active": true,
+      "nodeCount": 15,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "ck1NTtdvuqB7CQ81",
+      "name": "GDA.api.relationship-tracker",
+      "active": true,
+      "nodeCount": 12,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "RqtftSynjqEKbs9Q",
+      "name": "GDA.api.report-builder",
+      "active": true,
+      "nodeCount": 13,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "kW8RLL4hbAuGV6qr",
+      "name": "GDA.api.save-opp",
+      "active": true,
+      "nodeCount": 5,
+      "category": "API endpoint",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "9orS3FVOlInMes9r",
+      "name": "GDA.api.saved-opps",
+      "active": true,
+      "nodeCount": 5,
+      "category": "API endpoint",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "qyOybkM9DIHWoLKy",
+      "name": "GDA.api.scan-history",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "G9US1e01oY1cgJIF",
+      "name": "GDA.api.sitrep 2",
+      "active": true,
+      "nodeCount": 37,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "MP4p5WX1GRhWNFyv",
+      "name": "GDA.api.smart-recommender",
+      "active": true,
+      "nodeCount": 10,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "43YhEBU38pKBrqcv",
+      "name": "GDA.api.target-agencies 2",
+      "active": true,
+      "nodeCount": 4,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "lWWNkWxgRIEHAwuP",
+      "name": "GDA.api.teaming-finder",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "jQvgX6SD1RhARG3F",
+      "name": "GDA.api.teaming-scorer",
+      "active": true,
+      "nodeCount": 13,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "O4aAvY3mHxxGGJ0P",
+      "name": "GDA.api.vehicle-tracker",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "76V9lZ2CsmudoFEs",
+      "name": "GDA.api.wargame",
+      "active": true,
+      "nodeCount": 7,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "SpU3znFHHABYNmb9",
+      "name": "GDA.api.win-loss-db",
+      "active": true,
+      "nodeCount": 15,
+      "category": "API endpoint",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "BLS36QTOznJ8mJlC",
+      "name": "GDA.auto.e2e-gemini-report",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Automated utility",
+      "testingLane": "Approval required - paid/external API",
+      "priority": "Medium"
+    },
+    {
+      "id": "ER9YVGsU6mnCXDr1",
+      "name": "GDA.auto.e2e-test",
+      "active": true,
+      "nodeCount": 3,
+      "category": "Automated utility",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "aCrxoe1rCuIbsnC4",
+      "name": "GDA.auto.feedback-collector",
+      "active": true,
+      "nodeCount": 11,
+      "category": "Automated utility",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "djgOV2vX3PIv9cvm",
+      "name": "GDA.auto.gist-update",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Automated utility",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "oYwPpPdNCixRKItz",
+      "name": "GDA.auto.incumbent-enrichment",
+      "active": false,
+      "nodeCount": 9,
+      "category": "Automated utility",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "Rvs15RThVvlj3nVz",
+      "name": "GDA.auto.learning-capture",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Automated utility",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "njIW6V5tCFJIIjfk",
+      "name": "GDA.auto.pattern-extractor",
+      "active": true,
+      "nodeCount": 12,
+      "category": "Automated utility",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "6iVNBdDAmzxX2Hc1",
+      "name": "GDA.auto.stage-audit-logger",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Automated utility",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "MSwEgLTafx9ASXyJ",
+      "name": "GDA.batch.bulk-data-ingest",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Batch/data ingest",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "lcZkdOog2DOuMPgB",
+      "name": "GDA.batch.doc-ingest",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Batch/data ingest",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "uBjp6lDUmIB7qXBJ",
+      "name": "GDA.batch.white-glove-receiver",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Batch/data ingest",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "1ItrrFxGI3L43Pdv",
+      "name": "GDA.bot.telegram-chat",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Other",
+      "testingLane": "Approval required - external send",
+      "priority": "Medium"
+    },
+    {
+      "id": "akvlbmdUBCgx58PC",
+      "name": "GDA.controlled-fix-agent",
+      "active": true,
+      "nodeCount": 3,
+      "category": "Agent",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "1o8h7yGhLKLoNP0S",
+      "name": "GDA.cron.amendment-monitor",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "bPXzuxPpq8ClGdZ0",
+      "name": "GDA.cron.auto-index-docs",
+      "active": true,
+      "nodeCount": 13,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "IGw8FBZhZwnwiIe1",
+      "name": "GDA.cron.auto-opp-analysis",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "BQFYbILTezLgqkDY",
+      "name": "GDA.cron.broad-opp-search",
+      "active": true,
+      "nodeCount": 9,
+      "category": "Scheduled automation",
+      "testingLane": "Read-only or read-heavy",
+      "priority": "Medium"
+    },
+    {
+      "id": "t12i2kyfYr1oet4u",
+      "name": "GDA.cron.capture-gate-review",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "Kk7O8Bw2FOe41M9l",
+      "name": "GDA.cron.capture-milestone-alerts",
+      "active": true,
+      "nodeCount": 7,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "0E3lCtWt2rdJlMPY",
+      "name": "GDA.cron.capture-opp-sync",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "Zb2quk78c5mszZ2C",
+      "name": "GDA.cron.change-detector",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "51SkEH6ulJrmHdgS",
+      "name": "GDA.cron.competitor-auto-enrichment",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "bTE4k631s6JqZMiG",
+      "name": "GDA.cron.competitor-crawler",
+      "active": true,
+      "nodeCount": 13,
+      "category": "Scheduled automation",
+      "testingLane": "Approval required - paid/external API",
+      "priority": "Medium"
+    },
+    {
+      "id": "LzjiBI80aDAZgDIp",
+      "name": "GDA.cron.data-retention",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "M0xPvRs31zQOewfx",
+      "name": "GDA.cron.data-sync",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Scheduled automation",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "Qg55lRKjubgsvD28",
+      "name": "GDA.cron.deadline-escalation",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "jC1lR5zpO7IaZqKa",
+      "name": "GDA.cron.forecast-ingest",
+      "active": true,
+      "nodeCount": 7,
+      "category": "Scheduled automation",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "WmGfzHUE10o1zvqA",
+      "name": "GDA.cron.fpds-enrichment",
+      "active": true,
+      "nodeCount": 7,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "DeSN1t1swXX14xTc",
+      "name": "GDA.cron.idiq-task-order-alert",
+      "active": true,
+      "nodeCount": 12,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "fZpqchmmPnqAmiMq",
+      "name": "GDA.cron.learning-engine",
+      "active": true,
+      "nodeCount": 7,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "jhAAwyiW6IbA9KrF",
+      "name": "GDA.cron.master-scanner",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "AQOLuJyT8edVTEyP",
+      "name": "GDA.cron.ndaa-ingest",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Scheduled automation",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "EGQzp92GxbjTJ03X",
+      "name": "GDA.cron.nightly-fy-revenue-calc",
+      "active": true,
+      "nodeCount": 2,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "FydY7PY4h0BcToEW",
+      "name": "GDA.cron.nightly-pattern-and-enrichment",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "BxOfAsvQTJkTzTnz",
+      "name": "GDA.cron.nightly-perplexity-research",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Approval required - paid/external API",
+      "priority": "Medium"
+    },
+    {
+      "id": "b3PJhbe4cSADjzcz",
+      "name": "GDA.cron.on-ramp-scanner",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "MtcQwAgm1zHYXNfB",
+      "name": "GDA.cron.recompete-early-warning",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "lU2uQfmQ6sch69TA",
+      "name": "GDA.cron.stage-auto-promote",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "LPUSYd4Vpph1Qg7n",
+      "name": "GDA.cron.system-watchdog",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "uQ5cZ97cCrx5iIXk",
+      "name": "GDA.cron.weekly-comp-scan",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "ZuQkz1HrMONclkFm",
+      "name": "GDA.cron.win-rate-weekly-digest",
+      "active": true,
+      "nodeCount": 9,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "2Swf6LP9AzFjHFYU",
+      "name": "GDA.error.handler",
+      "active": true,
+      "nodeCount": 3,
+      "category": "Other",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "3sFvFJwP0xlihoLj",
+      "name": "GDA.event.bidirectional-sync",
+      "active": true,
+      "nodeCount": 6,
+      "category": "Event/sync",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "pkhbZBYzr6O93XAs",
+      "name": "GDA.event.opp-cross-wire",
+      "active": true,
+      "nodeCount": 5,
+      "category": "Event/sync",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "iJaZmAsI4GVvMySQ",
+      "name": "GDA.form.quick-entry",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Other",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "zyfMktOTcm57NbWy",
+      "name": "GDA.form.white-glove-upload",
+      "active": true,
+      "nodeCount": 3,
+      "category": "Other",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "8r0ss5z6X3i0yuqi",
+      "name": "GDA.mcp.proxy",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Other",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "j89YbSJwz8TT1zn6",
+      "name": "GDA.notify.telegram",
+      "active": true,
+      "nodeCount": 3,
+      "category": "Other",
+      "testingLane": "Approval required - external send",
+      "priority": "Medium"
+    },
+    {
+      "id": "TxcPdvx2Ld9rE9er",
+      "name": "GDA.qa.agent-runner",
+      "active": true,
+      "nodeCount": 2,
+      "category": "Agent",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "H6YKZDmLusvQqfIn",
+      "name": "GDA.qa.computer-operator",
+      "active": true,
+      "nodeCount": 2,
+      "category": "Other",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "aAVitXXjGWaP7bb2",
+      "name": "GDA.qa.fix-runner",
+      "active": false,
+      "nodeCount": 3,
+      "category": "Other",
+      "testingLane": "Needs classification",
+      "priority": "Medium"
+    },
+    {
+      "id": "q9YWVQCwnJGqmrO7",
+      "name": "GDA.research.deep-research",
+      "active": true,
+      "nodeCount": 12,
+      "category": "Research",
+      "testingLane": "Approval required - paid/external API",
+      "priority": "Medium"
+    },
+    {
+      "id": "AqWz367raGvlgIhp",
+      "name": "GDA.sched.dept-market-refresh",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "JRnWGEH9cesb8f3w",
+      "name": "GDA.sched.dept-opp-sweep",
+      "active": true,
+      "nodeCount": 10,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "j7Nj1zu5B6YEH9mO",
+      "name": "GDA.sched.dhs-industry-day-monitor",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "PRwFP7725TJ8gkVy",
+      "name": "GDA.sched.dpc-forecast-scraper",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "bFF0oopmkhP6cnau",
+      "name": "GDA.sched.golden-dome-monitor",
+      "active": true,
+      "nodeCount": 7,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "xKR1NtwUUu5xOC6g",
+      "name": "GDA.sched.idiq-to-monitor",
+      "active": true,
+      "nodeCount": 11,
+      "category": "Scheduled automation",
+      "testingLane": "Inspect before running",
+      "priority": "Medium"
+    },
+    {
+      "id": "PeLGDqgLAsEh5Gsd",
+      "name": "GDA.sched.opp-refresh",
+      "active": true,
+      "nodeCount": 43,
+      "category": "Scheduled automation",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Medium"
+    },
+    {
+      "id": "8GnGxnBL9TJjj1i2",
+      "name": "GDA.dev.deploy",
+      "active": true,
+      "nodeCount": 12,
+      "category": "Other",
+      "testingLane": "Dry-run/test-row required",
+      "priority": "Low"
+    },
+    {
+      "id": "eggRyGUueMkIJxgf",
+      "name": "GDA.util.oneshot-schema-fix-rr38",
+      "active": false,
+      "nodeCount": 4,
+      "category": "Utility",
+      "testingLane": "Needs classification",
+      "priority": "Low"
+    },
+    {
+      "id": "zPT6cd33TmJa7SZX",
+      "name": "GDA.util.smoke-test",
+      "active": true,
+      "nodeCount": 8,
+      "category": "Utility",
+      "testingLane": "Needs classification",
+      "priority": "Low"
+    },
+    {
+      "id": "IcD4K740vpWSIuaZ",
+      "name": "GDA.util.ssh-read-file",
+      "active": true,
+      "nodeCount": 4,
+      "category": "Utility",
+      "testingLane": "Needs classification",
+      "priority": "Low"
+    }
+  ]
+}
