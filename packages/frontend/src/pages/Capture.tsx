@@ -317,22 +317,26 @@ export default function Capture() {
         Capture plans, BD activities, milestones, gate reviews, and teaming management.
       </p>
 
-      {plansData?.source === "mock" && (
-        <span
-          style={{
-            display: "inline-block",
-            fontSize: 11,
-            fontWeight: 600,
-            padding: "2px 8px",
-            borderRadius: 4,
-            background: "rgba(251,191,36,0.15)",
-            color: "#fbbf24",
-            marginBottom: 16,
-          }}
-        >
-          Mock data
-        </span>
-      )}
+      {(() => {
+        const src = tab === "activity" ? activitiesData?.source : plansData?.source;
+        const isLive = src === "n8n" || src === "db";
+        return (
+          <span
+            style={{
+              display: "inline-block",
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "2px 8px",
+              borderRadius: 4,
+              background: isLive ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
+              color: isLive ? "#22c55e" : "#3b82f6",
+              marginBottom: 16,
+            }}
+          >
+            {src === "n8n" ? "Live — n8n" : src === "db" ? "Live — database" : "Mock data"}
+          </span>
+        );
+      })()}
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>

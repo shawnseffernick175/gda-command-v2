@@ -4,7 +4,7 @@
  * Falls back gracefully when n8n is unavailable.
  */
 
-import type { Opportunity, OpportunityStatus, DeepResearchReport, CompetitorProfile, ResearchStatus } from "@gda/shared";
+import type { Opportunity, OpportunityStatus, DeepResearchReport, CompetitorProfile, ResearchStatus, CapturePlan, CapturePhase, TeamingPartner, CaptureMilestone, CaptureGateReview, CaptureRisk } from "@gda/shared";
 import { callWebhook, webhookConfig } from "./n8n-client";
 
 // Webhook paths (distinct from workflow names)
@@ -15,6 +15,7 @@ const WEBHOOKS = {
   launchpadFunnel: "gda-launchpad-funnel",
   opportunityDetail: "gda-opportunity-detail",
   deepResearch: "gda-deep-research-history",
+  capturePlan: "gda-capture-plan",
 } as const;
 
 export function n8nWebhookConfigured(): boolean {
@@ -442,5 +443,212 @@ export async function fetchCompetitorsFromN8n(): Promise<N8nCompetitorResult> {
   return {
     ok: true,
     competitors: uniqueCompetitors.map((item, i) => mapCompetitor(item, i)),
+  };
+}
+
+// --- Capture Plan mapping: n8n → GDA CapturePlan ---
+
+interface N8nCapturePlanItem {
+  id: number;
+  opportunity: string;
+  agency: string | null;
+  contract_value: string | null;
+  plan_data: Record<string, unknown> | null;
+  opp_title: string | null;
+  created_at: string;
+  updated_at: string;
+  no_bid: boolean;
+}
+
+interface N8nCapturePlansResponse {
+  status: string;
+  plans: N8nCapturePlanItem[];
+}
+
+export interface N8nCapturePlansResult {
+  ok: boolean;
+  plans: CapturePlan[];
+}
+
+function mapN8nStageToPhase(stage: string | undefined): CapturePhase {
+  if (!stage) return "pre_rfp";
+  const s = stage.toLowerCase();
+  if (s === "pass" || s === "no-bid") return "pre_rfp";
+  if (s === "qualify" || s === "pursue") return "pre_rfp";
+  if (s === "go/no-go") return "rfp_released";
+  if (s === "proposal" || s === "proposal prep") return "proposal_prep";
+  if (s === "post-submittal" || s === "submitted") return "submitted";
+  if (s === "evaluation") return "evaluation";
+  if (s === "awarded" || s === "won") return "awarded";
+  return "pre_rfp";
+}
+
+function mapBidDecision(noBid: boolean, stage: string | undefined): "bid" | "no_bid" | "pending" {
+  if (noBid) return "no_bid";
+  const s = (stage ?? "").toLowerCase();
+  if (s === "pass" || s === "no-bid") return "no_bid";
+  if (s === "go/no-go" || s === "qualify") return "pending";
+  if (s === "proposal" || s === "proposal prep" || s === "post-submittal" || s === "awarded" || s === "pursue") return "bid";
+  return "pending";
+}
+
+function parseValue(raw: string | null | undefined): number {
+  if (!raw) return 0;
+  const s = String(raw).replace(/[$,]/g, "").trim();
+  const m = s.match(/([\d.]+)\s*([BMKbmk])?/);
+  if (!m) return parseFloat(s) || 0;
+  const num = parseFloat(m[1]);
+  const suffix = (m[2] ?? "").toUpperCase();
+  if (suffix === "B") return num * 1_000_000_000;
+  if (suffix === "M") return num * 1_000_000;
+  if (suffix === "K") return num * 1_000;
+  return num;
+}
+
+function parseBulletList(text: unknown): string[] {
+  if (!text || typeof text !== "string") return [];
+  return text
+    .split("\n")
+    .map((l) => l.replace(/^[•\-*]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+function parseTeamComposition(raw: unknown): TeamingPartner[] {
+  if (!raw) return [];
+  if (typeof raw === "string") {
+    return parseBulletList(raw).map((line) => ({
+      name: line.split(/[:(–—-]/)[0].trim(),
+      role: /prime/i.test(line) ? "prime" : "sub",
+      capability: line,
+      status: "identified" as const,
+      past_performance_score: null,
+    }));
+  }
+  if (Array.isArray(raw)) {
+    return raw.map((item: Record<string, unknown>) => ({
+      name: String(item.name ?? item.company ?? "Unknown"),
+      role: (String(item.role ?? "sub").toLowerCase().includes("prime") ? "prime" : "sub") as "prime" | "sub",
+      capability: String(item.capability ?? item.role_description ?? ""),
+      status: "identified" as const,
+      past_performance_score: null,
+    }));
+  }
+  return [];
+}
+
+function parseRisks(raw: unknown): CaptureRisk[] {
+  if (!raw) return [];
+  if (typeof raw === "string") {
+    return parseBulletList(raw).map((line) => ({
+      description: line,
+      likelihood: "medium" as const,
+      impact: "medium" as const,
+      mitigation: "",
+    }));
+  }
+  if (Array.isArray(raw)) {
+    return raw.map((r: Record<string, unknown>) => ({
+      description: String(r.description ?? r.risk ?? r.title ?? ""),
+      likelihood: (String(r.likelihood ?? "medium").toLowerCase() as "high" | "medium" | "low"),
+      impact: (String(r.impact ?? "medium").toLowerCase() as "high" | "medium" | "low"),
+      mitigation: String(r.mitigation ?? r.mitigation_plan ?? ""),
+    }));
+  }
+  return [];
+}
+
+function mapCapturePlan(raw: N8nCapturePlanItem): CapturePlan {
+  const pd = (raw.plan_data ?? {}) as Record<string, unknown>;
+  const stage = String(pd.stage ?? "");
+  const pwinRaw = pd.pwin ?? pd.pwin_scores;
+  let pwin = 0;
+  if (typeof pwinRaw === "number") pwin = pwinRaw;
+  else if (typeof pwinRaw === "string") pwin = parseInt(pwinRaw, 10) || 0;
+
+  const value = parseValue(raw.contract_value) || parseValue(pd.contract_value as string) || parseValue(pd.total_contract_value as string);
+
+  const strengths = parseBulletList(pd.eis_strengths);
+  const weaknesses = parseBulletList(pd.eis_weaknesses);
+  const threats = parseBulletList(pd.swot_threats);
+  const winStrategy = parseBulletList(pd.win_strategy);
+
+  const winThemes = winStrategy.length > 0 ? winStrategy : strengths.slice(0, 4);
+  const discriminators = winStrategy.length > 0 ? strengths.slice(0, 3) : strengths.length > winThemes.length ? strengths.slice(winThemes.length, winThemes.length + 3) : [];
+
+  const risks = parseRisks(pd.risks);
+  if (risks.length === 0 && threats.length > 0) {
+    for (const t of threats.slice(0, 3)) {
+      risks.push({ description: t, likelihood: "medium", impact: "medium", mitigation: "" });
+    }
+  }
+
+  const teamPartners = parseTeamComposition(pd.team_composition);
+  if (teamPartners.length === 0 && pd.prime_company) {
+    teamPartners.push({
+      name: String(pd.prime_company),
+      role: "prime",
+      capability: "Prime contractor",
+      status: "confirmed",
+      past_performance_score: null,
+    });
+  }
+
+  const goNoGoRec = String(pd.go_no_go_recommendation ?? "");
+  const gateReviews: CaptureGateReview[] = [];
+  if (goNoGoRec) {
+    gateReviews.push({
+      gate: "Go/No-Go",
+      status: /go|pursue|bid/i.test(goNoGoRec) && !/no.go|no.bid|pass/i.test(goNoGoRec) ? "passed" : "pending",
+      reviewer: String(pd.source ?? "GDA System"),
+      reviewed_at: raw.updated_at || null,
+      notes: goNoGoRec.length > 100 ? goNoGoRec.slice(0, 100) + "…" : goNoGoRec,
+    });
+  }
+
+  const milestones: CaptureMilestone[] = [];
+  const deadline = pd.response_deadline ?? pd.rfp_date;
+  if (deadline) {
+    milestones.push({
+      id: `ms-${raw.id}-deadline`,
+      title: "Response Deadline",
+      due_date: String(deadline),
+      status: "on_track",
+      owner: String(pd.source ?? "Capture Manager"),
+      notes: null,
+    });
+  }
+
+  return {
+    id: `n8n-cap-${raw.id}`,
+    opportunity_id: `n8n-opp-${raw.id}`,
+    opportunity_title: raw.opp_title || String(pd.opportunity_name ?? pd.opportunity ?? raw.opportunity),
+    agency: raw.agency || String(pd.agency ?? ""),
+    phase: mapN8nStageToPhase(stage),
+    pwin,
+    value_estimated: value,
+    capture_manager: String(pd.source ?? pd.division_owners ?? "GDA System"),
+    bid_decision: mapBidDecision(raw.no_bid, stage),
+    teaming_partners: teamPartners,
+    milestones,
+    gate_reviews: gateReviews,
+    win_themes: winThemes,
+    discriminators,
+    risks,
+    created_at: raw.created_at,
+    updated_at: raw.updated_at,
+  };
+}
+
+export async function fetchCapturePlansFromN8n(): Promise<N8nCapturePlansResult> {
+  const result = await callWebhook(WEBHOOKS.capturePlan, { action: "list" });
+  const body = result.body as N8nCapturePlansResponse | undefined;
+  if (!result.ok || !body || body.status !== "ok") {
+    return { ok: false, plans: [] };
+  }
+
+  const rawPlans = body.plans ?? [];
+  return {
+    ok: true,
+    plans: rawPlans.map(mapCapturePlan),
   };
 }
