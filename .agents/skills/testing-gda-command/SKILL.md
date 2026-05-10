@@ -53,6 +53,7 @@ curl http://localhost:3001/health
 | `/compliance` | Compliance Matrix | Requirements tab (15 items), Clause Library tab (10 FAR/DFARS), score 68% |
 | `/proposals` | Proposal Review | 6 proposals, split-view, 5 tabs (Overview/Volumes/Red Team/Scorecard/Timeline) |
 | `/contacts` | Contacts & Relationships | 25 contacts, split-view, 5 tabs (Overview/Meeting Notes/Relationships/Opportunities/Teaming) |
+| `/reports` | Reporting & Export | 8 templates, 12 reports, 4 schedules, 5 exports, generate modal |
 | `/workflows` | Workflow Manager | Browse/filter n8n workflows (183 when live) |
 | `/settings` | Settings | Connectors, feature flags, health check button |
 
@@ -206,6 +207,14 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 **Relationships (CON-001)**:
 - Lt. Col. Marcus Davis: Supervisor, Strong
 - Sarah Kim: Peer, Moderate
+
+### Reporting & Export
+**Summary strip**: Templates=8, Reports Generated=12, Completed=10, Failed=1 (red), Active Schedules=4, Export Jobs=5, Categories=6
+- 4 tabs: Templates (grid + detail panel), History (list + detail), Schedules, Exports
+- Generate Report dry-run modal: format selector (PDF/Excel/PPTX/CSV), section toggles, correlation ID
+- SITREP category filter → exactly 1 template
+- Failed report RPT-012 shows null pages/size as "—" with red error notes
+- 4 active + 1 paused schedule
 
 ### Doctrine (8 drafts)
 - Sprints: S-205 (3 drafts), S-206 (5 drafts)
