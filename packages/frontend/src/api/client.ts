@@ -331,6 +331,58 @@ export function fetchDashboardKPIs() {
   return request<DashboardKPIs>("/dashboard/kpis");
 }
 
+// --- Command Signals ---
+
+export interface CommandRisk {
+  plan_id: string;
+  opportunity_title: string;
+  agency: string;
+  description: string;
+  likelihood: "high" | "medium" | "low";
+  impact: "high" | "medium" | "low";
+  mitigation: string;
+}
+
+export interface CommandDecision {
+  plan_id: string;
+  opportunity_title: string;
+  agency: string;
+  phase: string;
+  pwin: number;
+  value_estimated: number;
+  next_deadline: string | null;
+  next_milestone: string | null;
+}
+
+export interface CommandDueSoon {
+  plan_id: string;
+  opportunity_title: string;
+  milestone_id: string;
+  title: string;
+  due_date: string;
+  status: string;
+  owner: string;
+}
+
+export interface CommandFastTrack {
+  opportunity_title: string;
+  signal: string;
+  urgency: "high" | "medium" | "low";
+}
+
+export interface CommandSignalsData {
+  activeRisks: CommandRisk[];
+  upcomingDecisions: CommandDecision[];
+  dueSoonItems: CommandDueSoon[];
+  fastTrackSignals: CommandFastTrack[];
+  approvalsSummary: { pending: number; critical: number };
+  captureSource: "n8n" | "mock";
+}
+
+export function fetchCommandSignals() {
+  return request<CommandSignalsData>("/dashboard/command-signals");
+}
+
 // --- Doctrine Automation ---
 
 export interface DoctrineDraftRow {
@@ -610,4 +662,279 @@ export function resolveApproval(id: string, action: "approve" | "reject", notes?
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, notes }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Compliance Matrix
+// ---------------------------------------------------------------------------
+
+export interface ComplianceRequirementRow {
+  id: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  section: string;
+  requirement: string;
+  category: string;
+  status: string;
+  evidence: string | null;
+  responsible_party: string;
+  notes: string | null;
+  related_clause_ids: string[];
+  updated_at: string;
+}
+
+export interface ComplianceSolicitation {
+  id: string;
+  title: string;
+}
+
+export interface ComplianceRequirementsData {
+  requirements: ComplianceRequirementRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    compliant: number;
+    partial: number;
+    gap: number;
+    not_applicable: number;
+    score: number;
+  };
+  solicitations: ComplianceSolicitation[];
+  categories: Record<string, number>;
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ClauseReferenceRow {
+  id: string;
+  clause_number: string;
+  title: string;
+  type: string;
+  full_text: string;
+  summary: string;
+  applicability: string[];
+  common_pitfalls: string[];
+  related_clauses: string[];
+  last_updated: string;
+}
+
+export interface ClauseLibraryData {
+  clauses: ClauseReferenceRow[];
+  total: number;
+  filtered: number;
+  typeCounts: Record<string, number>;
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ClauseDetailData {
+  clause: ClauseReferenceRow;
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchComplianceRequirements(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ComplianceRequirementsData>(`/compliance/requirements${qs}`);
+}
+
+export function fetchClauseLibrary(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ClauseLibraryData>(`/compliance/clauses${qs}`);
+}
+
+export function fetchClauseDetail(id: string) {
+  return request<ClauseDetailData>(`/compliance/clauses/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Proposal Review
+// ---------------------------------------------------------------------------
+
+export interface ProposalVolumeRow {
+  id: string;
+  type: string;
+  title: string;
+  page_count: number;
+  word_count: number;
+  compliance_score: number;
+  last_editor: string;
+  updated_at: string;
+}
+
+export interface RedTeamFindingRow {
+  id: string;
+  severity: string;
+  section: string;
+  finding: string;
+  recommendation: string;
+  status: string;
+  assigned_to: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface ProposalScorecardRow {
+  criteria: string;
+  weight: number;
+  score: number;
+  max_score: number;
+  notes: string;
+  evaluator: string;
+}
+
+export interface ProposalTimelineRow {
+  id: string;
+  milestone: string;
+  due_date: string;
+  status: string;
+  owner: string;
+  notes: string | null;
+}
+
+export interface ProposalRow {
+  id: string;
+  title: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  agency: string;
+  status: string;
+  value_estimated: number;
+  due_date: string;
+  submission_date: string | null;
+  capture_manager: string;
+  proposal_manager: string;
+  volumes: ProposalVolumeRow[];
+  red_team_findings: RedTeamFindingRow[];
+  scorecard: ProposalScorecardRow[];
+  timeline: ProposalTimelineRow[];
+  compliance_score: number;
+  overall_score: number;
+  win_themes: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProposalsData {
+  proposals: ProposalRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    statusCounts: Record<string, number>;
+    totalValue: number;
+    avgCompliance: number;
+    totalRedTeamOpen: number;
+    agencies: string[];
+  };
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ProposalDetailData {
+  proposal: ProposalRow;
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchProposals(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ProposalsData>(`/proposals${qs}`);
+}
+
+export function fetchProposalDetail(id: string) {
+  return request<ProposalDetailData>(`/proposals/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Contacts & Relationships
+// ---------------------------------------------------------------------------
+
+export interface ActionItemRow {
+  description: string;
+  owner: string;
+  due_date: string | null;
+  status: "open" | "completed" | "overdue";
+}
+
+export interface MeetingNoteRow {
+  id: string;
+  date: string;
+  type: string;
+  subject: string;
+  attendees: string[];
+  topics: string[];
+  action_items: ActionItemRow[];
+  notes: string;
+}
+
+export interface ContactRelationshipRow {
+  contact_id: string;
+  contact_name: string;
+  relationship_type: string;
+  strength: string;
+  notes: string | null;
+}
+
+export interface LinkedOpportunityRow {
+  opportunity_id: string;
+  opportunity_title: string;
+  role: string;
+  agency: string;
+  status: string;
+  value_estimated: number;
+}
+
+export interface TeamingRecordRow {
+  partner_name: string;
+  role: string;
+  status: string;
+  capability: string;
+  past_collaborations: string[];
+  assessment: string;
+}
+
+export interface ContactRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  title: string;
+  agency: string;
+  department: string;
+  email: string;
+  phone: string;
+  status: string;
+  relationship_strength: string;
+  last_contact_date: string;
+  relationship_history: string;
+  meeting_notes: MeetingNoteRow[];
+  relationships: ContactRelationshipRow[];
+  linked_opportunities: LinkedOpportunityRow[];
+  teaming_records: TeamingRecordRow[];
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactsData {
+  contacts: ContactRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    statusCounts: Record<string, number>;
+    strengthCounts: Record<string, number>;
+    activeRelationships: number;
+    pendingMeetings: number;
+    teamingGaps: number;
+    agencies: string[];
+  };
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ContactDetailData {
+  contact: ContactRow;
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchContacts(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ContactsData>(`/contacts${qs}`);
+}
+
+export function fetchContactDetail(id: string) {
+  return request<ContactDetailData>(`/contacts/${id}`);
 }

@@ -11,6 +11,9 @@ import Workflows from "./pages/Workflows";
 import Settings from "./pages/Settings";
 import FinancialBible from "./pages/FinancialBible";
 import Approvals from "./pages/Approvals";
+import Compliance from "./pages/Compliance";
+import ProposalReview from "./pages/ProposalReview";
+import Contacts from "./pages/Contacts";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 
 const NAV_GROUPS = [
@@ -28,6 +31,9 @@ const NAV_GROUPS = [
     label: "Analysis",
     items: [
       { path: "/intel", label: "Intel Hub" },
+      { path: "/compliance", label: "Compliance" },
+      { path: "/proposals", label: "Proposals" },
+      { path: "/contacts", label: "Contacts" },
       { path: "/financial-bible", label: "Financials" },
     ],
   },
@@ -118,6 +124,9 @@ export default function App() {
           <Route path="/financial-bible" element={<FinancialBible />} />
           <Route path="/financial-bible/:key" element={<FinancialBible />} />
           <Route path="/approvals" element={<Approvals />} />
+          <Route path="/compliance" element={<Compliance />} />
+          <Route path="/proposals" element={<ProposalReview />} />
+          <Route path="/contacts" element={<Contacts />} />
         </Routes>
       </main>
     </div>

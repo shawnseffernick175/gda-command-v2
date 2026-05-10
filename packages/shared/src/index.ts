@@ -472,3 +472,210 @@ export interface ApprovalCheck {
   status: "pass" | "warn" | "fail";
   message: string;
 }
+
+// ---------------------------------------------------------------------------
+// Compliance Matrix types
+// ---------------------------------------------------------------------------
+
+export type ComplianceStatus = "compliant" | "partial" | "gap" | "not_applicable";
+
+export type ComplianceCategory =
+  | "technical"
+  | "management"
+  | "past_performance"
+  | "cost_price"
+  | "certifications"
+  | "security"
+  | "small_business"
+  | "other";
+
+export type ClauseType = "far" | "dfars" | "agency" | "custom";
+
+export interface ComplianceRequirement {
+  id: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  section: string;
+  requirement: string;
+  category: ComplianceCategory;
+  status: ComplianceStatus;
+  evidence: string | null;
+  responsible_party: string;
+  notes: string | null;
+  related_clause_ids: string[];
+  updated_at: string;
+}
+
+export interface ClauseReference {
+  id: string;
+  clause_number: string;
+  title: string;
+  type: ClauseType;
+  full_text: string;
+  summary: string;
+  applicability: string[];
+  common_pitfalls: string[];
+  related_clauses: string[];
+  last_updated: string;
+}
+
+// ---------------------------------------------------------------------------
+// Proposal Review types
+// ---------------------------------------------------------------------------
+
+export type ProposalStatus =
+  | "draft"
+  | "in_review"
+  | "red_team"
+  | "final"
+  | "submitted"
+  | "archived";
+
+export type ProposalVolumeType =
+  | "technical"
+  | "management"
+  | "past_performance"
+  | "cost_price"
+  | "executive_summary"
+  | "cover_letter"
+  | "other";
+
+export interface ProposalVolume {
+  id: string;
+  type: ProposalVolumeType;
+  title: string;
+  page_count: number;
+  word_count: number;
+  compliance_score: number;
+  last_editor: string;
+  updated_at: string;
+}
+
+export interface RedTeamFinding {
+  id: string;
+  severity: "critical" | "major" | "minor" | "observation";
+  section: string;
+  finding: string;
+  recommendation: string;
+  status: "open" | "addressed" | "accepted_risk";
+  assigned_to: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface ProposalScorecard {
+  criteria: string;
+  weight: number;
+  score: number;
+  max_score: number;
+  notes: string;
+  evaluator: string;
+}
+
+export interface ProposalTimeline {
+  id: string;
+  milestone: string;
+  due_date: string;
+  status: "completed" | "on_track" | "at_risk" | "overdue";
+  owner: string;
+  notes: string | null;
+}
+
+export interface Proposal {
+  id: string;
+  title: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  agency: string;
+  status: ProposalStatus;
+  value_estimated: number;
+  due_date: string;
+  submission_date: string | null;
+  capture_manager: string;
+  proposal_manager: string;
+  volumes: ProposalVolume[];
+  red_team_findings: RedTeamFinding[];
+  scorecard: ProposalScorecard[];
+  timeline: ProposalTimeline[];
+  compliance_score: number;
+  overall_score: number;
+  win_themes: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Contacts & Relationships types
+// ---------------------------------------------------------------------------
+
+export type ContactStatus = "active" | "inactive" | "prospect";
+
+export type RelationshipStrength = "strong" | "moderate" | "weak" | "new";
+
+export type MeetingType = "in_person" | "virtual" | "phone" | "conference";
+
+export interface MeetingNote {
+  id: string;
+  date: string;
+  type: MeetingType;
+  subject: string;
+  attendees: string[];
+  topics: string[];
+  action_items: ActionItem[];
+  notes: string;
+}
+
+export interface ActionItem {
+  description: string;
+  owner: string;
+  due_date: string | null;
+  status: "open" | "completed" | "overdue";
+}
+
+export interface ContactRelationship {
+  contact_id: string;
+  contact_name: string;
+  relationship_type: "peer" | "supervisor" | "subordinate" | "stakeholder" | "champion";
+  strength: RelationshipStrength;
+  notes: string | null;
+}
+
+export interface LinkedOpportunity {
+  opportunity_id: string;
+  opportunity_title: string;
+  role: string;
+  agency: string;
+  status: string;
+  value_estimated: number;
+}
+
+export interface TeamingRecord {
+  partner_name: string;
+  role: "prime" | "sub" | "mentor" | "jv_partner";
+  status: "active" | "past" | "prospective";
+  capability: string;
+  past_collaborations: string[];
+  assessment: string;
+}
+
+export interface Contact {
+  id: string;
+  first_name: string;
+  last_name: string;
+  title: string;
+  agency: string;
+  department: string;
+  email: string;
+  phone: string;
+  status: ContactStatus;
+  relationship_strength: RelationshipStrength;
+  last_contact_date: string;
+  relationship_history: string;
+  meeting_notes: MeetingNote[];
+  relationships: ContactRelationship[];
+  linked_opportunities: LinkedOpportunity[];
+  teaming_records: TeamingRecord[];
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
