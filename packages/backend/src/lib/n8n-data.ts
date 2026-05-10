@@ -573,7 +573,7 @@ function mapCapturePlan(raw: N8nCapturePlanItem): CapturePlan {
   const winStrategy = parseBulletList(pd.win_strategy);
 
   const winThemes = winStrategy.length > 0 ? winStrategy : strengths.slice(0, 4);
-  const discriminators = strengths.length > winThemes.length ? strengths.slice(winThemes.length, winThemes.length + 3) : [];
+  const discriminators = winStrategy.length > 0 ? strengths.slice(0, 3) : strengths.length > winThemes.length ? strengths.slice(winThemes.length, winThemes.length + 3) : [];
 
   const risks = parseRisks(pd.risks);
   if (risks.length === 0 && threats.length > 0) {

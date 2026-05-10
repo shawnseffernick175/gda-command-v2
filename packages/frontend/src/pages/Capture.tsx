@@ -318,7 +318,7 @@ export default function Capture() {
       </p>
 
       {(() => {
-        const src = tab === "plans" ? plansData?.source : activitiesData?.source;
+        const src = tab === "activity" ? activitiesData?.source : plansData?.source;
         const isLive = src === "n8n" || src === "db";
         return (
           <span
