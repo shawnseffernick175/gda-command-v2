@@ -743,3 +743,99 @@ export function fetchClauseLibrary(params?: Record<string, string>) {
 export function fetchClauseDetail(id: string) {
   return request<ClauseDetailData>(`/compliance/clauses/${id}`);
 }
+
+// ---------------------------------------------------------------------------
+// Proposal Review
+// ---------------------------------------------------------------------------
+
+export interface ProposalVolumeRow {
+  id: string;
+  type: string;
+  title: string;
+  page_count: number;
+  word_count: number;
+  compliance_score: number;
+  last_editor: string;
+  updated_at: string;
+}
+
+export interface RedTeamFindingRow {
+  id: string;
+  severity: string;
+  section: string;
+  finding: string;
+  recommendation: string;
+  status: string;
+  assigned_to: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface ProposalScorecardRow {
+  criteria: string;
+  weight: number;
+  score: number;
+  max_score: number;
+  notes: string;
+  evaluator: string;
+}
+
+export interface ProposalTimelineRow {
+  id: string;
+  milestone: string;
+  due_date: string;
+  status: string;
+  owner: string;
+  notes: string | null;
+}
+
+export interface ProposalRow {
+  id: string;
+  title: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  agency: string;
+  status: string;
+  value_estimated: number;
+  due_date: string;
+  submission_date: string | null;
+  capture_manager: string;
+  proposal_manager: string;
+  volumes: ProposalVolumeRow[];
+  red_team_findings: RedTeamFindingRow[];
+  scorecard: ProposalScorecardRow[];
+  timeline: ProposalTimelineRow[];
+  compliance_score: number;
+  overall_score: number;
+  win_themes: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProposalsData {
+  proposals: ProposalRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    statusCounts: Record<string, number>;
+    totalValue: number;
+    avgCompliance: number;
+    totalRedTeamOpen: number;
+    agencies: string[];
+  };
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ProposalDetailData {
+  proposal: ProposalRow;
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchProposals(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ProposalsData>(`/proposals${qs}`);
+}
+
+export function fetchProposalDetail(id: string) {
+  return request<ProposalDetailData>(`/proposals/${id}`);
+}

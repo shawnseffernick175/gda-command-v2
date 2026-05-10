@@ -518,3 +518,88 @@ export interface ClauseReference {
   related_clauses: string[];
   last_updated: string;
 }
+
+// ---------------------------------------------------------------------------
+// Proposal Review types
+// ---------------------------------------------------------------------------
+
+export type ProposalStatus =
+  | "draft"
+  | "in_review"
+  | "red_team"
+  | "final"
+  | "submitted"
+  | "archived";
+
+export type ProposalVolumeType =
+  | "technical"
+  | "management"
+  | "past_performance"
+  | "cost_price"
+  | "executive_summary"
+  | "cover_letter"
+  | "other";
+
+export interface ProposalVolume {
+  id: string;
+  type: ProposalVolumeType;
+  title: string;
+  page_count: number;
+  word_count: number;
+  compliance_score: number;
+  last_editor: string;
+  updated_at: string;
+}
+
+export interface RedTeamFinding {
+  id: string;
+  severity: "critical" | "major" | "minor" | "observation";
+  section: string;
+  finding: string;
+  recommendation: string;
+  status: "open" | "addressed" | "accepted_risk";
+  assigned_to: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface ProposalScorecard {
+  criteria: string;
+  weight: number;
+  score: number;
+  max_score: number;
+  notes: string;
+  evaluator: string;
+}
+
+export interface ProposalTimeline {
+  id: string;
+  milestone: string;
+  due_date: string;
+  status: "completed" | "on_track" | "at_risk" | "overdue";
+  owner: string;
+  notes: string | null;
+}
+
+export interface Proposal {
+  id: string;
+  title: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  agency: string;
+  status: ProposalStatus;
+  value_estimated: number;
+  due_date: string;
+  submission_date: string | null;
+  capture_manager: string;
+  proposal_manager: string;
+  volumes: ProposalVolume[];
+  red_team_findings: RedTeamFinding[];
+  scorecard: ProposalScorecard[];
+  timeline: ProposalTimeline[];
+  compliance_score: number;
+  overall_score: number;
+  win_themes: string[];
+  created_at: string;
+  updated_at: string;
+}
