@@ -142,15 +142,15 @@ export default function Home() {
               gap: 16,
               marginBottom: 24,
             }}>
-              {/* Fast-Track Signals */}
+              {/* Accelerators */}
               <SignalCard
-                title="Fast-Track Signals"
+                title="Accelerators"
                 icon="⚡"
-                count={signals.fastTrackSignals.length}
+                count={signals.accelerators.length}
                 accentColor="#f59e0b"
               >
-                {signals.fastTrackSignals.map((ft, i) => (
-                  <div key={i} style={{ padding: "8px 0", borderBottom: i < signals.fastTrackSignals.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+                {signals.accelerators.map((ft, i) => (
+                  <div key={i} style={{ padding: "8px 0", borderBottom: i < signals.accelerators.length - 1 ? "1px solid var(--color-border)" : "none" }}>
                     <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{
                         width: 6, height: 6, borderRadius: "50%",
