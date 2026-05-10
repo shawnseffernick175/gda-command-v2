@@ -96,6 +96,13 @@ export default function OpportunityDetail() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
 
+    // Reset enrichment state before fetching for new opportunity
+    setPwin(null);
+    setIncumbent(null);
+    setCompetitors(null);
+    setBlackHat(null);
+    setWargame(null);
+
     // Fetch enrichments in parallel (non-blocking)
     fetchPwinBreakdown(id).then((e) => { if (e.success && e.data) setPwin(e.data); }).catch(() => {});
     fetchIncumbentAnalysis(id).then((e) => { if (e.success && e.data) setIncumbent(e.data); }).catch(() => {});

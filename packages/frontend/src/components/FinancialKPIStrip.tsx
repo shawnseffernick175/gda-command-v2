@@ -76,7 +76,7 @@ export default function FinancialKPIStrip() {
       }}>
         <span>Financial KPIs unavailable</span>
         <button
-          onClick={() => setRetryCount(0)}
+          onClick={() => setRetryCount((c) => c + 1)}
           style={{
             background: "none",
             border: "1px solid var(--color-border)",
