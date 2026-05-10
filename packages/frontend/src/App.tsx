@@ -7,6 +7,8 @@ import OpportunityDetail from "./pages/OpportunityDetail";
 import Doctrine from "./pages/Doctrine";
 import Intel from "./pages/Intel";
 import Capture from "./pages/Capture";
+import Workflows from "./pages/Workflows";
+import Settings from "./pages/Settings";
 
 const NAV_ITEMS = [
   { path: "/", label: "Launchpad" },
@@ -16,6 +18,8 @@ const NAV_ITEMS = [
   { path: "/doctrine", label: "Doctrine" },
   { path: "/intel", label: "Intel Hub" },
   { path: "/capture", label: "Capture" },
+  { path: "/workflows", label: "Workflows" },
+  { path: "/settings", label: "Settings" },
 ] as const;
 
 export default function App() {
@@ -65,10 +69,10 @@ export default function App() {
           <Route path="/doctrine" element={<Doctrine />} />
           <Route path="/intel" element={<Intel />} />
           <Route path="/capture" element={<Capture />} />
+          <Route path="/workflows" element={<Workflows />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
     </div>
   );
 }
-
-

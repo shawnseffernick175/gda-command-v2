@@ -434,3 +434,36 @@ export function finalizeDoctrineSprint(sprintId: string) {
     body: JSON.stringify({ sprintId }),
   });
 }
+
+// --- Settings ---
+
+export interface FeatureFlag {
+  key: string;
+  label: string;
+  enabled: boolean;
+  description: string;
+}
+
+export interface ConnectorStatus {
+  name: string;
+  configured: boolean;
+  missing: string[];
+  latencyMs?: number;
+  error?: string;
+}
+
+export interface SettingsData {
+  connectors: ConnectorStatus[];
+  featureFlags: FeatureFlag[];
+  environment: {
+    nodeVersion: string;
+    uptimeSec: number;
+    pid: number;
+    port: string;
+    env: string;
+  };
+}
+
+export function fetchSettings() {
+  return request<SettingsData>("/settings");
+}
