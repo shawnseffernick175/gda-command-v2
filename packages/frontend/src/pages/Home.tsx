@@ -184,6 +184,12 @@ export default function Home() {
                 to="/intel"
                 statusColor="#ec4899"
               />
+              <Card
+                title="Capture Planner"
+                description="Capture plans, BD activities, milestones, gate reviews, and teaming."
+                to="/capture"
+                statusColor="#f97316"
+              />
             </div>
           </div>
         </>
@@ -225,6 +231,12 @@ export default function Home() {
             description="Intelligence feed, morning briefings, deep research, and competitor watch."
             to="/intel"
             statusColor="#ec4899"
+          />
+          <Card
+            title="Capture Planner"
+            description="Capture plans, BD activities, milestones, gate reviews, and teaming."
+            to="/capture"
+            statusColor="#f97316"
           />
         </div>
       )}

@@ -6,6 +6,7 @@ import Pipeline from "./pages/Pipeline";
 import OpportunityDetail from "./pages/OpportunityDetail";
 import Doctrine from "./pages/Doctrine";
 import Intel from "./pages/Intel";
+import Capture from "./pages/Capture";
 
 const NAV_ITEMS = [
   { path: "/", label: "Launchpad" },
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
   { path: "/pipeline", label: "Pipeline" },
   { path: "/doctrine", label: "Doctrine" },
   { path: "/intel", label: "Intel Hub" },
+  { path: "/capture", label: "Capture" },
 ] as const;
 
 export default function App() {
@@ -62,6 +64,7 @@ export default function App() {
           <Route path="/opportunities/:id" element={<OpportunityDetail />} />
           <Route path="/doctrine" element={<Doctrine />} />
           <Route path="/intel" element={<Intel />} />
+          <Route path="/capture" element={<Capture />} />
         </Routes>
       </main>
     </div>

@@ -334,3 +334,90 @@ export interface CompetitorProfile {
   watch_status: "active" | "monitoring" | "inactive";
   last_updated: string;
 }
+
+// ---------------------------------------------------------------------------
+// Capture Planner types
+// ---------------------------------------------------------------------------
+
+export type CapturePhase =
+  | "pre_rfp"
+  | "rfp_released"
+  | "proposal_prep"
+  | "submitted"
+  | "evaluation"
+  | "awarded";
+
+export type CaptureGateStatus = "passed" | "failed" | "pending" | "waived";
+
+export interface CapturePlan {
+  id: string;
+  opportunity_id: string;
+  opportunity_title: string;
+  agency: string;
+  phase: CapturePhase;
+  pwin: number;
+  value_estimated: number;
+  capture_manager: string;
+  bid_decision: "bid" | "no_bid" | "pending";
+  teaming_partners: TeamingPartner[];
+  milestones: CaptureMilestone[];
+  gate_reviews: CaptureGateReview[];
+  win_themes: string[];
+  discriminators: string[];
+  risks: CaptureRisk[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamingPartner {
+  name: string;
+  role: "prime" | "sub" | "mentor" | "jv_partner";
+  capability: string;
+  status: "confirmed" | "negotiating" | "identified";
+  past_performance_score: number | null;
+}
+
+export interface CaptureMilestone {
+  id: string;
+  title: string;
+  due_date: string;
+  status: "completed" | "on_track" | "at_risk" | "overdue";
+  owner: string;
+  notes: string | null;
+}
+
+export interface CaptureGateReview {
+  gate: string;
+  status: CaptureGateStatus;
+  reviewer: string;
+  reviewed_at: string | null;
+  notes: string | null;
+}
+
+export interface CaptureRisk {
+  description: string;
+  likelihood: "high" | "medium" | "low";
+  impact: "high" | "medium" | "low";
+  mitigation: string;
+}
+
+export interface CaptureActivity {
+  id: string;
+  capture_plan_id: string;
+  opportunity_title: string;
+  activity_type: CaptureActivityType;
+  description: string;
+  performed_by: string;
+  performed_at: string;
+  outcome: string | null;
+}
+
+export type CaptureActivityType =
+  | "meeting"
+  | "call"
+  | "email"
+  | "site_visit"
+  | "research"
+  | "gate_review"
+  | "teaming_discussion"
+  | "proposal_work";
