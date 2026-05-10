@@ -2401,3 +2401,238 @@ export function resolveAnomaly(anomalyId: string) {
     method: "POST",
   });
 }
+
+// ---------------------------------------------------------------------------
+// SAM.gov Monitor
+// ---------------------------------------------------------------------------
+
+export interface SAMSummaryData {
+  total: number;
+  new_count: number;
+  tracked_count: number;
+  qualified_count: number;
+  dismissed_count: number;
+  avg_relevance: number;
+  naics_matched: number;
+  last_scan: string | null;
+}
+
+export interface SAMOpportunityRow {
+  id: string;
+  notice_id: string;
+  title: string;
+  agency: string;
+  sub_agency: string | null;
+  type: string;
+  set_aside: string | null;
+  naics: string;
+  naics_description: string;
+  psc: string | null;
+  value_estimate: number | null;
+  response_deadline: string | null;
+  posted_date: string;
+  place_of_performance: string | null;
+  relevance_score: number;
+  relevance_reasons: string[];
+  ai_summary: string;
+  scan_status: string;
+  matched_naics: boolean;
+  matched_keywords: string[];
+  sam_url: string;
+  created_at: string;
+}
+
+export interface SAMScanRow {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  opportunities_found: number;
+  new_matches: number;
+  naics_codes_scanned: string[];
+  error: string | null;
+}
+
+export function fetchSAMSummary() {
+  return request<SAMSummaryData>("/sam-monitor/summary");
+}
+
+export function fetchSAMOpportunities(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<SAMOpportunityRow[]>(`/sam-monitor/opportunities${qs}`);
+}
+
+export function fetchSAMScans() {
+  return request<SAMScanRow[]>("/sam-monitor/scans");
+}
+
+export function triggerSAMScan() {
+  return request<{ scan_id: string; message: string }>("/sam-monitor/scan", { method: "POST" });
+}
+
+export function qualifySAMOpportunity(id: string) {
+  return request<{ id: string; message: string }>(`/sam-monitor/opportunities/${id}/qualify`, { method: "POST" });
+}
+
+// ---------------------------------------------------------------------------
+// Discussions
+// ---------------------------------------------------------------------------
+
+export interface DiscussionSummaryData {
+  total_threads: number;
+  active: number;
+  resolved: number;
+  total_messages: number;
+  participants: number;
+  by_entity: Record<string, number>;
+}
+
+export interface DiscussionThreadRow {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_title: string;
+  title: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_at: string;
+  participants: string[];
+  is_resolved: boolean;
+  tags: string[];
+}
+
+export interface DiscussionMessageRow {
+  id: string;
+  thread_id: string;
+  author: string;
+  content: string;
+  created_at: string;
+  edited_at: string | null;
+  reactions: Record<string, number>;
+  mentions: string[];
+  attachments: { name: string; url: string; type: string }[];
+}
+
+export function fetchDiscussionSummary() {
+  return request<DiscussionSummaryData>("/discussions/summary");
+}
+
+export function fetchDiscussionThreads(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<DiscussionThreadRow[]>(`/discussions/threads${qs}`);
+}
+
+export function fetchDiscussionMessages(threadId: string) {
+  return request<DiscussionMessageRow[]>(`/discussions/threads/${threadId}/messages`);
+}
+
+export function postDiscussionMessage(threadId: string, content: string) {
+  return request<{ thread_id: string; message: string }>(`/discussions/threads/${threadId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CPARS / Past Performance Builder
+// ---------------------------------------------------------------------------
+
+export interface CPARSSummaryData {
+  total: number;
+  finalized: number;
+  draft: number;
+  in_review: number;
+  submitted: number;
+  total_value: number;
+  exceptional: number;
+  very_good: number;
+  ai_generated: number;
+}
+
+export interface CPARSRecordRow {
+  id: string;
+  contract_number: string;
+  contract_title: string;
+  agency: string;
+  period_of_performance: string;
+  contract_value: number;
+  status: string;
+  overall_rating: string | null;
+  quality_rating: string | null;
+  schedule_rating: string | null;
+  cost_rating: string | null;
+  management_rating: string | null;
+  narrative: string;
+  ai_generated_narrative: string | null;
+  key_accomplishments: string[];
+  relevance_tags: string[];
+  matched_opportunities: string[];
+  evaluator: string | null;
+  evaluation_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function fetchCPARSSummary() {
+  return request<CPARSSummaryData>("/cpars/summary");
+}
+
+export function fetchCPARSRecords(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<CPARSRecordRow[]>(`/cpars/records${qs}`);
+}
+
+export function generateCPARSNarrative(id: string) {
+  return request<{ id: string; message: string }>(`/cpars/records/${id}/generate-narrative`, { method: "POST" });
+}
+
+// ---------------------------------------------------------------------------
+// FPDS Award Monitor
+// ---------------------------------------------------------------------------
+
+export interface FPDSSummaryData {
+  total_awards: number;
+  total_value: number;
+  competitor_awards: number;
+  unique_competitors: number;
+  recompete_candidates: number;
+  avg_relevance: number;
+}
+
+export interface FPDSAwardRow {
+  id: string;
+  piid: string;
+  title: string;
+  agency: string;
+  vendor: string;
+  vendor_duns: string | null;
+  award_amount: number;
+  ceiling_amount: number | null;
+  award_date: string;
+  period_of_performance_start: string;
+  period_of_performance_end: string;
+  award_type: string;
+  competition_type: string;
+  naics: string;
+  psc: string | null;
+  place_of_performance: string | null;
+  is_competitor: boolean;
+  competitor_name: string | null;
+  is_recompete_candidate: boolean;
+  recompete_date: string | null;
+  relevance_score: number;
+  fpds_url: string;
+  created_at: string;
+}
+
+export function fetchFPDSSummary() {
+  return request<FPDSSummaryData>("/fpds/summary");
+}
+
+export function fetchFPDSAwards(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<FPDSAwardRow[]>(`/fpds/awards${qs}`);
+}

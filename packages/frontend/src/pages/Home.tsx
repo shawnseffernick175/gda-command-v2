@@ -313,7 +313,7 @@ export default function Home() {
             </div>
 
             {/* Quick Access */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, alignContent: "start" }}>
               <Card
                 title="Fast Track"
                 description="Emerging signals, technology matching, and contract-path discovery."
@@ -434,6 +434,36 @@ export default function Home() {
                 to="/color-review"
                 statusColor="#ec4899"
               />
+              <Card
+                title="Anomaly Detection"
+                description="Portfolio anomaly monitoring, competitor movement tracking, and smart deadline/risk escalation engine."
+                to="/anomaly"
+                statusColor="#dc2626"
+              />
+              <Card
+                title="SAM.gov Monitor"
+                description="Automated opportunity scanning from SAM.gov with AI relevance scoring, NAICS matching, and qualification workflows."
+                to="/sam-monitor"
+                statusColor="#0ea5e9"
+              />
+              <Card
+                title="Discussions"
+                description="Threaded conversations on opportunities, captures, and proposals — centralized team collaboration."
+                to="/discussions"
+                statusColor="#6366f1"
+              />
+              <Card
+                title="CPARS Builder"
+                description="Past performance narrative generation, rating tracking, and AI-powered CPARS draft authoring."
+                to="/cpars"
+                statusColor="#f97316"
+              />
+              <Card
+                title="FPDS Award Monitor"
+                description="Federal contract award tracking, competitor win alerts, and recompete opportunity identification."
+                to="/fpds-monitor"
+                statusColor="#ea580c"
+              />
             </div>
           </div>
         </>
@@ -464,6 +494,10 @@ export default function Home() {
           <Card title="Predictive Analytics" description="ML Pwin models, Monte Carlo revenue forecasting, bid/no-bid optimizer, and win/loss patterns." to="/predictive" statusColor="#0ea5e9" />
           <Card title="Color Review" description="Automated Pink/Red/Gold/Green/White team proposal scrubbing with compliance, cost, and format checks." to="/color-review" statusColor="#ec4899" />
           <Card title="Anomaly Detection" description="Portfolio anomaly monitoring, competitor movement tracking, and smart deadline/risk escalation engine." to="/anomaly" statusColor="#dc2626" />
+          <Card title="SAM.gov Monitor" description="Automated SAM.gov opportunity scanning with AI relevance scoring and NAICS matching." to="/sam-monitor" statusColor="#0ea5e9" />
+          <Card title="Discussions" description="Threaded conversations on opportunities, captures, and proposals." to="/discussions" statusColor="#6366f1" />
+          <Card title="CPARS Builder" description="Past performance narrative generation and AI-powered CPARS draft authoring." to="/cpars" statusColor="#f97316" />
+          <Card title="FPDS Award Monitor" description="Federal contract award tracking, competitor wins, and recompete alerts." to="/fpds-monitor" statusColor="#ea580c" />
         </div>
       )}
     </div>

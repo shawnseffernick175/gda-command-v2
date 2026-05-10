@@ -23,6 +23,10 @@ import RFPShredder from "./pages/RFPShredder";
 import Predictive from "./pages/Predictive";
 import ColorReview from "./pages/ColorReview";
 import AnomalyDetection from "./pages/AnomalyDetection";
+import SAMMonitor from "./pages/SAMMonitor";
+import Discussions from "./pages/Discussions";
+import CPARSBuilder from "./pages/CPARSBuilder";
+import FPDSMonitor from "./pages/FPDSMonitor";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -38,6 +42,8 @@ const NAV_GROUPS = [
       { path: "/capture", label: "Capture", icon: "🎯" },
       { path: "/approvals", label: "Approvals", icon: "✓" },
       { path: "/rfp-shredder", label: "RFP Shredder", icon: "✂" },
+      { path: "/sam-monitor", label: "SAM.gov Monitor", icon: "📡" },
+      { path: "/fpds-monitor", label: "FPDS Monitor", icon: "📈" },
     ],
   },
   {
@@ -53,6 +59,13 @@ const NAV_GROUPS = [
       { path: "/predictive", label: "Predictive", icon: "🧠" },
       { path: "/color-review", label: "Color Review", icon: "🎨" },
       { path: "/anomaly", label: "Anomaly Detection", icon: "🔔" },
+      { path: "/cpars", label: "CPARS Builder", icon: "📊" },
+    ],
+  },
+  {
+    label: "Collaboration",
+    items: [
+      { path: "/discussions", label: "Discussions", icon: "💬" },
     ],
   },
   {
@@ -282,6 +295,10 @@ export default function App() {
             <Route path="/predictive" element={<Predictive />} />
             <Route path="/color-review" element={<ColorReview />} />
             <Route path="/anomaly" element={<AnomalyDetection />} />
+            <Route path="/sam-monitor" element={<SAMMonitor />} />
+            <Route path="/discussions" element={<Discussions />} />
+            <Route path="/cpars" element={<CPARSBuilder />} />
+            <Route path="/fpds-monitor" element={<FPDSMonitor />} />
           </Routes>
         </main>
       </div>

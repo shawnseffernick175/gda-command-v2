@@ -1211,3 +1211,164 @@ export interface Escalation {
   resolved_at: string | null;
   days_overdue: number;
 }
+
+// ---------------------------------------------------------------------------
+// Phase K: SAM.gov Monitor
+// ---------------------------------------------------------------------------
+
+export type SAMOpportunityType = "presolicitation" | "solicitation" | "award" | "sources_sought" | "special_notice" | "combined_synopsis";
+export type SAMSetAside = "Total Small Business" | "8(a)" | "HUBZone" | "SDVOSB" | "WOSB" | "Unrestricted" | "Competitive 8(a)";
+export type SAMScanStatus = "new" | "tracked" | "qualified" | "dismissed";
+
+export interface SAMMonitorOpportunity {
+  id: string;
+  notice_id: string;
+  title: string;
+  agency: string;
+  sub_agency: string | null;
+  type: SAMOpportunityType;
+  set_aside: SAMSetAside | null;
+  naics: string;
+  naics_description: string;
+  psc: string | null;
+  value_estimate: number | null;
+  response_deadline: string | null;
+  posted_date: string;
+  place_of_performance: string | null;
+  relevance_score: number;
+  relevance_reasons: string[];
+  ai_summary: string;
+  scan_status: SAMScanStatus;
+  matched_naics: boolean;
+  matched_keywords: string[];
+  sam_url: string;
+  created_at: string;
+}
+
+export interface SAMScanRun {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: "running" | "completed" | "failed";
+  opportunities_found: number;
+  new_matches: number;
+  naics_codes_scanned: string[];
+  error: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Phase K: Discussions
+// ---------------------------------------------------------------------------
+
+export type DiscussionEntityType = "opportunity" | "capture_plan" | "proposal" | "compliance" | "general";
+
+export interface DiscussionThread {
+  id: string;
+  entity_type: DiscussionEntityType;
+  entity_id: string;
+  entity_title: string;
+  title: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_at: string;
+  participants: string[];
+  is_resolved: boolean;
+  tags: string[];
+}
+
+export interface DiscussionMessage {
+  id: string;
+  thread_id: string;
+  author: string;
+  content: string;
+  created_at: string;
+  edited_at: string | null;
+  reactions: Record<string, number>;
+  mentions: string[];
+  attachments: { name: string; url: string; type: string }[];
+}
+
+// ---------------------------------------------------------------------------
+// Phase K: CPARS / Past Performance Builder
+// ---------------------------------------------------------------------------
+
+export type CPARSRating = "Exceptional" | "Very Good" | "Satisfactory" | "Marginal" | "Unsatisfactory";
+export type CPARSStatus = "draft" | "in_review" | "submitted" | "finalized";
+
+export interface CPARSRecord {
+  id: string;
+  contract_number: string;
+  contract_title: string;
+  agency: string;
+  period_of_performance: string;
+  contract_value: number;
+  status: CPARSStatus;
+  overall_rating: CPARSRating | null;
+  quality_rating: CPARSRating | null;
+  schedule_rating: CPARSRating | null;
+  cost_rating: CPARSRating | null;
+  management_rating: CPARSRating | null;
+  narrative: string;
+  ai_generated_narrative: string | null;
+  key_accomplishments: string[];
+  relevance_tags: string[];
+  matched_opportunities: string[];
+  evaluator: string | null;
+  evaluation_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase K: FPDS Award Monitor
+// ---------------------------------------------------------------------------
+
+export type FPDSAwardType = "definitive_contract" | "purchase_order" | "bpa_call" | "delivery_order" | "idiq";
+export type FPDSCompetitionType = "full_and_open" | "set_aside" | "sole_source" | "follow_on" | "other";
+
+export interface FPDSAward {
+  id: string;
+  piid: string;
+  title: string;
+  agency: string;
+  vendor: string;
+  vendor_duns: string | null;
+  award_amount: number;
+  ceiling_amount: number | null;
+  award_date: string;
+  period_of_performance_start: string;
+  period_of_performance_end: string;
+  award_type: FPDSAwardType;
+  competition_type: FPDSCompetitionType;
+  naics: string;
+  psc: string | null;
+  place_of_performance: string | null;
+  is_competitor: boolean;
+  competitor_name: string | null;
+  is_recompete_candidate: boolean;
+  recompete_date: string | null;
+  relevance_score: number;
+  fpds_url: string;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase K: Quick Entry
+// ---------------------------------------------------------------------------
+
+export type QuickEntryType = "opportunity" | "meeting_note" | "action_item" | "contact" | "intel";
+
+export interface QuickEntry {
+  id: string;
+  type: QuickEntryType;
+  title: string;
+  content: string;
+  related_entity_id: string | null;
+  related_entity_type: string | null;
+  created_by: string;
+  created_at: string;
+  processed: boolean;
+  processed_at: string | null;
+}
