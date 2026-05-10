@@ -178,6 +178,12 @@ export default function Home() {
                 to="/doctrine"
                 statusColor="#06b6d4"
               />
+              <Card
+                title="Intel Hub"
+                description="Intelligence feed, morning briefings, deep research, and competitor watch."
+                to="/intel"
+                statusColor="#ec4899"
+              />
             </div>
           </div>
         </>
@@ -213,6 +219,12 @@ export default function Home() {
             description="Sprint doctrine drafts, finalization gates, and publish history."
             to="/doctrine"
             statusColor="#06b6d4"
+          />
+          <Card
+            title="Intel Hub"
+            description="Intelligence feed, morning briefings, deep research, and competitor watch."
+            to="/intel"
+            statusColor="#ec4899"
           />
         </div>
       )}

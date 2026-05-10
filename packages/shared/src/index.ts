@@ -233,3 +233,104 @@ export interface GateCheckResult {
   message: string;
   required: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Intel Hub types
+// ---------------------------------------------------------------------------
+
+export type IntelPriority = "critical" | "high" | "medium" | "low";
+
+export type IntelCategory =
+  | "competitive"
+  | "market"
+  | "threat"
+  | "opportunity"
+  | "regulatory"
+  | "technology";
+
+export type IntelSource =
+  | "n8n_crawl"
+  | "manual"
+  | "sam_gov"
+  | "fpds"
+  | "news"
+  | "research";
+
+export interface IntelItem {
+  id: string;
+  title: string;
+  summary: string;
+  category: IntelCategory;
+  priority: IntelPriority;
+  source: IntelSource;
+  source_url: string | null;
+  related_opportunity_id: string | null;
+  related_competitor: string | null;
+  tags: string[];
+  created_at: string;
+  read: boolean;
+}
+
+export interface MorningBriefing {
+  id: string;
+  date: string;
+  headline: string;
+  key_metrics: BriefingMetric[];
+  alerts: BriefingAlert[];
+  action_items: BriefingActionItem[];
+  market_snapshot: string;
+  generated_at: string;
+}
+
+export interface BriefingMetric {
+  label: string;
+  value: string;
+  change: string | null;
+  trend: "up" | "down" | "flat";
+}
+
+export interface BriefingAlert {
+  severity: IntelPriority;
+  message: string;
+  source: string;
+  action_required: boolean;
+}
+
+export interface BriefingActionItem {
+  action: string;
+  priority: IntelPriority;
+  due: string | null;
+  context: string;
+}
+
+export type ResearchStatus =
+  | "queued"
+  | "in_progress"
+  | "completed"
+  | "failed";
+
+export interface DeepResearchReport {
+  id: string;
+  query: string;
+  status: ResearchStatus;
+  summary: string | null;
+  findings: string | null;
+  sources_count: number;
+  requested_at: string;
+  completed_at: string | null;
+  requested_by: string;
+}
+
+export interface CompetitorProfile {
+  id: string;
+  name: string;
+  threat_score: number;
+  contracts_won: number;
+  contracts_value: number;
+  primary_naics: string[];
+  strengths: string[];
+  weaknesses: string[];
+  recent_wins: string[];
+  watch_status: "active" | "monitoring" | "inactive";
+  last_updated: string;
+}
