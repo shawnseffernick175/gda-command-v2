@@ -292,8 +292,8 @@ function MetricBox({ label, value, color }: { label: string; value: string; colo
 
 function formatMetricValue(metricName: string, value: number): string {
   if (metricName.includes("probability") || metricName.includes("pwin")) return `${Math.round(value * 100)}%`;
-  if (metricName.includes("pipeline_value") || metricName.includes("bid_vs")) return fmt$(value);
-  if (metricName.includes("ratio")) return value.toFixed(2);
+  if (metricName.includes("pipeline_value")) return fmt$(value);
+  if (metricName.includes("ratio") || metricName.includes("bid_vs")) return value.toFixed(2);
   if (metricName.includes("days")) return `${Math.round(value)}d`;
   if (metricName.includes("score") || metricName.includes("rate")) return `${Math.round(value)}`;
   return String(Math.round(value * 100) / 100);
