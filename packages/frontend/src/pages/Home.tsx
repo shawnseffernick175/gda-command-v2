@@ -84,24 +84,35 @@ export default function Home() {
               borderRadius: 12,
               fontSize: 12,
               fontWeight: 600,
-              background: kpis.source === "db" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
-              color: kpis.source === "db" ? "#22c55e" : "#3b82f6",
+              background: kpis.source === "n8n" ? "rgba(168,85,247,0.15)" : kpis.source === "db" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
+              color: kpis.source === "n8n" ? "#a855f7" : kpis.source === "db" ? "#22c55e" : "#3b82f6",
             }}>
-              {kpis.source === "db" ? "Live DB" : "Mock data"}
+              {kpis.source === "n8n" ? "Live n8n" : kpis.source === "db" ? "Live DB" : "Mock data"}
             </span>
           </div>
 
           {/* KPI Cards */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: kpis.n8nKpis ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
             gap: 16,
             marginBottom: 24,
           }}>
             <KPICard label="Total Opportunities" value={String(kpis.totalOpportunities)} />
-            <KPICard label="Pipeline Value" value={formatCurrency(kpis.totalPipelineValue)} accent="#8b5cf6" />
-            <KPICard label="Avg Pwin" value={formatPwin(kpis.avgPwin)} />
-            <KPICard label="Avg Score" value={kpis.avgScore.toFixed(1)} />
+            {kpis.n8nKpis ? (
+              <>
+                <KPICard label="Weighted Pipeline" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" />
+                <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" />
+                <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" />
+                <KPICard label="Monitor" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" />
+              </>
+            ) : (
+              <>
+                <KPICard label="Pipeline Value" value={formatCurrency(kpis.totalPipelineValue)} accent="#8b5cf6" />
+                <KPICard label="Avg Pwin" value={formatPwin(kpis.avgPwin)} />
+                <KPICard label="Avg Score" value={kpis.avgScore.toFixed(1)} />
+              </>
+            )}
           </div>
 
           {/* Funnel Visualization */}

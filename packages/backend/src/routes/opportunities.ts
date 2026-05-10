@@ -7,6 +7,11 @@ import {
   getMockOpportunityById,
 } from "../data/opportunities-mock";
 import { getMockOpportunityDetail } from "../data/opportunity-detail-mock";
+import {
+  n8nWebhookConfigured,
+  fetchOpsTrackerFromN8n,
+  fetchPipelineFromN8n,
+} from "../lib/n8n-data";
 
 const router = Router();
 
@@ -52,38 +57,72 @@ router.get("/", async (req, res) => {
     );
   }
 
-  const pool = getPool();
-
-  if (!pool) {
-    // Mock fallback
-    let rows = getMockOpportunities();
+  // --- Helper: apply filters & sort to in-memory opportunity array ---
+  function filterAndSort(rows: Opportunity[]): Opportunity[] {
+    let filtered = [...rows];
     if (search) {
       const q = search.toLowerCase();
-      rows = rows.filter(
+      filtered = filtered.filter(
         (o) =>
           o.id.toLowerCase().includes(q) || o.title.toLowerCase().includes(q)
       );
     }
     if (statusFilter) {
-      rows = rows.filter((o) => o.status === statusFilter);
+      filtered = filtered.filter((o) => o.status === statusFilter);
     }
     if (deptFilter) {
-      rows = rows.filter((o) => o.department === deptFilter);
+      filtered = filtered.filter((o) => o.department === deptFilter);
     }
     if (minPwin !== undefined && !isNaN(minPwin)) {
-      rows = rows.filter(
+      filtered = filtered.filter(
         (o) => o.probability_of_win !== null && o.probability_of_win >= minPwin
       );
     }
     const col = sortBy as keyof Opportunity;
-    rows.sort((a, b) => {
+    filtered.sort((a, b) => {
       const av = a[col] ?? "";
       const bv = b[col] ?? "";
       if (av < bv) return sortDir === "asc" ? -1 : 1;
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
+    return filtered;
+  }
 
+  // --- Source priority: n8n webhook → Postgres → mock ---
+
+  // 1. Try n8n webhook
+  if (n8nWebhookConfigured()) {
+    try {
+      const n8nResult = await fetchOpsTrackerFromN8n();
+      if (n8nResult.ok && n8nResult.opportunities.length > 0) {
+        const rows = filterAndSort(n8nResult.opportunities);
+        return res.json(
+          successEnvelope(
+            "gda-opportunities",
+            "list",
+            { opportunities: rows, source: "n8n" as const },
+            {
+              count: rows.length,
+              totalAvailable: n8nResult.meta.total,
+              filters_applied: { search, status: statusFilter, department: deptFilter, minPwin },
+              lastSync: n8nResult.meta.lastSync,
+              dataSources: n8nResult.meta.dataSources,
+            }
+          )
+        );
+      }
+    } catch (err: unknown) {
+      process.stderr.write(`[opportunities] n8n fallback: ${(err as Error).message}\n`);
+    }
+  }
+
+  // 2. Try Postgres
+  const pool = getPool();
+
+  if (!pool) {
+    // 3. Mock fallback
+    const rows = filterAndSort(getMockOpportunities());
     return res.json(
       successEnvelope(
         "gda-opportunities",
@@ -179,35 +218,69 @@ router.get("/pipeline", async (req, res) => {
   const sortBy = (req.query.sortBy as string) ?? "qualified_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
 
-  const pool = getPool();
-
-  if (!pool) {
-    // Mock fallback — filter pipeline-status opportunities
-    let rows = getMockOpportunities().filter((o) => o.status === "pipeline");
+  // --- Helper: apply pipeline filters & sort ---
+  function pipelineFilterAndSort(rows: Opportunity[]): Opportunity[] {
+    let filtered = [...rows];
     if (search) {
       const q = search.toLowerCase();
-      rows = rows.filter(
+      filtered = filtered.filter(
         (o) =>
           o.id.toLowerCase().includes(q) || o.title.toLowerCase().includes(q)
       );
     }
     if (deptFilter) {
-      rows = rows.filter((o) => o.department === deptFilter);
+      filtered = filtered.filter((o) => o.department === deptFilter);
     }
     if (minPwin !== undefined && !isNaN(minPwin)) {
-      rows = rows.filter(
+      filtered = filtered.filter(
         (o) => o.probability_of_win !== null && o.probability_of_win >= minPwin
       );
     }
     const col = sortBy as keyof Opportunity;
-    rows.sort((a, b) => {
+    filtered.sort((a, b) => {
       const av = a[col] ?? "";
       const bv = b[col] ?? "";
       if (av < bv) return sortDir === "asc" ? -1 : 1;
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
+    return filtered;
+  }
 
+  // --- Source priority: n8n webhook → Postgres → mock ---
+
+  // 1. Try n8n webhook (pipeline-specific endpoint)
+  if (n8nWebhookConfigured()) {
+    try {
+      const n8nResult = await fetchPipelineFromN8n();
+      if (n8nResult.ok && n8nResult.opportunities.length > 0) {
+        const rows = pipelineFilterAndSort(n8nResult.opportunities);
+        return res.json(
+          successEnvelope(
+            "gda-opportunities",
+            "pipeline-list",
+            { opportunities: rows, source: "n8n" as const },
+            {
+              count: rows.length,
+              totalAvailable: n8nResult.meta.count,
+              filters_applied: { search, department: deptFilter, minPwin },
+            }
+          )
+        );
+      }
+    } catch (err: unknown) {
+      process.stderr.write(`[opportunities] pipeline n8n fallback: ${(err as Error).message}\n`);
+    }
+  }
+
+  // 2. Try Postgres
+  const pool = getPool();
+
+  if (!pool) {
+    // 3. Mock fallback — filter pipeline-status opportunities
+    const rows = pipelineFilterAndSort(
+      getMockOpportunities().filter((o) => o.status === "pipeline")
+    );
     return res.json(
       successEnvelope(
         "gda-opportunities",

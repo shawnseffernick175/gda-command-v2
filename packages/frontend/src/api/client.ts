@@ -154,7 +154,7 @@ export interface OpportunityRow {
 
 export interface OpportunitiesData {
   opportunities: OpportunityRow[];
-  source: "mock" | "db";
+  source: "mock" | "db" | "n8n";
 }
 
 export interface QualifyResultData {
@@ -315,7 +315,16 @@ export interface DashboardKPIs {
   avgScore: number;
   funnel: DashboardFunnelStage[];
   topByScore: OpportunityRow[];
-  source: "mock" | "db";
+  source: "mock" | "db" | "n8n";
+  n8nKpis?: {
+    pursueCount: number;
+    evaluateCount: number;
+    monitorCount: number;
+    weightedPipeline: string;
+  };
+  captureStages?: Array<{ stage: string; count: number; valueM: number }>;
+  analysisStatus?: { available: boolean; message: string };
+  ftSignals?: unknown[];
 }
 
 export function fetchDashboardKPIs() {

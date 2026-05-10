@@ -3,6 +3,11 @@ import type { Opportunity, OpportunityStatus } from "@gda/shared";
 import { successEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { getMockOpportunities } from "../data/opportunities-mock";
+import {
+  n8nWebhookConfigured,
+  fetchLaunchpadFromN8n,
+  fetchLaunchpadFunnelFromN8n,
+} from "../lib/n8n-data";
 
 const router = Router();
 
@@ -18,6 +23,65 @@ const STAGE_ORDER: OpportunityStatus[] = [
 // GET /api/dashboard/kpis — Launchpad KPIs, funnel, and top opportunities
 // ---------------------------------------------------------------------------
 router.get("/kpis", async (_req, res) => {
+  // --- 1. Try n8n launchpad + funnel endpoints ---
+  if (n8nWebhookConfigured()) {
+    try {
+      const [launchpad, funnel] = await Promise.all([
+        fetchLaunchpadFromN8n(),
+        fetchLaunchpadFunnelFromN8n(),
+      ]);
+
+      if (launchpad.ok && funnel.ok) {
+        const totalOpportunities = funnel.summary.totalOpps || launchpad.kpis.totalOpps;
+        const totalPipelineValue = launchpad.kpis.weightedPipelineRaw;
+
+        const avgScore = launchpad.kpis.avgScore;
+        const topByScore = launchpad.topOpportunities.slice(0, 5);
+
+        const n8nFunnel = funnel.oppStages.map((s) => ({
+          stage: s.stage,
+          count: s.count,
+          totalValue: s.valueM * 1_000_000,
+          avgPwin: 0,
+          avgScore: 0,
+        }));
+
+        return res.json(
+          successEnvelope(
+            "gda-dashboard",
+            "kpis",
+            {
+              totalOpportunities,
+              totalPipelineValue,
+              avgPwin: 0,
+              avgScore,
+              funnel: n8nFunnel,
+              topByScore,
+              source: "n8n" as const,
+              n8nKpis: {
+                pursueCount: launchpad.kpis.pursueCount,
+                evaluateCount: launchpad.kpis.evaluateCount,
+                monitorCount: launchpad.kpis.monitorCount,
+                weightedPipeline: launchpad.kpis.weightedPipeline,
+              },
+              captureStages: funnel.captureStages,
+              analysisStatus: launchpad.analysisStatus,
+              ftSignals: launchpad.ftSignals,
+            },
+            {
+              generatedAt: launchpad.generatedAt || new Date().toISOString(),
+              opportunityCount: totalOpportunities,
+              pipelineCount: launchpad.kpis.pursueCount,
+            }
+          )
+        );
+      }
+    } catch (err: unknown) {
+      process.stderr.write(`[dashboard] n8n fallback: ${(err as Error).message}\n`);
+    }
+  }
+
+  // --- 2. Try Postgres ---
   const pool = getPool();
 
   let allOpps: Opportunity[];
@@ -48,6 +112,7 @@ router.get("/kpis", async (_req, res) => {
     allOpps = getMockOpportunities();
   }
 
+  // --- 3. Compute KPIs from local data (DB or mock) ---
   const totalOpportunities = allOpps.length;
 
   const pipelineOpps = allOpps.filter((o) => o.status === "pipeline");
