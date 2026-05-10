@@ -55,6 +55,7 @@ npm run dev --workspace=@gda/frontend
 | `/workflows` | Workflow Manager — browse, search, and filter all n8n workflows |
 | `/financial-bible` | Financial Bible — drill-down behind every KPI (Orders, Sales, EBIT, ROS, Backlog, Gross Profit) |
 | `/financial-bible/:key` | Financial Bible — single KPI drill-down with line items, trends, and insights |
+| `/prompts` | Prompt Architect — versioned prompt library with categories, tags, usage tracking |
 | `/settings` | Settings — system config, connectors, feature flags, health check |
 
 ### Backend API
@@ -83,6 +84,9 @@ npm run dev --workspace=@gda/frontend
 | `POST /api/capture/gate-review` | Trigger gate review checks (dry-run) |
 | `GET /api/financials/kpis` | Financial KPIs for persistent strip (Orders, Sales, EBIT, ROS, Funded Backlog, Backlog, Gross Profit) |
 | `GET /api/financials/:key` | Financial Bible drill-down for a single KPI |
+| `GET /api/prompts` | Prompt library with category/status/tag filtering |
+| `GET /api/prompts/usage` | Recent prompt usage log |
+| `GET /api/prompts/:id` | Prompt detail with version history and usage records |
 | `GET /api/workflows/registry` | n8n workflow registry with status and metadata |
 | `GET /api/settings` | System settings, connectors, feature flags |
 
@@ -102,7 +106,7 @@ A global financial KPI strip is rendered below the navigation bar on every page.
 The nav bar is organized into three groups:
 - **BD Tools**: Launchpad, Ops Tracker, Pipeline, Capture
 - **Analysis**: Intel Hub, Financials
-- **Platform**: QA Center, Doctrine, Workflows, Settings
+- **Platform**: QA Center, Doctrine, Prompts, Workflows, Settings
 
 ## Database
 

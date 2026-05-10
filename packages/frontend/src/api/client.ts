@@ -1351,3 +1351,99 @@ export function fetchNotifications(unreadOnly?: boolean) {
   const qs = unreadOnly ? "?unread=true" : "";
   return request<NotificationsData>(`/enrichments/notifications${qs}`);
 }
+
+// --- Prompts ---
+
+export interface PromptRow {
+  id: string;
+  title: string;
+  category: string;
+  description: string;
+  body: string;
+  tags: string[];
+  version: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  usageCount: number;
+  lastUsedAt: string | null;
+  starred: boolean;
+  status: "active" | "draft" | "archived";
+}
+
+export interface PromptsSummary {
+  total: number;
+  filtered: number;
+  active: number;
+  draft: number;
+  archived: number;
+  starred: number;
+  categories: string[];
+  tags: string[];
+}
+
+export interface PromptsData {
+  prompts: PromptRow[];
+  summary: PromptsSummary;
+  source: "mock" | "db" | "n8n";
+}
+
+export interface PromptVersion {
+  version: number;
+  body: string;
+  changedBy: string;
+  changedAt: string;
+  changeNote: string;
+}
+
+export interface PromptUsage {
+  id: string;
+  promptId: string;
+  usedBy: string;
+  usedAt: string;
+  context: string;
+  outcome: "success" | "partial" | "failed" | null;
+  notes: string | null;
+}
+
+export interface PromptDetailData {
+  prompt: PromptRow;
+  versions: PromptVersion[];
+  usage: PromptUsage[];
+  source: "mock" | "db" | "n8n";
+}
+
+export interface PromptQueryParams {
+  search?: string;
+  category?: string;
+  status?: string;
+  tag?: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+}
+
+export function fetchPrompts(params: PromptQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.category) qs.set("category", params.category);
+  if (params.status) qs.set("status", params.status);
+  if (params.tag) qs.set("tag", params.tag);
+  if (params.sortBy) qs.set("sortBy", params.sortBy);
+  if (params.sortDir) qs.set("sortDir", params.sortDir);
+  const query = qs.toString();
+  return request<PromptsData>(`/prompts${query ? `?${query}` : ""}`);
+}
+
+export function fetchPromptDetail(id: string) {
+  return request<PromptDetailData>(`/prompts/${id}`);
+}
+
+export interface RecentUsageData {
+  usage: PromptUsage[];
+  total: number;
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchRecentUsage() {
+  return request<RecentUsageData>("/prompts/usage");
+}
