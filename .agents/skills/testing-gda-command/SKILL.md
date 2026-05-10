@@ -96,7 +96,7 @@ For each new page:
 - Opportunity Detail (`/opportunities/:id`): Pwin breakdown, incumbent, competitors, black hat, wargame
 - Global Search: Search bar in sidebar, returns results with relevance scores
 - Notifications: Bell icon with unread badge, 8 alerts
-- Sidebar Navigation: 3 groups — BD Tools (7), Analysis (10), Platform (5). Collapse toggle: 220px expanded / 52px collapsed icons-only rail with tooltips.
+- Sidebar Navigation: 3 groups — BD Tools (9), Analysis (11), Collaboration (1), Platform (5). Collapse toggle: 220px expanded / 52px collapsed icons-only rail with tooltips.
 
 ## Common Issues
 
