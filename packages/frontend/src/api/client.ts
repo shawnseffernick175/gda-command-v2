@@ -331,6 +331,58 @@ export function fetchDashboardKPIs() {
   return request<DashboardKPIs>("/dashboard/kpis");
 }
 
+// --- Command Signals ---
+
+export interface CommandRisk {
+  plan_id: string;
+  opportunity_title: string;
+  agency: string;
+  description: string;
+  likelihood: "high" | "medium" | "low";
+  impact: "high" | "medium" | "low";
+  mitigation: string;
+}
+
+export interface CommandDecision {
+  plan_id: string;
+  opportunity_title: string;
+  agency: string;
+  phase: string;
+  pwin: number;
+  value_estimated: number;
+  next_deadline: string | null;
+  next_milestone: string | null;
+}
+
+export interface CommandDueSoon {
+  plan_id: string;
+  opportunity_title: string;
+  milestone_id: string;
+  title: string;
+  due_date: string;
+  status: string;
+  owner: string;
+}
+
+export interface CommandFastTrack {
+  opportunity_title: string;
+  signal: string;
+  urgency: "high" | "medium" | "low";
+}
+
+export interface CommandSignalsData {
+  activeRisks: CommandRisk[];
+  upcomingDecisions: CommandDecision[];
+  dueSoonItems: CommandDueSoon[];
+  fastTrackSignals: CommandFastTrack[];
+  approvalsSummary: { pending: number; critical: number };
+  captureSource: "n8n" | "mock";
+}
+
+export function fetchCommandSignals() {
+  return request<CommandSignalsData>("/dashboard/command-signals");
+}
+
 // --- Doctrine Automation ---
 
 export interface DoctrineDraftRow {

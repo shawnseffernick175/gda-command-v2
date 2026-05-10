@@ -1,12 +1,17 @@
 import { Router } from "express";
-import type { Opportunity, OpportunityStatus } from "@gda/shared";
+import type { Opportunity, OpportunityStatus, CapturePlan } from "@gda/shared";
 import { successEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { getMockOpportunities } from "../data/opportunities-mock";
 import {
+  MOCK_CAPTURE_PLANS,
+} from "../data/capture-mock";
+import { MOCK_APPROVALS } from "../data/approvals-mock";
+import {
   n8nWebhookConfigured,
   fetchLaunchpadFromN8n,
   fetchLaunchpadFunnelFromN8n,
+  fetchCapturePlansFromN8n,
 } from "../lib/n8n-data";
 
 const router = Router();
@@ -36,7 +41,7 @@ router.get("/kpis", async (_req, res) => {
         const totalPipelineValue = launchpad.kpis.weightedPipelineRaw;
 
         const avgScore = launchpad.kpis.avgScore;
-        const topByScore = launchpad.topOpportunities.slice(0, 5);
+        const topByScore = launchpad.topOpportunities.slice(0, 10);
 
         const n8nFunnel = funnel.oppStages.map((s) => ({
           stage: s.stage,
@@ -162,7 +167,7 @@ router.get("/kpis", async (_req, res) => {
     };
   });
 
-  const topByScore = [...allOpps].sort((a, b) => b.score - a.score).slice(0, 5);
+  const topByScore = [...allOpps].sort((a, b) => b.score - a.score).slice(0, 10);
 
   return res.json(
     successEnvelope(
@@ -181,6 +186,150 @@ router.get("/kpis", async (_req, res) => {
         generatedAt: new Date().toISOString(),
         opportunityCount: totalOpportunities,
         pipelineCount: pipelineOpps.length,
+      }
+    )
+  );
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/dashboard/command-signals — aggregated risks, decisions, due-soon,
+// fast-track, and pending approvals for the Launchpad
+// ---------------------------------------------------------------------------
+router.get("/command-signals", async (_req, res) => {
+  // --- Capture plans (try n8n first, then mock) ---
+  let plans: CapturePlan[];
+  let captureSource: "n8n" | "mock" = "mock";
+
+  if (n8nWebhookConfigured()) {
+    try {
+      const n8nResult = await fetchCapturePlansFromN8n();
+      if (n8nResult.ok && n8nResult.plans.length > 0) {
+        plans = n8nResult.plans;
+        captureSource = "n8n";
+      } else {
+        plans = MOCK_CAPTURE_PLANS;
+      }
+    } catch {
+      plans = MOCK_CAPTURE_PLANS;
+    }
+  } else {
+    plans = MOCK_CAPTURE_PLANS;
+  }
+
+  // --- Active risks: high likelihood or high impact ---
+  const activeRisks = plans
+    .flatMap((p) =>
+      p.risks
+        .filter((r) => r.likelihood === "high" || r.impact === "high")
+        .map((r) => ({
+          plan_id: p.id,
+          opportunity_title: p.opportunity_title,
+          agency: p.agency,
+          description: r.description,
+          likelihood: r.likelihood,
+          impact: r.impact,
+          mitigation: r.mitigation,
+        }))
+    )
+    .slice(0, 8);
+
+  // --- Upcoming decisions: pending bid decisions ---
+  const upcomingDecisions = plans
+    .filter((p) => p.bid_decision === "pending")
+    .map((p) => {
+      const nextMilestone = p.milestones
+        .filter((m) => m.status !== "completed")
+        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
+      return {
+        plan_id: p.id,
+        opportunity_title: p.opportunity_title,
+        agency: p.agency,
+        phase: p.phase,
+        pwin: p.pwin,
+        value_estimated: p.value_estimated,
+        next_deadline: nextMilestone?.due_date ?? null,
+        next_milestone: nextMilestone?.title ?? null,
+      };
+    })
+    .slice(0, 6);
+
+  // --- Due-soon items: at-risk/overdue milestones + milestones due within 30 days ---
+  const now = Date.now();
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  const dueSoonItems = plans
+    .flatMap((p) =>
+      p.milestones
+        .filter((m) => {
+          if (m.status === "at_risk" || m.status === "overdue") return true;
+          if (m.status === "completed") return false;
+          const due = new Date(m.due_date).getTime();
+          return due > 0 && due - now < thirtyDays && due - now > 0;
+        })
+        .map((m) => ({
+          plan_id: p.id,
+          opportunity_title: p.opportunity_title,
+          milestone_id: m.id,
+          title: m.title,
+          due_date: m.due_date,
+          status: m.status,
+          owner: m.owner,
+        }))
+    )
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+    .slice(0, 8);
+
+  // --- Fast-track signals (from n8n if available) ---
+  let fastTrackSignals: Array<{
+    opportunity_title: string;
+    signal: string;
+    urgency: "high" | "medium" | "low";
+  }> = [];
+
+  if (n8nWebhookConfigured()) {
+    try {
+      const lp = await fetchLaunchpadFromN8n();
+      if (lp.ok && Array.isArray(lp.ftSignals) && lp.ftSignals.length > 0) {
+        fastTrackSignals = (lp.ftSignals as Array<Record<string, unknown>>).map((s) => ({
+          opportunity_title: (s.opportunity_title ?? s.title ?? "Unknown") as string,
+          signal: (s.signal ?? s.description ?? s.message ?? "Fast-track eligible") as string,
+          urgency: (s.urgency ?? "medium") as "high" | "medium" | "low",
+        }));
+      }
+    } catch {
+      // fall through to mock
+    }
+  }
+
+  if (fastTrackSignals.length === 0) {
+    fastTrackSignals = [
+      { opportunity_title: "USACE FUDS IDIQ TO-3", signal: "RFP response window < 14 days — accelerate draft", urgency: "high" },
+      { opportunity_title: "NASA KSC Launch Ops", signal: "Incumbent contract expiring Q3 — early engagement window", urgency: "medium" },
+      { opportunity_title: "DHA MHS GENESIS Phase 4", signal: "Draft RFP posted — begin compliance matrix", urgency: "high" },
+    ];
+  }
+
+  // --- Pending approvals count ---
+  const pendingApprovals = MOCK_APPROVALS.filter((a) => a.status === "pending");
+  const criticalApprovals = pendingApprovals.filter((a) => a.priority === "critical");
+
+  return res.json(
+    successEnvelope(
+      "gda-dashboard",
+      "command-signals",
+      {
+        activeRisks,
+        upcomingDecisions,
+        dueSoonItems,
+        fastTrackSignals,
+        approvalsSummary: {
+          pending: pendingApprovals.length,
+          critical: criticalApprovals.length,
+        },
+        captureSource,
+      },
+      {
+        generatedAt: new Date().toISOString(),
+        totalPlans: plans.length,
       }
     )
   );
