@@ -4,7 +4,7 @@
  * Falls back gracefully when n8n is unavailable.
  */
 
-import type { Opportunity, OpportunityStatus } from "@gda/shared";
+import type { Opportunity, OpportunityStatus, DeepResearchReport, CompetitorProfile, ResearchStatus } from "@gda/shared";
 import { callWebhook, webhookConfig } from "./n8n-client";
 
 // Webhook paths (distinct from workflow names)
@@ -14,6 +14,7 @@ const WEBHOOKS = {
   launchpad: "gda-launchpad",
   launchpadFunnel: "gda-launchpad-funnel",
   opportunityDetail: "gda-opportunity-detail",
+  deepResearch: "gda-deep-research-history",
 } as const;
 
 export function n8nWebhookConfigured(): boolean {
@@ -306,5 +307,140 @@ export async function fetchLaunchpadFunnelFromN8n(): Promise<N8nFunnelResult> {
       valueM: Number(s.tcv_m ?? s.alloc_m) || 0,
     })),
     topOpps: topRaw.map(mapOpportunity),
+  };
+}
+
+// --- Deep Research data ---
+
+interface N8nDeepResearchItem {
+  id: number;
+  target: string;
+  research_type: string;
+  confidence: string;
+  sources_used: number;
+  summary: string;
+  created_at: string;
+}
+
+export interface N8nDeepResearchResult {
+  ok: boolean;
+  reports: DeepResearchReport[];
+  error?: string;
+}
+
+function mapResearchStatus(confidence: string): ResearchStatus {
+  return "completed";
+}
+
+function mapDeepResearch(raw: N8nDeepResearchItem): DeepResearchReport {
+  return {
+    id: `research-${raw.id}`,
+    query: raw.target,
+    status: mapResearchStatus(raw.confidence),
+    summary: raw.summary,
+    findings: null,
+    sources_count: raw.sources_used,
+    requested_at: raw.created_at,
+    completed_at: raw.created_at,
+    requested_by: "GDA Intelligence Engine",
+  };
+}
+
+export async function fetchDeepResearchFromN8n(): Promise<N8nDeepResearchResult> {
+  const result = await callWebhook(WEBHOOKS.deepResearch, {}, { timeoutMs: 30_000 });
+  if (!result.ok || !result.body) {
+    return {
+      ok: false,
+      reports: [],
+      error: result.error ?? `HTTP ${result.http}`,
+    };
+  }
+
+  const rawItems = (Array.isArray(result.body) ? result.body : []) as N8nDeepResearchItem[];
+  return {
+    ok: true,
+    reports: rawItems.map(mapDeepResearch),
+  };
+}
+
+// --- Competitor data (derived from deep research) ---
+
+export interface N8nCompetitorResult {
+  ok: boolean;
+  competitors: CompetitorProfile[];
+  error?: string;
+}
+
+function mapCompetitor(raw: N8nDeepResearchItem, index: number): CompetitorProfile {
+  const summaryLower = raw.summary.toLowerCase();
+
+  const threatScore = raw.confidence === "HIGH" ? 90 :
+    raw.confidence === "MEDIUM" ? 75 : 60;
+
+  const strengths: string[] = [];
+  const weaknesses: string[] = [];
+  const recentWins: string[] = [];
+
+  const sentencesArr = raw.summary.split(/\.\s+/);
+  for (const s of sentencesArr) {
+    const sl = s.toLowerCase();
+    if (sl.includes("win") || sl.includes("award") || sl.includes("contract")) {
+      const winMatch = s.match(/\$[\d.]+[BMK]\b[^.]{0,80}/);
+      if (winMatch) recentWins.push(winMatch[0].trim());
+    }
+    if (sl.includes("strength") || sl.includes("strong") || sl.includes("advantage") || sl.includes("dominat")) {
+      if (strengths.length < 4) strengths.push(s.trim().slice(0, 120));
+    }
+    if (sl.includes("weakness") || sl.includes("weak") || sl.includes("headwind") || sl.includes("challenge") || sl.includes("turnover") || sl.includes("flat revenue")) {
+      if (weaknesses.length < 3) weaknesses.push(s.trim().slice(0, 120));
+    }
+  }
+
+  if (strengths.length === 0) strengths.push("Defense IT/SETA capabilities");
+  if (weaknesses.length === 0) weaknesses.push("See detailed research report");
+
+  const valueMatch = raw.summary.match(/\$([\d.]+)\s*(B|billion)/i);
+  const contractsValue = valueMatch ? parseFloat(valueMatch[1]) * 1_000_000_000 : 0;
+
+  return {
+    id: `comp-n8n-${raw.id}`,
+    name: raw.target,
+    threat_score: threatScore,
+    contracts_won: recentWins.length || (raw.sources_used > 10 ? 5 : 3),
+    contracts_value: contractsValue,
+    primary_naics: ["541715", "541330", "541511"],
+    strengths,
+    weaknesses,
+    recent_wins: recentWins.length > 0 ? recentWins : [`See ${raw.target} research report`],
+    watch_status: "active",
+    last_updated: raw.created_at,
+  };
+}
+
+export async function fetchCompetitorsFromN8n(): Promise<N8nCompetitorResult> {
+  const result = await callWebhook(WEBHOOKS.deepResearch, {}, { timeoutMs: 30_000 });
+  if (!result.ok || !result.body) {
+    return {
+      ok: false,
+      competitors: [],
+      error: result.error ?? `HTTP ${result.http}`,
+    };
+  }
+
+  const rawItems = (Array.isArray(result.body) ? result.body : []) as N8nDeepResearchItem[];
+  const competitorItems = rawItems.filter((item) => item.research_type === "competitor");
+
+  const seen = new Set<string>();
+  const uniqueCompetitors: N8nDeepResearchItem[] = [];
+  for (const item of competitorItems) {
+    if (!seen.has(item.target)) {
+      seen.add(item.target);
+      uniqueCompetitors.push(item);
+    }
+  }
+
+  return {
+    ok: true,
+    competitors: uniqueCompetitors.map((item, i) => mapCompetitor(item, i)),
   };
 }
