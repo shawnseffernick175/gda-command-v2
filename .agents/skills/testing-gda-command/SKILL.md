@@ -10,35 +10,46 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - npm workspaces (monorepo)
 - No external services needed for mock mode (no DATABASE_URL = mock data)
 
+## Devin Secrets Needed
+- `N8N_API_KEY` — n8n REST API key for workflow queries (repo-scoped)
+- `GDA_WEBHOOK_KEY` — x-gda-key header value for n8n webhook auth (repo-scoped)
+
 ## Setup
 ```bash
-# 1. Build shared types
+# 1. Kill any stale processes on ports 3000/3001 first
+fuser 3000/tcp 2>/dev/null | xargs kill -9 2>/dev/null
+fuser 3001/tcp 2>/dev/null | xargs kill -9 2>/dev/null
+
+# 2. Build shared types
 npm run build --workspace=@gda/shared
 
-# 2. Start backend (port 3001)
+# 3. Start backend (port 3001)
 node --env-file=packages/backend/.env node_modules/.bin/tsx watch packages/backend/src/server.ts
 
-# 3. Start frontend (port 3000, proxies /api to :3001)
+# 4. Start frontend (port 3000, proxies /api to :3001)
 npm run dev --workspace=@gda/frontend
 
-# 4. Verify backend
+# 5. Verify backend
 curl http://localhost:3001/health
 ```
+
+**Important:** If frontend starts on port 3002 instead of 3000, a stale process is occupying port 3000. Kill it with `fuser 3000/tcp | xargs kill -9` and restart the frontend. The Vite proxy config expects the frontend on :3000 proxying to backend :3001.
 
 ## Pages & Routes
 | Route | Page | Key Features |
 |---|---|---|
-| `/` | Launchpad | KPI strip (10 opps, $79.3M, 58%, 72.4), funnel, top 5, quick-access cards |
+| `/` | Launchpad | KPI cards, 4-column command signals grid, funnel, top 10 opps, quick-access cards |
 | `/qa-center` | QA Center | Health checks, failures table, live/mock badge |
-| `/ops-tracker` | Ops Tracker | 10 rows, filters (status/dept/Pwin), Qualify dry-run on discovery rows |
-| `/pipeline` | Pipeline | 3 pipeline-status rows, read-only, audit strip |
+| `/ops-tracker` | Ops Tracker | Opportunity list, filters (status/dept/Pwin), Qualify dry-run |
+| `/pipeline` | Pipeline | Pipeline-status rows, read-only, audit strip |
 | `/opportunities/:id` | Opportunity Detail | OODA analysis, strengths/risks, sources, breadcrumb |
 | `/financial-bible` | Financial Bible (index) | 7 KPI navigation cards, "Select a KPI" prompt |
 | `/financial-bible/:key` | Financial Bible (drill-down) | Summary cards, trend chart, insights, line items table |
-| `/doctrine` | Doctrine | 8 drafts across 2 sprints, finalization gate checks, publish runs |
-| `/intel` | Intel Hub | Morning briefing, 12 feed items, 4 research reports, 5 competitors |
-| `/capture` | Capture Planner | 5 capture plans, 12 BD activities, 17 milestones, gate review |
+| `/doctrine` | Doctrine | Drafts across sprints, finalization gate checks, publish runs |
+| `/intel` | Intel Hub | Morning briefing, feed items, deep research reports, competitor watch |
+| `/capture` | Capture Planner | Capture plans, BD activities, milestones, gate review |
 | `/prompts` | Prompt Architect | 12 prompts, 6 categories, split-view detail with Body/Versions/Usage tabs |
+| `/approvals` | Approvals Queue | Pending/resolved approvals, dry-run checks, approve/reject actions |
 | `/workflows` | Workflow Manager | Browse/filter n8n workflows (183 when live) |
 | `/settings` | Settings | Connectors, feature flags, health check button |
 
@@ -54,11 +65,45 @@ Rendered on **every page** below the nav bar, above main content.
 
 ### Grouped Navigation Bar
 Nav bar uses 3 groups:
-- **BD Tools**: Launchpad, Ops Tracker, Pipeline, Capture
+- **BD Tools**: Launchpad, Ops Tracker, Pipeline, Capture, Approvals
 - **Analysis**: Intel Hub, Financials
-- **Platform**: QA Center, Doctrine, Prompts, Workflows, Settings
+- **Platform**: QA Center, Doctrine, Workflows, Settings
 
 Active page gets blue highlight. Group labels shown in uppercase.
+
+## Launchpad Command Signals Grid
+
+The Launchpad displays a **4-column grid** of command signals below the KPI summary cards:
+
+### Data Source Behavior
+- Backend endpoint: `GET /api/dashboard/command-signals`
+- When n8n is reachable: Shows real data with green "Live n8n" badge. Counts will vary based on real capture plan data.
+- When n8n is unreachable: Falls back to mock data with blue "Mock data" badge.
+- The `captureSource` field in the API response tells you which path was used ("n8n" or "mock").
+
+### Signal Cards (with n8n live data — counts may vary)
+| Card | Icon | Content |
+|---|---|---|
+| Fast-Track Signals | ⚡ | Opportunities eligible for fast-track, with urgency indicators |
+| Active Risks | 🔴 | High-likelihood/impact risks from capture plans, with likelihood badges |
+| Decisions Pending | 🎯 | Pending bid/no-bid decisions with agency, dollar value, and Pwin % |
+| Due Soon | 📅 | At-risk/overdue milestones + approvals badge linking to /approvals |
+
+### Mock Data Expected Values (when n8n is unavailable)
+- Fast-Track Signals: **3** (USACE FUDS RFP, Air Force Tyndall, DOE Oak Ridge)
+- Active Risks: **6** (from 5 capture plans)
+- Decisions Pending: **2** (Air Force Tyndall 55% Pwin, NASA KSC 35% Pwin)
+- Due Soon: **8** (milestones sliced to 8)
+- Approvals badge: **7 approvals (1 critical)** → links to `/approvals`
+
+### Pwin Display
+- Pwin values are stored as whole-number percentages (e.g., `pwin: 72` means 72%)
+- The frontend displays them as `{Math.round(dec.pwin)}% Pwin`
+- **Do NOT multiply by 100** — that was a bug that caused 7200% instead of 72%
+
+### Navigation Links
+- Due Soon card: "7 approvals (1 critical)" badge → navigates to `/approvals`
+- Top Opportunities: Now shows **10** entries (expanded from 5)
 
 ## Mock Data Overview
 
@@ -96,43 +141,11 @@ Active page gets blue highlight. Group labels shown in uppercase.
 
 **Summary stats**: Active Plans 5, Total Value $258.5M, Avg Pwin 64%, Bid 3, Pending 2, At-Risk Milestones 1
 
-### USACE FUDS Detail (cap-001)
-- Win Themes: 4 + 3 discriminators
-- Teaming: GDA (Prime/CONFIRMED), Arcadis (Sub/CONFIRMED), Enviro-Compliance (Sub/NEGOTIATING)
-- Milestones: 6 (5 on_track, 1 at_risk)
-- Gates: 3 (Gate 1 passed, Gate 2 passed, Gate 3 pending)
-- Risks: 3 (all with mitigation plans)
-
-### Gate Review Dry-Run (USACE FUDS, Gate 3)
-- Overall: **CONDITIONAL (3/5 passed)**
-- Teaming Partners Confirmed: WARN — "1 partner(s) not yet confirmed"
-- Win Themes Defined: PASS — "4 win theme(s) defined"
-- Risks Mitigated: PASS — "All risks have mitigation plans"
-- Milestones On Track: WARN — "1 milestone(s) at risk"
-- Discriminators Identified: PASS — "3 discriminator(s) identified"
-- Correlation ID: GDA-GATE-*
-
-### Activities (12 total)
-- Types: meeting(2), research(2), call(2), teaming_discussion(2), gate_review(1), site_visit(1), proposal_work(1), email(1)
-- All have Outcome sections
-
-### Milestones (17 total across all plans)
-- Completed: 4
-- On Track: 12
-- At Risk: 1
-- Overdue: 0
-
-### Doctrine (8 drafts)
-- Sprints: S-205 (3 drafts), S-206 (5 drafts)
-- Statuses: draft(3), finalized(4), blocked(1)
-- Publish runs: 3 total
-- Finalize S-206: success, 4/4 gates pass, GDA-DOC-* correlation ID
-
-### Intel Hub
-- Feed: 12 items, 6 unread
-- Briefings: 3 dates (today, yesterday, 2 days ago)
-- Research: 4 reports (2 completed, 1 in_progress, 1 queued)
-- Competitors: 5 profiles sorted by threat score (Tetra Tech 92 → Hensel Phelps 68)
+### Approvals Queue (10 total)
+- Pending: 7, Critical: 1, Expiring Soon: 0, Approved: 1, Rejected: 1, Expired: 1
+- Categories: Qualify, Bid Decision, Doctrine Publish, Teaming, Deploy, Budget Override, Gate Review
+- Each approval has expandable dry-run checks (PASS/WARN/FAIL)
+- Approve/Reject buttons trigger dry-run modal with correlation ID
 
 ### Prompt Architect (12 prompts across 6 categories)
 **Summary strip**: Total 12, Active 11, Draft 1, Archived 0, Starred 4, Categories 6
@@ -154,10 +167,17 @@ Active page gets blue highlight. Group labels shown in uppercase.
 
 **Category filter counts**: proposal(4), capture(2), general(2), compliance(1), research(2), analysis(1)
 
-**Detail panel for prompt-001 (Capture Plan First Draft)**:
-- Body tab: Monospace prompt text with `## Inputs` and `## Output Structure` sections
-- Versions tab: v3 "current" (Apr 20, 2025), v2 (Mar 15, 2025), v1 (Feb 15, 2025)
-- Usage tab: 1 record — EPA Superfund capture plan, outcome "success", notes about 4 win themes
+### Doctrine (8 drafts)
+- Sprints: S-205 (3 drafts), S-206 (5 drafts)
+- Statuses: draft(3), finalized(4), blocked(1)
+- Publish runs: 3 total
+- Finalize S-206: success, 4/4 gates pass, GDA-DOC-* correlation ID
+
+### Intel Hub
+- Feed: 12 items, 6 unread (mock); real n8n data when connected
+- Deep Research: 12 real reports when n8n connected (BAE Systems, GDIT, SAIC, ManTech, etc.), 4 mock otherwise
+- Competitors: 10 real profiles when n8n connected, 5 mock otherwise
+- Dynamic source badge: green "Live — n8n" per tab or blue "Mock data"
 
 ## Testing Tips
 - When DATABASE_URL is not set, all pages show "Mock data" blue badge
@@ -170,3 +190,6 @@ Active page gets blue highlight. Group labels shown in uppercase.
 - Prompt list default sort is by `usageCount` descending (most-used first)
 - After code changes, the backend hot-reload (tsx watch) might need a manual restart if routes change — if you see 500 errors on pages that worked before, restart the backend
 - Use `wmctrl -r :ACTIVE: -b add,maximized_vert,maximized_horz` to maximize browser before recording
+- If HMR gets into a bad state (page stuck on "Loading..."), kill all node processes, clear ports, and do a fresh restart
+- n8n webhooks might respond slowly (0.3-1s); the frontend shows "Loading dashboard..." while waiting
+- When n8n returns live data, signal card counts will differ from mock data values — verify against the API response, not hardcoded mock expectations
