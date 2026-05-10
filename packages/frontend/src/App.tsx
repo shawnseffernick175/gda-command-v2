@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
@@ -17,6 +17,8 @@ import ProposalReview from "./pages/ProposalReview";
 import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
+import GlobalSearch from "./components/GlobalSearch";
+import NotificationCenter from "./components/NotificationCenter";
 
 const NAV_GROUPS = [
   {
@@ -61,8 +63,19 @@ function isActive(pathname: string, itemPath: string): boolean {
 
 export default function App() {
   const { pathname } = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
   const sidebarWidth = sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+
+  // Auto-collapse sidebar on narrow screens
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth <= 768) {
+        setSidebarOpen(false);
+      }
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex" }}>
@@ -123,6 +136,9 @@ export default function App() {
             {sidebarOpen ? "◀" : "▶"}
           </button>
         </div>
+
+        {/* Global Search */}
+        <GlobalSearch collapsed={!sidebarOpen} />
 
         {/* Nav Groups */}
         <nav style={{
@@ -194,6 +210,11 @@ export default function App() {
             </div>
           ))}
         </nav>
+
+        {/* Notification Center */}
+        <div style={{ borderTop: "1px solid var(--color-border)", padding: sidebarOpen ? "4px 0" : "4px 0" }}>
+          <NotificationCenter collapsed={!sidebarOpen} />
+        </div>
 
         {/* Bottom branding */}
         {sidebarOpen && (

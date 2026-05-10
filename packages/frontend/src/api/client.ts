@@ -1108,3 +1108,246 @@ export function triggerExport(body: { source_page: string; format: string }) {
     body: JSON.stringify(body),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Enrichments — Pwin, Recommendations, Competitors, Search, Notifications
+// ---------------------------------------------------------------------------
+
+export interface PwinFactor {
+  name: string;
+  weight: number;
+  score: number;
+  weighted_score: number;
+  rationale: string;
+}
+
+export interface PwinBreakdownData {
+  opp_id: string;
+  overall_pwin: number;
+  factors: PwinFactor[];
+  historical_win_rate: number;
+  confidence: "high" | "medium" | "low";
+  last_calculated: string;
+  methodology: string;
+  source: "mock" | "n8n";
+}
+
+export function fetchPwinBreakdown(oppId: string) {
+  return request<PwinBreakdownData>(`/enrichments/pwin/${oppId}`);
+}
+
+export interface SmartRecommendation {
+  id: string;
+  opp_id: string;
+  type: "action" | "risk" | "opportunity" | "insight";
+  priority: "high" | "medium" | "low";
+  title: string;
+  description: string;
+  impact: string;
+  deadline: string | null;
+  source: string;
+}
+
+export interface RecommendationsData {
+  recommendations: SmartRecommendation[];
+  total: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchRecommendations(oppId?: string) {
+  const qs = oppId ? `?opp_id=${oppId}` : "";
+  return request<RecommendationsData>(`/enrichments/recommendations${qs}`);
+}
+
+export interface IncumbentData {
+  opp_id: string;
+  incumbent_name: string;
+  contract_number: string;
+  contract_value: number;
+  contract_start: string;
+  contract_end: string;
+  performance_rating: string;
+  recompete_advantage: number;
+  strengths: string[];
+  weaknesses: string[];
+  key_personnel: Array<{ name: string; role: string; years_on_contract: number }>;
+  protest_risk: string;
+  notes: string;
+  source: "mock" | "n8n";
+}
+
+export function fetchIncumbentAnalysis(oppId: string) {
+  return request<IncumbentData>(`/enrichments/incumbent/${oppId}`);
+}
+
+export interface CompetitorEntry {
+  id: string;
+  name: string;
+  threat_level: "high" | "medium" | "low";
+  estimated_pwin: number;
+  strengths: string[];
+  weaknesses: string[];
+  likely_teaming: string[];
+  recent_wins: number;
+  size_status: string;
+  notes: string;
+}
+
+export interface CompetitorFieldData {
+  opp_id: string;
+  competitors: CompetitorEntry[];
+  our_position: number;
+  total_expected_bidders: number;
+  market_analysis: string;
+  source: "mock" | "n8n";
+}
+
+export function fetchCompetitorField(oppId: string) {
+  return request<CompetitorFieldData>(`/enrichments/competitors/${oppId}`);
+}
+
+export interface BlackHatScenario {
+  competitor: string;
+  likely_strategy: string;
+  technical_approach: string;
+  pricing_strategy: string;
+  teaming_strategy: string;
+  discriminators: string[];
+  vulnerabilities: string[];
+  counter_strategy: string;
+}
+
+export interface BlackHatAnalysisData {
+  opp_id: string;
+  scenarios: BlackHatScenario[];
+  our_discriminators: string[];
+  key_takeaways: string[];
+  source: "mock" | "n8n";
+}
+
+export function fetchBlackHatAnalysis(oppId: string) {
+  return request<BlackHatAnalysisData>(`/enrichments/blackhat/${oppId}`);
+}
+
+export interface WargameScenario {
+  id: string;
+  name: string;
+  probability: number;
+  description: string;
+  our_move: string;
+  competitor_response: string;
+  outcome: string;
+  risk_level: "high" | "medium" | "low";
+}
+
+export interface WargameAnalysisData {
+  opp_id: string;
+  scenarios: WargameScenario[];
+  recommended_strategy: string;
+  confidence: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchWargameAnalysis(oppId: string) {
+  return request<WargameAnalysisData>(`/enrichments/wargame/${oppId}`);
+}
+
+export interface IntelModule {
+  id: string;
+  capture_plan_id: string;
+  module_type: "market" | "competitor" | "customer" | "technical" | "pricing";
+  title: string;
+  status: "complete" | "in_progress" | "pending";
+  findings: string[];
+  sources: string[];
+  last_updated: string;
+  confidence: number;
+  action_items: string[];
+}
+
+export interface IntelModulesData {
+  modules: IntelModule[];
+  total: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchIntelModules(capturePlanId?: string) {
+  const qs = capturePlanId ? `?capture_plan_id=${capturePlanId}` : "";
+  return request<IntelModulesData>(`/enrichments/intel-modules${qs}`);
+}
+
+export interface TeamingCandidate {
+  id: string;
+  company_name: string;
+  size_status: string;
+  cage_code: string;
+  capabilities: string[];
+  past_performance_score: number;
+  relationship_strength: "strong" | "moderate" | "new";
+  geographic_coverage: string[];
+  clearance_level: string;
+  teaming_score: number;
+  rationale: string;
+  risks: string[];
+  recommended_role: string;
+}
+
+export interface TeamingData {
+  opp_id: string;
+  candidates: TeamingCandidate[];
+  gaps_identified: string[];
+  recommended_team: string[];
+  source: "mock" | "n8n";
+}
+
+export function fetchTeamingCandidates(oppId: string) {
+  return request<TeamingData>(`/enrichments/teaming/${oppId}`);
+}
+
+export interface SearchResult {
+  type: string;
+  id: string;
+  title: string;
+  score: number;
+  snippet: string;
+  path: string;
+}
+
+export interface SearchData {
+  query: string;
+  results: SearchResult[];
+  total: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchSearchResults(query: string) {
+  return request<SearchData>("/enrichments/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+}
+
+export interface NotificationItem {
+  id: string;
+  type: "deadline" | "milestone" | "approval" | "intel" | "risk" | "system";
+  severity: "critical" | "warning" | "info";
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  link: string | null;
+  source: string;
+}
+
+export interface NotificationsData {
+  notifications: NotificationItem[];
+  total: number;
+  unread: number;
+  source: "mock" | "n8n";
+}
+
+export function fetchNotifications(unreadOnly?: boolean) {
+  const qs = unreadOnly ? "?unread=true" : "";
+  return request<NotificationsData>(`/enrichments/notifications${qs}`);
+}

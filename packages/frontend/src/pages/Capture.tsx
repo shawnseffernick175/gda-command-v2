@@ -255,15 +255,30 @@ function activityIcon(type: string): string {
 // Component
 // ---------------------------------------------------------------------------
 
-type Tab = "plans" | "activity" | "milestones";
+type Tab = "plans" | "activity" | "milestones" | "intel";
+
+interface IntelModuleItem {
+  id: string;
+  capture_plan_id: string;
+  module_type: string;
+  title: string;
+  status: "complete" | "in_progress" | "pending";
+  findings: string[];
+  sources: string[];
+  last_updated: string;
+  confidence: number;
+  action_items: string[];
+}
 
 export default function Capture() {
   const [tab, setTab] = useState<Tab>("plans");
   const [plansData, setPlansData] = useState<PlansData | null>(null);
   const [activitiesData, setActivitiesData] = useState<ActivitiesData | null>(null);
+  const [intelModules, setIntelModules] = useState<IntelModuleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [expandedIntel, setExpandedIntel] = useState<string | null>(null);
   const [phaseFilter, setPhaseFilter] = useState("");
   const [activityTypeFilter, setActivityTypeFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -287,9 +302,12 @@ export default function Capture() {
       `/api/capture/activities?${activityTypeFilter ? `type=${activityTypeFilter}` : ""}`
     );
 
-    Promise.all([fetchPlans, fetchActivities]).then(([p, a]) => {
+    const fetchIntel = fetchJson<{ modules: IntelModuleItem[] }>("/api/enrichments/intel-modules");
+
+    Promise.all([fetchPlans, fetchActivities, fetchIntel]).then(([p, a, im]) => {
       setPlansData(p);
       setActivitiesData(a);
+      if (im?.modules) setIntelModules(im.modules);
       setLoading(false);
     });
   }, [phaseFilter, search, activityTypeFilter]);
@@ -340,7 +358,7 @@ export default function Capture() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
-        {(["plans", "activity", "milestones"] as Tab[]).map((t) => (
+        {(["plans", "activity", "milestones", "intel"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -355,7 +373,7 @@ export default function Capture() {
               background: tab === t ? "rgba(59,130,246,0.1)" : "transparent",
             }}
           >
-            {t === "plans" ? "Capture Plans" : t === "activity" ? "Activity Log" : "Milestones"}
+            {t === "plans" ? "Capture Plans" : t === "activity" ? "Activity Log" : t === "milestones" ? "Milestones" : `Intel Modules (${intelModules.length})`}
           </button>
         ))}
       </div>
@@ -387,8 +405,88 @@ export default function Capture() {
           activityTypeFilter={activityTypeFilter}
           setActivityTypeFilter={setActivityTypeFilter}
         />
-      ) : (
+      ) : tab === "milestones" ? (
         <MilestonesTab plansData={plansData} plans={plans} />
+      ) : (
+        /* Intel Modules Tab */
+        <div>
+          {intelModules.length === 0 ? (
+            <p style={{ color: "var(--color-text-muted)" }}>No intel modules available.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 12 }}>
+              {intelModules.map((m) => {
+                const statusColor = m.status === "complete" ? "#22c55e" : m.status === "in_progress" ? "#f59e0b" : "#6b7280";
+                const typeIcons: Record<string, string> = { market: "📊", competitor: "🏢", customer: "👤", technical: "🔧", pricing: "💰" };
+                return (
+                  <div
+                    key={m.id}
+                    style={{
+                      padding: 16,
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 8,
+                      borderLeft: `3px solid ${statusColor}`,
+                      cursor: "pointer",
+                    }}
+                    onClick={() => setExpandedIntel(expandedIntel === m.id ? null : m.id)}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span>{typeIcons[m.module_type] ?? "📎"}</span>
+                        <strong style={{ fontSize: 14 }}>{m.title}</strong>
+                        <span style={{
+                          fontSize: 10,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: `${statusColor}20`,
+                          color: statusColor,
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                        }}>
+                          {m.status.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "#9ca3af" }}>
+                        <span>Confidence: {Math.round(m.confidence * 100)}%</span>
+                        <span>{new Date(m.last_updated).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+
+                    {expandedIntel === m.id && (
+                      <div style={{ marginTop: 12, fontSize: 13 }}>
+                        {m.findings.length > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <strong style={{ fontSize: 12, color: "#3b82f6" }}>Findings ({m.findings.length})</strong>
+                            <ul style={{ margin: "4px 0 0", paddingLeft: 20, lineHeight: 1.6 }}>
+                              {m.findings.map((f, i) => <li key={i}>{f}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {m.sources.length > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <strong style={{ fontSize: 12, color: "#9ca3af" }}>Sources</strong>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                              {m.sources.map((s, i) => (
+                                <span key={i} style={{ padding: "2px 8px", background: "rgba(107,114,128,0.1)", borderRadius: 4, fontSize: 11 }}>{s}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {m.action_items.length > 0 && (
+                          <div>
+                            <strong style={{ fontSize: 12, color: "#f59e0b" }}>Action Items ({m.action_items.length})</strong>
+                            <ul style={{ margin: "4px 0 0", paddingLeft: 20, lineHeight: 1.6 }}>
+                              {m.action_items.map((a, i) => <li key={i}>{a}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Gate Review Modal */}

@@ -2,12 +2,22 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   fetchOpportunityDetail,
+  fetchPwinBreakdown,
+  fetchIncumbentAnalysis,
+  fetchCompetitorField,
+  fetchBlackHatAnalysis,
+  fetchWargameAnalysis,
   type OpportunityDetailData,
   type OodaObserveItem,
   type OodaOrientItem,
   type OodaDecideOption,
   type OodaActStep,
   type OpportunitySourceRow,
+  type PwinBreakdownData,
+  type IncumbentData,
+  type CompetitorFieldData,
+  type BlackHatAnalysisData,
+  type WargameAnalysisData,
 } from "../api/client";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -62,6 +72,12 @@ export default function OpportunityDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [pwin, setPwin] = useState<PwinBreakdownData | null>(null);
+  const [incumbent, setIncumbent] = useState<IncumbentData | null>(null);
+  const [competitors, setCompetitors] = useState<CompetitorFieldData | null>(null);
+  const [blackHat, setBlackHat] = useState<BlackHatAnalysisData | null>(null);
+  const [wargame, setWargame] = useState<WargameAnalysisData | null>(null);
+
   const backPath = location.state?.from ?? "/ops-tracker";
   const backLabel = backPath === "/pipeline" ? "Pipeline" : backPath === "/" ? "Launchpad" : "Ops Tracker";
 
@@ -79,6 +95,13 @@ export default function OpportunityDetail() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    // Fetch enrichments in parallel (non-blocking)
+    fetchPwinBreakdown(id).then((e) => { if (e.success && e.data) setPwin(e.data); }).catch(() => {});
+    fetchIncumbentAnalysis(id).then((e) => { if (e.success && e.data) setIncumbent(e.data); }).catch(() => {});
+    fetchCompetitorField(id).then((e) => { if (e.success && e.data) setCompetitors(e.data); }).catch(() => {});
+    fetchBlackHatAnalysis(id).then((e) => { if (e.success && e.data) setBlackHat(e.data); }).catch(() => {});
+    fetchWargameAnalysis(id).then((e) => { if (e.success && e.data) setWargame(e.data); }).catch(() => {});
   }, [id]);
 
   if (loading) {
@@ -271,8 +294,199 @@ export default function OpportunityDetail() {
         </div>
       </Section>
 
-      {/* Section 5: Competitive Landscape */}
-      <Section title="Competitive Landscape">
+      {/* Section 5: Pwin Breakdown */}
+      {pwin && (
+        <Section title={`Pwin Analysis — ${Math.round(pwin.overall_pwin * 100)}%`}>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 16 }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: pwin.overall_pwin >= 0.6 ? "#22c55e" : pwin.overall_pwin >= 0.4 ? "#f59e0b" : "#ef4444" }}>
+                {Math.round(pwin.overall_pwin * 100)}%
+              </div>
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>Overall Pwin</div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "#6b7280" }}>{Math.round(pwin.historical_win_rate * 100)}%</div>
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>Historical Win Rate</div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <span style={{ ...styles.badge, background: pwin.confidence === "high" ? "#166534" : pwin.confidence === "medium" ? "#92400e" : "#991b1b", fontSize: 12, padding: "4px 10px" }}>
+                {pwin.confidence} confidence
+              </span>
+            </div>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr>
+                <th style={styles.sourceTh}>Factor</th>
+                <th style={{ ...styles.sourceTh, textAlign: "center" }}>Weight</th>
+                <th style={{ ...styles.sourceTh, textAlign: "center" }}>Score</th>
+                <th style={{ ...styles.sourceTh, textAlign: "center" }}>Weighted</th>
+                <th style={styles.sourceTh}>Rationale</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pwin.factors.map((f) => (
+                <tr key={f.name}>
+                  <td style={{ ...styles.sourceTd, fontWeight: 600 }}>{f.name}</td>
+                  <td style={{ ...styles.sourceTd, textAlign: "center" }}>{Math.round(f.weight * 100)}%</td>
+                  <td style={{ ...styles.sourceTd, textAlign: "center" }}>
+                    <span style={{ color: f.score >= 0.7 ? "#22c55e" : f.score >= 0.5 ? "#f59e0b" : "#ef4444", fontWeight: 600 }}>
+                      {Math.round(f.score * 100)}
+                    </span>
+                  </td>
+                  <td style={{ ...styles.sourceTd, textAlign: "center", fontWeight: 600 }}>{(f.weighted_score * 100).toFixed(1)}</td>
+                  <td style={{ ...styles.sourceTd, color: "#9ca3af", fontSize: 12 }}>{f.rationale}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 8, fontSize: 11, color: "#6b7280" }}>{pwin.methodology}</div>
+        </Section>
+      )}
+
+      {/* Section 6: Incumbent Analysis */}
+      {incumbent && (
+        <Section title={`Incumbent: ${incumbent.incumbent_name}`}>
+          <div style={styles.fieldGrid}>
+            <Field label="Contract" value={incumbent.contract_number} />
+            <Field label="Value" value={formatCurrency(incumbent.contract_value)} />
+            <Field label="Period" value={`${formatDate(incumbent.contract_start)} — ${formatDate(incumbent.contract_end)}`} />
+            <Field label="CPARS Rating" value={incumbent.performance_rating.charAt(0).toUpperCase() + incumbent.performance_rating.slice(1)} />
+            <Field label="Recompete Advantage" value={`+${Math.round(incumbent.recompete_advantage * 100)}%`} />
+            <Field label="Protest Risk" value={incumbent.protest_risk.charAt(0).toUpperCase() + incumbent.protest_risk.slice(1)} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+            <div>
+              <strong style={{ fontSize: 13, color: "#22c55e" }}>Strengths</strong>
+              <ul style={styles.bulletList}>{incumbent.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+            </div>
+            <div>
+              <strong style={{ fontSize: 13, color: "#ef4444" }}>Weaknesses</strong>
+              <ul style={styles.bulletList}>{incumbent.weaknesses.map((w, i) => <li key={i}>{w}</li>)}</ul>
+            </div>
+          </div>
+          {incumbent.key_personnel.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <strong style={{ fontSize: 13 }}>Key Personnel</strong>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 6 }}>
+                {incumbent.key_personnel.map((p) => (
+                  <span key={p.name} style={{ padding: "4px 10px", background: "rgba(107,114,128,0.1)", borderRadius: 4, fontSize: 12 }}>
+                    {p.name} — {p.role} ({p.years_on_contract}yr)
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <p style={{ marginTop: 12, fontSize: 13, color: "#9ca3af", lineHeight: 1.5 }}>{incumbent.notes}</p>
+        </Section>
+      )}
+
+      {/* Section 7: Competitor Field */}
+      {competitors && (
+        <Section title={`Competitor Field — ${competitors.total_expected_bidders} Expected Bidders (We're #${competitors.our_position})`}>
+          <p style={{ margin: "0 0 12px", lineHeight: 1.6, fontSize: 13, color: "#9ca3af" }}>{competitors.market_analysis}</p>
+          {competitors.competitors.map((c) => (
+            <div key={c.id} style={{ padding: 12, marginBottom: 8, background: "rgba(107,114,128,0.05)", borderRadius: 6, border: "1px solid var(--color-border)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong>{c.name}</strong>
+                  <span style={{ ...styles.badge, background: c.threat_level === "high" ? "#991b1b" : c.threat_level === "medium" ? "#92400e" : "#166534" }}>
+                    {c.threat_level} threat
+                  </span>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>{c.size_status.toUpperCase()}</span>
+                </div>
+                <span style={{ fontWeight: 600, color: c.estimated_pwin >= 0.3 ? "#ef4444" : "#f59e0b" }}>
+                  Est. Pwin: {Math.round(c.estimated_pwin * 100)}%
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
+                <div><span style={{ color: "#22c55e" }}>+</span> {c.strengths.slice(0, 3).join(" · ")}</div>
+                <div><span style={{ color: "#ef4444" }}>−</span> {c.weaknesses.slice(0, 2).join(" · ")}</div>
+              </div>
+              {c.likely_teaming.length > 0 && (
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Likely teaming: {c.likely_teaming.join(", ")}</div>
+              )}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* Section 8: Black Hat Analysis */}
+      {blackHat && (
+        <Section title="Black Hat Analysis">
+          <div style={{ marginBottom: 12 }}>
+            <strong style={{ fontSize: 13, color: "#3b82f6" }}>Our Discriminators</strong>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+              {blackHat.our_discriminators.map((d, i) => (
+                <span key={i} style={{ padding: "4px 10px", background: "rgba(59,130,246,0.1)", borderRadius: 12, fontSize: 12, color: "#60a5fa" }}>
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
+          {blackHat.scenarios.map((s, i) => (
+            <details key={i} style={{ marginBottom: 8, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>🎯 {s.competitor} — Black Hat Scenario</summary>
+              <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>
+                <p><strong>Strategy:</strong> {s.likely_strategy}</p>
+                <p><strong>Technical Approach:</strong> {s.technical_approach}</p>
+                <p><strong>Pricing:</strong> {s.pricing_strategy}</p>
+                <p><strong>Teaming:</strong> {s.teaming_strategy}</p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 8 }}>
+                  <div>
+                    <strong style={{ color: "#ef4444", fontSize: 12 }}>Their Discriminators</strong>
+                    <ul style={styles.bulletList}>{s.discriminators.map((d, j) => <li key={j}>{d}</li>)}</ul>
+                  </div>
+                  <div>
+                    <strong style={{ color: "#22c55e", fontSize: 12 }}>Their Vulnerabilities</strong>
+                    <ul style={styles.bulletList}>{s.vulnerabilities.map((v, j) => <li key={j}>{v}</li>)}</ul>
+                  </div>
+                </div>
+                <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(59,130,246,0.08)", borderRadius: 6 }}>
+                  <strong style={{ fontSize: 12, color: "#3b82f6" }}>Counter Strategy:</strong>
+                  <p style={{ margin: "4px 0 0" }}>{s.counter_strategy}</p>
+                </div>
+              </div>
+            </details>
+          ))}
+          <div style={{ marginTop: 12 }}>
+            <strong style={{ fontSize: 13 }}>Key Takeaways</strong>
+            <ul style={styles.bulletList}>{blackHat.key_takeaways.map((t, i) => <li key={i}>{t}</li>)}</ul>
+          </div>
+        </Section>
+      )}
+
+      {/* Section 9: Wargame Scenarios */}
+      {wargame && (
+        <Section title="Wargame Scenarios">
+          <div style={{ padding: "10px 14px", background: "rgba(59,130,246,0.08)", borderRadius: 6, marginBottom: 16, fontSize: 13 }}>
+            <strong>Recommended Strategy:</strong> {wargame.recommended_strategy}
+            <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>Confidence: {Math.round(wargame.confidence * 100)}%</div>
+          </div>
+          {wargame.scenarios.map((s) => (
+            <div key={s.id} style={{ padding: 12, marginBottom: 8, border: "1px solid var(--color-border)", borderRadius: 6, borderLeft: `3px solid ${s.risk_level === "high" ? "#ef4444" : s.risk_level === "medium" ? "#f59e0b" : "#22c55e"}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <strong>{s.name}</strong>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#9ca3af" }}>Probability: {Math.round(s.probability * 100)}%</span>
+                  <span style={{ ...styles.badge, background: s.risk_level === "high" ? "#991b1b" : s.risk_level === "medium" ? "#92400e" : "#166534" }}>
+                    {s.risk_level}
+                  </span>
+                </div>
+              </div>
+              <p style={{ margin: "0 0 8px", fontSize: 13, color: "#d1d5db" }}>{s.description}</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, fontSize: 12 }}>
+                <div><strong style={{ color: "#3b82f6" }}>Our Move:</strong><br />{s.our_move}</div>
+                <div><strong style={{ color: "#ef4444" }}>Competitor Response:</strong><br />{s.competitor_response}</div>
+                <div><strong style={{ color: "#f59e0b" }}>Outcome:</strong><br />{s.outcome}</div>
+              </div>
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* Section 10: Competitive Landscape (Text) */}
+      <Section title="Competitive Landscape Summary">
         {analysis.competitive_landscape ? (
           <p style={{ margin: 0, lineHeight: 1.6 }}>{analysis.competitive_landscape}</p>
         ) : (
@@ -280,7 +494,7 @@ export default function OpportunityDetail() {
         )}
       </Section>
 
-      {/* Section 6: Sources */}
+      {/* Section 11: Sources */}
       <Section title="Sources">
         {sources.length === 0 ? (
           <EmptyState text="No external sources are associated with this analysis." />

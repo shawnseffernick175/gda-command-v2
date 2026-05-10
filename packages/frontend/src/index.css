@@ -35,3 +35,27 @@ a {
 a:hover {
   text-decoration: underline;
 }
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  main {
+    padding: 12px !important;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Stack grids on mobile */
+  .field-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  main {
+    padding: 8px !important;
+  }
+}
