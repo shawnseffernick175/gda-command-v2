@@ -53,6 +53,8 @@ npm run dev --workspace=@gda/frontend
 | `/intel` | Intel Hub — intelligence feed, morning briefings, deep research, competitor watch |
 | `/capture` | Capture Planner — capture plans, BD activities, milestones, gate reviews, teaming |
 | `/workflows` | Workflow Manager — browse, search, and filter all n8n workflows |
+| `/financial-bible` | Financial Bible — drill-down behind every KPI (Orders, Sales, EBIT, ROS, Backlog, Gross Profit) |
+| `/financial-bible/:key` | Financial Bible — single KPI drill-down with line items, trends, and insights |
 | `/settings` | Settings — system config, connectors, feature flags, health check |
 
 ### Backend API
@@ -79,10 +81,28 @@ npm run dev --workspace=@gda/frontend
 | `GET /api/capture/plans/:id` | Single capture plan detail with activities |
 | `GET /api/capture/activities` | BD activity log across all captures |
 | `POST /api/capture/gate-review` | Trigger gate review checks (dry-run) |
+| `GET /api/financials/kpis` | Financial KPIs for persistent strip (Orders, Sales, EBIT, ROS, Funded Backlog, Backlog, Gross Profit) |
+| `GET /api/financials/:key` | Financial Bible drill-down for a single KPI |
 | `GET /api/workflows/registry` | n8n workflow registry with status and metadata |
 | `GET /api/settings` | System settings, connectors, feature flags |
 
 All API responses follow the standard GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`.
+
+## Persistent Financial KPI Strip
+
+A global financial KPI strip is rendered below the navigation bar on every page. It displays:
+- **Orders** · **Sales** · **EBIT** · **ROS** · **Funded Backlog** · **Backlog** · **Gross Profit**
+- Each KPI shows current value and change indicator vs. prior period
+- Clicking any KPI navigates to its Financial Bible drill-down
+- Collapsible to save vertical space
+- Falls back gracefully when financial data is not available
+
+## Navigation
+
+The nav bar is organized into three groups:
+- **BD Tools**: Launchpad, Ops Tracker, Pipeline, Capture
+- **Analysis**: Intel Hub, Financials
+- **Platform**: QA Center, Doctrine, Workflows, Settings
 
 ## Database
 

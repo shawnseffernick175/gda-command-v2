@@ -191,6 +191,12 @@ export default function Home() {
                 statusColor="#f97316"
               />
               <Card
+                title="Financial Bible"
+                description="Drill-down behind every KPI — Orders, Sales, EBIT, ROS, Backlog, Gross Profit."
+                to="/financial-bible"
+                statusColor="#3b82f6"
+              />
+              <Card
                 title="Workflows"
                 description="Browse and manage all n8n automation workflows."
                 to="/workflows"

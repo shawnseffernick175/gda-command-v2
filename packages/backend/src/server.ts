@@ -8,6 +8,7 @@ import doctrineRouter from "./routes/doctrine";
 import intelRouter from "./routes/intel";
 import captureRouter from "./routes/capture";
 import settingsRouter from "./routes/settings";
+import financialsRouter from "./routes/financials";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -66,6 +67,7 @@ app.use("/api/doctrine", doctrineRouter);
 app.use("/api/intel", intelRouter);
 app.use("/api/capture", captureRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/financials", financialsRouter);
 
 // --- Catch-all 404 ---
 app.use((_req, res) => {
