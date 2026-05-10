@@ -839,3 +839,102 @@ export function fetchProposals(params?: Record<string, string>) {
 export function fetchProposalDetail(id: string) {
   return request<ProposalDetailData>(`/proposals/${id}`);
 }
+
+// ---------------------------------------------------------------------------
+// Contacts & Relationships
+// ---------------------------------------------------------------------------
+
+export interface ActionItemRow {
+  description: string;
+  owner: string;
+  due_date: string | null;
+  status: "open" | "completed" | "overdue";
+}
+
+export interface MeetingNoteRow {
+  id: string;
+  date: string;
+  type: string;
+  subject: string;
+  attendees: string[];
+  topics: string[];
+  action_items: ActionItemRow[];
+  notes: string;
+}
+
+export interface ContactRelationshipRow {
+  contact_id: string;
+  contact_name: string;
+  relationship_type: string;
+  strength: string;
+  notes: string | null;
+}
+
+export interface LinkedOpportunityRow {
+  opportunity_id: string;
+  opportunity_title: string;
+  role: string;
+  agency: string;
+  status: string;
+  value_estimated: number;
+}
+
+export interface TeamingRecordRow {
+  partner_name: string;
+  role: string;
+  status: string;
+  capability: string;
+  past_collaborations: string[];
+  assessment: string;
+}
+
+export interface ContactRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  title: string;
+  agency: string;
+  department: string;
+  email: string;
+  phone: string;
+  status: string;
+  relationship_strength: string;
+  last_contact_date: string;
+  relationship_history: string;
+  meeting_notes: MeetingNoteRow[];
+  relationships: ContactRelationshipRow[];
+  linked_opportunities: LinkedOpportunityRow[];
+  teaming_records: TeamingRecordRow[];
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactsData {
+  contacts: ContactRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    statusCounts: Record<string, number>;
+    strengthCounts: Record<string, number>;
+    activeRelationships: number;
+    pendingMeetings: number;
+    teamingGaps: number;
+    agencies: string[];
+  };
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ContactDetailData {
+  contact: ContactRow;
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchContacts(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ContactsData>(`/contacts${qs}`);
+}
+
+export function fetchContactDetail(id: string) {
+  return request<ContactDetailData>(`/contacts/${id}`);
+}

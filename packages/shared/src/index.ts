@@ -603,3 +603,79 @@ export interface Proposal {
   created_at: string;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Contacts & Relationships types
+// ---------------------------------------------------------------------------
+
+export type ContactStatus = "active" | "inactive" | "prospect";
+
+export type RelationshipStrength = "strong" | "moderate" | "weak" | "new";
+
+export type MeetingType = "in_person" | "virtual" | "phone" | "conference";
+
+export interface MeetingNote {
+  id: string;
+  date: string;
+  type: MeetingType;
+  subject: string;
+  attendees: string[];
+  topics: string[];
+  action_items: ActionItem[];
+  notes: string;
+}
+
+export interface ActionItem {
+  description: string;
+  owner: string;
+  due_date: string | null;
+  status: "open" | "completed" | "overdue";
+}
+
+export interface ContactRelationship {
+  contact_id: string;
+  contact_name: string;
+  relationship_type: "peer" | "supervisor" | "subordinate" | "stakeholder" | "champion";
+  strength: RelationshipStrength;
+  notes: string | null;
+}
+
+export interface LinkedOpportunity {
+  opportunity_id: string;
+  opportunity_title: string;
+  role: string;
+  agency: string;
+  status: string;
+  value_estimated: number;
+}
+
+export interface TeamingRecord {
+  partner_name: string;
+  role: "prime" | "sub" | "mentor" | "jv_partner";
+  status: "active" | "past" | "prospective";
+  capability: string;
+  past_collaborations: string[];
+  assessment: string;
+}
+
+export interface Contact {
+  id: string;
+  first_name: string;
+  last_name: string;
+  title: string;
+  agency: string;
+  department: string;
+  email: string;
+  phone: string;
+  status: ContactStatus;
+  relationship_strength: RelationshipStrength;
+  last_contact_date: string;
+  relationship_history: string;
+  meeting_notes: MeetingNote[];
+  relationships: ContactRelationship[];
+  linked_opportunities: LinkedOpportunity[];
+  teaming_records: TeamingRecord[];
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
