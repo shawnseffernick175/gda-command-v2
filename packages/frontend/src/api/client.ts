@@ -1550,3 +1550,583 @@ export function fetchFastTrackMatches(params: FastTrackQueryParams = {}) {
 export function fetchFastTrackDetail(id: string) {
   return request<FastTrackDetailData>(`/fast-track/${id}`);
 }
+
+// ---------------------------------------------------------------------------
+// Knowledge Base (Phase F)
+// ---------------------------------------------------------------------------
+
+export interface KnowledgeSummaryData {
+  total_documents: number;
+  indexed_count: number;
+  processing_count: number;
+  total_chunks: number;
+  total_access_count: number;
+  collection_count: number;
+  top_documents: Array<{ id: string; title: string; access_count: number }>;
+}
+
+export interface KnowledgeCollection {
+  id: string;
+  name: string;
+  description: string;
+  document_count: number;
+  total_chunks: number;
+  last_updated: string;
+  icon: string;
+}
+
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  file_name: string;
+  file_size_bytes: number;
+  pages: number | null;
+  chunks_indexed: number;
+  uploaded_at: string;
+  indexed_at: string | null;
+  last_accessed: string | null;
+  access_count: number;
+  collection: string;
+  tags: string[];
+  metadata: {
+    agency?: string;
+    contract_number?: string;
+    naics?: string;
+    period_of_performance?: string;
+    solicitation_number?: string;
+    author?: string;
+  };
+  summary: string;
+}
+
+export interface KnowledgeSearchResult {
+  document_id: string;
+  document_title: string;
+  document_type: string;
+  collection: string;
+  chunks: Array<{
+    chunk_id: string;
+    text: string;
+    page: number | null;
+    section: string | null;
+    similarity_score?: number;
+  }>;
+  relevance_score: number;
+  highlight: string;
+}
+
+export interface KnowledgeSearchData {
+  query: string;
+  results: KnowledgeSearchResult[];
+  total_results: number;
+}
+
+export interface ChatMessageSource {
+  document_id: string;
+  document_title: string;
+  chunk_text: string;
+  page: number | null;
+  relevance: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+  sources?: ChatMessageSource[];
+}
+
+export interface ChatSessionSummary {
+  id: string;
+  title: string;
+  message_count: number;
+  created_at: string;
+  last_message: string;
+}
+
+export interface ChatSessionDetail {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  created_at: string;
+  context?: string;
+}
+
+export interface ChatResponseData {
+  session_id: string;
+  message: ChatMessage;
+}
+
+export interface UploadResponseData {
+  id: string;
+  file_name: string;
+  document_type: string;
+  collection: string;
+  tags: string[];
+  status: string;
+  message: string;
+  estimated_processing_time: string;
+  pipeline: string;
+}
+
+export function fetchKnowledgeSummary() {
+  return request<KnowledgeSummaryData>("/knowledge/summary");
+}
+
+export function fetchKnowledgeCollections() {
+  return request<KnowledgeCollection[]>("/knowledge/collections");
+}
+
+export interface KnowledgeDocumentQueryParams {
+  collection?: string;
+  type?: string;
+  status?: string;
+  search?: string;
+  sort?: string;
+}
+
+export function fetchKnowledgeDocuments(params: KnowledgeDocumentQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.collection) qs.set("collection", params.collection);
+  if (params.type) qs.set("type", params.type);
+  if (params.status) qs.set("status", params.status);
+  if (params.search) qs.set("search", params.search);
+  if (params.sort) qs.set("sort", params.sort);
+  const query = qs.toString();
+  return request<KnowledgeDocument[]>(`/knowledge/documents${query ? `?${query}` : ""}`);
+}
+
+export function fetchKnowledgeDocument(id: string) {
+  return request<KnowledgeDocument>(`/knowledge/documents/${id}`);
+}
+
+export function searchKnowledge(query: string, limit = 10) {
+  const qs = new URLSearchParams({ q: query, limit: String(limit) });
+  return request<KnowledgeSearchData>(`/knowledge/search?${qs}`);
+}
+
+export function fetchChatSessions() {
+  return request<ChatSessionSummary[]>("/knowledge/chat/sessions");
+}
+
+export function fetchChatSession(id: string) {
+  return request<ChatSessionDetail>(`/knowledge/chat/sessions/${id}`);
+}
+
+export function sendChatMessage(message: string, sessionId?: string) {
+  return request<ChatResponseData>("/knowledge/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, session_id: sessionId }),
+  });
+}
+
+export function uploadDocument(fileName: string, documentType?: string, collection?: string, tags?: string[]) {
+  return request<UploadResponseData>("/knowledge/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_name: fileName, document_type: documentType, collection, tags }),
+  });
+}
+
+// --- RFP Shredder ---
+
+export interface ShredJobRow {
+  id: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  agency: string;
+  file_name: string;
+  file_size_bytes: number;
+  page_count: number;
+  status: "completed" | "processing" | "failed" | "queued";
+  requirements_found: number;
+  sections_parsed: string[];
+  started_at: string;
+  completed_at: string | null;
+  processing_time_seconds: number | null;
+  correlation_id: string;
+  error_message: string | null;
+}
+
+export interface ShredJobsSummary {
+  total: number;
+  completed: number;
+  processing: number;
+  failed: number;
+  queued: number;
+  total_requirements: number;
+  total_pages: number;
+}
+
+export interface ShredJobsData {
+  jobs: ShredJobRow[];
+  summary: ShredJobsSummary;
+}
+
+export interface ExtractedRequirementRow {
+  id: string;
+  shred_job_id: string;
+  section: string;
+  requirement_text: string;
+  requirement_type: string;
+  complexity: "simple" | "moderate" | "complex";
+  keyword: string;
+  far_references: string[];
+  compliance_match: "full" | "partial" | "none";
+  matched_evidence: string | null;
+  matched_document_id: string | null;
+  matched_document_title: string | null;
+  page_number: number;
+  confidence: number;
+}
+
+export interface RequirementsSummary {
+  total: number;
+  full_match: number;
+  partial_match: number;
+  no_match: number;
+  by_type: Record<string, number>;
+  by_complexity: Record<string, number>;
+  avg_confidence: number;
+}
+
+export interface RequirementsData {
+  requirements: ExtractedRequirementRow[];
+  summary: RequirementsSummary;
+}
+
+export interface ComplianceMapRecord {
+  document_id: string;
+  document_title: string;
+  section: string;
+  relevance: number;
+  excerpt: string;
+}
+
+export interface ComplianceMapEntryRow {
+  requirement_id: string;
+  section: string;
+  requirement_text: string;
+  requirement_type: string;
+  match_level: "full" | "partial" | "none";
+  matched_records: ComplianceMapRecord[];
+  gap_notes: string | null;
+  suggested_approach: string | null;
+}
+
+export interface ComplianceMapSummary {
+  total: number;
+  full_match: number;
+  partial_match: number;
+  no_match: number;
+  coverage_score: number;
+}
+
+export interface ComplianceMapData {
+  job_id: string;
+  solicitation_title: string;
+  entries: ComplianceMapEntryRow[];
+  summary: ComplianceMapSummary;
+}
+
+export interface ResponseOutlineSectionRow {
+  id: string;
+  section_number: string;
+  title: string;
+  requirements_covered: string[];
+  recommended_approach: string;
+  past_performance_citations: string[];
+  page_estimate: number;
+  complexity: "simple" | "moderate" | "complex";
+  status: "draft_available" | "needs_new_content" | "reuse_available";
+}
+
+export interface ResponseOutlineSummary {
+  total_sections: number;
+  total_page_estimate: number;
+  reuse_available: number;
+  draft_available: number;
+  needs_new_content: number;
+}
+
+export interface ResponseOutlineData {
+  job_id: string;
+  solicitation_title: string;
+  sections: ResponseOutlineSectionRow[];
+  summary: ResponseOutlineSummary;
+}
+
+export interface ShredInitData {
+  id: string;
+  file_name: string;
+  solicitation_title: string;
+  agency: string;
+  status: string;
+  correlation_id: string;
+  message: string;
+  estimated_processing_time: string;
+  pipeline: string;
+}
+
+export interface RequirementQueryParams {
+  job_id?: string;
+  type?: string;
+  complexity?: string;
+  match?: string;
+  search?: string;
+  sort?: string;
+}
+
+export function fetchShredJobs(params: { status?: string; search?: string; agency?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.search) qs.set("search", params.search);
+  if (params.agency) qs.set("agency", params.agency);
+  const query = qs.toString();
+  return request<ShredJobsData>(`/rfp-shredder/jobs${query ? `?${query}` : ""}`);
+}
+
+export function fetchShredJob(id: string) {
+  return request<ShredJobRow>(`/rfp-shredder/jobs/${id}`);
+}
+
+export function fetchShredRequirements(params: RequirementQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.job_id) qs.set("job_id", params.job_id);
+  if (params.type) qs.set("type", params.type);
+  if (params.complexity) qs.set("complexity", params.complexity);
+  if (params.match) qs.set("match", params.match);
+  if (params.search) qs.set("search", params.search);
+  if (params.sort) qs.set("sort", params.sort);
+  const query = qs.toString();
+  return request<RequirementsData>(`/rfp-shredder/requirements${query ? `?${query}` : ""}`);
+}
+
+export function fetchComplianceMap(jobId: string) {
+  return request<ComplianceMapData>(`/rfp-shredder/compliance-map/${jobId}`);
+}
+
+export function fetchResponseOutline(jobId: string) {
+  return request<ResponseOutlineData>(`/rfp-shredder/response-outline/${jobId}`);
+}
+
+export function initiateShred(fileName: string, solicitationTitle: string, agency?: string) {
+  return request<ShredInitData>("/rfp-shredder/shred", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_name: fileName, solicitation_title: solicitationTitle, agency }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Phase I — Predictive Analytics
+// ---------------------------------------------------------------------------
+
+export interface PwinFeatureClient {
+  name: string;
+  value: string;
+  importance: number;
+  impact: "positive" | "negative" | "neutral";
+  benchmark: string;
+}
+
+export interface PwinImprovementClient {
+  action: string;
+  estimated_pwin_lift: number;
+  effort: "low" | "medium" | "high";
+  deadline: string | null;
+}
+
+export interface PwinModelData {
+  opp_id: string;
+  opp_title: string;
+  agency: string;
+  ml_pwin: number;
+  static_pwin: number;
+  confidence_interval: { lower: number; upper: number };
+  confidence_level: "high" | "medium" | "low";
+  model_version: string;
+  last_updated: string;
+  features: PwinFeatureClient[];
+  improvement_actions: PwinImprovementClient[];
+  similar_opps_won: number;
+  similar_opps_lost: number;
+  trend: "improving" | "stable" | "declining";
+  trend_delta: number;
+}
+
+export interface PwinModelsListData {
+  models: PwinModelData[];
+  total: number;
+}
+
+export function fetchPwinModels() {
+  return request<PwinModelsListData>("/predictive/pwin-models");
+}
+
+export function fetchPwinModel(oppId: string) {
+  return request<PwinModelData>(`/predictive/pwin-models/${oppId}`);
+}
+
+export interface MonthlyForecastClient {
+  month: string;
+  p10: number;
+  p50: number;
+  p90: number;
+  target: number;
+  actuals: number | null;
+}
+
+export interface ForecastContributorClient {
+  opp_id: string;
+  title: string;
+  agency: string;
+  value: number;
+  pwin: number;
+  weighted_value: number;
+  expected_close: string;
+  status: "pursue" | "evaluate" | "capture" | "proposal";
+}
+
+export interface ForecastRiskClient {
+  id: string;
+  risk: string;
+  impact_revenue: number;
+  probability: number;
+  mitigation: string;
+  severity: "critical" | "high" | "medium" | "low";
+}
+
+export interface ForecastScenarioClient {
+  label: string;
+  revenue: number;
+  probability: number;
+}
+
+export interface PipelineForecastData {
+  summary: {
+    total_pipeline: number;
+    weighted_pipeline: number;
+    p10_revenue: number;
+    p50_revenue: number;
+    p90_revenue: number;
+    annual_target: number;
+    gap_to_target: number;
+    pipeline_coverage_ratio: number;
+    simulations_run: number;
+    model_version: string;
+    last_updated: string;
+  };
+  monthly: MonthlyForecastClient[];
+  scenarios: ForecastScenarioClient[];
+  risk_factors: ForecastRiskClient[];
+  top_contributors: ForecastContributorClient[];
+}
+
+export function fetchPipelineForecast() {
+  return request<PipelineForecastData>("/predictive/forecast");
+}
+
+export interface BidFactorClient {
+  category: string;
+  score: number;
+  weight: number;
+  weighted_score: number;
+  notes: string;
+  signal: "green" | "amber" | "red";
+}
+
+export interface BidAssessmentData {
+  opp_id: string;
+  opp_title: string;
+  agency: string;
+  value: number;
+  recommendation: "bid" | "no_bid" | "watch";
+  overall_score: number;
+  factors: BidFactorClient[];
+  rationale: string;
+  resource_impact: string;
+  strategic_alignment: "high" | "medium" | "low";
+  assessed_at: string;
+}
+
+export interface BidAssessmentsListData {
+  assessments: BidAssessmentData[];
+  total: number;
+  bid: number;
+  no_bid: number;
+  watch: number;
+}
+
+export function fetchBidAssessments() {
+  return request<BidAssessmentsListData>("/predictive/bid-assessments");
+}
+
+export function fetchBidAssessment(oppId: string) {
+  return request<BidAssessmentData>(`/predictive/bid-assessments/${oppId}`);
+}
+
+export interface WinLossPatternClient {
+  id: string;
+  category: string;
+  insight: string;
+  detail: string;
+  confidence: number;
+  sample_size: number;
+  direction: "positive" | "negative" | "neutral";
+  actionable: boolean;
+}
+
+export interface AgencyPerfClient {
+  agency: string;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  total_value_won: number;
+  avg_pwin_accuracy: number;
+  trend: "improving" | "declining" | "stable";
+}
+
+export interface PwinCalibrationClient {
+  range: string;
+  predicted_win_rate: number;
+  actual_win_rate: number;
+  count: number;
+  calibration: "accurate" | "overconfident" | "underconfident";
+}
+
+export interface QuarterlyTrendClient {
+  quarter: string;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  avg_contract_value: number;
+  total_pipeline: number;
+}
+
+export interface WinLossAnalysisData {
+  summary: {
+    total_opportunities: number;
+    total_wins: number;
+    total_losses: number;
+    overall_win_rate: number;
+    avg_pwin_accuracy: number;
+    total_value_won: number;
+    total_value_lost: number;
+    model_calibration: "well_calibrated" | "overconfident" | "underconfident";
+    analysis_period: string;
+    last_updated: string;
+  };
+  patterns: WinLossPatternClient[];
+  agency_performance: AgencyPerfClient[];
+  pwin_calibration: PwinCalibrationClient[];
+  quarterly_trends: QuarterlyTrendClient[];
+}
+
+export function fetchWinLossAnalysis() {
+  return request<WinLossAnalysisData>("/predictive/win-loss");
+}

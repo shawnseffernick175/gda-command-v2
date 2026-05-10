@@ -17,6 +17,9 @@ import reportsRouter from "./routes/reports";
 import enrichmentsRouter from "./routes/enrichments";
 import promptsRouter from "./routes/prompts";
 import fastTrackRouter from "./routes/fast-track";
+import knowledgeRouter from "./routes/knowledge";
+import rfpShredderRouter from "./routes/rfp-shredder";
+import predictiveRouter from "./routes/predictive";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -84,6 +87,9 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/enrichments", enrichmentsRouter);
 app.use("/api/prompts", promptsRouter);
 app.use("/api/fast-track", fastTrackRouter);
+app.use("/api/knowledge", knowledgeRouter);
+app.use("/api/rfp-shredder", rfpShredderRouter);
+app.use("/api/predictive", predictiveRouter);
 
 // --- Catch-all 404 ---
 app.use((_req, res) => {

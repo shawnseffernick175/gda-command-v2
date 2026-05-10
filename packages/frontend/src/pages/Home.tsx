@@ -410,6 +410,24 @@ export default function Home() {
                 to="/settings"
                 statusColor="#6b7280"
               />
+              <Card
+                title="Knowledge Base"
+                description="Unified past performance, proposals, compliance records — searchable by meaning with RAG."
+                to="/knowledge"
+                statusColor="#8b5cf6"
+              />
+              <Card
+                title="RFP Shredder"
+                description="AI-powered solicitation parsing — extract requirements, map compliance, generate response outlines."
+                to="/rfp-shredder"
+                statusColor="#7c3aed"
+              />
+              <Card
+                title="Predictive Analytics"
+                description="ML-powered Pwin models, Monte Carlo revenue forecasting, bid/no-bid optimizer, and win/loss pattern analysis."
+                to="/predictive"
+                statusColor="#7c3aed"
+              />
             </div>
           </div>
         </>
@@ -435,6 +453,8 @@ export default function Home() {
           <Card title="Reporting & Export" description="Generate reports, schedule automated delivery, and export data across all GDA modules." to="/reports" statusColor="#f97316" />
           <Card title="Workflows" description="Browse and manage all n8n automation workflows." to="/workflows" statusColor="#06b6d4" />
           <Card title="Settings" description="System configuration, connectors, and feature flags." to="/settings" statusColor="#6b7280" />
+          <Card title="Knowledge Base" description="Unified past performance, proposals, compliance records — searchable by meaning with RAG." to="/knowledge" statusColor="#8b5cf6" />
+          <Card title="RFP Shredder" description="AI-powered solicitation parsing — extract requirements, map compliance, generate response outlines." to="/rfp-shredder" statusColor="#7c3aed" />
         </div>
       )}
     </div>
