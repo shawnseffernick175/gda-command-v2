@@ -113,6 +113,7 @@ export default function Reports() {
   const [generateFormat, setGenerateFormat] = useState("");
   const [generateResult, setGenerateResult] = useState<GenerateReportResult | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   // Generated report detail
   const [selectedReport, setSelectedReport] = useState<GeneratedReportRow | null>(null);
@@ -186,6 +187,7 @@ export default function Reports() {
     if (!generateTemplate) return;
     setGenerating(true);
     setGenerateResult(null);
+    setGenerateError(null);
     try {
       const env = await triggerReportGeneration({
         template_id: generateTemplate.id,
@@ -193,9 +195,11 @@ export default function Reports() {
       });
       if (env.success && env.data) {
         setGenerateResult(env.data);
+      } else {
+        setGenerateError(env.error?.message ?? "Report generation failed");
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : "Report generation failed");
     } finally {
       setGenerating(false);
     }
@@ -205,6 +209,7 @@ export default function Reports() {
     setGenerateTemplate(tpl);
     setGenerateFormat(tpl.default_format);
     setGenerateResult(null);
+    setGenerateError(null);
     setShowGenerateModal(true);
   };
 
@@ -1005,6 +1010,20 @@ export default function Reports() {
             <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16 }}>
               {generateTemplate.name}
             </p>
+
+            {generateError && (
+              <div style={{
+                padding: 12,
+                background: "rgba(239,68,68,0.08)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                borderRadius: 8,
+                marginBottom: 16,
+                fontSize: 13,
+                color: "#ef4444",
+              }}>
+                {generateError}
+              </div>
+            )}
 
             {!generateResult ? (
               <>
