@@ -50,18 +50,21 @@ export default function FinancialBible() {
       setLoading(false);
       return;
     }
+    let stale = false;
     setLoading(true);
     setError(null);
     fetchFinancialDrillDown(key)
       .then((env) => {
+        if (stale) return;
         if (env.success && env.data) {
           setDrillDown(env.data);
         } else {
           setError(env.error?.message ?? "Failed to load drill-down");
         }
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!stale) setError(err.message); })
+      .finally(() => { if (!stale) setLoading(false); });
+    return () => { stale = true; };
   }, [key]);
 
   return (
@@ -74,7 +77,7 @@ export default function FinancialBible() {
           <>
             <Link to="/financial-bible" style={{ color: "var(--color-primary)" }}>Financial Bible</Link>
             {" / "}
-            <span>{drillDown?.kpi.label ?? key}</span>
+            <span>{(drillDown && drillDown.kpi.key === key) ? drillDown.kpi.label : key}</span>
           </>
         ) : (
           <span>Financial Bible</span>
