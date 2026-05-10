@@ -18,6 +18,7 @@ import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
 import PromptArchitect from "./pages/PromptArchitect";
 import FastTrack from "./pages/FastTrack";
+import Knowledge from "./pages/Knowledge";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -43,6 +44,7 @@ const NAV_GROUPS = [
       { path: "/contacts", label: "Contacts", icon: "👤" },
       { path: "/financial-bible", label: "Financials", icon: "💰" },
       { path: "/reports", label: "Reports", icon: "📑" },
+      { path: "/knowledge", label: "Knowledge", icon: "📚" },
     ],
   },
   {
@@ -267,6 +269,7 @@ export default function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/prompts" element={<PromptArchitect />} />
             <Route path="/fast-track" element={<FastTrack />} />
+            <Route path="/knowledge" element={<Knowledge />} />
           </Routes>
         </main>
       </div>
