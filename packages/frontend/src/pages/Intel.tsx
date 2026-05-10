@@ -36,7 +36,7 @@ interface IntelFeedData {
   unreadCount: number;
   categoryCounts: Record<string, number>;
   priorityCounts: Record<string, number>;
-  source: "mock" | "db";
+  source: "mock" | "db" | "n8n";
 }
 
 interface BriefingMetric {
@@ -74,7 +74,7 @@ interface MorningBriefing {
 interface BriefingsData {
   briefings: MorningBriefing[];
   total: number;
-  source: "mock" | "db";
+  source: "mock" | "db" | "n8n";
 }
 
 interface DeepResearchReport {
@@ -94,7 +94,7 @@ interface ResearchData {
   total: number;
   filtered: number;
   statusCounts: Record<string, number>;
-  source: "mock" | "db";
+  source: "mock" | "db" | "n8n";
 }
 
 interface CompetitorProfile {
@@ -115,7 +115,7 @@ interface CompetitorsData {
   competitors: CompetitorProfile[];
   total: number;
   filtered: number;
-  source: "mock" | "db";
+  source: "mock" | "db" | "n8n";
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +203,13 @@ function formatDateTime(iso: string): string {
 
 export default function Intel() {
   const [tab, setTab] = useState<TabId>("briefing");
+  const [dataSource, setDataSource] = useState<"mock" | "db" | "n8n">("mock");
+
+  const sourceBadge = dataSource === "n8n"
+    ? { label: "Live \u2014 n8n", bg: "rgba(34,197,94,0.15)", color: "#22c55e" }
+    : dataSource === "db"
+    ? { label: "Live \u2014 database", bg: "rgba(34,197,94,0.15)", color: "#22c55e" }
+    : { label: "Mock data", bg: "rgba(59,130,246,0.15)", color: "#3b82f6" };
 
   return (
     <div>
@@ -218,10 +225,10 @@ export default function Intel() {
           borderRadius: 12,
           fontSize: 12,
           fontWeight: 600,
-          background: "rgba(59,130,246,0.15)",
-          color: "#3b82f6",
+          background: sourceBadge.bg,
+          color: sourceBadge.color,
         }}>
-          Mock data
+          {sourceBadge.label}
         </span>
       </div>
 
@@ -254,10 +261,10 @@ export default function Intel() {
         ))}
       </div>
 
-      {tab === "briefing" && <BriefingTab />}
-      {tab === "feed" && <FeedTab />}
-      {tab === "research" && <ResearchTab />}
-      {tab === "competitors" && <CompetitorsTab />}
+      {tab === "briefing" && <BriefingTab onSource={setDataSource} />}
+      {tab === "feed" && <FeedTab onSource={setDataSource} />}
+      {tab === "research" && <ResearchTab onSource={setDataSource} />}
+      {tab === "competitors" && <CompetitorsTab onSource={setDataSource} />}
     </div>
   );
 }
@@ -266,7 +273,7 @@ export default function Intel() {
 // Briefing Tab
 // ---------------------------------------------------------------------------
 
-function BriefingTab() {
+function BriefingTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
   const [briefings, setBriefings] = useState<MorningBriefing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -277,6 +284,7 @@ function BriefingTab() {
       .then((env) => {
         if (env.success && env.data) {
           setBriefings(env.data.briefings);
+          onSource(env.data.source);
           if (env.data.briefings.length > 0) setSelectedId(env.data.briefings[0].id);
         } else {
           setError(env.error?.message ?? "Failed to load briefings");
@@ -438,7 +446,7 @@ function BriefingTab() {
 // Feed Tab
 // ---------------------------------------------------------------------------
 
-function FeedTab() {
+function FeedTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
   const [data, setData] = useState<IntelFeedData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -455,8 +463,12 @@ function FeedTab() {
     const qs = params.toString();
     fetchJson<IntelFeedData>(`/intel/feed${qs ? `?${qs}` : ""}`)
       .then((env) => {
-        if (env.success && env.data) setData(env.data);
-        else setError(env.error?.message ?? "Failed to load intel feed");
+        if (env.success && env.data) {
+          setData(env.data);
+          onSource(env.data.source);
+        } else {
+          setError(env.error?.message ?? "Failed to load intel feed");
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -581,7 +593,7 @@ function FeedTab() {
 // Research Tab
 // ---------------------------------------------------------------------------
 
-function ResearchTab() {
+function ResearchTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
   const [data, setData] = useState<ResearchData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -590,8 +602,12 @@ function ResearchTab() {
   useEffect(() => {
     fetchJson<ResearchData>("/intel/research")
       .then((env) => {
-        if (env.success && env.data) setData(env.data);
-        else setError(env.error?.message ?? "Failed to load research");
+        if (env.success && env.data) {
+          setData(env.data);
+          onSource(env.data.source);
+        } else {
+          setError(env.error?.message ?? "Failed to load research");
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -689,7 +705,7 @@ function ResearchTab() {
 // Competitors Tab
 // ---------------------------------------------------------------------------
 
-function CompetitorsTab() {
+function CompetitorsTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
   const [data, setData] = useState<CompetitorsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -702,8 +718,12 @@ function CompetitorsTab() {
     const qs = params.toString();
     fetchJson<CompetitorsData>(`/intel/competitors${qs ? `?${qs}` : ""}`)
       .then((env) => {
-        if (env.success && env.data) setData(env.data);
-        else setError(env.error?.message ?? "Failed to load competitors");
+        if (env.success && env.data) {
+          setData(env.data);
+          onSource(env.data.source);
+        } else {
+          setError(env.error?.message ?? "Failed to load competitors");
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
