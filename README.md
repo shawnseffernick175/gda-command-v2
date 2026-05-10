@@ -51,6 +51,7 @@ npm run dev --workspace=@gda/frontend
 | `/opportunities/:id` | Opportunity Detail — OODA analysis, sources, learning (S-009) |
 | `/doctrine` | Doctrine — sprint doctrine drafts, finalization gates, publish history |
 | `/intel` | Intel Hub — intelligence feed, morning briefings, deep research, competitor watch |
+| `/capture` | Capture Planner — capture plans, BD activities, milestones, gate reviews, teaming |
 
 ### Backend API
 | Endpoint | Description |
@@ -72,6 +73,10 @@ npm run dev --workspace=@gda/frontend
 | `GET /api/intel/research` | Deep research reports (filterable by status) |
 | `GET /api/intel/research/:id` | Single research report detail |
 | `GET /api/intel/competitors` | Competitor profiles with threat scores |
+| `GET /api/capture/plans` | Capture plans with phase/decision filtering |
+| `GET /api/capture/plans/:id` | Single capture plan detail with activities |
+| `GET /api/capture/activities` | BD activity log across all captures |
+| `POST /api/capture/gate-review` | Trigger gate review checks (dry-run) |
 
 All API responses follow the standard GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`.
 
