@@ -119,8 +119,19 @@ export default function RFPShredder() {
   const [shredError, setShredError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [allCompletedJobs, setAllCompletedJobs] = useState<ShredJobRow[]>([]);
 
-  // ---- Fetch jobs ----
+  // ---- Fetch all completed jobs (unfiltered, for dropdowns) ----
+  useEffect(() => {
+    fetchShredJobs({})
+      .then((env) => {
+        if (env.success && env.data)
+          setAllCompletedJobs(env.data.jobs.filter((j) => j.status === "completed"));
+      })
+      .catch(() => {});
+  }, []);
+
+  // ---- Fetch jobs (filtered) ----
   useEffect(() => {
     setLoading(true);
     fetchShredJobs({ status: jobStatusFilter || undefined, search: jobSearch || undefined })
@@ -304,7 +315,7 @@ export default function RFPShredder() {
         onJobChange={setCompJobId}
         expandedId={expandedCompId}
         onToggleExpand={(id) => setExpandedCompId(expandedCompId === id ? null : id)}
-        completedJobs={jobsData?.jobs.filter((j) => j.status === "completed") ?? []}
+        completedJobs={allCompletedJobs}
       />}
       {tab === "outline" && <ResponseOutlineTab
         data={outlineData}
@@ -312,7 +323,7 @@ export default function RFPShredder() {
         onJobChange={setOutlineJobId}
         expandedId={expandedOutlineId}
         onToggleExpand={(id) => setExpandedOutlineId(expandedOutlineId === id ? null : id)}
-        completedJobs={jobsData?.jobs.filter((j) => j.status === "completed") ?? []}
+        completedJobs={allCompletedJobs}
       />}
 
       {/* Shred Modal */}
