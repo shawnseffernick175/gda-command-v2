@@ -44,10 +44,11 @@ npm run dev --workspace=@gda/frontend
 ### Frontend
 | Route | Page |
 |---|---|
-| `/` | Launchpad (home) |
+| `/` | Launchpad — KPI strip, opportunity funnel, top opportunities, quick access |
 | `/qa-center` | QA Center — health checks & latest failures |
 | `/ops-tracker` | Ops Tracker — opportunity list, filtering, sorting, qualify dry-run |
 | `/pipeline` | Pipeline — read-only qualified pipeline view with filtering & sorting |
+| `/opportunities/:id` | Opportunity Detail — OODA analysis, sources, learning (S-009) |
 
 ### Backend API
 | Endpoint | Description |
@@ -56,7 +57,9 @@ npm run dev --workspace=@gda/frontend
 | `GET /api/qa/latest-failures` | Most recent workflow failures |
 | `GET /api/opportunities` | List all opportunities with filtering & sorting |
 | `GET /api/opportunities/pipeline` | Pipeline-only opportunities (status=pipeline) |
+| `GET /api/opportunities/:id/detail` | Opportunity detail with OODA analysis (S-009) |
 | `POST /api/opportunities/:id/qualify` | Qualify dry-run / write with S-007/S-008 safety gates |
+| `GET /api/dashboard/kpis` | Dashboard KPIs, funnel stats, and top opportunities |
 
 All API responses follow the standard GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`.
 

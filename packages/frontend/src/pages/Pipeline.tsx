@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   fetchPipelineOpportunities,
   type OpportunityRow,
@@ -32,6 +33,7 @@ function formatDate(d: string | null): string {
 }
 
 export default function Pipeline() {
+  const navigate = useNavigate();
   const [data, setData] = useState<OpportunitiesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -365,7 +367,13 @@ export default function Pipeline() {
               </thead>
               <tbody>
                 {opportunities.map((opp) => (
-                  <tr key={opp.id}>
+                  <tr
+                    key={opp.id}
+                    style={{ cursor: "pointer", transition: "background 0.15s" }}
+                    onClick={() => navigate(`/opportunities/${opp.id}`, { state: { from: "/pipeline" } })}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
+                  >
                     <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: 12, color: "var(--color-text-muted)" }}>
                       {opp.id}
                     </td>

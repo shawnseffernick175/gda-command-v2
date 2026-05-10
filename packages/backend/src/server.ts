@@ -3,6 +3,7 @@ import cors from "cors";
 import qaRouter from "./routes/qa";
 import workflowsRouter from "./routes/workflows";
 import opportunitiesRouter from "./routes/opportunities";
+import dashboardRouter from "./routes/dashboard";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -56,6 +57,7 @@ app.get("/health", async (_req, res) => {
 app.use("/api/qa", qaRouter);
 app.use("/api/workflows", workflowsRouter);
 app.use("/api/opportunities", opportunitiesRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 // --- Catch-all 404 ---
 app.use((_req, res) => {

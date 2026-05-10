@@ -93,3 +93,83 @@ export interface OpportunityFilters {
   sortBy?: string;
   sortDir?: "asc" | "desc";
 }
+
+// ---------------------------------------------------------------------------
+// S-009 Opportunity Detail types
+// ---------------------------------------------------------------------------
+
+/** Executive analysis for a single opportunity. */
+export interface OpportunityAnalysis {
+  executive_summary: string;
+  strengths: string[];
+  risks: string[];
+  competitive_landscape: string | null;
+  relevance_rationale: string | null;
+  recommended_action: string | null;
+  confidence: number | null;
+  last_analyzed_at: string | null;
+  analyst_feedback: string | null;
+  analysis_version: string;
+}
+
+export interface OodaObserveItem {
+  label: string;
+  value: string;
+  source_ids: string[];
+}
+
+export interface OodaOrientItem {
+  label: string;
+  value: string;
+  source_ids: string[];
+  type: "strength" | "risk" | "fact" | "inference";
+}
+
+export interface OodaDecideOption {
+  label: string;
+  rationale: string;
+  recommended: boolean;
+}
+
+export interface OodaActStep {
+  action: string;
+  owner: string | null;
+  due_date: string | null;
+  priority: "high" | "medium" | "low";
+}
+
+export interface OodaBlock {
+  observe: { summary: string; items: OodaObserveItem[] };
+  orient: { summary: string; items: OodaOrientItem[] };
+  decide: { summary: string; options: OodaDecideOption[] };
+  act: { summary: string; next_steps: OodaActStep[] };
+}
+
+export interface OpportunitySource {
+  id: string;
+  title: string;
+  type: string;
+  url: string | null;
+  publisher: string | null;
+  published_at: string | null;
+  retrieved_at: string | null;
+  snippet: string | null;
+  relevance_reason: string;
+}
+
+export interface OpportunityLearning {
+  learning_notes: string | null;
+  feedback_submitted: boolean;
+  feedback_at: string | null;
+  source_count: number;
+  coverage_gaps: string[];
+  next_review_at: string | null;
+}
+
+export interface OpportunityDetailData {
+  opportunity: Opportunity;
+  analysis: OpportunityAnalysis;
+  ooda: OodaBlock;
+  sources: OpportunitySource[];
+  learning: OpportunityLearning;
+}
