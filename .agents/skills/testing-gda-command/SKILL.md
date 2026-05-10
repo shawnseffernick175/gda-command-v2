@@ -50,6 +50,9 @@ curl http://localhost:3001/health
 | `/capture` | Capture Planner | Capture plans, BD activities, milestones, gate review |
 | `/prompts` | Prompt Architect | 12 prompts, 6 categories, split-view detail with Body/Versions/Usage tabs |
 | `/approvals` | Approvals Queue | Pending/resolved approvals, dry-run checks, approve/reject actions |
+| `/compliance` | Compliance Matrix | Requirements tab (15 items), Clause Library tab (10 FAR/DFARS), score 68% |
+| `/proposals` | Proposal Review | 6 proposals, split-view, 5 tabs (Overview/Volumes/Red Team/Scorecard/Timeline) |
+| `/contacts` | Contacts & Relationships | 25 contacts, split-view, 5 tabs (Overview/Meeting Notes/Relationships/Opportunities/Teaming) |
 | `/workflows` | Workflow Manager | Browse/filter n8n workflows (183 when live) |
 | `/settings` | Settings | Connectors, feature flags, health check button |
 
@@ -66,7 +69,7 @@ Rendered on **every page** below the nav bar, above main content.
 ### Grouped Navigation Bar
 Nav bar uses 3 groups:
 - **BD Tools**: Launchpad, Ops Tracker, Pipeline, Capture, Approvals
-- **Analysis**: Intel Hub, Financials
+- **Analysis**: Intel Hub, Compliance, Proposals, Contacts, Financials
 - **Platform**: QA Center, Doctrine, Workflows, Settings
 
 Active page gets blue highlight. Group labels shown in uppercase.
@@ -167,6 +170,43 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 
 **Category filter counts**: proposal(4), capture(2), general(2), compliance(1), research(2), analysis(1)
 
+### Compliance Matrix
+**Summary strip**: Compliant=8, Partial=3, Gap=3, N/A=1, Score=68% (amber)
+- Requirements tab: 15 items across 3 solicitations (USACE FUDS, Tyndall, NASA KSC)
+- Clause Library tab: 10 references (FAR=7, DFARS=3)
+- Expandable requirement cards show evidence, notes, related clause badges
+- Expanded clause shows pitfalls, related clauses, applicability tags
+
+### Proposal Review (6 proposals)
+**Summary strip**: Total=6, Active=4, Red Team Open=3, Avg Compliance=69% (amber), Pipeline=$444.9M, Agencies=6
+- Split-view: clickable list on left, 5-tab detail panel on right
+- Tabs: Overview (scores/schedule), Volumes (compliance %), Red Team (expandable findings), Scorecard (weighted bars), Timeline (milestone dots)
+- Scorecard for USACE FUDS: 84/100pts — Tech 34/40, Mgmt 16/20, PP 23/25, Cost 11/15 (amber bar at 73%)
+- Status filter: "Red Team" → exactly 1 proposal
+
+### Contacts & Relationships (25 contacts)
+**Summary strip**: Total Contacts=25, Active Relationships=21, Pending Actions=15, Teaming Gaps=13
+- Split-view: scrollable contact list on left, 5-tab detail panel on right
+- Tabs: Overview, Meeting Notes, Relationships, Opportunities, Teaming
+- 14 agencies represented: USACE(4), Air Force(3), NASA(3), DHS(2), EPA(2), SOCOM(2), Army(2), DCSA(1), NAVFAC(1), DOE(1), DoD(1), DARPA(1), DoS(1), VA(1)
+- Statuses: active(21), prospect(3), inactive(1)
+- Strengths: strong(5), moderate(10), weak(7), new(3)
+
+**Key test contacts**:
+- CON-001 James Richardson: USACE, Contracting Officer, email james.richardson@usace.army.mil, 4 tags, Quick Stats 2/2/2/1
+- CON-018 Gregory Martinez: DOE, Inactive status — only inactive contact (used for filter testing)
+- PFAS-tagged contacts: Davis, Nguyen, Adams, Patel, Reeves, Price (exactly 6 — used for search testing)
+
+**Meeting Notes (CON-001 first note)**:
+- Title: "FUDS Task Order 4 Pre-Proposal Conference"
+- Attendees: James Richardson, Shawn Seffernick, Maria Chen (3)
+- Topics: 4 badge tags
+- Action Items: 2 total — 1 completed (Shawn Seffernick), 1 open (James Richardson)
+
+**Relationships (CON-001)**:
+- Lt. Col. Marcus Davis: Supervisor, Strong
+- Sarah Kim: Peer, Moderate
+
 ### Doctrine (8 drafts)
 - Sprints: S-205 (3 drafts), S-206 (5 drafts)
 - Statuses: draft(3), finalized(4), blocked(1)
@@ -188,8 +228,9 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 - Financial Bible drill-down has stale-fetch protection (rapid KPI switching won't show wrong data)
 - Prompt Architect uses split-view layout: clicking a prompt card opens the detail panel on the right side
 - Prompt list default sort is by `usageCount` descending (most-used first)
+- Split-view pages (Prompts, Proposals, Contacts) auto-select the first item on load
+- Contact search matches against name, title, agency, department, tags, and relationship history text
+- Color lookup maps (STRENGTH_COLORS, STATUS_COLORS) use nullish coalescing `?? "#6b7280"` for defensive fallback — if a new status/strength is added to mock data, the UI won't break
 - After code changes, the backend hot-reload (tsx watch) might need a manual restart if routes change — if you see 500 errors on pages that worked before, restart the backend
 - Use `wmctrl -r :ACTIVE: -b add,maximized_vert,maximized_horz` to maximize browser before recording
 - If HMR gets into a bad state (page stuck on "Loading..."), kill all node processes, clear ports, and do a fresh restart
-- n8n webhooks might respond slowly (0.3-1s); the frontend shows "Loading dashboard..." while waiting
-- When n8n returns live data, signal card counts will differ from mock data values — verify against the API response, not hardcoded mock expectations
