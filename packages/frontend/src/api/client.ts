@@ -1731,3 +1731,193 @@ export function uploadDocument(fileName: string, documentType?: string, collecti
     body: JSON.stringify({ file_name: fileName, document_type: documentType, collection, tags }),
   });
 }
+
+// --- RFP Shredder ---
+
+export interface ShredJobRow {
+  id: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  agency: string;
+  file_name: string;
+  file_size_bytes: number;
+  page_count: number;
+  status: "completed" | "processing" | "failed" | "queued";
+  requirements_found: number;
+  sections_parsed: string[];
+  started_at: string;
+  completed_at: string | null;
+  processing_time_seconds: number | null;
+  correlation_id: string;
+  error_message: string | null;
+}
+
+export interface ShredJobsSummary {
+  total: number;
+  completed: number;
+  processing: number;
+  failed: number;
+  queued: number;
+  total_requirements: number;
+  total_pages: number;
+}
+
+export interface ShredJobsData {
+  jobs: ShredJobRow[];
+  summary: ShredJobsSummary;
+}
+
+export interface ExtractedRequirementRow {
+  id: string;
+  shred_job_id: string;
+  section: string;
+  requirement_text: string;
+  requirement_type: string;
+  complexity: "simple" | "moderate" | "complex";
+  keyword: string;
+  far_references: string[];
+  compliance_match: "full" | "partial" | "none";
+  matched_evidence: string | null;
+  matched_document_id: string | null;
+  matched_document_title: string | null;
+  page_number: number;
+  confidence: number;
+}
+
+export interface RequirementsSummary {
+  total: number;
+  full_match: number;
+  partial_match: number;
+  no_match: number;
+  by_type: Record<string, number>;
+  by_complexity: Record<string, number>;
+  avg_confidence: number;
+}
+
+export interface RequirementsData {
+  requirements: ExtractedRequirementRow[];
+  summary: RequirementsSummary;
+}
+
+export interface ComplianceMapRecord {
+  document_id: string;
+  document_title: string;
+  section: string;
+  relevance: number;
+  excerpt: string;
+}
+
+export interface ComplianceMapEntryRow {
+  requirement_id: string;
+  section: string;
+  requirement_text: string;
+  requirement_type: string;
+  match_level: "full" | "partial" | "none";
+  matched_records: ComplianceMapRecord[];
+  gap_notes: string | null;
+  suggested_approach: string | null;
+}
+
+export interface ComplianceMapSummary {
+  total: number;
+  full_match: number;
+  partial_match: number;
+  no_match: number;
+  coverage_score: number;
+}
+
+export interface ComplianceMapData {
+  job_id: string;
+  solicitation_title: string;
+  entries: ComplianceMapEntryRow[];
+  summary: ComplianceMapSummary;
+}
+
+export interface ResponseOutlineSectionRow {
+  id: string;
+  section_number: string;
+  title: string;
+  requirements_covered: string[];
+  recommended_approach: string;
+  past_performance_citations: string[];
+  page_estimate: number;
+  complexity: "simple" | "moderate" | "complex";
+  status: "draft_available" | "needs_new_content" | "reuse_available";
+}
+
+export interface ResponseOutlineSummary {
+  total_sections: number;
+  total_page_estimate: number;
+  reuse_available: number;
+  draft_available: number;
+  needs_new_content: number;
+}
+
+export interface ResponseOutlineData {
+  job_id: string;
+  solicitation_title: string;
+  sections: ResponseOutlineSectionRow[];
+  summary: ResponseOutlineSummary;
+}
+
+export interface ShredInitData {
+  id: string;
+  file_name: string;
+  solicitation_title: string;
+  agency: string;
+  status: string;
+  correlation_id: string;
+  message: string;
+  estimated_processing_time: string;
+  pipeline: string;
+}
+
+export interface RequirementQueryParams {
+  job_id?: string;
+  type?: string;
+  complexity?: string;
+  match?: string;
+  search?: string;
+  sort?: string;
+}
+
+export function fetchShredJobs(params: { status?: string; search?: string; agency?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.search) qs.set("search", params.search);
+  if (params.agency) qs.set("agency", params.agency);
+  const query = qs.toString();
+  return request<ShredJobsData>(`/rfp-shredder/jobs${query ? `?${query}` : ""}`);
+}
+
+export function fetchShredJob(id: string) {
+  return request<ShredJobRow>(`/rfp-shredder/jobs/${id}`);
+}
+
+export function fetchShredRequirements(params: RequirementQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.job_id) qs.set("job_id", params.job_id);
+  if (params.type) qs.set("type", params.type);
+  if (params.complexity) qs.set("complexity", params.complexity);
+  if (params.match) qs.set("match", params.match);
+  if (params.search) qs.set("search", params.search);
+  if (params.sort) qs.set("sort", params.sort);
+  const query = qs.toString();
+  return request<RequirementsData>(`/rfp-shredder/requirements${query ? `?${query}` : ""}`);
+}
+
+export function fetchComplianceMap(jobId: string) {
+  return request<ComplianceMapData>(`/rfp-shredder/compliance-map/${jobId}`);
+}
+
+export function fetchResponseOutline(jobId: string) {
+  return request<ResponseOutlineData>(`/rfp-shredder/response-outline/${jobId}`);
+}
+
+export function initiateShred(fileName: string, solicitationTitle: string, agency?: string) {
+  return request<ShredInitData>("/rfp-shredder/shred", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_name: fileName, solicitation_title: solicitationTitle, agency }),
+  });
+}
