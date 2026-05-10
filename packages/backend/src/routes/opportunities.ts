@@ -254,6 +254,9 @@ router.get("/pipeline", async (req, res) => {
     try {
       const n8nResult = await fetchPipelineFromN8n();
       if (n8nResult.ok && n8nResult.opportunities.length > 0) {
+        // n8n gda-pipeline webhook already curates pipeline-worthy opportunities;
+        // their n8n stages (Qualified, Go/No-Go, Post-Submittal) are more granular
+        // than our simple "pipeline" status, so we trust the webhook's curation.
         const rows = pipelineFilterAndSort(n8nResult.opportunities);
         return res.json(
           successEnvelope(
