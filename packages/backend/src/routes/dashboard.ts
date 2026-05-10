@@ -193,7 +193,7 @@ router.get("/kpis", async (_req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/dashboard/command-signals — aggregated risks, decisions, due-soon,
-// fast-track, and pending approvals for the Launchpad
+// accelerators, and pending approvals for the Launchpad
 // ---------------------------------------------------------------------------
 router.get("/command-signals", async (_req, res) => {
   // --- Capture plans (try n8n first, then mock) ---
@@ -278,8 +278,8 @@ router.get("/command-signals", async (_req, res) => {
     .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
     .slice(0, 8);
 
-  // --- Fast-track signals (from n8n if available) ---
-  let fastTrackSignals: Array<{
+  // --- Accelerators (from n8n if available) ---
+  let accelerators: Array<{
     opportunity_title: string;
     signal: string;
     urgency: "high" | "medium" | "low";
@@ -289,9 +289,9 @@ router.get("/command-signals", async (_req, res) => {
     try {
       const lp = await fetchLaunchpadFromN8n();
       if (lp.ok && Array.isArray(lp.ftSignals) && lp.ftSignals.length > 0) {
-        fastTrackSignals = (lp.ftSignals as Array<Record<string, unknown>>).map((s) => ({
+        accelerators = (lp.ftSignals as Array<Record<string, unknown>>).map((s) => ({
           opportunity_title: (s.opportunity_title ?? s.title ?? "Unknown") as string,
-          signal: (s.signal ?? s.description ?? s.message ?? "Fast-track eligible") as string,
+          signal: (s.signal ?? s.description ?? s.message ?? "Accelerate action required") as string,
           urgency: (s.urgency ?? "medium") as "high" | "medium" | "low",
         }));
       }
@@ -300,8 +300,8 @@ router.get("/command-signals", async (_req, res) => {
     }
   }
 
-  if (fastTrackSignals.length === 0) {
-    fastTrackSignals = [
+  if (accelerators.length === 0) {
+    accelerators = [
       { opportunity_title: "USACE FUDS IDIQ TO-3", signal: "RFP response window < 14 days — accelerate draft", urgency: "high" },
       { opportunity_title: "NASA KSC Launch Ops", signal: "Incumbent contract expiring Q3 — early engagement window", urgency: "medium" },
       { opportunity_title: "DHA MHS GENESIS Phase 4", signal: "Draft RFP posted — begin compliance matrix", urgency: "high" },
@@ -320,7 +320,7 @@ router.get("/command-signals", async (_req, res) => {
         activeRisks,
         upcomingDecisions,
         dueSoonItems,
-        fastTrackSignals,
+        accelerators,
         approvalsSummary: {
           pending: pendingApprovals.length,
           critical: criticalApprovals.length,

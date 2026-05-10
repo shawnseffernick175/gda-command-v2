@@ -364,7 +364,7 @@ export interface CommandDueSoon {
   owner: string;
 }
 
-export interface CommandFastTrack {
+export interface CommandAccelerator {
   opportunity_title: string;
   signal: string;
   urgency: "high" | "medium" | "low";
@@ -374,7 +374,7 @@ export interface CommandSignalsData {
   activeRisks: CommandRisk[];
   upcomingDecisions: CommandDecision[];
   dueSoonItems: CommandDueSoon[];
-  fastTrackSignals: CommandFastTrack[];
+  accelerators: CommandAccelerator[];
   approvalsSummary: { pending: number; critical: number };
   captureSource: "n8n" | "mock";
 }

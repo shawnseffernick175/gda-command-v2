@@ -88,13 +88,13 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 ### Signal Cards (with n8n live data — counts may vary)
 | Card | Icon | Content |
 |---|---|---|
-| Fast-Track Signals | ⚡ | Opportunities eligible for fast-track, with urgency indicators |
+| Accelerators | ⚡ | Time-sensitive opportunities requiring accelerated action |
 | Active Risks | 🔴 | High-likelihood/impact risks from capture plans, with likelihood badges |
 | Decisions Pending | 🎯 | Pending bid/no-bid decisions with agency, dollar value, and Pwin % |
 | Due Soon | 📅 | At-risk/overdue milestones + approvals badge linking to /approvals |
 
 ### Mock Data Expected Values (when n8n is unavailable)
-- Fast-Track Signals: **3** (USACE FUDS RFP, Air Force Tyndall, DOE Oak Ridge)
+- Accelerators: **3** (USACE FUDS RFP, NASA KSC Launch Ops, DHA MHS GENESIS)
 - Active Risks: **6** (from 5 capture plans)
 - Decisions Pending: **2** (Air Force Tyndall 55% Pwin, NASA KSC 35% Pwin)
 - Due Soon: **8** (milestones sliced to 8)
