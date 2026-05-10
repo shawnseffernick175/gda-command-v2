@@ -38,6 +38,7 @@ curl http://localhost:3001/health
 | `/doctrine` | Doctrine | 8 drafts across 2 sprints, finalization gate checks, publish runs |
 | `/intel` | Intel Hub | Morning briefing, 12 feed items, 4 research reports, 5 competitors |
 | `/capture` | Capture Planner | 5 capture plans, 12 BD activities, 17 milestones, gate review |
+| `/prompts` | Prompt Architect | 12 prompts, 6 categories, split-view detail with Body/Versions/Usage tabs |
 | `/workflows` | Workflow Manager | Browse/filter n8n workflows (183 when live) |
 | `/settings` | Settings | Connectors, feature flags, health check button |
 
@@ -55,7 +56,7 @@ Rendered on **every page** below the nav bar, above main content.
 Nav bar uses 3 groups:
 - **BD Tools**: Launchpad, Ops Tracker, Pipeline, Capture
 - **Analysis**: Intel Hub, Financials
-- **Platform**: QA Center, Doctrine, Workflows, Settings
+- **Platform**: QA Center, Doctrine, Prompts, Workflows, Settings
 
 Active page gets blue highlight. Group labels shown in uppercase.
 
@@ -133,6 +134,31 @@ Active page gets blue highlight. Group labels shown in uppercase.
 - Research: 4 reports (2 completed, 1 in_progress, 1 queued)
 - Competitors: 5 profiles sorted by threat score (Tetra Tech 92 → Hensel Phelps 68)
 
+### Prompt Architect (12 prompts across 6 categories)
+**Summary strip**: Total 12, Active 11, Draft 1, Archived 0, Starred 4, Categories 6
+
+| # | Name | Category | Status | Version | Uses | Starred |
+|---|---|---|---|---|---|---|
+| 1 | Proposal Executive Summary Writer | proposal | active | v4 | 31 | yes |
+| 2 | Capture Plan First Draft | capture | active | v3 | 24 | yes |
+| 3 | Red Team Review Checklist | proposal | active | v3 | 22 | yes |
+| 4 | Email Drafter — Agency Follow-Up | general | active | v2 | 19 | no |
+| 5 | Compliance Matrix Analyzer | compliance | active | v2 | 18 | yes |
+| 6 | Past Performance Write-Up | proposal | active | v2 | 15 | no |
+| 7 | Technical Volume Section Writer | proposal | draft | v2 | 14 | no |
+| 8 | Competitor Intelligence Brief | research | active | v2 | 12 | no |
+| 9 | OODA Loop Analysis | analysis | active | v1 | 8 | no |
+| 10 | Teaming Partner Assessment | capture | active | v1 | 7 | no |
+| 11 | SAM.gov Opportunity Screener | research | active | v1 | 6 | no |
+| 12 | Doctrine Sprint Summary | general | active | v1 | 4 | no |
+
+**Category filter counts**: proposal(4), capture(2), general(2), compliance(1), research(2), analysis(1)
+
+**Detail panel for prompt-001 (Capture Plan First Draft)**:
+- Body tab: Monospace prompt text with `## Inputs` and `## Output Structure` sections
+- Versions tab: v3 "current" (Apr 20, 2025), v2 (Mar 15, 2025), v1 (Feb 15, 2025)
+- Usage tab: 1 record — EPA Superfund capture plan, outcome "success", notes about 4 win themes
+
 ## Testing Tips
 - When DATABASE_URL is not set, all pages show "Mock data" blue badge
 - All API responses use GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`
@@ -140,4 +166,7 @@ Active page gets blue highlight. Group labels shown in uppercase.
 - Breadcrumb on Opportunity Detail changes based on referrer (Launchpad/Ops Tracker/Pipeline)
 - Financial KPI Strip appears on ALL pages — verify by navigating to any page
 - Financial Bible drill-down has stale-fetch protection (rapid KPI switching won't show wrong data)
+- Prompt Architect uses split-view layout: clicking a prompt card opens the detail panel on the right side
+- Prompt list default sort is by `usageCount` descending (most-used first)
+- After code changes, the backend hot-reload (tsx watch) might need a manual restart if routes change — if you see 500 errors on pages that worked before, restart the backend
 - Use `wmctrl -r :ACTIVE: -b add,maximized_vert,maximized_horz` to maximize browser before recording
