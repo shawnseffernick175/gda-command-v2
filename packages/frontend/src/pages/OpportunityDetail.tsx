@@ -63,7 +63,7 @@ export default function OpportunityDetail() {
   const [error, setError] = useState<string | null>(null);
 
   const backPath = location.state?.from ?? "/ops-tracker";
-  const backLabel = backPath === "/pipeline" ? "Pipeline" : "Ops Tracker";
+  const backLabel = backPath === "/pipeline" ? "Pipeline" : backPath === "/" ? "Launchpad" : "Ops Tracker";
 
   useEffect(() => {
     if (!id) return;

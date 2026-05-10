@@ -97,7 +97,7 @@ router.get("/kpis", async (_req, res) => {
     };
   });
 
-  const topByScore = allOpps.slice(0, 5);
+  const topByScore = [...allOpps].sort((a, b) => b.score - a.score).slice(0, 5);
 
   return res.json(
     successEnvelope(

@@ -320,7 +320,7 @@ router.get("/:id/detail", async (req, res) => {
         ooda: detail.ooda,
         sources: detail.sources,
         learning: detail.learning,
-        source: pool ? ("db" as const) : ("mock" as const),
+        source: "mock" as const,
       },
       {
         requestedAt,
