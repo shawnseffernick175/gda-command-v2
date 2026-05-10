@@ -35,6 +35,8 @@ curl http://localhost:3001/health
 
 **Important:** If frontend starts on port 3002 instead of 3000, a stale process is occupying port 3000. Kill it with `fuser 3000/tcp | xargs kill -9` and restart the frontend. The Vite proxy config expects the frontend on :3000 proxying to backend :3001.
 
+**Important**: When testing n8n-wired pages, the backend `.env` must have `N8N_INSTANCE_URL`, `N8N_API_KEY`, and `GDA_WEBHOOK_KEY` set.
+
 ## Pages & Routes
 | Route | Page | Key Features |
 |---|---|---|
@@ -46,7 +48,7 @@ curl http://localhost:3001/health
 | `/financial-bible` | Financial Bible (index) | 7 KPI navigation cards, "Select a KPI" prompt |
 | `/financial-bible/:key` | Financial Bible (drill-down) | Summary cards, trend chart, insights, line items table |
 | `/doctrine` | Doctrine | Drafts across sprints, finalization gate checks, publish runs |
-| `/intel` | Intel Hub | Morning briefing, feed items, deep research reports, competitor watch |
+| `/intel` | Intel Hub | Morning briefing, feed items, deep research (n8n), competitor watch (n8n) |
 | `/capture` | Capture Planner | Capture plans, BD activities, milestones, gate review |
 | `/prompts` | Prompt Architect | 12 prompts, 6 categories, split-view detail with Body/Versions/Usage tabs |
 | `/approvals` | Approvals Queue | Pending/resolved approvals, dry-run checks, approve/reject actions |
@@ -105,6 +107,56 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 - Due Soon card: "7 approvals (1 critical)" badge → navigates to `/approvals`
 - Top Opportunities: Now shows **10** entries (expanded from 5)
 
+## n8n Real Data Wiring
+
+Some pages fetch real data from n8n webhooks when configured. The backend tries n8n first, then falls back to mock data. Each API response includes a `source` field (`"n8n"`, `"db"`, or `"mock"`).
+
+### Dynamic Source Badge
+Pages that support real data show a **source badge** below the page title:
+- **Green "Live — n8n"** — real data from n8n webhook
+- **Green "Live — database"** — real data from Postgres
+- **Blue "Mock data"** — using built-in mock data
+
+The badge updates **dynamically per tab** — switching between tabs on the same page may change the badge color if some tabs have n8n wiring and others don't.
+
+### Intel Hub n8n Data (Deep Research + Competitor Watch)
+- **Deep Research tab**: Fetches from `gda-deep-research-history` webhook (POST)
+  - Expected: ~12 reports, all status "completed"
+  - Real names: BAE Systems, General Dynamics IT, SAIC, ManTech, Peraton, CACI International, Leidos, SOF GDA, TRADOC, Booz Allen Hamilton
+  - Each report shows: requested_by "GDA Intelligence Engine", sources count, completion date
+  - Expanded reports show real intelligence text (revenue figures, market share, capabilities)
+- **Competitor Watch tab**: Derived from the same Deep Research data (research_type=="competitor")
+  - Expected: ~8 unique competitors (deduplicated by target name)
+  - Peraton has highest threat score (90, red circle), others default to 75 (amber)
+  - Expanded competitors show: Strengths, Weaknesses, Recent Wins, NAICS codes
+- **Morning Briefing + Intel Feed**: Stay on mock data (n8n workflows have configuration issues)
+  - These tabs show blue "Mock data" badge
+
+### Ops Tracker / Pipeline / Launchpad n8n Data
+- Fetches from `gda-opp-tracker` webhook (POST)
+- Returns real opportunity data with statuses, Pwin scores, values
+- Ops Tracker and Pipeline both use the same underlying data with different filters
+
+### Testing n8n Webhooks Directly
+```bash
+# Test webhook auth
+curl -s -X POST https://n8n.csr-llc.tech/webhook/gda-deep-research-history \
+  -H 'x-gda-key: <GDA_WEBHOOK_KEY value>' \
+  -H 'Content-Type: application/json' \
+  -d '{}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d), 'items')"
+
+# Test via backend API
+curl -s http://localhost:3001/api/intel/research | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'source={d[\"data\"][\"source\"]}, total={d[\"data\"][\"total\"]}')"
+```
+
+### Known n8n Workflow Issues
+Some n8n webhooks may not work due to configuration issues on the n8n side (not in our code):
+- `gda-intel-feed`: Might need Tavily API key configured on HTTP Request node
+- `gda-daily-brief`, `gda-competitor-watchlist`: Might reference a stale credential ID
+- `gda-morning-briefing`: Might have unknown configuration issues
+
+These are pre-existing n8n workflow issues — the backend gracefully falls back to mock data.
+
 ## Mock Data Overview
 
 ### Financial KPIs (7 total)
@@ -147,6 +199,44 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 - Each approval has expandable dry-run checks (PASS/WARN/FAIL)
 - Approve/Reject buttons trigger dry-run modal with correlation ID
 
+### USACE FUDS Detail (cap-001)
+- Win Themes: 4 + 3 discriminators
+- Teaming: GDA (Prime/CONFIRMED), Arcadis (Sub/CONFIRMED), Enviro-Compliance (Sub/NEGOTIATING)
+- Milestones: 6 (5 on_track, 1 at_risk)
+- Gates: 3 (Gate 1 passed, Gate 2 passed, Gate 3 pending)
+- Risks: 3 (all with mitigation plans)
+
+### Gate Review Dry-Run (USACE FUDS, Gate 3)
+- Overall: **CONDITIONAL (3/5 passed)**
+- Teaming Partners Confirmed: WARN — "1 partner(s) not yet confirmed"
+- Win Themes Defined: PASS — "4 win theme(s) defined"
+- Risks Mitigated: PASS — "All risks have mitigation plans"
+- Milestones On Track: WARN — "1 milestone(s) at risk"
+- Discriminators Identified: PASS — "3 discriminator(s) identified"
+- Correlation ID: GDA-GATE-*
+
+### Activities (12 total)
+- Types: meeting(2), research(2), call(2), teaming_discussion(2), gate_review(1), site_visit(1), proposal_work(1), email(1)
+- All have Outcome sections
+
+### Milestones (17 total across all plans)
+- Completed: 4
+- On Track: 12
+- At Risk: 1
+- Overdue: 0
+
+### Doctrine (8 drafts)
+- Sprints: S-205 (3 drafts), S-206 (5 drafts)
+- Statuses: draft(3), finalized(4), blocked(1)
+- Publish runs: 3 total
+- Finalize S-206: success, 4/4 gates pass, GDA-DOC-* correlation ID
+
+### Intel Hub
+- Feed: 12 items, 6 unread (mock); real n8n data when connected
+- Deep Research: 12 real reports when n8n connected (BAE Systems, GDIT, SAIC, ManTech, etc.), 4 mock otherwise
+- Competitors: 10 real profiles when n8n connected, 5 mock otherwise
+- Dynamic source badge: green "Live — n8n" per tab or blue "Mock data"
+
 ### Prompt Architect (12 prompts across 6 categories)
 **Summary strip**: Total 12, Active 11, Draft 1, Archived 0, Starred 4, Categories 6
 
@@ -167,20 +257,9 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 
 **Category filter counts**: proposal(4), capture(2), general(2), compliance(1), research(2), analysis(1)
 
-### Doctrine (8 drafts)
-- Sprints: S-205 (3 drafts), S-206 (5 drafts)
-- Statuses: draft(3), finalized(4), blocked(1)
-- Publish runs: 3 total
-- Finalize S-206: success, 4/4 gates pass, GDA-DOC-* correlation ID
-
-### Intel Hub
-- Feed: 12 items, 6 unread (mock); real n8n data when connected
-- Deep Research: 12 real reports when n8n connected (BAE Systems, GDIT, SAIC, ManTech, etc.), 4 mock otherwise
-- Competitors: 10 real profiles when n8n connected, 5 mock otherwise
-- Dynamic source badge: green "Live — n8n" per tab or blue "Mock data"
-
 ## Testing Tips
-- When DATABASE_URL is not set, all pages show "Mock data" blue badge
+- When DATABASE_URL is not set and n8n webhooks are not configured, all pages show "Mock data" blue badge
+- When n8n webhooks are configured, pages with n8n wiring show green "Live — n8n" badge; pages without wiring still show blue "Mock data"
 - All API responses use GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`
 - Dry-run operations use `dryRun: true` and return correlation IDs starting with "GDA-"
 - Breadcrumb on Opportunity Detail changes based on referrer (Launchpad/Ops Tracker/Pipeline)
@@ -193,3 +272,5 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 - If HMR gets into a bad state (page stuck on "Loading..."), kill all node processes, clear ports, and do a fresh restart
 - n8n webhooks might respond slowly (0.3-1s); the frontend shows "Loading dashboard..." while waiting
 - When n8n returns live data, signal card counts will differ from mock data values — verify against the API response, not hardcoded mock expectations
+- When testing badge toggle on Intel Hub, switch between all 4 tabs to verify badge changes dynamically (Deep Research/Competitor Watch = green n8n, Morning Briefing/Intel Feed = blue mock)
+- If backend port 3001 is already in use, run `fuser -k 3001/tcp` before restarting
