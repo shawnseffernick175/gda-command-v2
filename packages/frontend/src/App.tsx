@@ -4,12 +4,14 @@ import Home from "./pages/Home";
 import OpsTracker from "./pages/OpsTracker";
 import Pipeline from "./pages/Pipeline";
 import OpportunityDetail from "./pages/OpportunityDetail";
+import Doctrine from "./pages/Doctrine";
 
 const NAV_ITEMS = [
   { path: "/", label: "Launchpad" },
   { path: "/qa-center", label: "QA Center" },
   { path: "/ops-tracker", label: "Ops Tracker" },
   { path: "/pipeline", label: "Pipeline" },
+  { path: "/doctrine", label: "Doctrine" },
 ] as const;
 
 export default function App() {
@@ -56,6 +58,7 @@ export default function App() {
           <Route path="/ops-tracker" element={<OpsTracker />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/opportunities/:id" element={<OpportunityDetail />} />
+          <Route path="/doctrine" element={<Doctrine />} />
         </Routes>
       </main>
     </div>

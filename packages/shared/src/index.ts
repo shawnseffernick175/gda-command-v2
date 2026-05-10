@@ -173,3 +173,63 @@ export interface OpportunityDetailData {
   sources: OpportunitySource[];
   learning: OpportunityLearning;
 }
+
+// ---------------------------------------------------------------------------
+// Doctrine Automation types
+// ---------------------------------------------------------------------------
+
+export type DoctrineDocType =
+  | "book_of_truths"
+  | "sprint_notes"
+  | "decision_log"
+  | "master_build_note";
+
+export type DoctrineDraftStatus =
+  | "draft"
+  | "finalized"
+  | "superseded"
+  | "blocked";
+
+export type DoctrinePublishTrigger =
+  | "pr-merge"
+  | "finalize"
+  | "manual";
+
+export type DoctrinePublishStatus =
+  | "running"
+  | "success"
+  | "blocked"
+  | "failed";
+
+export interface DoctrineDraft {
+  id: string;
+  sprint_id: string;
+  component: string;
+  doc_type: DoctrineDocType;
+  title: string;
+  status: DoctrineDraftStatus;
+  source_pr_number: number | null;
+  source_pr_url: string | null;
+  body: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DoctrinePublishRun {
+  id: string;
+  sprint_id: string;
+  trigger_type: DoctrinePublishTrigger;
+  status: DoctrinePublishStatus;
+  gate_results: GateCheckResult[] | null;
+  commit_sha: string | null;
+  reason: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface GateCheckResult {
+  name: string;
+  status: "pass" | "fail" | "skip";
+  message: string;
+  required: boolean;
+}

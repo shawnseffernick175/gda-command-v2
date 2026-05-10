@@ -319,3 +319,118 @@ export interface DashboardKPIs {
 export function fetchDashboardKPIs() {
   return request<DashboardKPIs>("/dashboard/kpis");
 }
+
+// --- Doctrine Automation ---
+
+export interface DoctrineDraftRow {
+  id: string;
+  sprint_id: string;
+  component: string;
+  doc_type: string;
+  title: string;
+  status: string;
+  source_pr_number: number | null;
+  source_pr_url: string | null;
+  body: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DoctrineStatusCounts {
+  draft: number;
+  finalized: number;
+  superseded: number;
+  blocked: number;
+}
+
+export interface DoctrineDraftsData {
+  drafts: DoctrineDraftRow[];
+  total: number;
+  filtered: number;
+  sprints: string[];
+  statusCounts: DoctrineStatusCounts;
+  source: "mock" | "db";
+}
+
+export interface DoctrineDraftDetailData {
+  draft: DoctrineDraftRow;
+  source: "mock" | "db";
+}
+
+export interface GateCheckResultRow {
+  name: string;
+  status: "pass" | "fail" | "skip";
+  message: string;
+  required: boolean;
+}
+
+export interface DoctrinePublishRunRow {
+  id: string;
+  sprint_id: string;
+  trigger_type: string;
+  status: string;
+  gate_results: GateCheckResultRow[] | null;
+  commit_sha: string | null;
+  reason: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface DoctrinePublishRunsData {
+  runs: DoctrinePublishRunRow[];
+  total: number;
+  source: "mock" | "db";
+}
+
+export interface DoctrineFinalizeData {
+  sprintId: string;
+  status: "success" | "blocked";
+  correlationId: string;
+  draftsCount: number;
+  draftsFinalized?: string[];
+  gateResults: GateCheckResultRow[];
+  commitSha: string | null;
+  reason: string | null;
+  dryRun: boolean;
+  note?: string;
+}
+
+export interface DoctrineDraftsQueryParams {
+  sprint?: string;
+  component?: string;
+  doc_type?: string;
+  status?: string;
+  search?: string;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+}
+
+export function fetchDoctrineDrafts(params: DoctrineDraftsQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.sprint) qs.set("sprint", params.sprint);
+  if (params.component) qs.set("component", params.component);
+  if (params.doc_type) qs.set("doc_type", params.doc_type);
+  if (params.status) qs.set("status", params.status);
+  if (params.search) qs.set("search", params.search);
+  if (params.sortBy) qs.set("sortBy", params.sortBy);
+  if (params.sortDir) qs.set("sortDir", params.sortDir);
+  const query = qs.toString();
+  return request<DoctrineDraftsData>(`/doctrine/drafts${query ? `?${query}` : ""}`);
+}
+
+export function fetchDoctrineDraft(id: string) {
+  return request<DoctrineDraftDetailData>(`/doctrine/drafts/${id}`);
+}
+
+export function fetchDoctrinePublishRuns(sprint?: string) {
+  const qs = sprint ? `?sprint=${sprint}` : "";
+  return request<DoctrinePublishRunsData>(`/doctrine/publish-runs${qs}`);
+}
+
+export function finalizeDoctrineSprint(sprintId: string) {
+  return request<DoctrineFinalizeData>("/doctrine/finalize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sprintId }),
+  });
+}
