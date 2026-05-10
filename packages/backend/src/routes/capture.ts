@@ -4,12 +4,55 @@ import {
   MOCK_CAPTURE_PLANS,
   MOCK_CAPTURE_ACTIVITIES,
 } from "../data/capture-mock";
+import { n8nWebhookConfigured, fetchCapturePlansFromN8n } from "../lib/n8n-data";
+import type { CapturePlan } from "@gda/shared";
+
 const router = Router();
+
+// ---------------------------------------------------------------------------
+// Helper: compute summary stats from a plan array
+// ---------------------------------------------------------------------------
+function computePlanStats(allPlans: CapturePlan[], filteredPlans: CapturePlan[]) {
+  const totalValue = allPlans.reduce((s, p) => s + p.value_estimated, 0);
+  const avgPwin = allPlans.length > 0
+    ? Math.round(allPlans.reduce((s, p) => s + p.pwin, 0) / allPlans.length)
+    : 0;
+
+  const phases: Record<string, number> = {};
+  for (const p of allPlans) {
+    phases[p.phase] = (phases[p.phase] || 0) + 1;
+  }
+
+  const decisions: Record<string, number> = {};
+  for (const p of allPlans) {
+    decisions[p.bid_decision] = (decisions[p.bid_decision] || 0) + 1;
+  }
+
+  const allMilestones = allPlans.flatMap((p) => p.milestones);
+  const atRiskCount = allMilestones.filter(
+    (m) => m.status === "at_risk" || m.status === "overdue"
+  ).length;
+  const upcomingMilestones = allMilestones
+    .filter((m) => m.status !== "completed")
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))
+    .slice(0, 5);
+
+  return {
+    total: allPlans.length,
+    filtered: filteredPlans.length,
+    totalValue,
+    avgPwin,
+    phases,
+    decisions,
+    atRiskMilestones: atRiskCount,
+    upcomingMilestones,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/capture/plans — list capture plans with filtering
 // ---------------------------------------------------------------------------
-router.get("/plans", (_req, res) => {
+router.get("/plans", async (_req, res) => {
   const {
     phase,
     bid_decision,
@@ -18,7 +61,27 @@ router.get("/plans", (_req, res) => {
     sortDir = "desc",
   } = _req.query as Record<string, string | undefined>;
 
-  let plans = [...MOCK_CAPTURE_PLANS];
+  let allPlans: CapturePlan[];
+  let source: "n8n" | "mock" = "mock";
+
+  // Try n8n first
+  if (n8nWebhookConfigured()) {
+    try {
+      const result = await fetchCapturePlansFromN8n();
+      if (result.ok && result.plans.length > 0) {
+        allPlans = result.plans;
+        source = "n8n";
+      } else {
+        allPlans = [...MOCK_CAPTURE_PLANS];
+      }
+    } catch {
+      allPlans = [...MOCK_CAPTURE_PLANS];
+    }
+  } else {
+    allPlans = [...MOCK_CAPTURE_PLANS];
+  }
+
+  let plans = [...allPlans];
 
   if (phase) {
     plans = plans.filter((p) => p.phase === phase);
@@ -45,39 +108,13 @@ router.get("/plans", (_req, res) => {
     return String(av ?? "").localeCompare(String(bv ?? "")) * dir;
   });
 
-  // Compute summary stats
-  const totalValue = MOCK_CAPTURE_PLANS.reduce((s, p) => s + p.value_estimated, 0);
-  const avgPwin = Math.round(
-    MOCK_CAPTURE_PLANS.reduce((s, p) => s + p.pwin, 0) / MOCK_CAPTURE_PLANS.length
-  );
-  const phases: Record<string, number> = {};
-  for (const p of MOCK_CAPTURE_PLANS) {
-    phases[p.phase] = (phases[p.phase] || 0) + 1;
-  }
-  const decisions: Record<string, number> = {};
-  for (const p of MOCK_CAPTURE_PLANS) {
-    decisions[p.bid_decision] = (decisions[p.bid_decision] || 0) + 1;
-  }
-
-  const allMilestones = MOCK_CAPTURE_PLANS.flatMap((p) => p.milestones);
-  const atRiskCount = allMilestones.filter((m) => m.status === "at_risk" || m.status === "overdue").length;
-  const upcomingMilestones = allMilestones
-    .filter((m) => m.status !== "completed")
-    .sort((a, b) => a.due_date.localeCompare(b.due_date))
-    .slice(0, 5);
+  const stats = computePlanStats(allPlans, plans);
 
   res.json(
     successEnvelope("GDA.capture", "list-plans", {
       plans,
-      total: MOCK_CAPTURE_PLANS.length,
-      filtered: plans.length,
-      totalValue,
-      avgPwin,
-      phases,
-      decisions,
-      atRiskMilestones: atRiskCount,
-      upcomingMilestones,
-      source: "mock",
+      ...stats,
+      source,
     })
   );
 });
@@ -85,8 +122,28 @@ router.get("/plans", (_req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/capture/plans/:id — single capture plan detail
 // ---------------------------------------------------------------------------
-router.get("/plans/:id", (req, res) => {
-  const plan = MOCK_CAPTURE_PLANS.find((p) => p.id === req.params.id);
+router.get("/plans/:id", async (req, res) => {
+  let plan: CapturePlan | undefined;
+  let source: "n8n" | "mock" = "mock";
+
+  // Try n8n first
+  if (n8nWebhookConfigured()) {
+    try {
+      const result = await fetchCapturePlansFromN8n();
+      if (result.ok && result.plans.length > 0) {
+        plan = result.plans.find((p) => p.id === req.params.id);
+        if (plan) source = "n8n";
+      }
+    } catch {
+      // fall through to mock
+    }
+  }
+
+  // Fall back to mock
+  if (!plan) {
+    plan = MOCK_CAPTURE_PLANS.find((p) => p.id === req.params.id);
+  }
+
   if (!plan) {
     res.status(404).json(
       errorEnvelope("GDA.capture", "plan-detail", {
@@ -99,7 +156,7 @@ router.get("/plans/:id", (req, res) => {
   }
 
   const activities = MOCK_CAPTURE_ACTIVITIES.filter(
-    (a) => a.capture_plan_id === plan.id
+    (a) => a.capture_plan_id === plan!.id
   ).sort(
     (a, b) => new Date(b.performed_at).getTime() - new Date(a.performed_at).getTime()
   );
@@ -108,13 +165,14 @@ router.get("/plans/:id", (req, res) => {
     successEnvelope("GDA.capture", "plan-detail", {
       plan,
       activities,
-      source: "mock",
+      source,
     })
   );
 });
 
 // ---------------------------------------------------------------------------
 // GET /api/capture/activities — BD activity log across all captures
+// BD activity webhook (gda-bd-activity) has n8n credential issues — stays mock
 // ---------------------------------------------------------------------------
 router.get("/activities", (_req, res) => {
   const { type, search, limit = "20" } = _req.query as Record<string, string | undefined>;
@@ -159,6 +217,7 @@ router.get("/activities", (_req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/capture/gate-review — trigger gate review (dry-run)
+// Gate reviews work against mock plans only (needs structured data)
 // ---------------------------------------------------------------------------
 router.post("/gate-review", (req, res) => {
   const { capture_plan_id, gate } = req.body as {
