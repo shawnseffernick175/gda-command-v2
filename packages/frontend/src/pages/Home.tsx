@@ -363,6 +363,12 @@ export default function Home() {
                 statusColor="#10b981"
               />
               <Card
+                title="Proposal Review"
+                description="Track proposals, evaluate volumes, red team findings, scorecards, and submission timelines."
+                to="/proposals"
+                statusColor="#8b5cf6"
+              />
+              <Card
                 title="Financial Bible"
                 description="Drill-down behind every KPI — Orders, Sales, EBIT, ROS, Backlog, Gross Profit."
                 to="/financial-bible"
