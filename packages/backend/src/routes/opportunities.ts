@@ -25,6 +25,7 @@ const SORTABLE_COLUMNS: Record<string, string> = {
   value_estimated: "value_estimated",
   probability_of_win: "probability_of_win",
   due_date: "due_date",
+  qualified_at: "qualified_at",
   updated_at: "updated_at",
   created_at: "created_at",
 };
@@ -161,6 +162,125 @@ router.get("/", async (req, res) => {
       errorEnvelope("gda-opportunities", "list", {
         code: "DB_ERROR",
         message: "Failed to query opportunities.",
+        detail: null,
+      })
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/opportunities/pipeline — read-only pipeline view per S-008
+// ---------------------------------------------------------------------------
+router.get("/pipeline", async (req, res) => {
+  const search = (req.query.search as string) ?? "";
+  const deptFilter = req.query.department as string | undefined;
+  const minPwin = req.query.minPwin ? parseFloat(req.query.minPwin as string) : undefined;
+  const sortBy = (req.query.sortBy as string) ?? "qualified_at";
+  const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
+
+  const pool = getPool();
+
+  if (!pool) {
+    // Mock fallback — filter pipeline-status opportunities
+    let rows = getMockOpportunities().filter((o) => o.status === "pipeline");
+    if (search) {
+      const q = search.toLowerCase();
+      rows = rows.filter(
+        (o) =>
+          o.id.toLowerCase().includes(q) || o.title.toLowerCase().includes(q)
+      );
+    }
+    if (deptFilter) {
+      rows = rows.filter((o) => o.department === deptFilter);
+    }
+    if (minPwin !== undefined && !isNaN(minPwin)) {
+      rows = rows.filter(
+        (o) => o.probability_of_win !== null && o.probability_of_win >= minPwin
+      );
+    }
+    const col = sortBy as keyof Opportunity;
+    rows.sort((a, b) => {
+      const av = a[col] ?? "";
+      const bv = b[col] ?? "";
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return res.json(
+      successEnvelope(
+        "gda-opportunities",
+        "pipeline-list",
+        { opportunities: rows, source: "mock" as const },
+        {
+          count: rows.length,
+          filters_applied: { search, department: deptFilter, minPwin },
+        }
+      )
+    );
+  }
+
+  // Real DB query — pipeline status only
+  try {
+    const conditions: string[] = ["status = 'pipeline'"];
+    const params: unknown[] = [];
+    let paramIdx = 1;
+
+    if (search) {
+      conditions.push(`(id::text ILIKE $${paramIdx} OR title ILIKE $${paramIdx})`);
+      params.push(`%${search}%`);
+      paramIdx++;
+    }
+    if (deptFilter) {
+      conditions.push(`department = $${paramIdx}`);
+      params.push(deptFilter);
+      paramIdx++;
+    }
+    if (minPwin !== undefined && !isNaN(minPwin)) {
+      conditions.push(`probability_of_win >= $${paramIdx}`);
+      params.push(minPwin);
+      paramIdx++;
+    }
+
+    const where = `WHERE ${conditions.join(" AND ")}`;
+    const sortColumn = SORTABLE_COLUMNS[sortBy] ?? "qualified_at";
+    const direction = sortDir === "asc" ? "ASC" : "DESC";
+
+    const sql = `
+      SELECT id, title, agency, department, status, score, value_estimated,
+             probability_of_win, naics, psc, due_date, solicitation_number,
+             set_aside, place_of_performance, incumbent, qualified_at,
+             qualified_by, tags, raw_source_url, created_at, updated_at
+      FROM opportunities
+      ${where}
+      ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
+    `;
+
+    const result = await pool.query(sql, params);
+    const rows: Opportunity[] = result.rows.map((r) => ({
+      ...r,
+      score: parseFloat(r.score) || 0,
+      value_estimated: r.value_estimated ? parseFloat(r.value_estimated) : null,
+      probability_of_win: r.probability_of_win ? parseFloat(r.probability_of_win) : null,
+    }));
+
+    return res.json(
+      successEnvelope(
+        "gda-opportunities",
+        "pipeline-list",
+        { opportunities: rows, source: "db" as const },
+        {
+          count: rows.length,
+          filters_applied: { search, department: deptFilter, minPwin },
+        }
+      )
+    );
+  } catch (err: unknown) {
+    process.stderr.write(`[opportunities] pipeline query error: ${(err as Error).message}\n`);
+    return res.status(500).json(
+      errorEnvelope("gda-opportunities", "pipeline-list", {
+        code: "DB_ERROR",
+        message: "Failed to query pipeline opportunities.",
         detail: null,
       })
     );

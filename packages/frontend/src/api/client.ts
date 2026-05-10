@@ -187,6 +187,25 @@ export function fetchOpportunities(params: OpportunityQueryParams = {}) {
   return request<OpportunitiesData>(`/opportunities${query ? `?${query}` : ""}`);
 }
 
+export interface PipelineQueryParams {
+  search?: string;
+  department?: string;
+  minPwin?: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+}
+
+export function fetchPipelineOpportunities(params: PipelineQueryParams = {}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.department) qs.set("department", params.department);
+  if (params.minPwin !== undefined) qs.set("minPwin", String(params.minPwin));
+  if (params.sortBy) qs.set("sortBy", params.sortBy);
+  if (params.sortDir) qs.set("sortDir", params.sortDir);
+  const query = qs.toString();
+  return request<OpportunitiesData>(`/opportunities/pipeline${query ? `?${query}` : ""}`);
+}
+
 export function qualifyOpportunity(id: string, dryRun = true, approve = false) {
   return request<QualifyResultData>(`/opportunities/${id}/qualify`, {
     method: "POST",

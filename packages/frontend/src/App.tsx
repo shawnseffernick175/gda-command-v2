@@ -2,6 +2,7 @@ import { Routes, Route, Link, useLocation } from "react-router-dom";
 import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
 import OpsTracker from "./pages/OpsTracker";
+import Pipeline from "./pages/Pipeline";
 
 const NAV_ITEMS = [
   { path: "/", label: "Launchpad" },
@@ -52,26 +53,11 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/qa-center" element={<QACenter />} />
           <Route path="/ops-tracker" element={<OpsTracker />} />
-          <Route path="/pipeline" element={<Placeholder label="Pipeline" />} />
+          <Route path="/pipeline" element={<Pipeline />} />
         </Routes>
       </main>
     </div>
   );
 }
 
-function Placeholder({ label }: { label: string }) {
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      height: 300,
-      border: "1px dashed var(--color-border)",
-      borderRadius: 8,
-      color: "var(--color-text-muted)",
-      fontSize: 18,
-    }}>
-      {label} — coming in a future milestone
-    </div>
-  );
-}
+
