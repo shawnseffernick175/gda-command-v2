@@ -13,6 +13,7 @@ import FinancialBible from "./pages/FinancialBible";
 import Approvals from "./pages/Approvals";
 import Compliance from "./pages/Compliance";
 import ProposalReview from "./pages/ProposalReview";
+import Contacts from "./pages/Contacts";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 
 const NAV_GROUPS = [
@@ -32,6 +33,7 @@ const NAV_GROUPS = [
       { path: "/intel", label: "Intel Hub" },
       { path: "/compliance", label: "Compliance" },
       { path: "/proposals", label: "Proposals" },
+      { path: "/contacts", label: "Contacts" },
       { path: "/financial-bible", label: "Financials" },
     ],
   },
@@ -124,6 +126,7 @@ export default function App() {
           <Route path="/approvals" element={<Approvals />} />
           <Route path="/compliance" element={<Compliance />} />
           <Route path="/proposals" element={<ProposalReview />} />
+          <Route path="/contacts" element={<Contacts />} />
         </Routes>
       </main>
     </div>

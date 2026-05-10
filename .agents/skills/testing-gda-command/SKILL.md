@@ -50,8 +50,9 @@ curl http://localhost:3001/health
 | `/capture` | Capture Planner | Capture plans, BD activities, milestones, gate review |
 | `/prompts` | Prompt Architect | 12 prompts, 6 categories, split-view detail with Body/Versions/Usage tabs |
 | `/approvals` | Approvals Queue | Pending/resolved approvals, dry-run checks, approve/reject actions |
-| `/compliance` | Compliance Matrix | Requirements tab (15 items), Clause Library tab (10 FAR/DFARS), filters |
+| `/compliance` | Compliance Matrix | Requirements tab (15 items), Clause Library tab (10 FAR/DFARS), score 68% |
 | `/proposals` | Proposal Review | 6 proposals, split-view, 5 tabs (Overview/Volumes/Red Team/Scorecard/Timeline) |
+| `/contacts` | Contacts & Relationships | 25 contacts, split-view, 5 tabs (Overview/Meeting Notes/Relationships/Opportunities/Teaming) |
 | `/workflows` | Workflow Manager | Browse/filter n8n workflows (183 when live) |
 | `/settings` | Settings | Connectors, feature flags, health check button |
 
@@ -68,7 +69,7 @@ Rendered on **every page** below the nav bar, above main content.
 ### Grouped Navigation Bar
 Nav bar uses 3 groups:
 - **BD Tools**: Launchpad, Ops Tracker, Pipeline, Capture, Approvals
-- **Analysis**: Intel Hub, Compliance, Proposals, Financials
+- **Analysis**: Intel Hub, Compliance, Proposals, Contacts, Financials
 - **Platform**: QA Center, Doctrine, Workflows, Settings
 
 Active page gets blue highlight. Group labels shown in uppercase.
@@ -171,79 +172,40 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 
 ### Compliance Matrix
 **Summary strip**: Compliant=8, Partial=3, Gap=3, N/A=1, Score=68% (amber)
-- Requirements tab: 15 requirements across 3 solicitations (USACE FUDS, Tyndall, NASA KSC)
-- Clause Library tab: 10 references (7 FAR, 3 DFARS)
-- Expandable cards with evidence, notes, related clause badges
-- Solicitation filter: USACE FUDS → 7 requirements
-- DFARS filter → 3 clauses; expanded DFARS 252.204-7012 has 4 pitfalls, 3 related clauses, 3 applicability tags
+- Requirements tab: 15 items across 3 solicitations (USACE FUDS, Tyndall, NASA KSC)
+- Clause Library tab: 10 references (FAR=7, DFARS=3)
+- Expandable requirement cards show evidence, notes, related clause badges
+- Expanded clause shows pitfalls, related clauses, applicability tags
 
-### Proposal Review (6 proposals across 6 agencies)
-**Summary strip**: Total=6, Active=4, Red Team Open=3, Avg Compliance=69% (amber), Pipeline Value=$444.9M, Agencies=6
+### Proposal Review (6 proposals)
+**Summary strip**: Total=6, Active=4, Red Team Open=3, Avg Compliance=69% (amber), Pipeline=$444.9M, Agencies=6
+- Split-view: clickable list on left, 5-tab detail panel on right
+- Tabs: Overview (scores/schedule), Volumes (compliance %), Red Team (expandable findings), Scorecard (weighted bars), Timeline (milestone dots)
+- Scorecard for USACE FUDS: 84/100pts — Tech 34/40, Mgmt 16/20, PP 23/25, Cost 11/15 (amber bar at 73%)
+- Status filter: "Red Team" → exactly 1 proposal
 
-| ID | Title | Agency | Status | Score | Value | Compliance |
-|---|---|---|---|---|---|---|
-| PROP-001 | USACE FUDS IDIQ Environmental Remediation | US Army Corps of Engineers | red_team | 84 | $48.5M | 87% |
-| PROP-002 | Air Force Tyndall AFB Reconstruction Support | US Air Force | in_review | 72 | $125.0M | 72% |
-| PROP-003 | NASA KSC Launch Complex Modernization | NASA | draft | — | $210.0M | 27% |
-| PROP-004 | DHS CISA Cyber Assessment BPA | Dept of Homeland Security | submitted | 91 | $18.2M | 90% |
-| PROP-005 | DCSA NBIS Platform Support | Defense Counterintelligence & Security Agency | final | 88 | $34.7M | — |
-| PROP-006 | SOCOM C-UAS Technology Evaluation | US Special Operations Command | archived | 82 | $8.5M | — |
+### Contacts & Relationships (25 contacts)
+**Summary strip**: Total Contacts=25, Active Relationships=21, Pending Actions=15, Teaming Gaps=13
+- Split-view: scrollable contact list on left, 5-tab detail panel on right
+- Tabs: Overview, Meeting Notes, Relationships, Opportunities, Teaming
+- 14 agencies represented: USACE(4), Air Force(3), NASA(3), DHS(2), EPA(2), SOCOM(2), Army(2), DCSA(1), NAVFAC(1), DOE(1), DoD(1), DARPA(1), DoS(1), VA(1)
+- Statuses: active(21), prospect(3), inactive(1)
+- Strengths: strong(5), moderate(10), weak(7), new(3)
 
-**Active proposals** (for avg compliance calculation): PROP-001, 002, 003, 005 (excludes submitted PROP-004 and archived PROP-006)
-**Avg Compliance**: (87+72+27+90)/4 = 69% — note: code uses `activeStatuses` filter
-**Red Team Open**: 3 (all from PROP-001; PROP-006 has 1 finding with status "accepted_risk" which does NOT count as open)
+**Key test contacts**:
+- CON-001 James Richardson: USACE, Contracting Officer, email james.richardson@usace.army.mil, 4 tags, Quick Stats 2/2/2/1
+- CON-018 Gregory Martinez: DOE, Inactive status — only inactive contact (used for filter testing)
+- PFAS-tagged contacts: Davis, Nguyen, Adams, Patel, Reeves, Price (exactly 6 — used for search testing)
 
-#### USACE FUDS (PROP-001) Detail Tabs
+**Meeting Notes (CON-001 first note)**:
+- Title: "FUDS Task Order 4 Pre-Proposal Conference"
+- Attendees: James Richardson, Shawn Seffernick, Maria Chen (3)
+- Topics: 4 badge tags
+- Action Items: 2 total — 1 completed (Shawn Seffernick), 1 open (James Richardson)
 
-**Overview tab:**
-- Scores: Overall Score=84 (green, ≥80), Compliance=87% (green)
-- Red Team: 3 Open (red) / 2 Addressed (green) / 5 Total
-- Document: 5 Volumes, 127 Pages (4+45+32+28+18), 50.4K Words
-- Schedule: Days Overdue (dynamic), Due Date Jun 15, 2025
-- Win Themes: 4 blue badges ("Proven FUDS remediation experience across 47+ sites", etc.)
-
-**Red Team tab:**
-- Summary: Critical=1, Major=2, Open=3, Addressed=2
-- 5 findings, each with expandable card showing section, finding text, recommendation (blue left-border highlight), assigned_to, created_at
-- RT-001-1: critical/open — "Transition plan does not address 30-day assumption..." → Assigned: James Chen
-- RT-001-2: major/open — Arcadis GSA schedule rates
-- RT-001-3: major/addressed — ISO 14001 QCP reference
-- RT-001-4: minor/open — Win theme #3 unsubstantiated
-- RT-001-5: observation/addressed — EPA CPARS rating period
-
-**Scorecard tab:**
-- Overall Score: 84 (large green text, font-size 40px)
-- 84/100 points (100% total weight)
-- Technical Approach: 34/40 (Weight: 40%) — green bar (85%)
-- Management Plan: 16/20 (Weight: 20%) — green bar (80%)
-- Past Performance: 23/25 (Weight: 25%) — green bar (92%)
-- Cost Reasonableness: 11/15 (Weight: 15%) — **amber bar** (73%, between 60-79%)
-- All evaluators: Red Team Lead
-
-**Timeline tab:**
-- "Final submission due: Jun 15, 2025"
-- 6 milestones with colored dots:
-  - Compliance Matrix Complete — completed (green), Apr 15
-  - First Draft — All Volumes — completed (green), Apr 30
-  - Pink Team Review — completed (green), May 5, "14 findings, all resolved"
-  - Red Team Review — on_track (blue), May 9, "5 findings, 2 addressed"
-  - Gold Team Final — on_track (blue), May 20
-  - Production & Submission — on_track (blue), Jun 15, "FedConnect submission"
-
-**Volumes tab:**
-- 5 volumes with compliance % and type badges:
-  - Executive Summary: 95% (green)
-  - Technical Approach Vol I: 88% (green)
-  - Management Plan Vol II: 82% (green)
-  - Past Performance Vol III: 92% (green)
-  - Cost/Price Volume IV: 78% (amber)
-
-#### Filter Behavior
-- Status "Red Team" → 1 proposal (PROP-001)
-- Status "Draft" → 1 proposal (PROP-003)
-- Agency "NASA" → 1 proposal (PROP-003)
-- Search "DCSA" → 1 proposal (PROP-005, matches title)
-- Clear filters restores all 6 proposals
+**Relationships (CON-001)**:
+- Lt. Col. Marcus Davis: Supervisor, Strong
+- Sarah Kim: Peer, Moderate
 
 ### Doctrine (8 drafts)
 - Sprints: S-205 (3 drafts), S-206 (5 drafts)
@@ -266,10 +228,9 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 - Financial Bible drill-down has stale-fetch protection (rapid KPI switching won't show wrong data)
 - Prompt Architect uses split-view layout: clicking a prompt card opens the detail panel on the right side
 - Prompt list default sort is by `usageCount` descending (most-used first)
-- Proposal Review uses split-view layout: proposal list on left, detail panel with 5 tabs on right
-- First proposal is auto-selected on page load, so detail panel is immediately visible
-- Avg Compliance uses only active statuses (red_team, in_review, draft, final) — NOT submitted/archived
-- Scorecard color thresholds: ≥80% green, ≥60% amber, <60% red — Cost Reasonableness at 73% is the only amber bar for PROP-001
+- Split-view pages (Prompts, Proposals, Contacts) auto-select the first item on load
+- Contact search matches against name, title, agency, department, tags, and relationship history text
+- Color lookup maps (STRENGTH_COLORS, STATUS_COLORS) use nullish coalescing `?? "#6b7280"` for defensive fallback — if a new status/strength is added to mock data, the UI won't break
 - After code changes, the backend hot-reload (tsx watch) might need a manual restart if routes change — if you see 500 errors on pages that worked before, restart the backend
 - Use `wmctrl -r :ACTIVE: -b add,maximized_vert,maximized_horz` to maximize browser before recording
 - If HMR gets into a bad state (page stuck on "Loading..."), kill all node processes, clear ports, and do a fresh restart
