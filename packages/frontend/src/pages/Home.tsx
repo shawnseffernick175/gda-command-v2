@@ -315,6 +315,12 @@ export default function Home() {
             {/* Quick Access */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <Card
+                title="Fast Track"
+                description="Emerging signals, technology matching, and contract-path discovery."
+                to="/fast-track"
+                statusColor="#ef4444"
+              />
+              <Card
                 title="QA Center"
                 description="Platform health checks, smoke tests, and latest failures."
                 to="/qa-center"
