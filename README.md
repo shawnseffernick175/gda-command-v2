@@ -50,6 +50,7 @@ npm run dev --workspace=@gda/frontend
 | `/pipeline` | Pipeline — read-only qualified pipeline view with filtering & sorting |
 | `/opportunities/:id` | Opportunity Detail — OODA analysis, sources, learning (S-009) |
 | `/doctrine` | Doctrine — sprint doctrine drafts, finalization gates, publish history |
+| `/intel` | Intel Hub — intelligence feed, morning briefings, deep research, competitor watch |
 
 ### Backend API
 | Endpoint | Description |
@@ -65,6 +66,12 @@ npm run dev --workspace=@gda/frontend
 | `GET /api/doctrine/drafts/:id` | Single doctrine draft detail |
 | `GET /api/doctrine/publish-runs` | Publish run history with gate results |
 | `POST /api/doctrine/finalize` | Trigger sprint finalization with gate checks (dry-run) |
+| `GET /api/intel/feed` | Intelligence feed with category/priority/source filtering |
+| `GET /api/intel/briefings` | Morning briefings list (filterable by date) |
+| `GET /api/intel/briefings/:id` | Single briefing detail |
+| `GET /api/intel/research` | Deep research reports (filterable by status) |
+| `GET /api/intel/research/:id` | Single research report detail |
+| `GET /api/intel/competitors` | Competitor profiles with threat scores |
 
 All API responses follow the standard GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`.
 

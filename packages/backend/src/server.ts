@@ -5,6 +5,7 @@ import workflowsRouter from "./routes/workflows";
 import opportunitiesRouter from "./routes/opportunities";
 import dashboardRouter from "./routes/dashboard";
 import doctrineRouter from "./routes/doctrine";
+import intelRouter from "./routes/intel";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -60,6 +61,7 @@ app.use("/api/workflows", workflowsRouter);
 app.use("/api/opportunities", opportunitiesRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/doctrine", doctrineRouter);
+app.use("/api/intel", intelRouter);
 
 // --- Catch-all 404 ---
 app.use((_req, res) => {
