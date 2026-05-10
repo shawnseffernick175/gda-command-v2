@@ -237,6 +237,13 @@ const ENDPOINTS = [
   { method: "GET", path: "/api/financials/kpis", description: "Financial KPIs strip data" },
   { method: "GET", path: "/api/financials/:key", description: "Financial Bible drill-down" },
   { method: "GET", path: "/api/workflows/registry", description: "n8n workflow registry" },
+  { method: "GET", path: "/api/approvals", description: "Approvals queue with filters" },
+  { method: "POST", path: "/api/approvals/:id/resolve", description: "Approve/reject dry-run" },
+  { method: "GET", path: "/api/compliance/requirements", description: "Compliance requirements" },
+  { method: "GET", path: "/api/compliance/clauses", description: "Clause library" },
+  { method: "GET", path: "/api/compliance/clauses/:id", description: "Single clause detail" },
+  { method: "GET", path: "/api/proposals", description: "Proposal list with filters" },
+  { method: "GET", path: "/api/proposals/:id", description: "Single proposal detail" },
   { method: "GET", path: "/api/settings", description: "System settings and config" },
 ];
 
