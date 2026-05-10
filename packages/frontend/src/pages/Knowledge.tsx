@@ -113,6 +113,7 @@ function DocumentsTab() {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [collections, setCollections] = useState<KnowledgeCollection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<KnowledgeDocument | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -135,15 +136,17 @@ function DocumentsTab() {
   }, [search, collectionFilter, typeFilter, sortBy]);
 
   useEffect(() => {
-    if (!selectedDoc) return;
+    if (!selectedDocId) return;
+    let stale = false;
     setDetailLoading(true);
-    fetchKnowledgeDocument(selectedDoc.id)
+    fetchKnowledgeDocument(selectedDocId)
       .then((env) => {
-        if (env.success && env.data) setSelectedDoc(env.data);
+        if (!stale && env.success && env.data) setSelectedDoc(env.data);
       })
       .catch(() => {})
-      .finally(() => setDetailLoading(false));
-  }, [selectedDoc?.id]);
+      .finally(() => { if (!stale) setDetailLoading(false); });
+    return () => { stale = true; };
+  }, [selectedDocId]);
 
   if (loading) return <p style={{ color: "var(--color-text-muted)" }}>Loading documents...</p>;
 
@@ -225,7 +228,7 @@ function DocumentsTab() {
         {documents.map((doc) => (
           <div
             key={doc.id}
-            onClick={() => setSelectedDoc(doc)}
+            onClick={() => { setSelectedDocId(doc.id); setSelectedDoc(doc); }}
             style={{
               padding: "10px 12px",
               borderRadius: 8,

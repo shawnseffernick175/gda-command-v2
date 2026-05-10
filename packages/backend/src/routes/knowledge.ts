@@ -184,8 +184,9 @@ router.get("/search", (req, res) => {
       );
     }
 
-    const maxResults =
-      limit && typeof limit === "string" ? Math.min(parseInt(limit, 10), 20) : 10;
+    const limitRaw =
+      limit && typeof limit === "string" ? parseInt(limit, 10) : 10;
+    const maxResults = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 20) : 10;
 
     const results = mockSemanticSearch(q.trim(), maxResults);
 
