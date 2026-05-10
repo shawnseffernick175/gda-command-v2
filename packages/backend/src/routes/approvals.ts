@@ -115,7 +115,8 @@ router.post("/:id/resolve", (req, res) => {
           dry_run_result: item.dry_run_result,
           correlation_id: correlationId,
         },
-        { dryRun: true },
+        {},
+        true,
       ),
     );
   } else {
