@@ -109,3 +109,113 @@ For each new page:
 ## Devin Secrets Needed
 
 None — all testing uses mock data with no external service dependencies.
+---
+name: testing-gda-command
+description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API endpoints, or new milestone features.
+---
+
+# Testing GDA Command v2
+
+## Quick Start
+
+```bash
+cd /home/ubuntu/gda-command-v2
+
+# Kill stale processes
+fuser -k 3000/tcp 2>/dev/null; fuser -k 3001/tcp 2>/dev/null
+
+# Build shared types first
+npm run build --workspace=@gda/shared
+
+# Start backend (port 3001)
+cd packages/backend && npm run dev &
+
+# Start frontend (port 3000)
+cd packages/frontend && npm run dev &
+```
+
+## Architecture
+
+- **Frontend**: React + Vite at `localhost:3000`
+- **Backend**: Express + tsx at `localhost:3001`
+- **Shared types**: `packages/shared/src/index.ts` — build before running
+- **Mock data**: `packages/backend/src/data/*-mock.ts`
+- **API prefix**: `/api/*` (e.g., `/api/color-review`, `/api/opportunities`)
+- **No CI checks configured** — verify manually
+
+## Common Issues
+
+- **Ports occupied**: Run `fuser -k 3000/tcp` and `fuser -k 3001/tcp` before starting
+- **Backend 404s**: tsx watcher can drop routes on file changes — restart backend
+- **Financial KPI strip missing**: Pre-existing race condition — hard refresh fixes it
+- **Shared types stale**: Always `npm run build --workspace=@gda/shared` after type changes
+
+## Pages & Key Test Points
+
+### Launchpad (`/`)
+- 4 Command Signal cards: Active Risks, Decisions Pending, Due Soon, Accelerators
+- KPI grid with pipeline/revenue metrics
+- Navigation cards to all major pages
+
+### Color Review (`/color-review`)
+- **5 phases**: White (#94a3b8), Pink (#ec4899), Green (#22c55e), Red (#ef4444), Gold (#eab308)
+- **15 reviews** across 6 proposals (White=3, Pink=4, Green=3, Red=3, Gold=2)
+- **Summary strip**: 9 KPIs (Reviews/White/Pink/Green/Red/Gold/Avg Score/Proposals/GO-Cond-NoGo)
+- **Phase-specific tabs**:
+  - Pink: Compliance (pass/fail/warn checks with suggestions)
+  - Red: Sections (scored 0-100 with strengths/weaknesses)
+  - Gold: Gold Checks (go/no-go with confidence %)
+  - Green: Cost Items (proposed/gov estimate/variance/BOE), Green Checks (benchmarks/recommendations)
+  - White: Format Checks (expected vs actual, volume tags)
+- **Filters**: Phase dropdown (All/White/Pink/Green/Red/Gold), Status dropdown
+- **Run modal**: 5 phase options, White default, 6 proposals, dry-run queue
+- **Key mock reviews**: CR-010 (Green, 76%, 6 cost items $101.7M), CR-014 (White, 63%, 3 FAIL format checks)
+
+### Fast Track (`/fast-track`)
+- 10 match candidates with signal types (academia, innovation_factory, sbir, etc.)
+- Summary strip with status filters (new/reviewing/watching/promoted/discarded)
+- Detail panel: Overview, OODA, Sources tabs
+
+### Predictive Analytics (`/predictive`)
+- 4 tabs: ML Pwin Models, Revenue Forecast, Bid/No-Bid, Win/Loss Patterns
+- Key values: opp-001 Pwin=73%, 42% win rate, $68.2M weighted pipeline
+- Negative currency formatting: verify `-$24.6M` not `$-24600000`
+
+### RFP Shredder (`/rfp-shredder`)
+- 4 shred jobs, 42 extracted requirements
+- Compliance Map (77% coverage), Response Outline (13 sections, 94 pages)
+
+### Knowledge Base (`/knowledge`)
+- 4 tabs: Documents (30 docs), Semantic Search, Collections (6), RAG Chat
+- Chat sessions with source citations and page numbers
+
+### Reports (`/reports`)
+- 4 tabs: Templates (8), Generated (12), Schedules (4+1 paused), Exports (5)
+- Generate modal with dry-run
+
+### Sidebar Navigation
+- 3 groups: BD Tools (7), Analysis (8), Platform (5)
+- Collapse toggle: 220px expanded / 52px collapsed icons-only rail
+- Tooltips on collapsed state
+
+### Other Pages
+- Ops Tracker (`/ops-tracker`): Smart recommendations panel (8 cards)
+- Capture Planner (`/capture`): Intel Modules tab (7 modules)
+- Opportunity Detail (`/opportunities/:id`): Pwin breakdown, incumbent, competitors, black hat, wargame
+- Global Search: Search bar in sidebar, returns results with relevance scores
+- Notifications: Bell icon with unread badge, 8 alerts
+
+## Testing Strategy
+
+1. **Extract expected values** from mock data files before testing
+2. **Use adversarial test plans** with exact pass/fail criteria
+3. **Verify summary strips first** — wrong counts = broken data pipeline
+4. **Test filters** — select, verify count, clear, verify restoration
+5. **Test tabs** — click each, verify content renders with correct data
+6. **Test modals** — open, verify form fields, close
+7. **Record browser interactions** for visual proof
+8. **Annotate recordings** with setup/test_start/assertion markers
+
+## Devin Secrets Needed
+
+None — all mock data, no external services required for testing.
