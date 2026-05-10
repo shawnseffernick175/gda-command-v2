@@ -2130,3 +2130,99 @@ export interface WinLossAnalysisData {
 export function fetchWinLossAnalysis() {
   return request<WinLossAnalysisData>("/predictive/win-loss");
 }
+
+// ---------------------------------------------------------------------------
+// Color Review
+// ---------------------------------------------------------------------------
+
+export interface ColorReviewRequirementCheckRow {
+  id: string;
+  requirement_id: string;
+  requirement_text: string;
+  source_reference: string;
+  verdict: "pass" | "fail" | "warning" | "not_reviewed";
+  response_location: string | null;
+  gap_detail: string | null;
+  suggestion: string | null;
+}
+
+export interface ColorReviewSectionScoreRow {
+  id: string;
+  section: string;
+  volume: string;
+  score: number;
+  max_score: number;
+  strengths: string[];
+  weaknesses: string[];
+  discriminators_found: string[];
+  discriminators_missing: string[];
+  improvement_actions: string[];
+  evaluator_notes: string;
+}
+
+export interface ColorReviewGoldCheckRow {
+  id: string;
+  category: string;
+  label: string;
+  verdict: "pass" | "fail" | "warning" | "not_reviewed";
+  score: number;
+  max_score: number;
+  detail: string;
+  recommendations: string[];
+}
+
+export interface ColorReviewRow {
+  id: string;
+  proposal_id: string;
+  proposal_title: string;
+  agency: string;
+  phase: "pink" | "red" | "gold";
+  status: "pending" | "in_progress" | "completed" | "failed";
+  started_at: string;
+  completed_at: string | null;
+  overall_score: number;
+  max_score: number;
+  pass_rate: number;
+  total_checks: number;
+  passed_checks: number;
+  failed_checks: number;
+  warning_checks: number;
+  reviewer: string;
+  summary: string;
+  go_no_go: "go" | "conditional_go" | "no_go" | null;
+  confidence: number | null;
+  requirement_checks: ColorReviewRequirementCheckRow[];
+  section_scores: ColorReviewSectionScoreRow[];
+  gold_checks: ColorReviewGoldCheckRow[];
+  risk_factors: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ColorReviewData {
+  reviews: ColorReviewRow[];
+  total: number;
+  filtered: number;
+  summary: {
+    phaseCounts: Record<string, number>;
+    statusCounts: Record<string, number>;
+    avgScore: number;
+    goCount: number;
+    conditionalGoCount: number;
+    noGoCount: number;
+    proposalsReviewed: number;
+  };
+  source: "mock" | "n8n";
+}
+
+export function fetchColorReviews() {
+  return request<ColorReviewData>("/color-review");
+}
+
+export function runColorReview(proposal_id: string, phase: string) {
+  return request<{ correlationId: string; proposal_id: string; phase: string; status: string; message: string }>("/color-review/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ proposal_id, phase }),
+  });
+}

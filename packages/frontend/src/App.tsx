@@ -21,6 +21,7 @@ import FastTrack from "./pages/FastTrack";
 import Knowledge from "./pages/Knowledge";
 import RFPShredder from "./pages/RFPShredder";
 import Predictive from "./pages/Predictive";
+import ColorReview from "./pages/ColorReview";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -49,6 +50,7 @@ const NAV_GROUPS = [
       { path: "/reports", label: "Reports", icon: "📑" },
       { path: "/knowledge", label: "Knowledge", icon: "📚" },
       { path: "/predictive", label: "Predictive", icon: "🧠" },
+      { path: "/color-review", label: "Color Review", icon: "🎨" },
     ],
   },
   {
@@ -276,6 +278,7 @@ export default function App() {
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/rfp-shredder" element={<RFPShredder />} />
             <Route path="/predictive" element={<Predictive />} />
+            <Route path="/color-review" element={<ColorReview />} />
           </Routes>
         </main>
       </div>

@@ -1,0 +1,752 @@
+import { useEffect, useState } from "react";
+import {
+  fetchColorReviews,
+  runColorReview,
+  type ColorReviewData,
+  type ColorReviewRow,
+  type ColorReviewRequirementCheckRow,
+  type ColorReviewSectionScoreRow,
+  type ColorReviewGoldCheckRow,
+} from "../api/client";
+
+const PHASE_COLORS: Record<string, string> = {
+  pink: "#ec4899",
+  red: "#ef4444",
+  gold: "#eab308",
+};
+
+const PHASE_LABELS: Record<string, string> = {
+  pink: "Pink Team",
+  red: "Red Team",
+  gold: "Gold Team",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "#6b7280",
+  in_progress: "#3b82f6",
+  completed: "#22c55e",
+  failed: "#ef4444",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  in_progress: "In Progress",
+  completed: "Completed",
+  failed: "Failed",
+};
+
+const VERDICT_COLORS: Record<string, string> = {
+  pass: "#22c55e",
+  fail: "#ef4444",
+  warning: "#f59e0b",
+  not_reviewed: "#6b7280",
+};
+
+const VERDICT_LABELS: Record<string, string> = {
+  pass: "PASS",
+  fail: "FAIL",
+  warning: "WARN",
+  not_reviewed: "N/R",
+};
+
+const GO_COLORS: Record<string, string> = {
+  go: "#22c55e",
+  conditional_go: "#f59e0b",
+  no_go: "#ef4444",
+};
+
+const GO_LABELS: Record<string, string> = {
+  go: "GO",
+  conditional_go: "CONDITIONAL GO",
+  no_go: "NO-GO",
+};
+
+function formatDate(d: string): string {
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+type DetailTab = "checks" | "sections" | "gold" | "risks";
+
+export default function ColorReview() {
+  const [data, setData] = useState<ColorReviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<DetailTab>("checks");
+  const [phaseFilter, setPhaseFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [expandedGold, setExpandedGold] = useState<string | null>(null);
+  const [runModal, setRunModal] = useState(false);
+  const [runResult, setRunResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetchColorReviews()
+      .then((env) => {
+        if (env.success && env.data) {
+          setData(env.data);
+          if (env.data.reviews.length > 0) setSelected(env.data.reviews[0].id);
+        } else {
+          setError(env.error?.message ?? "Failed to load color reviews");
+        }
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p style={{ color: "var(--color-text-muted)" }}>Loading color reviews...</p>;
+  if (error) return <p style={{ color: "#ef4444" }}>Error: {error}</p>;
+  if (!data) return null;
+
+  const source = data.source;
+
+  let reviews = data.reviews;
+  if (phaseFilter) reviews = reviews.filter((r) => r.phase === phaseFilter);
+  if (statusFilter) reviews = reviews.filter((r) => r.status === statusFilter);
+
+  const sel = data.reviews.find((r) => r.id === selected) ?? null;
+
+  // Determine best tab for selected review
+  function bestTab(r: ColorReviewRow): DetailTab {
+    if (r.phase === "pink" && r.requirement_checks.length > 0) return "checks";
+    if (r.phase === "red" && r.section_scores.length > 0) return "sections";
+    if (r.phase === "gold" && r.gold_checks.length > 0) return "gold";
+    if (r.risk_factors.length > 0) return "risks";
+    return "checks";
+  }
+
+  function handleSelect(id: string) {
+    setSelected(id);
+    setExpandedCheck(null);
+    setExpandedSection(null);
+    setExpandedGold(null);
+    const r = data!.reviews.find((rv) => rv.id === id);
+    if (r) setTab(bestTab(r));
+  }
+
+  async function handleRun(proposalId: string, phase: string) {
+    try {
+      const env = await runColorReview(proposalId, phase);
+      if (env.success && env.data) {
+        setRunResult(`Queued: ${env.data.correlationId}`);
+      }
+    } catch (e) {
+      setRunResult(`Error: ${String(e)}`);
+    }
+  }
+
+  const { summary } = data;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <h1 style={{ margin: 0 }}>Color Review</h1>
+        <span style={{
+          fontSize: 11,
+          padding: "2px 8px",
+          borderRadius: 4,
+          background: source === "n8n" ? "#166534" : "#1e3a5f",
+          color: source === "n8n" ? "#4ade80" : "#60a5fa",
+        }}>{source === "n8n" ? "Live n8n" : "Mock data"}</span>
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={() => { setRunModal(true); setRunResult(null); }}
+          style={{
+            background: "#7c3aed",
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            padding: "8px 16px",
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: 13,
+          }}
+        >Run Color Review</button>
+      </div>
+
+      {/* Summary strip */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(7, 1fr)",
+        gap: 12,
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 20,
+      }}>
+        {[
+          { label: "Reviews", value: String(data.total) },
+          { label: "Pink", value: String(summary.phaseCounts["pink"] ?? 0), color: PHASE_COLORS.pink },
+          { label: "Red", value: String(summary.phaseCounts["red"] ?? 0), color: PHASE_COLORS.red },
+          { label: "Gold", value: String(summary.phaseCounts["gold"] ?? 0), color: PHASE_COLORS.gold },
+          { label: "Avg Score", value: `${summary.avgScore}%`, color: summary.avgScore >= 80 ? "#22c55e" : summary.avgScore >= 60 ? "#f59e0b" : "#ef4444" },
+          { label: "Proposals", value: String(summary.proposalsReviewed) },
+          { label: "GO / Cond / No-Go", value: `${summary.goCount} / ${summary.conditionalGoCount} / ${summary.noGoCount}`, color: "#7c3aed" },
+        ].map((kpi, i) => (
+          <div key={i}>
+            <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{kpi.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)} style={selectStyle}>
+          <option value="">All Phases</option>
+          <option value="pink">Pink Team</option>
+          <option value="red">Red Team</option>
+          <option value="gold">Gold Team</option>
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
+          <option value="">All Statuses</option>
+          <option value="completed">Completed</option>
+          <option value="in_progress">In Progress</option>
+          <option value="pending">Pending</option>
+          <option value="failed">Failed</option>
+        </select>
+        {(phaseFilter || statusFilter) && (
+          <button onClick={() => { setPhaseFilter(""); setStatusFilter(""); }} style={{ background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", borderRadius: 4, padding: "4px 10px", cursor: "pointer", fontSize: 12 }}>
+            Clear filters
+          </button>
+        )}
+        <span style={{ color: "var(--color-text-muted)", fontSize: 12, alignSelf: "center" }}>
+          {reviews.length} of {data.total}
+        </span>
+      </div>
+
+      {/* Split view */}
+      <div style={{ display: "flex", gap: 16, minHeight: 600 }}>
+        {/* Left list */}
+        <div style={{
+          width: 420,
+          minWidth: 420,
+          maxHeight: 700,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}>
+          {reviews.map((r) => (
+            <div
+              key={r.id}
+              onClick={() => handleSelect(r.id)}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 6,
+                cursor: "pointer",
+                border: selected === r.id ? "1px solid #7c3aed" : "1px solid var(--color-border)",
+                background: selected === r.id ? "rgba(124,58,237,0.08)" : "var(--color-surface)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontWeight: 600, fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.proposal_title.length > 50 ? r.proposal_title.slice(0, 50) + "..." : r.proposal_title}
+                </span>
+                {r.status === "completed" && <span style={{ fontSize: 16, fontWeight: 700, color: r.overall_score >= 80 ? "#22c55e" : r.overall_score >= 60 ? "#f59e0b" : "#ef4444" }}>{r.overall_score}%</span>}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
+                <span style={{
+                  fontSize: 10,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  background: PHASE_COLORS[r.phase] ?? "#6b7280",
+                  color: "#fff",
+                  fontWeight: 600,
+                }}>{PHASE_LABELS[r.phase] ?? r.phase}</span>
+                <span style={{
+                  fontSize: 10,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  background: "rgba(255,255,255,0.06)",
+                  color: STATUS_COLORS[r.status] ?? "#6b7280",
+                  border: `1px solid ${STATUS_COLORS[r.status] ?? "#6b7280"}`,
+                }}>{STATUS_LABELS[r.status] ?? r.status}</span>
+                {r.go_no_go && (
+                  <span style={{
+                    fontSize: 10,
+                    padding: "1px 6px",
+                    borderRadius: 3,
+                    background: GO_COLORS[r.go_no_go] ?? "#6b7280",
+                    color: "#fff",
+                    fontWeight: 700,
+                  }}>{GO_LABELS[r.go_no_go]}</span>
+                )}
+                <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: "auto" }}>{r.agency}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Right detail */}
+        <div style={{
+          flex: 1,
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 20,
+          overflowY: "auto",
+          maxHeight: 700,
+        }}>
+          {!sel ? (
+            <p style={{ color: "var(--color-text-muted)" }}>Select a review to view details</p>
+          ) : (
+            <>
+              {/* Header */}
+              <div style={{ marginBottom: 16 }}>
+                <h2 style={{ margin: 0, fontSize: 16 }}>{sel.proposal_title}</h2>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                    background: PHASE_COLORS[sel.phase],
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 12,
+                  }}>{PHASE_LABELS[sel.phase]}</span>
+                  <span style={{
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                    background: "rgba(255,255,255,0.06)",
+                    border: `1px solid ${STATUS_COLORS[sel.status]}`,
+                    color: STATUS_COLORS[sel.status],
+                    fontSize: 12,
+                  }}>{STATUS_LABELS[sel.status]}</span>
+                  {sel.go_no_go && (
+                    <span style={{
+                      padding: "3px 10px",
+                      borderRadius: 4,
+                      background: GO_COLORS[sel.go_no_go],
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 13,
+                    }}>{GO_LABELS[sel.go_no_go]}</span>
+                  )}
+                  {sel.confidence !== null && (
+                    <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                      Confidence: {sel.confidence}%
+                    </span>
+                  )}
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)", marginLeft: "auto" }}>
+                    {formatDate(sel.started_at)}
+                    {sel.completed_at ? ` — ${formatDate(sel.completed_at)}` : ""}
+                  </span>
+                </div>
+              </div>
+
+              {/* Score bar */}
+              {sel.status === "completed" && (
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: sel.phase === "pink" ? "repeat(4, 1fr)" : "repeat(2, 1fr)",
+                  gap: 12,
+                  background: "rgba(255,255,255,0.03)",
+                  borderRadius: 6,
+                  padding: 12,
+                  marginBottom: 16,
+                  border: "1px solid var(--color-border)",
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Overall Score</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: sel.overall_score >= 80 ? "#22c55e" : sel.overall_score >= 60 ? "#f59e0b" : "#ef4444" }}>{sel.overall_score}%</div>
+                  </div>
+                  {sel.phase === "pink" && (
+                    <>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Pass Rate</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: sel.pass_rate >= 90 ? "#22c55e" : sel.pass_rate >= 75 ? "#f59e0b" : "#ef4444" }}>{sel.pass_rate}%</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Checks</div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          <span style={{ color: "#22c55e" }}>{sel.passed_checks}P</span>{" / "}
+                          <span style={{ color: "#ef4444" }}>{sel.failed_checks}F</span>{" / "}
+                          <span style={{ color: "#f59e0b" }}>{sel.warning_checks}W</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Total</div>
+                        <div style={{ fontSize: 22, fontWeight: 700 }}>{sel.total_checks}</div>
+                      </div>
+                    </>
+                  )}
+                  {sel.phase !== "pink" && (
+                    <div>
+                      <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Reviewer</div>
+                      <div style={{ fontSize: 13 }}>{sel.reviewer}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Summary */}
+              <div style={{
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: "var(--color-text-muted)",
+                marginBottom: 16,
+                padding: 12,
+                background: "rgba(124,58,237,0.05)",
+                borderRadius: 6,
+                borderLeft: `3px solid ${PHASE_COLORS[sel.phase]}`,
+              }}>
+                {sel.summary}
+              </div>
+
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
+                {([
+                  { key: "checks" as DetailTab, label: `Compliance (${sel.requirement_checks.length})`, show: sel.requirement_checks.length > 0 },
+                  { key: "sections" as DetailTab, label: `Sections (${sel.section_scores.length})`, show: sel.section_scores.length > 0 },
+                  { key: "gold" as DetailTab, label: `Gold Checks (${sel.gold_checks.length})`, show: sel.gold_checks.length > 0 },
+                  { key: "risks" as DetailTab, label: `Risk Factors (${sel.risk_factors.length})`, show: sel.risk_factors.length > 0 },
+                ] as const).filter((t) => t.show).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    style={{
+                      background: tab === t.key ? "rgba(124,58,237,0.15)" : "transparent",
+                      color: tab === t.key ? "#a78bfa" : "var(--color-text-muted)",
+                      border: "none",
+                      borderRadius: 4,
+                      padding: "6px 12px",
+                      cursor: "pointer",
+                      fontWeight: tab === t.key ? 700 : 400,
+                      fontSize: 13,
+                    }}
+                  >{t.label}</button>
+                ))}
+              </div>
+
+              {/* Tab content */}
+              {tab === "checks" && <ComplianceChecks checks={sel.requirement_checks} expanded={expandedCheck} onToggle={(id) => setExpandedCheck(expandedCheck === id ? null : id)} />}
+              {tab === "sections" && <SectionScores sections={sel.section_scores} expanded={expandedSection} onToggle={(id) => setExpandedSection(expandedSection === id ? null : id)} />}
+              {tab === "gold" && <GoldChecks checks={sel.gold_checks} expanded={expandedGold} onToggle={(id) => setExpandedGold(expandedGold === id ? null : id)} />}
+              {tab === "risks" && <RiskFactors factors={sel.risk_factors} />}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Run modal */}
+      {runModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
+        }} onClick={() => setRunModal(false)}>
+          <div style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 10,
+            padding: 24,
+            width: 440,
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 16px" }}>Run Color Review</h3>
+            <RunForm onRun={handleRun} result={runResult} proposals={Array.from(new Set(data.reviews.map((r) => ({ id: r.proposal_id, title: r.proposal_title }))))} />
+            <button onClick={() => setRunModal(false)} style={{ marginTop: 12, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", borderRadius: 4, padding: "6px 16px", cursor: "pointer" }}>Close</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function ComplianceChecks({ checks, expanded, onToggle }: { checks: ColorReviewRequirementCheckRow[]; expanded: string | null; onToggle: (id: string) => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {checks.map((c) => (
+        <div key={c.id} style={{
+          border: "1px solid var(--color-border)",
+          borderRadius: 6,
+          background: "rgba(255,255,255,0.02)",
+          overflow: "hidden",
+        }}>
+          <div
+            onClick={() => onToggle(c.id)}
+            style={{
+              padding: "10px 14px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <span style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 3,
+              background: VERDICT_COLORS[c.verdict],
+              color: "#fff",
+              fontWeight: 700,
+              minWidth: 36,
+              textAlign: "center",
+            }}>{VERDICT_LABELS[c.verdict]}</span>
+            <span style={{ flex: 1, fontSize: 13 }}>{c.requirement_text.length > 100 ? c.requirement_text.slice(0, 100) + "..." : c.requirement_text}</span>
+            <span style={{ fontSize: 11, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>{c.source_reference}</span>
+            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{expanded === c.id ? "▲" : "▼"}</span>
+          </div>
+          {expanded === c.id && (
+            <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border)" }}>
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>Requirement ID</div>
+                <div style={{ fontSize: 13 }}>{c.requirement_id}</div>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>Full Requirement</div>
+                <div style={{ fontSize: 13 }}>{c.requirement_text}</div>
+              </div>
+              {c.response_location && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>Response Location</div>
+                  <div style={{ fontSize: 13, color: "#22c55e" }}>{c.response_location}</div>
+                </div>
+              )}
+              {c.gap_detail && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 4 }}>Gap Detail</div>
+                  <div style={{ fontSize: 13, color: "#ef4444" }}>{c.gap_detail}</div>
+                </div>
+              )}
+              {c.suggestion && (
+                <div style={{ marginTop: 8, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+                  <div style={{ fontSize: 11, color: "#60a5fa", marginBottom: 4, fontWeight: 600 }}>Suggestion</div>
+                  <div style={{ fontSize: 13 }}>{c.suggestion}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SectionScores({ sections, expanded, onToggle }: { sections: ColorReviewSectionScoreRow[]; expanded: string | null; onToggle: (id: string) => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {sections.map((s) => {
+        const pct = Math.round((s.score / s.max_score) * 100);
+        const barColor = pct >= 80 ? "#22c55e" : pct >= 60 ? "#f59e0b" : "#ef4444";
+        return (
+          <div key={s.id} style={{
+            border: "1px solid var(--color-border)",
+            borderRadius: 6,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+          }}>
+            <div
+              onClick={() => onToggle(s.id)}
+              style={{ padding: "12px 14px", cursor: "pointer" }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{s.section}</span>
+                  <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: 8 }}>{s.volume}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: barColor }}>{s.score}/{s.max_score}</span>
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{expanded === s.id ? "▲" : "▼"}</span>
+                </div>
+              </div>
+              <div style={{ marginTop: 6, height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 3 }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 3, transition: "width 0.3s" }} />
+              </div>
+            </div>
+            {expanded === s.id && (
+              <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, marginBottom: 4 }}>Strengths ({s.strengths.length})</div>
+                    {s.strengths.map((st, i) => (
+                      <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #22c55e" }}>{st}</div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, marginBottom: 4 }}>Weaknesses ({s.weaknesses.length})</div>
+                    {s.weaknesses.map((w, i) => (
+                      <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #ef4444" }}>{w}</div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#3b82f6", fontWeight: 600, marginBottom: 4 }}>Discriminators Found ({s.discriminators_found.length})</div>
+                    {s.discriminators_found.map((d, i) => (
+                      <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #3b82f6" }}>{d}</div>
+                    ))}
+                    {s.discriminators_found.length === 0 && <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>None identified</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 600, marginBottom: 4 }}>Discriminators Missing ({s.discriminators_missing.length})</div>
+                    {s.discriminators_missing.map((d, i) => (
+                      <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #f59e0b" }}>{d}</div>
+                    ))}
+                    {s.discriminators_missing.length === 0 && <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>None</div>}
+                  </div>
+                </div>
+                {s.improvement_actions.length > 0 && (
+                  <div style={{ marginTop: 12, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+                    <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Improvement Actions ({s.improvement_actions.length})</div>
+                    {s.improvement_actions.map((a, i) => (
+                      <div key={i} style={{ fontSize: 12, marginBottom: 3 }}>• {a}</div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ marginTop: 10, fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>
+                  {s.evaluator_notes}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function GoldChecks({ checks, expanded, onToggle }: { checks: ColorReviewGoldCheckRow[]; expanded: string | null; onToggle: (id: string) => void }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {checks.map((c) => {
+        const pct = Math.round((c.score / c.max_score) * 100);
+        const barColor = VERDICT_COLORS[c.verdict] ?? "#6b7280";
+        return (
+          <div key={c.id} style={{
+            border: "1px solid var(--color-border)",
+            borderRadius: 6,
+            background: "rgba(255,255,255,0.02)",
+            overflow: "hidden",
+          }}>
+            <div
+              onClick={() => onToggle(c.id)}
+              style={{ padding: "12px 14px", cursor: "pointer" }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{
+                    fontSize: 10,
+                    padding: "2px 6px",
+                    borderRadius: 3,
+                    background: VERDICT_COLORS[c.verdict],
+                    color: "#fff",
+                    fontWeight: 700,
+                  }}>{VERDICT_LABELS[c.verdict]}</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{c.label}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: barColor }}>{c.score}/{c.max_score}</span>
+                  <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{expanded === c.id ? "▲" : "▼"}</span>
+                </div>
+              </div>
+              <div style={{ marginTop: 6, height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 3 }}>
+                <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: 3, transition: "width 0.3s" }} />
+              </div>
+            </div>
+            {expanded === c.id && (
+              <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border)" }}>
+                <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.5 }}>{c.detail}</div>
+                {c.recommendations.length > 0 && (
+                  <div style={{ marginTop: 10, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+                    <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Recommendations ({c.recommendations.length})</div>
+                    {c.recommendations.map((r, i) => (
+                      <div key={i} style={{ fontSize: 12, marginBottom: 3 }}>• {r}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RiskFactors({ factors }: { factors: string[] }) {
+  const severityColor = (f: string): string => {
+    if (f.startsWith("CRITICAL:")) return "#ef4444";
+    if (f.startsWith("HIGH:")) return "#f59e0b";
+    if (f.startsWith("MEDIUM:")) return "#3b82f6";
+    if (f.startsWith("LOW:")) return "#6b7280";
+    return "#f59e0b";
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {factors.map((f, i) => (
+        <div key={i} style={{
+          padding: "10px 14px",
+          borderRadius: 6,
+          borderLeft: `3px solid ${severityColor(f)}`,
+          background: "rgba(255,255,255,0.02)",
+          fontSize: 13,
+        }}>
+          {f}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RunForm({ onRun, result, proposals }: {
+  onRun: (proposalId: string, phase: string) => void;
+  result: string | null;
+  proposals: Array<{ id: string; title: string }>;
+}) {
+  const [proposalId, setProposalId] = useState(proposals[0]?.id ?? "");
+  const [phase, setPhase] = useState("pink");
+  const uniqueProposals = proposals.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i);
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Proposal</label>
+        <select value={proposalId} onChange={(e) => setProposalId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+          {uniqueProposals.map((p) => (
+            <option key={p.id} value={p.id}>{p.id} — {p.title.slice(0, 50)}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Review Phase</label>
+        <select value={phase} onChange={(e) => setPhase(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+          <option value="pink">Pink Team — Compliance Check</option>
+          <option value="red">Red Team — Quality Scoring</option>
+          <option value="gold">Gold Team — Executive Review</option>
+        </select>
+      </div>
+      <button
+        onClick={() => onRun(proposalId, phase)}
+        style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 6, padding: "8px 20px", cursor: "pointer", fontWeight: 600 }}
+      >Queue Review (Dry Run)</button>
+      {result && (
+        <div style={{
+          marginTop: 10,
+          padding: 10,
+          borderRadius: 4,
+          background: result.startsWith("Error") ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)",
+          color: result.startsWith("Error") ? "#ef4444" : "#22c55e",
+          fontSize: 13,
+        }}>{result}</div>
+      )}
+    </div>
+  );
+}
+
+const selectStyle: React.CSSProperties = {
+  background: "var(--color-surface)",
+  color: "var(--color-text)",
+  border: "1px solid var(--color-border)",
+  borderRadius: 4,
+  padding: "4px 8px",
+  fontSize: 13,
+};
