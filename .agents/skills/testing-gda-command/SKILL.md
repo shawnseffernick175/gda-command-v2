@@ -65,7 +65,7 @@ Three opportunities have hand-crafted OODA analysis: opp-001, opp-004, opp-010. 
 - Opportunity Funnel visualization with 5 stages (discovery, qualified, pipeline, won, lost)
 - Each funnel row shows count, value bar, dollar amount, and Pwin percentage
 - "Top Opportunities by Score" list with 5 clickable entries linking to `/opportunities/:id`
-- Quick-access cards for QA Center, Ops Tracker, Pipeline (no "upcoming" badges)
+- Quick-access cards: QA Center, Ops Tracker, Pipeline, Workflows, Settings (5 total)
 - "Mock data" badge visible when no DATABASE_URL
 - Verify KPI endpoint: `curl http://localhost:3001/api/dashboard/kpis`
 
@@ -98,11 +98,45 @@ Three opportunities have hand-crafted OODA analysis: opp-001, opp-004, opp-010. 
   - From Launchpad → breadcrumb shows "Launchpad"
   - Default (direct URL) → breadcrumb shows "Ops Tracker"
 - Sections: Core Fields, Executive Summary (with Recommended Action), OODA Analysis (Observe/Orient/Decide/Act), Strengths & Risks, Competitive Landscape, Sources, Learning & Feedback
-- Score color: green (≥80), amber (≥60), red (<60)
+- Score color: green (>=80), amber (>=60), red (<60)
 - Status badge color-coded: discovery gray, qualified blue, pipeline green, lost red, won yellow
 - Verify detail endpoint: `curl http://localhost:3001/api/opportunities/opp-001/detail`
 - Source badge always shows "Mock data" (detail endpoint uses mock data even if DB is configured)
 - **Testing breadcrumb navigation**: To distinguish a working vs broken implementation, test navigation from at least 2 different origins (e.g., Ops Tracker and Launchpad) and verify the breadcrumb text changes accordingly.
+
+### Workflow Manager (`/workflows`)
+- Shows all n8n workflows from the live API when `N8N_API_KEY` is configured
+- "Live n8n" badge (green) when connected, "Not configured" badge otherwise
+- Summary strip: Total, Active, Inactive counts (verify against `curl http://localhost:3001/api/workflows/registry`)
+- Category chips: API, QA, Doctrine, Cron, Deploy, Intel, Other — each with count. Categories are derived from workflow name prefixes (e.g., `GDA.api.*` → API, `GDA.cron.*` → Cron)
+- Search filter: type text to filter by workflow name (case-insensitive). Counter updates to "X of Y workflows"
+- Category filter: click a chip to filter by category. Click "All" to reset
+- Status dropdown: filter by Active/Inactive/All
+- Sortable columns: Name, Status, Nodes, Updated. Click column header to sort (arrow indicator shows direction)
+- Table columns: Name (with category color chip), Status (Active green / Inactive gray badge), Nodes (count), Updated (relative time like "7d ago")
+- **Key test**: Search + category filter combine — e.g., search "doctrine" with All categories shows 2 results
+- **Adversarial check**: If n8n connection fails, the page should show an error state, not crash
+
+### Settings (`/settings`)
+- Fetches from two endpoints on load: `GET /api/settings` and `GET /health`
+- **Environment section**: Node.js version, Uptime, PID, Port, Environment (development/production)
+- **Connectors section** — 3 cards showing configuration status:
+  - n8n Webhooks: "Connected" (green) when `N8N_BASE_URL` is set
+  - n8n REST API: "Connected" (green) when `N8N_API_BASE` and `N8N_API_KEY` are set
+  - PostgreSQL: "Not configured" (amber) when `DATABASE_URL` is missing, shows "Missing: DATABASE_URL"
+- **Feature Flags section**: Shows `QUALIFY_WRITES_ENABLED` flag with Enabled/Disabled badge
+- **Gateway Health section**: "Run Health Check" button that calls `/health` and shows response time + status
+  - Health cards: Status (ok/error), Webhook, n8n API, Database connectivity
+- **API Endpoints table**: 10 rows listing all available endpoints with Method, Endpoint path, Description
+- **Important**: The `fetchGatewayHealth()` function calls `/health` directly (not `/api/health`) because the health endpoint is at root level. The Vite proxy has a separate entry for `/health`. If this breaks, you may see 404 errors on the health check button.
+- Verify settings endpoint: `curl http://localhost:3001/api/settings`
+
+## Navigation
+
+- **Nav bar**: 6 items — Launchpad, QA Center, Ops Tracker, Pipeline, Workflows, Settings
+- Active nav item is highlighted with blue background/text
+- All pages are accessible via nav bar clicks and direct URL navigation
+- Launchpad quick-access cards provide alternate navigation to all pages
 
 ## Testing Tips
 
@@ -114,3 +148,5 @@ Three opportunities have hand-crafted OODA analysis: opp-001, opp-004, opp-010. 
 - No CI is configured on this repo, so verification is manual
 - When testing row clicks, verify the Qualify button on discovery rows does NOT trigger navigation (uses `e.stopPropagation()`)
 - For KPI value verification, calculate expected values from `packages/backend/src/data/opportunities-mock.ts` before testing
+- For Workflow Manager testing, get exact expected counts from `curl` before asserting in the UI — workflow counts may change as the user adds/removes n8n workflows
+- The Vite proxy config (`packages/frontend/vite.config.ts`) proxies both `/api` and `/health` separately to backend port 3001. If either proxy entry is missing, the corresponding frontend feature will break with 404s.
