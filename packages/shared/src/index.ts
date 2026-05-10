@@ -1003,3 +1003,112 @@ export interface WinLossAnalysis {
     total_pipeline: number;
   }>;
 }
+
+// ---------------------------------------------------------------------------
+// Color Review types
+// ---------------------------------------------------------------------------
+
+export type ColorReviewPhase = "pink" | "red" | "gold" | "green" | "white";
+
+export type ColorReviewStatus = "pending" | "in_progress" | "completed" | "failed";
+
+export type SectionVerdict = "pass" | "fail" | "warning" | "not_reviewed";
+
+export interface ColorReviewRequirementCheck {
+  id: string;
+  requirement_id: string;
+  requirement_text: string;
+  source_reference: string;
+  verdict: SectionVerdict;
+  response_location: string | null;
+  gap_detail: string | null;
+  suggestion: string | null;
+}
+
+export interface ColorReviewSectionScore {
+  id: string;
+  section: string;
+  volume: string;
+  score: number;
+  max_score: number;
+  strengths: string[];
+  weaknesses: string[];
+  discriminators_found: string[];
+  discriminators_missing: string[];
+  improvement_actions: string[];
+  evaluator_notes: string;
+}
+
+export interface ColorReviewGoldCheck {
+  id: string;
+  category: "win_theme_consistency" | "discriminator_reinforcement" | "pricing_alignment" | "exec_summary_effectiveness" | "compliance_completeness" | "risk_mitigation";
+  label: string;
+  verdict: SectionVerdict;
+  score: number;
+  max_score: number;
+  detail: string;
+  recommendations: string[];
+}
+
+export interface ColorReviewCostLineItem {
+  id: string;
+  category: string;
+  proposed_amount: number;
+  government_estimate: number | null;
+  variance_pct: number | null;
+  verdict: SectionVerdict;
+  basis_of_estimate: string;
+  notes: string;
+}
+
+export interface ColorReviewGreenCheck {
+  id: string;
+  area: "labor_rates" | "odc" | "subcontract" | "travel" | "material" | "fee_profit" | "escalation" | "boe_completeness";
+  label: string;
+  verdict: SectionVerdict;
+  detail: string;
+  benchmark: string | null;
+  recommendation: string | null;
+}
+
+export interface ColorReviewFormatCheck {
+  id: string;
+  category: "page_count" | "font_compliance" | "margin" | "header_footer" | "numbering" | "toc" | "cross_reference" | "acronym" | "attachment" | "naming_convention";
+  label: string;
+  verdict: SectionVerdict;
+  expected: string;
+  actual: string;
+  volume: string;
+  detail: string | null;
+}
+
+export interface ColorReview {
+  id: string;
+  proposal_id: string;
+  proposal_title: string;
+  agency: string;
+  phase: ColorReviewPhase;
+  status: ColorReviewStatus;
+  started_at: string;
+  completed_at: string | null;
+  overall_score: number;
+  max_score: number;
+  pass_rate: number;
+  total_checks: number;
+  passed_checks: number;
+  failed_checks: number;
+  warning_checks: number;
+  reviewer: string;
+  summary: string;
+  go_no_go: "go" | "conditional_go" | "no_go" | null;
+  confidence: number | null;
+  requirement_checks: ColorReviewRequirementCheck[];
+  section_scores: ColorReviewSectionScore[];
+  gold_checks: ColorReviewGoldCheck[];
+  cost_line_items: ColorReviewCostLineItem[];
+  green_checks: ColorReviewGreenCheck[];
+  format_checks: ColorReviewFormatCheck[];
+  risk_factors: string[];
+  created_at: string;
+  updated_at: string;
+}

@@ -428,6 +428,12 @@ export default function Home() {
                 to="/predictive"
                 statusColor="#7c3aed"
               />
+              <Card
+                title="Color Review"
+                description="AI-powered Pink, Red, and Gold team reviews — compliance checks, section scoring, go/no-go recommendations."
+                to="/color-review"
+                statusColor="#ec4899"
+              />
             </div>
           </div>
         </>
