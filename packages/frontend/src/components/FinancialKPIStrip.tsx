@@ -29,15 +29,24 @@ export default function FinancialKPIStrip() {
   const [kpis, setKpis] = useState<FinancialKPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
     fetchFinancialKPIs()
       .then((env) => {
-        if (env.success && env.data) setKpis(env.data.kpis);
+        if (!cancelled && env.success && env.data) setKpis(env.data.kpis);
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .catch(() => {
+        if (!cancelled && retryCount < 3) {
+          const delay = Math.min(2000 * 2 ** retryCount, 8000);
+          setTimeout(() => { if (!cancelled) setRetryCount((c) => c + 1); }, delay);
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [retryCount]);
 
   if (loading) {
     return (
@@ -53,7 +62,36 @@ export default function FinancialKPIStrip() {
     );
   }
 
-  if (kpis.length === 0) return null;
+  if (kpis.length === 0) {
+    return (
+      <div style={{
+        background: "var(--color-surface)",
+        borderBottom: "1px solid var(--color-border)",
+        padding: "6px 24px",
+        fontSize: 12,
+        color: "var(--color-text-muted)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+      }}>
+        <span>Financial KPIs unavailable</span>
+        <button
+          onClick={() => setRetryCount((c) => c + 1)}
+          style={{
+            background: "none",
+            border: "1px solid var(--color-border)",
+            borderRadius: 4,
+            padding: "2px 8px",
+            fontSize: 11,
+            color: "var(--color-text-muted)",
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{

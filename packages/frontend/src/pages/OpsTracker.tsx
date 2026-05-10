@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import {
   fetchOpportunities,
   qualifyOpportunity,
+  fetchRecommendations,
   type OpportunityRow,
   type OpportunitiesData,
+  type SmartRecommendation,
 } from "../api/client";
 
 type SortKey =
@@ -62,6 +64,9 @@ export default function OpsTracker() {
   const [qualifyLoading, setQualifyLoading] = useState(false);
   const [qualifyResult, setQualifyResult] = useState<string | null>(null);
 
+  // Smart recommendations
+  const [recommendations, setRecommendations] = useState<SmartRecommendation[]>([]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -88,6 +93,9 @@ export default function OpsTracker() {
 
   useEffect(() => {
     load();
+    fetchRecommendations().then((e) => {
+      if (e.success && e.data) setRecommendations(e.data.recommendations);
+    }).catch(() => {});
   }, [load]);
 
   const opportunities = data?.opportunities ?? [];
@@ -557,6 +565,69 @@ export default function OpsTracker() {
           }}
         >
           Showing {opportunities.length} opportunity{opportunities.length !== 1 ? "ies" : "y"}
+        </div>
+      )}
+
+      {/* Smart Recommendations */}
+      {recommendations.length > 0 && (
+        <div style={{
+          marginTop: 24,
+          padding: 20,
+          background: "var(--color-surface)",
+          borderRadius: 8,
+          border: "1px solid var(--color-border)",
+        }}>
+          <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 600 }}>
+            Smart Recommendations
+            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 400, marginLeft: 8 }}>
+              ({recommendations.length})
+            </span>
+          </h3>
+          <div style={{ display: "grid", gap: 8 }}>
+            {recommendations.slice(0, 6).map((rec) => (
+              <div
+                key={rec.id}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 6,
+                  border: "1px solid var(--color-border)",
+                  borderLeft: `3px solid ${rec.type === "action" ? "#3b82f6" : rec.type === "risk" ? "#ef4444" : rec.type === "opportunity" ? "#22c55e" : "#8b5cf6"}`,
+                  cursor: "pointer",
+                }}
+                onClick={() => navigate(`/opportunities/${rec.opp_id}`, { state: { from: "/ops-tracker" } })}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      color: rec.type === "action" ? "#3b82f6" : rec.type === "risk" ? "#ef4444" : rec.type === "opportunity" ? "#22c55e" : "#8b5cf6",
+                    }}>
+                      {rec.type}
+                    </span>
+                    <span style={{
+                      fontSize: 10,
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                      background: rec.priority === "high" ? "rgba(239,68,68,0.15)" : rec.priority === "medium" ? "rgba(245,158,11,0.15)" : "rgba(107,114,128,0.15)",
+                      color: rec.priority === "high" ? "#ef4444" : rec.priority === "medium" ? "#f59e0b" : "#6b7280",
+                      fontWeight: 600,
+                    }}>
+                      {rec.priority}
+                    </span>
+                  </div>
+                  {rec.deadline && (
+                    <span style={{ fontSize: 10, color: "#f59e0b" }}>
+                      Due: {new Date(rec.deadline).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{rec.title}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{rec.impact}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
