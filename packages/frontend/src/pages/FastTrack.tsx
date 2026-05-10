@@ -178,6 +178,7 @@ export default function FastTrack() {
       setDetail(null);
       return;
     }
+    setDetail(null);
     setDetailLoading(true);
     fetchFastTrackDetail(selectedId)
       .then((env) => {
