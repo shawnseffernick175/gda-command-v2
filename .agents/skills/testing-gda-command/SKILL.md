@@ -40,8 +40,34 @@ When `DATABASE_URL` is not set, the app falls back to mock data. The source badg
 ### Expected Aggregates
 - **Ops Tracker (all 10)**: Count 10, Total $166.9M, Avg Pwin 58%, Avg Score 72.4
 - **Pipeline (3 only)**: Count 3, Total $79.3M, Avg Pwin 74%, Avg Score 87.2
+- **Dashboard KPIs**: Total 10, Pipeline Value $79.3M, Avg Pwin 58%, Avg Score 72.4
+- **Funnel counts**: Discovery 3/$26.0M, Qualified 2/$39.9M, Pipeline 3/$79.3M, Won 1/$18.5M, Lost 1/$3.2M
+- **Top 5 by Score**: opp-008 (95), opp-004 (91.3), opp-001 (87.5), opp-010 (82.7), opp-006 (78.9)
+
+### Rich Detail Mock Data
+Three opportunities have hand-crafted OODA analysis: opp-001, opp-004, opp-010. All others get auto-generated generic analysis. Use opp-001 for detailed assertions:
+- Executive summary mentions "Fort Bragg" and "$24.5M"
+- Recommended action: "Pursue aggressively"
+- OODA Observe: 5 items with source chips
+- OODA Orient: 4 items (risk, strength, inference, strength)
+- OODA Decide: 3 options, "Pursue as Prime" marked Recommended
+- OODA Act: 4 action steps with Owner/Due/Priority
+- Strengths: exactly 4 items
+- Risks: exactly 3 items
+- Competitive Landscape: mentions AECOM, Tetra Tech, Arcadis, Parsons
+- Sources: 3 rows (SAM.gov, AECOM contract award, Envision FUDS)
+- Learning: Source Count 3, 2 coverage gaps
 
 ## Page-Specific Testing
+
+### Launchpad (`/`)
+- KPI strip with 4 cards: Total Opportunities, Pipeline Value, Avg Pwin, Avg Score
+- Opportunity Funnel visualization with 5 stages (discovery, qualified, pipeline, won, lost)
+- Each funnel row shows count, value bar, dollar amount, and Pwin percentage
+- "Top Opportunities by Score" list with 5 clickable entries linking to `/opportunities/:id`
+- Quick-access cards for QA Center, Ops Tracker, Pipeline (no "upcoming" badges)
+- "Mock data" badge visible when no DATABASE_URL
+- Verify KPI endpoint: `curl http://localhost:3001/api/dashboard/kpis`
 
 ### QA Center (`/qa-center`)
 - Mock mode: 6 health checks, "degraded" status (5/6 pass), "Mock data" badge
@@ -54,6 +80,7 @@ When `DATABASE_URL` is not set, the app falls back to mock data. The source badg
 - "Qualify" buttons appear only on discovery-status rows (3 rows)
 - Qualify dry-run modal shows correlation ID starting with "GDA-"
 - Filters: search (ID/title), status dropdown, department dropdown, min Pwin
+- Rows are clickable — navigate to `/opportunities/:id` with `state={{ from: "/ops-tracker" }}`
 
 ### Pipeline (`/pipeline`)
 - Read-only — NO Qualify buttons, NO Actions column
@@ -61,6 +88,21 @@ When `DATABASE_URL` is not set, the app falls back to mock data. The source badg
 - 3 rows only (pipeline status)
 - Audit acknowledgement strip visible per S-008 spec
 - Filters: search, department dropdown, min Pwin (no status filter)
+- Rows are clickable — navigate to `/opportunities/:id` with `state={{ from: "/pipeline" }}`
+
+### Opportunity Detail (`/opportunities/:id`)
+- Reached by clicking any row in Ops Tracker, Pipeline, or Top Opportunities on Launchpad
+- Breadcrumb is context-aware based on navigation origin:
+  - From Ops Tracker → breadcrumb shows "Ops Tracker"
+  - From Pipeline → breadcrumb shows "Pipeline"
+  - From Launchpad → breadcrumb shows "Launchpad"
+  - Default (direct URL) → breadcrumb shows "Ops Tracker"
+- Sections: Core Fields, Executive Summary (with Recommended Action), OODA Analysis (Observe/Orient/Decide/Act), Strengths & Risks, Competitive Landscape, Sources, Learning & Feedback
+- Score color: green (≥80), amber (≥60), red (<60)
+- Status badge color-coded: discovery gray, qualified blue, pipeline green, lost red, won yellow
+- Verify detail endpoint: `curl http://localhost:3001/api/opportunities/opp-001/detail`
+- Source badge always shows "Mock data" (detail endpoint uses mock data even if DB is configured)
+- **Testing breadcrumb navigation**: To distinguish a working vs broken implementation, test navigation from at least 2 different origins (e.g., Ops Tracker and Launchpad) and verify the breadcrumb text changes accordingly.
 
 ## Testing Tips
 
@@ -70,3 +112,5 @@ When `DATABASE_URL` is not set, the app falls back to mock data. The source badg
 - The frontend Vite proxy handles /api routing — test via frontend port (3000), not backend port (3001), for realistic E2E testing
 - Use `curl` to verify backend endpoints independently before browser testing to catch server-side issues early
 - No CI is configured on this repo, so verification is manual
+- When testing row clicks, verify the Qualify button on discovery rows does NOT trigger navigation (uses `e.stopPropagation()`)
+- For KPI value verification, calculate expected values from `packages/backend/src/data/opportunities-mock.ts` before testing
