@@ -387,6 +387,12 @@ export default function Home() {
                 statusColor="#3b82f6"
               />
               <Card
+                title="Prompt Architect"
+                description="Versioned prompt library for capture, compliance, proposals, and research."
+                to="/prompts"
+                statusColor="#8b5cf6"
+              />
+              <Card
                 title="Workflows"
                 description="Browse and manage all n8n automation workflows."
                 to="/workflows"

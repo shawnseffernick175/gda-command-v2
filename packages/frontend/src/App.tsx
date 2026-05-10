@@ -16,6 +16,7 @@ import Compliance from "./pages/Compliance";
 import ProposalReview from "./pages/ProposalReview";
 import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
+import PromptArchitect from "./pages/PromptArchitect";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -47,6 +48,7 @@ const NAV_GROUPS = [
     items: [
       { path: "/qa-center", label: "QA Center", icon: "🧪" },
       { path: "/doctrine", label: "Doctrine", icon: "📖" },
+      { path: "/prompts", label: "Prompts", icon: "📝" },
       { path: "/workflows", label: "Workflows", icon: "⚙" },
       { path: "/settings", label: "Settings", icon: "⚡" },
     ],
@@ -261,6 +263,7 @@ export default function App() {
             <Route path="/proposals" element={<ProposalReview />} />
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/prompts" element={<PromptArchitect />} />
           </Routes>
         </main>
       </div>
