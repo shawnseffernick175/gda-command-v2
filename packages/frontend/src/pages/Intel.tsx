@@ -178,7 +178,10 @@ function formatCurrency(v: number): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+  // Date-only strings (YYYY-MM-DD) are parsed as UTC midnight by spec.
+  // Append T12:00 to avoid timezone shift showing the wrong day.
+  const safe = iso.length === 10 ? `${iso}T12:00:00` : iso;
+  return new Date(safe).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
