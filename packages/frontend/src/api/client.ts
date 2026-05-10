@@ -120,8 +120,10 @@ export function fetchWorkflowRegistry() {
   return request<WorkflowRegistryData>("/workflows/registry");
 }
 
-export function fetchGatewayHealth() {
-  return request<GatewayHealthData>("/health");
+export async function fetchGatewayHealth(): Promise<GDAEnvelope<GatewayHealthData>> {
+  const res = await fetch("/health");
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  return res.json() as Promise<GDAEnvelope<GatewayHealthData>>;
 }
 
 // --- Opportunities ---
@@ -433,4 +435,37 @@ export function finalizeDoctrineSprint(sprintId: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sprintId }),
   });
+}
+
+// --- Settings ---
+
+export interface FeatureFlag {
+  key: string;
+  label: string;
+  enabled: boolean;
+  description: string;
+}
+
+export interface ConnectorStatus {
+  name: string;
+  configured: boolean;
+  missing: string[];
+  latencyMs?: number;
+  error?: string;
+}
+
+export interface SettingsData {
+  connectors: ConnectorStatus[];
+  featureFlags: FeatureFlag[];
+  environment: {
+    nodeVersion: string;
+    uptimeSec: number;
+    pid: number;
+    port: string;
+    env: string;
+  };
+}
+
+export function fetchSettings() {
+  return request<SettingsData>("/settings");
 }

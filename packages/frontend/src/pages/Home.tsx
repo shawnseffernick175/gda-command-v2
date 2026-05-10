@@ -190,6 +190,18 @@ export default function Home() {
                 to="/capture"
                 statusColor="#f97316"
               />
+              <Card
+                title="Workflows"
+                description="Browse and manage all n8n automation workflows."
+                to="/workflows"
+                statusColor="#06b6d4"
+              />
+              <Card
+                title="Settings"
+                description="System configuration, connectors, and feature flags."
+                to="/settings"
+                statusColor="#6b7280"
+              />
             </div>
           </div>
         </>
@@ -237,6 +249,18 @@ export default function Home() {
             description="Capture plans, BD activities, milestones, gate reviews, and teaming."
             to="/capture"
             statusColor="#f97316"
+          />
+          <Card
+            title="Workflows"
+            description="Browse and manage all n8n automation workflows."
+            to="/workflows"
+            statusColor="#06b6d4"
+          />
+          <Card
+            title="Settings"
+            description="System configuration, connectors, and feature flags."
+            to="/settings"
+            statusColor="#6b7280"
           />
         </div>
       )}

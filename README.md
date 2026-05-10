@@ -52,6 +52,8 @@ npm run dev --workspace=@gda/frontend
 | `/doctrine` | Doctrine — sprint doctrine drafts, finalization gates, publish history |
 | `/intel` | Intel Hub — intelligence feed, morning briefings, deep research, competitor watch |
 | `/capture` | Capture Planner — capture plans, BD activities, milestones, gate reviews, teaming |
+| `/workflows` | Workflow Manager — browse, search, and filter all n8n workflows |
+| `/settings` | Settings — system config, connectors, feature flags, health check |
 
 ### Backend API
 | Endpoint | Description |
@@ -77,6 +79,8 @@ npm run dev --workspace=@gda/frontend
 | `GET /api/capture/plans/:id` | Single capture plan detail with activities |
 | `GET /api/capture/activities` | BD activity log across all captures |
 | `POST /api/capture/gate-review` | Trigger gate review checks (dry-run) |
+| `GET /api/workflows/registry` | n8n workflow registry with status and metadata |
+| `GET /api/settings` | System settings, connectors, feature flags |
 
 All API responses follow the standard GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`.
 
