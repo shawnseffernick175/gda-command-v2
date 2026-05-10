@@ -7,16 +7,23 @@ import {
   type ColorReviewRequirementCheckRow,
   type ColorReviewSectionScoreRow,
   type ColorReviewGoldCheckRow,
+  type ColorReviewCostLineItemRow,
+  type ColorReviewGreenCheckRow,
+  type ColorReviewFormatCheckRow,
 } from "../api/client";
 
 const PHASE_COLORS: Record<string, string> = {
+  white: "#94a3b8",
   pink: "#ec4899",
+  green: "#22c55e",
   red: "#ef4444",
   gold: "#eab308",
 };
 
 const PHASE_LABELS: Record<string, string> = {
+  white: "White Team",
   pink: "Pink Team",
+  green: "Green Team",
   red: "Red Team",
   gold: "Gold Team",
 };
@@ -65,7 +72,7 @@ function formatDate(d: string): string {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-type DetailTab = "checks" | "sections" | "gold" | "risks";
+type DetailTab = "checks" | "sections" | "gold" | "costs" | "green" | "format" | "risks";
 
 export default function ColorReview() {
   const [data, setData] = useState<ColorReviewData | null>(null);
@@ -114,6 +121,9 @@ export default function ColorReview() {
     if (r.phase === "pink" && r.requirement_checks.length > 0) return "checks";
     if (r.phase === "red" && r.section_scores.length > 0) return "sections";
     if (r.phase === "gold" && r.gold_checks.length > 0) return "gold";
+    if (r.phase === "green" && r.cost_line_items.length > 0) return "costs";
+    if (r.phase === "green" && r.green_checks.length > 0) return "green";
+    if (r.phase === "white" && r.format_checks.length > 0) return "format";
     if (r.risk_factors.length > 0) return "risks";
     return "checks";
   }
@@ -170,7 +180,7 @@ export default function ColorReview() {
       {/* Summary strip */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(7, 1fr)",
+        gridTemplateColumns: "repeat(9, 1fr)",
         gap: 12,
         background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
@@ -180,7 +190,9 @@ export default function ColorReview() {
       }}>
         {[
           { label: "Reviews", value: String(data.total) },
+          { label: "White", value: String(summary.phaseCounts["white"] ?? 0), color: PHASE_COLORS.white },
           { label: "Pink", value: String(summary.phaseCounts["pink"] ?? 0), color: PHASE_COLORS.pink },
+          { label: "Green", value: String(summary.phaseCounts["green"] ?? 0), color: PHASE_COLORS.green },
           { label: "Red", value: String(summary.phaseCounts["red"] ?? 0), color: PHASE_COLORS.red },
           { label: "Gold", value: String(summary.phaseCounts["gold"] ?? 0), color: PHASE_COLORS.gold },
           { label: "Avg Score", value: `${summary.avgScore}%`, color: summary.avgScore >= 80 ? "#22c55e" : summary.avgScore >= 60 ? "#f59e0b" : "#ef4444" },
@@ -198,7 +210,9 @@ export default function ColorReview() {
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)} style={selectStyle}>
           <option value="">All Phases</option>
+          <option value="white">White Team</option>
           <option value="pink">Pink Team</option>
+          <option value="green">Green Team</option>
           <option value="red">Red Team</option>
           <option value="gold">Gold Team</option>
         </select>
@@ -342,7 +356,7 @@ export default function ColorReview() {
               {sel.status === "completed" && (
                 <div style={{
                   display: "grid",
-                  gridTemplateColumns: sel.phase === "pink" ? "repeat(4, 1fr)" : "repeat(2, 1fr)",
+                  gridTemplateColumns: (sel.phase === "pink" || sel.phase === "white") ? "repeat(4, 1fr)" : sel.phase === "green" ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
                   gap: 12,
                   background: "rgba(255,255,255,0.03)",
                   borderRadius: 6,
@@ -354,7 +368,7 @@ export default function ColorReview() {
                     <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Overall Score</div>
                     <div style={{ fontSize: 22, fontWeight: 700, color: sel.overall_score >= 80 ? "#22c55e" : sel.overall_score >= 60 ? "#f59e0b" : "#ef4444" }}>{sel.overall_score}%</div>
                   </div>
-                  {sel.phase === "pink" && (
+                  {(sel.phase === "pink" || sel.phase === "white") && (
                     <>
                       <div>
                         <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Pass Rate</div>
@@ -374,7 +388,23 @@ export default function ColorReview() {
                       </div>
                     </>
                   )}
-                  {sel.phase !== "pink" && (
+                  {sel.phase === "green" && (
+                    <>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Cost Items</div>
+                        <div style={{ fontSize: 22, fontWeight: 700 }}>{sel.cost_line_items.length}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Checks</div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          <span style={{ color: "#22c55e" }}>{sel.passed_checks}P</span>{" / "}
+                          <span style={{ color: "#ef4444" }}>{sel.failed_checks}F</span>{" / "}
+                          <span style={{ color: "#f59e0b" }}>{sel.warning_checks}W</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {(sel.phase !== "pink" && sel.phase !== "white" && sel.phase !== "green") && (
                     <div>
                       <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Reviewer</div>
                       <div style={{ fontSize: 13 }}>{sel.reviewer}</div>
@@ -403,6 +433,9 @@ export default function ColorReview() {
                   { key: "checks" as DetailTab, label: `Compliance (${sel.requirement_checks.length})`, show: sel.requirement_checks.length > 0 },
                   { key: "sections" as DetailTab, label: `Sections (${sel.section_scores.length})`, show: sel.section_scores.length > 0 },
                   { key: "gold" as DetailTab, label: `Gold Checks (${sel.gold_checks.length})`, show: sel.gold_checks.length > 0 },
+                  { key: "costs" as DetailTab, label: `Cost Items (${sel.cost_line_items.length})`, show: sel.cost_line_items.length > 0 },
+                  { key: "green" as DetailTab, label: `Green Checks (${sel.green_checks.length})`, show: sel.green_checks.length > 0 },
+                  { key: "format" as DetailTab, label: `Format Checks (${sel.format_checks.length})`, show: sel.format_checks.length > 0 },
                   { key: "risks" as DetailTab, label: `Risk Factors (${sel.risk_factors.length})`, show: sel.risk_factors.length > 0 },
                 ] as const).filter((t) => t.show).map((t) => (
                   <button
@@ -426,6 +459,9 @@ export default function ColorReview() {
               {tab === "checks" && <ComplianceChecks checks={sel.requirement_checks} expanded={expandedCheck} onToggle={(id) => setExpandedCheck(expandedCheck === id ? null : id)} />}
               {tab === "sections" && <SectionScores sections={sel.section_scores} expanded={expandedSection} onToggle={(id) => setExpandedSection(expandedSection === id ? null : id)} />}
               {tab === "gold" && <GoldChecks checks={sel.gold_checks} expanded={expandedGold} onToggle={(id) => setExpandedGold(expandedGold === id ? null : id)} />}
+              {tab === "costs" && <CostLineItems items={sel.cost_line_items} />}
+              {tab === "green" && <GreenChecks checks={sel.green_checks} />}
+              {tab === "format" && <FormatChecks checks={sel.format_checks} />}
               {tab === "risks" && <RiskFactors factors={sel.risk_factors} />}
             </>
           )}
@@ -673,6 +709,101 @@ function GoldChecks({ checks, expanded, onToggle }: { checks: ColorReviewGoldChe
   );
 }
 
+function fmt$(n: number): string {
+  const abs = Math.abs(n);
+  const s = abs >= 1e6 ? `$${(abs / 1e6).toFixed(1)}M` : abs >= 1e3 ? `$${(abs / 1e3).toFixed(0)}K` : `$${abs.toFixed(0)}`;
+  return n < 0 ? `-${s}` : s;
+}
+
+function CostLineItems({ items }: { items: ColorReviewCostLineItemRow[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Header row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 0.8fr 0.5fr", gap: 8, padding: "8px 14px", fontSize: 11, color: "var(--color-text-muted)", fontWeight: 600, borderBottom: "1px solid var(--color-border)" }}>
+        <span>Category</span><span style={{ textAlign: "right" }}>Proposed</span><span style={{ textAlign: "right" }}>Gov. Estimate</span><span style={{ textAlign: "right" }}>Variance</span><span style={{ textAlign: "center" }}>Status</span>
+      </div>
+      {items.map((c) => (
+        <div key={c.id} style={{ border: "1px solid var(--color-border)", borderRadius: 6, background: "rgba(255,255,255,0.02)", padding: "12px 14px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 0.8fr 0.5fr", gap: 8, alignItems: "center" }}>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{c.category}</span>
+            <span style={{ textAlign: "right", fontSize: 14, fontWeight: 700 }}>{fmt$(c.proposed_amount)}</span>
+            <span style={{ textAlign: "right", fontSize: 13, color: "var(--color-text-muted)" }}>{c.government_estimate !== null ? fmt$(c.government_estimate) : "—"}</span>
+            <span style={{ textAlign: "right", fontSize: 13, color: c.variance_pct !== null ? (Math.abs(c.variance_pct) <= 5 ? "#22c55e" : c.variance_pct > 10 ? "#ef4444" : "#f59e0b") : "var(--color-text-muted)" }}>
+              {c.variance_pct !== null ? `${c.variance_pct > 0 ? "+" : ""}${c.variance_pct.toFixed(1)}%` : "—"}
+            </span>
+            <span style={{ textAlign: "center" }}>
+              <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, background: VERDICT_COLORS[c.verdict], color: "#fff", fontWeight: 700 }}>{VERDICT_LABELS[c.verdict]}</span>
+            </span>
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-text-muted)" }}>
+            <strong>BOE:</strong> {c.basis_of_estimate}
+          </div>
+          {c.notes && <div style={{ marginTop: 4, fontSize: 12, color: c.verdict === "fail" ? "#ef4444" : c.verdict === "warning" ? "#f59e0b" : "var(--color-text-muted)" }}>{c.notes}</div>}
+        </div>
+      ))}
+      {/* Total row */}
+      {items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 0.8fr 0.5fr", gap: 8, padding: "10px 14px", borderTop: "2px solid var(--color-border)", fontWeight: 700, fontSize: 14 }}>
+          <span>Total</span>
+          <span style={{ textAlign: "right" }}>{fmt$(items.reduce((s, c) => s + c.proposed_amount, 0))}</span>
+          <span style={{ textAlign: "right", color: "var(--color-text-muted)" }}>{fmt$(items.filter((c) => c.government_estimate !== null).reduce((s, c) => s + (c.government_estimate ?? 0), 0))}</span>
+          <span /><span />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GreenChecks({ checks }: { checks: ColorReviewGreenCheckRow[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {checks.map((c) => (
+        <div key={c.id} style={{ border: "1px solid var(--color-border)", borderRadius: 6, background: "rgba(255,255,255,0.02)", padding: "12px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, background: VERDICT_COLORS[c.verdict], color: "#fff", fontWeight: 700, minWidth: 36, textAlign: "center" }}>{VERDICT_LABELS[c.verdict]}</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>{c.label}</span>
+            {c.benchmark && <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: "auto" }}>Benchmark: {c.benchmark}</span>}
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--color-text-muted)" }}>{c.detail}</div>
+          {c.recommendation && (
+            <div style={{ marginTop: 8, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+              <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Recommendation</div>
+              <div style={{ fontSize: 12 }}>{c.recommendation}</div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FormatChecks({ checks }: { checks: ColorReviewFormatCheckRow[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {checks.map((c) => (
+        <div key={c.id} style={{ border: "1px solid var(--color-border)", borderRadius: 6, background: "rgba(255,255,255,0.02)", padding: "12px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, background: VERDICT_COLORS[c.verdict], color: "#fff", fontWeight: 700, minWidth: 36, textAlign: "center" }}>{VERDICT_LABELS[c.verdict]}</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>{c.label}</span>
+            <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 3, background: "rgba(148,163,184,0.15)", color: "#94a3b8" }}>{c.volume}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 2 }}>Expected</div>
+              <div style={{ fontSize: 13 }}>{c.expected}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 2 }}>Actual</div>
+              <div style={{ fontSize: 13, color: c.verdict === "pass" ? "#22c55e" : c.verdict === "fail" ? "#ef4444" : "#f59e0b" }}>{c.actual}</div>
+            </div>
+          </div>
+          {c.detail && <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>{c.detail}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RiskFactors({ factors }: { factors: string[] }) {
   const severityColor = (f: string): string => {
     if (f.startsWith("CRITICAL:")) return "#ef4444";
@@ -704,7 +835,7 @@ function RunForm({ onRun, result, proposals }: {
   proposals: Array<{ id: string; title: string }>;
 }) {
   const [proposalId, setProposalId] = useState(proposals[0]?.id ?? "");
-  const [phase, setPhase] = useState("pink");
+  const [phase, setPhase] = useState("white");
   const uniqueProposals = proposals.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i);
   return (
     <div>
@@ -719,7 +850,9 @@ function RunForm({ onRun, result, proposals }: {
       <div style={{ marginBottom: 12 }}>
         <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Review Phase</label>
         <select value={phase} onChange={(e) => setPhase(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+          <option value="white">White Team — Format & Compliance</option>
           <option value="pink">Pink Team — Compliance Check</option>
+          <option value="green">Green Team — Cost/Pricing Review</option>
           <option value="red">Red Team — Quality Scoring</option>
           <option value="gold">Gold Team — Executive Review</option>
         </select>

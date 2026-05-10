@@ -2171,12 +2171,44 @@ export interface ColorReviewGoldCheckRow {
   recommendations: string[];
 }
 
+export interface ColorReviewCostLineItemRow {
+  id: string;
+  category: string;
+  proposed_amount: number;
+  government_estimate: number | null;
+  variance_pct: number | null;
+  verdict: "pass" | "fail" | "warning" | "not_reviewed";
+  basis_of_estimate: string;
+  notes: string;
+}
+
+export interface ColorReviewGreenCheckRow {
+  id: string;
+  area: string;
+  label: string;
+  verdict: "pass" | "fail" | "warning" | "not_reviewed";
+  detail: string;
+  benchmark: string | null;
+  recommendation: string | null;
+}
+
+export interface ColorReviewFormatCheckRow {
+  id: string;
+  category: string;
+  label: string;
+  verdict: "pass" | "fail" | "warning" | "not_reviewed";
+  expected: string;
+  actual: string;
+  volume: string;
+  detail: string | null;
+}
+
 export interface ColorReviewRow {
   id: string;
   proposal_id: string;
   proposal_title: string;
   agency: string;
-  phase: "pink" | "red" | "gold";
+  phase: "pink" | "red" | "gold" | "green" | "white";
   status: "pending" | "in_progress" | "completed" | "failed";
   started_at: string;
   completed_at: string | null;
@@ -2194,6 +2226,9 @@ export interface ColorReviewRow {
   requirement_checks: ColorReviewRequirementCheckRow[];
   section_scores: ColorReviewSectionScoreRow[];
   gold_checks: ColorReviewGoldCheckRow[];
+  cost_line_items: ColorReviewCostLineItemRow[];
+  green_checks: ColorReviewGreenCheckRow[];
+  format_checks: ColorReviewFormatCheckRow[];
   risk_factors: string[];
   created_at: string;
   updated_at: string;
