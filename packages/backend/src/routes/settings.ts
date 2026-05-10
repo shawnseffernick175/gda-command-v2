@@ -29,11 +29,18 @@ router.get("/", async (_req, res) => {
   const api = apiConfig();
   const db = dbConfig();
 
+  const webhookAuthConfigured = wh.missing.length === 0 && !!wh.key;
+
   const connectors: ConnectorStatus[] = [
     {
       name: "n8n Webhooks",
       configured: wh.missing.length === 0,
       missing: wh.missing,
+    },
+    {
+      name: "n8n Webhook Auth",
+      configured: webhookAuthConfigured,
+      missing: webhookAuthConfigured ? [] : ["GDA_WEBHOOK_KEY"],
     },
     {
       name: "n8n REST API",

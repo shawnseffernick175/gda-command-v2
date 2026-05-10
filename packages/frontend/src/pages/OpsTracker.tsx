@@ -200,11 +200,11 @@ export default function OpsTracker() {
             borderRadius: 12,
             fontSize: 12,
             fontWeight: 600,
-            background: source === "db" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
-            color: source === "db" ? "#22c55e" : "#3b82f6",
+            background: source === "n8n" ? "rgba(168,85,247,0.15)" : source === "db" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
+            color: source === "n8n" ? "#a855f7" : source === "db" ? "#22c55e" : "#3b82f6",
           }}
         >
-          {source === "db" ? "Live DB" : "Mock data"}
+          {source === "n8n" ? "Live n8n" : source === "db" ? "Live DB" : "Mock data"}
         </span>
       </div>
 
