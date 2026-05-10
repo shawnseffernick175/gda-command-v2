@@ -767,3 +767,89 @@ export interface ExportJob {
   row_count: number | null;
   correlation_id: string;
 }
+
+// ---------------------------------------------------------------------------
+// RFP Shredder types (Phase G)
+// ---------------------------------------------------------------------------
+
+export type ShredJobStatus = "completed" | "processing" | "failed" | "queued";
+
+export type RequirementType =
+  | "technical"
+  | "management"
+  | "past_performance"
+  | "cost_price"
+  | "security"
+  | "certifications"
+  | "small_business"
+  | "compliance"
+  | "staffing"
+  | "transition";
+
+export type RequirementComplexity = "simple" | "moderate" | "complex";
+
+export type ComplianceMatchLevel = "full" | "partial" | "none";
+
+export interface ShredJob {
+  id: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  agency: string;
+  file_name: string;
+  file_size_bytes: number;
+  page_count: number;
+  status: ShredJobStatus;
+  requirements_found: number;
+  sections_parsed: string[];
+  started_at: string;
+  completed_at: string | null;
+  processing_time_seconds: number | null;
+  correlation_id: string;
+  error_message: string | null;
+}
+
+export interface ExtractedRequirement {
+  id: string;
+  shred_job_id: string;
+  section: string;
+  requirement_text: string;
+  requirement_type: RequirementType;
+  complexity: RequirementComplexity;
+  keyword: string;
+  far_references: string[];
+  compliance_match: ComplianceMatchLevel;
+  matched_evidence: string | null;
+  matched_document_id: string | null;
+  matched_document_title: string | null;
+  page_number: number;
+  confidence: number;
+}
+
+export interface ComplianceMapEntry {
+  requirement_id: string;
+  section: string;
+  requirement_text: string;
+  requirement_type: RequirementType;
+  match_level: ComplianceMatchLevel;
+  matched_records: Array<{
+    document_id: string;
+    document_title: string;
+    section: string;
+    relevance: number;
+    excerpt: string;
+  }>;
+  gap_notes: string | null;
+  suggested_approach: string | null;
+}
+
+export interface ResponseOutlineSection {
+  id: string;
+  section_number: string;
+  title: string;
+  requirements_covered: string[];
+  recommended_approach: string;
+  past_performance_citations: string[];
+  page_estimate: number;
+  complexity: RequirementComplexity;
+  status: "draft_available" | "needs_new_content" | "reuse_available";
+}

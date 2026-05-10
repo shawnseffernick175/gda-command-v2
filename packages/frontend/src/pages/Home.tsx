@@ -416,6 +416,12 @@ export default function Home() {
                 to="/knowledge"
                 statusColor="#8b5cf6"
               />
+              <Card
+                title="RFP Shredder"
+                description="AI-powered solicitation parsing — extract requirements, map compliance, generate response outlines."
+                to="/rfp-shredder"
+                statusColor="#7c3aed"
+              />
             </div>
           </div>
         </>
@@ -442,6 +448,7 @@ export default function Home() {
           <Card title="Workflows" description="Browse and manage all n8n automation workflows." to="/workflows" statusColor="#06b6d4" />
           <Card title="Settings" description="System configuration, connectors, and feature flags." to="/settings" statusColor="#6b7280" />
           <Card title="Knowledge Base" description="Unified past performance, proposals, compliance records — searchable by meaning with RAG." to="/knowledge" statusColor="#8b5cf6" />
+          <Card title="RFP Shredder" description="AI-powered solicitation parsing — extract requirements, map compliance, generate response outlines." to="/rfp-shredder" statusColor="#7c3aed" />
         </div>
       )}
     </div>
