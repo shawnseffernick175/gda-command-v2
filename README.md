@@ -46,14 +46,17 @@ npm run dev --workspace=@gda/frontend
 |---|---|
 | `/` | Launchpad (home) |
 | `/qa-center` | QA Center — health checks & latest failures |
-| `/ops-tracker` | Ops Tracker (placeholder) |
-| `/pipeline` | Pipeline (placeholder) |
+| `/ops-tracker` | Ops Tracker — opportunity list, filtering, sorting, qualify dry-run |
+| `/pipeline` | Pipeline — read-only qualified pipeline view with filtering & sorting |
 
 ### Backend API
 | Endpoint | Description |
 |---|---|
 | `GET /api/qa/health` | Platform health status with individual check results |
 | `GET /api/qa/latest-failures` | Most recent workflow failures |
+| `GET /api/opportunities` | List all opportunities with filtering & sorting |
+| `GET /api/opportunities/pipeline` | Pipeline-only opportunities (status=pipeline) |
+| `POST /api/opportunities/:id/qualify` | Qualify dry-run / write with S-007/S-008 safety gates |
 
 All API responses follow the standard GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`.
 
