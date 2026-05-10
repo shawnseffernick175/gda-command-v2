@@ -172,6 +172,12 @@ export default function Home() {
                 to="/pipeline"
                 statusColor="#8b5cf6"
               />
+              <Card
+                title="Doctrine"
+                description="Sprint doctrine drafts, finalization gates, and publish history."
+                to="/doctrine"
+                statusColor="#06b6d4"
+              />
             </div>
           </div>
         </>
@@ -201,6 +207,12 @@ export default function Home() {
             description="Read-only view of qualified opportunities."
             to="/pipeline"
             statusColor="#8b5cf6"
+          />
+          <Card
+            title="Doctrine"
+            description="Sprint doctrine drafts, finalization gates, and publish history."
+            to="/doctrine"
+            statusColor="#06b6d4"
           />
         </div>
       )}

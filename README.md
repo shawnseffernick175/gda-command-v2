@@ -49,6 +49,7 @@ npm run dev --workspace=@gda/frontend
 | `/ops-tracker` | Ops Tracker — opportunity list, filtering, sorting, qualify dry-run |
 | `/pipeline` | Pipeline — read-only qualified pipeline view with filtering & sorting |
 | `/opportunities/:id` | Opportunity Detail — OODA analysis, sources, learning (S-009) |
+| `/doctrine` | Doctrine — sprint doctrine drafts, finalization gates, publish history |
 
 ### Backend API
 | Endpoint | Description |
@@ -60,6 +61,10 @@ npm run dev --workspace=@gda/frontend
 | `GET /api/opportunities/:id/detail` | Opportunity detail with OODA analysis (S-009) |
 | `POST /api/opportunities/:id/qualify` | Qualify dry-run / write with S-007/S-008 safety gates |
 | `GET /api/dashboard/kpis` | Dashboard KPIs, funnel stats, and top opportunities |
+| `GET /api/doctrine/drafts` | List doctrine drafts with sprint/status/type filtering |
+| `GET /api/doctrine/drafts/:id` | Single doctrine draft detail |
+| `GET /api/doctrine/publish-runs` | Publish run history with gate results |
+| `POST /api/doctrine/finalize` | Trigger sprint finalization with gate checks (dry-run) |
 
 All API responses follow the standard GDA envelope: `{ success, workflow, action, dryRun, data, meta, error }`.
 
