@@ -525,7 +525,7 @@ export default function Reports() {
               <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Report Sections</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {selectedTemplate.sections
-                  .sort((a, b) => a.order - b.order)
+                  .slice().sort((a, b) => a.order - b.order)
                   .map((sec) => (
                     <div key={sec.id} style={{
                       display: "flex",
