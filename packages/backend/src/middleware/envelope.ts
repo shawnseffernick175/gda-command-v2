@@ -16,7 +16,7 @@ export function successEnvelope<T>(
     action,
     dryRun,
     data,
-    meta: { ...meta, respondedAt: new Date().toISOString() },
+    meta: { generatedAt: new Date().toISOString(), source: "gateway", ...meta },
     error: null,
   };
 }
@@ -37,7 +37,35 @@ export function errorEnvelope(
     action,
     dryRun,
     data: null,
-    meta: { ...meta, respondedAt: new Date().toISOString() },
+    meta: { generatedAt: new Date().toISOString(), source: "gateway", ...meta },
     error,
+  };
+}
+
+/**
+ * Build a "not configured" envelope for endpoints that require
+ * env vars that are missing. Mirrors the v1 gateway pattern.
+ */
+export function notConfiguredEnvelope(
+  workflow: string,
+  action: string,
+  missing: string[],
+  meta: Record<string, unknown> = {}
+): GDAEnvelope<null> & { configured: boolean } {
+  return {
+    success: true,
+    workflow,
+    action,
+    dryRun: false,
+    data: null,
+    configured: false,
+    meta: {
+      generatedAt: new Date().toISOString(),
+      source: "gateway",
+      missing,
+      hint: "Set the listed env vars in .env to enable this endpoint.",
+      ...meta,
+    },
+    error: null,
   };
 }

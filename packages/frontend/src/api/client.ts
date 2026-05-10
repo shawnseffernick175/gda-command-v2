@@ -18,18 +18,25 @@ async function request<T>(path: string): Promise<GDAEnvelope<T>> {
   return res.json() as Promise<GDAEnvelope<T>>;
 }
 
-export interface QACheck {
+export interface QACheckRow {
   name: string;
   status: "pass" | "fail" | "warn";
   message: string;
   durationMs: number;
 }
 
+export interface QAHealthSummary {
+  total: number;
+  passed: number;
+  failed: number;
+  warned: number;
+}
+
 export interface QAHealthData {
-  platform: string;
-  status: "healthy" | "degraded" | "down";
-  checks: QACheck[];
-  checkedAt: string;
+  overall: "healthy" | "degraded" | "down";
+  summary: QAHealthSummary;
+  rows: QACheckRow[];
+  nextAction: string;
 }
 
 export interface QAFailure {
@@ -47,5 +54,5 @@ export function fetchQAHealth() {
 }
 
 export function fetchQALatestFailures() {
-  return request<{ failures: QAFailure[] }>("/qa/latest-failures");
+  return request<{ rows: QAFailure[] }>("/qa/latest-failures");
 }

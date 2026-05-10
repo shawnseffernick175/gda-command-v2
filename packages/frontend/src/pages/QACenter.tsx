@@ -22,7 +22,7 @@ export default function QACenter() {
       ]);
       if (healthRes.success && healthRes.data) setHealth(healthRes.data);
       if (failuresRes.success && failuresRes.data)
-        setFailures(failuresRes.data.failures);
+        setFailures(failuresRes.data.rows);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -52,14 +52,14 @@ export default function QACenter() {
         <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
           Latest Failures
           <span style={{
-              marginLeft: 8,
-              padding: "2px 10px",
-              borderRadius: 12,
-              fontSize: 12,
-              fontWeight: 500,
-              background: "rgba(239,68,68,0.15)",
-              color: "var(--color-danger)",
-            }}>
+            marginLeft: 8,
+            padding: "2px 10px",
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 500,
+            background: "rgba(239,68,68,0.15)",
+            color: "var(--color-danger)",
+          }}>
             {failures.filter((f) => !f.resolved).length} unresolved
           </span>
         </h2>
@@ -135,23 +135,42 @@ function HealthPanel({ health }: { health: QAHealthData }) {
           width: 12,
           height: 12,
           borderRadius: "50%",
-          background: statusColors[health.status] ?? "gray",
+          background: statusColors[health.overall] ?? "gray",
         }} />
         <span style={{ fontSize: 16, fontWeight: 600, textTransform: "capitalize" }}>
-          {health.status}
+          {health.overall}
         </span>
-        <span style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
-          {health.platform} — checked{" "}
-          {new Date(health.checkedAt).toLocaleTimeString()}
+        <span style={{
+          fontSize: 13,
+          color: "var(--color-text-muted)",
+          padding: "2px 8px",
+          background: "var(--color-bg)",
+          borderRadius: 4,
+        }}>
+          {health.summary.passed}/{health.summary.total} passed
         </span>
       </div>
+
+      {health.nextAction && (
+        <p style={{
+          fontSize: 13,
+          color: "var(--color-text-muted)",
+          marginBottom: 16,
+          padding: "8px 12px",
+          background: "var(--color-bg)",
+          borderRadius: 6,
+          borderLeft: `3px solid ${statusColors[health.overall] ?? "gray"}`,
+        }}>
+          {health.nextAction}
+        </p>
+      )}
 
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
         gap: 8,
       }}>
-        {health.checks.map((check) => (
+        {health.rows.map((check) => (
           <div
             key={check.name}
             style={{
