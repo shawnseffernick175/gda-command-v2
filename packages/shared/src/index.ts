@@ -472,3 +472,49 @@ export interface ApprovalCheck {
   status: "pass" | "warn" | "fail";
   message: string;
 }
+
+// ---------------------------------------------------------------------------
+// Compliance Matrix types
+// ---------------------------------------------------------------------------
+
+export type ComplianceStatus = "compliant" | "partial" | "gap" | "not_applicable";
+
+export type ComplianceCategory =
+  | "technical"
+  | "management"
+  | "past_performance"
+  | "cost_price"
+  | "certifications"
+  | "security"
+  | "small_business"
+  | "other";
+
+export type ClauseType = "far" | "dfars" | "agency" | "custom";
+
+export interface ComplianceRequirement {
+  id: string;
+  solicitation_id: string;
+  solicitation_title: string;
+  section: string;
+  requirement: string;
+  category: ComplianceCategory;
+  status: ComplianceStatus;
+  evidence: string | null;
+  responsible_party: string;
+  notes: string | null;
+  related_clause_ids: string[];
+  updated_at: string;
+}
+
+export interface ClauseReference {
+  id: string;
+  clause_number: string;
+  title: string;
+  type: ClauseType;
+  full_text: string;
+  summary: string;
+  applicability: string[];
+  common_pitfalls: string[];
+  related_clauses: string[];
+  last_updated: string;
+}
