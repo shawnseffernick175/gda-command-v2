@@ -183,7 +183,7 @@ export default function FinancialBible() {
         </div>
       )}
 
-      {key && drillDown && !loading && !error && (
+      {key && drillDown && drillDown.kpi.key === key && !loading && !error && (
         <DrillDownView data={drillDown} />
       )}
     </div>
