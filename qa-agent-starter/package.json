@@ -1,0 +1,33 @@
+{
+  "name": "qa-agent-starter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Configurable QA agent for n8n backends, React apps, and Retool apps.",
+  "scripts": {
+    "test": "npm run test:n8n && npm run test:ui",
+    "test:n8n": "tsx src/run-n8n-checks.ts",
+    "test:ui": "playwright test",
+    "test:react": "playwright test tests/react.spec.ts",
+    "test:retool": "playwright test tests/retool.spec.ts",
+    "n8n:inventory": "tsx src/n8n-inventory.ts",
+    "retool:test-deploy": "tsx src/retool-test-deploy.ts",
+    "report": "tsx src/ai-reviewer.ts",
+    "qa": "tsx src/run-all.ts",
+    "install:browsers": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.52.0",
+    "ajv": "^8.17.1",
+    "dotenv": "^16.5.0",
+    "tsx": "^4.19.4",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.2",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
