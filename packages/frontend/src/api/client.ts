@@ -531,3 +531,83 @@ export function fetchFinancialKPIs() {
 export function fetchFinancialDrillDown(key: string) {
   return request<FinancialDrillDownData>(`/financials/${key}`);
 }
+
+// ---------------------------------------------------------------------------
+// Approvals Queue
+// ---------------------------------------------------------------------------
+
+export interface ApprovalCheckRow {
+  name: string;
+  status: "pass" | "warn" | "fail";
+  message: string;
+}
+
+export interface ApprovalDryRunRow {
+  checks: ApprovalCheckRow[];
+  overall: "pass" | "warn" | "fail";
+  correlation_id: string;
+  ran_at: string;
+}
+
+export interface ApprovalRow {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: string;
+  requester: string;
+  assignee: string;
+  correlation_id: string | null;
+  related_entity_id: string | null;
+  related_entity_type: string | null;
+  dry_run_result: ApprovalDryRunRow | null;
+  created_at: string;
+  updated_at: string;
+  expires_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_notes: string | null;
+}
+
+export interface ApprovalsData {
+  approvals: ApprovalRow[];
+  total: number;
+  summary: {
+    pending: number;
+    approved: number;
+    rejected: number;
+    expired: number;
+    critical: number;
+    expiringSoon: number;
+  };
+  categories: Record<string, number>;
+  source: "mock" | "db" | "n8n";
+}
+
+export interface ApprovalResolveData {
+  approval_id: string;
+  previous_status?: string;
+  proposed_action?: string;
+  current_status?: string;
+  would_change_to?: string;
+  new_status?: string;
+  resolved_by?: string;
+  resolved_at?: string;
+  resolution_notes?: string | null;
+  dry_run_result?: ApprovalDryRunRow | null;
+  correlation_id: string;
+}
+
+export function fetchApprovals(params?: Record<string, string>) {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  return request<ApprovalsData>(`/approvals${qs}`);
+}
+
+export function resolveApproval(id: string, action: "approve" | "reject", notes?: string, dryRun = true) {
+  return request<ApprovalResolveData>(`/approvals/${id}/resolve?dryRun=${dryRun}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, notes }),
+  });
+}

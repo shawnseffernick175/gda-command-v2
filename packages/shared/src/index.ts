@@ -421,3 +421,54 @@ export type CaptureActivityType =
   | "gate_review"
   | "teaming_discussion"
   | "proposal_work";
+
+// ---------------------------------------------------------------------------
+// Approvals Queue types
+// ---------------------------------------------------------------------------
+
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
+
+export type ApprovalCategory =
+  | "qualify_write"
+  | "bid_decision"
+  | "doctrine_publish"
+  | "gate_review"
+  | "teaming_agreement"
+  | "deploy"
+  | "budget_override";
+
+export type ApprovalPriority = "critical" | "high" | "medium" | "low";
+
+export interface ApprovalItem {
+  id: string;
+  title: string;
+  description: string;
+  category: ApprovalCategory;
+  priority: ApprovalPriority;
+  status: ApprovalStatus;
+  requester: string;
+  assignee: string;
+  correlation_id: string | null;
+  related_entity_id: string | null;
+  related_entity_type: string | null;
+  dry_run_result: ApprovalDryRunResult | null;
+  created_at: string;
+  updated_at: string;
+  expires_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_notes: string | null;
+}
+
+export interface ApprovalDryRunResult {
+  checks: ApprovalCheck[];
+  overall: "pass" | "warn" | "fail";
+  correlation_id: string;
+  ran_at: string;
+}
+
+export interface ApprovalCheck {
+  name: string;
+  status: "pass" | "warn" | "fail";
+  message: string;
+}
