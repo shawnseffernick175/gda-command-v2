@@ -237,9 +237,10 @@ The Launchpad displays a **4-column grid** of command signals below the KPI summ
 - Financial Bible drill-down has stale-fetch protection (rapid KPI switching won't show wrong data)
 - Prompt Architect uses split-view layout: clicking a prompt card opens the detail panel on the right side
 - Prompt list default sort is by `usageCount` descending (most-used first)
-- Split-view pages (Prompts, Proposals, Contacts) auto-select the first item on load
+- Split-view pages (Prompts, Proposals, Contacts, Knowledge Documents) auto-select the first item on load
 - Contact search matches against name, title, agency, department, tags, and relationship history text
 - Color lookup maps (STRENGTH_COLORS, STATUS_COLORS) use nullish coalescing `?? "#6b7280"` for defensive fallback — if a new status/strength is added to mock data, the UI won't break
 - After code changes, the backend hot-reload (tsx watch) might need a manual restart if routes change — if you see 500 errors on pages that worked before, restart the backend
 - Use `wmctrl -r :ACTIVE: -b add,maximized_vert,maximized_horz` to maximize browser before recording
 - If HMR gets into a bad state (page stuck on "Loading..."), kill all node processes, clear ports, and do a fresh restart
+- Knowledge Base document detail uses separate `selectedDocId` (user intent) and `selectedDoc` (fetched data) state to prevent infinite fetch loops on rapid clicks
