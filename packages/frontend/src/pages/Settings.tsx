@@ -220,6 +220,10 @@ const ENDPOINTS = [
   { method: "GET", path: "/api/opportunities/:id/detail", description: "Opportunity detail with OODA" },
   { method: "POST", path: "/api/opportunities/:id/qualify", description: "Qualify dry-run / write" },
   { method: "GET", path: "/api/dashboard/kpis", description: "Dashboard KPIs and funnel" },
+  { method: "GET", path: "/api/doctrine/drafts", description: "List doctrine drafts" },
+  { method: "GET", path: "/api/doctrine/drafts/:id", description: "Single doctrine draft detail" },
+  { method: "GET", path: "/api/doctrine/publish-runs", description: "Publish run history" },
+  { method: "POST", path: "/api/doctrine/finalize", description: "Trigger sprint finalization" },
   { method: "GET", path: "/api/workflows/registry", description: "n8n workflow registry" },
   { method: "GET", path: "/api/settings", description: "System settings and config" },
 ];
