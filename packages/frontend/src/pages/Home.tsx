@@ -202,6 +202,12 @@ export default function Home() {
                 statusColor="#f97316"
               />
               <Card
+                title="Approvals Queue"
+                description="Human-in-the-loop approvals for qualifications, bid decisions, deployments, and more."
+                to="/approvals"
+                statusColor="#eab308"
+              />
+              <Card
                 title="Financial Bible"
                 description="Drill-down behind every KPI — Orders, Sales, EBIT, ROS, Backlog, Gross Profit."
                 to="/financial-bible"
@@ -266,6 +272,12 @@ export default function Home() {
             description="Capture plans, BD activities, milestones, gate reviews, and teaming."
             to="/capture"
             statusColor="#f97316"
+          />
+          <Card
+            title="Approvals Queue"
+            description="Human-in-the-loop approvals for qualifications, bid decisions, deployments, and more."
+            to="/approvals"
+            statusColor="#eab308"
           />
           <Card
             title="Workflows"

@@ -10,6 +10,7 @@ import Capture from "./pages/Capture";
 import Workflows from "./pages/Workflows";
 import Settings from "./pages/Settings";
 import FinancialBible from "./pages/FinancialBible";
+import Approvals from "./pages/Approvals";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 
 const NAV_GROUPS = [
@@ -20,6 +21,7 @@ const NAV_GROUPS = [
       { path: "/ops-tracker", label: "Ops Tracker" },
       { path: "/pipeline", label: "Pipeline" },
       { path: "/capture", label: "Capture" },
+      { path: "/approvals", label: "Approvals" },
     ],
   },
   {
@@ -115,6 +117,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/financial-bible" element={<FinancialBible />} />
           <Route path="/financial-bible/:key" element={<FinancialBible />} />
+          <Route path="/approvals" element={<Approvals />} />
         </Routes>
       </main>
     </div>
