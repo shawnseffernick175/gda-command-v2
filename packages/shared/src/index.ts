@@ -679,3 +679,91 @@ export interface Contact {
   created_at: string;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Reporting & Export types
+// ---------------------------------------------------------------------------
+
+export type ReportCategory =
+  | "pipeline"
+  | "bd_performance"
+  | "executive_summary"
+  | "sitrep"
+  | "financial"
+  | "compliance";
+
+export type ReportStatus =
+  | "completed"
+  | "generating"
+  | "scheduled"
+  | "failed";
+
+export type ExportFormat = "pdf" | "excel" | "pptx" | "csv";
+
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  category: ReportCategory;
+  description: string;
+  sections: ReportSection[];
+  default_format: ExportFormat;
+  available_formats: ExportFormat[];
+  estimated_pages: number;
+  last_used: string | null;
+  use_count: number;
+  created_by: string;
+  tags: string[];
+}
+
+export interface ReportSection {
+  id: string;
+  title: string;
+  description: string;
+  included: boolean;
+  order: number;
+}
+
+export interface GeneratedReport {
+  id: string;
+  template_id: string;
+  template_name: string;
+  category: ReportCategory;
+  title: string;
+  status: ReportStatus;
+  format: ExportFormat;
+  generated_at: string;
+  generated_by: string;
+  file_size_bytes: number | null;
+  page_count: number | null;
+  sections_included: string[];
+  parameters: Record<string, string>;
+  download_url: string | null;
+  expires_at: string | null;
+  notes: string | null;
+}
+
+export interface ScheduledReport {
+  id: string;
+  template_id: string;
+  template_name: string;
+  frequency: "daily" | "weekly" | "monthly" | "quarterly";
+  next_run: string;
+  last_run: string | null;
+  recipients: string[];
+  format: ExportFormat;
+  enabled: boolean;
+  created_by: string;
+}
+
+export interface ExportJob {
+  id: string;
+  source_page: string;
+  format: ExportFormat;
+  status: ReportStatus;
+  started_at: string;
+  completed_at: string | null;
+  file_size_bytes: number | null;
+  download_url: string | null;
+  row_count: number | null;
+  correlation_id: string;
+}
