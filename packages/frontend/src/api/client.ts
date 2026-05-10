@@ -469,3 +469,56 @@ export interface SettingsData {
 export function fetchSettings() {
   return request<SettingsData>("/settings");
 }
+
+// --- Financials ---
+
+export interface FinancialKPI {
+  key: string;
+  label: string;
+  current: number;
+  prior: number;
+  plan: number;
+  unit: "currency" | "percent" | "ratio";
+  period: string;
+  updated_at: string;
+}
+
+export interface FinancialKPIsData {
+  kpis: FinancialKPI[];
+  period: string;
+  source: "mock" | "db" | "n8n";
+}
+
+export interface FinancialLineItem {
+  id: string;
+  kpi_key: string;
+  label: string;
+  amount: number;
+  category: string;
+  contract_id: string | null;
+  period: string;
+  notes: string | null;
+}
+
+export interface FinancialTrend {
+  period: string;
+  value: number;
+}
+
+export interface FinancialDrillDownData {
+  kpi: FinancialKPI;
+  line_items: FinancialLineItem[];
+  trends: FinancialTrend[];
+  variance_from_plan: number;
+  variance_pct: number;
+  insights: string[];
+  source: "mock" | "db" | "n8n";
+}
+
+export function fetchFinancialKPIs() {
+  return request<FinancialKPIsData>("/financials/kpis");
+}
+
+export function fetchFinancialDrillDown(key: string) {
+  return request<FinancialDrillDownData>(`/financials/${key}`);
+}

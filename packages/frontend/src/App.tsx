@@ -9,18 +9,41 @@ import Intel from "./pages/Intel";
 import Capture from "./pages/Capture";
 import Workflows from "./pages/Workflows";
 import Settings from "./pages/Settings";
+import FinancialBible from "./pages/FinancialBible";
+import FinancialKPIStrip from "./components/FinancialKPIStrip";
 
-const NAV_ITEMS = [
-  { path: "/", label: "Launchpad" },
-  { path: "/qa-center", label: "QA Center" },
-  { path: "/ops-tracker", label: "Ops Tracker" },
-  { path: "/pipeline", label: "Pipeline" },
-  { path: "/doctrine", label: "Doctrine" },
-  { path: "/intel", label: "Intel Hub" },
-  { path: "/capture", label: "Capture" },
-  { path: "/workflows", label: "Workflows" },
-  { path: "/settings", label: "Settings" },
+const NAV_GROUPS = [
+  {
+    label: "BD Tools",
+    items: [
+      { path: "/", label: "Launchpad" },
+      { path: "/ops-tracker", label: "Ops Tracker" },
+      { path: "/pipeline", label: "Pipeline" },
+      { path: "/capture", label: "Capture" },
+    ],
+  },
+  {
+    label: "Analysis",
+    items: [
+      { path: "/intel", label: "Intel Hub" },
+      { path: "/financial-bible", label: "Financials" },
+    ],
+  },
+  {
+    label: "Platform",
+    items: [
+      { path: "/qa-center", label: "QA Center" },
+      { path: "/doctrine", label: "Doctrine" },
+      { path: "/workflows", label: "Workflows" },
+      { path: "/settings", label: "Settings" },
+    ],
+  },
 ] as const;
+
+function isActive(pathname: string, itemPath: string): boolean {
+  if (itemPath === "/") return pathname === "/";
+  return pathname.startsWith(itemPath);
+}
 
 export default function App() {
   const { pathname } = useLocation();
@@ -34,30 +57,49 @@ export default function App() {
         display: "flex",
         alignItems: "center",
         height: 56,
-        gap: 32,
+        gap: 24,
       }}>
-        <span style={{ fontWeight: 700, fontSize: 18, letterSpacing: "0.5px" }}>
+        <Link to="/" style={{ fontWeight: 700, fontSize: 18, letterSpacing: "0.5px", textDecoration: "none", color: "var(--color-text)" }}>
           GDA Command
-        </span>
-        <nav style={{ display: "flex", gap: 4 }}>
-          {NAV_ITEMS.map(({ path, label }) => (
-            <Link
-              key={path}
-              to={path}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 6,
-                fontSize: 14,
-                fontWeight: pathname === path ? 600 : 400,
-                color: pathname === path ? "var(--color-primary)" : "var(--color-text-muted)",
-                background: pathname === path ? "rgba(59,130,246,0.1)" : "transparent",
-              }}
-            >
-              {label}
-            </Link>
+        </Link>
+        <nav style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "var(--color-text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginRight: 4,
+                opacity: 0.6,
+              }}>
+                {group.label}
+              </span>
+              {group.items.map(({ path, label }) => (
+                <Link
+                  key={path}
+                  to={path}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: isActive(pathname, path) ? 600 : 400,
+                    color: isActive(pathname, path) ? "var(--color-primary)" : "var(--color-text-muted)",
+                    background: isActive(pathname, path) ? "rgba(59,130,246,0.1)" : "transparent",
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
       </header>
+
+      <FinancialKPIStrip />
 
       <main style={{ flex: 1, padding: 24 }}>
         <Routes>
@@ -71,6 +113,8 @@ export default function App() {
           <Route path="/capture" element={<Capture />} />
           <Route path="/workflows" element={<Workflows />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/financial-bible" element={<FinancialBible />} />
+          <Route path="/financial-bible/:key" element={<FinancialBible />} />
         </Routes>
       </main>
     </div>
