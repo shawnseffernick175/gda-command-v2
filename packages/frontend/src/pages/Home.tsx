@@ -209,7 +209,7 @@ export default function Home() {
                       <span>·</span>
                       <span>{formatCurrency(dec.value_estimated)}</span>
                       <span>·</span>
-                      <span style={{ color: "#8b5cf6" }}>{Math.round(dec.pwin * 100)}% Pwin</span>
+                      <span style={{ color: "#8b5cf6" }}>{Math.round(dec.pwin)}% Pwin</span>
                     </div>
                     {dec.next_deadline && (
                       <div style={{ fontSize: 10, color: daysUntil(dec.next_deadline) < 14 ? "#ef4444" : "var(--color-text-muted)", marginTop: 2 }}>
