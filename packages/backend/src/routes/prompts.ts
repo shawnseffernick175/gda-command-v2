@@ -11,7 +11,7 @@ import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 const router = Router();
 
 router.get("/", (req, res) => {
-  let prompts = getMockPrompts();
+  let prompts = [...getMockPrompts()];
   const { search, category, status, tag, sortBy, sortDir } = req.query;
 
   if (typeof search === "string" && search.trim()) {

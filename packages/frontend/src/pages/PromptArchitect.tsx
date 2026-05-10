@@ -410,8 +410,8 @@ function PromptDetail({
               borderRadius: 12,
               fontSize: 11,
               fontWeight: 600,
-              background: prompt.status === "active" ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)",
-              color: prompt.status === "active" ? "#22c55e" : "#f59e0b",
+              background: prompt.status === "active" ? "rgba(34,197,94,0.15)" : prompt.status === "draft" ? "rgba(245,158,11,0.15)" : "rgba(107,114,128,0.15)",
+              color: prompt.status === "active" ? "#22c55e" : prompt.status === "draft" ? "#f59e0b" : "#6b7280",
             }}>
               {prompt.status}
             </span>
