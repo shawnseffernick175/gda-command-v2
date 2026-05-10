@@ -1,0 +1,191 @@
+# S-008 DELIVERY NOTES
+GDA Rebuild — Sprint S-008 | Phase 2
+
+---
+
+## What shipped
+
+### 1. GDAPipelineView.jsx (NEW)
+**Route:** `/pipeline`
+
+Read-only page listing all qualified opportunities (status = 'Pipeline').
+
+**Features:**
+- Fetches from `GET /api/opportunities/pipeline`
+- Table columns: ID, Opportunity, Dept, Value, Pwin, Score, Qualified, Due
+- Client-side filtering: search by ID/title, filter by dept, filter by min Pwin
+- Client-side sort on all columns (click any header); default: qualified_at DESC
+- Clear empty state when no Pipeline rows exist — distinguishes zero results from filtered-out results
+- Record count badge (filtered vs total)
+- Refresh button
+- Mock mode: `USE_MOCK = true` — flip to false once the API endpoint is live
+- Secondary strip: Pipeline-specific summary (count, total value, avg Pwin, avg Score)
+- Audit acknowledgement in secondary strip: explains that writes are server-logged; future audit view will surface the history
+- Mock badge shown in header when `USE_MOCK = true`
+
+**No writes.** No qualify button. No approve payload. This file cannot trigger a write.
+
+**App shell wiring:**
+```jsx
+import GDAPipelineView from "./GDAPipelineView.jsx";
+// In your routes:
+<Route path="/pipeline" element={<GDAPipelineView />} />
+```
+
+---
+
+### 2. gda-api-routes-4-3.js (UPDATED)
+
+**New endpoint: `GET /api/opportunities/pipeline`**
+
+```
+Envelope:
+  workflow: "gda-opportunities"
+  action:   "pipeline-list"
+  dryRun:   false
+  data:     { opportunities: [ { id, title, dept, value, pwin, score, status, qualified_at, due_date } ] }
+  meta:     { count, generated_at, filters_applied: {} }
+```
+
+Query:
+```sql
+SELECT id, title, dept, value, pwin, score, status, qualified_at, due_date
+FROM opportunities
+WHERE status = 'Pipeline'
+ORDER BY qualified_at DESC NULLS LAST, id ASC;
+```
+
+- Empty array (`count: 0`) returns `success: true` — correct behavior.
+- DB errors return HTTP 500 with envelope; raw SQL is not sent to client.
+
+**Strengthened qualify audit log (S-008):**
+
+Old format (S-007):
+```
+[GDA QUALIFY WRITE] id=X | prev=Y | new=Z | qualified_at=T | triggered_by=GDA_REBUILD_UI
+```
+
+New format (S-008):
+```
+[GDA QUALIFY WRITE] correlation_id=GDA-1714932811042-a3f7 | opportunity_id=X | title=Some_Title | prev_status=Y | new_status=Z | qualified_at=T | triggered_by=GDA_REBUILD_UI
+```
+
+`correlation_id` is also returned in the write response envelope under `data.correlation_id` and `meta.correlation_id`. This links the UI event to the server log line.
+
+**All S-007 safety gates are byte-for-byte preserved:**
+- `dryRun:true` path: unchanged
+- `dryRun:false` without `approve:true`: HTTP 400 (unchanged)
+- `QUALIFY_WRITES_ENABLED=false`: HTTP 400 writes-disabled (unchanged)
+- Real write path requires all three: `dryRun:false` + `approve:true` + `QUALIFY_WRITES_ENABLED=true`
+
+---
+
+### 3. gda-smoke-tests-8.js (NEW — replaces gda-smoke-tests-7.js)
+
+**New test: `testPipelineView()`**
+
+Always safe — read-only GET. Run in any environment.
+
+Asserts:
+- HTTP 200
+- Full envelope contract (all 7 fields)
+- `success: true` (even if zero rows)
+- `workflow: "gda-opportunities"`
+- `action: "pipeline-list"`
+- `dryRun: false`
+- `data.opportunities` is an array
+- `meta.count` is a number and matches array length
+- `meta.generated_at` present (warn if missing)
+- When non-empty: required columns present on first row (`id, title, dept, value, pwin, score, status`)
+- When non-empty: optional columns present (`qualified_at, due_date`) — warns if missing
+- When non-empty: every row has `status = 'Pipeline'`
+
+**New assertion on write test (Test 3):**
+- `data.correlation_id` present in write response (warn if missing, since S-007 servers won't have it)
+
+**All S-004 through S-007 tests preserved — no assertions weakened:**
+- testHealth
+- testFinancialKpis
+- testLaunchpadSummary
+- testTop10
+- testQualifyDryRun
+- testQualifyWritePath (S-007 safety tests)
+- testQualifyDryRunFalseGate (S-004–S-008 hard gate)
+- testSchemaCheck
+- testNotFound
+
+---
+
+## Flags — unchanged from S-007
+
+| Flag | Location | Default | Effect |
+|---|---|---|---|
+| `USE_MOCK` | GDAPipelineView.jsx | `true` | Uses mock data; flip false for live API |
+| `USE_MOCK` | GDAOpsTracker-7.jsx | `true` | Unchanged from S-007 |
+| `KPI_USE_MOCK` | GDAKpiContext.jsx | (per file) | Unchanged from S-007 |
+| `QUALIFY_WRITES_ENABLED` | server env | `false` | Must be `true` for real qualify writes |
+| `TEST_QUALIFY_WRITE` | test env | not set | Must be `true` to run real write smoke test |
+| `TEST_QUALIFY_OPP_ID` | test env | `TEST-OPP-001` | ID of test record for real write test |
+
+---
+
+## What did NOT change
+
+- GDAKpiContext.jsx — untouched
+- GDAFinancialBible.jsx — untouched
+- GDAHealthBadge.jsx — untouched
+- GDALaunchpad — untouched
+- GDAOpsTracker-7.jsx — untouched (S-008 only adds the new Pipeline page)
+- All frozen workflows — untouched
+- Schema check endpoint — untouched
+- No new DB tables
+- No chart/graph work
+
+---
+
+## App shell routing change required
+
+Add one route to your existing App shell:
+
+```jsx
+import GDAPipelineView from "./GDAPipelineView.jsx";
+
+// Inside your router:
+<Route path="/pipeline" element={<GDAPipelineView />} />
+```
+
+If `/pipeline` is already mapped, use `/pipeline-view` and update the `GDA_PIPELINE_PATH` constant at the top of GDAPipelineView.jsx.
+
+---
+
+## How to run smoke tests
+
+```bash
+# Read-only (safe for any env including production):
+node gda-smoke-tests-8.js http://localhost:3001
+
+# With real write test (dev only — see safety notes in test file):
+export TEST_QUALIFY_WRITE=true
+export TEST_QUALIFY_OPP_ID=TEST-OPP-001
+node gda-smoke-tests-8.js http://localhost:3001
+```
+
+---
+
+## S-008 status
+
+- [ ] Wire `/pipeline` route in App shell
+- [ ] Flip `USE_MOCK = false` in GDAPipelineView.jsx once `GET /api/opportunities/pipeline` is live
+- [ ] Run `node gda-smoke-tests-8.js` against dev server — expect green on pipeline test
+- [ ] Confirm audit log format in server output after any qualify write
+- [ ] Human approval required before any production deploy
+
+---
+
+## Frozen items — DO NOT TOUCH
+
+- GDA.api.ingest (MJapg8dGkvEzLn0K)
+- Frozen workflow 1 (1G4gw4N7DFtVZKF7)
+- Frozen workflow 2 (NQmaj5nu4TBQxBgD)
+- RR-38 — FROZEN
+- RR-28 — FROZEN
