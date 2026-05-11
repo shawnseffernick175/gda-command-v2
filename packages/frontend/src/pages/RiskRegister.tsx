@@ -133,7 +133,7 @@ export default function RiskRegister() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch("http://localhost:3001/api/risk-register");
+        const r = await fetch("/api/risk-register");
         const env: GDAEnvelope<RiskListData> = await r.json();
         if (env.data) setData(env.data);
         else setError("No data returned");
@@ -150,7 +150,7 @@ export default function RiskRegister() {
     setEvalLoading(true);
     setEvalResult(null);
     try {
-      const r = await fetch("http://localhost:3001/api/risk-register/evaluate", {
+      const r = await fetch("/api/risk-register/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ if_statement: evalInput, dry_run: true }),
@@ -675,10 +675,10 @@ function RiskMatrix({ risks }: { risks: RiskEntry[] }) {
           <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(245,158,11,0.25)" }} /> High (9-14)
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(59,130,246,0.15)" }} /> Medium (3-8)
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(59,130,246,0.15)" }} /> Medium (5-8)
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(16,185,129,0.10)" }} /> Low (1-2)
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(16,185,129,0.10)" }} /> Low (1-3)
         </span>
       </div>
 
