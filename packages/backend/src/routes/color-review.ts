@@ -13,14 +13,13 @@ async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" | "moc
   const pool = getPool();
   if (pool) {
     try {
-      const { rows } = await pool.query("SELECT * FROM color_reviews ORDER BY review_date DESC");
+      const { rows } = await pool.query("SELECT * FROM color_reviews ORDER BY created_at DESC");
       if (rows.length > 0) {
         return { items: rows.map((r) => ({
           ...r,
-          findings: typeof r.findings === "string" ? JSON.parse(r.findings) : (r.findings ?? []),
-          strengths: typeof r.strengths === "string" ? JSON.parse(r.strengths) : (r.strengths ?? []),
-          weaknesses: typeof r.weaknesses === "string" ? JSON.parse(r.weaknesses) : (r.weaknesses ?? []),
-          action_items: typeof r.action_items === "string" ? JSON.parse(r.action_items) : (r.action_items ?? []),
+          requirement_checks: r.requirement_checks ?? [],
+          section_scores: r.section_scores ?? [],
+          risk_factors: r.risk_factors ?? [],
         })) as ReviewItem[], source: "db" };
       }
     } catch { /* fall through */ }
@@ -102,10 +101,9 @@ router.get("/:id", async (req, res) => {
           const r = rows[0];
           const review = {
             ...r,
-            findings: typeof r.findings === "string" ? JSON.parse(r.findings) : (r.findings ?? []),
-            strengths: typeof r.strengths === "string" ? JSON.parse(r.strengths) : (r.strengths ?? []),
-            weaknesses: typeof r.weaknesses === "string" ? JSON.parse(r.weaknesses) : (r.weaknesses ?? []),
-            action_items: typeof r.action_items === "string" ? JSON.parse(r.action_items) : (r.action_items ?? []),
+            requirement_checks: r.requirement_checks ?? [],
+            section_scores: r.section_scores ?? [],
+            risk_factors: r.risk_factors ?? [],
           };
           return res.json(successEnvelope("GDA.color-review", "get-detail", { review, source: "db" }));
         }
