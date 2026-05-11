@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import { MOCK_DRAFTS, MOCK_PUBLISH_RUNS } from "../data/doctrine-mock";
 import type { DoctrineDraft, GateCheckResult } from "@gda/shared";
 
@@ -142,7 +143,7 @@ router.get("/publish-runs", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/doctrine/finalize — trigger sprint finalization, real DB write
 // ---------------------------------------------------------------------------
-router.post("/finalize", async (req, res) => {
+router.post("/finalize", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
   const { sprintId } = req.body as { sprintId?: string };
 
   if (!sprintId) {

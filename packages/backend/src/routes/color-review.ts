@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import { MOCK_COLOR_REVIEWS } from "../data/color-review-mock";
 import { getPool } from "../lib/db";
 import type { ColorReviewPhase, ColorReviewStatus } from "@gda/shared";
@@ -124,7 +125,7 @@ router.get("/:id", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/color-review/run — initiate a color review (LLM-powered)
 // ---------------------------------------------------------------------------
-router.post("/run", async (req, res) => {
+router.post("/run", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   try {
     const { proposal_id, phase, proposal_text } = req.body ?? {};
     if (!proposal_id || !phase) {

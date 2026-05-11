@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import {
   MOCK_CAPTURE_PLANS,
   MOCK_CAPTURE_ACTIVITIES,
@@ -270,7 +271,7 @@ router.get("/activities", async (_req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/capture/gate-review — run gate review and store result
 // ---------------------------------------------------------------------------
-router.post("/gate-review", async (req, res) => {
+router.post("/gate-review", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
   const { capture_plan_id, gate } = req.body as {
     capture_plan_id?: string;
     gate?: string;

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import {
   MOCK_DOCUMENTS,
   MOCK_COLLECTIONS,
@@ -269,7 +270,7 @@ router.get("/chat/sessions/:id", (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/knowledge/chat — send a message (LLM-powered with RAG context)
 // ---------------------------------------------------------------------------
-router.post("/chat", async (req, res) => {
+router.post("/chat", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   try {
     const { message, session_id } = req.body as {
       message?: string;
@@ -373,7 +374,7 @@ router.post("/chat", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/knowledge/upload — upload document (dry-run)
 // ---------------------------------------------------------------------------
-router.post("/upload", (req, res) => {
+router.post("/upload", requireRole("admin", "bd_manager", "capture_lead"), (req, res) => {
   try {
     const { file_name, document_type, collection, tags } = req.body as {
       file_name?: string;

@@ -2693,3 +2693,69 @@ export function fetchBackupStatus() {
 export function createBackup() {
   return request<BackupCreateData>("/backup/create", { method: "POST" });
 }
+
+// ---------------------------------------------------------------------------
+// Admin / User Management
+// ---------------------------------------------------------------------------
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  display_name: string;
+  role: string;
+  is_active: boolean;
+  avatar_url: string | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminRole {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface AdminUsersData {
+  users: AdminUser[];
+  total: number;
+  roles: string[];
+}
+
+export function fetchAdminUsers() {
+  return request<AdminUsersData>("/admin/users");
+}
+
+export function fetchAdminRoles() {
+  return request<{ roles: AdminRole[] }>("/admin/roles");
+}
+
+export function updateUserRole(userId: string, role: string) {
+  return request<AdminUser>(`/admin/users/${userId}/role`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function updateUserStatus(userId: string, is_active: boolean) {
+  return request<AdminUser>(`/admin/users/${userId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_active }),
+  });
+}
+
+export function createUser(email: string, password: string, display_name: string, role: string) {
+  return request<AdminUser>("/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, display_name, role }),
+  });
+}
+
+export function deleteUser(userId: string) {
+  return request<{ id: string; deleted: boolean }>(`/admin/users/${userId}`, {
+    method: "DELETE",
+  });
+}

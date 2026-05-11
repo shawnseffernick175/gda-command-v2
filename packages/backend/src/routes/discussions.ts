@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import { MOCK_THREADS, MOCK_MESSAGES } from "../data/discussions-mock";
 import type { DiscussionThread } from "../data/discussions-mock";
 import type { DiscussionEntityType } from "@gda/shared";
@@ -159,7 +160,7 @@ router.get("/threads/:id/messages", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/discussions/threads/:id/messages — real DB write
 // ---------------------------------------------------------------------------
-router.post("/threads/:id/messages", async (req, res) => {
+router.post("/threads/:id/messages", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   const { content, author } = req.body as { content?: string; author?: string };
   const threadId = req.params.id;
   const resolvedAuthor = author ?? (req as unknown as { user?: { email?: string } }).user?.email ?? "system";
@@ -228,7 +229,7 @@ router.post("/threads/:id/messages", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/discussions/threads — create thread, real DB write
 // ---------------------------------------------------------------------------
-router.post("/threads", async (req, res) => {
+router.post("/threads", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   const { title, entity_type, entity_id, entity_title, tags } = req.body as {
     title?: string;
     entity_type?: string;

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import { MOCK_SAM_OPPORTUNITIES, MOCK_SCAN_RUNS } from "../data/sam-monitor-mock";
 import type { SAMMonitorOpportunity } from "../data/sam-monitor-mock";
 
@@ -167,7 +168,7 @@ router.get("/scans", async (_req, res) => {
 });
 
 // POST /api/sam-monitor/scan — trigger scan (dry-run, needs n8n)
-router.post("/scan", (_req, res) => {
+router.post("/scan", requireRole("admin", "bd_manager"), (_req, res) => {
   return res.json(
     successEnvelope("gda-sam-monitor", "trigger-scan", {
       scan_id: "scan-dry-run",
@@ -180,7 +181,7 @@ router.post("/scan", (_req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/sam-monitor/opportunities/:id/qualify — real DB write
 // ---------------------------------------------------------------------------
-router.post("/opportunities/:id/qualify", async (req, res) => {
+router.post("/opportunities/:id/qualify", requireRole("admin", "bd_manager"), async (req, res) => {
   const { id } = req.params;
   const pool = getPool();
 

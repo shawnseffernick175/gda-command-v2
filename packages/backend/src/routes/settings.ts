@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import { webhookConfig, apiConfig, callWebhook } from "../lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "../lib/db";
 import { getRegistrySummary, WEBHOOK_REGISTRY } from "../lib/webhook-registry";
@@ -106,7 +107,7 @@ router.get("/", async (_req, res) => {
  * Ping all 42 webhooks and return current status (live/exists/planned).
  * Updates in-memory registry so subsequent requests reflect real state.
  */
-router.post("/webhook-sync", async (_req, res) => {
+router.post("/webhook-sync", requireRole("admin"), async (_req, res) => {
   const wh = webhookConfig();
   if (wh.missing.length > 0) {
     return res.status(503).json(errorEnvelope("GDA.gateway.settings", "webhook-sync", {
