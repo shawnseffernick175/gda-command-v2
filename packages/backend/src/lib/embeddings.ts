@@ -269,23 +269,27 @@ export async function embedAllDocuments(): Promise<{
       if (meta.description) textParts.push(meta.description);
       if (meta.content) textParts.push(meta.content);
 
-      // Read linked file content if available
+      // Read linked file content if available (text-based files only)
+      const TEXT_MIME_TYPES = new Set(["text/plain", "text/csv", "text/markdown"]);
       try {
         const fileResult = await pool.query(
-          `SELECT uf.storage_key FROM uploaded_files uf
+          `SELECT uf.storage_key, uf.mime_type FROM uploaded_files uf
            JOIN knowledge_documents kd ON kd.file_id = uf.id
            WHERE kd.id = $1`,
           [doc.id],
         );
         if (fileResult.rows.length > 0) {
-          const fs = await import("fs");
-          const path = await import("path");
-          const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
-          const filePath = path.join(uploadDir, fileResult.rows[0].storage_key);
-          if (fs.existsSync(filePath)) {
-            const content = fs.readFileSync(filePath, "utf-8");
-            if (content.trim().length > 0) {
-              textParts.push(content);
+          const { storage_key, mime_type } = fileResult.rows[0];
+          if (TEXT_MIME_TYPES.has(mime_type)) {
+            const fs = await import("fs");
+            const path = await import("path");
+            const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+            const filePath = path.join(uploadDir, storage_key);
+            if (fs.existsSync(filePath)) {
+              const content = fs.readFileSync(filePath, "utf-8");
+              if (content.trim().length > 0) {
+                textParts.push(content);
+              }
             }
           }
         }
