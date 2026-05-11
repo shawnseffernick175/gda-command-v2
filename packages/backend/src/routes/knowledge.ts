@@ -472,6 +472,7 @@ router.post(
   requireRole("admin", "bd_manager", "capture_lead"),
   knowledgeUpload.single("file"),
   async (req: Request, res: Response) => {
+    let storageKey: string | undefined;
     try {
       const file = req.file;
       const { document_type, collection, tags } = req.body as {
@@ -511,7 +512,7 @@ router.post(
       }
 
       // Real file upload
-      const storageKey = generateStorageKey(file.originalname);
+      storageKey = generateStorageKey(file.originalname);
       saveFile(storageKey, file.buffer);
 
       const parsedTags = tags
@@ -589,6 +590,10 @@ router.post(
         }),
       );
     } catch (err) {
+      // Clean up orphaned file if it was saved to disk before the error
+      if (storageKey) {
+        try { deleteFile(storageKey); } catch { /* best effort */ }
+      }
       log.error("knowledge_upload_error", { error: (err as Error).message });
       res.status(500).json(
         errorEnvelope("gda-knowledge", "upload", {
