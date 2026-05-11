@@ -108,6 +108,27 @@ const PAGE_SECTIONS: PageSection[] = [
       "All approval decisions are logged in the Audit Log",
     ],
   },
+  {
+    id: "risk-register",
+    title: "Risk Register",
+    icon: "\u26A0",
+    group: "Operations",
+    description:
+      "If-This-Then-That risk tracking across your portfolio. Identify, assess, and mitigate risks with structured trigger indicators and contingency plans.",
+    features: [
+      "KPI cards: Total, Critical, Open, Mitigating, Accepted, Closed",
+      "If-This-Then-That rule evaluation engine",
+      "5x5 risk heat map matrix (likelihood vs impact)",
+      "Trigger indicators and contingency plans per risk",
+      "Filter by category, status, and search",
+      "Source attribution badges on all risk entries",
+    ],
+    tips: [
+      "Use the Evaluator to test 'what if' scenarios against existing risks",
+      "Click the Risk Matrix tab for a visual heat map of your risk exposure",
+      "Critical risks (score 15+) are highlighted in red and should be reviewed weekly",
+    ],
+  },
   // Capture
   {
     id: "capture",

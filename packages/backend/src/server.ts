@@ -40,6 +40,7 @@ import exportRouter from "./routes/export";
 import aiRouter from "./routes/ai";
 import bookOfTruthsRouter from "./routes/book-of-truths";
 import govwinRouter from "./routes/govwin";
+import riskRegisterRouter from "./routes/risk-register";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -152,6 +153,7 @@ app.use("/api/export", exportRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/book-of-truths", bookOfTruthsRouter);
 app.use("/api/govwin", govwinRouter);
+app.use("/api/risk-register", riskRegisterRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {

@@ -392,6 +392,7 @@ export default function Capture() {
   const [phaseFilter, setPhaseFilter] = useState("");
   const [activityTypeFilter, setActivityTypeFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [kpiFilter, setKpiFilter] = useState<string | null>(null);
 
   // Gate review modal state
   const [gateModal, setGateModal] = useState<{
@@ -505,6 +506,8 @@ export default function Capture() {
           setExpandedPlan={setExpandedPlan}
           expandedSection={expandedSection}
           setExpandedSection={setExpandedSection}
+          kpiFilter={kpiFilter}
+          setKpiFilter={setKpiFilter}
           onGateReview={(planId, gate) => {
             setGateModal({ planId, gate });
             setGateResult(null);
@@ -769,6 +772,8 @@ function PlansTab({
   setExpandedPlan,
   expandedSection,
   setExpandedSection,
+  kpiFilter,
+  setKpiFilter,
   onGateReview,
 }: {
   plansData: PlansData | null;
@@ -781,12 +786,39 @@ function PlansTab({
   setExpandedPlan: (v: string | null) => void;
   expandedSection: string | null;
   setExpandedSection: (v: string | null) => void;
+  kpiFilter: string | null;
+  setKpiFilter: (v: string | null) => void;
   onGateReview: (planId: string, gate: string) => void;
 }) {
   if (!plansData) return null;
 
+  // Apply KPI-based filtering
+  let filteredPlans = plans;
+  if (kpiFilter === "bid") filteredPlans = plans.filter((p) => p.bid_decision === "bid");
+  else if (kpiFilter === "pending") filteredPlans = plans.filter((p) => p.bid_decision === "pending");
+  else if (kpiFilter === "at_risk") filteredPlans = plans.filter((p) => p.milestones.some((m) => m.status === "at_risk" || m.status === "overdue"));
+  else if (kpiFilter === "high_pwin") filteredPlans = plans.filter((p) => p.pwin >= plansData.avgPwin);
+  else if (kpiFilter === "low_pwin") filteredPlans = plans.filter((p) => p.pwin < plansData.avgPwin);
+
   return (
     <>
+      {/* KPI filter indicator */}
+      {kpiFilter && (
+        <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Filtered by:</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-primary)", padding: "2px 10px", borderRadius: 4, background: "rgba(59,130,246,0.12)" }}>
+            {kpiFilter === "bid" ? "Bid Decisions" : kpiFilter === "pending" ? "Pending" : kpiFilter === "at_risk" ? "At-Risk Milestones" : kpiFilter === "high_pwin" ? "Above Avg Pwin" : kpiFilter === "low_pwin" ? "Below Avg Pwin" : kpiFilter}
+          </span>
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>({filteredPlans.length} plans)</span>
+          <button
+            onClick={() => setKpiFilter(null)}
+            style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", cursor: "pointer" }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Summary strip */}
       <div
         style={{
@@ -796,16 +828,18 @@ function PlansTab({
           marginBottom: 20,
         }}
       >
-        <StatCard label="Active Plans" value={String(plansData.total)} info={{ whatItIs: "Number of capture plans actively being worked.", whatItMeans: "Active pursuits with assigned capture managers." }} />
+        <StatCard label="Active Plans" value={String(plansData.total)} onClick={() => setKpiFilter(null)} active={kpiFilter === null} info={{ whatItIs: "Number of capture plans actively being worked.", whatItMeans: "Active pursuits with assigned capture managers. Click to show all plans." }} />
         <StatCard label="Total Value" value={fmtCurrency(plansData.totalValue)} info={{ whatItIs: "Combined estimated value of all active capture plans.", whatItMeans: "Total addressable revenue if all pursuits are won.", howCalculated: "Sum of value_estimated across all active plans." }} />
-        <StatCard label="Avg Pwin" value={`${plansData.avgPwin}%`} info={{ whatItIs: "Average win probability across active plans.", whatItMeans: "Portfolio strength indicator. Below 40% = weak positioning.", howCalculated: "Mean Pwin across all active capture plans." }} />
-        <StatCard label="Bid Decisions" value={String(plansData.decisions["bid"] ?? 0)} sub="bid" info={{ whatItIs: "Plans with a 'Bid' decision confirmed.", whatItMeans: "Opportunities approved for proposal development." }} />
-        <StatCard label="Pending" value={String(plansData.decisions["pending"] ?? 0)} sub="pending" info={{ whatItIs: "Plans awaiting bid/no-bid decision.", whatItMeans: "Opportunities still being evaluated for pursuit." }} />
+        <StatCard label="Avg Pwin" value={`${plansData.avgPwin}%`} onClick={() => setKpiFilter(kpiFilter === "high_pwin" ? "low_pwin" : kpiFilter === "low_pwin" ? null : "high_pwin")} active={kpiFilter === "high_pwin" || kpiFilter === "low_pwin"} info={{ whatItIs: "Average win probability across active plans.", whatItMeans: "Click to toggle between above/below average Pwin.", howCalculated: "Mean Pwin across all active capture plans." }} />
+        <StatCard label="Bid Decisions" value={String(plansData.decisions["bid"] ?? 0)} sub="bid" onClick={() => setKpiFilter(kpiFilter === "bid" ? null : "bid")} active={kpiFilter === "bid"} info={{ whatItIs: "Plans with a 'Bid' decision confirmed.", whatItMeans: "Click to filter to bid-approved plans only." }} />
+        <StatCard label="Pending" value={String(plansData.decisions["pending"] ?? 0)} sub="pending" onClick={() => setKpiFilter(kpiFilter === "pending" ? null : "pending")} active={kpiFilter === "pending"} info={{ whatItIs: "Plans awaiting bid/no-bid decision.", whatItMeans: "Click to filter to pending plans only." }} />
         <StatCard
           label="At-Risk Milestones"
           value={String(plansData.atRiskMilestones)}
           color={plansData.atRiskMilestones > 0 ? "#f59e0b" : undefined}
-          info={{ whatItIs: "Capture milestones flagged as at-risk or overdue.", whatItMeans: "Action needed — these milestones may delay proposal submission." }}
+          onClick={() => setKpiFilter(kpiFilter === "at_risk" ? null : "at_risk")}
+          active={kpiFilter === "at_risk"}
+          info={{ whatItIs: "Capture milestones flagged as at-risk or overdue.", whatItMeans: "Click to filter to plans with at-risk milestones." }}
         />
       </div>
 
@@ -848,7 +882,7 @@ function PlansTab({
 
       {/* Plan cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {plans.map((plan) => {
+        {filteredPlans.map((plan) => {
           const isExpanded = expandedPlan === plan.id;
           return (
             <div
@@ -1451,21 +1485,29 @@ function StatCard({
   sub,
   color,
   info,
+  onClick,
+  active,
 }: {
   label: string;
   value: string;
   sub?: string;
   color?: string;
   info?: { whatItIs: string; whatItMeans: string; howCalculated?: string };
+  onClick?: () => void;
+  active?: boolean;
 }) {
   return (
     <div
+      onClick={onClick}
       style={{
         background: "var(--color-surface)",
         borderRadius: 8,
-        border: "1px solid var(--color-border)",
+        border: active ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
         padding: "14px 16px",
         textAlign: "center",
+        cursor: onClick ? "pointer" : undefined,
+        transition: "border-color 0.15s, box-shadow 0.15s",
+        boxShadow: active ? "0 0 0 1px var(--color-primary)" : undefined,
       }}
     >
       <div style={{ fontSize: 11, textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
