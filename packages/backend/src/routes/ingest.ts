@@ -83,7 +83,7 @@ router.post("/opportunities", async (req, res) => {
         opp.naics ?? null, opp.psc ?? null, opp.due_date ?? null,
         opp.solicitation_number ?? null, opp.set_aside ?? null,
         opp.place_of_performance ?? null, opp.incumbent ?? null,
-        JSON.stringify(opp.tags ?? []), opp.raw_source_url ?? null,
+        opp.tags && Array.isArray(opp.tags) ? `{${opp.tags.join(",")}}` : "{}", opp.raw_source_url ?? null,
         opp.created_at ?? new Date().toISOString(),
         opp.updated_at ?? new Date().toISOString(),
       ]);
