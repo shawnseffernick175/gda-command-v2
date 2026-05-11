@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ExportButton from "../components/ExportButton";
 import {
   fetchContacts,
   type ContactsData,
@@ -143,6 +144,7 @@ export default function Contacts() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Contacts &amp; Relationships</h1>
+        <ExportButton endpoint="contacts" label="Export CSV" />
         <span
           style={{
             fontSize: 11,

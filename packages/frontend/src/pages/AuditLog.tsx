@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchAuditLog, fetchAuditStats, type AuditEntry, type AuditStats } from "../api/client";
+import ExportButton from "../components/ExportButton";
 
 export default function AuditLog() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
@@ -31,7 +32,10 @@ export default function AuditLog() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>Audit Log</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Audit Log</h1>
+        <ExportButton endpoint="audit-log" label="Export CSV" />
+      </div>
       <p style={{ color: "var(--color-text-muted)", marginBottom: 24 }}>
         Track all write operations across the system.
       </p>

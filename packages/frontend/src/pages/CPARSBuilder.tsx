@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ExportButton from "../components/ExportButton";
 import {
   fetchCPARSSummary,
   fetchCPARSRecords,
@@ -83,7 +84,10 @@ export default function CPARSBuilder() {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 16px", fontSize: 20 }}>CPARS / Past Performance Builder</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 20 }}>CPARS / Past Performance Builder</h2>
+        <ExportButton endpoint="cpars" label="Export CSV" />
+      </div>
 
       {/* Summary Strip */}
       {summary && (

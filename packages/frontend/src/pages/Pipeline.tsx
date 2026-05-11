@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import ExportButton from "../components/ExportButton";
 import {
   fetchPipelineOpportunities,
   type OpportunityRow,
@@ -158,6 +159,7 @@ export default function Pipeline() {
         >
           Refresh
         </button>
+        <ExportButton endpoint="pipeline" label="Export CSV" />
         <span
           style={{
             padding: "3px 10px",
