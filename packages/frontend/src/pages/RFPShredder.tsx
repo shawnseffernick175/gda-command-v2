@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   fetchShredJobs,
   fetchShredRequirements,
@@ -112,11 +112,13 @@ export default function RFPShredder() {
 
   // Shred modal
   const [showShredModal, setShowShredModal] = useState(false);
-  const [shredFileName, setShredFileName] = useState("");
+  const [shredFile, setShredFile] = useState<File | null>(null);
+  const [shredDocText, setShredDocText] = useState("");
   const [shredTitle, setShredTitle] = useState("");
   const [shredAgency, setShredAgency] = useState("");
   const [shredResult, setShredResult] = useState<string | null>(null);
   const [shredError, setShredError] = useState<string | null>(null);
+  const shredFileRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [allCompletedJobs, setAllCompletedJobs] = useState<ShredJobRow[]>([]);
@@ -186,10 +188,10 @@ export default function RFPShredder() {
 
   // ---- Shred action ----
   function handleShred() {
-    if (!shredFileName || !shredTitle) return;
+    if (!shredTitle || (!shredFile && !shredDocText.trim())) return;
     setShredError(null);
     setShredResult(null);
-    initiateShred(shredFileName, shredTitle, shredAgency || undefined)
+    initiateShred(shredTitle, shredAgency || undefined, shredFile || undefined, shredDocText.trim() || undefined)
       .then((env) => {
         if (env.success && env.data) {
           setShredResult(`Job queued: ${env.data.correlation_id}\n${env.data.message}`);
@@ -334,7 +336,7 @@ export default function RFPShredder() {
         }} onClick={() => setShowShredModal(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{
             background: "var(--color-surface)", borderRadius: 12, padding: 24,
-            width: 480, maxWidth: "90vw", border: "1px solid var(--color-border)",
+            width: 520, maxWidth: "90vw", border: "1px solid var(--color-border)",
           }}>
             <h3 style={{ margin: "0 0 16px" }}>Shred New RFP</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -342,19 +344,58 @@ export default function RFPShredder() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>Solicitation Title *</label>
                 <input value={shredTitle} onChange={(e) => setShredTitle(e.target.value)}
                   placeholder="e.g., USACE Environmental Services IDIQ"
-                  style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4 }} />
+                  style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4, boxSizing: "border-box" }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>File Name *</label>
-                <input value={shredFileName} onChange={(e) => setShredFileName(e.target.value)}
-                  placeholder="e.g., W912DY-25-R-0001.pdf"
-                  style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4 }} />
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>RFP Document (PDF, DOC, DOCX, or TXT)</label>
+                <div
+                  onClick={() => shredFileRef.current?.click()}
+                  style={{
+                    border: "2px dashed var(--color-border)",
+                    borderRadius: 8,
+                    padding: 16,
+                    textAlign: "center",
+                    cursor: "pointer",
+                    marginTop: 4,
+                  }}
+                >
+                  <input
+                    ref={shredFileRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setShredFile(f);
+                    }}
+                  />
+                  {shredFile ? (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{shredFile.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                        {shredFile.size >= 1_000_000 ? `${(shredFile.size / 1_000_000).toFixed(1)} MB` : `${(shredFile.size / 1_000).toFixed(0)} KB`}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Click to select an RFP document</div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>Or Paste Document Text</label>
+                <textarea
+                  value={shredDocText}
+                  onChange={(e) => setShredDocText(e.target.value)}
+                  placeholder="Paste the full solicitation text here for AI extraction..."
+                  rows={4}
+                  style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4, fontSize: 12, resize: "vertical", boxSizing: "border-box" }}
+                />
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>Agency</label>
                 <input value={shredAgency} onChange={(e) => setShredAgency(e.target.value)}
                   placeholder="e.g., US Army Corps of Engineers"
-                  style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4 }} />
+                  style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4, boxSizing: "border-box" }} />
               </div>
               {shredResult && (
                 <div style={{ padding: 12, background: "#22c55e15", border: "1px solid #22c55e40", borderRadius: 8, fontSize: 13, whiteSpace: "pre-wrap" }}>{shredResult}</div>
@@ -364,15 +405,12 @@ export default function RFPShredder() {
               )}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
                 <button onClick={() => setShowShredModal(false)} style={{ padding: "8px 16px", border: "1px solid var(--color-border)", borderRadius: 6, background: "transparent", color: "var(--color-text)", cursor: "pointer" }}>Cancel</button>
-                <button onClick={handleShred} disabled={!shredFileName || !shredTitle} style={{
+                <button onClick={handleShred} disabled={!shredTitle || (!shredFile && !shredDocText.trim())} style={{
                   padding: "8px 16px", border: "none", borderRadius: 6,
-                  background: (!shredFileName || !shredTitle) ? "#6b7280" : "#7c3aed",
-                  color: "#fff", cursor: (!shredFileName || !shredTitle) ? "not-allowed" : "pointer", fontWeight: 600,
-                }}>Shred (Dry Run)</button>
+                  background: (!shredTitle || (!shredFile && !shredDocText.trim())) ? "#6b7280" : "#7c3aed",
+                  color: "#fff", cursor: (!shredTitle || (!shredFile && !shredDocText.trim())) ? "not-allowed" : "pointer", fontWeight: 600,
+                }}>Shred RFP</button>
               </div>
-            </div>
-            <div style={{ marginTop: 12, padding: 8, background: "#3b82f615", border: "1px solid #3b82f640", borderRadius: 6, fontSize: 11, color: "var(--color-text-muted)" }}>
-              Dry-run mode — document will be queued to the n8n pipeline: doc-ingest → rfp-shredder → compliance-matrix. No production writes.
             </div>
           </div>
         </div>

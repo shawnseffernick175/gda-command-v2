@@ -377,29 +377,44 @@ function MetaField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
 function UploadModal({ collections, onClose }: { collections: KnowledgeCollection[]; onClose: () => void }) {
-  const [fileName, setFileName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("memo");
   const [collection, setCollection] = useState("col-contracts");
   const [tagsInput, setTagsInput] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = () => {
-    if (!fileName.trim()) return;
+    if (!selectedFile) return;
     setUploading(true);
     const tags = tagsInput
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
-    uploadDocument(fileName.trim(), docType, collection, tags)
+    uploadDocument(selectedFile, docType, collection, tags)
       .then((env) => {
         if (env.success && env.data) {
-          setResult(`Queued: ${env.data.message}\nPipeline: ${env.data.pipeline}\nETA: ${env.data.estimated_processing_time}`);
+          setResult(`Uploaded: ${env.data.message}${env.data.download_url ? `\nDownload: ${env.data.download_url}` : ""}`);
         }
       })
       .catch(() => setResult("Upload failed"))
       .finally(() => setUploading(false));
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) setSelectedFile(file);
   };
 
   return (
@@ -426,18 +441,47 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
           maxWidth: "90vw",
         }}
       >
-        <h3 style={{ margin: "0 0 16px" }}>Upload Document (Dry-Run)</h3>
+        <h3 style={{ margin: "0 0 16px" }}>Upload Document</h3>
         {!result ? (
           <>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>File Name</label>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                border: `2px dashed ${dragOver ? "#3b82f6" : "var(--color-border)"}`,
+                borderRadius: 8,
+                padding: 24,
+                textAlign: "center",
+                cursor: "pointer",
+                marginBottom: 12,
+                background: dragOver ? "rgba(59,130,246,0.05)" : "transparent",
+                transition: "all 0.2s",
+              }}
+            >
               <input
-                type="text"
-                placeholder="document.pdf"
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-                style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13, boxSizing: "border-box" }}
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.pptx,.md,.png,.jpg,.jpeg,.gif"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) setSelectedFile(file);
+                }}
               />
+              {selectedFile ? (
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>{selectedFile.name}</div>
+                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>{formatFileSize(selectedFile.size)} &middot; {selectedFile.type || "unknown type"}</div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 24, marginBottom: 8 }}>📄</div>
+                  <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Drop a file here or click to browse</div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>PDF, DOC, DOCX, TXT, CSV, XLSX, MD, images (max 50 MB)</div>
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
@@ -471,10 +515,10 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text)", cursor: "pointer", fontSize: 13 }}>Cancel</button>
               <button
                 onClick={handleUpload}
-                disabled={!fileName.trim() || uploading}
-                style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: !fileName.trim() || uploading ? 0.5 : 1 }}
+                disabled={!selectedFile || uploading}
+                style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: !selectedFile || uploading ? 0.5 : 1 }}
               >
-                {uploading ? "Uploading..." : "Upload (Dry-Run)"}
+                {uploading ? "Uploading..." : "Upload"}
               </button>
             </div>
           </>

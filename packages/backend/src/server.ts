@@ -31,12 +31,14 @@ import fpdsRouter from "./routes/fpds";
 import ingestRouter from "./routes/ingest";
 import backupRouter from "./routes/backup";
 import adminRouter from "./routes/admin";
+import filesRouter from "./routes/files";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
 import { WEBHOOK_REGISTRY, getRegistrySummary } from "./lib/webhook-registry";
 import { isLLMAvailable } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
+import { ensureUploadDir } from "./lib/storage";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -44,6 +46,9 @@ const PORT = process.env.PORT ?? 3001;
 app.disable("x-powered-by");
 app.use(cors());
 app.use(express.json({ limit: "256kb" }));
+
+// Ensure upload directory exists
+ensureUploadDir();
 
 // Structured JSON request logging with correlation IDs
 app.use(requestLogger);
@@ -122,6 +127,7 @@ app.use("/api/cpars", cparsRouter);
 app.use("/api/fpds", fpdsRouter);
 app.use("/api/backup", backupRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/files", filesRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {
