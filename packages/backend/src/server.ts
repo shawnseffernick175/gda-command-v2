@@ -33,6 +33,8 @@ import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
 import { WEBHOOK_REGISTRY, getRegistrySummary } from "./lib/webhook-registry";
+import { isLLMAvailable } from "./lib/llm";
+import { requestLogger, log } from "./lib/logger";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -41,15 +43,8 @@ app.disable("x-powered-by");
 app.use(cors());
 app.use(express.json({ limit: "256kb" }));
 
-// Structured request log
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on("finish", () => {
-    const ms = Date.now() - start;
-    process.stdout.write(`[gateway] ${req.method} ${req.path} ${res.statusCode} ${ms}ms\n`);
-  });
-  next();
-});
+// Structured JSON request logging with correlation IDs
+app.use(requestLogger);
 
 // --- Gateway health ---
 app.get("/health", async (_req, res) => {
@@ -124,6 +119,75 @@ app.use("/api/discussions", discussionsRouter);
 app.use("/api/cpars", cparsRouter);
 app.use("/api/fpds", fpdsRouter);
 
+// --- Frontend error reporting endpoint ---
+app.post("/api/errors", (req, res) => {
+  const { message, stack, componentStack, url, timestamp } = req.body ?? {};
+  log.error("client_error", {
+    clientMessage: typeof message === "string" ? message.slice(0, 500) : "Unknown",
+    clientStack: typeof stack === "string" ? stack.slice(0, 2000) : undefined,
+    componentStack: typeof componentStack === "string" ? componentStack.slice(0, 1000) : undefined,
+    clientUrl: typeof url === "string" ? url.slice(0, 500) : undefined,
+    clientTimestamp: timestamp,
+    correlationId: req.headers["x-correlation-id"] as string,
+  });
+  res.json({ received: true });
+});
+
+// --- Detailed health endpoint ---
+app.get("/health/detailed", async (_req, res) => {
+  const wh = webhookConfig();
+  const api = apiConfig();
+  const db = dbConfig();
+  let dbStatus: { ok: boolean; latencyMs: number; error?: string } | null = null;
+  if (db.configured) {
+    dbStatus = await dbHealthCheck();
+  }
+
+  const memUsage = process.memoryUsage();
+
+  const components = [
+    {
+      name: "postgresql",
+      status: !db.configured ? "not_configured" : dbStatus?.ok ? "healthy" : "unhealthy",
+      latencyMs: dbStatus?.latencyMs ?? null,
+      error: dbStatus?.error ?? null,
+    },
+    {
+      name: "n8n_webhooks",
+      status: wh.missing.length === 0 ? "configured" : "not_configured",
+      missing: wh.missing,
+    },
+    {
+      name: "n8n_api",
+      status: api.missing.length === 0 ? "configured" : "not_configured",
+      missing: api.missing,
+    },
+    {
+      name: "openai_llm",
+      status: isLLMAvailable() ? "configured" : "not_configured",
+    },
+  ];
+
+  const allHealthy = components.every((c) => c.status !== "unhealthy");
+
+  res.json(
+    successEnvelope("GDA.gateway", "health-detailed", {
+      status: allHealthy ? "ok" : "degraded",
+      uptimeSec: Math.round(process.uptime()),
+      pid: process.pid,
+      nodeVersion: process.version,
+      memory: {
+        rss: Math.round(memUsage.rss / 1_048_576),
+        heapUsed: Math.round(memUsage.heapUsed / 1_048_576),
+        heapTotal: Math.round(memUsage.heapTotal / 1_048_576),
+        external: Math.round(memUsage.external / 1_048_576),
+      },
+      components,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+});
+
 // --- Catch-all 404 ---
 app.use((_req, res) => {
   res.status(404).json({
@@ -143,7 +207,7 @@ app.use((_req, res) => {
 
 // Last-resort error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  process.stderr.write(`[gateway] error: ${err.message}\n`);
+  log.error("unhandled_error", { error: err.message, stack: err.stack?.slice(0, 2000) });
   res.status(500).json({
     success: false,
     workflow: "GDA.gateway",
@@ -160,19 +224,19 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 const server = app.listen(PORT, () => {
-  process.stdout.write(`[GDA Gateway v2] listening on http://localhost:${PORT}\n`);
+  log.info("server_started", { port: Number(PORT), env: process.env.NODE_ENV ?? "development" });
 });
 
 // Graceful shutdown
 function shutdown(signal: string) {
-  process.stdout.write(`[GDA Gateway v2] ${signal} received, shutting down...\n`);
+  log.info("shutdown_initiated", { signal });
   server.close(() => {
-    process.stdout.write("[GDA Gateway v2] HTTP server closed\n");
+    log.info("server_closed");
     process.exit(0);
   });
   // Force exit after 10s if connections don't drain
   setTimeout(() => {
-    process.stderr.write("[GDA Gateway v2] Forced shutdown after timeout\n");
+    log.error("forced_shutdown", { reason: "timeout" });
     process.exit(1);
   }, 10_000).unref();
 }
