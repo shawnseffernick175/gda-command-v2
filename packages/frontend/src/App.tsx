@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
+import Login from "./pages/Login";
+import { isAuthenticated, logout, getUser } from "./api/auth";
 import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
 import OpsTracker from "./pages/OpsTracker";
@@ -91,7 +93,20 @@ function isActive(pathname: string, itemPath: string): boolean {
 export default function App() {
   const { pathname } = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
+  const [authed, setAuthed] = useState(() => isAuthenticated());
   const sidebarWidth = sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+
+  const handleLogout = useCallback(async () => {
+    await logout();
+    setAuthed(false);
+  }, []);
+
+  // Check auth status periodically (picks up token refresh)
+  useEffect(() => {
+    const check = () => setAuthed(isAuthenticated());
+    window.addEventListener("storage", check);
+    return () => window.removeEventListener("storage", check);
+  }, []);
 
   // Auto-collapse sidebar on narrow screens
   useEffect(() => {
@@ -243,11 +258,58 @@ export default function App() {
           <NotificationCenter collapsed={!sidebarOpen} />
         </div>
 
+        {/* User / Logout */}
+        <div style={{
+          borderTop: "1px solid var(--color-border)",
+          padding: sidebarOpen ? "8px 12px" : "8px 4px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}>
+          {sidebarOpen ? (
+            <>
+              <span style={{ fontSize: 12, color: "var(--color-text-muted)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {getUser()?.display_name ?? "Admin"}
+              </span>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                style={{
+                  background: "none",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 4,
+                  color: "var(--color-text-muted)",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  padding: "2px 8px",
+                }}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 16,
+                width: "100%",
+                textAlign: "center",
+                padding: "4px 0",
+              }}
+            >
+              {"🚪"}
+            </button>
+          )}
+        </div>
+
         {/* Bottom branding */}
         {sidebarOpen && (
           <div style={{
-            padding: "12px 16px",
-            borderTop: "1px solid var(--color-border)",
+            padding: "8px 16px",
             fontSize: 10,
             color: "var(--color-text-muted)",
             opacity: 0.5,
