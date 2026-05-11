@@ -32,6 +32,7 @@ import FPDSMonitor from "./pages/FPDSMonitor";
 import UserManagement from "./pages/UserManagement";
 import AuditLog from "./pages/AuditLog";
 import UserManual from "./pages/UserManual";
+import Charts from "./pages/Charts";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -78,6 +79,7 @@ const NAV_GROUPS = [
     items: [
       { path: "/financial-bible", label: "Financials", icon: "💰" },
       { path: "/reports", label: "Reports", icon: "📑" },
+      { path: "/charts", label: "Charts", icon: "📈" },
       { path: "/discussions", label: "Discussions", icon: "💬" },
     ],
   },
@@ -500,6 +502,7 @@ export default function App() {
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/audit" element={<AuditLog />} />
+            <Route path="/charts" element={<Charts />} />
             <Route path="/help" element={<UserManual />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

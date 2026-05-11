@@ -253,6 +253,114 @@ function activityIcon(type: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Shipley Stage Timeline
+// ---------------------------------------------------------------------------
+
+const SHIPLEY_STAGES = [
+  { key: "interest", label: "Interest", days: 0, color: "#6b7280", desc: "Opportunity identified" },
+  { key: "qualify", label: "Qualify", days: 30, color: "#f59e0b", desc: "Assess fit, resources, competition" },
+  { key: "pursue", label: "Pursue", days: 12, color: "#3b82f6", desc: "Develop capture strategy" },
+  { key: "capture", label: "Capture", days: 45, color: "#8b5cf6", desc: "Execute capture plan, build relationships" },
+  { key: "propose", label: "Propose", days: 30, color: "#ec4899", desc: "Write and submit proposal" },
+  { key: "submit", label: "Submit", days: 5, color: "#06b6d4", desc: "Final QC and delivery" },
+  { key: "win", label: "Win", days: 0, color: "#10b981", desc: "Award and transition" },
+] as const;
+
+function ShipleyTimeline({
+  phases,
+  onFilter,
+  activeFilter,
+}: {
+  phases: Record<string, number>;
+  onFilter: (phase: string) => void;
+  activeFilter: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        padding: 16,
+        marginBottom: 20,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>Shipley Stage Timeline</span>
+        <InfoBadge
+          whatItIs="The Shipley business development lifecycle from opportunity identification through award."
+          whatItMeans="Each stage has typical durations. Click a stage to filter plans to that phase."
+          howCalculated="Based on Shipley Associates methodology. Days shown are typical durations."
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 0, overflowX: "auto" }}>
+        {SHIPLEY_STAGES.map((stage, i) => {
+          const count = phases[stage.key] ?? 0;
+          const isActive = activeFilter === stage.key;
+          return (
+            <div key={stage.key} style={{ display: "flex", alignItems: "center" }}>
+              <button
+                onClick={() => onFilter(isActive ? "" : stage.key)}
+                title={`${stage.desc}\nClick to ${isActive ? "clear" : "filter to"} ${stage.label}`}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: isActive ? `2px solid ${stage.color}` : "2px solid transparent",
+                  background: isActive ? `${stage.color}15` : "transparent",
+                  cursor: "pointer",
+                  color: "inherit",
+                  minWidth: 80,
+                  transition: "all 0.15s",
+                }}
+              >
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    background: stage.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: "#fff",
+                  }}
+                >
+                  {count || "\u2013"}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: stage.color }}>
+                  {stage.label}
+                </div>
+                {stage.days > 0 && (
+                  <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>
+                    ~{stage.days}d
+                  </div>
+                )}
+              </button>
+              {i < SHIPLEY_STAGES.length - 1 && (
+                <div
+                  style={{
+                    width: 24,
+                    height: 2,
+                    background: "var(--color-border)",
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -356,6 +464,9 @@ export default function Capture() {
           </span>
         );
       })()}
+
+      {/* Shipley Stage Timeline */}
+      <ShipleyTimeline phases={plansData?.phases ?? {}} onFilter={setPhaseFilter} activeFilter={phaseFilter} />
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
