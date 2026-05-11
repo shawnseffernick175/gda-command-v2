@@ -327,6 +327,430 @@ router.post("/fpds-awards", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/ingest/capture-plans — Upsert capture plans from n8n
+// ---------------------------------------------------------------------------
+router.post("/capture-plans", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "capture-plans", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.plans ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const p of items) {
+    try {
+      await pool.query(`
+        INSERT INTO capture_plans (id, opportunity_id, opportunity_title, agency, phase,
+          pwin, value_estimated, capture_manager, bid_decision, teaming_partners,
+          milestones, gate_reviews, win_themes, discriminators, risks, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          opportunity_title = EXCLUDED.opportunity_title, agency = EXCLUDED.agency,
+          phase = EXCLUDED.phase, pwin = EXCLUDED.pwin, value_estimated = EXCLUDED.value_estimated,
+          capture_manager = EXCLUDED.capture_manager, bid_decision = EXCLUDED.bid_decision,
+          teaming_partners = EXCLUDED.teaming_partners, milestones = EXCLUDED.milestones,
+          gate_reviews = EXCLUDED.gate_reviews, win_themes = EXCLUDED.win_themes,
+          discriminators = EXCLUDED.discriminators, risks = EXCLUDED.risks, updated_at = NOW()
+      `, [
+        p.id, p.opportunity_id ?? null, p.opportunity_title, p.agency ?? null,
+        p.phase ?? "pre_rfp", p.pwin ?? 0, p.value_estimated ?? null,
+        p.capture_manager ?? null, p.bid_decision ?? "pending",
+        JSON.stringify(p.teaming_partners ?? []), JSON.stringify(p.milestones ?? []),
+        JSON.stringify(p.gate_reviews ?? []),
+        p.win_themes ?? [], p.discriminators ?? [],
+        JSON.stringify(p.risks ?? []),
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] capture-plan error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "capture-plans", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/contacts — Upsert contacts from n8n CRM sync
+// ---------------------------------------------------------------------------
+router.post("/contacts", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "contacts", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.contacts ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const c of items) {
+    try {
+      await pool.query(`
+        INSERT INTO contacts (id, first_name, last_name, title, agency, department,
+          email, phone, status, relationship_strength, last_contact_date,
+          relationship_history, meeting_notes, tags)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        ON CONFLICT (id) DO UPDATE SET
+          first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name,
+          title = EXCLUDED.title, agency = EXCLUDED.agency, department = EXCLUDED.department,
+          email = EXCLUDED.email, phone = EXCLUDED.phone, status = EXCLUDED.status,
+          relationship_strength = EXCLUDED.relationship_strength,
+          last_contact_date = EXCLUDED.last_contact_date,
+          relationship_history = EXCLUDED.relationship_history,
+          meeting_notes = EXCLUDED.meeting_notes, tags = EXCLUDED.tags
+      `, [
+        c.id, c.first_name, c.last_name, c.title ?? null,
+        c.agency ?? null, c.department ?? null, c.email ?? null, c.phone ?? null,
+        c.status ?? "active", c.relationship_strength ?? "new",
+        c.last_contact_date ?? null, c.relationship_history ?? null,
+        JSON.stringify(c.meeting_notes ?? []), c.tags ?? [],
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] contact error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "contacts", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/compliance — Upsert compliance requirements
+// ---------------------------------------------------------------------------
+router.post("/compliance", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "compliance", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.requirements ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const r of items) {
+    try {
+      await pool.query(`
+        INSERT INTO compliance_requirements (id, solicitation_id, solicitation_title,
+          section, requirement, category, status, evidence, responsible_party, notes,
+          related_clause_ids, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          solicitation_title = EXCLUDED.solicitation_title, section = EXCLUDED.section,
+          requirement = EXCLUDED.requirement, category = EXCLUDED.category,
+          status = EXCLUDED.status, evidence = EXCLUDED.evidence,
+          responsible_party = EXCLUDED.responsible_party, notes = EXCLUDED.notes,
+          related_clause_ids = EXCLUDED.related_clause_ids, updated_at = NOW()
+      `, [
+        r.id, r.solicitation_id, r.solicitation_title, r.section, r.requirement,
+        r.category ?? "other", r.status ?? "gap", r.evidence ?? null,
+        r.responsible_party ?? "unassigned", r.notes ?? null,
+        r.related_clause_ids ?? [],
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] compliance error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "compliance", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/anomalies — Upsert anomalies from detection engine
+// ---------------------------------------------------------------------------
+router.post("/anomalies", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "anomalies", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.anomalies ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const a of items) {
+    try {
+      await pool.query(`
+        INSERT INTO anomalies (id, category, severity, status, title, description,
+          opportunity_id, opportunity_title, agency, detected_at,
+          metric_name, metric_value, baseline_value, deviation_pct, trend,
+          root_cause, recommended_actions)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        ON CONFLICT (id) DO UPDATE SET
+          severity = EXCLUDED.severity, title = EXCLUDED.title,
+          description = EXCLUDED.description, metric_name = EXCLUDED.metric_name,
+          metric_value = EXCLUDED.metric_value, baseline_value = EXCLUDED.baseline_value,
+          deviation_pct = EXCLUDED.deviation_pct, trend = EXCLUDED.trend,
+          root_cause = EXCLUDED.root_cause, recommended_actions = EXCLUDED.recommended_actions
+      `, [
+        a.id, a.category, a.severity ?? "medium", a.status ?? "active",
+        a.title, a.description ?? null, a.opportunity_id ?? null,
+        a.opportunity_title ?? null, a.agency ?? null,
+        a.detected_at ?? new Date().toISOString(),
+        a.metric_name ?? null, a.metric_value ?? null, a.baseline_value ?? null,
+        a.deviation_pct ?? null, JSON.stringify(a.trend ?? []),
+        a.root_cause ?? null, JSON.stringify(a.recommended_actions ?? []),
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] anomaly error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "anomalies", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/escalations — Upsert escalations from escalation engine
+// ---------------------------------------------------------------------------
+router.post("/escalations", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "escalations", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.escalations ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const e2 of items) {
+    try {
+      await pool.query(`
+        INSERT INTO escalations (id, rule_id, rule_name, priority, status, title,
+          description, opportunity_id, opportunity_title, agency,
+          assigned_to, due_date, created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          priority = EXCLUDED.priority, title = EXCLUDED.title,
+          description = EXCLUDED.description, assigned_to = EXCLUDED.assigned_to,
+          due_date = EXCLUDED.due_date
+      `, [
+        e2.id, e2.rule_id ?? null, e2.rule_name ?? null, e2.priority ?? "info",
+        e2.status ?? "open", e2.title, e2.description ?? null,
+        e2.opportunity_id ?? null, e2.opportunity_title ?? null, e2.agency ?? null,
+        e2.assigned_to ?? null, e2.due_date ?? null,
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] escalation error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "escalations", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/cpars — Upsert CPARS records from n8n
+// ---------------------------------------------------------------------------
+router.post("/cpars", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "cpars", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.records ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const c of items) {
+    try {
+      await pool.query(`
+        INSERT INTO cpars_records (id, contract_number, contract_title, agency,
+          period_of_performance, contract_value, status, overall_rating,
+          quality_rating, schedule_rating, cost_rating, management_rating,
+          narrative, key_accomplishments, relevance_tags, matched_opportunities,
+          evaluator, evaluation_date, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW(),NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          contract_title = EXCLUDED.contract_title, agency = EXCLUDED.agency,
+          status = EXCLUDED.status, overall_rating = EXCLUDED.overall_rating,
+          quality_rating = EXCLUDED.quality_rating, schedule_rating = EXCLUDED.schedule_rating,
+          cost_rating = EXCLUDED.cost_rating, management_rating = EXCLUDED.management_rating,
+          narrative = EXCLUDED.narrative, key_accomplishments = EXCLUDED.key_accomplishments,
+          relevance_tags = EXCLUDED.relevance_tags, matched_opportunities = EXCLUDED.matched_opportunities,
+          evaluator = EXCLUDED.evaluator, evaluation_date = EXCLUDED.evaluation_date,
+          updated_at = NOW()
+      `, [
+        c.id, c.contract_number, c.contract_title, c.agency,
+        c.period_of_performance ?? null, c.contract_value ?? null,
+        c.status ?? "draft", c.overall_rating ?? null,
+        c.quality_rating ?? null, c.schedule_rating ?? null,
+        c.cost_rating ?? null, c.management_rating ?? null,
+        c.narrative ?? null, c.key_accomplishments ?? [],
+        c.relevance_tags ?? [], c.matched_opportunities ?? [],
+        c.evaluator ?? null, c.evaluation_date ?? null,
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] cpars error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "cpars", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/doctrine — Upsert doctrine drafts from n8n
+// ---------------------------------------------------------------------------
+router.post("/doctrine", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "doctrine", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.drafts ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const d of items) {
+    try {
+      await pool.query(`
+        INSERT INTO doctrine_drafts (id, sprint_id, component, doc_type, title,
+          status, source_pr_number, source_pr_url, body, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title, status = EXCLUDED.status,
+          body = EXCLUDED.body, source_pr_number = EXCLUDED.source_pr_number,
+          source_pr_url = EXCLUDED.source_pr_url, updated_at = NOW()
+      `, [
+        d.id, d.sprint_id, d.component, d.doc_type ?? "sprint_notes",
+        d.title, d.status ?? "draft", d.source_pr_number ?? null,
+        d.source_pr_url ?? null, d.body ?? null,
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] doctrine error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "doctrine", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/prompts — Upsert prompt library entries
+// ---------------------------------------------------------------------------
+router.post("/prompts", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "prompts", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.prompts ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const p of items) {
+    try {
+      await pool.query(`
+        INSERT INTO prompts (id, name, category, description, template, variables,
+          tags, version, is_active, created_by, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW(),NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name, category = EXCLUDED.category,
+          description = EXCLUDED.description, template = EXCLUDED.template,
+          variables = EXCLUDED.variables, tags = EXCLUDED.tags,
+          version = EXCLUDED.version, is_active = EXCLUDED.is_active, updated_at = NOW()
+      `, [
+        p.id, p.name, p.category, p.description ?? null,
+        p.template, p.variables ?? [], p.tags ?? [],
+        p.version ?? 1, p.is_active ?? true, p.created_by ?? null,
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] prompt error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "prompts", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/competitor-movements — Upsert competitive movement data
+// ---------------------------------------------------------------------------
+router.post("/competitor-movements", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "competitor-movements", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.movements ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const m of items) {
+    try {
+      await pool.query(`
+        INSERT INTO competitor_movements (id, competitor_name, movement_type, severity,
+          title, description, opportunity_id, opportunity_title,
+          source, source_url, verified, detected_at, impact_assessment)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        ON CONFLICT (id) DO UPDATE SET
+          movement_type = EXCLUDED.movement_type, severity = EXCLUDED.severity,
+          title = EXCLUDED.title, description = EXCLUDED.description,
+          source = EXCLUDED.source, source_url = EXCLUDED.source_url,
+          verified = EXCLUDED.verified, impact_assessment = EXCLUDED.impact_assessment
+      `, [
+        m.id, m.competitor_name, m.movement_type ?? "general", m.severity ?? "medium",
+        m.title, m.description ?? null, m.opportunity_id ?? null,
+        m.opportunity_title ?? null, m.source ?? null, m.source_url ?? null,
+        m.verified ?? false, m.detected_at ?? new Date().toISOString(),
+        m.impact_assessment ?? null,
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] competitor-movement error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "competitor-movements", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/color-reviews — Upsert color review results
+// ---------------------------------------------------------------------------
+router.post("/color-reviews", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "color-reviews", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+  const items = Array.isArray(req.body) ? req.body : (req.body.reviews ?? [req.body]);
+  let upserted = 0, errors = 0;
+  for (const r of items) {
+    try {
+      await pool.query(`
+        INSERT INTO color_reviews (id, proposal_id, proposal_title, phase, status,
+          reviewer, review_date, overall_score, recommendation,
+          findings, strengths, weaknesses, action_items,
+          created_at, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          status = EXCLUDED.status, reviewer = EXCLUDED.reviewer,
+          review_date = EXCLUDED.review_date, overall_score = EXCLUDED.overall_score,
+          recommendation = EXCLUDED.recommendation, findings = EXCLUDED.findings,
+          strengths = EXCLUDED.strengths, weaknesses = EXCLUDED.weaknesses,
+          action_items = EXCLUDED.action_items, updated_at = NOW()
+      `, [
+        r.id, r.proposal_id, r.proposal_title, r.phase ?? "pink",
+        r.status ?? "in_progress", r.reviewer ?? null,
+        r.review_date ?? new Date().toISOString(), r.overall_score ?? null,
+        r.recommendation ?? null, JSON.stringify(r.findings ?? []),
+        JSON.stringify(r.strengths ?? []), JSON.stringify(r.weaknesses ?? []),
+        JSON.stringify(r.action_items ?? []),
+      ]);
+      upserted++;
+    } catch (e) {
+      errors++;
+      process.stderr.write(`[ingest] color-review error: ${(e as Error).message}\n`);
+    }
+  }
+  res.json(successEnvelope("gda-ingest", "color-reviews", { upserted, errors, total: items.length, timestamp: new Date().toISOString() }));
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/ingest/status — Ingestion health check + registry summary
 // ---------------------------------------------------------------------------
 router.get("/status", async (req, res) => {
@@ -335,7 +759,11 @@ router.get("/status", async (req, res) => {
   let dbCounts: Record<string, number> = {};
   if (pool) {
     try {
-      const tables = ["opportunities", "competitor_profiles", "intel_items", "sam_opportunities", "fpds_awards"];
+      const tables = [
+        "opportunities", "competitor_profiles", "intel_items", "sam_opportunities", "fpds_awards",
+        "capture_plans", "contacts", "compliance_requirements", "anomalies", "escalations",
+        "cpars_records", "doctrine_drafts", "prompts", "competitor_movements", "color_reviews",
+      ];
       for (const table of tables) {
         const { rows } = await pool.query(`SELECT COUNT(*) as count FROM ${table}`);
         dbCounts[table] = parseInt(rows[0].count, 10);

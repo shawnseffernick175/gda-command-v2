@@ -11,13 +11,14 @@ import {
   fetchDeepResearchFromN8n,
   fetchCompetitorsFromN8n,
 } from "../lib/n8n-data";
+import { getPool } from "../lib/db";
 
 const router = Router();
 
 // GET /api/intel/feed — list intel items with filtering
 // NOTE: n8n gda-intel-feed webhook has a broken external dependency (Tavily API key not configured).
 // Keeping mock data until the n8n workflow is fixed.
-router.get("/feed", (_req: Request, res: Response) => {
+router.get("/feed", async (_req: Request, res: Response) => {
   const {
     category,
     priority,
@@ -28,7 +29,27 @@ router.get("/feed", (_req: Request, res: Response) => {
     sortDir = "desc",
   } = _req.query;
 
-  let items = [...MOCK_INTEL_ITEMS];
+  let items: Array<Record<string, unknown>>;
+  let dataSource: "db" | "mock" = "mock";
+  const pool = getPool();
+
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM intel_items ORDER BY created_at DESC");
+      if (rows.length > 0) {
+        items = rows.map((r) => ({
+          ...r, read: false, tags: r.tags ?? [],
+        }));
+        dataSource = "db";
+      } else {
+        items = [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
+      }
+    } catch {
+      items = [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
+    }
+  } else {
+    items = [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
+  }
 
   if (category && typeof category === "string") {
     items = items.filter((i) => i.category === category);
@@ -46,9 +67,9 @@ router.get("/feed", (_req: Request, res: Response) => {
     const q = search.toLowerCase();
     items = items.filter(
       (i) =>
-        i.title.toLowerCase().includes(q) ||
-        i.summary.toLowerCase().includes(q) ||
-        i.tags.some((t: string) => t.toLowerCase().includes(q))
+        String(i.title ?? "").toLowerCase().includes(q) ||
+        String(i.summary ?? "").toLowerCase().includes(q) ||
+        (Array.isArray(i.tags) && i.tags.some((t: string) => t.toLowerCase().includes(q)))
     );
   }
 
@@ -63,22 +84,25 @@ router.get("/feed", (_req: Request, res: Response) => {
     return sortDir === "asc" ? cmp : -cmp;
   });
 
+  const allItems = dataSource === "db" ? items : [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
   const categoryCounts: Record<string, number> = {};
   const priorityCounts: Record<string, number> = {};
-  for (const item of MOCK_INTEL_ITEMS) {
-    categoryCounts[item.category] = (categoryCounts[item.category] ?? 0) + 1;
-    priorityCounts[item.priority] = (priorityCounts[item.priority] ?? 0) + 1;
+  for (const item of allItems) {
+    const cat = String(item.category ?? "");
+    const pri = String(item.priority ?? "");
+    categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
+    priorityCounts[pri] = (priorityCounts[pri] ?? 0) + 1;
   }
 
   res.json(
     successEnvelope("GDA.api.intel-feed", "list", {
       items,
-      total: MOCK_INTEL_ITEMS.length,
+      total: allItems.length,
       filtered: items.length,
-      unreadCount: MOCK_INTEL_ITEMS.filter((i) => !i.read).length,
+      unreadCount: allItems.filter((i) => !i.read).length,
       categoryCounts,
       priorityCounts,
-      source: "mock" as const,
+      source: dataSource,
     })
   );
 });
