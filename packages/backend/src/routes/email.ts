@@ -109,7 +109,7 @@ router.get("/preferences", async (req: Request, res: Response) => {
       return;
     }
 
-    const userId = (req as unknown as Record<string, unknown>).userId as string | undefined;
+    const userId = req.user?.userId as string | undefined;
     if (!userId) {
       res.status(401).json(
         errorEnvelope("gda-email", "preferences", {
@@ -173,7 +173,7 @@ router.put("/preferences", async (req: Request, res: Response) => {
       return;
     }
 
-    const userId = (req as unknown as Record<string, unknown>).userId as string | undefined;
+    const userId = req.user?.userId as string | undefined;
     if (!userId) {
       res.status(401).json(
         errorEnvelope("gda-email", "preferences", {
