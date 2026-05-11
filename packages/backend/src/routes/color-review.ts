@@ -23,6 +23,10 @@ async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" | "moc
           ...r,
           requirement_checks: r.requirement_checks ?? [],
           section_scores: r.section_scores ?? [],
+          gold_checks: r.gold_checks ?? [],
+          cost_line_items: r.cost_line_items ?? [],
+          green_checks: r.green_checks ?? [],
+          format_checks: r.format_checks ?? [],
           risk_factors: r.risk_factors ?? [],
         })) as ReviewItem[], source: "db" };
       }
@@ -224,6 +228,10 @@ router.get("/:id", async (req, res) => {
             ...r,
             requirement_checks: r.requirement_checks ?? [],
             section_scores: r.section_scores ?? [],
+            gold_checks: r.gold_checks ?? [],
+            cost_line_items: r.cost_line_items ?? [],
+            green_checks: r.green_checks ?? [],
+            format_checks: r.format_checks ?? [],
             risk_factors: r.risk_factors ?? [],
           };
           return res.json(successEnvelope("GDA.color-review", "get-detail", { review, source: "db" }));
