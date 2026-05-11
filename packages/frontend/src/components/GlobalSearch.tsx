@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchSearchResults, type SearchResult } from "../api/client";
 
@@ -13,14 +13,23 @@ const TYPE_ICONS: Record<string, string> = {
   report: "📑",
 };
 
-export default function GlobalSearch({ collapsed }: { collapsed: boolean }) {
+export interface GlobalSearchHandle {
+  focus: () => void;
+}
+
+const GlobalSearch = forwardRef<GlobalSearchHandle, { collapsed: boolean }>(function GlobalSearch({ collapsed }, ref) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+  }));
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -94,8 +103,9 @@ export default function GlobalSearch({ collapsed }: { collapsed: boolean }) {
       }}>
         <span style={{ fontSize: 13, opacity: 0.5 }}>🔎</span>
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Search everything..."
+          placeholder="Search everything...  (Ctrl+K)"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
           onFocus={() => { if (results.length > 0) setOpen(true); }}
@@ -179,4 +189,6 @@ export default function GlobalSearch({ collapsed }: { collapsed: boolean }) {
       )}
     </div>
   );
-}
+});
+
+export default GlobalSearch;

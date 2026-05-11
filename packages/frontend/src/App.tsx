@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
 import { isAuthenticated, logout, getUser } from "./api/auth";
@@ -29,9 +29,13 @@ import SAMMonitor from "./pages/SAMMonitor";
 import Discussions from "./pages/Discussions";
 import CPARSBuilder from "./pages/CPARSBuilder";
 import FPDSMonitor from "./pages/FPDSMonitor";
+import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
-import GlobalSearch from "./components/GlobalSearch";
+import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
+import ErrorBoundary from "./components/ErrorBoundary";
+import Breadcrumb from "./components/Breadcrumb";
+import { ToastProvider } from "./components/Toast";
 
 const NAV_GROUPS = [
   {
@@ -95,6 +99,21 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
   const [authed, setAuthed] = useState<boolean | null>(null); // null = loading
   const sidebarWidth = sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  const searchRef = useRef<GlobalSearchHandle>(null);
+
+  // Ctrl+K shortcut to focus global search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        if (!sidebarOpen) setSidebarOpen(true);
+        // Small delay to let sidebar expand before focusing
+        setTimeout(() => searchRef.current?.focus(), sidebarOpen ? 0 : 250);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [sidebarOpen]);
 
   const handleLogout = useCallback(async () => {
     await logout();
@@ -154,6 +173,8 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary>
+    <ToastProvider>
     <div style={{ minHeight: "100vh", display: "flex" }}>
       {/* Sidebar */}
       <aside style={{
@@ -214,7 +235,7 @@ export default function App() {
         </div>
 
         {/* Global Search */}
-        <GlobalSearch collapsed={!sidebarOpen} />
+        <GlobalSearch ref={searchRef} collapsed={!sidebarOpen} />
 
         {/* Nav Groups */}
         <nav style={{
@@ -366,6 +387,7 @@ export default function App() {
         <FinancialKPIStrip />
 
         <main style={{ flex: 1, padding: 24 }}>
+          <Breadcrumb />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/qa-center" element={<QACenter />} />
@@ -395,9 +417,12 @@ export default function App() {
             <Route path="/discussions" element={<Discussions />} />
             <Route path="/cpars" element={<CPARSBuilder />} />
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
       </div>
     </div>
+    </ToastProvider>
+    </ErrorBoundary>
   );
 }
