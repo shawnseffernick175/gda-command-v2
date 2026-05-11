@@ -51,6 +51,8 @@ router.get("/feed", async (_req: Request, res: Response) => {
     items = [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
   }
 
+  const allItems = [...items];
+
   if (category && typeof category === "string") {
     items = items.filter((i) => i.category === category);
   }
@@ -83,8 +85,6 @@ router.get("/feed", async (_req: Request, res: Response) => {
     const cmp = String(av).localeCompare(String(bv));
     return sortDir === "asc" ? cmp : -cmp;
   });
-
-  const allItems = dataSource === "db" ? items : [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
   const categoryCounts: Record<string, number> = {};
   const priorityCounts: Record<string, number> = {};
   for (const item of allItems) {
