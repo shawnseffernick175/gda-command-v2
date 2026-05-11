@@ -31,6 +31,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
   {
     id: "APR-002",
@@ -62,6 +63,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
   {
     id: "APR-003",
@@ -91,6 +93,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
   {
     id: "APR-004",
@@ -111,6 +114,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
   {
     id: "APR-005",
@@ -140,6 +144,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
   {
     id: "APR-006",
@@ -169,6 +174,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: "2025-04-29T09:15:00Z",
     resolved_by: "Shawn Seffernick",
     resolution_notes: "Approved — proceed with qualification and competitive analysis.",
+    data_source: "manual",
   },
   {
     id: "APR-007",
@@ -189,6 +195,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
   {
     id: "APR-008",
@@ -218,6 +225,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: "2025-04-26T10:00:00Z",
     resolved_by: "Shawn Seffernick",
     resolution_notes: "Rejected — Pwin too low, no competitive advantage. Moved to No-Bid.",
+    data_source: "manual",
   },
   {
     id: "APR-009",
@@ -249,6 +257,7 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
   {
     id: "APR-010",
@@ -277,5 +286,6 @@ export const MOCK_APPROVALS: ApprovalItem[] = [
     resolved_at: null,
     resolved_by: null,
     resolution_notes: null,
+    data_source: "manual",
   },
 ];

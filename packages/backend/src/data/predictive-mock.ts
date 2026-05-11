@@ -26,6 +26,7 @@ export interface PwinModelOutput {
   similar_opps_lost: number;
   trend: "improving" | "stable" | "declining";
   trend_delta: number;
+  data_source: string | null;
 }
 
 export interface PwinFeature {
@@ -74,6 +75,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 9,
     trend: "improving",
     trend_delta: 0.03,
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-002",
@@ -104,6 +106,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 13,
     trend: "declining",
     trend_delta: -0.04,
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-003",
@@ -133,6 +136,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 4,
     trend: "stable",
     trend_delta: 0.01,
+    data_source: "govwin",
   },
   {
     opp_id: "opp-004",
@@ -164,6 +168,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 11,
     trend: "declining",
     trend_delta: -0.06,
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-005",
@@ -194,6 +199,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 6,
     trend: "improving",
     trend_delta: 0.02,
+    data_source: "govwin",
   },
   {
     opp_id: "opp-006",
@@ -223,6 +229,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 8,
     trend: "stable",
     trend_delta: 0.00,
+    data_source: "sam.gov",
   },
 ];
 
@@ -366,6 +373,7 @@ export interface BidNoBidAssessment {
   resource_impact: string;
   strategic_alignment: "high" | "medium" | "low";
   assessed_at: string;
+  data_source: string | null;
 }
 
 export interface BidFactor {
@@ -397,6 +405,7 @@ const BID_ASSESSMENTS: BidNoBidAssessment[] = [
     resource_impact: "Requires 3 FTE for 45 days (PM, Technical Writer, Cost Analyst). Manageable with current capacity.",
     strategic_alignment: "high",
     assessed_at: "2026-05-09T18:30:00Z",
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-003",
@@ -417,6 +426,7 @@ const BID_ASSESSMENTS: BidNoBidAssessment[] = [
     resource_impact: "Requires 5 FTE for 60 days (dedicated proposal team). Priority allocation — block other proposals if conflict arises.",
     strategic_alignment: "high",
     assessed_at: "2026-05-09T19:00:00Z",
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-002",
@@ -437,6 +447,7 @@ const BID_ASSESSMENTS: BidNoBidAssessment[] = [
     resource_impact: "Would require 2 FTE for 30 days, competing with opp-001 for toxicologist. Defer unless resource conflict resolves.",
     strategic_alignment: "medium",
     assessed_at: "2026-05-09T16:45:00Z",
+    data_source: "govwin",
   },
   {
     opp_id: "opp-004",
@@ -457,6 +468,7 @@ const BID_ASSESSMENTS: BidNoBidAssessment[] = [
     resource_impact: "Full bid requires 6 FTE for 90 days + new hire. Only justified if JV secures incumbent advantage.",
     strategic_alignment: "medium",
     assessed_at: "2026-05-09T14:15:00Z",
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-005",
@@ -477,6 +489,7 @@ const BID_ASSESSMENTS: BidNoBidAssessment[] = [
     resource_impact: "Requires 4 FTE for 50 days (Cyber Architect, PM, Tech Writer, Cost Analyst). Available with current staffing.",
     strategic_alignment: "high",
     assessed_at: "2026-05-09T12:30:00Z",
+    data_source: "govwin",
   },
   {
     opp_id: "opp-006",
@@ -497,6 +510,7 @@ const BID_ASSESSMENTS: BidNoBidAssessment[] = [
     resource_impact: "Not recommended. Resources better allocated to opp-001, opp-003, opp-005.",
     strategic_alignment: "low",
     assessed_at: "2026-05-09T09:15:00Z",
+    data_source: "fpds",
   },
 ];
 

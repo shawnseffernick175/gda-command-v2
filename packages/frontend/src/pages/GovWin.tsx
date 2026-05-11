@@ -1,3 +1,4 @@
+import SourceBadge from "../components/SourceBadge";
 import { useEffect, useState } from "react";
 import {
   fetchGovWinSummary,
@@ -333,7 +334,7 @@ export default function GovWin() {
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
                     <div style={{ flex: 1, marginRight: 8 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text, #e4e4e7)", marginBottom: 2 }}>{o.title}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text, #e4e4e7)", marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>{o.title} <SourceBadge source="govwin" /></div>
                       <div style={{ fontSize: 12, color: "var(--color-text-muted, #9ca3af)" }}>{o.agency}</div>
                     </div>
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
@@ -373,7 +374,7 @@ export default function GovWin() {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text, #e4e4e7)" }}>{sel.title}</h3>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--color-text, #e4e4e7)", display: "flex", alignItems: "center", gap: 8 }}>{sel.title} <SourceBadge source="govwin" size="md" /></h3>
                   <button onClick={() => setSelectedId(null)} style={{ background: "none", border: "none", color: "#6b7280", fontSize: 18, cursor: "pointer" }}>
                     {"\u2715"}
                   </button>

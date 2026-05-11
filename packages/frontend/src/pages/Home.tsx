@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import SourceBadge from "../components/SourceBadge";
 import {
   fetchDashboardKPIs,
   fetchCommandSignals,
@@ -891,10 +892,12 @@ function TopOppRow({ opp }: { opp: OpportunityRow }) {
           fontSize: 13,
           fontWeight: 600,
           overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
         }}>
-          {opp.title}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{opp.title}</span>
+          <SourceBadge source={opp.data_source} />
         </div>
         <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
           {opp.department ?? "—"} · {formatCurrency(opp.value_estimated)}

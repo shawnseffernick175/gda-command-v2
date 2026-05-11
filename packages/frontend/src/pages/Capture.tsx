@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import InfoBadge from "../components/InfoBadge";
+import SourceBadge from "../components/SourceBadge";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -63,6 +64,7 @@ interface CapturePlan {
   win_themes: string[];
   discriminators: string[];
   risks: CaptureRisk[];
+  data_source: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -897,7 +899,7 @@ function PlansTab({
                   {plan.bid_decision.replace("_", " ")}
                 </span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{plan.opportunity_title}</div>
+                  <div style={{ fontWeight: 600, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>{plan.opportunity_title} <SourceBadge source={plan.data_source} /></div>
                   <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
                     {plan.agency} &middot; {plan.capture_manager} &middot; Pwin {plan.pwin}% &middot;{" "}
                     {fmtCurrency(plan.value_estimated)}

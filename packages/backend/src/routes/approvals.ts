@@ -28,6 +28,7 @@ function rowToApproval(r: Record<string, unknown>): ApprovalItem {
     resolved_at: r.resolved_at instanceof Date ? r.resolved_at.toISOString() : r.resolved_at ? String(r.resolved_at) : null,
     resolved_by: (r.resolved_by as string) ?? null,
     resolution_notes: (r.resolution_notes as string) ?? null,
+    data_source: (r.data_source as string) ?? null,
   };
 }
 

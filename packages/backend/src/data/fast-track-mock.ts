@@ -27,6 +27,7 @@ export interface FastTrackMatch {
   match_score: number;
   recommended_next_action: string;
   safety_lane: "read-only" | "dry-run";
+  data_source: string | null;
   sources: FastTrackSource[];
   created_at: string;
   updated_at: string;
@@ -70,6 +71,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 87,
     recommended_next_action: "Review ERDC BAA for partnership eligibility and assess Arcadis collaboration vs. competition strategy",
     safety_lane: "read-only",
+    data_source: "sam.gov",
     sources: [
       {
         source_id: "src-001a",
@@ -144,6 +146,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 78,
     recommended_next_action: "Submit capability statement responding to RFI with focus on AI C2 integration experience, and initiate teaming discussion with Shield AI",
     safety_lane: "read-only",
+    data_source: "govwin",
     sources: [
       {
         source_id: "src-002a",
@@ -218,6 +221,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 65,
     recommended_next_action: "Monitor SBIR Phase III transition announcement and assess subcontracting opportunity under ManTech prime",
     safety_lane: "read-only",
+    data_source: "sam.gov",
     sources: [
       {
         source_id: "src-003a",
@@ -280,6 +284,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 58,
     recommended_next_action: "Track MIT LL publication trail and monitor NRO/NGA commercial GEOINT solicitations for edge AI requirements",
     safety_lane: "read-only",
+    data_source: "manual",
     sources: [
       {
         source_id: "src-004a",
@@ -342,6 +347,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 82,
     recommended_next_action: "Attend Industry Day (June 10), submit draft PWS comments, begin teaming outreach to CrowdStrike for endpoint protection",
     safety_lane: "read-only",
+    data_source: "sam.gov",
     sources: [
       {
         source_id: "src-005a",
@@ -417,6 +423,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 72,
     recommended_next_action: "Contact Army PEO IEW&S program office for upcoming acquisition forecast briefing. Assess L3Harris teaming opportunity for spectrum management software.",
     safety_lane: "read-only",
+    data_source: "sam.gov",
     sources: [
       {
         source_id: "src-006a",
@@ -489,6 +496,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 52,
     recommended_next_action: "Monitor. Assess whether to compete directly or pursue subcontracting. Track CISA training contract recompete timeline.",
     safety_lane: "read-only",
+    data_source: "govwin",
     sources: [
       {
         source_id: "src-007a",
@@ -551,6 +559,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 91,
     recommended_next_action: "PROMOTED to Ops Tracker. Submit Sources Sought response and formalize Illumio teaming agreement.",
     safety_lane: "read-only",
+    data_source: "fpds",
     sources: [
       {
         source_id: "src-008a",
@@ -622,6 +631,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 28,
     recommended_next_action: "DISCARDED — hardware-only challenge outside our capability profile",
     safety_lane: "read-only",
+    data_source: "sam.gov",
     sources: [
       {
         source_id: "src-009a",
@@ -681,6 +691,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
     match_score: 74,
     recommended_next_action: "Attend DOE Grid Resilience Industry Day and assess teaming with Siemens Energy for AI analytics integration",
     safety_lane: "read-only",
+    data_source: "manual",
     sources: [
       {
         source_id: "src-010a",

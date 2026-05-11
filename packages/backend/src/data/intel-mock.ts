@@ -20,6 +20,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: null,
     tags: ["USACE", "FUDS", "environmental", "IDIQ"],
     created_at: "2026-05-10T06:00:00Z",
+    data_source: "sam.gov",
     read: false,
   },
   {
@@ -36,6 +37,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: "Tetra Tech",
     tags: ["Tetra Tech", "EPA", "Superfund", "loss analysis"],
     created_at: "2026-05-09T18:30:00Z",
+    data_source: "fpds",
     read: true,
   },
   {
@@ -53,6 +55,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: null,
     tags: ["PFAS", "EPA", "regulation", "remediation", "DoD"],
     created_at: "2026-05-09T14:00:00Z",
+    data_source: "manual",
     read: false,
   },
   {
@@ -69,6 +72,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: "Jacobs Engineering",
     tags: ["Jacobs", "AI", "acquisition", "competitive"],
     created_at: "2026-05-09T10:15:00Z",
+    data_source: "manual",
     read: true,
   },
   {
@@ -86,6 +90,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: "Hensel Phelps",
     tags: ["Navy", "NAVFAC", "Tyndall", "infrastructure", "resilience"],
     created_at: "2026-05-08T22:00:00Z",
+    data_source: "sam.gov",
     read: false,
   },
   {
@@ -102,6 +107,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: null,
     tags: ["DOE", "NNSA", "security", "protest", "recompete"],
     created_at: "2026-05-08T16:45:00Z",
+    data_source: "manual",
     read: true,
   },
   {
@@ -119,6 +125,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: null,
     tags: ["NASA", "KSC", "launch complex", "environmental", "RFI"],
     created_at: "2026-05-08T12:00:00Z",
+    data_source: "sam.gov",
     read: false,
   },
   {
@@ -136,6 +143,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: "AECOM",
     tags: ["AECOM", "earnings", "growth", "environmental", "hiring"],
     created_at: "2026-05-07T20:00:00Z",
+    data_source: "manual",
     read: true,
   },
   {
@@ -153,6 +161,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: null,
     tags: ["AI", "proposal", "DoD", "evaluation", "technology"],
     created_at: "2026-05-07T14:30:00Z",
+    data_source: "manual",
     read: false,
   },
   {
@@ -170,6 +179,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: null,
     tags: ["EPA", "Region 2", "environmental justice", "budget", "lead"],
     created_at: "2026-05-07T08:00:00Z",
+    data_source: "manual",
     read: true,
   },
   {
@@ -187,6 +197,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: "Parsons",
     tags: ["Parsons", "earnings", "weakness", "recompete"],
     created_at: "2026-05-06T19:00:00Z",
+    data_source: "manual",
     read: true,
   },
   {
@@ -204,6 +215,7 @@ export const MOCK_INTEL_ITEMS: IntelItem[] = [
     related_competitor: null,
     tags: ["Air Force", "BRAC", "restoration", "IDIQ", "pipeline"],
     created_at: "2026-05-06T11:00:00Z",
+    data_source: "manual",
     read: false,
   },
 ];

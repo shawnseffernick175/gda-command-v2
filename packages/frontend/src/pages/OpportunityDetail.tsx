@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import AskAIChat from "../components/AskAIChat";
+import SourceBadge from "../components/SourceBadge";
 import {
   fetchOpportunityDetail,
   fetchPwinBreakdown,
@@ -158,7 +159,7 @@ export default function OpportunityDetail() {
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{opp.title}</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>{opp.title} <SourceBadge source={opp.data_source} size="md" /></h1>
         <span
           style={{
             ...styles.badge,

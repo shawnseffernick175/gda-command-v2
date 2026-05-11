@@ -28,6 +28,7 @@ function rowToCapturePlan(r: Record<string, unknown>): CapturePlan {
     win_themes: (r.win_themes as string[]) ?? [],
     discriminators: (r.discriminators as string[]) ?? [],
     risks: (r.risks as CapturePlan["risks"]) ?? [],
+    data_source: (r.data_source as string) ?? null,
     created_at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
     updated_at: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
   };
