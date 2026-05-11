@@ -220,21 +220,42 @@ export default function Approvals() {
         </select>
       </div>
 
-      {/* Approval items */}
+      {/* Approval items — grouped by category type */}
       {items.length === 0 ? (
         <p style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>No approvals match filters.</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {items.map((item) => (
-            <ApprovalCard
-              key={item.id}
-              item={item}
-              expanded={expanded === item.id}
-              onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
-              onResolve={handleResolve}
-              resolving={resolving === item.id}
-            />
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {(() => {
+            const oppCats = new Set(["qualify_write", "bid_decision", "gate_review"]);
+            const riskCats = new Set(["budget_override", "teaming_agreement"]);
+            const groups = [
+              { label: "Opportunities", color: "#3b82f6", items: items.filter((a) => oppCats.has(a.category)) },
+              { label: "Risks", color: "#f59e0b", items: items.filter((a) => riskCats.has(a.category)) },
+              { label: "Other", color: "#6b7280", items: items.filter((a) => !oppCats.has(a.category) && !riskCats.has(a.category)) },
+            ].filter((g) => g.items.length > 0);
+            return groups.map((group) => (
+              <div key={group.label}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: group.color, letterSpacing: "0.05em" }}>
+                    {group.label}
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>({group.items.length})</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {group.items.map((item) => (
+                    <ApprovalCard
+                      key={item.id}
+                      item={item}
+                      expanded={expanded === item.id}
+                      onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+                      onResolve={handleResolve}
+                      resolving={resolving === item.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
         </div>
       )}
 
