@@ -733,6 +733,7 @@ router.post("/color-reviews", async (req, res) => {
         ON CONFLICT (id) DO UPDATE SET
           status = EXCLUDED.status, reviewer = EXCLUDED.reviewer,
           completed_at = EXCLUDED.completed_at, overall_score = EXCLUDED.overall_score,
+          max_score = EXCLUDED.max_score,
           pass_rate = EXCLUDED.pass_rate, total_checks = EXCLUDED.total_checks,
           passed_checks = EXCLUDED.passed_checks, failed_checks = EXCLUDED.failed_checks,
           warning_checks = EXCLUDED.warning_checks, summary = EXCLUDED.summary,
