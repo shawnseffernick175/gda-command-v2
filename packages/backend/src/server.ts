@@ -159,8 +159,25 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   process.stdout.write(`[GDA Gateway v2] listening on http://localhost:${PORT}\n`);
 });
+
+// Graceful shutdown
+function shutdown(signal: string) {
+  process.stdout.write(`[GDA Gateway v2] ${signal} received, shutting down...\n`);
+  server.close(() => {
+    process.stdout.write("[GDA Gateway v2] HTTP server closed\n");
+    process.exit(0);
+  });
+  // Force exit after 10s if connections don't drain
+  setTimeout(() => {
+    process.stderr.write("[GDA Gateway v2] Forced shutdown after timeout\n");
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 export default app;

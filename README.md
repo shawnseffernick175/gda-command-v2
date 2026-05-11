@@ -110,10 +110,69 @@ The nav bar is organized into three groups:
 
 ## Database
 
-The Postgres schema is in `packages/backend/src/db/init.sql`. It defines:
-- `opportunities` — opportunity records (S-009 spec)
-- `doctrine_drafts` — sprint doctrine drafts (doctrine automation spec)
-- `doctrine_publish_runs` — publish run tracking
+PostgreSQL 16 with 30+ tables. Managed via SQL migrations in `packages/backend/src/db/migrations/`.
+
+```bash
+# Start local Postgres (dev)
+docker compose up -d
+
+# Run migrations
+cd packages/backend && npm run db:migrate
+
+# Seed with mock data (300+ records)
+cd packages/backend && npm run db:seed
+
+# Full reset (drop + migrate + seed)
+cd packages/backend && npm run db:reset
+```
+
+**Important**: The VM may have a system-level `DATABASE_URL` pointing elsewhere. Always start the backend with explicit override:
+```bash
+DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev
+```
+
+## Production Deployment
+
+### Docker Compose (recommended)
+
+```bash
+# 1. Copy and configure production environment
+cp .env.production.example .env.production
+# Edit .env.production — set POSTGRES_PASSWORD and JWT_SECRET
+
+# 2. Build and start all services
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+
+# 3. Run seed (first deploy only)
+docker exec gda-backend node packages/backend/dist/db/seed.js
+```
+
+The production stack runs:
+- **postgres** — PostgreSQL 16 with health checks
+- **backend** — Node.js API server (port 3001, internal only)
+- **frontend** — Nginx serving React SPA + reverse proxy to backend (port 80)
+
+Auto-migration runs on container startup. Set `AUTO_MIGRATE=false` to disable.
+
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `POSTGRES_PASSWORD` | Yes | — | PostgreSQL password |
+| `JWT_SECRET` | Yes | — | JWT signing secret (`openssl rand -hex 32`) |
+| `POSTGRES_USER` | No | `gda` | PostgreSQL username |
+| `POSTGRES_DB` | No | `gda_command` | PostgreSQL database name |
+| `APP_PORT` | No | `80` | Port the frontend is exposed on |
+| `N8N_BASE_URL` | No | — | n8n instance URL for webhook integration |
+| `N8N_API_BASE` | No | — | n8n REST API base URL |
+| `N8N_API_KEY` | No | — | n8n API key |
+| `AUTO_MIGRATE` | No | `true` | Run DB migrations on startup |
+| `AUTO_SEED` | No | `false` | Run DB seed on startup |
+
+### Health Checks
+
+- Backend: `GET /health` — returns status, uptime, DB connection, config
+- Frontend: `GET /` — nginx serves the SPA
 
 ## Type Checking
 

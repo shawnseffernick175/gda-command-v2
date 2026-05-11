@@ -32,8 +32,12 @@ async function run() {
   );
   const appliedSet = new Set(applied.map((r) => r.name));
 
-  // Read migration files
-  const migrationsDir = path.join(__dirname, "migrations");
+  // Read migration files — check both src and dist locations
+  let migrationsDir = path.join(__dirname, "migrations");
+  if (!fs.existsSync(migrationsDir)) {
+    // When running compiled from dist/db/, look in src/db/migrations/
+    migrationsDir = path.join(__dirname, "../../src/db/migrations");
+  }
   const files = fs
     .readdirSync(migrationsDir)
     .filter((f) => f.endsWith(".sql"))
