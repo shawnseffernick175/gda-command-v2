@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
+import multer from "multer";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
 import {
@@ -16,6 +17,9 @@ import type {
   RequirementComplexity,
 } from "@gda/shared";
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
+import { getPool } from "../lib/db";
+import { log } from "../lib/logger";
+import { generateStorageKey, saveFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
 
 const router = Router();
 
@@ -110,41 +114,95 @@ router.get("/jobs/:id", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/rfp-shredder/shred — initiate a shred job (LLM-powered extraction)
+// Multer config for RFP uploads
 // ---------------------------------------------------------------------------
-router.post("/shred", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
+const rfpUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: getMaxFileSize() },
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set(["application/pdf", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
+    if (!allowed.has(file.mimetype)) {
+      cb(new Error(`File type ${file.mimetype} is not allowed for RFP shredding. Use PDF, DOC, DOCX, or TXT.`));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/rfp-shredder/shred — initiate a shred job (file upload + LLM)
+// ---------------------------------------------------------------------------
+router.post(
+  "/shred",
+  requireRole("admin", "bd_manager", "capture_lead", "analyst"),
+  rfpUpload.single("file"),
+  async (req: Request, res: Response) => {
   try {
+    const file = req.file;
     const { file_name, solicitation_title, agency, document_text } = req.body;
 
-    if (!file_name || !solicitation_title) {
-      return res.status(400).json(
+    const effectiveFileName = file ? file.originalname : file_name;
+
+    if (!effectiveFileName || !solicitation_title) {
+      res.status(400).json(
         errorEnvelope(WF, "shred", {
           code: "VALIDATION",
-          message: "file_name and solicitation_title are required",
+          message: "solicitation_title is required. Provide either a file upload or file_name.",
           detail: null,
         }),
       );
+      return;
     }
 
     const correlationId = `GDA-SHRED-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const jobId = `SJ-${Date.now()}`;
 
-    if (!isLLMAvailable() || !document_text) {
-      // Fallback when no LLM or no document text provided
-      return res.json(
+    // If file uploaded, store it and link to shred job
+    let fileId: string | null = null;
+    if (file) {
+      const storageKey = generateStorageKey(file.originalname);
+      saveFile(storageKey, file.buffer);
+      fileId = `file-${Date.now()}`;
+
+      const pool = getPool();
+      if (pool) {
+        await pool.query(
+          `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
+        );
+        log.info("rfp_file_uploaded", { fileId, fileName: file.originalname, sizeBytes: file.size });
+      }
+    }
+
+    // Extract text from uploaded file if available (plain text only for now)
+    let effectiveText = document_text ?? "";
+    if (file && !document_text) {
+      if (file.mimetype === "text/plain") {
+        effectiveText = file.buffer.toString("utf-8");
+      }
+      // PDF/DOCX text extraction would require additional libraries (pdf-parse, mammoth)
+      // For now, users can paste text or upload .txt files
+    }
+
+    if (!isLLMAvailable() || !effectiveText) {
+      res.json(
         successEnvelope(
           WF,
           "shred",
           {
             id: jobId,
-            file_name,
+            file_name: effectiveFileName,
+            file_id: fileId,
             solicitation_title,
             agency: agency ?? "Unknown",
             status: "queued",
             correlation_id: correlationId,
-            message: document_text
+            message: effectiveText
               ? "Set OPENAI_API_KEY to enable AI-powered requirement extraction."
-              : "Shred job queued. Provide document_text in the request body for AI extraction, or upload the document via the n8n pipeline.",
+              : file
+                ? "File uploaded and stored. Paste document text or use a .txt file for AI extraction."
+                : "Shred job queued. Upload an RFP document or provide document_text for AI extraction.",
             estimated_processing_time: "3-5 minutes",
             pipeline: "GDA.batch.doc-ingest → GDA.api.rfp-shredder → GDA.api.compliance-matrix",
           },
@@ -152,10 +210,11 @@ router.post("/shred", requireRole("admin", "bd_manager", "capture_lead", "analys
           true,
         ),
       );
+      return;
     }
 
     // Real LLM extraction
-    const truncatedText = document_text.slice(0, 12000);
+    const truncatedText = effectiveText.slice(0, 12000);
     const llmResponse = await chatCompletion(
       [
         { role: "system", content: SYSTEM_PROMPTS.rfpShredder },
@@ -178,7 +237,8 @@ router.post("/shred", requireRole("admin", "bd_manager", "capture_lead", "analys
     res.json(
       successEnvelope(WF, "shred", {
         id: jobId,
-        file_name,
+        file_name: effectiveFileName,
+        file_id: fileId,
         solicitation_title,
         agency: agency ?? "Unknown",
         status: "completed",
@@ -189,6 +249,7 @@ router.post("/shred", requireRole("admin", "bd_manager", "capture_lead", "analys
       }),
     );
   } catch (err) {
+    log.error("rfp_shred_error", { error: (err as Error).message });
     res.status(500).json(
       errorEnvelope(WF, "shred", {
         code: "INTERNAL",

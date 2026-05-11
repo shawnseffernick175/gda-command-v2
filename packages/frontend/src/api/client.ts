@@ -1689,14 +1689,18 @@ export interface ChatResponseData {
 
 export interface UploadResponseData {
   id: string;
+  file_id?: string;
   file_name: string;
   document_type: string;
   collection: string;
   tags: string[];
+  size_bytes?: number;
+  mime_type?: string;
   status: string;
+  download_url?: string;
   message: string;
-  estimated_processing_time: string;
-  pipeline: string;
+  estimated_processing_time?: string;
+  pipeline?: string;
 }
 
 export function fetchKnowledgeSummary() {
@@ -1751,7 +1755,19 @@ export function sendChatMessage(message: string, sessionId?: string) {
   });
 }
 
-export function uploadDocument(fileName: string, documentType?: string, collection?: string, tags?: string[]) {
+export function uploadDocument(file: File, documentType?: string, collection?: string, tags?: string[]) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (documentType) formData.append("document_type", documentType);
+  if (collection) formData.append("collection", collection);
+  if (tags && tags.length > 0) formData.append("tags", tags.join(","));
+  return request<UploadResponseData>("/knowledge/upload", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function uploadDocumentDryRun(fileName: string, documentType?: string, collection?: string, tags?: string[]) {
   return request<UploadResponseData>("/knowledge/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1941,11 +1957,16 @@ export function fetchResponseOutline(jobId: string) {
   return request<ResponseOutlineData>(`/rfp-shredder/response-outline/${jobId}`);
 }
 
-export function initiateShred(fileName: string, solicitationTitle: string, agency?: string) {
+export function initiateShred(solicitationTitle: string, agency?: string, file?: File, documentText?: string) {
+  const formData = new FormData();
+  formData.append("solicitation_title", solicitationTitle);
+  if (agency) formData.append("agency", agency);
+  if (file) formData.append("file", file);
+  if (documentText) formData.append("document_text", documentText);
+  if (!file) formData.append("file_name", "pasted-text.txt");
   return request<ShredInitData>("/rfp-shredder/shred", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ file_name: fileName, solicitation_title: solicitationTitle, agency }),
+    body: formData,
   });
 }
 

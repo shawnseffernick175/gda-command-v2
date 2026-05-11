@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
+import multer from "multer";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
 import {
@@ -14,6 +15,9 @@ import type {
   ChatMessage,
 } from "../data/knowledge-mock";
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
+import { getPool } from "../lib/db";
+import { log } from "../lib/logger";
+import { generateStorageKey, saveFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
 
 const router = Router();
 
@@ -372,55 +376,141 @@ router.post("/chat", requireRole("admin", "bd_manager", "capture_lead", "analyst
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/knowledge/upload — upload document (dry-run)
+// Multer config for knowledge uploads
 // ---------------------------------------------------------------------------
-router.post("/upload", requireRole("admin", "bd_manager", "capture_lead"), (req, res) => {
-  try {
-    const { file_name, document_type, collection, tags } = req.body as {
-      file_name?: string;
-      document_type?: string;
-      collection?: string;
-      tags?: string[];
-    };
+const knowledgeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: getMaxFileSize() },
+  fileFilter: (_req, file, cb) => {
+    if (!isAllowedMimeType(file.mimetype)) {
+      cb(new Error(`File type ${file.mimetype} is not allowed`));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
-    if (!file_name || typeof file_name !== "string") {
-      return res.status(400).json(
+// ---------------------------------------------------------------------------
+// POST /api/knowledge/upload — upload document (real file upload)
+// ---------------------------------------------------------------------------
+router.post(
+  "/upload",
+  requireRole("admin", "bd_manager", "capture_lead"),
+  knowledgeUpload.single("file"),
+  async (req: Request, res: Response) => {
+    try {
+      const file = req.file;
+      const { document_type, collection, tags } = req.body as {
+        document_type?: string;
+        collection?: string;
+        tags?: string;
+      };
+
+      // Support both file upload and legacy JSON-only mode
+      if (!file) {
+        // Legacy dry-run mode (backward compat)
+        const { file_name } = req.body as { file_name?: string };
+        if (!file_name || typeof file_name !== "string") {
+          res.status(400).json(
+            errorEnvelope("gda-knowledge", "upload", {
+              code: "BAD_REQUEST",
+              message: "No file provided. Send a multipart form with field name 'file', or provide file_name for dry-run.",
+              detail: null,
+            }),
+          );
+          return;
+        }
+        res.json(
+          successEnvelope("gda-knowledge", "upload", {
+            id: `doc-${Date.now()}`,
+            file_name,
+            document_type: document_type ?? "memo",
+            collection: collection ?? "col-contracts",
+            tags: tags ? (typeof tags === "string" ? tags.split(",").map((t: string) => t.trim()).filter(Boolean) : tags) : [],
+            status: "pending",
+            message: "Document queued for processing (dry-run).",
+            estimated_processing_time: "2-5 minutes",
+            pipeline: "GDA.batch.doc-ingest → GDA.api.embed-and-store",
+          }, {}, true),
+        );
+        return;
+      }
+
+      // Real file upload
+      const storageKey = generateStorageKey(file.originalname);
+      saveFile(storageKey, file.buffer);
+
+      const parsedTags = tags
+        ? (typeof tags === "string" ? tags.split(",").map((t: string) => t.trim()).filter(Boolean) : Array.isArray(tags) ? tags : [])
+        : [];
+      const docType = document_type ?? "memo";
+      const collectionId = collection ?? "col-contracts";
+      const docId = `doc-${Date.now()}`;
+      const fileId = `file-${Date.now()}`;
+
+      const pool = getPool();
+      if (pool) {
+        // Insert uploaded_files record
+        await pool.query(
+          `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
+        );
+
+        // Insert knowledge_documents record linked to file
+        await pool.query(
+          `INSERT INTO knowledge_documents
+             (id, collection_id, title, doc_type, file_name, file_size_bytes, page_count, chunk_count, status, tags, metadata, file_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 'pending', $7, $8, $9, NOW(), NOW())`,
+          [
+            docId,
+            collectionId,
+            file.originalname.replace(/\.[^.]+$/, ""),
+            docType,
+            file.originalname,
+            file.size,
+            `{${parsedTags.map((t: string) => `"${t}"`).join(",")}}`,
+            JSON.stringify({ mime_type: file.mimetype, storage_key: storageKey }),
+            fileId,
+          ],
+        );
+
+        log.info("knowledge_document_uploaded", {
+          docId,
+          fileId,
+          fileName: file.originalname,
+          sizeBytes: file.size,
+          collection: collectionId,
+          uploadedBy: req.user?.userId,
+        });
+      }
+
+      res.json(
+        successEnvelope("gda-knowledge", "upload", {
+          id: docId,
+          file_id: fileId,
+          file_name: file.originalname,
+          document_type: docType,
+          collection: collectionId,
+          tags: parsedTags,
+          size_bytes: file.size,
+          mime_type: file.mimetype,
+          status: "pending",
+          download_url: `/api/files/${fileId}/download`,
+          message: "Document uploaded and queued for processing.",
+        }),
+      );
+    } catch (err) {
+      log.error("knowledge_upload_error", { error: (err as Error).message });
+      res.status(500).json(
         errorEnvelope("gda-knowledge", "upload", {
-          code: "BAD_REQUEST",
-          message: "file_name is required",
+          code: "INTERNAL",
+          message: (err as Error).message || "Upload failed",
           detail: null,
         }),
       );
     }
-
-    return res.json(
-      successEnvelope(
-        "gda-knowledge",
-        "upload",
-        {
-          id: `doc-${Date.now()}`,
-          file_name,
-          document_type: document_type ?? "memo",
-          collection: collection ?? "col-contracts",
-          tags: tags ?? [],
-          status: "pending",
-          message: "Document queued for processing. Will be sent to n8n doc-ingest pipeline.",
-          estimated_processing_time: "2-5 minutes",
-          pipeline: "GDA.batch.doc-ingest → GDA.api.embed-and-store",
-        },
-        {},
-        true,
-      ),
-    );
-  } catch (err) {
-    return res.status(500).json(
-      errorEnvelope("gda-knowledge", "upload", {
-        code: "INTERNAL",
-        message: err instanceof Error ? err.message : "Unknown error",
-        detail: null,
-      }),
-    );
-  }
-});
+  },
+);
 
 export default router;
