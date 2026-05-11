@@ -3171,3 +3171,63 @@ export function promoteFastTrack(matchId: string) {
     body: JSON.stringify({ matchId }),
   });
 }
+
+// --- Book of Truths / Data Dictionary ---
+
+export interface BookOfTruthsFieldRow {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+}
+
+export interface BookOfTruthsEntityRow {
+  id: string;
+  name: string;
+  category: "entity" | "rule" | "glossary" | "source";
+  module: string;
+  description: string;
+  fields?: BookOfTruthsFieldRow[];
+  rules?: string[];
+  related?: string[];
+  api_endpoints?: string[];
+  updated_at: string;
+}
+
+export interface BookOfTruthsGlossaryRow {
+  id: string;
+  term: string;
+  acronym: string | null;
+  definition: string;
+  category: string;
+  related_entities: string[];
+}
+
+export interface BookOfTruthsSourceRow {
+  id: string;
+  name: string;
+  type: "api" | "database" | "file" | "webhook" | "manual";
+  description: string;
+  endpoint: string | null;
+  entities_served: string[];
+  status: "active" | "planned" | "deprecated";
+  refresh_frequency: string;
+}
+
+export interface BookOfTruthsData {
+  entities: BookOfTruthsEntityRow[];
+  glossary: BookOfTruthsGlossaryRow[];
+  sources: BookOfTruthsSourceRow[];
+  categoryCounts: { entity: number; rule: number; glossary: number; source: number };
+  modules: string[];
+  source: "mock" | "db";
+}
+
+export function fetchBookOfTruths(params: { search?: string; category?: string; module?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.category) qs.set("category", params.category);
+  if (params.module) qs.set("module", params.module);
+  const query = qs.toString();
+  return request<BookOfTruthsData>(`/book-of-truths${query ? `?${query}` : ""}`);
+}
