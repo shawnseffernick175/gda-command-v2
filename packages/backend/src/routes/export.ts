@@ -5,6 +5,7 @@
 import { Router, Request, Response } from "express";
 import { getPool } from "../lib/db";
 import { toCSV } from "../lib/csv-export";
+import { requireRole } from "../lib/auth";
 import { log } from "../lib/logger";
 
 const router = Router();
@@ -109,7 +110,7 @@ router.get("/cpars", async (_req: Request, res: Response) => {
 });
 
 // GET /api/export/audit-log
-router.get("/audit-log", async (_req: Request, res: Response) => {
+router.get("/audit-log", requireRole("admin"), async (_req: Request, res: Response) => {
   const pool = getPool();
   if (!pool) { res.status(503).json({ error: "Database not configured" }); return; }
 

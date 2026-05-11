@@ -301,7 +301,7 @@ export default function App() {
               {group.items
                 .filter(({ path }) => {
                   // Admin-only pages
-                  if (path === "/admin/users") {
+                  if (path === "/admin/users" || path === "/admin/audit") {
                     const u = getUser();
                     return u?.role === "admin";
                   }

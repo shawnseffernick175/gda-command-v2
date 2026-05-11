@@ -8,10 +8,10 @@ import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
 
 const SKIP_PATHS = [
-  "/api/errors",
-  "/api/audit",
+  "/errors",
+  "/audit",
   "/health",
-  "/api/webhooks/registry",
+  "/webhooks/registry",
 ];
 
 function extractResourceInfo(req: Request): { resourceType: string; resourceId?: string } {
