@@ -287,7 +287,7 @@ export default function Contacts() {
                 </div>
                 <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>{c.title}</div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{c.agency} — {c.department.split(" - ")[0]}</span>
+                  <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{c.agency} — {c.department?.split(" - ")[0] ?? ""}</span>
                   <span
                     style={{
                       fontSize: 10,
