@@ -153,19 +153,26 @@ export default function GovWin() {
     });
   }
 
-  const filtered = opps.filter((o) => {
-    if (statusFilter && o.status !== statusFilter) return false;
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      return (
-        o.title.toLowerCase().includes(q) ||
-        o.agency.toLowerCase().includes(q) ||
-        o.naics.includes(q) ||
-        o.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-    return true;
-  });
+  const filtered = opps
+    .filter((o) => {
+      if (statusFilter && o.status !== statusFilter) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        return (
+          o.title.toLowerCase().includes(q) ||
+          o.agency.toLowerCase().includes(q) ||
+          o.naics.includes(q) ||
+          o.tags.some((t) => t.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "relevance") return b.relevance_score - a.relevance_score;
+      if (sortBy === "value") return (b.value_high ?? 0) - (a.value_high ?? 0);
+      if (sortBy === "date") return new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime();
+      return 0;
+    });
 
   const sel = filtered.find((o) => o.id === selectedId) ?? null;
 
