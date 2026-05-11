@@ -680,10 +680,8 @@ const QUICK_ACCESS_CARDS = [
   { title: "Predictive Analytics", description: "ML-powered Pwin models, Monte Carlo revenue forecasting, bid/no-bid optimizer, and win/loss pattern analysis.", to: "/predictive", statusColor: "#7c3aed" },
   { title: "Color Review", description: "AI-powered Pink, Red, and Gold team reviews — compliance checks, section scoring, go/no-go recommendations.", to: "/color-review", statusColor: "#ec4899" },
   { title: "Anomaly Detection", description: "Portfolio anomaly monitoring, competitor movement tracking, and smart deadline/risk escalation engine.", to: "/anomaly", statusColor: "#dc2626" },
-  { title: "SAM.gov Monitor", description: "Automated opportunity scanning from SAM.gov with AI relevance scoring, NAICS matching, and qualification workflows.", to: "/sam-monitor", statusColor: "#0ea5e9" },
   { title: "Discussions", description: "Threaded conversations on opportunities, captures, and proposals — centralized team collaboration.", to: "/discussions", statusColor: "#6366f1" },
   { title: "CPARS Builder", description: "Past performance narrative generation, rating tracking, and AI-powered CPARS draft authoring.", to: "/cpars", statusColor: "#f97316" },
-  { title: "FPDS Award Monitor", description: "Federal contract award tracking, competitor win alerts, and recompete opportunity identification.", to: "/fpds-monitor", statusColor: "#ea580c" },
 ];
 
 function QuickAccessSection() {
