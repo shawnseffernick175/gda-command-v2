@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import {
   getAnomalies,
   getAnomaly,
@@ -305,7 +306,7 @@ router.get("/escalations/:id", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/anomaly/anomalies/:id/acknowledge — real DB write
 // ---------------------------------------------------------------------------
-router.post("/anomalies/:id/acknowledge", async (req, res) => {
+router.post("/anomalies/:id/acknowledge", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   const { id } = req.params;
   const pool = getPool();
   const now = new Date().toISOString();
@@ -354,7 +355,7 @@ router.post("/anomalies/:id/acknowledge", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/anomaly/anomalies/:id/resolve — real DB write
 // ---------------------------------------------------------------------------
-router.post("/anomalies/:id/resolve", async (req, res) => {
+router.post("/anomalies/:id/resolve", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   const { id } = req.params;
   const { resolution_notes } = req.body as { resolution_notes?: string };
   const pool = getPool();

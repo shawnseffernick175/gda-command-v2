@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import { MOCK_APPROVALS } from "../data/approvals-mock";
 import type { ApprovalItem } from "@gda/shared";
 
@@ -143,7 +144,7 @@ router.get("/:id", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/approvals/:id/resolve — approve or reject
 // ---------------------------------------------------------------------------
-router.post("/:id/resolve", async (req, res) => {
+router.post("/:id/resolve", requireRole("admin", "bd_manager"), async (req, res) => {
   const { action, notes } = req.body as { action?: string; notes?: string };
   if (!action || !["approve", "reject"].includes(action)) {
     return res.status(400).json(

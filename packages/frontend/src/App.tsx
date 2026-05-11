@@ -29,6 +29,7 @@ import SAMMonitor from "./pages/SAMMonitor";
 import Discussions from "./pages/Discussions";
 import CPARSBuilder from "./pages/CPARSBuilder";
 import FPDSMonitor from "./pages/FPDSMonitor";
+import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -82,6 +83,7 @@ const NAV_GROUPS = [
       { path: "/prompts", label: "Prompts", icon: "📝" },
       { path: "/workflows", label: "Workflows", icon: "⚙" },
       { path: "/settings", label: "Settings", icon: "⚡" },
+      { path: "/admin/users", label: "Users", icon: "👥" },
     ],
   },
 ] as const;
@@ -265,7 +267,16 @@ export default function App() {
                   margin: "4px 8px 8px",
                 }} />
               )}
-              {group.items.map(({ path, label, icon }) => {
+              {group.items
+                .filter(({ path }) => {
+                  // Admin-only pages
+                  if (path === "/admin/users") {
+                    const u = getUser();
+                    return u?.role === "admin";
+                  }
+                  return true;
+                })
+                .map(({ path, label, icon }) => {
                 const active = isActive(pathname, path);
                 return (
                   <Link
@@ -417,6 +428,7 @@ export default function App() {
             <Route path="/discussions" element={<Discussions />} />
             <Route path="/cpars" element={<CPARSBuilder />} />
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
+            <Route path="/admin/users" element={<UserManagement />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

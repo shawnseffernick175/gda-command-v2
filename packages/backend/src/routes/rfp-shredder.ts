@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import {
   MOCK_SHRED_JOBS,
   ALL_MOCK_REQUIREMENTS,
@@ -111,7 +112,7 @@ router.get("/jobs/:id", (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/rfp-shredder/shred — initiate a shred job (LLM-powered extraction)
 // ---------------------------------------------------------------------------
-router.post("/shred", async (req, res) => {
+router.post("/shred", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   try {
     const { file_name, solicitation_title, agency, document_text } = req.body;
 

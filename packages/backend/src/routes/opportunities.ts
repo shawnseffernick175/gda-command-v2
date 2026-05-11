@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Opportunity, OpportunityStatus } from "@gda/shared";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import {
   getMockOpportunities,
   getMockOpportunityById,
@@ -418,7 +419,7 @@ router.get("/:id/detail", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/opportunities/:id/qualify — S-007/S-008 safety-gated write
 // ---------------------------------------------------------------------------
-router.post("/:id/qualify", async (req, res) => {
+router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res) => {
   const { id } = req.params;
   const dryRun = req.body.dryRun !== false; // default true for safety
   const approve = req.body.approve === true;

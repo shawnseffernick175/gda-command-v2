@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getPool } from "../lib/db";
 import { successEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import { log } from "../lib/logger";
 import { execSync } from "child_process";
 import * as fs from "fs";
@@ -75,7 +76,7 @@ router.get("/status", async (_req, res) => {
 });
 
 // POST /api/backup/create — trigger an on-demand backup
-router.post("/create", async (_req, res) => {
+router.post("/create", requireRole("admin"), async (_req, res) => {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const filename = `gda_command_${timestamp}_manual.sql.gz`;

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import { MOCK_CPARS_RECORDS } from "../data/cpars-mock";
 import { getPool } from "../lib/db";
 import type { CPARSRecord } from "../data/cpars-mock";
@@ -91,7 +92,7 @@ router.get("/records/:id", async (req, res) => {
   return res.json(successEnvelope("gda-cpars", "detail", item));
 });
 
-router.post("/records/:id/generate-narrative", async (req, res) => {
+router.post("/records/:id/generate-narrative", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   try {
     let item: CPARSRecord | undefined;
     const pool = getPool();
@@ -158,7 +159,7 @@ router.post("/records/:id/generate-narrative", async (req, res) => {
   }
 });
 
-router.post("/match-opportunities", (_req, res) => {
+router.post("/match-opportunities", requireRole("admin", "bd_manager", "capture_lead", "analyst"), (_req, res) => {
   return res.json(
     successEnvelope("gda-cpars", "match-opportunities", {
       message: "Past performance matching triggered (dry-run). In production, this cross-references CPARS records with active opportunities via semantic similarity.",

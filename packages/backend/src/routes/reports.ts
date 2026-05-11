@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import {
   MOCK_REPORT_TEMPLATES,
   MOCK_GENERATED_REPORTS,
@@ -158,7 +159,7 @@ router.get("/generated", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/reports/generate — create report job, real DB write
 // ---------------------------------------------------------------------------
-router.post("/generate", async (req, res) => {
+router.post("/generate", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   try {
     const { template_id, format, sections } = req.body as {
       template_id?: string;
@@ -316,7 +317,7 @@ router.get("/exports", async (_req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/reports/export — create export job, real DB write
 // ---------------------------------------------------------------------------
-router.post("/export", async (req, res) => {
+router.post("/export", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req, res) => {
   try {
     const { source_page, format } = req.body as {
       source_page?: string;
