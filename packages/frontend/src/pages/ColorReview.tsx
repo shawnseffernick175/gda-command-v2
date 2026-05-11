@@ -44,7 +44,7 @@ const PHASE_DESCRIPTIONS: Record<string, string> = {
   red: "Proposal Evaluation — Near-final ~90-95% complete",
   green: "Pricing — Cost volume review",
   gold: "Final Review — Executive go/no-go decision",
-  white: "Lessons Learned — Post-submission analysis",
+  white: "Format / Compliance — Structure, formatting, and packaging check",
   black_hat: "Competitor Analysis — Predict competitor strategies",
   white_glove: "Final Inspection — Visual/print quality check",
 };
@@ -580,7 +580,7 @@ export default function ColorReview() {
                       </div>
                     </>
                   )}
-                  {(sel.phase !== "pink" && sel.phase !== "white" && sel.phase !== "green") && (
+                  {(sel.phase !== "pink" && sel.phase !== "white" && sel.phase !== "green" && sel.phase !== "blue" && sel.phase !== "white_glove") && (
                     <div>
                       <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Reviewer</div>
                       <div style={{ fontSize: 13 }}>{sel.reviewer}</div>
