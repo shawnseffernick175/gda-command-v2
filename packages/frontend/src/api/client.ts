@@ -2948,3 +2948,60 @@ export function updateEmailPreferences(prefs: Partial<EmailPreferencesData>) {
     body: JSON.stringify(prefs),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Quick Entry — fast create endpoints
+// ---------------------------------------------------------------------------
+
+export function quickCreateOpportunity(data: {
+  title: string;
+  agency?: string;
+  department?: string;
+  status?: string;
+  value_estimated?: number;
+}) {
+  return request<{ id: string; title: string }>("/opportunities/quick-create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function quickCreateContact(data: {
+  first_name: string;
+  last_name: string;
+  title?: string;
+  agency?: string;
+  email?: string;
+  phone?: string;
+}) {
+  return request<{ id: string; name: string }>("/contacts/quick-create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function quickCreateDiscussionThread(data: {
+  title: string;
+  entity_type: string;
+  tags?: string[];
+}) {
+  return request<{ thread_id: string; title: string }>("/discussions/threads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export function quickCreateNote(data: {
+  title: string;
+  content?: string;
+  tags?: string[];
+}) {
+  return request<{ id: string; title: string }>("/knowledge/quick-create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}

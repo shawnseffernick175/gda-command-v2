@@ -253,9 +253,9 @@ export async function sendEmail(
     const pool = getPool();
     if (pool) {
       await pool.query(
-        `INSERT INTO email_log (user_id, recipient_email, subject, template, status)
-         VALUES ($1, $2, $3, $4, 'sent')`,
-        [opts?.userId ?? null, to, subject, templateId],
+        `INSERT INTO email_log (user_id, recipient_email, subject, template, status, notification_id)
+         VALUES ($1, $2, $3, $4, 'sent', $5)`,
+        [opts?.userId ?? null, to, subject, templateId, opts?.notificationId ?? null],
       ).catch(() => {});
     }
 
@@ -268,9 +268,9 @@ export async function sendEmail(
     const pool = getPool();
     if (pool) {
       await pool.query(
-        `INSERT INTO email_log (user_id, recipient_email, subject, template, status, error_message)
-         VALUES ($1, $2, $3, $4, 'failed', $5)`,
-        [opts?.userId ?? null, to, subject, templateId, errMsg],
+        `INSERT INTO email_log (user_id, recipient_email, subject, template, status, error_message, notification_id)
+         VALUES ($1, $2, $3, $4, 'failed', $5, $6)`,
+        [opts?.userId ?? null, to, subject, templateId, errMsg, opts?.notificationId ?? null],
       ).catch(() => {});
     }
 

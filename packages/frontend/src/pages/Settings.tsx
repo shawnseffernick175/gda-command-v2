@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getUser } from "../api/auth";
 import {
   fetchSettings,
   fetchGatewayHealth,
@@ -529,7 +530,8 @@ export default function Settings() {
                 setEmailTesting(true);
                 setEmailTestResult(null);
                 try {
-                  const env = await sendTestEmail(emailPrefs ? "" : "");
+                  const user = getUser();
+                  const env = await sendTestEmail(user?.email ?? "");
                   if (env.success && env.data?.sent) {
                     setEmailTestResult("Test email sent successfully!");
                   } else {

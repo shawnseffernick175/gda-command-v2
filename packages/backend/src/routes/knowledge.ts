@@ -725,4 +725,43 @@ router.post("/embeddings/document/:id", requireRole("admin"), async (req, res) =
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/knowledge/quick-create — create a knowledge document (Quick Entry)
+// ---------------------------------------------------------------------------
+router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req: Request, res: Response) => {
+  const { title, content, tags } = req.body as {
+    title?: string;
+    content?: string;
+    tags?: string[];
+  };
+
+  if (!title) {
+    return res.status(400).json(
+      errorEnvelope("gda-knowledge", "quick-create", { code: "BAD_REQUEST", message: "title is required", detail: null }),
+    );
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(500).json(
+      errorEnvelope("gda-knowledge", "quick-create", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+    );
+  }
+
+  try {
+    const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    await pool.query(
+      `INSERT INTO knowledge_documents (id, title, doc_type, status, tags, metadata, created_at, updated_at)
+       VALUES ($1, $2, 'note', 'indexed', $3, $4, $5, $5)`,
+      [id, title, tags ?? [], JSON.stringify({ content: content ?? "", source: "quick-entry" }), now],
+    );
+    res.json(successEnvelope("gda-knowledge", "quick-create", { id, title }));
+  } catch (e) {
+    res.status(500).json(
+      errorEnvelope("gda-knowledge", "quick-create", { code: "INTERNAL", message: (e as Error).message, detail: null }),
+    );
+  }
+});
+
 export default router;

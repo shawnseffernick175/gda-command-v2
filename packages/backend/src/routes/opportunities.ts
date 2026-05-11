@@ -417,6 +417,47 @@ router.get("/:id/detail", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/opportunities/quick-create — create a new opportunity (Quick Entry)
+// ---------------------------------------------------------------------------
+router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
+  const { title, agency, department, status, value_estimated } = req.body as {
+    title?: string;
+    agency?: string;
+    department?: string;
+    status?: string;
+    value_estimated?: number;
+  };
+
+  if (!title) {
+    return res.status(400).json(
+      errorEnvelope("gda-opportunities", "quick-create", { code: "BAD_REQUEST", message: "title is required", detail: null }),
+    );
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(500).json(
+      errorEnvelope("gda-opportunities", "quick-create", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+    );
+  }
+
+  try {
+    const id = `opp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    await pool.query(
+      `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $7)`,
+      [id, title, agency ?? null, department ?? null, status ?? "discovery", value_estimated ?? null, now],
+    );
+    res.json(successEnvelope("gda-opportunities", "quick-create", { id, title }));
+  } catch (e) {
+    res.status(500).json(
+      errorEnvelope("gda-opportunities", "quick-create", { code: "INTERNAL", message: (e as Error).message, detail: null }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/opportunities/:id/qualify — S-007/S-008 safety-gated write
 // ---------------------------------------------------------------------------
 router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res) => {
