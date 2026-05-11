@@ -4,11 +4,15 @@ import {
   fetchGatewayHealth,
   fetchBackupStatus,
   createBackup,
+  fetchFeedStatus,
+  triggerFeedSync,
   type SettingsData,
   type ConnectorStatus,
   type FeatureFlag,
   type GatewayHealthData,
   type BackupStatusData,
+  type FeedStatusData,
+  type FeedSyncData,
 } from "../api/client";
 
 function formatUptime(seconds: number): string {
@@ -31,6 +35,9 @@ export default function Settings() {
   const [backupStatus, setBackupStatus] = useState<BackupStatusData | null>(null);
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupResult, setBackupResult] = useState<string | null>(null);
+  const [feedStatus, setFeedStatus] = useState<FeedStatusData | null>(null);
+  const [feedSyncing, setFeedSyncing] = useState(false);
+  const [feedSyncResult, setFeedSyncResult] = useState<FeedSyncData | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -48,6 +55,11 @@ export default function Settings() {
           if (env.success && env.data) setBackupStatus(env.data);
         })
         .catch(() => { /* backup endpoint may not exist yet */ }),
+      fetchFeedStatus()
+        .then((env) => {
+          if (env.success && env.data) setFeedStatus(env.data);
+        })
+        .catch(() => { /* feeds endpoint may not exist yet */ }),
     ])
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -90,6 +102,24 @@ export default function Settings() {
       setBackupResult(`Backup error: ${(err as Error).message}`);
     } finally {
       setBackupLoading(false);
+    }
+  }
+
+  async function runFeedSync(feed?: "sam" | "fpds" | "all") {
+    setFeedSyncing(true);
+    setFeedSyncResult(null);
+    try {
+      const env = await triggerFeedSync(feed, 30);
+      if (env.success && env.data) {
+        setFeedSyncResult(env.data);
+        // Refresh feed status
+        const status = await fetchFeedStatus();
+        if (status.success && status.data) setFeedStatus(status.data);
+      }
+    } catch (err) {
+      setFeedSyncResult({ results: [{ feed: feed ?? "all", status: "error", fetched: 0, upserted: 0, errors: 1, durationMs: 0, error: (err as Error).message }], timestamp: new Date().toISOString() });
+    } finally {
+      setFeedSyncing(false);
     }
   }
 
@@ -199,6 +229,88 @@ export default function Settings() {
           </div>
         </Section>
       )}
+
+      {/* Data Feeds */}
+      <Section title="Data Feeds (SAM.gov / FPDS)">
+        {feedStatus?.feeds ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {feedStatus.feeds.map((f) => (
+              <div key={f.id} style={{
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: 16,
+                background: "var(--color-surface)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{f.name}</span>
+                    <span style={{
+                      marginLeft: 8,
+                      fontSize: 11,
+                      padding: "2px 8px",
+                      borderRadius: 12,
+                      background: f.configured ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+                      color: f.configured ? "#22c55e" : "#ef4444",
+                      fontWeight: 600,
+                    }}>
+                      {f.configured ? "Configured" : "Not Configured"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => runFeedSync(f.id === "sam-opportunities" ? "sam" : "fpds")}
+                    disabled={feedSyncing || !f.configured}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 6,
+                      border: "1px solid var(--color-primary)",
+                      background: "rgba(59,130,246,0.1)",
+                      color: "var(--color-primary)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: feedSyncing || !f.configured ? "not-allowed" : "pointer",
+                      opacity: feedSyncing || !f.configured ? 0.5 : 1,
+                    }}
+                  >
+                    {feedSyncing ? "Syncing..." : "Sync Now"}
+                  </button>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 8 }}>
+                  {f.description}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8 }}>
+                  <InfoCard label="Source" value={f.source} />
+                  <InfoCard label="Records" value={String(f.record_count ?? 0)} />
+                  {f.last_sync && <InfoCard label="Last Sync" value={new Date(f.last_sync).toLocaleString()} />}
+                  {f.last_status && <InfoCard label="Status" value={f.last_status} color={f.last_status === "completed" ? "#22c55e" : "#f59e0b"} />}
+                  {!f.configured && f.api_key_env && <InfoCard label="Required" value={f.api_key_env} color="#ef4444" />}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <InfoCard label="Status" value="Loading..." />
+        )}
+
+        {feedSyncResult && (
+          <div style={{ marginTop: 16, padding: 12, borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-surface)" }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Sync Results</div>
+            {feedSyncResult.results.map((r) => (
+              <div key={r.feed} style={{ fontSize: 13, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600 }}>{r.feed}:</span>{" "}
+                <span style={{ color: r.status === "success" ? "#22c55e" : "#ef4444" }}>{r.status}</span>
+                {r.status === "success" && ` — ${r.fetched} fetched, ${r.upserted} upserted (${r.durationMs}ms)`}
+                {r.error && <span style={{ color: "#ef4444" }}> — {r.error}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginTop: 12, fontSize: 13, color: "var(--color-text-muted)" }}>
+          SAM.gov requires an API key (<a href="https://sam.gov" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-primary)" }}>get one here</a>).
+          FPDS/USAspending data is free and requires no API key.
+          Feeds sync automatically every 6 hours when configured.
+        </div>
+      </Section>
 
       {/* Database Backup Management */}
       <Section title="Database Backups">

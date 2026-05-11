@@ -149,8 +149,9 @@ router.get("/:id/download", async (req: Request, res: Response) => {
       return;
     }
 
+    const safeName = original_name.replace(/"/g, '\\"');
     res.setHeader("Content-Type", mime_type);
-    res.setHeader("Content-Disposition", `attachment; filename="${original_name}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
     res.setHeader("Content-Length", buffer.length);
     res.send(buffer);
   } catch (err) {

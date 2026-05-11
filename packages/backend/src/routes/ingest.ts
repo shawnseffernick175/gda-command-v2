@@ -225,33 +225,42 @@ router.post("/sam-opportunities", async (req, res) => {
   for (const opp of items) {
     try {
       await pool.query(`
-        INSERT INTO sam_opportunities (id, notice_id, title, agency, office,
-          naics_code, set_aside_code, response_deadline, posted_date,
-          estimated_value, description, sol_number, url,
-          relevance_score, scan_status, matched_at, created_at, updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW(),NOW())
+        INSERT INTO sam_opportunities (id, notice_id, title, agency, sub_agency,
+          type, set_aside, naics, naics_description, psc,
+          value_estimate, response_deadline, posted_date,
+          place_of_performance, relevance_score, relevance_reasons,
+          ai_summary, scan_status, matched_naics, matched_keywords, sam_url,
+          created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())
         ON CONFLICT (id) DO UPDATE SET
           title = EXCLUDED.title,
           agency = EXCLUDED.agency,
-          office = EXCLUDED.office,
-          naics_code = EXCLUDED.naics_code,
-          set_aside_code = EXCLUDED.set_aside_code,
+          sub_agency = EXCLUDED.sub_agency,
+          type = EXCLUDED.type,
+          set_aside = EXCLUDED.set_aside,
+          naics = EXCLUDED.naics,
+          naics_description = EXCLUDED.naics_description,
+          psc = EXCLUDED.psc,
+          value_estimate = EXCLUDED.value_estimate,
           response_deadline = EXCLUDED.response_deadline,
-          estimated_value = EXCLUDED.estimated_value,
-          description = EXCLUDED.description,
-          sol_number = EXCLUDED.sol_number,
-          url = EXCLUDED.url,
+          place_of_performance = EXCLUDED.place_of_performance,
           relevance_score = EXCLUDED.relevance_score,
-          updated_at = NOW()
+          relevance_reasons = EXCLUDED.relevance_reasons,
+          ai_summary = EXCLUDED.ai_summary,
+          matched_naics = EXCLUDED.matched_naics,
+          matched_keywords = EXCLUDED.matched_keywords,
+          sam_url = EXCLUDED.sam_url
       `, [
-        opp.id, opp.notice_id ?? null, opp.title,
-        opp.agency ?? null, opp.office ?? null,
-        opp.naics_code ?? null, opp.set_aside_code ?? null,
+        opp.id, opp.notice_id ?? opp.id, opp.title,
+        opp.agency ?? null, opp.sub_agency ?? null,
+        opp.type ?? "unknown", opp.set_aside ?? null,
+        opp.naics ?? opp.naics_code ?? null, opp.naics_description ?? null,
+        opp.psc ?? null, opp.value_estimate ?? opp.estimated_value ?? null,
         opp.response_deadline ?? null, opp.posted_date ?? null,
-        opp.estimated_value ?? null, opp.description ?? null,
-        opp.sol_number ?? null, opp.url ?? null,
-        opp.relevance_score ?? null, opp.scan_status ?? "new",
-        opp.matched_at ?? null,
+        opp.place_of_performance ?? null, opp.relevance_score ?? 0,
+        opp.relevance_reasons ?? [], opp.ai_summary ?? null,
+        opp.scan_status ?? "new", opp.matched_naics ?? false,
+        opp.matched_keywords ?? [], opp.sam_url ?? opp.url ?? null,
       ]);
       upserted++;
     } catch (e) {

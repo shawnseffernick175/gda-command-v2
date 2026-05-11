@@ -32,6 +32,7 @@ import ingestRouter from "./routes/ingest";
 import backupRouter from "./routes/backup";
 import adminRouter from "./routes/admin";
 import filesRouter from "./routes/files";
+import feedsRouter from "./routes/feeds";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -39,6 +40,7 @@ import { WEBHOOK_REGISTRY, getRegistrySummary } from "./lib/webhook-registry";
 import { isLLMAvailable } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
 import { ensureUploadDir } from "./lib/storage";
+import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -128,6 +130,7 @@ app.use("/api/fpds", fpdsRouter);
 app.use("/api/backup", backupRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/files", filesRouter);
+app.use("/api/feeds", feedsRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {
@@ -235,11 +238,18 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 const server = app.listen(PORT, () => {
   log.info("server_started", { port: Number(PORT), env: process.env.NODE_ENV ?? "development" });
+
+  // Start scheduled feed sync if configured
+  const syncInterval = parseInt(process.env.FEED_SYNC_INTERVAL_HOURS ?? "6", 10);
+  if (syncInterval > 0) {
+    startScheduledSync(syncInterval);
+  }
 });
 
 // Graceful shutdown
 function shutdown(signal: string) {
   log.info("shutdown_initiated", { signal });
+  stopScheduledSync();
   server.close(() => {
     log.info("server_closed");
     process.exit(0);

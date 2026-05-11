@@ -2780,3 +2780,78 @@ export function deleteUser(userId: string) {
     method: "DELETE",
   });
 }
+
+// ---------------------------------------------------------------------------
+// Data Feeds (SAM.gov / FPDS)
+// ---------------------------------------------------------------------------
+
+export interface FeedInfo {
+  id: string;
+  name: string;
+  source: string;
+  configured: boolean;
+  api_key_env: string | null;
+  description: string;
+  record_count?: number;
+  last_sync?: string | null;
+  last_status?: string | null;
+  last_count?: number;
+  recent_runs?: Array<{
+    id: string;
+    started_at: string;
+    completed_at: string | null;
+    status: string;
+    opportunities_found: number;
+    new_matches: number;
+    error: string | null;
+  }>;
+}
+
+export interface FeedStatusData {
+  feeds: FeedInfo[];
+}
+
+export interface FeedSyncResult {
+  feed: string;
+  status: "success" | "error";
+  fetched: number;
+  upserted: number;
+  errors: number;
+  durationMs: number;
+  error?: string;
+}
+
+export interface FeedSyncData {
+  results: FeedSyncResult[];
+  timestamp: string;
+}
+
+export interface FeedConfigData {
+  naics_codes: string[];
+  keywords: string[];
+  sync_interval_hours: number;
+}
+
+export function fetchFeedStatus() {
+  return request<FeedStatusData>("/feeds/status");
+}
+
+export function triggerFeedSync(feed?: "sam" | "fpds" | "all", daysBack?: number) {
+  return request<FeedSyncData>("/feeds/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ feed: feed ?? "all", days_back: daysBack ?? 30 }),
+  });
+}
+
+export function fetchFeedConfig() {
+  return request<FeedConfigData>("/feeds/config");
+}
+
+export function updateFeedConfig(config: Partial<FeedConfigData>) {
+  return request<FeedConfigData>("/feeds/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+}

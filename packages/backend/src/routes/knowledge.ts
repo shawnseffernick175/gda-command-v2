@@ -17,7 +17,7 @@ import type {
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
-import { generateStorageKey, saveFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
+import { generateStorageKey, saveFile, deleteFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
 
 const router = Router();
 
@@ -450,30 +450,44 @@ router.post(
 
       const pool = getPool();
       if (pool) {
-        // Insert uploaded_files record
-        await pool.query(
-          `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
-        );
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
 
-        // Insert knowledge_documents record linked to file
-        await pool.query(
-          `INSERT INTO knowledge_documents
-             (id, collection_id, title, doc_type, file_name, file_size_bytes, page_count, chunk_count, status, tags, metadata, file_id, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 'pending', $7, $8, $9, NOW(), NOW())`,
-          [
-            docId,
-            collectionId,
-            file.originalname.replace(/\.[^.]+$/, ""),
-            docType,
-            file.originalname,
-            file.size,
-            `{${parsedTags.map((t: string) => `"${t}"`).join(",")}}`,
-            JSON.stringify({ mime_type: file.mimetype, storage_key: storageKey }),
-            fileId,
-          ],
-        );
+          // Insert uploaded_files record
+          await client.query(
+            `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
+          );
+
+          // Insert knowledge_documents record linked to file
+          await client.query(
+            `INSERT INTO knowledge_documents
+               (id, collection_id, title, doc_type, file_name, file_size_bytes, page_count, chunk_count, status, tags, metadata, file_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 'pending', $7, $8, $9, NOW(), NOW())`,
+            [
+              docId,
+              collectionId,
+              file.originalname.replace(/\.[^.]+$/, ""),
+              docType,
+              file.originalname,
+              file.size,
+              parsedTags,
+              JSON.stringify({ mime_type: file.mimetype, storage_key: storageKey }),
+              fileId,
+            ],
+          );
+
+          await client.query("COMMIT");
+        } catch (txErr) {
+          await client.query("ROLLBACK");
+          // Clean up orphaned file on disk
+          try { deleteFile(storageKey); } catch { /* best effort */ }
+          throw txErr;
+        } finally {
+          client.release();
+        }
 
         log.info("knowledge_document_uploaded", {
           docId,
