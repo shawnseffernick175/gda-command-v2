@@ -3005,3 +3005,63 @@ export function quickCreateNote(data: {
     body: JSON.stringify(data),
   });
 }
+
+// ── Dashboard Layout ──────────────────────────────────────────────
+
+export interface WidgetLayout {
+  id: string;
+  visible: boolean;
+  order: number;
+}
+
+export function fetchDashboardLayout() {
+  return request<{ layout: WidgetLayout[] | null }>("/dashboard-layout/layout");
+}
+
+export function saveDashboardLayout(layout: WidgetLayout[]) {
+  return request<{ saved: boolean }>("/dashboard-layout/layout", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ layout }),
+  });
+}
+
+export function resetDashboardLayout() {
+  return request<{ reset: boolean }>("/dashboard-layout/layout", {
+    method: "DELETE",
+  });
+}
+
+// ── Audit Log ──────────────────────────────────────────────────────
+
+export interface AuditEntry {
+  id: string;
+  user_id: string | null;
+  user_email: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  details: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface AuditStats {
+  totalEntries: number;
+  topActions: { action: string; count: number }[];
+  topUsers: { user_email: string; count: number }[];
+  recentActivity: { date: string; count: number }[];
+}
+
+export function fetchAuditLog(page = 1, limit = 50, action?: string, resourceType?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (action) params.set("action", action);
+  if (resourceType) params.set("resource_type", resourceType);
+  return request<{ entries: AuditEntry[]; total: number; page: number; limit: number; totalPages: number }>(
+    `/audit?${params}`
+  );
+}
+
+export function fetchAuditStats() {
+  return request<AuditStats>("/audit/stats");
+}

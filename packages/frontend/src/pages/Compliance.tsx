@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ExportButton from "../components/ExportButton";
 import {
   fetchComplianceRequirements,
   fetchClauseLibrary,
@@ -123,7 +124,10 @@ export default function Compliance() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>Compliance Matrix</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>Compliance Matrix</h1>
+        <ExportButton endpoint="compliance" label="Export CSV" />
+      </div>
       <p style={{ color: "var(--color-text-muted)", fontSize: 14, marginBottom: 8 }}>
         Track solicitation requirements, assess compliance status, and browse the clause library.
       </p>

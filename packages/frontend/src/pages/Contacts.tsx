@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ExportButton from "../components/ExportButton";
 import {
   fetchContacts,
   type ContactsData,
@@ -143,6 +144,7 @@ export default function Contacts() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Contacts &amp; Relationships</h1>
+        <ExportButton endpoint="contacts" label="Export CSV" />
         <span
           style={{
             fontSize: 11,
@@ -243,7 +245,7 @@ export default function Contacts() {
       {error && <p style={{ color: "#ef4444" }}>{error}</p>}
 
       {!loading && !error && (
-        <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, alignItems: "start" }}>
+        <div className="two-column-layout" style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, alignItems: "start" }}>
           {/* Contact List */}
           <div
             style={{

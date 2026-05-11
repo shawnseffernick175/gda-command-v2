@@ -34,6 +34,9 @@ import adminRouter from "./routes/admin";
 import filesRouter from "./routes/files";
 import feedsRouter from "./routes/feeds";
 import emailRouter from "./routes/email";
+import dashboardLayoutRouter from "./routes/dashboard-layout";
+import auditRouter from "./routes/audit";
+import exportRouter from "./routes/export";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -42,6 +45,8 @@ import { isLLMAvailable } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
 import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
+import { auditMiddleware } from "./middleware/audit-middleware";
+import { authLimiter, apiLimiter, ingestLimiter } from "./middleware/rate-limit";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -84,11 +89,11 @@ app.get("/health", async (_req, res) => {
   );
 });
 
-// --- Auth routes (no auth middleware) ---
-app.use("/api/auth", authRouter);
+// --- Auth routes (no auth middleware, rate-limited) ---
+app.use("/api/auth", authLimiter, authRouter);
 
-// --- Ingest routes (key-based auth, no JWT) ---
-app.use("/api/ingest", ingestRouter);
+// --- Ingest routes (key-based auth, no JWT, rate-limited) ---
+app.use("/api/ingest", ingestLimiter, ingestRouter);
 
 // --- Webhook registry (public, read-only) ---
 app.get("/api/webhooks/registry", (_req, res) => {
@@ -98,8 +103,12 @@ app.get("/api/webhooks/registry", (_req, res) => {
   }));
 });
 
-// --- Auth middleware for all other API routes ---
+// --- Rate limiting + Auth middleware for all other API routes ---
+app.use("/api", apiLimiter);
 app.use("/api", authMiddleware);
+
+// --- Audit middleware (records all write operations) ---
+app.use("/api", auditMiddleware);
 
 // --- API routes ---
 app.use("/api/qa", qaRouter);
@@ -133,6 +142,9 @@ app.use("/api/admin", adminRouter);
 app.use("/api/files", filesRouter);
 app.use("/api/feeds", feedsRouter);
 app.use("/api/email", emailRouter);
+app.use("/api/dashboard-layout", dashboardLayoutRouter);
+app.use("/api/audit", auditRouter);
+app.use("/api/export", exportRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {

@@ -18,6 +18,7 @@
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --sidebar-width: 220px;
 }
 
 body {
@@ -25,6 +26,7 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
 }
 
 a {
@@ -36,7 +38,20 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Mobile responsive */
+/* Tablet breakpoint (768px - 1024px) */
+@media (max-width: 1024px) {
+  /* Stack 4-column grids to 2 columns */
+  .signal-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* KPI cards to 2-3 per row */
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* Mobile breakpoint (768px and below) */
 @media (max-width: 768px) {
   main {
     padding: 12px !important;
@@ -52,10 +67,96 @@ a:hover {
   .field-grid {
     grid-template-columns: 1fr !important;
   }
+
+  /* Stack signal columns */
+  .signal-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stack KPI cards */
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Quick access cards single column */
+  .quick-access-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Sidebar overlay on mobile */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+  }
+
+  /* Mobile hamburger trigger area */
+  .mobile-header {
+    display: flex !important;
+  }
+
+  /* Funnel adjustments */
+  .funnel-row {
+    flex-wrap: wrap;
+    gap: 4px !important;
+  }
+
+  .funnel-label {
+    width: 70px !important;
+    font-size: 11px !important;
+  }
+
+  .funnel-value,
+  .funnel-pwin {
+    width: auto !important;
+    font-size: 11px !important;
+  }
+
+  /* Page titles smaller */
+  h1 {
+    font-size: 22px !important;
+  }
+
+  /* Summary strips wrap */
+  .summary-strip {
+    flex-wrap: wrap !important;
+  }
+
+  /* Filter bars stack */
+  .filter-bar {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  /* Two-column layouts stack */
+  .two-column-layout {
+    grid-template-columns: 1fr !important;
+  }
 }
 
+/* Small phone breakpoint (480px and below) */
 @media (max-width: 480px) {
   main {
     padding: 8px !important;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  h1 {
+    font-size: 18px !important;
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  button, a, select, input {
+    min-height: 44px;
+  }
+
+  select {
+    padding: 10px 12px !important;
   }
 }

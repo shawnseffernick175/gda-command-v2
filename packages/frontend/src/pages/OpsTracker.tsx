@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import ExportButton from "../components/ExportButton";
 import {
   fetchOpportunities,
   qualifyOpportunity,
@@ -202,6 +203,7 @@ export default function OpsTracker() {
         >
           Refresh
         </button>
+        <ExportButton endpoint="opportunities" label="Export CSV" />
         <span
           style={{
             padding: "3px 10px",
