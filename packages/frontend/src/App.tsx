@@ -35,6 +35,7 @@ import UserManual from "./pages/UserManual";
 import Charts from "./pages/Charts";
 import BookOfTruths from "./pages/BookOfTruths";
 import GovWin from "./pages/GovWin";
+import RiskRegister from "./pages/RiskRegister";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -53,6 +54,7 @@ const NAV_GROUPS = [
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
       { path: "/approvals", label: "Approvals", icon: "✓" },
+      { path: "/risk-register", label: "Risk Register", icon: "⚠" },
     ],
   },
   {
@@ -510,6 +512,7 @@ export default function App() {
             <Route path="/govwin" element={<GovWin />} />
             <Route path="/book-of-truths" element={<BookOfTruths />} />
             <Route path="/help" element={<UserManual />} />
+            <Route path="/risk-register" element={<RiskRegister />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

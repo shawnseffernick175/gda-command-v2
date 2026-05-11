@@ -29,6 +29,9 @@ const PATH_LABELS: Record<string, string> = {
   "/prompts": "Prompts",
   "/workflows": "Workflows",
   "/settings": "Settings",
+  "/risk-register": "Risk Register",
+  "/help": "User Manual",
+  "/charts": "Charts",
 };
 
 const PATH_GROUPS: Record<string, string> = {
@@ -59,6 +62,9 @@ const PATH_GROUPS: Record<string, string> = {
   "/prompts": "Admin",
   "/sam-monitor": "Operations",
   "/fpds-monitor": "Operations",
+  "/risk-register": "Operations",
+  "/charts": "Reporting",
+  "/help": "Admin",
 };
 
 export default function Breadcrumb() {
