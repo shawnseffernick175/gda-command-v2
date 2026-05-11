@@ -34,6 +34,7 @@ import adminRouter from "./routes/admin";
 import filesRouter from "./routes/files";
 import feedsRouter from "./routes/feeds";
 import emailRouter from "./routes/email";
+import dashboardLayoutRouter from "./routes/dashboard-layout";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -133,6 +134,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/files", filesRouter);
 app.use("/api/feeds", feedsRouter);
 app.use("/api/email", emailRouter);
+app.use("/api/dashboard-layout", dashboardLayoutRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {

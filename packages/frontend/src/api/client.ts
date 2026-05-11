@@ -3005,3 +3005,29 @@ export function quickCreateNote(data: {
     body: JSON.stringify(data),
   });
 }
+
+// ── Dashboard Layout ──────────────────────────────────────────────
+
+export interface WidgetLayout {
+  id: string;
+  visible: boolean;
+  order: number;
+}
+
+export function fetchDashboardLayout() {
+  return request<{ layout: WidgetLayout[] | null }>("/dashboard-layout/layout");
+}
+
+export function saveDashboardLayout(layout: WidgetLayout[]) {
+  return request<{ saved: boolean }>("/dashboard-layout/layout", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ layout }),
+  });
+}
+
+export function resetDashboardLayout() {
+  return request<{ reset: boolean }>("/dashboard-layout/layout", {
+    method: "DELETE",
+  });
+}
