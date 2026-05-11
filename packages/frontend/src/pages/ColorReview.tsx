@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   fetchColorReviews,
-  runColorReview,
+  runColorReviewWithFile,
+  runColorReviewWithText,
   type ColorReviewData,
   type ColorReviewRow,
+  type ColorReviewRunResult,
   type ColorReviewRequirementCheckRow,
   type ColorReviewSectionScoreRow,
   type ColorReviewGoldCheckRow,
@@ -87,6 +89,8 @@ export default function ColorReview() {
   const [expandedGold, setExpandedGold] = useState<string | null>(null);
   const [runModal, setRunModal] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewComplete, setReviewComplete] = useState<ColorReviewRunResult | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -137,14 +141,41 @@ export default function ColorReview() {
     if (r) setTab(bestTab(r));
   }
 
-  async function handleRun(proposalId: string, phase: string) {
+  async function handleUploadReview(file: File | null, pastedText: string, phase: string, title: string, agency: string) {
+    setReviewing(true);
+    setRunResult(null);
+    setReviewComplete(null);
     try {
-      const env = await runColorReview(proposalId, phase);
+      let env;
+      if (file) {
+        env = await runColorReviewWithFile(file, phase, title || undefined, agency || undefined);
+      } else if (pastedText.trim()) {
+        env = await runColorReviewWithText(pastedText, phase, title || undefined, agency || undefined);
+      } else {
+        setRunResult("Please upload a file or paste document text.");
+        setReviewing(false);
+        return;
+      }
       if (env.success && env.data) {
-        setRunResult(`Queued: ${env.data.correlationId}`);
+        if (env.data.status === "completed") {
+          setReviewComplete(env.data);
+          setRunResult(null);
+          // Refresh review list
+          const refreshed = await fetchColorReviews();
+          if (refreshed.success && refreshed.data) {
+            setData(refreshed.data);
+            if (env.data.reviewId) setSelected(env.data.reviewId);
+          }
+        } else {
+          setRunResult(env.data.message ?? "Review queued — connect OpenAI API key for AI reviews.");
+        }
+      } else {
+        setRunResult(env.error?.message ?? "Review failed");
       }
     } catch (e) {
       setRunResult(`Error: ${String(e)}`);
+    } finally {
+      setReviewing(false);
     }
   }
 
@@ -174,7 +205,7 @@ export default function ColorReview() {
             fontWeight: 600,
             fontSize: 13,
           }}
-        >Run Color Review</button>
+        >Upload & Review Document</button>
       </div>
 
       {/* Summary strip */}
@@ -468,7 +499,7 @@ export default function ColorReview() {
         </div>
       </div>
 
-      {/* Run modal */}
+      {/* Upload & Review modal */}
       {runModal && (
         <div style={{
           position: "fixed",
@@ -478,17 +509,29 @@ export default function ColorReview() {
           alignItems: "center",
           justifyContent: "center",
           zIndex: 1000,
-        }} onClick={() => setRunModal(false)}>
+        }} onClick={() => { if (!reviewing) setRunModal(false); }}>
           <div style={{
             background: "var(--color-surface)",
             border: "1px solid var(--color-border)",
             borderRadius: 10,
             padding: 24,
-            width: 440,
+            width: 560,
+            maxHeight: "85vh",
+            overflowY: "auto",
           }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 16px" }}>Run Color Review</h3>
-            <RunForm onRun={handleRun} result={runResult} proposals={Array.from(new Set(data.reviews.map((r) => ({ id: r.proposal_id, title: r.proposal_title }))))} />
-            <button onClick={() => setRunModal(false)} style={{ marginTop: 12, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", borderRadius: 4, padding: "6px 16px", cursor: "pointer" }}>Close</button>
+            <h3 style={{ margin: "0 0 16px" }}>Upload & Review Document</h3>
+            {reviewComplete ? (
+              <ReviewResultView result={reviewComplete} onClose={() => { setRunModal(false); setReviewComplete(null); }} />
+            ) : (
+              <UploadReviewForm
+                onSubmit={handleUploadReview}
+                result={runResult}
+                reviewing={reviewing}
+              />
+            )}
+            {!reviewing && !reviewComplete && (
+              <button onClick={() => setRunModal(false)} style={{ marginTop: 12, background: "transparent", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", borderRadius: 4, padding: "6px 16px", cursor: "pointer" }}>Cancel</button>
+            )}
           </div>
         </div>
       )}
@@ -829,48 +872,245 @@ function RiskFactors({ factors }: { factors: string[] }) {
   );
 }
 
-function RunForm({ onRun, result, proposals }: {
-  onRun: (proposalId: string, phase: string) => void;
+function UploadReviewForm({ onSubmit, result, reviewing }: {
+  onSubmit: (file: File | null, pastedText: string, phase: string, title: string, agency: string) => void;
   result: string | null;
-  proposals: Array<{ id: string; title: string }>;
+  reviewing: boolean;
 }) {
-  const [proposalId, setProposalId] = useState(proposals[0]?.id ?? "");
-  const [phase, setPhase] = useState("white");
-  const uniqueProposals = proposals.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i);
+  const [phase, setPhase] = useState("pink");
+  const [title, setTitle] = useState("");
+  const [agency, setAgency] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [pastedText, setPastedText] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [inputMode, setInputMode] = useState<"file" | "paste">("file");
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped) { setFile(dropped); setInputMode("file"); }
+  }, []);
+
   return (
     <div>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Proposal</label>
-        <select value={proposalId} onChange={(e) => setProposalId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-          {uniqueProposals.map((p) => (
-            <option key={p.id} value={p.id}>{p.id} — {p.title.slice(0, 50)}</option>
-          ))}
-        </select>
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Review Phase</label>
+      <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginTop: 0, marginBottom: 16 }}>
+        Upload your proposal document and select a review type. The AI will evaluate it against Shipley criteria and provide detailed findings.
+      </p>
+
+      {/* Review Phase */}
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4, fontWeight: 600 }}>Review Phase</label>
         <select value={phase} onChange={(e) => setPhase(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
           <option value="white">White Team — Format & Compliance</option>
           <option value="pink">Pink Team — Compliance Check</option>
-          <option value="green">Green Team — Cost/Pricing Review</option>
           <option value="red">Red Team — Quality Scoring</option>
-          <option value="gold">Gold Team — Executive Review</option>
+          <option value="green">Green Team — Cost/Pricing Review</option>
+          <option value="gold">Gold Team — Executive Go/No-Go</option>
         </select>
       </div>
+
+      {/* Title and Agency */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <div>
+          <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4, fontWeight: 600 }}>Document Title (optional)</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Technical Volume I" style={{ ...selectStyle, width: "100%" }} />
+        </div>
+        <div>
+          <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4, fontWeight: 600 }}>Agency (optional)</label>
+          <input value={agency} onChange={(e) => setAgency(e.target.value)} placeholder="e.g. USACE" style={{ ...selectStyle, width: "100%" }} />
+        </div>
+      </div>
+
+      {/* Input mode tabs */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button onClick={() => setInputMode("file")} style={{ background: inputMode === "file" ? "rgba(124,58,237,0.15)" : "transparent", color: inputMode === "file" ? "#a78bfa" : "var(--color-text-muted)", border: "none", borderRadius: 4, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: inputMode === "file" ? 700 : 400 }}>Upload File</button>
+        <button onClick={() => setInputMode("paste")} style={{ background: inputMode === "paste" ? "rgba(124,58,237,0.15)" : "transparent", color: inputMode === "paste" ? "#a78bfa" : "var(--color-text-muted)", border: "none", borderRadius: 4, padding: "4px 12px", cursor: "pointer", fontSize: 12, fontWeight: inputMode === "paste" ? 700 : 400 }}>Paste Text</button>
+      </div>
+
+      {/* File upload */}
+      {inputMode === "file" && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            border: `2px dashed ${dragOver ? "#7c3aed" : "var(--color-border)"}`,
+            borderRadius: 8,
+            padding: 24,
+            textAlign: "center",
+            cursor: "pointer",
+            marginBottom: 14,
+            background: dragOver ? "rgba(124,58,237,0.05)" : "transparent",
+            transition: "all 0.2s",
+          }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.txt,.doc,.docx"
+            onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }}
+            style={{ display: "none" }}
+          />
+          {file ? (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#22c55e" }}>{file.name}</div>
+              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB — Click to change</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>📄</div>
+              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                Drag & drop your proposal document here
+              </div>
+              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
+                PDF, TXT, DOC, DOCX — up to 50 MB
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Paste text */}
+      {inputMode === "paste" && (
+        <div style={{ marginBottom: 14 }}>
+          <textarea
+            value={pastedText}
+            onChange={(e) => setPastedText(e.target.value)}
+            placeholder="Paste your proposal document text here..."
+            style={{
+              ...selectStyle,
+              width: "100%",
+              minHeight: 120,
+              resize: "vertical",
+              fontFamily: "inherit",
+            }}
+          />
+          {pastedText && (
+            <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
+              {pastedText.length.toLocaleString()} characters
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Submit */}
       <button
-        onClick={() => onRun(proposalId, phase)}
-        style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 6, padding: "8px 20px", cursor: "pointer", fontWeight: 600 }}
-      >Queue Review (Dry Run)</button>
+        onClick={() => onSubmit(inputMode === "file" ? file : null, inputMode === "paste" ? pastedText : "", phase, title, agency)}
+        disabled={reviewing || (inputMode === "file" && !file) || (inputMode === "paste" && !pastedText.trim())}
+        style={{
+          background: reviewing ? "#4b5563" : "#7c3aed",
+          color: "#fff",
+          border: "none",
+          borderRadius: 6,
+          padding: "10px 24px",
+          cursor: reviewing ? "wait" : "pointer",
+          fontWeight: 600,
+          fontSize: 14,
+          opacity: (reviewing || (inputMode === "file" && !file) || (inputMode === "paste" && !pastedText.trim())) ? 0.6 : 1,
+        }}
+      >
+        {reviewing ? "Analyzing document..." : `Run ${phase.charAt(0).toUpperCase() + phase.slice(1)} Team Review`}
+      </button>
+
+      {reviewing && (
+        <div style={{
+          marginTop: 12,
+          padding: 12,
+          borderRadius: 6,
+          background: "rgba(124,58,237,0.08)",
+          border: "1px solid rgba(124,58,237,0.2)",
+          fontSize: 13,
+          color: "#a78bfa",
+        }}>
+          AI is reviewing your document... This may take 15-30 seconds depending on document length.
+        </div>
+      )}
+
       {result && (
         <div style={{
           marginTop: 10,
           padding: 10,
           borderRadius: 4,
-          background: result.startsWith("Error") ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)",
-          color: result.startsWith("Error") ? "#ef4444" : "#22c55e",
+          background: result.startsWith("Error") ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)",
+          color: result.startsWith("Error") ? "#ef4444" : "#f59e0b",
           fontSize: 13,
         }}>{result}</div>
       )}
+    </div>
+  );
+}
+
+function ReviewResultView({ result, onClose }: { result: ColorReviewRunResult; onClose: () => void }) {
+  const goColor = result.go_no_go === "go" ? "#22c55e" : result.go_no_go === "no_go" ? "#ef4444" : "#f59e0b";
+  const goLabel = result.go_no_go === "go" ? "GO" : result.go_no_go === "no_go" ? "NO-GO" : "CONDITIONAL";
+  const phaseLabel = PHASE_LABELS[result.phase] ?? result.phase;
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ display: "inline-block", padding: "6px 20px", borderRadius: 20, background: goColor, color: "#fff", fontWeight: 800, fontSize: 18, letterSpacing: 2 }}>{goLabel}</div>
+        <div style={{ marginTop: 8, fontSize: 13, color: "var(--color-text-muted)" }}>{phaseLabel} Review Complete</div>
+      </div>
+
+      {/* Score cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+        <div style={{ background: "rgba(124,58,237,0.08)", borderRadius: 6, padding: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#a78bfa" }}>{result.overall_score ?? 0}</div>
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Score</div>
+        </div>
+        <div style={{ background: "rgba(34,197,94,0.08)", borderRadius: 6, padding: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#22c55e" }}>{result.passed_checks ?? 0}</div>
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Passed</div>
+        </div>
+        <div style={{ background: "rgba(239,68,68,0.08)", borderRadius: 6, padding: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#ef4444" }}>{result.failed_checks ?? 0}</div>
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Failed</div>
+        </div>
+        <div style={{ background: "rgba(245,158,11,0.08)", borderRadius: 6, padding: 10, textAlign: "center" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#f59e0b" }}>{result.warning_checks ?? 0}</div>
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Warnings</div>
+        </div>
+      </div>
+
+      {/* Summary */}
+      {result.summary && (
+        <div style={{ marginBottom: 16, padding: 12, borderRadius: 6, background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-border)", fontSize: 13, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, color: "var(--color-text-muted)" }}>Executive Summary</div>
+          {result.summary}
+        </div>
+      )}
+
+      {/* Risk factors */}
+      {result.risk_factors && result.risk_factors.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 11, color: "var(--color-text-muted)" }}>Risk Factors</div>
+          {result.risk_factors.map((f, i) => (
+            <div key={i} style={{
+              padding: "8px 12px",
+              borderRadius: 4,
+              borderLeft: `3px solid ${f.startsWith("CRITICAL") ? "#ef4444" : f.startsWith("HIGH") ? "#f59e0b" : "#3b82f6"}`,
+              background: "rgba(255,255,255,0.02)",
+              fontSize: 12,
+              marginBottom: 4,
+            }}>{f}</div>
+          ))}
+        </div>
+      )}
+
+      {result.ai && (
+        <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 12 }}>
+          Reviewed by {result.ai.model} — {result.ai.tokens.toLocaleString()} tokens used
+        </div>
+      )}
+
+      <div style={{ textAlign: "center" }}>
+        <button onClick={onClose} style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: 6, padding: "8px 20px", cursor: "pointer", fontWeight: 600 }}>
+          View Full Review Details
+        </button>
+      </div>
     </div>
   );
 }
