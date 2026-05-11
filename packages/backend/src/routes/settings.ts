@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { successEnvelope } from "../middleware/envelope";
-import { webhookConfig, apiConfig } from "../lib/n8n-client";
+import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { webhookConfig, apiConfig, callWebhook } from "../lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "../lib/db";
-import { getRegistrySummary } from "../lib/webhook-registry";
+import { getRegistrySummary, WEBHOOK_REGISTRY } from "../lib/webhook-registry";
+import type { WebhookStatus } from "../lib/webhook-registry";
 import { isLLMAvailable } from "../lib/llm";
 
 const router = Router();
@@ -98,6 +99,88 @@ router.get("/", async (_req, res) => {
       webhookRegistry,
     })
   );
+});
+
+/**
+ * POST /api/settings/webhook-sync
+ * Ping all 42 webhooks and return current status (live/exists/planned).
+ * Updates in-memory registry so subsequent requests reflect real state.
+ */
+router.post("/webhook-sync", async (_req, res) => {
+  const wh = webhookConfig();
+  if (wh.missing.length > 0) {
+    return res.status(503).json(errorEnvelope("GDA.gateway.settings", "webhook-sync", {
+      code: "NOT_CONFIGURED",
+      message: "N8N_BASE_URL not set — cannot sync webhooks",
+      detail: null,
+    }));
+  }
+
+  const results: Array<{
+    path: string;
+    previousStatus: WebhookStatus;
+    currentStatus: WebhookStatus;
+    httpCode: number;
+    latencyMs: number;
+    changed: boolean;
+  }> = [];
+
+  const entries = Object.entries(WEBHOOK_REGISTRY);
+  const concurrency = 5;
+
+  for (let i = 0; i < entries.length; i += concurrency) {
+    const batch = entries.slice(i, i + concurrency);
+    const promises = batch.map(async ([key, entry]) => {
+      const result = await callWebhook(entry.path, {}, { timeoutMs: 8000 });
+      const previousStatus = entry.status;
+      let currentStatus: WebhookStatus;
+
+      if (result.ok && result.http === 200) {
+        currentStatus = "live";
+      } else if (result.http >= 400 && result.http < 500) {
+        currentStatus = "planned";
+      } else if (result.http >= 500) {
+        currentStatus = "exists";
+      } else if (result.error === "timeout" || result.error === "not_configured") {
+        currentStatus = previousStatus;
+      } else {
+        currentStatus = "planned";
+      }
+
+      // Update in-memory registry
+      WEBHOOK_REGISTRY[key].status = currentStatus;
+
+      return {
+        path: entry.path,
+        previousStatus,
+        currentStatus,
+        httpCode: result.http,
+        latencyMs: result.ms,
+        changed: previousStatus !== currentStatus,
+      };
+    });
+    const batchResults = await Promise.all(promises);
+    results.push(...batchResults);
+  }
+
+  const summary = getRegistrySummary();
+  const changed = results.filter((r) => r.changed);
+
+  res.json(successEnvelope("GDA.gateway.settings", "webhook-sync", {
+    summary,
+    changed: changed.length,
+    results,
+    timestamp: new Date().toISOString(),
+  }));
+});
+
+/**
+ * GET /api/settings/webhooks
+ * Full webhook registry with per-webhook details.
+ */
+router.get("/webhooks", (_req, res) => {
+  const entries = Object.values(WEBHOOK_REGISTRY);
+  res.json(successEnvelope("GDA.gateway.settings", "webhooks", entries));
 });
 
 export default router;
