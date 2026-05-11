@@ -183,7 +183,7 @@ router.post("/promote", async (req, res) => {
       try {
         const oppId = `opp-ft-${matchId}`;
         const result = await pool.query(
-          `INSERT INTO opportunities (id, title, agency, department, status, capture_stage, score, value_estimated, probability_of_win, naics, tags, source, created_at, updated_at)
+          `INSERT INTO opportunities (id, title, agency, department, status, capture_stage, score, value_estimated, probability_of_win, naics, tags, data_source, created_at, updated_at)
            VALUES ($1, $2, $3, $4, 'discovery', 'interest', $5, 0, 0, '', $6, 'fast-track', NOW(), NOW())
            ON CONFLICT (id) DO NOTHING
            RETURNING id`,

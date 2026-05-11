@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { askOpportunityChat } from "../api/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -29,17 +30,8 @@ export default function AskAIChat({ opportunityId, opportunityTitle }: AskAIChat
     setLoading(true);
 
     try {
-      const res = await fetch("/api/ai/opportunity-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          opportunityId,
-          question: userMsg.content,
-          history: messages.slice(-6),
-        }),
-      });
-      const data = await res.json();
-      const answer = data?.data?.answer ?? data?.answer ?? "I couldn't generate an answer. Please try again.";
+      const data = await askOpportunityChat(opportunityId, userMsg.content, messages.slice(-6));
+      const answer = data?.data?.answer ?? "I couldn't generate an answer. Please try again.";
       setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Error connecting to AI service. Please try again." }]);
