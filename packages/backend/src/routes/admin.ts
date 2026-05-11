@@ -118,25 +118,25 @@ router.patch("/users/:id/status", requireRole("admin"), async (req: Request, res
     return;
   }
 
-  // Prevent deactivating the last admin
-  if (!is_active) {
-    const user = await pool.query("SELECT role FROM users WHERE id = $1", [id]);
-    if (user.rows[0]?.role === "admin") {
-      const adminCount = await pool.query(
-        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = true AND id != $1",
-        [id]
-      );
-      if (parseInt(adminCount.rows[0].count) === 0) {
-        res.status(400).json({
-          success: false,
-          error: "Cannot deactivate the last admin.",
-        });
-        return;
+  try {
+    // Prevent deactivating the last admin
+    if (!is_active) {
+      const user = await pool.query("SELECT role FROM users WHERE id = $1", [id]);
+      if (user.rows[0]?.role === "admin") {
+        const adminCount = await pool.query(
+          "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = true AND id != $1",
+          [id]
+        );
+        if (parseInt(adminCount.rows[0].count) === 0) {
+          res.status(400).json({
+            success: false,
+            error: "Cannot deactivate the last admin.",
+          });
+          return;
+        }
       }
     }
-  }
 
-  try {
     const { rows } = await pool.query(
       `UPDATE users SET is_active = $1, updated_at = NOW()
        WHERE id = $2
@@ -224,24 +224,24 @@ router.delete("/users/:id", requireRole("admin"), async (req: Request, res: Resp
     return;
   }
 
-  // Prevent deleting the last admin
-  const user = await pool.query("SELECT role FROM users WHERE id = $1", [id]);
-  if (user.rows.length === 0) {
-    res.status(404).json({ success: false, error: "User not found" });
-    return;
-  }
-  if (user.rows[0].role === "admin") {
-    const adminCount = await pool.query(
-      "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = true AND id != $1",
-      [id]
-    );
-    if (parseInt(adminCount.rows[0].count) === 0) {
-      res.status(400).json({ success: false, error: "Cannot delete the last admin." });
+  try {
+    // Prevent deleting the last admin
+    const user = await pool.query("SELECT role FROM users WHERE id = $1", [id]);
+    if (user.rows.length === 0) {
+      res.status(404).json({ success: false, error: "User not found" });
       return;
     }
-  }
+    if (user.rows[0].role === "admin") {
+      const adminCount = await pool.query(
+        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = true AND id != $1",
+        [id]
+      );
+      if (parseInt(adminCount.rows[0].count) === 0) {
+        res.status(400).json({ success: false, error: "Cannot delete the last admin." });
+        return;
+      }
+    }
 
-  try {
     await pool.query("DELETE FROM refresh_tokens WHERE user_id = $1", [id]);
     await pool.query("DELETE FROM users WHERE id = $1", [id]);
 
