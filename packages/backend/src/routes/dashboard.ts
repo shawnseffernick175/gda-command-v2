@@ -98,7 +98,7 @@ router.get("/kpis", async (_req, res) => {
         `SELECT id, title, agency, department, status, score, value_estimated,
                 probability_of_win, naics, psc, due_date, solicitation_number,
                 set_aside, place_of_performance, incumbent, qualified_at,
-                qualified_by, tags, raw_source_url, created_at, updated_at
+                qualified_by, tags, raw_source_url, data_source, created_at, updated_at
          FROM opportunities ORDER BY score DESC`
       );
       allOpps = result.rows.map((r) => ({
@@ -119,7 +119,7 @@ router.get("/kpis", async (_req, res) => {
 
   // --- 3. Compute KPIs from local data (DB or mock) ---
   // Exclude fast-track signals from opportunity counts
-  const realOpps = allOpps.filter((o) => (o as unknown as Record<string, unknown>).source !== "fast-track");
+  const realOpps = allOpps.filter((o) => (o as unknown as Record<string, unknown>).data_source !== "fast-track");
   const totalOpportunities = realOpps.length;
 
   // Pipeline Value = only Qualified + Pipeline status (approved items)

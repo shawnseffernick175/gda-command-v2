@@ -3,6 +3,7 @@ import {
   fetchFastTrackSummary,
   fetchFastTrackMatches,
   fetchFastTrackDetail,
+  promoteFastTrack,
   type FastTrackSummaryData,
   type FastTrackMatch,
   type FastTrackDetailData,
@@ -451,11 +452,7 @@ function DetailPanel({ data }: { data: FastTrackDetailData }) {
   const handlePromote = async () => {
     setPromoting(true);
     try {
-      await fetch("/api/fast-track/promote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matchId: m.id }),
-      });
+      await promoteFastTrack(m.id);
       setPromoted(true);
     } catch {
       // silently fail

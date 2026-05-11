@@ -3128,3 +3128,23 @@ export function fetchAuditLog(page = 1, limit = 50, action?: string, resourceTyp
 export function fetchAuditStats() {
   return request<AuditStats>("/audit/stats");
 }
+
+// --- AI Chat ---
+
+export function askOpportunityChat(opportunityId: string, question: string, history: { role: string; content: string }[]) {
+  return request<{ answer: string }>("/ai/opportunity-chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ opportunityId, question, history }),
+  });
+}
+
+// --- Fast Track Promote ---
+
+export function promoteFastTrack(matchId: string) {
+  return request<{ opportunityId: string | null }>("/fast-track/promote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ matchId }),
+  });
+}
