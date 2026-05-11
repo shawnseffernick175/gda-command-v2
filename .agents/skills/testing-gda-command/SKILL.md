@@ -41,7 +41,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - **Production mode** (`AUTH_REQUIRED=true`): JWT-based auth enforced on all `/api/*` routes except `/api/auth/*`. Frontend probes `/api/auth/me`, gets 401 if no token, shows Login page.
 - **Auth endpoints**: POST `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh`, `/api/auth/logout`, GET `/api/auth/me`
 - **Token storage**: localStorage keys `gda_access_token`, `gda_refresh_token`, `gda_user`
-- **Default admin user**: `admin@gda-command.local` / `admin123` (seeded in migrations)
+- **Default admin user**: `admin@gda-command.local` — **WARNING**: The seed data uses a placeholder password hash (`$2b$10$placeholder_hash_for_dev`), so login with `admin123` may fail after a fresh `db:reset`. Workaround: register a new user via `POST /api/auth/register` with `{"email":"tester@gda.local","password":"tester123","display_name":"Test User"}`.
 - **Frontend auth gate**: `App.tsx` — `authed` state: `null` = loading spinner, `false` = Login component, `true` = main app
 - **Logout**: Sidebar shows username + "Logout" button at bottom
 
@@ -64,6 +64,39 @@ For each new page:
 5. Test filters (dropdowns, search) — verify exact result counts
 6. Test Launchpad card navigation back to the page
 7. Record browser interactions with annotate_recording tool
+
+## POST Write Persistence Testing
+
+For testing endpoints that write to PostgreSQL (Phase 1c+):
+
+1. **Reset DB to clean state**: `cd packages/backend && npm run db:reset`
+2. **Record initial state**: `docker exec gda-postgres psql -U gda -d gda_command -c "SELECT id, status FROM <table> WHERE id='<id>'"`
+3. **Call POST endpoint**: `curl -s -X POST http://localhost:3001/api/<endpoint> -H 'Content-Type: application/json' -d '{...}'`
+4. **Verify API response**: Check `success: true`, `dryRun: false` (not `true`), and returned data matches expected
+5. **Verify DB persistence**: `docker exec gda-postgres psql -U gda -d gda_command -c "SELECT ... FROM <table> WHERE ..."`
+6. **Verify UI renders updated data**: Navigate to the page in browser and confirm the change is visible
+
+### POST Endpoints with Real DB Writes
+
+| Route | Endpoint | DB Operation |
+|-------|----------|--------------|
+| approvals | `POST /:id/resolve` | UPDATE approvals status/resolved_by/at/notes |
+| anomaly | `POST /anomalies/:id/acknowledge` | UPDATE status + acknowledged_at |
+| anomaly | `POST /anomalies/:id/resolve` | UPDATE status + resolved_at |
+| discussions | `POST /threads` | INSERT discussion_threads |
+| discussions | `POST /threads/:id/messages` | INSERT message + UPDATE thread count |
+| doctrine | `POST /finalize` | UPDATE drafts + INSERT publish run |
+| sam-monitor | `POST /opportunities/:id/qualify` | UPDATE scan_status |
+| reports | `POST /generate` | INSERT generated_reports |
+| reports | `POST /export` | INSERT export_jobs |
+| capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+
+### Key Gotchas for Write Testing
+
+- **Template IDs are case-sensitive**: Use `TPL-001` not `tpl-001` for report generation
+- **Auth header may be required**: If `AUTH_REQUIRED=true`, include `Authorization: Bearer <token>` in curl requests. If `AUTH_REQUIRED=false`, the dev middleware injects admin user automatically.
+- **Verify `dryRun: false`**: If response shows `dryRun: true`, the write did NOT go to DB — it fell back to mock.
+- **New discussion threads may show "NaNd ago"**: The relative timestamp display might not parse ISO timestamps from newly created threads correctly. This is a cosmetic issue — data persists correctly.
 
 ## Page-Specific Testing Data
 
@@ -133,6 +166,8 @@ For each new page:
 - Stale detail state: when switching between items rapidly, the detail panel may briefly show old data. Fixed in most pages with useEffect cleanup.
 - Launchpad cards: when many page cards exist, the last card(s) may not render due to CSS container constraints. Verify via sidebar navigation as fallback.
 - Devin Review may flag issues — always check PR comments and fix before testing.
+- **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
+- **New discussion threads show "NaNd ago"**: Relative timestamp display doesn't parse ISO dates from freshly created threads. Cosmetic only.
 
 ## Testing Strategy
 
@@ -142,8 +177,9 @@ For each new page:
 4. **Test filters** — select, verify count, clear, verify restoration
 5. **Test tabs** — click each, verify content renders with correct data
 6. **Test modals** — open, verify form fields, close
-7. **Record browser interactions** for visual proof
-8. **Annotate recordings** with setup/test_start/assertion markers
+7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **Record browser interactions** for visual proof
+9. **Annotate recordings** with setup/test_start/assertion markers
 
 ## Devin Secrets Needed
 
