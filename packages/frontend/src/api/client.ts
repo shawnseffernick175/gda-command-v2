@@ -1648,6 +1648,7 @@ export interface KnowledgeSearchData {
   query: string;
   results: KnowledgeSearchResult[];
   total_results: number;
+  source?: "pgvector" | "mock";
 }
 
 export interface ChatMessageSource {
@@ -2853,5 +2854,35 @@ export function updateFeedConfig(config: Partial<FeedConfigData>) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Vector Embeddings
+// ---------------------------------------------------------------------------
+
+export interface EmbeddingStatsData {
+  totalDocuments: number;
+  embeddedDocuments: number;
+  pendingDocuments: number;
+  failedDocuments: number;
+  totalChunks: number;
+  embeddingAvailable: boolean;
+}
+
+export interface EmbedResult {
+  total: number;
+  embedded: number;
+  failed: number;
+  skipped: number;
+}
+
+export function fetchEmbeddingStats() {
+  return request<EmbeddingStatsData>("/knowledge/embeddings/stats");
+}
+
+export function triggerEmbedAll() {
+  return request<EmbedResult>("/knowledge/embeddings/generate", {
+    method: "POST",
   });
 }

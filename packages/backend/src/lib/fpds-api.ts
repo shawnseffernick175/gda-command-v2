@@ -206,7 +206,7 @@ export function mapToDBRecord(raw: USASpendingAward): Record<string, unknown> {
     award_date: raw["Start Date"] ?? new Date().toISOString().slice(0, 10),
     period_of_performance_start: raw["Start Date"] ?? null,
     period_of_performance_end: raw["End Date"] ?? null,
-    award_type: AWARD_TYPE_MAP[contractType] ?? contractType || raw["Award Type"] ?? "unknown",
+    award_type: AWARD_TYPE_MAP[contractType] ?? (contractType || raw["Award Type"]) ?? "unknown",
     competition_type: "unknown",
     naics: null,
     psc: null,

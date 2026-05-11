@@ -45,9 +45,9 @@ export async function syncSAMOpportunities(
       durationMs: Date.now() - start, error: "Database not available" };
   }
 
+  const runId = `sam-sync-${Date.now()}`;
   try {
     // Record sync run start
-    const runId = `sam-sync-${Date.now()}`;
     await pool.query(
       `INSERT INTO sam_scan_runs (id, started_at, status, naics_codes_scanned)
        VALUES ($1, NOW(), 'running', $2)`,
@@ -131,6 +131,15 @@ export async function syncSAMOpportunities(
     log.info("sam_sync_complete", { ...result });
     return result;
   } catch (e) {
+    // Mark scan run as failed so it doesn't stay permanently 'running'
+    if (runId) {
+      try {
+        await pool.query(
+          `UPDATE sam_scan_runs SET status = 'failed', completed_at = NOW() WHERE id = $1`,
+          [runId],
+        );
+      } catch { /* best effort */ }
+    }
     const result: SyncResult = {
       feed, status: "error", fetched: 0, upserted: 0, errors: 1,
       durationMs: Date.now() - start, error: (e as Error).message,
