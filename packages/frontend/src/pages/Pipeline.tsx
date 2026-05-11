@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import ExportButton from "../components/ExportButton";
 import InfoBadge from "../components/InfoBadge";
+import SourceBadge from "../components/SourceBadge";
 import {
   fetchPipelineOpportunities,
   type OpportunityRow,
@@ -385,8 +386,9 @@ export default function Pipeline() {
                       {opp.id}
                     </td>
                     <td style={{ ...tdStyle, maxWidth: 340 }}>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
                         {opp.title}
+                        <SourceBadge source={opp.data_source} />
                       </div>
                     </td>
                     <td style={{ ...tdStyle, color: "var(--color-text-muted)", maxWidth: 220 }}>

@@ -268,6 +268,7 @@ export interface IntelItem {
   related_opportunity_id: string | null;
   related_competitor: string | null;
   tags: string[];
+  data_source: string | null;
   created_at: string;
   read: boolean;
 }
@@ -366,6 +367,7 @@ export interface CapturePlan {
   win_themes: string[];
   discriminators: string[];
   risks: CaptureRisk[];
+  data_source: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -459,6 +461,7 @@ export interface ApprovalItem {
   resolved_at: string | null;
   resolved_by: string | null;
   resolution_notes: string | null;
+  data_source: string | null;
 }
 
 export interface ApprovalDryRunResult {

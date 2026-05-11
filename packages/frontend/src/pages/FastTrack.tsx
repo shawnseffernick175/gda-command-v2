@@ -8,6 +8,7 @@ import {
   type FastTrackMatch,
   type FastTrackDetailData,
 } from "../api/client";
+import SourceBadge from "../components/SourceBadge";
 
 // ---------------------------------------------------------------------------
 // Constants & helpers
@@ -398,7 +399,7 @@ export default function FastTrack() {
                 </div>
 
                 {/* Technology */}
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>{m.technology}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3, display: "flex", alignItems: "center", gap: 6 }}>{m.technology} <SourceBadge source={m.data_source} /></div>
 
                 {/* Company + Role */}
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -501,7 +502,7 @@ function DetailPanel({ data }: { data: FastTrackDetailData }) {
               <span style={{ fontSize: 11, fontWeight: 600, color: "#22c55e" }}>Promoted</span>
             )}
           </div>
-          <h3 style={{ margin: "0 0 4px", fontSize: 17 }}>{m.technology}</h3>
+          <h3 style={{ margin: "0 0 4px", fontSize: 17, display: "flex", alignItems: "center", gap: 8 }}>{m.technology} <SourceBadge source={m.data_source} size="md" /></h3>
           <div style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 8 }}>
             {m.company_name}
             {m.company_url && (

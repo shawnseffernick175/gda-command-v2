@@ -26,6 +26,7 @@ export interface PwinModelOutput {
   similar_opps_lost: number;
   trend: "improving" | "stable" | "declining";
   trend_delta: number;
+  data_source: string | null;
 }
 
 export interface PwinFeature {
@@ -74,6 +75,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 9,
     trend: "improving",
     trend_delta: 0.03,
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-002",
@@ -104,6 +106,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 13,
     trend: "declining",
     trend_delta: -0.04,
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-003",
@@ -133,6 +136,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 4,
     trend: "stable",
     trend_delta: 0.01,
+    data_source: "govwin",
   },
   {
     opp_id: "opp-004",
@@ -164,6 +168,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 11,
     trend: "declining",
     trend_delta: -0.06,
+    data_source: "sam.gov",
   },
   {
     opp_id: "opp-005",
@@ -194,6 +199,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 6,
     trend: "improving",
     trend_delta: 0.02,
+    data_source: "govwin",
   },
   {
     opp_id: "opp-006",
@@ -223,6 +229,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
     similar_opps_lost: 8,
     trend: "stable",
     trend_delta: 0.00,
+    data_source: "sam.gov",
   },
 ];
 

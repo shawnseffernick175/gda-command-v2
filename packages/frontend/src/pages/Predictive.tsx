@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import InfoBadge from "../components/InfoBadge";
+import SourceBadge from "../components/SourceBadge";
 import {
   fetchPwinModels,
   fetchPipelineForecast,
@@ -81,7 +82,7 @@ function PwinModelsTab({ models, selectedId, onSelect }: {
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ fontSize: 13 }}>{m.opp_title}</strong>
+              <span style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>{m.opp_title} <SourceBadge source={m.data_source} /></span>
               <span style={{ color: TREND_COLOR[m.trend], fontWeight: 700, fontSize: 18 }}>
                 {pct(m.ml_pwin)}
               </span>
@@ -432,7 +433,7 @@ function BidNoBidTab({ data, selectedId, onSelect }: {
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <strong style={{ fontSize: 13 }}>{a.opp_title}</strong>
+              <span style={{ fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>{a.opp_title} <SourceBadge source={a.data_source} /></span>
               <span style={{
                 padding: "3px 10px",
                 borderRadius: 4,

@@ -635,6 +635,7 @@ function mapCapturePlan(raw: N8nCapturePlanItem): CapturePlan {
     win_themes: winThemes,
     discriminators,
     risks,
+    data_source: "manual",
     created_at: raw.created_at,
     updated_at: raw.updated_at,
   };

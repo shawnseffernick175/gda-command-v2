@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SourceBadge from "../components/SourceBadge";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -25,6 +26,7 @@ interface IntelItem {
   related_opportunity_id: string | null;
   related_competitor: string | null;
   tags: string[];
+  data_source: string | null;
   created_at: string;
   read: boolean;
 }
@@ -536,7 +538,7 @@ function FeedTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void })
               <PriorityBadge priority={item.priority} />
               <CategoryBadge category={item.category} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: item.read ? 400 : 600 }}>{item.title}</div>
+                <div style={{ fontSize: 14, fontWeight: item.read ? 400 : 600, display: "flex", alignItems: "center", gap: 6 }}>{item.title} <SourceBadge source={item.data_source} /></div>
                 <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
                   {formatDateTime(item.created_at)} · {item.source}
                   {item.related_competitor && ` · ${item.related_competitor}`}

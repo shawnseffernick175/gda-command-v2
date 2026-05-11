@@ -1527,6 +1527,7 @@ export interface FastTrackMatch {
   match_score: number;
   recommended_next_action: string;
   safety_lane: "read-only" | "dry-run";
+  data_source: string | null;
   sources: FastTrackSource[];
   created_at: string;
   updated_at: string;
@@ -2030,6 +2031,7 @@ export interface PwinModelData {
   similar_opps_lost: number;
   trend: "improving" | "stable" | "declining";
   trend_delta: number;
+  data_source: string | null;
 }
 
 export interface PwinModelsListData {
@@ -2125,6 +2127,7 @@ export interface BidAssessmentData {
   resource_impact: string;
   strategic_alignment: "high" | "medium" | "low";
   assessed_at: string;
+  data_source: string | null;
 }
 
 export interface BidAssessmentsListData {
