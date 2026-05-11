@@ -43,10 +43,12 @@ export default function Login({ onAuth }: LoginProps) {
     >
       <div
         style={{
-          width: 400,
+          width: "100%",
+          maxWidth: 400,
           background: "#1e293b",
           borderRadius: 12,
-          padding: 32,
+          padding: "32px 24px",
+          margin: "0 16px",
           boxShadow: "0 25px 50px rgba(0,0,0,0.3)",
           border: "1px solid #334155",
         }}

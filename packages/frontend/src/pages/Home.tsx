@@ -396,7 +396,7 @@ export default function Home() {
 
 function KPISection({ kpis }: { kpis: DashboardKPIs }) {
   return (
-    <div style={{
+    <div className="kpi-grid" style={{
       display: "grid",
       gridTemplateColumns: kpis.n8nKpis ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
       gap: 16,
@@ -422,7 +422,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
 
 function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
   return (
-    <div style={{
+    <div className="signal-grid" style={{
       display: "grid",
       gridTemplateColumns: "repeat(4, 1fr)",
       gap: 16,
@@ -611,7 +611,7 @@ const QUICK_ACCESS_CARDS = [
 
 function QuickAccessSection() {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+    <div className="quick-access-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
       {QUICK_ACCESS_CARDS.map((card) => (
         <Card key={card.to} {...card} />
       ))}

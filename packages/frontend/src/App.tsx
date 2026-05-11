@@ -103,7 +103,8 @@ export default function App() {
   const { pathname } = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
   const [authed, setAuthed] = useState<boolean | null>(null); // null = loading
-  const sidebarWidth = sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const sidebarWidth = isMobile ? (sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : 0) : (sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH);
   const searchRef = useRef<GlobalSearchHandle>(null);
 
   // Ctrl+K shortcut to focus global search
@@ -159,16 +160,21 @@ export default function App() {
     return () => window.removeEventListener("storage", check);
   }, []);
 
-  // Auto-collapse sidebar on narrow screens
+  // Track mobile state and auto-collapse sidebar on narrow screens
   useEffect(() => {
     function handleResize() {
-      if (window.innerWidth <= 768) {
-        setSidebarOpen(false);
-      }
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Close sidebar when navigating on mobile
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [pathname, isMobile]);
 
   // Loading state while checking auth
   if (authed === null) {
@@ -188,21 +194,36 @@ export default function App() {
     <ErrorBoundary>
     <ToastProvider>
     <div style={{ minHeight: "100vh", display: "flex" }}>
+      {/* Mobile sidebar backdrop */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 99,
+          }}
+        />
+      )}
+
       {/* Sidebar */}
       <aside style={{
-        width: sidebarWidth,
-        minWidth: sidebarWidth,
+        width: isMobile ? SIDEBAR_EXPANDED_WIDTH : sidebarWidth,
+        minWidth: isMobile ? SIDEBAR_EXPANDED_WIDTH : sidebarWidth,
         background: "var(--color-surface)",
         borderRight: "1px solid var(--color-border)",
         display: "flex",
         flexDirection: "column",
-        transition: "width 0.2s ease, min-width 0.2s ease",
+        transition: isMobile ? "transform 0.25s ease" : "width 0.2s ease, min-width 0.2s ease",
         overflow: "hidden",
         position: "fixed",
         top: 0,
         left: 0,
         bottom: 0,
         zIndex: 100,
+        transform: isMobile && !sidebarOpen ? "translateX(-100%)" : "translateX(0)",
       }}>
         {/* Logo / Brand */}
         <div style={{
@@ -399,15 +420,49 @@ export default function App() {
       {/* Main Content */}
       <div style={{
         flex: 1,
-        marginLeft: sidebarWidth,
+        marginLeft: isMobile ? 0 : sidebarWidth,
         display: "flex",
         flexDirection: "column",
         minHeight: "100vh",
-        transition: "margin-left 0.2s ease",
+        transition: isMobile ? "none" : "margin-left 0.2s ease",
       }}>
+        {/* Mobile header with hamburger */}
+        {isMobile && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 16px",
+            background: "var(--color-surface)",
+            borderBottom: "1px solid var(--color-border)",
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+          }}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--color-text)",
+                cursor: "pointer",
+                fontSize: 20,
+                padding: "4px 8px",
+                borderRadius: 4,
+                display: "flex",
+                alignItems: "center",
+              }}
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>GDA Command</span>
+          </div>
+        )}
+
         <FinancialKPIStrip />
 
-        <main style={{ flex: 1, padding: 24 }}>
+        <main style={{ flex: 1, padding: isMobile ? 12 : 24 }}>
           <Breadcrumb />
           <Routes>
             <Route path="/" element={<Home />} />
