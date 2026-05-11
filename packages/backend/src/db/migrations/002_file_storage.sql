@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
   storage_key TEXT NOT NULL UNIQUE,
   mime_type TEXT NOT NULL,
   size_bytes BIGINT NOT NULL DEFAULT 0,
-  uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
