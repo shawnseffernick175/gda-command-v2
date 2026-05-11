@@ -329,7 +329,8 @@ router.post("/fpds-awards", async (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/ingest/status — Ingestion health check + registry summary
 // ---------------------------------------------------------------------------
-router.get("/status", async (_req, res) => {
+router.get("/status", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
   const pool = getPool();
   let dbCounts: Record<string, number> = {};
   if (pool) {

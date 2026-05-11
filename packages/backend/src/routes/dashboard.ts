@@ -395,7 +395,7 @@ router.get("/mega", async (_req, res) => {
       contracts: [],
       opps: [],
       sitrep: null,
-      source: pool ? "db" : "mock",
+      source: pool && oppCount > 0 ? "db" : "mock",
     }, {
       generatedAt: new Date().toISOString(),
     })
