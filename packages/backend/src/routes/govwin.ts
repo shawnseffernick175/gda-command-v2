@@ -8,7 +8,8 @@ const router = Router();
 // GET /api/govwin/summary
 router.get("/summary", (_req, res) => {
   const all = MOCK_GOVWIN_OPPORTUNITIES;
-  const totalValue = all.reduce((s, o) => s + ((o.value_low ?? 0) + (o.value_high ?? 0)) / 2, 0);
+  const activeOpps = all.filter((o) => o.status !== "dismissed" && o.status !== "archived");
+  const totalValue = activeOpps.reduce((s, o) => s + ((o.value_low ?? 0) + (o.value_high ?? 0)) / 2, 0);
   const lastSync = MOCK_GOVWIN_SYNCS.find((s) => s.status === "completed");
 
   res.json(
