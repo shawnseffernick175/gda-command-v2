@@ -193,7 +193,7 @@ router.post("/promote", async (req, res) => {
             match.candidate_agency ?? "TBD",
             "TBD",
             match.match_score,
-            JSON.stringify(match.technology_tags ?? []),
+            match.technology_tags ?? [],
           ],
         );
         if (result.rows.length > 0) {
