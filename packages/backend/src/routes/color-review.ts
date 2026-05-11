@@ -23,6 +23,10 @@ async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" | "moc
           ...r,
           requirement_checks: r.requirement_checks ?? [],
           section_scores: r.section_scores ?? [],
+          gold_checks: r.gold_checks ?? [],
+          cost_line_items: r.cost_line_items ?? [],
+          green_checks: r.green_checks ?? [],
+          format_checks: r.format_checks ?? [],
           risk_factors: r.risk_factors ?? [],
         })) as ReviewItem[], source: "db" };
       }
@@ -224,6 +228,10 @@ router.get("/:id", async (req, res) => {
             ...r,
             requirement_checks: r.requirement_checks ?? [],
             section_scores: r.section_scores ?? [],
+            gold_checks: r.gold_checks ?? [],
+            cost_line_items: r.cost_line_items ?? [],
+            green_checks: r.green_checks ?? [],
+            format_checks: r.format_checks ?? [],
             risk_factors: r.risk_factors ?? [],
           };
           return res.json(successEnvelope("GDA.color-review", "get-detail", { review, source: "db" }));
@@ -377,12 +385,81 @@ router.post(
     const summary = String(reviewResult.summary ?? "");
     const riskFactors = Array.isArray(reviewResult.risk_factors) ? reviewResult.risk_factors : [];
 
-    const requirementChecks = Array.isArray(reviewResult.requirement_checks) ? reviewResult.requirement_checks : [];
-    const sectionScores = Array.isArray(reviewResult.section_scores) ? reviewResult.section_scores : [];
-    const goldChecks = Array.isArray(reviewResult.gold_checks) ? reviewResult.gold_checks : [];
-    const costLineItems = Array.isArray(reviewResult.cost_line_items) ? reviewResult.cost_line_items : [];
-    const greenChecks = Array.isArray(reviewResult.green_checks) ? reviewResult.green_checks : [];
-    const formatChecks = Array.isArray(reviewResult.format_checks) ? reviewResult.format_checks : [];
+    // Normalize AI response fields to match frontend expected schema
+    const rawRequirementChecks = Array.isArray(reviewResult.requirement_checks) ? reviewResult.requirement_checks as Record<string, unknown>[] : [];
+    const requirementChecks = rawRequirementChecks.map((c) => ({
+      id: c.id ?? c.requirement_id ?? `CHK-${Math.random().toString(36).slice(2, 6)}`,
+      requirement_id: c.requirement_id ?? c.id ?? "",
+      requirement_text: c.requirement_text ?? c.requirement ?? "",
+      source_reference: c.source_reference ?? c.section ?? "",
+      verdict: c.verdict ?? "not_reviewed",
+      response_location: c.response_location ?? null,
+      gap_detail: c.gap_detail ?? c.detail ?? null,
+      suggestion: c.suggestion ?? c.recommendation ?? null,
+    }));
+
+    const rawSectionScores = Array.isArray(reviewResult.section_scores) ? reviewResult.section_scores as Record<string, unknown>[] : [];
+    const sectionScores = rawSectionScores.map((s) => ({
+      id: s.id ?? `SEC-${Math.random().toString(36).slice(2, 6)}`,
+      section: s.section ?? s.section_name ?? "",
+      volume: s.volume ?? "",
+      score: Number(s.score ?? 0),
+      max_score: Number(s.max_score ?? 100),
+      strengths: Array.isArray(s.strengths) ? s.strengths : [],
+      weaknesses: Array.isArray(s.weaknesses) ? s.weaknesses : [],
+      discriminators_found: Array.isArray(s.discriminators_found) ? s.discriminators_found : [],
+      discriminators_missing: Array.isArray(s.discriminators_missing) ? s.discriminators_missing : [],
+      improvement_actions: Array.isArray(s.improvement_actions) ? s.improvement_actions : [],
+      evaluator_notes: s.evaluator_notes ?? s.detail ?? "",
+      verdict: s.verdict ?? "not_reviewed",
+    }));
+
+    const rawGoldChecks = Array.isArray(reviewResult.gold_checks) ? reviewResult.gold_checks as Record<string, unknown>[] : [];
+    const goldChecks = rawGoldChecks.map((g) => ({
+      id: g.id ?? `GOLD-${Math.random().toString(36).slice(2, 6)}`,
+      category: g.category ?? g.area ?? "",
+      label: g.label ?? g.area ?? g.assessment ?? "",
+      verdict: g.verdict ?? "not_reviewed",
+      score: Number(g.score ?? 0),
+      max_score: Number(g.max_score ?? 100),
+      detail: g.detail ?? g.assessment ?? "",
+      recommendations: Array.isArray(g.recommendations) ? g.recommendations : (g.recommendation ? [g.recommendation] : []),
+    }));
+
+    const rawCostLineItems = Array.isArray(reviewResult.cost_line_items) ? reviewResult.cost_line_items as Record<string, unknown>[] : [];
+    const costLineItems = rawCostLineItems.map((c) => ({
+      id: c.id ?? `COST-${Math.random().toString(36).slice(2, 6)}`,
+      category: c.category ?? c.label ?? "",
+      proposed_amount: Number(c.proposed_amount ?? c.amount ?? 0),
+      government_estimate: c.government_estimate != null ? Number(c.government_estimate) : null,
+      variance_pct: c.variance_pct != null ? Number(c.variance_pct) : null,
+      verdict: c.verdict ?? "not_reviewed",
+      basis_of_estimate: c.basis_of_estimate ?? c.detail ?? "",
+      notes: c.notes ?? "",
+    }));
+
+    const rawGreenChecks = Array.isArray(reviewResult.green_checks) ? reviewResult.green_checks as Record<string, unknown>[] : [];
+    const greenChecks = rawGreenChecks.map((g) => ({
+      id: g.id ?? `GC-${Math.random().toString(36).slice(2, 6)}`,
+      area: g.area ?? g.category ?? "",
+      label: g.label ?? "",
+      verdict: g.verdict ?? "not_reviewed",
+      detail: g.detail ?? "",
+      benchmark: g.benchmark ?? null,
+      recommendation: g.recommendation ?? null,
+    }));
+
+    const rawFormatChecks = Array.isArray(reviewResult.format_checks) ? reviewResult.format_checks as Record<string, unknown>[] : [];
+    const formatChecks = rawFormatChecks.map((f) => ({
+      id: f.id ?? `FMT-${Math.random().toString(36).slice(2, 6)}`,
+      category: f.category ?? "",
+      label: f.label ?? "",
+      verdict: f.verdict ?? "not_reviewed",
+      expected: f.expected ?? "",
+      actual: f.actual ?? "",
+      volume: f.volume ?? "",
+      detail: f.detail ?? null,
+    }));
 
     // Count verdicts across all check types
     const allChecks = [...requirementChecks, ...sectionScores, ...goldChecks, ...costLineItems, ...greenChecks, ...formatChecks];

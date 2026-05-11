@@ -122,13 +122,13 @@ export default function ColorReview() {
 
   // Determine best tab for selected review
   function bestTab(r: ColorReviewRow): DetailTab {
-    if (r.phase === "pink" && r.requirement_checks.length > 0) return "checks";
-    if (r.phase === "red" && r.section_scores.length > 0) return "sections";
-    if (r.phase === "gold" && r.gold_checks.length > 0) return "gold";
-    if (r.phase === "green" && r.cost_line_items.length > 0) return "costs";
-    if (r.phase === "green" && r.green_checks.length > 0) return "green";
-    if (r.phase === "white" && r.format_checks.length > 0) return "format";
-    if (r.risk_factors.length > 0) return "risks";
+    if (r.phase === "pink" && (r.requirement_checks ?? []).length > 0) return "checks";
+    if (r.phase === "red" && (r.section_scores ?? []).length > 0) return "sections";
+    if (r.phase === "gold" && (r.gold_checks ?? []).length > 0) return "gold";
+    if (r.phase === "green" && (r.cost_line_items ?? []).length > 0) return "costs";
+    if (r.phase === "green" && (r.green_checks ?? []).length > 0) return "green";
+    if (r.phase === "white" && (r.format_checks ?? []).length > 0) return "format";
+    if ((r.risk_factors ?? []).length > 0) return "risks";
     return "checks";
   }
 
@@ -423,7 +423,7 @@ export default function ColorReview() {
                     <>
                       <div>
                         <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Cost Items</div>
-                        <div style={{ fontSize: 22, fontWeight: 700 }}>{sel.cost_line_items.length}</div>
+                        <div style={{ fontSize: 22, fontWeight: 700 }}>{(sel.cost_line_items ?? []).length}</div>
                       </div>
                       <div>
                         <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Checks</div>
@@ -461,13 +461,13 @@ export default function ColorReview() {
               {/* Tabs */}
               <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
                 {([
-                  { key: "checks" as DetailTab, label: `Compliance (${sel.requirement_checks.length})`, show: sel.requirement_checks.length > 0 },
-                  { key: "sections" as DetailTab, label: `Sections (${sel.section_scores.length})`, show: sel.section_scores.length > 0 },
-                  { key: "gold" as DetailTab, label: `Gold Checks (${sel.gold_checks.length})`, show: sel.gold_checks.length > 0 },
-                  { key: "costs" as DetailTab, label: `Cost Items (${sel.cost_line_items.length})`, show: sel.cost_line_items.length > 0 },
-                  { key: "green" as DetailTab, label: `Green Checks (${sel.green_checks.length})`, show: sel.green_checks.length > 0 },
-                  { key: "format" as DetailTab, label: `Format Checks (${sel.format_checks.length})`, show: sel.format_checks.length > 0 },
-                  { key: "risks" as DetailTab, label: `Risk Factors (${sel.risk_factors.length})`, show: sel.risk_factors.length > 0 },
+                  { key: "checks" as DetailTab, label: `Compliance (${(sel.requirement_checks ?? []).length})`, show: (sel.requirement_checks ?? []).length > 0 },
+                  { key: "sections" as DetailTab, label: `Sections (${(sel.section_scores ?? []).length})`, show: (sel.section_scores ?? []).length > 0 },
+                  { key: "gold" as DetailTab, label: `Gold Checks (${(sel.gold_checks ?? []).length})`, show: (sel.gold_checks ?? []).length > 0 },
+                  { key: "costs" as DetailTab, label: `Cost Items (${(sel.cost_line_items ?? []).length})`, show: (sel.cost_line_items ?? []).length > 0 },
+                  { key: "green" as DetailTab, label: `Green Checks (${(sel.green_checks ?? []).length})`, show: (sel.green_checks ?? []).length > 0 },
+                  { key: "format" as DetailTab, label: `Format Checks (${(sel.format_checks ?? []).length})`, show: (sel.format_checks ?? []).length > 0 },
+                  { key: "risks" as DetailTab, label: `Risk Factors (${(sel.risk_factors ?? []).length})`, show: (sel.risk_factors ?? []).length > 0 },
                 ] as const).filter((t) => t.show).map((t) => (
                   <button
                     key={t.key}
@@ -487,13 +487,13 @@ export default function ColorReview() {
               </div>
 
               {/* Tab content */}
-              {tab === "checks" && <ComplianceChecks checks={sel.requirement_checks} expanded={expandedCheck} onToggle={(id) => setExpandedCheck(expandedCheck === id ? null : id)} />}
-              {tab === "sections" && <SectionScores sections={sel.section_scores} expanded={expandedSection} onToggle={(id) => setExpandedSection(expandedSection === id ? null : id)} />}
-              {tab === "gold" && <GoldChecks checks={sel.gold_checks} expanded={expandedGold} onToggle={(id) => setExpandedGold(expandedGold === id ? null : id)} />}
-              {tab === "costs" && <CostLineItems items={sel.cost_line_items} />}
-              {tab === "green" && <GreenChecks checks={sel.green_checks} />}
-              {tab === "format" && <FormatChecks checks={sel.format_checks} />}
-              {tab === "risks" && <RiskFactors factors={sel.risk_factors} />}
+              {tab === "checks" && <ComplianceChecks checks={sel.requirement_checks ?? []} expanded={expandedCheck} onToggle={(id) => setExpandedCheck(expandedCheck === id ? null : id)} />}
+              {tab === "sections" && <SectionScores sections={sel.section_scores ?? []} expanded={expandedSection} onToggle={(id) => setExpandedSection(expandedSection === id ? null : id)} />}
+              {tab === "gold" && <GoldChecks checks={sel.gold_checks ?? []} expanded={expandedGold} onToggle={(id) => setExpandedGold(expandedGold === id ? null : id)} />}
+              {tab === "costs" && <CostLineItems items={sel.cost_line_items ?? []} />}
+              {tab === "green" && <GreenChecks checks={sel.green_checks ?? []} />}
+              {tab === "format" && <FormatChecks checks={sel.format_checks ?? []} />}
+              {tab === "risks" && <RiskFactors factors={sel.risk_factors ?? []} />}
             </>
           )}
         </div>
@@ -646,38 +646,38 @@ function SectionScores({ sections, expanded, onToggle }: { sections: ColorReview
               <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border)" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, marginBottom: 4 }}>Strengths ({s.strengths.length})</div>
-                    {s.strengths.map((st, i) => (
+                    <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, marginBottom: 4 }}>Strengths ({(s.strengths ?? []).length})</div>
+                    {(s.strengths ?? []).map((st, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #22c55e" }}>{st}</div>
                     ))}
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, marginBottom: 4 }}>Weaknesses ({s.weaknesses.length})</div>
-                    {s.weaknesses.map((w, i) => (
+                    <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600, marginBottom: 4 }}>Weaknesses ({(s.weaknesses ?? []).length})</div>
+                    {(s.weaknesses ?? []).map((w, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #ef4444" }}>{w}</div>
                     ))}
                   </div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: "#3b82f6", fontWeight: 600, marginBottom: 4 }}>Discriminators Found ({s.discriminators_found.length})</div>
-                    {s.discriminators_found.map((d, i) => (
+                    <div style={{ fontSize: 11, color: "#3b82f6", fontWeight: 600, marginBottom: 4 }}>Discriminators Found ({(s.discriminators_found ?? []).length})</div>
+                    {(s.discriminators_found ?? []).map((d, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #3b82f6" }}>{d}</div>
                     ))}
-                    {s.discriminators_found.length === 0 && <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>None identified</div>}
+                    {(s.discriminators_found ?? []).length === 0 && <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>None identified</div>}
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 600, marginBottom: 4 }}>Discriminators Missing ({s.discriminators_missing.length})</div>
-                    {s.discriminators_missing.map((d, i) => (
+                    <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 600, marginBottom: 4 }}>Discriminators Missing ({(s.discriminators_missing ?? []).length})</div>
+                    {(s.discriminators_missing ?? []).map((d, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #f59e0b" }}>{d}</div>
                     ))}
-                    {s.discriminators_missing.length === 0 && <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>None</div>}
+                    {(s.discriminators_missing ?? []).length === 0 && <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>None</div>}
                   </div>
                 </div>
-                {s.improvement_actions.length > 0 && (
+                {(s.improvement_actions ?? []).length > 0 && (
                   <div style={{ marginTop: 12, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
-                    <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Improvement Actions ({s.improvement_actions.length})</div>
-                    {s.improvement_actions.map((a, i) => (
+                    <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Improvement Actions ({(s.improvement_actions ?? []).length})</div>
+                    {(s.improvement_actions ?? []).map((a, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3 }}>• {a}</div>
                     ))}
                   </div>
@@ -735,10 +735,10 @@ function GoldChecks({ checks, expanded, onToggle }: { checks: ColorReviewGoldChe
             {expanded === c.id && (
               <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border)" }}>
                 <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.5 }}>{c.detail}</div>
-                {c.recommendations.length > 0 && (
+                {(c.recommendations ?? []).length > 0 && (
                   <div style={{ marginTop: 10, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
-                    <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Recommendations ({c.recommendations.length})</div>
-                    {c.recommendations.map((r, i) => (
+                    <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Recommendations ({(c.recommendations ?? []).length})</div>
+                    {(c.recommendations ?? []).map((r, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3 }}>• {r}</div>
                     ))}
                   </div>
