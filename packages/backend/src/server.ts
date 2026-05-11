@@ -28,9 +28,11 @@ import samMonitorRouter from "./routes/sam-monitor";
 import discussionsRouter from "./routes/discussions";
 import cparsRouter from "./routes/cpars";
 import fpdsRouter from "./routes/fpds";
+import ingestRouter from "./routes/ingest";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
+import { WEBHOOK_REGISTRY, getRegistrySummary } from "./lib/webhook-registry";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -79,6 +81,17 @@ app.get("/health", async (_req, res) => {
 
 // --- Auth routes (no auth middleware) ---
 app.use("/api/auth", authRouter);
+
+// --- Ingest routes (key-based auth, no JWT) ---
+app.use("/api/ingest", ingestRouter);
+
+// --- Webhook registry (public, read-only) ---
+app.get("/api/webhooks/registry", (_req, res) => {
+  res.json(successEnvelope("gda-webhooks", "registry", {
+    ...getRegistrySummary(),
+    webhooks: WEBHOOK_REGISTRY,
+  }));
+});
 
 // --- Auth middleware for all other API routes ---
 app.use("/api", authMiddleware);

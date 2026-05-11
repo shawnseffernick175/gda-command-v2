@@ -335,4 +335,127 @@ router.get("/command-signals", async (_req, res) => {
   );
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/dashboard/mega — Combined live data from n8n dashboard-mega webhook
+// Returns funnel, risks, stats, trends, contracts, opps, and sitrep
+// ---------------------------------------------------------------------------
+router.get("/mega", async (_req, res) => {
+  if (n8nWebhookConfigured()) {
+    try {
+      const { callWebhook } = await import("../lib/n8n-client");
+      const result = await callWebhook("gda-dashboard-mega", {}, { timeoutMs: 30_000 });
+      if (result.ok && result.body) {
+        const data = result.body as Record<string, unknown>;
+        return res.json(
+          successEnvelope("gda-dashboard", "mega", {
+            ...data,
+            source: "n8n",
+          }, {
+            generatedAt: new Date().toISOString(),
+            webhookMs: result.ms,
+          })
+        );
+      }
+    } catch (err: unknown) {
+      process.stderr.write(`[dashboard] mega n8n error: ${(err as Error).message}\n`);
+    }
+  }
+
+  // Fallback: compose from DB/mock
+  const pool = getPool();
+  let oppCount = 0;
+  let pipelineValue = 0;
+
+  if (pool) {
+    try {
+      const { rows: countRow } = await pool.query("SELECT COUNT(*) as c FROM opportunities");
+      oppCount = parseInt(countRow[0].c, 10);
+      const { rows: valRow } = await pool.query(
+        "SELECT COALESCE(SUM(value_estimated), 0) as v FROM opportunities WHERE status = 'pipeline'"
+      );
+      pipelineValue = parseFloat(valRow[0].v) || 0;
+    } catch { /* fallback */ }
+  }
+
+  if (oppCount === 0) {
+    const opps = getMockOpportunities();
+    oppCount = opps.length;
+    pipelineValue = opps
+      .filter((o) => o.status === "pipeline")
+      .reduce((s, o) => s + (o.value_estimated ?? 0), 0);
+  }
+
+  res.json(
+    successEnvelope("gda-dashboard", "mega", {
+      status: "ok",
+      funnel: [],
+      risks: [],
+      stats: { totalOpps: oppCount, pipelineValue },
+      trends: [],
+      contracts: [],
+      opps: [],
+      sitrep: null,
+      source: pool ? "db" : "mock",
+    }, {
+      generatedAt: new Date().toISOString(),
+    })
+  );
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/dashboard/trends — Live trend metrics from n8n
+// ---------------------------------------------------------------------------
+router.get("/trends", async (_req, res) => {
+  if (n8nWebhookConfigured()) {
+    try {
+      const { callWebhook } = await import("../lib/n8n-client");
+      const result = await callWebhook("gda-trends", {}, { timeoutMs: 15_000 });
+      if (result.ok && result.body) {
+        const data = result.body as Record<string, unknown>;
+        return res.json(
+          successEnvelope("gda-dashboard", "trends", {
+            ...(data.data ? { trends: data.data, count: data.count } : data),
+            source: "n8n",
+          })
+        );
+      }
+    } catch { /* fallback */ }
+  }
+
+  res.json(
+    successEnvelope("gda-dashboard", "trends", {
+      trends: [],
+      count: 0,
+      source: "mock",
+    })
+  );
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/dashboard/actions — Daily action items from n8n
+// ---------------------------------------------------------------------------
+router.get("/actions", async (_req, res) => {
+  if (n8nWebhookConfigured()) {
+    try {
+      const { callWebhook } = await import("../lib/n8n-client");
+      const result = await callWebhook("gda-daily-actions", {}, { timeoutMs: 15_000 });
+      if (result.ok && result.body) {
+        return res.json(
+          successEnvelope("gda-dashboard", "actions", {
+            actions: Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).actions ?? [],
+            source: "n8n",
+          })
+        );
+      }
+    } catch { /* fallback */ }
+  }
+
+  res.json(
+    successEnvelope("gda-dashboard", "actions", {
+      actions: [],
+      source: "mock",
+    })
+  );
+});
+
 export default router;
