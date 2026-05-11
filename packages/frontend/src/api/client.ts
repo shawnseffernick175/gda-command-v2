@@ -3031,3 +3031,37 @@ export function resetDashboardLayout() {
     method: "DELETE",
   });
 }
+
+// ── Audit Log ──────────────────────────────────────────────────────
+
+export interface AuditEntry {
+  id: string;
+  user_id: string | null;
+  user_email: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  details: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface AuditStats {
+  totalEntries: number;
+  topActions: { action: string; count: number }[];
+  topUsers: { user_email: string; count: number }[];
+  recentActivity: { date: string; count: number }[];
+}
+
+export function fetchAuditLog(page = 1, limit = 50, action?: string, resourceType?: string) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (action) params.set("action", action);
+  if (resourceType) params.set("resource_type", resourceType);
+  return request<{ entries: AuditEntry[]; total: number; page: number; limit: number; totalPages: number }>(
+    `/audit?${params}`
+  );
+}
+
+export function fetchAuditStats() {
+  return request<AuditStats>("/audit/stats");
+}

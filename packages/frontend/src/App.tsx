@@ -30,6 +30,7 @@ import Discussions from "./pages/Discussions";
 import CPARSBuilder from "./pages/CPARSBuilder";
 import FPDSMonitor from "./pages/FPDSMonitor";
 import UserManagement from "./pages/UserManagement";
+import AuditLog from "./pages/AuditLog";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -85,6 +86,7 @@ const NAV_GROUPS = [
       { path: "/workflows", label: "Workflows", icon: "⚙" },
       { path: "/settings", label: "Settings", icon: "⚡" },
       { path: "/admin/users", label: "Users", icon: "👥" },
+      { path: "/admin/audit", label: "Audit Log", icon: "📜" },
     ],
   },
 ] as const;
@@ -437,6 +439,7 @@ export default function App() {
             <Route path="/cpars" element={<CPARSBuilder />} />
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
             <Route path="/admin/users" element={<UserManagement />} />
+            <Route path="/admin/audit" element={<AuditLog />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
