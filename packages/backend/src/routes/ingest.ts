@@ -490,7 +490,7 @@ router.post("/anomalies", async (req, res) => {
         a.detected_at ?? new Date().toISOString(),
         a.metric_name ?? null, a.metric_value ?? null, a.baseline_value ?? null,
         a.deviation_pct ?? null, JSON.stringify(a.trend ?? []),
-        a.root_cause ?? null, JSON.stringify(a.recommended_actions ?? []),
+        a.root_cause ?? null, a.recommended_actions ?? [],
       ]);
       upserted++;
     } catch (e) {
@@ -519,7 +519,7 @@ router.post("/escalations", async (req, res) => {
       await pool.query(`
         INSERT INTO escalations (id, rule_id, rule_name, priority, status, title,
           description, opportunity_id, opportunity_title, agency,
-          assigned_to, due_date, created_at)
+          assigned_to, due_date, triggered_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
         ON CONFLICT (id) DO UPDATE SET
           priority = EXCLUDED.priority, title = EXCLUDED.title,
@@ -681,21 +681,22 @@ router.post("/competitor-movements", async (req, res) => {
   for (const m of items) {
     try {
       await pool.query(`
-        INSERT INTO competitor_movements (id, competitor_name, movement_type, severity,
-          title, description, opportunity_id, opportunity_title,
-          source, source_url, verified, detected_at, impact_assessment)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        INSERT INTO competitor_movements (id, competitor_name, movement_type, threat_level,
+          title, description, impact_assessment,
+          affected_opportunities, source, source_url, verified, detected_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         ON CONFLICT (id) DO UPDATE SET
-          movement_type = EXCLUDED.movement_type, severity = EXCLUDED.severity,
+          movement_type = EXCLUDED.movement_type, threat_level = EXCLUDED.threat_level,
           title = EXCLUDED.title, description = EXCLUDED.description,
+          impact_assessment = EXCLUDED.impact_assessment,
+          affected_opportunities = EXCLUDED.affected_opportunities,
           source = EXCLUDED.source, source_url = EXCLUDED.source_url,
-          verified = EXCLUDED.verified, impact_assessment = EXCLUDED.impact_assessment
+          verified = EXCLUDED.verified
       `, [
-        m.id, m.competitor_name, m.movement_type ?? "general", m.severity ?? "medium",
-        m.title, m.description ?? null, m.opportunity_id ?? null,
-        m.opportunity_title ?? null, m.source ?? null, m.source_url ?? null,
+        m.id, m.competitor_name, m.movement_type ?? "general", m.threat_level ?? m.severity ?? "medium",
+        m.title, m.description ?? null, m.impact_assessment ?? null,
+        m.affected_opportunities ?? [], m.source ?? null, m.source_url ?? null,
         m.verified ?? false, m.detected_at ?? new Date().toISOString(),
-        m.impact_assessment ?? null,
       ]);
       upserted++;
     } catch (e) {
@@ -722,24 +723,32 @@ router.post("/color-reviews", async (req, res) => {
   for (const r of items) {
     try {
       await pool.query(`
-        INSERT INTO color_reviews (id, proposal_id, proposal_title, phase, status,
-          reviewer, review_date, overall_score, recommendation,
-          findings, strengths, weaknesses, action_items,
+        INSERT INTO color_reviews (id, proposal_id, proposal_title, agency, phase, status,
+          started_at, completed_at, overall_score, max_score, pass_rate,
+          total_checks, passed_checks, failed_checks, warning_checks,
+          reviewer, summary, go_no_go, confidence,
+          requirement_checks, section_scores, risk_factors,
           created_at, updated_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW(),NOW())
         ON CONFLICT (id) DO UPDATE SET
           status = EXCLUDED.status, reviewer = EXCLUDED.reviewer,
-          review_date = EXCLUDED.review_date, overall_score = EXCLUDED.overall_score,
-          recommendation = EXCLUDED.recommendation, findings = EXCLUDED.findings,
-          strengths = EXCLUDED.strengths, weaknesses = EXCLUDED.weaknesses,
-          action_items = EXCLUDED.action_items, updated_at = NOW()
+          completed_at = EXCLUDED.completed_at, overall_score = EXCLUDED.overall_score,
+          pass_rate = EXCLUDED.pass_rate, total_checks = EXCLUDED.total_checks,
+          passed_checks = EXCLUDED.passed_checks, failed_checks = EXCLUDED.failed_checks,
+          warning_checks = EXCLUDED.warning_checks, summary = EXCLUDED.summary,
+          go_no_go = EXCLUDED.go_no_go, confidence = EXCLUDED.confidence,
+          requirement_checks = EXCLUDED.requirement_checks,
+          section_scores = EXCLUDED.section_scores,
+          risk_factors = EXCLUDED.risk_factors, updated_at = NOW()
       `, [
-        r.id, r.proposal_id, r.proposal_title, r.phase ?? "pink",
-        r.status ?? "in_progress", r.reviewer ?? null,
-        r.review_date ?? new Date().toISOString(), r.overall_score ?? null,
-        r.recommendation ?? null, JSON.stringify(r.findings ?? []),
-        JSON.stringify(r.strengths ?? []), JSON.stringify(r.weaknesses ?? []),
-        JSON.stringify(r.action_items ?? []),
+        r.id, r.proposal_id ?? null, r.proposal_title, r.agency ?? null,
+        r.phase ?? "pink", r.status ?? "in_progress",
+        r.started_at ?? null, r.completed_at ?? null,
+        r.overall_score ?? 0, r.max_score ?? 100, r.pass_rate ?? 0,
+        r.total_checks ?? 0, r.passed_checks ?? 0, r.failed_checks ?? 0, r.warning_checks ?? 0,
+        r.reviewer ?? null, r.summary ?? null, r.go_no_go ?? null, r.confidence ?? null,
+        JSON.stringify(r.requirement_checks ?? []), JSON.stringify(r.section_scores ?? []),
+        r.risk_factors ?? [],
       ]);
       upserted++;
     } catch (e) {
