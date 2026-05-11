@@ -64,6 +64,22 @@ export function chunkText(
     const trimmed = para.trim();
     if (!trimmed) continue;
 
+    // If a single paragraph exceeds maxChars, split it into windows
+    if (trimmed.length > maxChars) {
+      // Flush any buffered content first
+      if (currentChunk.trim()) {
+        chunks.push({ text: currentChunk.trim(), chunkIndex: chunkIndex++ });
+        currentChunk = "";
+      }
+      for (let i = 0; i < trimmed.length; i += maxChars - overlap) {
+        chunks.push({
+          text: trimmed.slice(i, i + maxChars).trim(),
+          chunkIndex: chunkIndex++,
+        });
+      }
+      continue;
+    }
+
     if (currentChunk.length + trimmed.length + 2 > maxChars && currentChunk.length > 0) {
       chunks.push({ text: currentChunk.trim(), chunkIndex: chunkIndex++ });
 
@@ -77,17 +93,6 @@ export function chunkText(
 
   if (currentChunk.trim()) {
     chunks.push({ text: currentChunk.trim(), chunkIndex: chunkIndex++ });
-  }
-
-  // Handle case where single paragraph is very long
-  if (chunks.length === 0 && fullText.trim().length > 0) {
-    const text = fullText.trim();
-    for (let i = 0; i < text.length; i += maxChars - overlap) {
-      chunks.push({
-        text: text.slice(i, i + maxChars).trim(),
-        chunkIndex: chunkIndex++,
-      });
-    }
   }
 
   return chunks;
@@ -115,7 +120,8 @@ export async function generateEmbeddings(
       dimensions: EMBEDDING_DIMENSIONS,
     });
 
-    for (const item of response.data) {
+    const sorted = [...response.data].sort((a, b) => a.index - b.index);
+    for (const item of sorted) {
       results.push(item.embedding);
     }
 
@@ -263,15 +269,30 @@ export async function embedAllDocuments(): Promise<{
       if (meta.description) textParts.push(meta.description);
       if (meta.content) textParts.push(meta.content);
 
-      // Check for linked file content
-      const fileResult = await pool.query(
-        `SELECT uf.storage_key FROM uploaded_files uf
-         JOIN knowledge_documents kd ON kd.file_id = uf.id
-         WHERE kd.id = $1`,
-        [doc.id],
-      );
+      // Read linked file content if available
+      try {
+        const fileResult = await pool.query(
+          `SELECT uf.storage_key FROM uploaded_files uf
+           JOIN knowledge_documents kd ON kd.file_id = uf.id
+           WHERE kd.id = $1`,
+          [doc.id],
+        );
+        if (fileResult.rows.length > 0) {
+          const fs = await import("fs");
+          const path = await import("path");
+          const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+          const filePath = path.join(uploadDir, fileResult.rows[0].storage_key);
+          if (fs.existsSync(filePath)) {
+            const content = fs.readFileSync(filePath, "utf-8");
+            if (content.trim().length > 0) {
+              textParts.push(content);
+            }
+          }
+        }
+      } catch {
+        // File read failed — continue with metadata only
+      }
 
-      // If no substantial text available, use title + metadata
       const fullText = textParts.join("\n\n");
 
       if (fullText.trim().length < 20) {
