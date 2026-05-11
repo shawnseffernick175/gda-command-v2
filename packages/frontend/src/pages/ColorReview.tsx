@@ -12,23 +12,44 @@ import {
   type ColorReviewCostLineItemRow,
   type ColorReviewGreenCheckRow,
   type ColorReviewFormatCheckRow,
+  type ColorReviewBlueAssessmentRow,
+  type ColorReviewBlackHatFindingRow,
 } from "../api/client";
 
 const PHASE_COLORS: Record<string, string> = {
-  white: "#94a3b8",
+  blue: "#3b82f6",
   pink: "#ec4899",
-  green: "#22c55e",
   red: "#ef4444",
+  green: "#22c55e",
   gold: "#eab308",
+  white: "#94a3b8",
+  black_hat: "#1e1e1e",
+  white_glove: "#e2e8f0",
 };
 
 const PHASE_LABELS: Record<string, string> = {
-  white: "White Team",
+  blue: "Blue Team",
   pink: "Pink Team",
-  green: "Green Team",
   red: "Red Team",
+  green: "Green Team",
   gold: "Gold Team",
+  white: "White Team",
+  black_hat: "Black Hat",
+  white_glove: "White Glove",
 };
+
+const PHASE_DESCRIPTIONS: Record<string, string> = {
+  blue: "Strategy / Capture — Fit assessment before proposal writing",
+  pink: "Structure / Compliance — First draft ~50-60% complete",
+  red: "Proposal Evaluation — Near-final ~90-95% complete",
+  green: "Pricing — Cost volume review",
+  gold: "Final Review — Executive go/no-go decision",
+  white: "Lessons Learned — Post-submission analysis",
+  black_hat: "Competitor Analysis — Predict competitor strategies",
+  white_glove: "Final Inspection — Visual/print quality check",
+};
+
+const SHIPLEY_ORDER: string[] = ["blue", "pink", "red", "green", "gold", "white", "black_hat", "white_glove"];
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#6b7280",
@@ -74,7 +95,7 @@ function formatDate(d: string): string {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-type DetailTab = "checks" | "sections" | "gold" | "costs" | "green" | "format" | "risks";
+type DetailTab = "checks" | "sections" | "gold" | "costs" | "green" | "format" | "blue" | "black_hat" | "risks";
 
 export default function ColorReview() {
   const [data, setData] = useState<ColorReviewData | null>(null);
@@ -87,6 +108,7 @@ export default function ColorReview() {
   const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [expandedGold, setExpandedGold] = useState<string | null>(null);
+  const [expandedOpps, setExpandedOpps] = useState<Set<string>>(new Set());
   const [runModal, setRunModal] = useState(false);
   const [runResult, setRunResult] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
@@ -100,6 +122,8 @@ export default function ColorReview() {
         if (env.success && env.data) {
           setData(env.data);
           if (env.data.reviews.length > 0) setSelected(env.data.reviews[0].id);
+          const oppIds = new Set(env.data.reviews.map((r) => r.proposal_id));
+          setExpandedOpps(oppIds);
         } else {
           setError(env.error?.message ?? "Failed to load color reviews");
         }
@@ -122,12 +146,14 @@ export default function ColorReview() {
 
   // Determine best tab for selected review
   function bestTab(r: ColorReviewRow): DetailTab {
+    if (r.phase === "blue" && (r.blue_assessments ?? []).length > 0) return "blue";
     if (r.phase === "pink" && (r.requirement_checks ?? []).length > 0) return "checks";
     if (r.phase === "red" && (r.section_scores ?? []).length > 0) return "sections";
-    if (r.phase === "gold" && (r.gold_checks ?? []).length > 0) return "gold";
     if (r.phase === "green" && (r.cost_line_items ?? []).length > 0) return "costs";
     if (r.phase === "green" && (r.green_checks ?? []).length > 0) return "green";
-    if (r.phase === "white" && (r.format_checks ?? []).length > 0) return "format";
+    if (r.phase === "gold" && (r.gold_checks ?? []).length > 0) return "gold";
+    if ((r.phase === "white" || r.phase === "white_glove") && (r.format_checks ?? []).length > 0) return "format";
+    if (r.phase === "black_hat" && (r.black_hat_findings ?? []).length > 0) return "black_hat";
     if ((r.risk_factors ?? []).length > 0) return "risks";
     return "checks";
   }
@@ -211,24 +237,21 @@ export default function ColorReview() {
       {/* Summary strip */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(9, 1fr)",
+        gridTemplateColumns: "repeat(6, 1fr)",
         gap: 12,
         background: "var(--color-surface)",
         border: "1px solid var(--color-border)",
         borderRadius: 8,
         padding: 16,
-        marginBottom: 20,
+        marginBottom: 12,
       }}>
         {[
           { label: "Reviews", value: String(data.total) },
-          { label: "White", value: String(summary.phaseCounts["white"] ?? 0), color: PHASE_COLORS.white },
-          { label: "Pink", value: String(summary.phaseCounts["pink"] ?? 0), color: PHASE_COLORS.pink },
-          { label: "Green", value: String(summary.phaseCounts["green"] ?? 0), color: PHASE_COLORS.green },
-          { label: "Red", value: String(summary.phaseCounts["red"] ?? 0), color: PHASE_COLORS.red },
-          { label: "Gold", value: String(summary.phaseCounts["gold"] ?? 0), color: PHASE_COLORS.gold },
+          { label: "Opportunities", value: String(summary.proposalsReviewed) },
           { label: "Avg Score", value: `${summary.avgScore}%`, color: summary.avgScore >= 80 ? "#22c55e" : summary.avgScore >= 60 ? "#f59e0b" : "#ef4444" },
-          { label: "Proposals", value: String(summary.proposalsReviewed) },
-          { label: "GO / Cond / No-Go", value: `${summary.goCount} / ${summary.conditionalGoCount} / ${summary.noGoCount}`, color: "#7c3aed" },
+          { label: "GO", value: String(summary.goCount), color: "#22c55e" },
+          { label: "Conditional", value: String(summary.conditionalGoCount), color: "#f59e0b" },
+          { label: "No-Go", value: String(summary.noGoCount), color: "#ef4444" },
         ].map((kpi, i) => (
           <div key={i}>
             <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{kpi.label}</div>
@@ -237,15 +260,41 @@ export default function ColorReview() {
         ))}
       </div>
 
+      {/* Shipley phase legend */}
+      <div style={{
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap",
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        padding: "10px 14px",
+        marginBottom: 20,
+        alignItems: "center",
+      }}>
+        <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontWeight: 600, marginRight: 4 }}>Shipley Phases:</span>
+        {SHIPLEY_ORDER.map((p) => (
+          <span key={p} title={PHASE_DESCRIPTIONS[p]} style={{
+            fontSize: 10,
+            padding: "2px 8px",
+            borderRadius: 3,
+            background: PHASE_COLORS[p],
+            color: p === "white_glove" ? "#334155" : "#fff",
+            fontWeight: 600,
+            cursor: "help",
+          }}>
+            {PHASE_LABELS[p]} ({summary.phaseCounts[p] ?? 0})
+          </span>
+        ))}
+      </div>
+
       {/* Filters */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value)} style={selectStyle}>
           <option value="">All Phases</option>
-          <option value="white">White Team</option>
-          <option value="pink">Pink Team</option>
-          <option value="green">Green Team</option>
-          <option value="red">Red Team</option>
-          <option value="gold">Gold Team</option>
+          {SHIPLEY_ORDER.map((p) => (
+            <option key={p} value={p}>{PHASE_LABELS[p]}</option>
+          ))}
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
           <option value="">All Statuses</option>
@@ -266,65 +315,154 @@ export default function ColorReview() {
 
       {/* Split view */}
       <div style={{ display: "flex", gap: 16, minHeight: 600 }}>
-        {/* Left list */}
+        {/* Left panel — grouped by opportunity */}
         <div style={{
-          width: 420,
-          minWidth: 420,
+          width: 440,
+          minWidth: 440,
           maxHeight: 700,
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
-          gap: 4,
+          gap: 8,
         }}>
-          {reviews.map((r) => (
-            <div
-              key={r.id}
-              onClick={() => handleSelect(r.id)}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 6,
-                cursor: "pointer",
-                border: selected === r.id ? "1px solid #7c3aed" : "1px solid var(--color-border)",
-                background: selected === r.id ? "rgba(124,58,237,0.08)" : "var(--color-surface)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 600, fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.proposal_title.length > 50 ? r.proposal_title.slice(0, 50) + "..." : r.proposal_title}
-                </span>
-                {r.status === "completed" && <span style={{ fontSize: 16, fontWeight: 700, color: r.overall_score >= 80 ? "#22c55e" : r.overall_score >= 60 ? "#f59e0b" : "#ef4444" }}>{r.overall_score}%</span>}
-              </div>
-              <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
-                <span style={{
-                  fontSize: 10,
-                  padding: "1px 6px",
-                  borderRadius: 3,
-                  background: PHASE_COLORS[r.phase] ?? "#6b7280",
-                  color: "#fff",
-                  fontWeight: 600,
-                }}>{PHASE_LABELS[r.phase] ?? r.phase}</span>
-                <span style={{
-                  fontSize: 10,
-                  padding: "1px 6px",
-                  borderRadius: 3,
-                  background: "rgba(255,255,255,0.06)",
-                  color: STATUS_COLORS[r.status] ?? "#6b7280",
-                  border: `1px solid ${STATUS_COLORS[r.status] ?? "#6b7280"}`,
-                }}>{STATUS_LABELS[r.status] ?? r.status}</span>
-                {r.go_no_go && (
-                  <span style={{
-                    fontSize: 10,
-                    padding: "1px 6px",
-                    borderRadius: 3,
-                    background: GO_COLORS[r.go_no_go] ?? "#6b7280",
-                    color: "#fff",
-                    fontWeight: 700,
-                  }}>{GO_LABELS[r.go_no_go]}</span>
-                )}
-                <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: "auto" }}>{r.agency}</span>
-              </div>
-            </div>
-          ))}
+          {(() => {
+            // Group reviews by proposal_id, preserving order
+            const oppMap = new Map<string, { title: string; agency: string; reviews: typeof reviews }>();
+            for (const r of reviews) {
+              if (!oppMap.has(r.proposal_id)) {
+                oppMap.set(r.proposal_id, { title: r.proposal_title, agency: r.agency, reviews: [] });
+              }
+              oppMap.get(r.proposal_id)!.reviews.push(r);
+            }
+            // Sort reviews within each opp by Shipley order
+            for (const g of oppMap.values()) {
+              g.reviews.sort((a, b) => SHIPLEY_ORDER.indexOf(a.phase) - SHIPLEY_ORDER.indexOf(b.phase));
+            }
+            return Array.from(oppMap.entries()).map(([oppId, group]) => {
+              const isExpanded = expandedOpps.has(oppId);
+              const completedReviews = group.reviews.filter((r) => r.status === "completed");
+              const avgOppScore = completedReviews.length > 0
+                ? Math.round(completedReviews.reduce((s, r) => s + r.overall_score, 0) / completedReviews.length)
+                : null;
+              const latestGoNoGo = completedReviews.filter((r) => r.go_no_go).pop();
+              return (
+                <div key={oppId} style={{
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 8,
+                  background: "var(--color-surface)",
+                  overflow: "hidden",
+                }}>
+                  {/* Opportunity header — click to expand/collapse */}
+                  <div
+                    onClick={() => {
+                      const next = new Set(expandedOpps);
+                      if (next.has(oppId)) next.delete(oppId); else next.add(oppId);
+                      setExpandedOpps(next);
+                    }}
+                    style={{
+                      padding: "10px 14px",
+                      cursor: "pointer",
+                      background: group.reviews.some((r) => r.id === selected) ? "rgba(124,58,237,0.06)" : "transparent",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {isExpanded ? "▼" : "▶"}{" "}
+                        {group.title.length > 45 ? group.title.slice(0, 45) + "..." : group.title}
+                      </span>
+                      {avgOppScore !== null && (
+                        <span style={{ fontSize: 14, fontWeight: 700, color: avgOppScore >= 80 ? "#22c55e" : avgOppScore >= 60 ? "#f59e0b" : "#ef4444" }}>{avgOppScore}%</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{group.agency}</span>
+                      <span style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 4px" }}>·</span>
+                      <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{group.reviews.length} reviews</span>
+                      {/* Phase dots showing completion progress */}
+                      <span style={{ marginLeft: "auto", display: "flex", gap: 3 }}>
+                        {SHIPLEY_ORDER.filter((p) => group.reviews.some((r) => r.phase === p)).map((p) => {
+                          const review = group.reviews.find((r) => r.phase === p);
+                          return (
+                            <span key={p} title={`${PHASE_LABELS[p]}: ${review ? STATUS_LABELS[review.status] : "—"}`} style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              background: PHASE_COLORS[p],
+                              opacity: review?.status === "completed" ? 1 : 0.3,
+                              display: "inline-block",
+                            }} />
+                          );
+                        })}
+                      </span>
+                      {latestGoNoGo?.go_no_go && (
+                        <span style={{
+                          fontSize: 9,
+                          padding: "1px 6px",
+                          borderRadius: 3,
+                          background: GO_COLORS[latestGoNoGo.go_no_go] ?? "#6b7280",
+                          color: "#fff",
+                          fontWeight: 700,
+                          marginLeft: 4,
+                        }}>{GO_LABELS[latestGoNoGo.go_no_go]}</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Reviews within this opportunity */}
+                  {isExpanded && (
+                    <div style={{ borderTop: "1px solid var(--color-border)", padding: "4px 8px 8px" }}>
+                      {group.reviews.map((r) => (
+                        <div
+                          key={r.id}
+                          onClick={() => handleSelect(r.id)}
+                          style={{
+                            padding: "8px 10px",
+                            borderRadius: 5,
+                            cursor: "pointer",
+                            marginTop: 4,
+                            border: selected === r.id ? "1px solid #7c3aed" : "1px solid transparent",
+                            background: selected === r.id ? "rgba(124,58,237,0.1)" : "transparent",
+                          }}
+                        >
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <span style={{
+                              fontSize: 10,
+                              padding: "1px 6px",
+                              borderRadius: 3,
+                              background: PHASE_COLORS[r.phase] ?? "#6b7280",
+                              color: r.phase === "white_glove" ? "#334155" : "#fff",
+                              fontWeight: 600,
+                              minWidth: 70,
+                              textAlign: "center",
+                            }}>{PHASE_LABELS[r.phase] ?? r.phase}</span>
+                            <span style={{
+                              fontSize: 10,
+                              padding: "1px 6px",
+                              borderRadius: 3,
+                              color: STATUS_COLORS[r.status] ?? "#6b7280",
+                              border: `1px solid ${STATUS_COLORS[r.status] ?? "#6b7280"}`,
+                            }}>{STATUS_LABELS[r.status] ?? r.status}</span>
+                            {r.go_no_go && (
+                              <span style={{
+                                fontSize: 9,
+                                padding: "1px 6px",
+                                borderRadius: 3,
+                                background: GO_COLORS[r.go_no_go] ?? "#6b7280",
+                                color: "#fff",
+                                fontWeight: 700,
+                              }}>{GO_LABELS[r.go_no_go]}</span>
+                            )}
+                            {r.status === "completed" && r.phase !== "black_hat" && (
+                              <span style={{ fontSize: 14, fontWeight: 700, marginLeft: "auto", color: r.overall_score >= 80 ? "#22c55e" : r.overall_score >= 60 ? "#f59e0b" : "#ef4444" }}>{r.overall_score}%</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* Right detail */}
@@ -383,11 +521,18 @@ export default function ColorReview() {
                 </div>
               </div>
 
+              {/* Phase description */}
+              {PHASE_DESCRIPTIONS[sel.phase] && (
+                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 12, fontStyle: "italic" }}>
+                  {PHASE_DESCRIPTIONS[sel.phase]}
+                </div>
+              )}
+
               {/* Score bar */}
-              {sel.status === "completed" && (
+              {sel.status === "completed" && sel.phase !== "black_hat" && (
                 <div style={{
                   display: "grid",
-                  gridTemplateColumns: (sel.phase === "pink" || sel.phase === "white") ? "repeat(4, 1fr)" : sel.phase === "green" ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
+                  gridTemplateColumns: (sel.phase === "pink" || sel.phase === "white" || sel.phase === "white_glove" || sel.phase === "blue") ? "repeat(4, 1fr)" : sel.phase === "green" ? "repeat(3, 1fr)" : "repeat(2, 1fr)",
                   gap: 12,
                   background: "rgba(255,255,255,0.03)",
                   borderRadius: 6,
@@ -399,7 +544,7 @@ export default function ColorReview() {
                     <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Overall Score</div>
                     <div style={{ fontSize: 22, fontWeight: 700, color: sel.overall_score >= 80 ? "#22c55e" : sel.overall_score >= 60 ? "#f59e0b" : "#ef4444" }}>{sel.overall_score}%</div>
                   </div>
-                  {(sel.phase === "pink" || sel.phase === "white") && (
+                  {(sel.phase === "pink" || sel.phase === "white" || sel.phase === "white_glove" || sel.phase === "blue") && (
                     <>
                       <div>
                         <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Pass Rate</div>
@@ -461,6 +606,8 @@ export default function ColorReview() {
               {/* Tabs */}
               <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
                 {([
+                  { key: "blue" as DetailTab, label: `Fit Assessment (${(sel.blue_assessments ?? []).length})`, show: (sel.blue_assessments ?? []).length > 0 },
+                  { key: "black_hat" as DetailTab, label: `Competitor Analysis (${(sel.black_hat_findings ?? []).length})`, show: (sel.black_hat_findings ?? []).length > 0 },
                   { key: "checks" as DetailTab, label: `Compliance (${(sel.requirement_checks ?? []).length})`, show: (sel.requirement_checks ?? []).length > 0 },
                   { key: "sections" as DetailTab, label: `Sections (${(sel.section_scores ?? []).length})`, show: (sel.section_scores ?? []).length > 0 },
                   { key: "gold" as DetailTab, label: `Gold Checks (${(sel.gold_checks ?? []).length})`, show: (sel.gold_checks ?? []).length > 0 },
@@ -487,6 +634,8 @@ export default function ColorReview() {
               </div>
 
               {/* Tab content */}
+              {tab === "blue" && <BlueAssessments assessments={sel.blue_assessments ?? []} />}
+              {tab === "black_hat" && <BlackHatFindings findings={sel.black_hat_findings ?? []} />}
               {tab === "checks" && <ComplianceChecks checks={sel.requirement_checks ?? []} expanded={expandedCheck} onToggle={(id) => setExpandedCheck(expandedCheck === id ? null : id)} />}
               {tab === "sections" && <SectionScores sections={sel.section_scores ?? []} expanded={expandedSection} onToggle={(id) => setExpandedSection(expandedSection === id ? null : id)} />}
               {tab === "gold" && <GoldChecks checks={sel.gold_checks ?? []} expanded={expandedGold} onToggle={(id) => setExpandedGold(expandedGold === id ? null : id)} />}
@@ -540,6 +689,140 @@ export default function ColorReview() {
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
+
+const CATEGORY_LABELS: Record<string, string> = {
+  past_performance: "Past Performance",
+  naics_fit: "NAICS / Size Standard",
+  certifications: "Certifications",
+  clearances: "Security Clearances",
+  set_aside: "Set-Aside Eligibility",
+  competitive_position: "Competitive Position",
+  teaming: "Teaming Strategy",
+  pwin_estimate: "Pwin Estimate",
+};
+
+const THREAT_COLORS: Record<string, string> = {
+  high: "#ef4444",
+  medium: "#f59e0b",
+  low: "#22c55e",
+};
+
+function BlueAssessments({ assessments }: { assessments: ColorReviewBlueAssessmentRow[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {assessments.map((a) => (
+        <div key={a.id} style={{
+          padding: "12px 14px",
+          borderRadius: 6,
+          border: "1px solid var(--color-border)",
+          background: "var(--color-surface)",
+        }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+            <span style={{
+              fontSize: 10,
+              padding: "2px 8px",
+              borderRadius: 3,
+              background: VERDICT_COLORS[a.verdict] ?? "#6b7280",
+              color: "#fff",
+              fontWeight: 700,
+            }}>{VERDICT_LABELS[a.verdict] ?? a.verdict.toUpperCase()}</span>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{a.label}</span>
+            <span style={{ fontSize: 10, color: "var(--color-text-muted)", marginLeft: "auto" }}>
+              {CATEGORY_LABELS[a.category] ?? a.category}
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5 }}>{a.detail}</div>
+          {a.evidence && (
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+              <strong>Evidence:</strong> {a.evidence}
+            </div>
+          )}
+          {a.recommendation && (
+            <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 6, padding: "6px 10px", background: "rgba(245,158,11,0.08)", borderRadius: 4 }}>
+              ⚠ {a.recommendation}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BlackHatFindings({ findings }: { findings: ColorReviewBlackHatFindingRow[] }) {
+  // Group by competitor
+  const byCompetitor = new Map<string, ColorReviewBlackHatFindingRow[]>();
+  for (const f of findings) {
+    if (!byCompetitor.has(f.competitor)) byCompetitor.set(f.competitor, []);
+    byCompetitor.get(f.competitor)!.push(f);
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {Array.from(byCompetitor.entries()).map(([competitor, items]) => (
+        <div key={competitor} style={{
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}>
+          <div style={{
+            padding: "8px 14px",
+            background: "rgba(30,30,30,0.3)",
+            borderBottom: "1px solid var(--color-border)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}>
+            <span style={{ fontWeight: 700, fontSize: 14 }}>{competitor}</span>
+            <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{items.length} findings</span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+              {["high", "medium", "low"].map((level) => {
+                const count = items.filter((f) => f.threat_level === level).length;
+                return count > 0 ? (
+                  <span key={level} style={{
+                    fontSize: 10,
+                    padding: "1px 6px",
+                    borderRadius: 3,
+                    background: THREAT_COLORS[level],
+                    color: "#fff",
+                    fontWeight: 600,
+                  }}>{count} {level}</span>
+                ) : null;
+              })}
+            </span>
+          </div>
+          <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 }}>
+            {items.map((f) => (
+              <div key={f.id} style={{
+                padding: "10px 12px",
+                borderRadius: 5,
+                border: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+              }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                  <span style={{
+                    fontSize: 9,
+                    padding: "1px 6px",
+                    borderRadius: 3,
+                    background: THREAT_COLORS[f.threat_level],
+                    color: "#fff",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}>{f.threat_level}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, textTransform: "capitalize" }}>{f.area.replace(/_/g, " ")}</span>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5 }}>{f.assessment}</div>
+                {f.counter_strategy && (
+                  <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 6, padding: "6px 10px", background: "rgba(59,130,246,0.08)", borderRadius: 4 }}>
+                    <strong>Counter:</strong> {f.counter_strategy}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ComplianceChecks({ checks, expanded, onToggle }: { checks: ColorReviewRequirementCheckRow[]; expanded: string | null; onToggle: (id: string) => void }) {
   return (
@@ -903,11 +1186,9 @@ function UploadReviewForm({ onSubmit, result, reviewing }: {
       <div style={{ marginBottom: 14 }}>
         <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4, fontWeight: 600 }}>Review Phase</label>
         <select value={phase} onChange={(e) => setPhase(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-          <option value="white">White Team — Format & Compliance</option>
-          <option value="pink">Pink Team — Compliance Check</option>
-          <option value="red">Red Team — Quality Scoring</option>
-          <option value="green">Green Team — Cost/Pricing Review</option>
-          <option value="gold">Gold Team — Executive Go/No-Go</option>
+          {SHIPLEY_ORDER.map((p) => (
+            <option key={p} value={p}>{PHASE_LABELS[p]} — {PHASE_DESCRIPTIONS[p]?.split(" — ")[1] ?? p}</option>
+          ))}
         </select>
       </div>
 

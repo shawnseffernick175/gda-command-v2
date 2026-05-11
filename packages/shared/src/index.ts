@@ -1009,7 +1009,7 @@ export interface WinLossAnalysis {
 // Color Review types
 // ---------------------------------------------------------------------------
 
-export type ColorReviewPhase = "pink" | "red" | "gold" | "green" | "white";
+export type ColorReviewPhase = "blue" | "pink" | "red" | "green" | "gold" | "white" | "black_hat" | "white_glove";
 
 export type ColorReviewStatus = "pending" | "in_progress" | "completed" | "failed";
 
@@ -1083,6 +1083,25 @@ export interface ColorReviewFormatCheck {
   detail: string | null;
 }
 
+export interface BlueTeamAssessment {
+  id: string;
+  category: "past_performance" | "naics_fit" | "certifications" | "clearances" | "set_aside" | "competitive_position" | "teaming" | "pwin_estimate";
+  label: string;
+  verdict: SectionVerdict;
+  detail: string;
+  evidence: string | null;
+  recommendation: string | null;
+}
+
+export interface BlackHatFinding {
+  id: string;
+  competitor: string;
+  area: "technical_approach" | "pricing" | "past_performance" | "teaming" | "differentiator" | "weakness";
+  assessment: string;
+  threat_level: "high" | "medium" | "low";
+  counter_strategy: string | null;
+}
+
 export interface ColorReview {
   id: string;
   proposal_id: string;
@@ -1109,6 +1128,8 @@ export interface ColorReview {
   cost_line_items: ColorReviewCostLineItem[];
   green_checks: ColorReviewGreenCheck[];
   format_checks: ColorReviewFormatCheck[];
+  blue_assessments: BlueTeamAssessment[];
+  black_hat_findings: BlackHatFinding[];
   risk_factors: string[];
   created_at: string;
   updated_at: string;
