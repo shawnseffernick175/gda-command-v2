@@ -1279,6 +1279,55 @@ export interface SAMScanRun {
 }
 
 // ---------------------------------------------------------------------------
+// GovWin / GovTribe Integration
+// ---------------------------------------------------------------------------
+
+export type GovWinStatus = "new" | "tracking" | "qualified" | "dismissed" | "archived";
+
+export interface GovWinOpportunity {
+  id: string;
+  govwin_id: string;
+  title: string;
+  agency: string;
+  sub_agency: string;
+  status: GovWinStatus;
+  stage: string;
+  value_low: number | null;
+  value_high: number | null;
+  procurement_type: string;
+  naics: string;
+  set_aside: string | null;
+  place_of_performance: string;
+  expected_release: string | null;
+  expected_award: string | null;
+  incumbents: string[];
+  competitors: string[];
+  relevance_score: number;
+  ai_summary: string;
+  key_contacts: GovWinContact[];
+  tags: string[];
+  govwin_url: string;
+  last_updated: string;
+  created_at: string;
+}
+
+export interface GovWinContact {
+  name: string;
+  title: string;
+  agency: string;
+}
+
+export interface GovWinSyncRun {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: "running" | "completed" | "failed";
+  opportunities_synced: number;
+  new_matches: number;
+  error: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Phase K: Discussions
 // ---------------------------------------------------------------------------
 

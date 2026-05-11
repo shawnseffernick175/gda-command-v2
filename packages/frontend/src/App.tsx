@@ -34,6 +34,7 @@ import AuditLog from "./pages/AuditLog";
 import UserManual from "./pages/UserManual";
 import Charts from "./pages/Charts";
 import BookOfTruths from "./pages/BookOfTruths";
+import GovWin from "./pages/GovWin";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -73,6 +74,7 @@ const NAV_GROUPS = [
       { path: "/contacts", label: "Contacts", icon: "👤" },
       { path: "/knowledge", label: "Knowledge Base", icon: "📚" },
       { path: "/cpars", label: "CPARS Builder", icon: "📊" },
+      { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
     ],
   },
   {
@@ -505,6 +507,7 @@ export default function App() {
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/audit" element={<AuditLog />} />
             <Route path="/charts" element={<Charts />} />
+            <Route path="/govwin" element={<GovWin />} />
             <Route path="/book-of-truths" element={<BookOfTruths />} />
             <Route path="/help" element={<UserManual />} />
             <Route path="*" element={<NotFound />} />
