@@ -23,8 +23,8 @@ router.get("/opportunities", async (_req: Request, res: Response) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, title, agency, department, status, score, pwin, value_estimated,
-              naics_code, set_aside, response_deadline, created_at, updated_at
+      `SELECT id, title, agency, department, status, score, probability_of_win AS pwin, value_estimated,
+              naics, set_aside, due_date, created_at, updated_at
        FROM opportunities ORDER BY created_at DESC`
     );
     sendCSV(res, `gda-opportunities-${dateStamp()}.csv`, toCSV(rows));
@@ -42,7 +42,7 @@ router.get("/contacts", async (_req: Request, res: Response) => {
   try {
     const { rows } = await pool.query(
       `SELECT id, first_name, last_name, email, phone, agency, department,
-              title, relationship_strength, last_contact_date, notes, created_at
+              title, relationship_strength, last_contact_date, meeting_notes, created_at
        FROM contacts ORDER BY last_name, first_name`
     );
     sendCSV(res, `gda-contacts-${dateStamp()}.csv`, toCSV(rows));
@@ -59,8 +59,8 @@ router.get("/pipeline", async (_req: Request, res: Response) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, title, agency, department, status, score, pwin, value_estimated,
-              naics_code, set_aside, response_deadline, created_at
+      `SELECT id, title, agency, department, status, score, probability_of_win AS pwin, value_estimated,
+              naics, set_aside, due_date, created_at
        FROM opportunities
        WHERE status IN ('qualified', 'pipeline', 'won')
        ORDER BY score DESC`
