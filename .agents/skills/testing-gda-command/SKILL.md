@@ -168,6 +168,7 @@ For testing endpoints that write to PostgreSQL (Phase 1c+):
 - Devin Review may flag issues — always check PR comments and fix before testing.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **New discussion threads show "NaNd ago"**: Relative timestamp display doesn't parse ISO dates from freshly created threads. Cosmetic only.
+- **Docker postgres container may stop on VM restart**: If `gda-postgres-dev` container is stopped, run `docker start gda-postgres-dev` before starting the backend. Check with `docker ps -a | grep postgres`.
 
 ## Testing Strategy
 
