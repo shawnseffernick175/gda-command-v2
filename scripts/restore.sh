@@ -6,13 +6,13 @@
 # WARNING: This drops and recreates the database. All current data will be lost.
 #
 # Environment variables (with defaults):
-#   POSTGRES_CONTAINER  — Docker container name (default: gda-postgres)
+#   POSTGRES_CONTAINER  — Docker container name (default: gda-v2-postgres)
 #   POSTGRES_USER       — Database user (default: gda)
 #   POSTGRES_DB         — Database name (default: gda_command)
 
 set -euo pipefail
 
-CONTAINER="${POSTGRES_CONTAINER:-gda-postgres}"
+CONTAINER="${POSTGRES_CONTAINER:-gda-v2-postgres}"
 PG_USER="${POSTGRES_USER:-gda}"
 PG_DB="${POSTGRES_DB:-gda_command}"
 

@@ -95,11 +95,22 @@ router.post("/create", async (_req, res) => {
 
     log.info("backup_started", { filename });
 
-    execSync(`pg_dump "${dbUrl}" --no-owner --no-privileges --clean --if-exists | gzip > "${filePath}"`, {
+    // Pass DATABASE_URL via GDA_DUMP_URL env var to avoid shell metacharacter
+    // injection from passwords. Use pipefail so pg_dump failures propagate.
+    execSync(`bash -c 'set -o pipefail; pg_dump --dbname="$GDA_DUMP_URL" --no-owner --no-privileges --clean --if-exists | gzip > "${filePath}"'`, {
       timeout: 60_000,
+      env: { ...process.env, GDA_DUMP_URL: dbUrl },
     });
 
     const stats = fs.statSync(filePath);
+
+    // A valid backup should be >100 bytes; an empty gzip is ~20 bytes
+    const MIN_BACKUP_BYTES = 100;
+    if (stats.size < MIN_BACKUP_BYTES) {
+      fs.unlinkSync(filePath);
+      throw new Error(`pg_dump produced empty output (${stats.size} bytes) — check database connectivity`);
+    }
+
     const sizeKB = (stats.size / 1024).toFixed(0);
 
     log.info("backup_completed", { filename, sizeKB });
