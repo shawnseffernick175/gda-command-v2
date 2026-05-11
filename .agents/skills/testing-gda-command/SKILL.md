@@ -7,11 +7,18 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 
 ## Environment Setup
 
-1. Backend: `cd packages/backend && npm run dev` → runs on port 3001
-2. Frontend: `cd packages/frontend && npm run dev` → runs on port 3000
-3. If ports are occupied, kill old processes: `fuser -k 3001/tcp; fuser -k 3000/tcp`
-4. Frontend proxies `/api/*` to backend via Vite config
-5. No CI configured — repo has no automated checks
+1. **PostgreSQL**: `docker compose up -d` from repo root → starts `gda-postgres` container on port 5432
+   - Verify: `docker ps --format '{{.Names}} {{.Status}}'` should show `gda-postgres Up ... (healthy)`
+   - Connection: `postgresql://gda:gda_dev_password@localhost:5432/gda_command`
+   - **IMPORTANT**: The VM may have a system-level `DATABASE_URL` env var pointing to a different database (e.g., n8n). Always start the backend with explicit override: `DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev`
+2. **Database migrations**: `cd packages/backend && npm run db:migrate` (runs SQL migrations)
+3. **Database seed**: `cd packages/backend && npm run db:seed` (populates 300+ records from mock data)
+4. **Database reset**: `cd packages/backend && npm run db:reset` (drops all, re-migrates, re-seeds)
+5. Backend: `cd packages/backend && DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev` → runs on port 3001
+6. Frontend: `cd packages/frontend && npm run dev` → runs on port 3000
+7. If ports are occupied, kill old processes: `fuser -k 3001/tcp; fuser -k 3000/tcp`
+8. Frontend proxies `/api/*` to backend via Vite config
+9. No CI configured — repo has no automated checks
 
 ## Architecture
 
@@ -21,11 +28,31 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - Shared types: `packages/shared/src/index.ts`
 - All API responses use `successEnvelope(workflow, action, data, meta, dryRun)` wrapper
 - Navigation: Collapsible sidebar (220px expanded / 52px collapsed)
-  - BD Tools: Launchpad, Fast Track, Ops Tracker, Pipeline, Capture, Approvals, RFP Shredder
-  - Analysis: Intel Hub, Compliance, Proposals, Contacts, Financials, Reports, Knowledge, Predictive, Color Review
+  - BD Tools: Launchpad, Fast Track, Ops Tracker, Pipeline, Capture, Approvals, RFP Shredder, SAM.gov Monitor, FPDS Monitor
+  - Analysis: Intel Hub, Compliance, Proposals, Contacts, Financials, Reports, Knowledge, Predictive, Color Review, Anomaly Detection, CPARS Builder
+  - Collaboration: Discussions
   - Platform: QA Center, Doctrine, Prompts, Workflows, Settings
 - Financial KPI strip: persistent header with Orders/Sales/EBIT/ROS/Backlog/Gross Profit
   - May not render on initial load due to fetch race condition — hard reload fixes it
+
+## Auth System
+
+- **Dev mode** (`AUTH_REQUIRED=false` in `.env`): Auth middleware injects admin user for all requests. Frontend probes `/api/auth/me` on mount, gets 200, renders main app without login.
+- **Production mode** (`AUTH_REQUIRED=true`): JWT-based auth enforced on all `/api/*` routes except `/api/auth/*`. Frontend probes `/api/auth/me`, gets 401 if no token, shows Login page.
+- **Auth endpoints**: POST `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh`, `/api/auth/logout`, GET `/api/auth/me`
+- **Token storage**: localStorage keys `gda_access_token`, `gda_refresh_token`, `gda_user`
+- **Default admin user**: `admin@gda-command.local` / `admin123` (seeded in migrations)
+- **Frontend auth gate**: `App.tsx` — `authed` state: `null` = loading spinner, `false` = Login component, `true` = main app
+- **Logout**: Sidebar shows username + "Logout" button at bottom
+
+### Auth Testing Procedure
+
+1. **Dev mode bypass**: Start backend with `AUTH_REQUIRED=false`. Navigate to localhost:3000. Verify sidebar + Launchpad render (no login page).
+2. **Switch to auth-required**: Restart backend with `AUTH_REQUIRED=true`. Clear localStorage (`localStorage.clear()` in console). Reload page. Verify Login page renders.
+3. **Register**: Click "Register" link, fill Display Name/Email/Password, click "Create Account". Verify redirect to Launchpad with username in sidebar.
+4. **Logout**: Click "Logout" button in sidebar. Verify return to Login page.
+5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
+6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
 
 ## Testing Pattern
 
@@ -63,7 +90,6 @@ For each new page:
 - **ESC-008**: status="resolved", resolution_notes renders in green section: "Registered for industry day May 15..."
 - **Critical filter**: Exactly 2 results (ANO-001, ANO-006), shows "2 of 12"
 - **Rules tab**: 8 rules (ER-001–ER-008), monospace condition text, priority pills (2 critical, 5 warning, 1 info)
-- **Launchpad card**: May not render due to CSS container overflow — card is last in Home.tsx and might be clipped. Sidebar navigation to `/anomaly` works as fallback.
 - **API**: GET /api/anomaly/anomalies, GET /api/anomaly/competitor-movements, GET /api/anomaly/escalations, GET /api/anomaly/escalation-rules
 
 ### Predictive Analytics (`/predictive`)
@@ -100,6 +126,8 @@ For each new page:
 
 ## Common Issues
 
+- **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...` to avoid connecting to the wrong database.
+- **Backend crash on DB failure**: Some auth endpoints (e.g., `/me` at `auth.ts:221`) might lack try/catch around `pool.query()`. If DB connection fails, the backend process may crash with unhandled promise rejection.
 - Financial KPI strip may not render on first load — the component returns null when kpis array is empty due to fetch race. Hard reload fixes it.
 - Ops Tracker main table may show 500 error — n8n connection timeout, mock fallback doesn't fire for that endpoint.
 - Stale detail state: when switching between items rapidly, the detail panel may briefly show old data. Fixed in most pages with useEffect cleanup.
@@ -119,4 +147,4 @@ For each new page:
 
 ## Devin Secrets Needed
 
-None — all mock data, no external services required for testing.
+None — all mock data, no external services required for testing. Auth uses local JWT with dev secret.
