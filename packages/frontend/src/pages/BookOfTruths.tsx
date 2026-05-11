@@ -56,7 +56,7 @@ export default function BookOfTruths() {
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    loadData();
+    loadData(search);
   }, [moduleFilter]);
 
   function loadData(q?: string) {
@@ -154,7 +154,7 @@ export default function BookOfTruths() {
               }}
             >
               <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1 }}>
-                {CATEGORY_ICONS[t.key === "entities" ? "entity" : t.key === "rules" ? "rule" : t.key]} {t.label}
+                {CATEGORY_ICONS[t.key === "entities" ? "entity" : t.key === "rules" ? "rule" : t.key === "sources" ? "source" : t.key]} {t.label}
               </div>
               <div style={{ fontSize: 24, fontWeight: 700, color: t.color, marginTop: 4 }}>
                 {t.count}
