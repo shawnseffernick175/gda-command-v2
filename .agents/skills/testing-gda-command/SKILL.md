@@ -18,7 +18,13 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 6. Frontend: `cd packages/frontend && npm run dev` → runs on port 3000
 7. If ports are occupied, kill old processes: `fuser -k 3001/tcp; fuser -k 3000/tcp`
 8. Frontend proxies `/api/*` to backend via Vite config
-9. No CI configured — repo has no automated checks
+9. CI configured via GitHub Actions: build, typecheck, and test checks
+
+### After Branch Switches or Merges
+
+- **Always restart both frontend and backend** after switching branches or pulling merged code. The Vite dev server may cache stale compiled code and show HTTP 500 errors even though the backend API works fine via curl.
+- Kill and restart sequence: `fuser -k 3001/tcp; fuser -k 3000/tcp; sleep 1` then start backend, then frontend.
+- If the frontend shows HTTP 500 but `curl http://localhost:3000/api/<endpoint>` returns 200, the issue is a stale Vite dev server — restart it.
 
 ## Architecture
 
@@ -27,12 +33,13 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - Frontend: React + TypeScript + Vite, pages in `packages/frontend/src/pages/`
 - Shared types: `packages/shared/src/index.ts`
 - All API responses use `successEnvelope(workflow, action, data, meta, dryRun)` wrapper
-- Navigation: Collapsible sidebar (220px expanded / 52px collapsed)
-  - BD Tools: Launchpad, Fast Track, Ops Tracker, Pipeline, Capture, Approvals, RFP Shredder, SAM.gov Monitor, FPDS Monitor
-  - Analysis: Intel Hub, Compliance, Proposals, Contacts, Financials, Reports, Knowledge, Predictive, Color Review, Anomaly Detection, CPARS Builder
-  - Collaboration: Discussions
-  - Platform: QA Center, Doctrine, Prompts, Workflows, Settings
-- Financial KPI strip: persistent header with Orders/Sales/EBIT/ROS/Backlog/Gross Profit
+- Navigation: Collapsible sidebar grouped into 5 sections:
+  - Operations: Launchpad, Fast Track, Ops Tracker, Pipeline, Approvals
+  - Capture: Capture Plans, Proposals, RFP Shredder, Compliance, Color Review
+  - Intelligence: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, CPARS Builder
+  - Reporting: Financials, Reports, Discussions
+  - Admin: Settings, Health, Workflows, Users, Audit Log, Doctrine, Prompts
+- Financial KPI strip: persistent header with Orders/Sales/EBIT/Gross Profit/ROS/Funded Backlog/Contract Backlog
   - May not render on initial load due to fetch race condition — hard reload fixes it
 
 ## Auth System
@@ -44,6 +51,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - **Default admin user**: `admin@gda-command.local` — **WARNING**: The seed data uses a placeholder password hash (`$2b$10$placeholder_hash_for_dev`), so login with `admin123` may fail after a fresh `db:reset`. Workaround: register a new user via `POST /api/auth/register` with `{"email":"tester@gda.local","password":"tester123","display_name":"Test User"}`.
 - **Frontend auth gate**: `App.tsx` — `authed` state: `null` = loading spinner, `false` = Login component, `true` = main app
 - **Logout**: Sidebar shows username + "Logout" button at bottom
+- **Authenticated API helpers**: `packages/frontend/src/api/client.ts` exports typed functions like `promoteFastTrack()`, `askOpportunityChat()` that use `request()` → `authenticatedFetch()`. The `authenticatedFetch` function in `auth.ts` creates a `Headers` object and adds `Authorization: Bearer <token>` before calling `fetch()`. When testing auth headers, note that the header is added inside `authenticatedFetch`, not in the caller's init object.
 
 ### Auth Testing Procedure
 
@@ -53,6 +61,13 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 4. **Logout**: Click "Logout" button in sidebar. Verify return to Login page.
 5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
 6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
+
+### Auth Header Verification
+
+To verify that frontend API calls include the Authorization header, you can:
+1. Check `localStorage.getItem('gda_access_token')` is present (confirms token exists)
+2. Trace the code: the API function calls `request()` → `authenticatedFetch()` which adds the header
+3. For direct proof, inject a fetch interceptor that checks `init.headers` as a `Headers` instance (not plain object): `headers instanceof Headers && headers.has('Authorization')`
 
 ## Testing Pattern
 
@@ -76,10 +91,24 @@ For testing endpoints that write to PostgreSQL (Phase 1c+):
 5. **Verify DB persistence**: `docker exec gda-postgres psql -U gda -d gda_command -c "SELECT ... FROM <table> WHERE ..."`
 6. **Verify UI renders updated data**: Navigate to the page in browser and confirm the change is visible
 
+### Fast Track Promote Testing
+
+The promote flow creates a real opportunity in the DB from a Fast Track match:
+
+1. **Baseline**: `SELECT count(*) FROM opportunities` → note the count (typically 11 after seed)
+2. **Navigate to `/fast-track`**, select a match with status "new" (e.g., FT-001)
+3. **Click "Promote to Opportunity"** button in the detail panel
+4. **Verify API response**: `data.opportunityId` should be `"opp-ft-FT-001"` (NOT null). If null, the DB insert failed silently.
+5. **Verify DB**: `SELECT id, data_source, tags FROM opportunities WHERE id='opp-ft-FT-001'`
+   - `data_source` should be `'fast-track'`
+   - `tags` should be a proper PostgreSQL array like `{PFAS,AI/ML,remediation,environmental}` (NOT a JSON string)
+6. **Verify dashboard exclusion**: Navigate to Launchpad, Total Opportunities should still show the original count (fast-track opps are filtered out by `data_source !== 'fast-track'` in `dashboard.ts`)
+7. **ON CONFLICT DO NOTHING**: Re-promoting the same match won't create a duplicate — it returns success but `opportunityId` may be null on second attempt. Use a different match ID or clean up the DB record first.
+
 ### POST Endpoints with Real DB Writes
 
 | Route | Endpoint | DB Operation |
-|-------|----------|--------------|
+|-------|----------|-------------|
 | approvals | `POST /:id/resolve` | UPDATE approvals status/resolved_by/at/notes |
 | anomaly | `POST /anomalies/:id/acknowledge` | UPDATE status + acknowledged_at |
 | anomaly | `POST /anomalies/:id/resolve` | UPDATE status + resolved_at |
@@ -90,6 +119,7 @@ For testing endpoints that write to PostgreSQL (Phase 1c+):
 | reports | `POST /generate` | INSERT generated_reports |
 | reports | `POST /export` | INSERT export_jobs |
 | capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+| fast-track | `POST /promote` | INSERT opportunities with data_source='fast-track' |
 
 ### Key Gotchas for Write Testing
 
@@ -97,6 +127,8 @@ For testing endpoints that write to PostgreSQL (Phase 1c+):
 - **Auth header may be required**: If `AUTH_REQUIRED=true`, include `Authorization: Bearer <token>` in curl requests. If `AUTH_REQUIRED=false`, the dev middleware injects admin user automatically.
 - **Verify `dryRun: false`**: If response shows `dryRun: true`, the write did NOT go to DB — it fell back to mock.
 - **New discussion threads may show "NaNd ago"**: The relative timestamp display might not parse ISO timestamps from newly created threads correctly. This is a cosmetic issue — data persists correctly.
+- **PostgreSQL array columns**: When inserting into `text[]` columns (like `tags`), pass JavaScript arrays directly as pg query parameters — the `pg` driver handles the conversion. Do NOT use `JSON.stringify()` — it produces `["a","b"]` which PostgreSQL rejects as malformed array literal.
+- **Silent DB failures**: Some INSERT operations are wrapped in try/catch that swallows errors. If the API returns success but with null IDs, check for DB-level errors (wrong column names, type mismatches, etc.).
 
 ## Page-Specific Testing Data
 
@@ -148,14 +180,15 @@ For testing endpoints that write to PostgreSQL (Phase 1c+):
 - **Summary strip**: New=4, Reviewing=2, Watching=2, Promoted=1, Discarded=1, NeedsAttention=5, Total=10
 - **3 tabs**: Overview (contract path hypothesis), OODA (Observe/Orient/Decide/Act), Sources (traceable)
 - **Sort**: By match_score descending (FT-008 score=91 first)
+- **Promote flow**: Click "Promote to Opportunity" → button changes to green "Promoted" text → API returns opportunityId → DB row created with data_source='fast-track'
 
 ### Other Pages
 - Ops Tracker (`/ops-tracker`): Smart recommendations panel (8 cards). Main table may show HTTP 500 (n8n timeout, mock fallback not firing) — pre-existing issue.
 - Capture Planner (`/capture`): Intel Modules tab (7 modules)
-- Opportunity Detail (`/opportunities/:id`): Pwin breakdown, incumbent, competitors, black hat, wargame
+- Opportunity Detail (`/opportunities/:id`): Pwin breakdown, incumbent, competitors, black hat, wargame. Ask AI chat at bottom uses `askOpportunityChat()` authenticated helper.
 - Global Search: Search bar in sidebar, returns results with relevance scores
 - Notifications: Bell icon with unread badge, 8 alerts
-- Sidebar Navigation: 3 groups — BD Tools (9), Analysis (11), Collaboration (1), Platform (5). Collapse toggle: 220px expanded / 52px collapsed icons-only rail with tooltips.
+- Sidebar Navigation: 5 groups — Operations (5), Capture (5), Intelligence (6), Reporting (3), Admin (7). Collapse toggle: 220px expanded / 52px collapsed icons-only rail with tooltips.
 
 ## Common Issues
 
@@ -168,6 +201,8 @@ For testing endpoints that write to PostgreSQL (Phase 1c+):
 - Devin Review may flag issues — always check PR comments and fix before testing.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **New discussion threads show "NaNd ago"**: Relative timestamp display doesn't parse ISO dates from freshly created threads. Cosmetic only.
+- **Stale Vite dev server after branch switch**: If the frontend shows HTTP 500 but the backend API works via curl, restart the Vite dev server. This is the most common testing environment issue.
+- **Silent promote failures**: If the promote button changes to "Promoted" but the DB has no record, check for data type mismatches in the INSERT (e.g., array columns needing native JS arrays, not JSON.stringify output).
 
 ## Testing Strategy
 
@@ -180,6 +215,7 @@ For testing endpoints that write to PostgreSQL (Phase 1c+):
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
 8. **Record browser interactions** for visual proof
 9. **Annotate recordings** with setup/test_start/assertion markers
+10. **Always restart both servers** after pulling new code or switching branches
 
 ## Devin Secrets Needed
 
