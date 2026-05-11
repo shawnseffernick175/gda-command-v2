@@ -2276,12 +2276,31 @@ export interface ColorReviewFormatCheckRow {
   detail: string | null;
 }
 
+export interface ColorReviewBlueAssessmentRow {
+  id: string;
+  category: string;
+  label: string;
+  verdict: string;
+  detail: string;
+  evidence: string | null;
+  recommendation: string | null;
+}
+
+export interface ColorReviewBlackHatFindingRow {
+  id: string;
+  competitor: string;
+  area: string;
+  assessment: string;
+  threat_level: "high" | "medium" | "low";
+  counter_strategy: string | null;
+}
+
 export interface ColorReviewRow {
   id: string;
   proposal_id: string;
   proposal_title: string;
   agency: string;
-  phase: "pink" | "red" | "gold" | "green" | "white";
+  phase: "blue" | "pink" | "red" | "green" | "gold" | "white" | "black_hat" | "white_glove";
   status: "pending" | "in_progress" | "completed" | "failed";
   started_at: string;
   completed_at: string | null;
@@ -2302,6 +2321,8 @@ export interface ColorReviewRow {
   cost_line_items: ColorReviewCostLineItemRow[];
   green_checks: ColorReviewGreenCheckRow[];
   format_checks: ColorReviewFormatCheckRow[];
+  blue_assessments: ColorReviewBlueAssessmentRow[];
+  black_hat_findings: ColorReviewBlackHatFindingRow[];
   risk_factors: string[];
   created_at: string;
   updated_at: string;
@@ -2348,6 +2369,8 @@ export interface ColorReviewRunResult {
   cost_line_items?: ColorReviewCostLineItemRow[];
   green_checks?: ColorReviewGreenCheckRow[];
   format_checks?: ColorReviewFormatCheckRow[];
+  blue_assessments?: ColorReviewBlueAssessmentRow[];
+  black_hat_findings?: ColorReviewBlackHatFindingRow[];
   risk_factors?: string[];
   file_id?: string;
   message?: string;

@@ -27,6 +27,8 @@ async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" | "moc
           cost_line_items: r.cost_line_items ?? [],
           green_checks: r.green_checks ?? [],
           format_checks: r.format_checks ?? [],
+          blue_assessments: r.blue_assessments ?? [],
+          black_hat_findings: r.black_hat_findings ?? [],
           risk_factors: r.risk_factors ?? [],
         })) as ReviewItem[], source: "db" };
       }
@@ -74,6 +76,34 @@ function buildReviewPrompt(phase: string, proposalTitle: string, text: string): 
   const truncated = text.slice(0, 15000);
 
   const phaseInstructions: Record<string, string> = {
+    blue: `Perform a BLUE TEAM review (capture strategy / fit assessment).
+This is the first review before any proposal is written. Evaluate whether our company should pursue this opportunity:
+- Do we have relevant past performance? (minimum references, CPARS ratings)
+- Does our NAICS/size standard qualify?
+- Do we have required certifications? (ISO, CMMI, FedRAMP, etc.)
+- Do we have necessary clearances? (facility + personnel)
+- Are we eligible for any set-aside requirements?
+- What is our competitive position vs. likely competitors?
+- What is our teaming strategy?
+- What is our estimated pre-capture Pwin?
+
+For each assessment area: { "id": "BA-001", "category": "past_performance|naics_fit|certifications|clearances|set_aside|competitive_position|teaming|pwin_estimate", "label": "...", "verdict": "pass|fail|warning", "detail": "assessment", "evidence": "supporting data", "recommendation": "what to do" }
+
+Return JSON: { "overall_score": 0-100, "go_no_go": "go|conditional_go|no_go", "confidence": 0-100, "summary": "2-3 sentence fit assessment", "blue_assessments": [...assessments...], "risk_factors": ["description", ...] }`,
+
+    black_hat: `Perform a BLACK HAT review (competitor analysis).
+Predict each competitor's likely approach:
+- What technical solution will they propose?
+- What is their pricing strategy?
+- What past performance will they cite?
+- Who will they team with?
+- What are their differentiators?
+- What are their weaknesses we can exploit?
+
+For each competitor finding: { "id": "BH-001", "competitor": "name", "area": "technical_approach|pricing|past_performance|teaming|differentiator|weakness", "assessment": "detailed assessment", "threat_level": "high|medium|low", "counter_strategy": "how to counter this" }
+
+Return JSON: { "overall_score": 0, "summary": "2-3 sentence competitive landscape summary", "black_hat_findings": [...findings...], "risk_factors": ["description", ...] }`,
+
     white: `Perform a WHITE TEAM review (format & compliance check).
 Evaluate:
 - Page count compliance
@@ -138,6 +168,21 @@ This is the final gate review. Evaluate:
 For each evaluation area: { "id": "GOLD-001", "area": "...", "assessment": "...", "verdict": "pass|fail|warning", "recommendation": "..." }
 
 Return JSON: { "overall_score": 0-100, "go_no_go": "go|conditional_go|no_go", "confidence": 0-100, "summary": "2-3 sentence executive recommendation for leadership", "gold_checks": [...checks...], "risk_factors": ["SEVERITY: description", ...] }`,
+
+    white_glove: `Perform a WHITE GLOVE review (final visual/print inspection).
+This is the absolute last check before physical submission. Evaluate:
+- Layout consistency across all volumes
+- Font, margin, and spacing compliance
+- Header/footer accuracy (company name, proposal title, page numbers)
+- Table of contents accuracy — do page numbers match?
+- Cross-references valid — do section references point correctly?
+- Acronym list complete and consistent
+- Attachments and appendices included and labeled correctly
+- Print-ready quality — no orphaned lines, no cut-off text, no broken images
+
+For each check: { "id": "WG-001", "category": "layout|fonts|headers|toc|cross_ref|acronyms|attachments|print_quality", "label": "...", "verdict": "pass|fail|warning", "expected": "...", "actual": "...", "detail": "..." }
+
+Return JSON: { "overall_score": 0-100, "summary": "2-3 sentence visual inspection summary", "format_checks": [...checks...], "risk_factors": ["description", ...] }`,
   };
 
   return `Review the following proposal document.
@@ -232,6 +277,8 @@ router.get("/:id", async (req, res) => {
             cost_line_items: r.cost_line_items ?? [],
             green_checks: r.green_checks ?? [],
             format_checks: r.format_checks ?? [],
+            blue_assessments: r.blue_assessments ?? [],
+            black_hat_findings: r.black_hat_findings ?? [],
             risk_factors: r.risk_factors ?? [],
           };
           return res.json(successEnvelope("GDA.color-review", "get-detail", { review, source: "db" }));
@@ -287,13 +334,13 @@ router.post(
       return res.status(400).json(
         errorEnvelope("GDA.color-review", "run", {
           code: "VALIDATION",
-          message: "phase is required (white, pink, green, red, or gold)",
+          message: "phase is required (blue, pink, red, green, gold, white, black_hat, or white_glove)",
           detail: null,
         }),
       );
     }
 
-    const validPhases = ["white", "pink", "green", "red", "gold"];
+    const validPhases = ["blue", "pink", "red", "green", "gold", "white", "black_hat", "white_glove"];
     if (!validPhases.includes(phase)) {
       return res.status(400).json(
         errorEnvelope("GDA.color-review", "run", {
@@ -461,8 +508,29 @@ router.post(
       detail: f.detail ?? null,
     }));
 
+    const rawBlueAssessments = Array.isArray(reviewResult.blue_assessments) ? reviewResult.blue_assessments as Record<string, unknown>[] : [];
+    const blueAssessments = rawBlueAssessments.map((b) => ({
+      id: b.id ?? `BA-${Math.random().toString(36).slice(2, 6)}`,
+      category: b.category ?? "",
+      label: b.label ?? "",
+      verdict: b.verdict ?? "not_reviewed",
+      detail: b.detail ?? "",
+      evidence: b.evidence ?? null,
+      recommendation: b.recommendation ?? null,
+    }));
+
+    const rawBlackHatFindings = Array.isArray(reviewResult.black_hat_findings) ? reviewResult.black_hat_findings as Record<string, unknown>[] : [];
+    const blackHatFindings = rawBlackHatFindings.map((bh) => ({
+      id: bh.id ?? `BH-${Math.random().toString(36).slice(2, 6)}`,
+      competitor: bh.competitor ?? "",
+      area: bh.area ?? "",
+      assessment: bh.assessment ?? "",
+      threat_level: bh.threat_level ?? "medium",
+      counter_strategy: bh.counter_strategy ?? null,
+    }));
+
     // Count verdicts across all check types
-    const allChecks = [...requirementChecks, ...sectionScores, ...goldChecks, ...costLineItems, ...greenChecks, ...formatChecks];
+    const allChecks = [...requirementChecks, ...sectionScores, ...goldChecks, ...costLineItems, ...greenChecks, ...formatChecks, ...blueAssessments];
     const totalChecks = allChecks.length;
     const passedChecks = allChecks.filter((c: Record<string, unknown>) => c.verdict === "pass").length;
     const failedChecks = allChecks.filter((c: Record<string, unknown>) => c.verdict === "fail").length;
@@ -480,15 +548,17 @@ router.post(
             total_checks, passed_checks, failed_checks, warning_checks,
             reviewer, summary, go_no_go, confidence,
             requirement_checks, section_scores, gold_checks,
-            cost_line_items, green_checks, format_checks, risk_factors,
-            file_id
+            cost_line_items, green_checks, format_checks,
+            blue_assessments, black_hat_findings,
+            risk_factors, file_id
           ) VALUES (
             $1, $2, $3, $4, $5, 'completed',
             NOW(), NOW(), $6, 100, $7,
             $8, $9, $10, $11,
             'AI (GPT-4o)', $12, $13, $14,
-            $15, $16, $17, $18, $19, $20, $21,
-            $22
+            $15, $16, $17, $18, $19, $20,
+            $21, $22,
+            $23, $24
           )`,
           [
             reviewId, effectiveProposalId, title, agency ?? null, phase,
@@ -498,8 +568,8 @@ router.post(
             JSON.stringify(requirementChecks), JSON.stringify(sectionScores),
             JSON.stringify(goldChecks), JSON.stringify(costLineItems),
             JSON.stringify(greenChecks), JSON.stringify(formatChecks),
-            riskFactors,
-            fileId,
+            JSON.stringify(blueAssessments), JSON.stringify(blackHatFindings),
+            riskFactors, fileId,
           ],
         );
         log.info("color_review_saved", { reviewId, phase, overallScore, goNoGo });
@@ -530,6 +600,8 @@ router.post(
         cost_line_items: costLineItems,
         green_checks: greenChecks,
         format_checks: formatChecks,
+        blue_assessments: blueAssessments,
+        black_hat_findings: blackHatFindings,
         risk_factors: riskFactors,
         file_id: fileId,
         ai: { model: llmResponse.model, tokens: llmResponse.usage.total_tokens },
