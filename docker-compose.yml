@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gda-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gda
+      POSTGRES_PASSWORD: gda_dev_password
+      POSTGRES_DB: gda_command
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gda -d gda_command"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:

@@ -1,3 +1,5 @@
+import { authenticatedFetch } from "./auth";
+
 const API_BASE = "/api";
 
 interface GDAEnvelope<T> {
@@ -11,7 +13,7 @@ interface GDAEnvelope<T> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<GDAEnvelope<T>> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const res = await authenticatedFetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }

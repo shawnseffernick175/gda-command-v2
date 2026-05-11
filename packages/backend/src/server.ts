@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import authRouter from "./routes/auth";
+import { authMiddleware } from "./lib/auth";
 import qaRouter from "./routes/qa";
 import workflowsRouter from "./routes/workflows";
 import opportunitiesRouter from "./routes/opportunities";
@@ -74,6 +76,12 @@ app.get("/health", async (_req, res) => {
     })
   );
 });
+
+// --- Auth routes (no auth middleware) ---
+app.use("/api/auth", authRouter);
+
+// --- Auth middleware for all other API routes ---
+app.use("/api", authMiddleware);
 
 // --- API routes ---
 app.use("/api/qa", qaRouter);
