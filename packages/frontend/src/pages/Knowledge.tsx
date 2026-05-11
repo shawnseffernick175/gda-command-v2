@@ -603,6 +603,7 @@ function SearchTab() {
   const [results, setResults] = useState<KnowledgeSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [searchSource, setSearchSource] = useState<"pgvector" | "mock" | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const handleSearch = () => {
@@ -611,9 +612,12 @@ function SearchTab() {
     setSearched(true);
     searchKnowledge(query.trim())
       .then((env) => {
-        if (env.success && env.data) setResults(env.data.results);
+        if (env.success && env.data) {
+          setResults(env.data.results);
+          setSearchSource(env.data.source ?? null);
+        }
       })
-      .catch(() => setResults([]))
+      .catch(() => { setResults([]); setSearchSource(null); })
       .finally(() => setSearching(false));
   };
 
@@ -660,7 +664,7 @@ function SearchTab() {
           <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
           <div>Enter a query to search across all indexed documents using semantic similarity</div>
           <div style={{ fontSize: 12, marginTop: 8, color: "var(--color-text-muted)" }}>
-            Powered by n8n RAG pipeline (GDA.api.rag-query + GDA.api.semantic-search)
+            Powered by pgvector cosine similarity (text-embedding-3-small)
           </div>
         </div>
       ) : searching ? (
@@ -671,6 +675,19 @@ function SearchTab() {
         <div>
           <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 12 }}>
             {results.length} results for "{query}"
+            {searchSource && (
+              <span style={{
+                marginLeft: 8,
+                padding: "2px 8px",
+                borderRadius: 10,
+                fontSize: 11,
+                fontWeight: 600,
+                background: searchSource === "pgvector" ? "#7c3aed" : "#6b7280",
+                color: "#fff",
+              }}>
+                {searchSource === "pgvector" ? "Vector Search" : "Keyword Fallback"}
+              </span>
+            )}
           </div>
           {results.map((r, i) => (
             <div

@@ -18,6 +18,14 @@ import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
 import { generateStorageKey, saveFile, deleteFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
+import {
+  isEmbeddingAvailable,
+  vectorSearch,
+  embedDocument,
+  embedAllDocuments,
+  getEmbeddingStats,
+  type VectorSearchResult,
+} from "../lib/embeddings";
 
 const router = Router();
 
@@ -175,8 +183,9 @@ router.get("/documents/:id", (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/knowledge/search — semantic search across knowledge base
+// Uses pgvector when embeddings exist + OpenAI key available, else mock fallback.
 // ---------------------------------------------------------------------------
-router.get("/search", (req, res) => {
+router.get("/search", async (req, res) => {
   try {
     const { q, limit } = req.query;
 
@@ -194,6 +203,42 @@ router.get("/search", (req, res) => {
       limit && typeof limit === "string" ? parseInt(limit, 10) : 10;
     const maxResults = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 20) : 10;
 
+    // Try real vector search first
+    if (isEmbeddingAvailable()) {
+      try {
+        const vectorResults = await vectorSearch(q.trim(), maxResults);
+        if (vectorResults.length > 0) {
+          const results = vectorResults.map((vr) => ({
+            document_id: vr.document_id,
+            document_title: vr.document_title,
+            document_type: vr.document_type,
+            collection: vr.collection,
+            relevance_score: vr.similarity,
+            highlight: vr.chunk_text.slice(0, 200),
+            chunks: [{
+              chunk_id: `${vr.document_id}-chunk-${vr.chunk_index}`,
+              text: vr.chunk_text,
+              page: vr.page_number,
+              section: vr.section_title ?? "Content",
+              similarity_score: vr.similarity,
+            }],
+          }));
+
+          return res.json(
+            successEnvelope("gda-knowledge", "search", {
+              query: q.trim(),
+              results,
+              total_results: results.length,
+              source: "pgvector",
+            }),
+          );
+        }
+      } catch (vectorErr) {
+        log.warn("vector_search_fallback", { error: (vectorErr as Error).message });
+      }
+    }
+
+    // Fallback to mock keyword search
     const results = mockSemanticSearch(q.trim(), maxResults);
 
     return res.json(
@@ -201,6 +246,7 @@ router.get("/search", (req, res) => {
         query: q.trim(),
         results,
         total_results: results.length,
+        source: "mock",
       }),
     );
   } catch (err) {
@@ -292,25 +338,53 @@ router.post("/chat", requireRole("admin", "bd_manager", "capture_lead", "analyst
     }
 
     // Retrieve relevant document context via semantic search
-    const searchResults = mockSemanticSearch(message.trim(), 5);
+    // Try real vector search first, fall back to mock
+    let sourceDocs: Array<{document_id: string; document_title: string; chunk_text: string; page: number | null; relevance: number}> = [];
+    let ragContext = "";
+    let searchSource = "mock";
 
-    const sourceDocs = searchResults.map((r) => ({
-      document_id: r.document_id,
-      document_title: r.document_title,
-      chunk_text: r.chunks[0]?.text ?? "",
-      page: r.chunks[0]?.page ?? null,
-      relevance: r.relevance_score,
-    }));
+    if (isEmbeddingAvailable()) {
+      try {
+        const vectorResults = await vectorSearch(message.trim(), 5);
+        if (vectorResults.length > 0) {
+          searchSource = "pgvector";
+          sourceDocs = vectorResults.map((vr) => ({
+            document_id: vr.document_id,
+            document_title: vr.document_title,
+            chunk_text: vr.chunk_text,
+            page: vr.page_number,
+            relevance: vr.similarity,
+          }));
+          ragContext = vectorResults
+            .map(
+              (vr, i) =>
+                `[Document ${i + 1}: "${vr.document_title}" (${Math.round(vr.similarity * 100)}% relevance)]\n${vr.chunk_text}`,
+            )
+            .join("\n\n---\n\n");
+        }
+      } catch (e) {
+        log.warn("rag_vector_fallback", { error: (e as Error).message });
+      }
+    }
 
-    // Build RAG context from retrieved documents
-    const ragContext = searchResults
-      .map(
-        (r, i) =>
-          `[Document ${i + 1}: "${r.document_title}" (${Math.round(r.relevance_score * 100)}% relevance)]\n${r.highlight}\n${r.chunks.map((c) => c.text).join("\n")}`,
-      )
-      .join("\n\n---\n\n");
+    if (sourceDocs.length === 0) {
+      const searchResults = mockSemanticSearch(message.trim(), 5);
+      sourceDocs = searchResults.map((r) => ({
+        document_id: r.document_id,
+        document_title: r.document_title,
+        chunk_text: r.chunks[0]?.text ?? "",
+        page: r.chunks[0]?.page ?? null,
+        relevance: r.relevance_score,
+      }));
+      ragContext = searchResults
+        .map(
+          (r, i) =>
+            `[Document ${i + 1}: "${r.document_title}" (${Math.round(r.relevance_score * 100)}% relevance)]\n${r.highlight}\n${r.chunks.map((c) => c.text).join("\n")}`,
+        )
+        .join("\n\n---\n\n");
+    }
 
-    if (isLLMAvailable() && searchResults.length > 0) {
+    if (isLLMAvailable() && sourceDocs.length > 0) {
       // Real LLM call with RAG context
       const llmResponse = await chatCompletion(
         [
@@ -344,12 +418,12 @@ router.post("/chat", requireRole("admin", "bd_manager", "capture_lead", "analyst
     const response: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: "assistant",
-      content: `Based on your knowledge base, I found ${searchResults.length} relevant document${searchResults.length === 1 ? "" : "s"} related to "${message.trim()}".\n\n${
-        searchResults.length > 0
-          ? searchResults
+      content: `Based on your knowledge base, I found ${sourceDocs.length} relevant document${sourceDocs.length === 1 ? "" : "s"} related to "${message.trim()}".\n\n${
+        sourceDocs.length > 0
+          ? sourceDocs
               .map(
                 (r, i) =>
-                  `**${i + 1}. ${r.document_title}** (${Math.round(r.relevance_score * 100)}% relevance)\n${r.highlight}`,
+                  `**${i + 1}. ${r.document_title}** (${Math.round(r.relevance * 100)}% relevance)\n${r.chunk_text.slice(0, 200)}`,
               )
               .join("\n\n")
           : "No directly relevant documents were found. Try rephrasing your query or uploading relevant documents to the knowledge base."
@@ -526,5 +600,124 @@ router.post(
     }
   },
 );
+
+// ---------------------------------------------------------------------------
+// GET /api/knowledge/embeddings/stats — embedding statistics
+// ---------------------------------------------------------------------------
+router.get("/embeddings/stats", async (_req, res) => {
+  try {
+    const stats = await getEmbeddingStats();
+    return res.json(
+      successEnvelope("gda-knowledge", "embedding-stats", stats),
+    );
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-knowledge", "embedding-stats", {
+        code: "INTERNAL",
+        message: err instanceof Error ? err.message : "Unknown error",
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/knowledge/embeddings/generate — embed all unembedded docs (admin)
+// ---------------------------------------------------------------------------
+router.post("/embeddings/generate", requireRole("admin"), async (_req, res) => {
+  try {
+    if (!isEmbeddingAvailable()) {
+      return res.status(400).json(
+        errorEnvelope("gda-knowledge", "embed", {
+          code: "NOT_CONFIGURED",
+          message: "OPENAI_API_KEY not configured — embeddings unavailable",
+          detail: null,
+        }),
+      );
+    }
+
+    const result = await embedAllDocuments();
+    return res.json(
+      successEnvelope("gda-knowledge", "embed", result),
+    );
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-knowledge", "embed", {
+        code: "INTERNAL",
+        message: err instanceof Error ? err.message : "Unknown error",
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/knowledge/embeddings/document/:id — embed a single document (admin)
+// ---------------------------------------------------------------------------
+router.post("/embeddings/document/:id", requireRole("admin"), async (req, res) => {
+  try {
+    if (!isEmbeddingAvailable()) {
+      return res.status(400).json(
+        errorEnvelope("gda-knowledge", "embed-doc", {
+          code: "NOT_CONFIGURED",
+          message: "OPENAI_API_KEY not configured — embeddings unavailable",
+          detail: null,
+        }),
+      );
+    }
+
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(
+        errorEnvelope("gda-knowledge", "embed-doc", {
+          code: "NO_DB",
+          message: "Database not available",
+          detail: null,
+        }),
+      );
+    }
+
+    const docId = req.params.id;
+    const { rows } = await pool.query(
+      `SELECT id, title, doc_type, tags, metadata FROM knowledge_documents WHERE id = $1`,
+      [docId],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json(
+        errorEnvelope("gda-knowledge", "embed-doc", {
+          code: "NOT_FOUND",
+          message: `Document ${docId} not found`,
+          detail: null,
+        }),
+      );
+    }
+
+    const doc = rows[0];
+    const textParts: string[] = [doc.title];
+    if (doc.doc_type) textParts.push(`Document type: ${doc.doc_type}`);
+    if (doc.tags?.length) textParts.push(`Tags: ${doc.tags.join(", ")}`);
+
+    const meta = doc.metadata ?? {};
+    if (meta.summary) textParts.push(meta.summary);
+    if (meta.description) textParts.push(meta.description);
+    if (meta.content) textParts.push(meta.content);
+
+    const fullText = textParts.join("\n\n");
+    const result = await embedDocument(docId, fullText);
+
+    return res.json(
+      successEnvelope("gda-knowledge", "embed-doc", result),
+    );
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-knowledge", "embed-doc", {
+        code: "INTERNAL",
+        message: err instanceof Error ? err.message : "Unknown error",
+        detail: null,
+      }),
+    );
+  }
+});
 
 export default router;

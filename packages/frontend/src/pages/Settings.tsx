@@ -6,6 +6,8 @@ import {
   createBackup,
   fetchFeedStatus,
   triggerFeedSync,
+  fetchEmbeddingStats,
+  triggerEmbedAll,
   type SettingsData,
   type ConnectorStatus,
   type FeatureFlag,
@@ -13,6 +15,8 @@ import {
   type BackupStatusData,
   type FeedStatusData,
   type FeedSyncData,
+  type EmbeddingStatsData,
+  type EmbedResult,
 } from "../api/client";
 
 function formatUptime(seconds: number): string {
@@ -38,6 +42,9 @@ export default function Settings() {
   const [feedStatus, setFeedStatus] = useState<FeedStatusData | null>(null);
   const [feedSyncing, setFeedSyncing] = useState(false);
   const [feedSyncResult, setFeedSyncResult] = useState<FeedSyncData | null>(null);
+  const [embeddingStats, setEmbeddingStats] = useState<EmbeddingStatsData | null>(null);
+  const [embedding, setEmbedding] = useState(false);
+  const [embedResult, setEmbedResult] = useState<EmbedResult | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -60,6 +67,11 @@ export default function Settings() {
           if (env.success && env.data) setFeedStatus(env.data);
         })
         .catch(() => { /* feeds endpoint may not exist yet */ }),
+      fetchEmbeddingStats()
+        .then((env) => {
+          if (env.success && env.data) setEmbeddingStats(env.data);
+        })
+        .catch(() => { /* embeddings endpoint may not exist yet */ }),
     ])
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -309,6 +321,70 @@ export default function Settings() {
           SAM.gov requires an API key (<a href="https://sam.gov" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-primary)" }}>get one here</a>).
           FPDS/USAspending data is free and requires no API key.
           Feeds sync automatically every 6 hours when configured.
+        </div>
+      </Section>
+
+      {/* Vector Search / Embeddings */}
+      <Section title="Vector Search (pgvector)">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+          {embeddingStats ? (
+            <>
+              <InfoCard label="Total Documents" value={String(embeddingStats.totalDocuments)} />
+              <InfoCard label="Embedded" value={String(embeddingStats.embeddedDocuments)} color={embeddingStats.embeddedDocuments > 0 ? "#22c55e" : "#6b7280"} />
+              <InfoCard label="Pending" value={String(embeddingStats.pendingDocuments)} color={embeddingStats.pendingDocuments > 0 ? "#f59e0b" : "#6b7280"} />
+              <InfoCard label="Failed" value={String(embeddingStats.failedDocuments)} color={embeddingStats.failedDocuments > 0 ? "#ef4444" : "#6b7280"} />
+              <InfoCard label="Total Chunks" value={String(embeddingStats.totalChunks)} />
+              <InfoCard label="OpenAI Key" value={embeddingStats.embeddingAvailable ? "Configured" : "Not Set"} color={embeddingStats.embeddingAvailable ? "#22c55e" : "#ef4444"} />
+            </>
+          ) : (
+            <InfoCard label="Status" value="Loading..." color="#6b7280" />
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+          <button
+            onClick={async () => {
+              setEmbedding(true);
+              setEmbedResult(null);
+              try {
+                const env = await triggerEmbedAll();
+                if (env.success && env.data) {
+                  setEmbedResult(env.data);
+                  const stats = await fetchEmbeddingStats();
+                  if (stats.success && stats.data) setEmbeddingStats(stats.data);
+                }
+              } catch (err) {
+                setEmbedResult({ total: 0, embedded: 0, failed: 1, skipped: 0 });
+              } finally {
+                setEmbedding(false);
+              }
+            }}
+            disabled={embedding || !embeddingStats?.embeddingAvailable}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 6,
+              border: "none",
+              background: embedding || !embeddingStats?.embeddingAvailable ? "#374151" : "#7c3aed",
+              color: "#fff",
+              cursor: embedding || !embeddingStats?.embeddingAvailable ? "not-allowed" : "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+              opacity: embedding || !embeddingStats?.embeddingAvailable ? 0.5 : 1,
+            }}
+          >
+            {embedding ? "Embedding..." : "Embed All Documents"}
+          </button>
+          {embedResult && (
+            <span style={{ fontSize: 13, color: embedResult.failed > 0 ? "#f59e0b" : "#22c55e" }}>
+              Embedded: {embedResult.embedded} | Skipped: {embedResult.skipped} | Failed: {embedResult.failed}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          pgvector enables real semantic search across your Knowledge Base documents.
+          When OpenAI API key is configured, document text is split into chunks and
+          embedded using text-embedding-3-small (1536 dimensions). Search queries are
+          matched by cosine similarity via HNSW index.
+          {!embeddingStats?.embeddingAvailable && " Set OPENAI_API_KEY to enable."}
         </div>
       </Section>
 
