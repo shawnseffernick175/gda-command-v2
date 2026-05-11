@@ -386,8 +386,8 @@ export default function Pipeline() {
                       {opp.id}
                     </td>
                     <td style={{ ...tdStyle, maxWidth: 340 }}>
-                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
-                        {opp.title}
+                      <div style={{ overflow: "hidden", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{opp.title}</span>
                         <SourceBadge source={opp.data_source} />
                       </div>
                     </td>

@@ -671,6 +671,7 @@ export interface ApprovalRow {
   resolved_at: string | null;
   resolved_by: string | null;
   resolution_notes: string | null;
+  data_source: string | null;
 }
 
 export interface ApprovalsData {

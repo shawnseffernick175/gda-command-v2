@@ -490,15 +490,13 @@ export default function OpsTracker() {
                     <div
                       style={{
                         overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
                       }}
                       title={opp.title}
                     >
-                      {opp.title}
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{opp.title}</span>
                       <SourceBadge source={opp.data_source} />
                     </div>
                   </td>

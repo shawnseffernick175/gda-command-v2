@@ -410,7 +410,7 @@ function ApprovalCard({
       </div>
 
       {/* Title & meta */}
-      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>{item.title} <SourceBadge source={(item as any).data_source} /></div>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>{item.title} <SourceBadge source={item.data_source} /></div>
       <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
         Requested by {item.requester} {timeAgo}
         {expiresIn && item.status === "pending" && (
