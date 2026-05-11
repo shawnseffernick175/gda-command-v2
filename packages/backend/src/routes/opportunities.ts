@@ -224,13 +224,18 @@ router.get("/", async (req, res) => {
       )
     );
   } catch (err: unknown) {
-    process.stderr.write(`[opportunities] query error: ${(err as Error).message}\n`);
-    return res.status(500).json(
-      errorEnvelope("gda-opportunities", "list", {
-        code: "DB_ERROR",
-        message: "Failed to query opportunities.",
-        detail: null,
-      })
+    process.stderr.write(`[opportunities] query error, falling back to mock: ${(err as Error).message}\n`);
+    const rows = filterAndSort(getMockOpportunities());
+    return res.json(
+      successEnvelope(
+        "gda-opportunities",
+        "list",
+        { opportunities: rows, source: "mock" as const },
+        {
+          count: rows.length,
+          filters_applied: { search, status: statusFilter, department: deptFilter, minPwin },
+        }
+      )
     );
   }
 });
@@ -380,13 +385,20 @@ router.get("/pipeline", async (req, res) => {
       )
     );
   } catch (err: unknown) {
-    process.stderr.write(`[opportunities] pipeline query error: ${(err as Error).message}\n`);
-    return res.status(500).json(
-      errorEnvelope("gda-opportunities", "pipeline-list", {
-        code: "DB_ERROR",
-        message: "Failed to query pipeline opportunities.",
-        detail: null,
-      })
+    process.stderr.write(`[opportunities] pipeline query error, falling back to mock: ${(err as Error).message}\n`);
+    const rows = pipelineFilterAndSort(
+      getMockOpportunities().filter((o) => o.status === "pipeline")
+    );
+    return res.json(
+      successEnvelope(
+        "gda-opportunities",
+        "pipeline-list",
+        { opportunities: rows, source: "mock" as const },
+        {
+          count: rows.length,
+          filters_applied: { search, department: deptFilter, minPwin },
+        }
+      )
     );
   }
 });
