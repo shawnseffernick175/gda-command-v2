@@ -31,6 +31,7 @@ import CPARSBuilder from "./pages/CPARSBuilder";
 import FPDSMonitor from "./pages/FPDSMonitor";
 import UserManagement from "./pages/UserManagement";
 import AuditLog from "./pages/AuditLog";
+import UserManual from "./pages/UserManual";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -90,6 +91,7 @@ const NAV_GROUPS = [
       { path: "/admin/audit", label: "Audit Log", icon: "📜" },
       { path: "/doctrine", label: "Doctrine", icon: "📖" },
       { path: "/prompts", label: "Prompts", icon: "📝" },
+      { path: "/help", label: "User Manual", icon: "❓" },
     ],
   },
 ] as const;
@@ -498,6 +500,7 @@ export default function App() {
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/audit" element={<AuditLog />} />
+            <Route path="/help" element={<UserManual />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
