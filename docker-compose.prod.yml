@@ -38,6 +38,16 @@ services:
       N8N_API_BASE: ${N8N_API_BASE:-}
       N8N_API_KEY: ${N8N_API_KEY:-}
       GDA_WEBHOOK_KEY: ${GDA_WEBHOOK_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SAM_API_KEY: ${SAM_API_KEY:-}
+      FEED_SYNC_INTERVAL_HOURS: ${FEED_SYNC_INTERVAL_HOURS:-6}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      APP_URL: ${APP_URL:-https://gda.csr-llc.tech}
       BACKUP_DIR: /var/backups/gda
       UPLOAD_DIR: /var/uploads/gda
     volumes:
