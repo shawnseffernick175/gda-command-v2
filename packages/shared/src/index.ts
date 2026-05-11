@@ -1377,6 +1377,52 @@ export interface FPDSAward {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Book of Truths / Data Dictionary
+// ---------------------------------------------------------------------------
+
+export type BookOfTruthsCategory = "entity" | "rule" | "glossary" | "source";
+
+export interface BookOfTruthsEntity {
+  id: string;
+  name: string;
+  category: BookOfTruthsCategory;
+  module: string;
+  description: string;
+  fields?: BookOfTruthsField[];
+  rules?: string[];
+  related?: string[];
+  api_endpoints?: string[];
+  updated_at: string;
+}
+
+export interface BookOfTruthsField {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+}
+
+export interface BookOfTruthsGlossaryTerm {
+  id: string;
+  term: string;
+  acronym: string | null;
+  definition: string;
+  category: string;
+  related_entities: string[];
+}
+
+export interface BookOfTruthsDataSource {
+  id: string;
+  name: string;
+  type: "api" | "database" | "file" | "webhook" | "manual";
+  description: string;
+  endpoint: string | null;
+  entities_served: string[];
+  status: "active" | "planned" | "deprecated";
+  refresh_frequency: string;
+}
+
 // Phase K: Quick Entry
 // ---------------------------------------------------------------------------
 

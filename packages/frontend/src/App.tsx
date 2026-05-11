@@ -33,6 +33,7 @@ import UserManagement from "./pages/UserManagement";
 import AuditLog from "./pages/AuditLog";
 import UserManual from "./pages/UserManual";
 import Charts from "./pages/Charts";
+import BookOfTruths from "./pages/BookOfTruths";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -92,6 +93,7 @@ const NAV_GROUPS = [
       { path: "/admin/users", label: "Users", icon: "👥" },
       { path: "/admin/audit", label: "Audit Log", icon: "📜" },
       { path: "/doctrine", label: "Doctrine", icon: "📖" },
+      { path: "/book-of-truths", label: "Book of Truths", icon: "📓" },
       { path: "/prompts", label: "Prompts", icon: "📝" },
       { path: "/help", label: "User Manual", icon: "❓" },
     ],
@@ -503,6 +505,7 @@ export default function App() {
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/audit" element={<AuditLog />} />
             <Route path="/charts" element={<Charts />} />
+            <Route path="/book-of-truths" element={<BookOfTruths />} />
             <Route path="/help" element={<UserManual />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
