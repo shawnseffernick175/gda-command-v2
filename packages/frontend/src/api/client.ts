@@ -3231,3 +3231,97 @@ export function fetchBookOfTruths(params: { search?: string; category?: string; 
   const query = qs.toString();
   return request<BookOfTruthsData>(`/book-of-truths${query ? `?${query}` : ""}`);
 }
+
+// --- GovWin / GovTribe Integration ---
+
+export interface GovWinContactRow {
+  name: string;
+  title: string;
+  agency: string;
+}
+
+export interface GovWinOpportunityRow {
+  id: string;
+  govwin_id: string;
+  title: string;
+  agency: string;
+  sub_agency: string;
+  status: "new" | "tracking" | "qualified" | "dismissed" | "archived";
+  stage: string;
+  value_low: number | null;
+  value_high: number | null;
+  procurement_type: string;
+  naics: string;
+  set_aside: string | null;
+  place_of_performance: string;
+  expected_release: string | null;
+  expected_award: string | null;
+  incumbents: string[];
+  competitors: string[];
+  relevance_score: number;
+  ai_summary: string;
+  key_contacts: GovWinContactRow[];
+  tags: string[];
+  govwin_url: string;
+  last_updated: string;
+  created_at: string;
+}
+
+export interface GovWinSyncRow {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: "running" | "completed" | "failed";
+  opportunities_synced: number;
+  new_matches: number;
+  error: string | null;
+}
+
+export interface GovWinSummaryData {
+  total: number;
+  new_count: number;
+  tracking_count: number;
+  qualified_count: number;
+  dismissed_count: number;
+  avg_relevance: number;
+  total_pipeline_value: number;
+  last_sync: string | null;
+  source: "mock" | "db";
+}
+
+export function fetchGovWinSummary() {
+  return request<GovWinSummaryData>("/govwin/summary");
+}
+
+export function fetchGovWinOpportunities(params: { search?: string; status?: string; stage?: string; sort?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set("search", params.search);
+  if (params.status) qs.set("status", params.status);
+  if (params.stage) qs.set("stage", params.stage);
+  if (params.sort) qs.set("sort", params.sort);
+  const query = qs.toString();
+  return request<GovWinOpportunityRow[]>(`/govwin/opportunities${query ? `?${query}` : ""}`);
+}
+
+export function fetchGovWinSyncs() {
+  return request<GovWinSyncRow[]>("/govwin/syncs");
+}
+
+export function triggerGovWinSync() {
+  return request<GovWinSyncRow>("/govwin/sync", { method: "POST" });
+}
+
+export function updateGovWinStatus(id: string, status: string) {
+  return request<GovWinOpportunityRow>(`/govwin/opportunities/${id}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function promoteGovWinOpportunity(id: string) {
+  return request<{ govwin_opportunity: GovWinOpportunityRow; promoted_to: string; new_opportunity_id: string }>(
+    `/govwin/opportunities/${id}/promote`,
+    { method: "POST" }
+  );
+}
