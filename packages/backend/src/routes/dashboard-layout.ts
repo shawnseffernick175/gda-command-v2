@@ -14,7 +14,7 @@ router.get("/layout", async (req: Request, res: Response) => {
   const pool = getPool();
   const userId = req.user?.userId;
   if (!pool || !userId) {
-    res.json(successEnvelope({ layout: null }));
+    res.json(successEnvelope("dashboard", "get-layout", { layout: null }));
     return;
   }
 
@@ -23,10 +23,10 @@ router.get("/layout", async (req: Request, res: Response) => {
       "SELECT layout FROM dashboard_layouts WHERE user_id = $1",
       [userId]
     );
-    res.json(successEnvelope({ layout: rows[0]?.layout ?? null }));
+    res.json(successEnvelope("dashboard", "get-layout", { layout: rows[0]?.layout ?? null }));
   } catch (err) {
     log.error("dashboard_layout_fetch_error", { error: (err as Error).message, userId });
-    res.json(successEnvelope({ layout: null }));
+    res.json(successEnvelope("dashboard", "get-layout", { layout: null }));
   }
 });
 
@@ -53,7 +53,7 @@ router.put("/layout", async (req: Request, res: Response) => {
       [userId, JSON.stringify(layout)]
     );
     log.info("dashboard_layout_saved", { userId, widgetCount: layout.length });
-    res.json(successEnvelope({ saved: true }));
+    res.json(successEnvelope("dashboard", "save-layout", { saved: true }));
   } catch (err) {
     log.error("dashboard_layout_save_error", { error: (err as Error).message, userId });
     res.status(500).json({ success: false, error: { message: "Failed to save layout" } });
@@ -72,7 +72,7 @@ router.delete("/layout", async (req: Request, res: Response) => {
   try {
     await pool.query("DELETE FROM dashboard_layouts WHERE user_id = $1", [userId]);
     log.info("dashboard_layout_reset", { userId });
-    res.json(successEnvelope({ reset: true }));
+    res.json(successEnvelope("dashboard", "reset-layout", { reset: true }));
   } catch (err) {
     log.error("dashboard_layout_reset_error", { error: (err as Error).message, userId });
     res.status(500).json({ success: false, error: { message: "Failed to reset layout" } });

@@ -14,7 +14,7 @@ const router = Router();
 router.get("/", requireRole("admin"), async (req: Request, res: Response) => {
   const pool = getPool();
   if (!pool) {
-    res.json(successEnvelope({ entries: [], total: 0 }));
+    res.json(successEnvelope("audit", "list", { entries: [], total: 0 }));
     return;
   }
 
@@ -59,7 +59,7 @@ router.get("/", requireRole("admin"), async (req: Request, res: Response) => {
       [...params, limit, offset]
     );
 
-    res.json(successEnvelope({
+    res.json(successEnvelope("audit", "list", {
       entries: rows,
       total,
       page,
@@ -76,7 +76,7 @@ router.get("/", requireRole("admin"), async (req: Request, res: Response) => {
 router.get("/stats", requireRole("admin"), async (_req: Request, res: Response) => {
   const pool = getPool();
   if (!pool) {
-    res.json(successEnvelope({ totalEntries: 0, topActions: [], topUsers: [], recentActivity: [] }));
+    res.json(successEnvelope("audit", "stats", { totalEntries: 0, topActions: [], topUsers: [], recentActivity: [] }));
     return;
   }
 
@@ -99,7 +99,7 @@ router.get("/stats", requireRole("admin"), async (_req: Request, res: Response) 
       ),
     ]);
 
-    res.json(successEnvelope({
+    res.json(successEnvelope("audit", "stats", {
       totalEntries: parseInt(totalRes.rows[0].total),
       topActions: actionsRes.rows,
       topUsers: usersRes.rows,
