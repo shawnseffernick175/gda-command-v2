@@ -445,6 +445,24 @@ export default function FastTrack() {
 function DetailPanel({ data }: { data: FastTrackDetailData }) {
   const { match: m, analysis, ooda, sources, learning } = data;
   const [activeTab, setActiveTab] = useState<"overview" | "ooda" | "sources">("overview");
+  const [promoting, setPromoting] = useState(false);
+  const [promoted, setPromoted] = useState(m.status === "promoted");
+
+  const handlePromote = async () => {
+    setPromoting(true);
+    try {
+      await fetch("/api/fast-track/promote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId: m.id }),
+      });
+      setPromoted(true);
+    } catch {
+      // silently fail
+    } finally {
+      setPromoting(false);
+    }
+  };
 
   const tabs = [
     { key: "overview" as const, label: "Overview" },
@@ -463,6 +481,27 @@ function DetailPanel({ data }: { data: FastTrackDetailData }) {
             <Badge label={m.safety_lane} color="#6b7280" bg="#f3f4f6" />
             {m.promotion_target && (
               <Badge label={`→ ${m.promotion_target}`} color="#22c55e" />
+            )}
+            {!promoted ? (
+              <button
+                onClick={handlePromote}
+                disabled={promoting}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 6,
+                  border: "1px solid #22c55e",
+                  background: promoting ? "rgba(34,197,94,0.1)" : "transparent",
+                  color: "#22c55e",
+                  cursor: promoting ? "default" : "pointer",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {promoting ? "Promoting..." : "Promote to Opportunity"}
+              </button>
+            ) : (
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#22c55e" }}>Promoted</span>
             )}
           </div>
           <h3 style={{ margin: "0 0 4px", fontSize: 17 }}>{m.technology}</h3>

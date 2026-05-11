@@ -37,6 +37,7 @@ import emailRouter from "./routes/email";
 import dashboardLayoutRouter from "./routes/dashboard-layout";
 import auditRouter from "./routes/audit";
 import exportRouter from "./routes/export";
+import aiRouter from "./routes/ai";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -45,6 +46,7 @@ import { isLLMAvailable } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
 import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
+import { getPool } from "./lib/db";
 import { auditMiddleware } from "./middleware/audit-middleware";
 import { authLimiter, apiLimiter, ingestLimiter } from "./middleware/rate-limit";
 
@@ -145,6 +147,7 @@ app.use("/api/email", emailRouter);
 app.use("/api/dashboard-layout", dashboardLayoutRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/export", exportRouter);
+app.use("/api/ai", aiRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {
@@ -250,6 +253,41 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
+// Auto-No Bid: move unqualified opps with due_date <= 30 days to no_bid
+let autoNoBidTimer: ReturnType<typeof setInterval> | null = null;
+
+async function runAutoNoBidCheck() {
+  const pool = getPool();
+  if (!pool) return;
+  try {
+    const result = await pool.query(
+      `UPDATE opportunities
+       SET status = 'lost', capture_stage = 'no_bid', updated_at = NOW()
+       WHERE status = 'discovery'
+         AND capture_stage IN ('interest', 'discovery')
+         AND due_date IS NOT NULL
+         AND due_date <= NOW() + INTERVAL '30 days'
+         AND due_date > NOW()
+       RETURNING id, title`
+    );
+    if (result.rows.length > 0) {
+      log.info("auto_no_bid", { count: result.rows.length, ids: result.rows.map((r: { id: string }) => r.id) });
+    }
+  } catch (err: unknown) {
+    log.error("auto_no_bid_error", { error: (err as Error).message });
+  }
+}
+
+function startAutoNoBidCheck() {
+  runAutoNoBidCheck();
+  // Check every 6 hours
+  autoNoBidTimer = setInterval(runAutoNoBidCheck, 6 * 60 * 60 * 1000);
+}
+
+function stopAutoNoBidCheck() {
+  if (autoNoBidTimer) clearInterval(autoNoBidTimer);
+}
+
 const server = app.listen(PORT, () => {
   log.info("server_started", { port: Number(PORT), env: process.env.NODE_ENV ?? "development" });
 
@@ -258,12 +296,16 @@ const server = app.listen(PORT, () => {
   if (syncInterval > 0) {
     startScheduledSync(syncInterval);
   }
+
+  // Auto-No Bid rule: daily check for unqualified opps due within 30 days
+  startAutoNoBidCheck();
 });
 
 // Graceful shutdown
 function shutdown(signal: string) {
   log.info("shutdown_initiated", { signal });
   stopScheduledSync();
+  stopAutoNoBidCheck();
   server.close(() => {
     log.info("server_closed");
     process.exit(0);

@@ -218,6 +218,26 @@ export function qualifyOpportunity(id: string, dryRun = true, approve = false) {
   });
 }
 
+export const SHIPLEY_STAGES = [
+  { value: "interest", label: "Interest", color: "#6b7280" },
+  { value: "qualify", label: "Qualify", color: "#3b82f6" },
+  { value: "pursue", label: "Pursue", color: "#22c55e" },
+  { value: "solicitation", label: "Solicitation", color: "#f59e0b" },
+  { value: "post_submittal", label: "Post Submittal", color: "#8b5cf6" },
+  { value: "won", label: "Won", color: "#22c55e" },
+  { value: "lost", label: "Lost", color: "#ef4444" },
+  { value: "no_bid", label: "No Bid", color: "#9ca3af" },
+  { value: "gov_cancelled", label: "Gov Cancelled", color: "#9ca3af" },
+] as const;
+
+export function changeOpportunityStage(id: string, stage: string) {
+  return request<{ opportunity_id: string; new_stage: string; new_status: string }>(`/opportunities/${id}/stage`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stage }),
+  });
+}
+
 // --- Opportunity Detail (S-009) ---
 
 export interface OpportunityDetailAnalysis {
@@ -356,6 +376,7 @@ export function fetchDashboardMega() {
 
 export interface CommandRisk {
   plan_id: string;
+  opportunity_id?: string;
   opportunity_title: string;
   agency: string;
   description: string;
@@ -366,6 +387,7 @@ export interface CommandRisk {
 
 export interface CommandDecision {
   plan_id: string;
+  opportunity_id?: string;
   opportunity_title: string;
   agency: string;
   phase: string;
@@ -377,6 +399,7 @@ export interface CommandDecision {
 
 export interface CommandDueSoon {
   plan_id: string;
+  opportunity_id?: string;
   opportunity_title: string;
   milestone_id: string;
   title: string;

@@ -118,15 +118,18 @@ router.get("/kpis", async (_req, res) => {
   }
 
   // --- 3. Compute KPIs from local data (DB or mock) ---
-  const totalOpportunities = allOpps.length;
+  // Exclude fast-track signals from opportunity counts
+  const realOpps = allOpps.filter((o) => (o as unknown as Record<string, unknown>).source !== "fast-track");
+  const totalOpportunities = realOpps.length;
 
-  const pipelineOpps = allOpps.filter((o) => o.status === "pipeline");
+  // Pipeline Value = only Qualified + Pipeline status (approved items)
+  const pipelineOpps = realOpps.filter((o) => o.status === "qualified" || o.status === "pipeline");
   const totalPipelineValue = pipelineOpps.reduce(
     (s, o) => s + (o.value_estimated ?? 0),
     0
   );
 
-  const withPwin = allOpps.filter((o) => o.probability_of_win !== null);
+  const withPwin = realOpps.filter((o) => o.probability_of_win !== null);
   const avgPwin =
     withPwin.length > 0
       ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) /
@@ -135,11 +138,11 @@ router.get("/kpis", async (_req, res) => {
 
   const avgScore =
     totalOpportunities > 0
-      ? allOpps.reduce((s, o) => s + o.score, 0) / totalOpportunities
+      ? realOpps.reduce((s, o) => s + o.score, 0) / totalOpportunities
       : 0;
 
   const funnel = STAGE_ORDER.map((stage) => {
-    const stageOpps = allOpps.filter((o) => o.status === stage);
+    const stageOpps = realOpps.filter((o) => o.status === stage);
     const count = stageOpps.length;
     const totalValue = stageOpps.reduce(
       (s, o) => s + (o.value_estimated ?? 0),
@@ -167,7 +170,7 @@ router.get("/kpis", async (_req, res) => {
     };
   });
 
-  const topByScore = [...allOpps].sort((a, b) => b.score - a.score).slice(0, 10);
+  const topByScore = [...realOpps].sort((a, b) => b.score - a.score).slice(0, 10);
 
   return res.json(
     successEnvelope(
@@ -223,6 +226,7 @@ router.get("/command-signals", async (_req, res) => {
         .filter((r) => r.likelihood === "high" || r.impact === "high")
         .map((r) => ({
           plan_id: p.id,
+          opportunity_id: p.opportunity_id,
           opportunity_title: p.opportunity_title,
           agency: p.agency,
           description: r.description,
@@ -242,6 +246,7 @@ router.get("/command-signals", async (_req, res) => {
         .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
       return {
         plan_id: p.id,
+        opportunity_id: p.opportunity_id,
         opportunity_title: p.opportunity_title,
         agency: p.agency,
         phase: p.phase,
@@ -267,6 +272,7 @@ router.get("/command-signals", async (_req, res) => {
         })
         .map((m) => ({
           plan_id: p.id,
+          opportunity_id: p.opportunity_id,
           opportunity_title: p.opportunity_title,
           milestone_id: m.id,
           title: m.title,

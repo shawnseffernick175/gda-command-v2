@@ -24,6 +24,32 @@ const VALID_STATUSES: OpportunityStatus[] = [
   "won",
 ];
 
+// Shipley stages — superset of existing statuses for the capture pipeline
+const SHIPLEY_STAGES = [
+  "interest",
+  "qualify",
+  "pursue",
+  "solicitation",
+  "post_submittal",
+  "won",
+  "lost",
+  "no_bid",
+  "gov_cancelled",
+] as const;
+
+// Map Shipley stages to the existing DB status values
+const SHIPLEY_TO_STATUS: Record<string, OpportunityStatus> = {
+  interest: "discovery",
+  qualify: "qualified",
+  pursue: "pipeline",
+  solicitation: "pipeline",
+  post_submittal: "pipeline",
+  won: "won",
+  lost: "lost",
+  no_bid: "lost",
+  gov_cancelled: "lost",
+};
+
 const SORTABLE_COLUMNS: Record<string, string> = {
   title: "title",
   department: "department",
@@ -649,6 +675,88 @@ router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res)
         },
         { correlation_id: correlationId }
       )
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/opportunities/:id/stage — change Shipley capture stage
+// ---------------------------------------------------------------------------
+router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) => {
+  const { id } = req.params;
+  const { stage } = req.body as { stage: string };
+
+  if (!stage || !SHIPLEY_STAGES.includes(stage as typeof SHIPLEY_STAGES[number])) {
+    return res.status(400).json(
+      errorEnvelope("gda-opportunities", "change-stage", {
+        code: "INVALID_STAGE",
+        message: `Invalid stage. Must be one of: ${SHIPLEY_STAGES.join(", ")}`,
+        detail: null,
+      })
+    );
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("gda-opportunities", "change-stage", {
+        code: "NO_DB",
+        message: "Database not available",
+        detail: null,
+      })
+    );
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const dbStatus = SHIPLEY_TO_STATUS[stage] ?? "discovery";
+
+    const current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
+    if (current.rows.length === 0) {
+      return res.status(404).json(
+        errorEnvelope("gda-opportunities", "change-stage", {
+          code: "NOT_FOUND",
+          message: `Opportunity ${id} not found`,
+          detail: null,
+        })
+      );
+    }
+
+    const prevStatus = current.rows[0].status;
+    const prevStage = current.rows[0].capture_stage;
+    const title = current.rows[0].title;
+
+    await pool.query(
+      `UPDATE opportunities
+       SET status = $2, capture_stage = $3, updated_at = $4,
+           qualified_at = CASE WHEN $3 IN ('qualify','pursue','solicitation','post_submittal') AND qualified_at IS NULL THEN $4 ELSE qualified_at END,
+           qualified_by = CASE WHEN $3 IN ('qualify','pursue','solicitation','post_submittal') AND qualified_by IS NULL THEN 'GDA_STAGE_CHANGE' ELSE qualified_by END
+       WHERE id = $1`,
+      [id, dbStatus, stage, now]
+    );
+
+    process.stdout.write(
+      `[GDA STAGE CHANGE] opportunity_id=${id} | title=${title.replace(/\s+/g, "_")} | prev_status=${prevStatus} | prev_stage=${prevStage} | new_stage=${stage} | new_status=${dbStatus}\n`
+    );
+
+    return res.json(
+      successEnvelope("gda-opportunities", "change-stage", {
+        opportunity_id: id,
+        title,
+        prev_status: prevStatus,
+        prev_stage: prevStage,
+        new_stage: stage,
+        new_status: dbStatus,
+      })
+    );
+  } catch (err: unknown) {
+    process.stderr.write(`[opportunities] stage change error: ${(err as Error).message}\n`);
+    return res.status(500).json(
+      errorEnvelope("gda-opportunities", "change-stage", {
+        code: "DB_ERROR",
+        message: "Failed to change stage.",
+        detail: null,
+      })
     );
   }
 });

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   fetchDashboardKPIs,
   fetchCommandSignals,
@@ -13,6 +13,7 @@ import {
   type WidgetLayout,
 } from "../api/client";
 import { useToast } from "../components/Toast";
+import InfoBadge from "../components/InfoBadge";
 
 function formatCurrency(v: number | null): string {
   if (v === null || v === undefined || v === 0) return "$0";
@@ -401,19 +402,56 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
       gridTemplateColumns: kpis.n8nKpis ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
       gap: 16,
     }}>
-      <KPICard label="Total Opportunities" value={String(kpis.totalOpportunities)} />
+      <KPICard
+        label="Total Opportunities"
+        value={String(kpis.totalOpportunities)}
+        info={{
+          whatItIs: "Count of all tracked opportunities (Discovery + Qualified status).",
+          whatItMeans: "Total number of potential contracts being evaluated or actively pursued.",
+          howCalculated: "Count of opportunities in Discovery and Qualified stages. Does not include Fast Track R&D signals.",
+        }}
+      />
       {kpis.n8nKpis ? (
         <>
-          <KPICard label="Weighted Pipeline" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" />
+          <KPICard label="Weighted Pipeline" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" info={{
+            whatItIs: "Pipeline value weighted by probability of win.",
+            whatItMeans: "Risk-adjusted revenue forecast from your active pipeline.",
+            howCalculated: "Sum of (contract value × Pwin) for all Qualified and Pipeline opportunities.",
+          }} />
           <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" />
           <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" />
           <KPICard label="Monitor" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" />
         </>
       ) : (
         <>
-          <KPICard label="Pipeline Value" value={formatCurrency(kpis.totalPipelineValue)} accent="#8b5cf6" />
-          <KPICard label="Avg Pwin" value={formatPwin(kpis.avgPwin)} />
-          <KPICard label="Avg Score" value={kpis.avgScore.toFixed(1)} />
+          <KPICard
+            label="Pipeline Value"
+            value={formatCurrency(kpis.totalPipelineValue)}
+            accent="#8b5cf6"
+            info={{
+              whatItIs: "Total estimated value of approved pipeline opportunities.",
+              whatItMeans: "The dollar amount of contracts you are actively pursuing (Qualified + Pipeline status only).",
+              howCalculated: "Sum of estimated values for opportunities in Qualified and Pipeline stages. Discovery items are excluded — they are prospects, not pipeline.",
+            }}
+          />
+          <KPICard
+            label="Avg Pwin"
+            value={formatPwin(kpis.avgPwin)}
+            info={{
+              whatItIs: "Average probability of win across all tracked opportunities.",
+              whatItMeans: "Higher Pwin means stronger competitive position. Below 40% suggests heavy competition or weak positioning.",
+              howCalculated: "Composite score based on: Technical Fit (30%), Past Performance (25%), Competition (20%), Customer Relationship (15%), Price Competitiveness (10%). Each factor scored 0-100, then weighted and averaged across all opportunities.",
+            }}
+          />
+          <KPICard
+            label="Avg Score"
+            value={kpis.avgScore.toFixed(1)}
+            info={{
+              whatItIs: "Average opportunity quality score across all tracked opportunities.",
+              whatItMeans: "Measures overall opportunity attractiveness. Above 70 is strong, 50-70 is moderate, below 50 needs review.",
+              howCalculated: "Each opportunity scored 0-100 based on: strategic fit, revenue potential, competitive landscape, incumbent advantage, contract vehicle access, and past performance relevance. Averaged across all opportunities.",
+            }}
+          />
         </>
       )}
     </div>
@@ -421,6 +459,17 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
 }
 
 function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
+  const navigate = useNavigate();
+  const clickableRow = (oppId: string | undefined): React.CSSProperties => ({
+    padding: "8px 0",
+    cursor: oppId ? "pointer" : "default",
+    borderRadius: 4,
+    transition: "background 0.15s",
+  });
+  const goToOpp = (oppId: string | undefined) => {
+    if (oppId) navigate(`/opportunities/${oppId}`, { state: { from: "/" } });
+  };
+
   return (
     <div className="signal-grid" style={{
       display: "grid",
@@ -428,9 +477,10 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
       gap: 16,
     }}>
       {/* Accelerators */}
-      <SignalCard title="Accelerators" icon="⚡" count={signals.accelerators.length} accentColor="#f59e0b">
+      <SignalCard title="Accelerators" icon="⚡" count={signals.accelerators.length} accentColor="#f59e0b"
+        info={{ whatItIs: "Fast-track signals requiring immediate attention.", whatItMeans: "These opportunities have time-sensitive windows — act now or miss the chance.", howCalculated: "Flagged when RFP response windows are < 14 days, incumbent contracts are expiring, or draft RFPs are posted." }}>
         {signals.accelerators.map((ft, i) => (
-          <div key={i} style={{ padding: "8px 0", borderBottom: i < signals.accelerators.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+          <div key={i} style={{ ...clickableRow(undefined), borderBottom: i < signals.accelerators.length - 1 ? "1px solid var(--color-border)" : "none" }}>
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{
                 width: 6, height: 6, borderRadius: "50%",
@@ -445,9 +495,16 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
       </SignalCard>
 
       {/* Active Risks */}
-      <SignalCard title="Active Risks" icon="🔴" count={signals.activeRisks.length} accentColor="#ef4444">
+      <SignalCard title="Active Risks" icon="🔴" count={signals.activeRisks.length} accentColor="#ef4444"
+        info={{ whatItIs: "High-likelihood or high-impact risks across your capture portfolio.", whatItMeans: "These risks could derail wins if not mitigated. Review and assign mitigation actions.", howCalculated: "Risks with likelihood=high OR impact=high from all active capture plans." }}>
         {signals.activeRisks.slice(0, 4).map((risk, i) => (
-          <div key={i} style={{ padding: "8px 0", borderBottom: i < Math.min(signals.activeRisks.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}>
+          <div
+            key={i}
+            style={{ ...clickableRow(risk.opportunity_id), borderBottom: i < Math.min(signals.activeRisks.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
+            onClick={() => goToOpp(risk.opportunity_id)}
+            onMouseEnter={(e) => { if (risk.opportunity_id) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{
                 padding: "1px 5px", borderRadius: 4, fontSize: 9, fontWeight: 700,
@@ -470,9 +527,16 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
       </SignalCard>
 
       {/* Upcoming Decisions */}
-      <SignalCard title="Decisions Pending" icon="🎯" count={signals.upcomingDecisions.length} accentColor="#8b5cf6">
+      <SignalCard title="Decisions Pending" icon="🎯" count={signals.upcomingDecisions.length} accentColor="#8b5cf6"
+        info={{ whatItIs: "Opportunities awaiting your bid/no-bid decision.", whatItMeans: "These need your go/no-go call. Delays risk missing submission windows.", howCalculated: "Capture plans with bid_decision = 'pending' status." }}>
         {signals.upcomingDecisions.slice(0, 4).map((dec, i) => (
-          <div key={i} style={{ padding: "8px 0", borderBottom: i < Math.min(signals.upcomingDecisions.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}>
+          <div
+            key={i}
+            style={{ ...clickableRow(dec.opportunity_id), borderBottom: i < Math.min(signals.upcomingDecisions.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
+            onClick={() => goToOpp(dec.opportunity_id)}
+            onMouseEnter={(e) => { if (dec.opportunity_id) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{dec.opportunity_title}</div>
             <div style={{ fontSize: 11, color: "var(--color-text-muted)", display: "flex", gap: 8 }}>
               <span>{dec.agency}</span>
@@ -496,6 +560,7 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
         icon="📅"
         count={signals.dueSoonItems.length}
         accentColor="#06b6d4"
+        info={{ whatItIs: "Milestones and tasks due within the next 30 days.", whatItMeans: "Items at risk or overdue need immediate action to stay on track.", howCalculated: "Milestones with status 'at_risk' or 'overdue', plus any milestone due within 30 days." }}
         badge={signals.approvalsSummary.pending > 0 ? (
           <Link to="/approvals" style={{
             padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700,
@@ -508,7 +573,13 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
         ) : undefined}
       >
         {signals.dueSoonItems.slice(0, 4).map((item, i) => (
-          <div key={i} style={{ padding: "8px 0", borderBottom: i < Math.min(signals.dueSoonItems.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}>
+          <div
+            key={i}
+            style={{ ...clickableRow(item.opportunity_id), borderBottom: i < Math.min(signals.dueSoonItems.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
+            onClick={() => goToOpp(item.opportunity_id)}
+            onMouseEnter={(e) => { if (item.opportunity_id) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{
                 padding: "1px 5px", borderRadius: 4, fontSize: 9, fontWeight: 700,
@@ -543,8 +614,14 @@ function FunnelSection({ kpis }: { kpis: DashboardKPIs }) {
       borderRadius: 8,
       padding: 20,
     }}>
-      <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600 }}>
+      <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
         Opportunity Funnel
+        <InfoBadge
+          whatItIs="Visual breakdown of opportunities by pipeline stage."
+          whatItMeans="Shows how many opportunities are at each stage. Click any bar to filter the Ops Tracker by that stage."
+          howCalculated="Count and total value of opportunities grouped by status: Discovery → Qualified → Pipeline → Won → Lost."
+          size={16}
+        />
       </h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {kpis.funnel.map((stage) => (
@@ -627,10 +704,12 @@ function KPICard({
   label,
   value,
   accent,
+  info,
 }: {
   label: string;
   value: string;
   accent?: string;
+  info?: { whatItIs: string; whatItMeans: string; howCalculated?: string };
 }) {
   return (
     <div style={{
@@ -646,8 +725,12 @@ function KPICard({
         letterSpacing: "0.05em",
         color: "var(--color-text-muted)",
         marginBottom: 6,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
       }}>
         {label}
+        {info && <InfoBadge {...info} size={16} />}
       </div>
       <div style={{
         fontSize: 28,
@@ -666,6 +749,7 @@ function SignalCard({
   count,
   accentColor,
   badge,
+  info,
   children,
 }: {
   title: string;
@@ -673,6 +757,7 @@ function SignalCard({
   count: number;
   accentColor: string;
   badge?: React.ReactNode;
+  info?: { whatItIs: string; whatItMeans: string; howCalculated?: string };
   children: React.ReactNode;
 }) {
   return (
@@ -688,6 +773,7 @@ function SignalCard({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>{icon}</span>
           <span style={{ fontSize: 13, fontWeight: 600 }}>{title}</span>
+          {info && <InfoBadge {...info} size={16} />}
           <span style={{
             padding: "1px 7px",
             borderRadius: 10,
@@ -713,11 +799,17 @@ function FunnelRow({
   stage: DashboardFunnelStage;
   maxCount: number;
 }) {
+  const navigate = useNavigate();
   const pct = maxCount > 0 ? (stage.count / maxCount) * 100 : 0;
   const color = STAGE_COLORS[stage.stage] ?? "#6b7280";
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", padding: "4px 0", borderRadius: 4, transition: "background 0.15s" }}
+      onClick={() => navigate(`/ops-tracker?status=${stage.stage}`)}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
       <div style={{
         width: 90,
         fontSize: 13,

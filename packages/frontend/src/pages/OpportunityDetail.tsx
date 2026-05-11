@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import AskAIChat from "../components/AskAIChat";
 import {
   fetchOpportunityDetail,
   fetchPwinBreakdown,
@@ -565,6 +566,11 @@ export default function OpportunityDetail() {
           Feedback controls will be available in a future sprint.
         </div>
       </Section>
+
+      {/* Section 8: Ask AI */}
+      <div style={{ marginTop: 24 }}>
+        <AskAIChat opportunityId={id ?? ""} opportunityTitle={opp.title} />
+      </div>
     </div>
   );
 }

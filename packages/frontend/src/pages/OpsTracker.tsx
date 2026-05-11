@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ExportButton from "../components/ExportButton";
+import InfoBadge from "../components/InfoBadge";
 import {
   fetchOpportunities,
   qualifyOpportunity,
+  changeOpportunityStage,
   fetchRecommendations,
+  SHIPLEY_STAGES,
   type OpportunityRow,
   type OpportunitiesData,
   type SmartRecommendation,
@@ -44,15 +47,27 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString();
 }
 
+function statusToShipley(status: string): string {
+  const map: Record<string, string> = {
+    discovery: "interest",
+    qualified: "qualify",
+    pipeline: "pursue",
+    won: "won",
+    lost: "lost",
+  };
+  return map[status] ?? "interest";
+}
+
 export default function OpsTracker() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [data, setData] = useState<OpportunitiesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
+  // Filters — initialize status from URL query param if present
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
   const [deptFilter, setDeptFilter] = useState("");
   const [minPwin, setMinPwin] = useState("");
 
@@ -230,21 +245,38 @@ export default function OpsTracker() {
           fontSize: 14,
         }}
       >
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Count </span>
           <strong>{summary.total}</strong>
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Total Value </span>
           <strong>{formatCurrency(summary.totalValue)}</strong>
+          <InfoBadge
+            whatItIs="Sum of estimated values for all displayed opportunities."
+            whatItMeans="Total addressable contract value in your current view."
+            size={14}
+          />
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Avg Pwin </span>
           <strong>{formatPwin(summary.avgPwin)}</strong>
+          <InfoBadge
+            whatItIs="Average probability of win across displayed opportunities."
+            whatItMeans="Higher Pwin means stronger competitive position."
+            howCalculated="Composite of: Technical Fit (30%), Past Performance (25%), Competition (20%), Customer Relationship (15%), Price (10%)."
+            size={14}
+          />
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Avg Score </span>
           <strong>{summary.avgScore.toFixed(1)}</strong>
+          <InfoBadge
+            whatItIs="Average opportunity quality score."
+            whatItMeans="Above 70 is strong, 50-70 moderate, below 50 needs review."
+            howCalculated="Each opp scored 0-100 on: strategic fit, revenue potential, competitive landscape, incumbent advantage, contract vehicle access, past performance."
+            size={14}
+          />
         </div>
       </div>
 
@@ -532,23 +564,39 @@ export default function OpsTracker() {
                     {formatDate(opp.due_date)}
                   </td>
                   <td style={tdStyle}>
-                    {opp.status === "discovery" && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleQualifyDryRun(opp); }}
-                        style={{
-                          padding: "4px 10px",
-                          borderRadius: 4,
-                          border: "1px solid #3b82f6",
-                          background: "transparent",
-                          color: "#3b82f6",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          fontWeight: 500,
-                        }}
-                      >
-                        Qualify
-                      </button>
-                    )}
+                    <select
+                      value={statusToShipley(opp.status)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={async (e) => {
+                        e.stopPropagation();
+                        const newStage = e.target.value;
+                        try {
+                          await changeOpportunityStage(opp.id, newStage);
+                          load();
+                        } catch {
+                          // fallback: try qualify for backward compat
+                          if (newStage === "qualify") {
+                            await qualifyOpportunity(opp.id, false, true);
+                            load();
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: "3px 6px",
+                        borderRadius: 4,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-surface)",
+                        color: SHIPLEY_STAGES.find(s => s.value === statusToShipley(opp.status))?.color ?? "var(--color-text)",
+                        cursor: "pointer",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        minWidth: 100,
+                      }}
+                    >
+                      {SHIPLEY_STAGES.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
                   </td>
                 </tr>
               ))}
@@ -566,7 +614,7 @@ export default function OpsTracker() {
             color: "var(--color-text-muted)",
           }}
         >
-          Showing {opportunities.length} opportunity{opportunities.length !== 1 ? "ies" : "y"}
+          Showing {opportunities.length} {opportunities.length !== 1 ? "opportunities" : "opportunity"}
         </div>
       )}
 
