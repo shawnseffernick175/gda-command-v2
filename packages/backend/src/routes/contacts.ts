@@ -2,6 +2,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { MOCK_CONTACTS } from "../data/contacts-mock";
 import { getPool } from "../lib/db";
+import { requireRole } from "../lib/auth";
 import type { Contact } from "@gda/shared";
 
 const router = Router();
@@ -147,6 +148,48 @@ router.get("/:id", async (req, res) => {
     res.json(successEnvelope("GDA.contacts", "get-detail", { contact, source }));
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.contacts", "get-detail", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/contacts/quick-create — create a new contact (Quick Entry)
+// ---------------------------------------------------------------------------
+router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
+  const { first_name, last_name, title, agency, email, phone } = req.body as {
+    first_name?: string;
+    last_name?: string;
+    title?: string;
+    agency?: string;
+    email?: string;
+    phone?: string;
+  };
+
+  if (!first_name || !last_name) {
+    return res.status(400).json(
+      errorEnvelope("GDA.contacts", "quick-create", { code: "BAD_REQUEST", message: "first_name and last_name are required", detail: null }),
+    );
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(500).json(
+      errorEnvelope("GDA.contacts", "quick-create", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+    );
+  }
+
+  try {
+    const id = `contact-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    await pool.query(
+      `INSERT INTO contacts (id, first_name, last_name, title, agency, email, phone, status, relationship_strength, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'new', $8, $8)`,
+      [id, first_name, last_name, title ?? null, agency ?? null, email ?? null, phone ?? null, now],
+    );
+    res.json(successEnvelope("GDA.contacts", "quick-create", { id, name: `${first_name} ${last_name}` }));
+  } catch (e) {
+    res.status(500).json(
+      errorEnvelope("GDA.contacts", "quick-create", { code: "INTERNAL", message: (e as Error).message, detail: null }),
+    );
   }
 });
 

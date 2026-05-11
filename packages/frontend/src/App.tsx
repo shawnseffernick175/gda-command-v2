@@ -37,6 +37,7 @@ import NotificationCenter from "./components/NotificationCenter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Breadcrumb from "./components/Breadcrumb";
 import { ToastProvider } from "./components/Toast";
+import QuickEntry from "./components/QuickEntry";
 
 const NAV_GROUPS = [
   {
@@ -441,6 +442,7 @@ export default function App() {
         </main>
       </div>
     </div>
+    <QuickEntry />
     </ToastProvider>
     </ErrorBoundary>
   );
