@@ -29,6 +29,7 @@ import discussionsRouter from "./routes/discussions";
 import cparsRouter from "./routes/cpars";
 import fpdsRouter from "./routes/fpds";
 import ingestRouter from "./routes/ingest";
+import backupRouter from "./routes/backup";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -118,6 +119,7 @@ app.use("/api/sam-monitor", samMonitorRouter);
 app.use("/api/discussions", discussionsRouter);
 app.use("/api/cpars", cparsRouter);
 app.use("/api/fpds", fpdsRouter);
+app.use("/api/backup", backupRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {

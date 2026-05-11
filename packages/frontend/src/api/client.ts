@@ -2663,3 +2663,33 @@ export function fetchFPDSAwards(params?: Record<string, string>) {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
   return request<FPDSAwardRow[]>(`/fpds/awards${qs}`);
 }
+
+// --- Backup Management ---
+
+export interface BackupStatusData {
+  backupDir: string;
+  database: {
+    size: string;
+    tables: number;
+    totalRows: number;
+  };
+  backups: {
+    daily: string[];
+    weekly: string[];
+  };
+}
+
+export interface BackupCreateData {
+  filename: string;
+  sizeKB: number;
+  path: string;
+  createdAt: string;
+}
+
+export function fetchBackupStatus() {
+  return request<BackupStatusData>("/backup/status");
+}
+
+export function createBackup() {
+  return request<BackupCreateData>("/backup/create", { method: "POST" });
+}

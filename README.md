@@ -168,11 +168,54 @@ Auto-migration runs on container startup. Set `AUTO_MIGRATE=false` to disable.
 | `N8N_API_KEY` | No | — | n8n API key |
 | `AUTO_MIGRATE` | No | `true` | Run DB migrations on startup |
 | `AUTO_SEED` | No | `false` | Run DB seed on startup |
+| `OPENAI_API_KEY` | No | — | OpenAI API key for LLM features (RAG, CPARS, RFP, Color Review) |
+| `GDA_WEBHOOK_KEY` | No | — | Shared key for n8n ingest authentication (`x-gda-key` header) |
+| `BACKUP_DIR` | No | `/var/backups/gda` | Directory for database backup files |
 
 ### Health Checks
 
 - Backend: `GET /health` — returns status, uptime, DB connection, config
 - Frontend: `GET /` — nginx serves the SPA
+
+## Database Backups
+
+### Automated Backups (Production)
+
+Daily backups run via cron at 2:00 AM server time. Setup on the VPS:
+
+```bash
+# Install the cron job (run once on the VPS)
+./scripts/setup-cron.sh
+```
+
+Retention: 7 daily backups + 4 weekly backups (promoted on Sundays).
+
+### Manual Backup & Restore
+
+```bash
+# Create a backup (via Docker)
+cd packages/backend && npm run db:backup
+
+# Check backup status
+cd packages/backend && npm run db:backup-status
+
+# Restore from a backup
+cd packages/backend && npm run db:restore /var/backups/gda/daily/gda_command_20250510.sql.gz
+```
+
+### API-Based Backup
+
+Backups can also be triggered from the Settings page UI or via API:
+
+```bash
+# Check backup status
+curl -H "Authorization: Bearer <token>" https://gda.csr-llc.tech/api/backup/status
+
+# Trigger on-demand backup
+curl -X POST -H "Authorization: Bearer <token>" https://gda.csr-llc.tech/api/backup/create
+```
+
+Backups are stored in the `gda-backups` Docker volume (`/var/backups/gda/` inside the backend container).
 
 ## Type Checking
 

@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import {
   fetchSettings,
   fetchGatewayHealth,
+  fetchBackupStatus,
+  createBackup,
   type SettingsData,
   type ConnectorStatus,
   type FeatureFlag,
   type GatewayHealthData,
+  type BackupStatusData,
 } from "../api/client";
 
 function formatUptime(seconds: number): string {
@@ -25,6 +28,9 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [backupStatus, setBackupStatus] = useState<BackupStatusData | null>(null);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupResult, setBackupResult] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -37,6 +43,11 @@ export default function Settings() {
         .then((env) => {
           if (env.success && env.data) setHealth(env.data);
         }),
+      fetchBackupStatus()
+        .then((env) => {
+          if (env.success && env.data) setBackupStatus(env.data);
+        })
+        .catch(() => { /* backup endpoint may not exist yet */ }),
     ])
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -59,6 +70,26 @@ export default function Settings() {
       setTestResult(`Connection error: ${(err as Error).message}`);
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function triggerBackup() {
+    setBackupLoading(true);
+    setBackupResult(null);
+    try {
+      const env = await createBackup();
+      if (env.success && env.data) {
+        setBackupResult(`Backup created: ${env.data.filename} (${env.data.sizeKB} KB)`);
+        // Refresh status
+        const status = await fetchBackupStatus();
+        if (status.success && status.data) setBackupStatus(status.data);
+      } else {
+        setBackupResult(`Backup failed: ${env.error?.message}`);
+      }
+    } catch (err) {
+      setBackupResult(`Backup error: ${(err as Error).message}`);
+    } finally {
+      setBackupLoading(false);
     }
   }
 
@@ -169,6 +200,76 @@ export default function Settings() {
         </Section>
       )}
 
+      {/* Database Backup Management */}
+      <Section title="Database Backups">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+          {backupStatus ? (
+            <>
+              <InfoCard label="Database Size" value={backupStatus.database.size} />
+              <InfoCard label="Tables" value={String(backupStatus.database.tables)} />
+              <InfoCard label="Total Rows" value={backupStatus.database.totalRows.toLocaleString()} />
+              <InfoCard label="Daily Backups" value={String(backupStatus.backups.daily.length)} color={backupStatus.backups.daily.length > 0 ? "#22c55e" : "#f59e0b"} />
+              <InfoCard label="Weekly Backups" value={String(backupStatus.backups.weekly.length)} color={backupStatus.backups.weekly.length > 0 ? "#22c55e" : "#6b7280"} />
+            </>
+          ) : (
+            <InfoCard label="Status" value="Not available" color="#6b7280" />
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
+          <button
+            onClick={triggerBackup}
+            disabled={backupLoading}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 6,
+              border: "1px solid #22c55e",
+              background: "rgba(34,197,94,0.1)",
+              color: "#22c55e",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: backupLoading ? "wait" : "pointer",
+              opacity: backupLoading ? 0.6 : 1,
+            }}
+          >
+            {backupLoading ? "Creating Backup..." : "Create Backup Now"}
+          </button>
+          {backupResult && (
+            <span style={{ fontSize: 13, color: backupResult.includes("error") || backupResult.includes("failed") ? "#ef4444" : "#22c55e" }}>
+              {backupResult}
+            </span>
+          )}
+        </div>
+
+        {backupStatus && backupStatus.backups.daily.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-muted)" }}>Recent Daily Backups</div>
+            <div style={{ fontSize: 13, fontFamily: "monospace", lineHeight: 1.8 }}>
+              {backupStatus.backups.daily.slice(0, 7).map((b) => (
+                <div key={b} style={{ color: "var(--color-text-muted)" }}>{b}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {backupStatus && backupStatus.backups.weekly.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-muted)" }}>Weekly Backups</div>
+            <div style={{ fontSize: 13, fontFamily: "monospace", lineHeight: 1.8 }}>
+              {backupStatus.backups.weekly.map((b) => (
+                <div key={b} style={{ color: "var(--color-text-muted)" }}>{b}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          Automated backups run daily at 2:00 AM. Retention: 7 daily + 4 weekly.
+          Use <code style={{ fontSize: 12, background: "var(--color-surface)", padding: "2px 6px", borderRadius: 4 }}>npm run db:backup</code> for CLI backups
+          or <code style={{ fontSize: 12, background: "var(--color-surface)", padding: "2px 6px", borderRadius: 4 }}>npm run db:restore &lt;file&gt;</code> to restore.
+        </div>
+      </Section>
+
       {/* API Endpoints Reference */}
       <Section title="API Endpoints">
         <div
@@ -274,6 +375,8 @@ const ENDPOINTS = [
   { method: "POST", path: "/api/ingest/sam-opportunities", description: "SAM.gov opportunity upsert (n8n push)" },
   { method: "POST", path: "/api/ingest/fpds-awards", description: "FPDS award data (n8n push)" },
   { method: "GET", path: "/api/ingest/status", description: "Ingestion health + record counts" },
+  { method: "GET", path: "/api/backup/status", description: "Backup status, DB size, backup files" },
+  { method: "POST", path: "/api/backup/create", description: "Trigger on-demand database backup" },
 ];
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
