@@ -849,10 +849,10 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-04-28T17:00:00Z",
   },
 
-  // ─── PROP-002: EPA Superfund — Blue Team ──────────────────────────────
+  // ─── PROP-005: EPA Superfund — Blue Team ──────────────────────────────
   {
     id: "CR-017",
-    proposal_id: "PROP-002",
+    proposal_id: "PROP-005",
     proposal_title: "EPA Superfund Technical Support — Region 4",
     agency: "Environmental Protection Agency",
     phase: "blue",
@@ -896,10 +896,10 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-04-20T16:00:00Z",
   },
 
-  // ─── PROP-003: DHS CISA CDM — Blue Team ───────────────────────────────
+  // ─── PROP-004: DHS CISA CDM — Blue Team ───────────────────────────────
   {
     id: "CR-018",
-    proposal_id: "PROP-003",
+    proposal_id: "PROP-004",
     proposal_title: "DHS CISA CDM DEFEND Phase 4 — Cybersecurity Dashboard Modernization",
     agency: "Department of Homeland Security",
     phase: "blue",
