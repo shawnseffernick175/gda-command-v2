@@ -2,6 +2,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { MOCK_CPARS_RECORDS } from "../data/cpars-mock";
 import type { CPARSRecord } from "../data/cpars-mock";
+import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 
 const router = Router();
 
@@ -77,20 +78,69 @@ router.get("/records/:id", (req, res) => {
   return res.json(successEnvelope("gda-cpars", "detail", item));
 });
 
-router.post("/records/:id/generate-narrative", (req, res) => {
-  const item = MOCK_CPARS_RECORDS.find((r) => r.id === req.params.id);
-  if (!item) {
-    return res.status(404).json(
-      errorEnvelope("gda-cpars", "generate", { code: "NOT_FOUND", message: `CPARS record ${req.params.id} not found`, detail: null }),
+router.post("/records/:id/generate-narrative", async (req, res) => {
+  try {
+    const item = MOCK_CPARS_RECORDS.find((r) => r.id === req.params.id);
+    if (!item) {
+      return res.status(404).json(
+        errorEnvelope("gda-cpars", "generate", { code: "NOT_FOUND", message: `CPARS record ${req.params.id} not found`, detail: null }),
+      );
+    }
+
+    if (!isLLMAvailable()) {
+      return res.json(
+        successEnvelope("gda-cpars", "generate-narrative", {
+          id: item.id,
+          message: `AI narrative generation triggered for "${item.contract_title}" — set OPENAI_API_KEY to enable real narrative generation.`,
+          estimated_time: "30-60 seconds",
+        }, {}, true),
+      );
+    }
+
+    const contractContext = [
+      `Contract: ${item.contract_title}`,
+      `Agency: ${item.agency}`,
+      `Contract Number: ${item.contract_number}`,
+      `Period: ${item.period_of_performance}`,
+      `Value: $${(item.contract_value / 1_000_000).toFixed(1)}M`,
+      `Overall Rating: ${item.overall_rating ?? "Not yet rated"}`,
+      `Quality: ${item.quality_rating ?? "N/A"}`,
+      `Schedule: ${item.schedule_rating ?? "N/A"}`,
+      `Cost: ${item.cost_rating ?? "N/A"}`,
+      `Management: ${item.management_rating ?? "N/A"}`,
+      item.narrative ? `Existing Narrative: ${item.narrative}` : "",
+      item.key_accomplishments.length > 0
+        ? `Key Accomplishments:\n${item.key_accomplishments.map((a) => `- ${a}`).join("\n")}`
+        : "",
+    ].filter(Boolean).join("\n");
+
+    const llmResponse = await chatCompletion(
+      [
+        { role: "system", content: SYSTEM_PROMPTS.cparsNarrative },
+        {
+          role: "user",
+          content: `Generate a CPARS-ready past performance narrative for the following contract:\n\n${contractContext}`,
+        },
+      ],
+      { temperature: 0.4, max_tokens: 1000 },
+    );
+
+    return res.json(
+      successEnvelope("gda-cpars", "generate-narrative", {
+        id: item.id,
+        narrative: llmResponse.content,
+        ai: { model: llmResponse.model, tokens: llmResponse.usage.total_tokens },
+      }),
+    );
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-cpars", "generate-narrative", {
+        code: "INTERNAL",
+        message: err instanceof Error ? err.message : "Unknown error",
+        detail: null,
+      }),
     );
   }
-  return res.json(
-    successEnvelope("gda-cpars", "generate-narrative", {
-      id: item.id,
-      message: `AI narrative generation triggered for "${item.contract_title}" (dry-run). In production, this uses GDA.api.agentic-chat + RAG knowledge base to generate CPARS-ready past performance narratives.`,
-      estimated_time: "30-60 seconds",
-    }, {}, true),
-  );
 });
 
 router.post("/match-opportunities", (_req, res) => {

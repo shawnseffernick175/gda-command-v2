@@ -14,6 +14,7 @@ import type {
   ComplianceMatchLevel,
   RequirementComplexity,
 } from "@gda/shared";
+import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 
 const router = Router();
 
@@ -108,11 +109,11 @@ router.get("/jobs/:id", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/rfp-shredder/shred — initiate a new shred job (dry-run)
+// POST /api/rfp-shredder/shred — initiate a shred job (LLM-powered extraction)
 // ---------------------------------------------------------------------------
-router.post("/shred", (req, res) => {
+router.post("/shred", async (req, res) => {
   try {
-    const { file_name, solicitation_title, agency } = req.body;
+    const { file_name, solicitation_title, agency, document_text } = req.body;
 
     if (!file_name || !solicitation_title) {
       return res.status(400).json(
@@ -125,25 +126,66 @@ router.post("/shred", (req, res) => {
     }
 
     const correlationId = `GDA-SHRED-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const jobId = `SJ-${Date.now()}`;
+
+    if (!isLLMAvailable() || !document_text) {
+      // Fallback when no LLM or no document text provided
+      return res.json(
+        successEnvelope(
+          WF,
+          "shred",
+          {
+            id: jobId,
+            file_name,
+            solicitation_title,
+            agency: agency ?? "Unknown",
+            status: "queued",
+            correlation_id: correlationId,
+            message: document_text
+              ? "Set OPENAI_API_KEY to enable AI-powered requirement extraction."
+              : "Shred job queued. Provide document_text in the request body for AI extraction, or upload the document via the n8n pipeline.",
+            estimated_processing_time: "3-5 minutes",
+            pipeline: "GDA.batch.doc-ingest → GDA.api.rfp-shredder → GDA.api.compliance-matrix",
+          },
+          {},
+          true,
+        ),
+      );
+    }
+
+    // Real LLM extraction
+    const truncatedText = document_text.slice(0, 12000);
+    const llmResponse = await chatCompletion(
+      [
+        { role: "system", content: SYSTEM_PROMPTS.rfpShredder },
+        {
+          role: "user",
+          content: `Extract all structured requirements from this solicitation document.\n\nSolicitation: ${solicitation_title}\nAgency: ${agency ?? "Unknown"}\n\n--- DOCUMENT TEXT ---\n${truncatedText}`,
+        },
+      ],
+      { temperature: 0.2, max_tokens: 3000, response_format: { type: "json_object" } },
+    );
+
+    let extractedRequirements: Array<Record<string, unknown>> = [];
+    try {
+      const parsed = JSON.parse(llmResponse.content);
+      extractedRequirements = Array.isArray(parsed.requirements) ? parsed.requirements : Array.isArray(parsed) ? parsed : [];
+    } catch {
+      extractedRequirements = [];
+    }
 
     res.json(
-      successEnvelope(
-        WF,
-        "shred",
-        {
-          id: `SJ-${Date.now()}`,
-          file_name,
-          solicitation_title,
-          agency: agency ?? "Unknown",
-          status: "queued",
-          correlation_id: correlationId,
-          message: "Shred job queued for processing. The AI extraction pipeline will parse the document and extract all SHALL/MUST/WILL requirements.",
-          estimated_processing_time: "3-5 minutes",
-          pipeline: "GDA.batch.doc-ingest → GDA.api.rfp-shredder → GDA.api.compliance-matrix",
-        },
-        {},
-        true, // dryRun
-      ),
+      successEnvelope(WF, "shred", {
+        id: jobId,
+        file_name,
+        solicitation_title,
+        agency: agency ?? "Unknown",
+        status: "completed",
+        correlation_id: correlationId,
+        requirements_count: extractedRequirements.length,
+        requirements: extractedRequirements,
+        ai: { model: llmResponse.model, tokens: llmResponse.usage.total_tokens },
+      }),
     );
   } catch (err) {
     res.status(500).json(

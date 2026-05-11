@@ -12,6 +12,7 @@ import type {
   DocumentStatus,
   ChatMessage,
 } from "../data/knowledge-mock";
+import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 
 const router = Router();
 
@@ -266,9 +267,9 @@ router.get("/chat/sessions/:id", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/knowledge/chat — send a message (dry-run, returns mock response)
+// POST /api/knowledge/chat — send a message (LLM-powered with RAG context)
 // ---------------------------------------------------------------------------
-router.post("/chat", (req, res) => {
+router.post("/chat", async (req, res) => {
   try {
     const { message, session_id } = req.body as {
       message?: string;
@@ -285,8 +286,8 @@ router.post("/chat", (req, res) => {
       );
     }
 
-    // Perform a search to find relevant sources
-    const searchResults = mockSemanticSearch(message.trim(), 3);
+    // Retrieve relevant document context via semantic search
+    const searchResults = mockSemanticSearch(message.trim(), 5);
 
     const sourceDocs = searchResults.map((r) => ({
       document_id: r.document_id,
@@ -296,6 +297,45 @@ router.post("/chat", (req, res) => {
       relevance: r.relevance_score,
     }));
 
+    // Build RAG context from retrieved documents
+    const ragContext = searchResults
+      .map(
+        (r, i) =>
+          `[Document ${i + 1}: "${r.document_title}" (${Math.round(r.relevance_score * 100)}% relevance)]\n${r.highlight}\n${r.chunks.map((c) => c.text).join("\n")}`,
+      )
+      .join("\n\n---\n\n");
+
+    if (isLLMAvailable() && searchResults.length > 0) {
+      // Real LLM call with RAG context
+      const llmResponse = await chatCompletion(
+        [
+          { role: "system", content: SYSTEM_PROMPTS.ragChat },
+          {
+            role: "user",
+            content: `Here are the relevant documents from the GDA knowledge base:\n\n${ragContext}\n\n---\n\nUser question: ${message.trim()}`,
+          },
+        ],
+        { temperature: 0.3, max_tokens: 1500 },
+      );
+
+      const response: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        role: "assistant",
+        content: llmResponse.content,
+        timestamp: new Date().toISOString(),
+        sources: sourceDocs,
+      };
+
+      return res.json(
+        successEnvelope("gda-knowledge", "chat", {
+          session_id: session_id ?? `chat-${Date.now()}`,
+          message: response,
+          ai: { model: llmResponse.model, tokens: llmResponse.usage.total_tokens },
+        }),
+      );
+    }
+
+    // Fallback: mock response when LLM is not available
     const response: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: "assistant",
@@ -308,7 +348,7 @@ router.post("/chat", (req, res) => {
               )
               .join("\n\n")
           : "No directly relevant documents were found. Try rephrasing your query or uploading relevant documents to the knowledge base."
-      }\n\n*This is a dry-run response. Connect to the n8n RAG pipeline (GDA.api.rag-query) for full AI-powered responses.*`,
+      }\n\n*Set OPENAI_API_KEY for AI-powered responses with source citations.*`,
       timestamp: new Date().toISOString(),
       sources: sourceDocs,
     };

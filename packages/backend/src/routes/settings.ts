@@ -3,6 +3,7 @@ import { successEnvelope } from "../middleware/envelope";
 import { webhookConfig, apiConfig } from "../lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "../lib/db";
 import { getRegistrySummary } from "../lib/webhook-registry";
+import { isLLMAvailable } from "../lib/llm";
 
 const router = Router();
 
@@ -52,6 +53,11 @@ router.get("/", async (_req, res) => {
       name: "PostgreSQL",
       configured: db.configured,
       missing: db.missing,
+    },
+    {
+      name: "OpenAI LLM",
+      configured: isLLMAvailable(),
+      missing: isLLMAvailable() ? [] : ["OPENAI_API_KEY"],
     },
   ];
 

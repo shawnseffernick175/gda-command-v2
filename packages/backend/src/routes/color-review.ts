@@ -2,6 +2,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { MOCK_COLOR_REVIEWS } from "../data/color-review-mock";
 import type { ColorReviewPhase, ColorReviewStatus } from "@gda/shared";
+import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 
 const router = Router();
 
@@ -95,11 +96,11 @@ router.get("/:id", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/color-review/run — dry-run: initiate a new color review
+// POST /api/color-review/run — initiate a color review (LLM-powered)
 // ---------------------------------------------------------------------------
-router.post("/run", (req, res) => {
+router.post("/run", async (req, res) => {
   try {
-    const { proposal_id, phase } = req.body ?? {};
+    const { proposal_id, phase, proposal_text } = req.body ?? {};
     if (!proposal_id || !phase) {
       return res.status(400).json(
         errorEnvelope("GDA.color-review", "run", {
@@ -110,20 +111,55 @@ router.post("/run", (req, res) => {
       );
     }
     const correlationId = `GDA-CR-${Date.now()}`;
-    res.json(
-      successEnvelope(
-        "GDA.color-review",
-        "run",
+
+    if (!isLLMAvailable() || !proposal_text) {
+      return res.json(
+        successEnvelope(
+          "GDA.color-review",
+          "run",
+          {
+            correlationId,
+            proposal_id,
+            phase,
+            status: "queued",
+            message: proposal_text
+              ? `Set OPENAI_API_KEY to enable AI-powered ${phase} team review.`
+              : `Color review (${phase} team) queued for proposal ${proposal_id}. Provide proposal_text for AI review, or connect the n8n pipeline.`,
+          },
+          {},
+          true,
+        ),
+      );
+    }
+
+    const truncatedText = proposal_text.slice(0, 10000);
+    const llmResponse = await chatCompletion(
+      [
+        { role: "system", content: SYSTEM_PROMPTS.colorReview },
         {
-          correlationId,
-          proposal_id,
-          phase,
-          status: "queued",
-          message: `Color review (${phase} team) queued for proposal ${proposal_id}. Connect n8n pipeline for live execution.`,
+          role: "user",
+          content: `Perform a ${phase} team review on the following proposal section.\n\nProposal ID: ${proposal_id}\nReview Phase: ${phase}\n\n--- PROPOSAL TEXT ---\n${truncatedText}\n\n---\n\nProvide your review as a JSON object with: { "phase": "${phase}", "overall_score": <0-100>, "verdict": "pass|fail|conditional", "checks": [{ "name": "...", "verdict": "pass|fail|warning", "detail": "..." }], "summary": "..." }`,
         },
-        {},
-        true,
-      ),
+      ],
+      { temperature: 0.3, max_tokens: 2000, response_format: { type: "json_object" } },
+    );
+
+    let reviewResult: Record<string, unknown> = {};
+    try {
+      reviewResult = JSON.parse(llmResponse.content);
+    } catch {
+      reviewResult = { raw_response: llmResponse.content };
+    }
+
+    res.json(
+      successEnvelope("GDA.color-review", "run", {
+        correlationId,
+        proposal_id,
+        phase,
+        status: "completed",
+        review: reviewResult,
+        ai: { model: llmResponse.model, tokens: llmResponse.usage.total_tokens },
+      }),
     );
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.color-review", "run", { code: "INTERNAL", message: String(err), detail: null }));
