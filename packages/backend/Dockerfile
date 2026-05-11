@@ -15,7 +15,7 @@ RUN npm ci --workspace=@gda/shared --workspace=@gda/backend --include-workspace-
 COPY packages/shared/ packages/shared/
 COPY packages/backend/ packages/backend/
 
-# Build shared types first, then backend
+# Build shared types first, then backend with project references
 RUN npm run build --workspace=@gda/shared
 RUN npm run build --workspace=@gda/backend
 
@@ -43,8 +43,15 @@ COPY packages/backend/src/db/migrations/ packages/backend/src/db/migrations/
 COPY packages/backend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+# pg_dump for in-app backup API
+RUN apk add --no-cache postgresql16-client
+
+# Backup directory
+RUN mkdir -p /var/backups/gda/daily /var/backups/gda/weekly
+
 # Non-root user
 RUN addgroup -g 1001 -S gda && adduser -u 1001 -S gda -G gda
+RUN chown -R gda:gda /var/backups/gda
 USER gda
 
 ENV NODE_ENV=production

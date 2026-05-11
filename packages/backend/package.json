@@ -10,7 +10,10 @@
     "lint": "eslint src --ext .ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:reset": "tsx src/db/reset.ts"
+    "db:reset": "tsx src/db/reset.ts",
+    "db:backup": "../../scripts/backup.sh",
+    "db:restore": "../../scripts/restore.sh",
+    "db:backup-status": "../../scripts/backup-status.sh"
   },
   "dependencies": {
     "@gda/shared": "*",

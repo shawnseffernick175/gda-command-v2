@@ -38,6 +38,9 @@ services:
       N8N_API_BASE: ${N8N_API_BASE:-}
       N8N_API_KEY: ${N8N_API_KEY:-}
       GDA_WEBHOOK_KEY: ${GDA_WEBHOOK_KEY:-}
+      BACKUP_DIR: /var/backups/gda
+    volumes:
+      - gda-backups:/var/backups/gda
     networks:
       - gda
 
@@ -60,3 +63,4 @@ networks:
 
 volumes:
   pgdata:
+  gda-backups:
