@@ -2,6 +2,7 @@ import { Router } from "express";
 import { successEnvelope } from "../middleware/envelope";
 import { webhookConfig, apiConfig } from "../lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "../lib/db";
+import { getRegistrySummary } from "../lib/webhook-registry";
 
 const router = Router();
 
@@ -81,11 +82,14 @@ router.get("/", async (_req, res) => {
     env: process.env.NODE_ENV ?? "development",
   };
 
+  const webhookRegistry = getRegistrySummary();
+
   res.json(
     successEnvelope("GDA.gateway.settings", "read", {
       connectors,
       featureFlags,
       environment,
+      webhookRegistry,
     })
   );
 });

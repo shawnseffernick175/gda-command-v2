@@ -153,6 +153,22 @@ export default function Settings() {
         )}
       </Section>
 
+      {/* Webhook Registry */}
+      {settings?.webhookRegistry && (
+        <Section title="n8n Webhook Registry">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+            <InfoCard label="Total Webhooks" value={String(settings.webhookRegistry.total)} />
+            <InfoCard label="Live" value={String(settings.webhookRegistry.live)} color="#22c55e" />
+            <InfoCard label="Exists (needs config)" value={String(settings.webhookRegistry.exists)} color="#f59e0b" />
+            <InfoCard label="Planned" value={String(settings.webhookRegistry.planned)} color="#6b7280" />
+          </div>
+          <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+            Live webhooks return real data from n8n. "Exists" webhooks have n8n workflows but need internal configuration.
+            View full registry at <code style={{ fontSize: 12, background: "var(--color-surface)", padding: "2px 6px", borderRadius: 4 }}>/api/webhooks/registry</code>
+          </div>
+        </Section>
+      )}
+
       {/* API Endpoints Reference */}
       <Section title="API Endpoints">
         <div
@@ -248,6 +264,16 @@ const ENDPOINTS = [
   { method: "GET", path: "/api/proposals", description: "Proposal list with filters" },
   { method: "GET", path: "/api/proposals/:id", description: "Single proposal detail" },
   { method: "GET", path: "/api/settings", description: "System settings and config" },
+  { method: "GET", path: "/api/webhooks/registry", description: "n8n webhook registry (all paths + status)" },
+  { method: "GET", path: "/api/dashboard/mega", description: "Combined dashboard data from n8n (live)" },
+  { method: "GET", path: "/api/dashboard/trends", description: "Daily trend metrics from n8n (live)" },
+  { method: "GET", path: "/api/dashboard/actions", description: "Daily action items from n8n (live)" },
+  { method: "POST", path: "/api/ingest/opportunities", description: "Upsert opportunities (n8n push)" },
+  { method: "POST", path: "/api/ingest/competitors", description: "Upsert competitor profiles (n8n push)" },
+  { method: "POST", path: "/api/ingest/intel", description: "Push intel feed items (n8n push)" },
+  { method: "POST", path: "/api/ingest/sam-opportunities", description: "SAM.gov opportunity upsert (n8n push)" },
+  { method: "POST", path: "/api/ingest/fpds-awards", description: "FPDS award data (n8n push)" },
+  { method: "GET", path: "/api/ingest/status", description: "Ingestion health + record counts" },
 ];
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

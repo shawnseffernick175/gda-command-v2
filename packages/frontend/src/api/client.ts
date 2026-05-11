@@ -333,6 +333,25 @@ export function fetchDashboardKPIs() {
   return request<DashboardKPIs>("/dashboard/kpis");
 }
 
+// --- Dashboard Mega (live n8n data) ---
+
+export interface DashboardMega {
+  status: string;
+  cached_at?: string;
+  funnel: Array<{ stage: string; count: number; value: number; ord?: number }>;
+  risks: Array<{ title: string; severity: string; category: string; status: string }>;
+  stats: Record<string, unknown>;
+  trends: Array<Record<string, unknown>>;
+  contracts: Array<Record<string, unknown>>;
+  opps: Array<Record<string, unknown>>;
+  sitrep: unknown;
+  source: string;
+}
+
+export function fetchDashboardMega() {
+  return request<DashboardMega>("/dashboard/mega");
+}
+
 // --- Command Signals ---
 
 export interface CommandRisk {
@@ -526,6 +545,12 @@ export interface SettingsData {
     pid: number;
     port: string;
     env: string;
+  };
+  webhookRegistry?: {
+    total: number;
+    live: number;
+    exists: number;
+    planned: number;
   };
 }
 
