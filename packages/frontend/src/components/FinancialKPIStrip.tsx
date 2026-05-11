@@ -30,8 +30,8 @@ const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalcu
     howCalculated: "Sum of funded ceiling on active contracts minus revenue already recognized.",
   },
   backlog: {
-    whatItIs: "Total remaining value on all active contracts (funded + unfunded).",
-    whatItMeans: "Long-term revenue pipeline. Higher backlog = more future revenue security.",
+    whatItIs: "Contract Backlog — total remaining value on all active contracts (funded + unfunded).",
+    whatItMeans: "Long-term revenue pipeline. Higher contract backlog = more future revenue security.",
     howCalculated: "Sum of total contract ceiling minus revenue recognized across all active contracts.",
   },
   gross_profit: {

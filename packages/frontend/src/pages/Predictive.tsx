@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import InfoBadge from "../components/InfoBadge";
 import {
   fetchPwinModels,
   fetchPipelineForecast,
@@ -804,16 +805,16 @@ export default function Predictive() {
           padding: 16,
         }}>
           {[
-            { label: "Opps Tracked", value: String(pwinModels.length) },
-            { label: "Portfolio Win Rate", value: pct(winLossData.summary.overall_win_rate), color: "#16a34a" },
-            { label: "Weighted Pipeline", value: fmt$(forecastData.summary.weighted_pipeline), color: "#7c3aed" },
-            { label: "P50 Revenue", value: fmt$(forecastData.summary.p50_revenue) },
-            { label: "Target Gap", value: fmt$(forecastData.summary.gap_to_target), color: "#dc2626" },
-            { label: "Bid Recommended", value: String(bidData?.bid ?? 0), color: "#16a34a" },
-            { label: "Model Accuracy", value: pct(winLossData.summary.avg_pwin_accuracy), color: "#7c3aed" },
+            { label: "Opps Tracked", value: String(pwinModels.length), info: { whatItIs: "Opportunities with ML Pwin predictions.", whatItMeans: "Number of active pursuits being analyzed by the predictive model." } },
+            { label: "Portfolio Win Rate", value: pct(winLossData.summary.overall_win_rate), color: "#16a34a", info: { whatItIs: "Historical win rate across all tracked opportunities.", whatItMeans: "Above 40% is strong for GovCon. Below 30% signals positioning issues.", howCalculated: "Wins ÷ (Wins + Losses) over all resolved opportunities." } },
+            { label: "Weighted Pipeline", value: fmt$(forecastData.summary.weighted_pipeline), color: "#7c3aed", info: { whatItIs: "Pipeline value weighted by win probability.", whatItMeans: "Expected revenue if Pwin predictions are accurate.", howCalculated: "Sum of (value_estimated × Pwin) for each opportunity." } },
+            { label: "P50 Revenue", value: fmt$(forecastData.summary.p50_revenue), info: { whatItIs: "50th percentile revenue forecast (base case).", whatItMeans: "50% chance actual revenue will be above this amount.", howCalculated: "Monte Carlo simulation with 10,000 iterations." } },
+            { label: "Target Gap", value: fmt$(forecastData.summary.gap_to_target), color: "#dc2626", info: { whatItIs: "Difference between revenue target and P50 forecast.", whatItMeans: "Negative = below target. Need more pipeline or higher Pwin.", howCalculated: "Revenue target minus P50 forecast value." } },
+            { label: "Bid Recommended", value: String(bidData?.bid ?? 0), color: "#16a34a", info: { whatItIs: "Opportunities where AI recommends bidding.", whatItMeans: "Strong fit based on past performance, capability, and competition." } },
+            { label: "Model Accuracy", value: pct(winLossData.summary.avg_pwin_accuracy), color: "#7c3aed", info: { whatItIs: "How accurate past Pwin predictions were.", whatItMeans: "Above 80% = reliable model. Below 70% = needs more training data.", howCalculated: "Brier score comparison of predicted vs actual outcomes." } },
           ].map((kpi, i) => (
             <div key={i}>
-              <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{kpi.label}</div>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: 4 }}>{kpi.label} {kpi.info && <InfoBadge size={14} {...kpi.info} />}</div>
               <div style={{ fontSize: 20, fontWeight: 700, color: kpi.color }}>{kpi.value}</div>
             </div>
           ))}

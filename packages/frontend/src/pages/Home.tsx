@@ -671,7 +671,7 @@ const QUICK_ACCESS_CARDS = [
   { title: "Proposal Review", description: "Track proposals, evaluate volumes, red team findings, scorecards, and submission timelines.", to: "/proposals", statusColor: "#8b5cf6" },
   { title: "Contacts & Relationships", description: "Contact directory, relationship tracking, meeting notes, and teaming partner management.", to: "/contacts", statusColor: "#14b8a6" },
   { title: "Reporting & Export", description: "Generate reports, schedule automated delivery, and export data across all GDA modules.", to: "/reports", statusColor: "#f97316" },
-  { title: "Financial Bible", description: "Drill-down behind every KPI — Orders, Sales, EBIT, ROS, Backlog, Gross Profit.", to: "/financial-bible", statusColor: "#3b82f6" },
+  { title: "Financial Bible", description: "Drill-down behind every KPI — Orders, Sales, EBIT, Gross Profit, ROS, Funded Backlog, Contract Backlog.", to: "/financial-bible", statusColor: "#3b82f6" },
   { title: "Prompt Architect", description: "Versioned prompt library for capture, compliance, proposals, and research.", to: "/prompts", statusColor: "#8b5cf6" },
   { title: "Workflows", description: "Browse and manage all n8n automation workflows.", to: "/workflows", statusColor: "#06b6d4" },
   { title: "Settings", description: "System configuration, connectors, and feature flags.", to: "/settings", statusColor: "#6b7280" },

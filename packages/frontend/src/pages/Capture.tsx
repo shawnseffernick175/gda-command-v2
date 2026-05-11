@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import InfoBadge from "../components/InfoBadge";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -683,15 +684,16 @@ function PlansTab({
           marginBottom: 20,
         }}
       >
-        <StatCard label="Active Plans" value={String(plansData.total)} />
-        <StatCard label="Total Value" value={fmtCurrency(plansData.totalValue)} />
-        <StatCard label="Avg Pwin" value={`${plansData.avgPwin}%`} />
-        <StatCard label="Bid Decisions" value={String(plansData.decisions["bid"] ?? 0)} sub="bid" />
-        <StatCard label="Pending" value={String(plansData.decisions["pending"] ?? 0)} sub="pending" />
+        <StatCard label="Active Plans" value={String(plansData.total)} info={{ whatItIs: "Number of capture plans actively being worked.", whatItMeans: "Active pursuits with assigned capture managers." }} />
+        <StatCard label="Total Value" value={fmtCurrency(plansData.totalValue)} info={{ whatItIs: "Combined estimated value of all active capture plans.", whatItMeans: "Total addressable revenue if all pursuits are won.", howCalculated: "Sum of value_estimated across all active plans." }} />
+        <StatCard label="Avg Pwin" value={`${plansData.avgPwin}%`} info={{ whatItIs: "Average win probability across active plans.", whatItMeans: "Portfolio strength indicator. Below 40% = weak positioning.", howCalculated: "Mean Pwin across all active capture plans." }} />
+        <StatCard label="Bid Decisions" value={String(plansData.decisions["bid"] ?? 0)} sub="bid" info={{ whatItIs: "Plans with a 'Bid' decision confirmed.", whatItMeans: "Opportunities approved for proposal development." }} />
+        <StatCard label="Pending" value={String(plansData.decisions["pending"] ?? 0)} sub="pending" info={{ whatItIs: "Plans awaiting bid/no-bid decision.", whatItMeans: "Opportunities still being evaluated for pursuit." }} />
         <StatCard
           label="At-Risk Milestones"
           value={String(plansData.atRiskMilestones)}
           color={plansData.atRiskMilestones > 0 ? "#f59e0b" : undefined}
+          info={{ whatItIs: "Capture milestones flagged as at-risk or overdue.", whatItMeans: "Action needed — these milestones may delay proposal submission." }}
         />
       </div>
 
@@ -1336,11 +1338,13 @@ function StatCard({
   value,
   sub,
   color,
+  info,
 }: {
   label: string;
   value: string;
   sub?: string;
   color?: string;
+  info?: { whatItIs: string; whatItMeans: string; howCalculated?: string };
 }) {
   return (
     <div
@@ -1352,8 +1356,9 @@ function StatCard({
         textAlign: "center",
       }}
     >
-      <div style={{ fontSize: 11, textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 4 }}>
+      <div style={{ fontSize: 11, textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
         {label}
+        {info && <InfoBadge size={14} {...info} />}
       </div>
       <div style={{ fontSize: 22, fontWeight: 700, color: color ?? "var(--color-text)" }}>{value}</div>
       {sub && (

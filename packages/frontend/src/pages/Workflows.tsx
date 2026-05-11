@@ -155,8 +155,28 @@ export default function Workflows() {
 
   if (error) {
     return (
-      <div style={{ padding: 48, textAlign: "center", color: "#ef4444" }}>
-        Error: {error}
+      <div style={{ padding: 48, textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⚙️</div>
+        <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 700 }}>Workflow Engine Unavailable</h2>
+        <p style={{ color: "var(--color-text-muted)", fontSize: 14, marginBottom: 16, maxWidth: 480, margin: "0 auto 16px" }}>
+          Could not connect to the n8n workflow engine. This is expected in development if n8n is not running.
+          All other GDA Command features work independently.
+        </p>
+        <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 16, fontFamily: "monospace", background: "var(--color-surface)", padding: "8px 16px", borderRadius: 6, display: "inline-block" }}>
+          {error}
+        </div>
+        <div>
+          <button
+            onClick={() => { setError(null); setLoading(true); fetchWorkflowRegistry().then((env) => { if (env.success && env.data) { setData(env.data); } else { setError(env.error?.message ?? "Failed to load workflows"); } }).catch((err) => setError(err.message)).finally(() => setLoading(false)); }}
+            style={{
+              padding: "8px 20px", borderRadius: 6, border: "none",
+              background: "#3b82f6", color: "#fff", fontSize: 14,
+              fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            Retry Connection
+          </button>
+        </div>
       </div>
     );
   }
