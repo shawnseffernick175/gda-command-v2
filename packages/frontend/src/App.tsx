@@ -124,6 +124,7 @@ export default function App() {
 
   // On mount, probe /api/auth/me to determine auth state.
   // In dev mode (AUTH_REQUIRED=false), backend injects admin — no token needed.
+  // Stores user data from response so getUser() returns role for nav filtering.
   useEffect(() => {
     async function checkAuth() {
       try {
@@ -132,6 +133,12 @@ export default function App() {
             ? { Authorization: `Bearer ${localStorage.getItem("gda_access_token")}` }
             : {},
         });
+        if (res.ok) {
+          const body = await res.json();
+          if (body.data) {
+            localStorage.setItem("gda_user", JSON.stringify(body.data));
+          }
+        }
         setAuthed(res.ok);
       } catch {
         setAuthed(false);
