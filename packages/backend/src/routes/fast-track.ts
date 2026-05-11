@@ -2,6 +2,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { MOCK_FAST_TRACK_MATCHES } from "../data/fast-track-mock";
 import type { FastTrackMatch } from "../data/fast-track-mock";
+import { getPool } from "../lib/db";
 
 const router = Router();
 
@@ -153,6 +154,67 @@ router.get("/:id", (req, res) => {
   } catch (err) {
     return res.status(500).json(
       errorEnvelope("gda-fast-track", "detail", { code: "INTERNAL", message: (err as Error).message, detail: null }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/fast-track/promote — promote a fast-track signal to an active opp
+// ---------------------------------------------------------------------------
+router.post("/promote", async (req, res) => {
+  try {
+    const { matchId } = req.body as { matchId: string };
+    const match = MOCK_FAST_TRACK_MATCHES.find((m) => m.id === matchId);
+    if (!match) {
+      return res.status(404).json(
+        errorEnvelope("gda-fast-track", "promote", { code: "NOT_FOUND", message: `Match ${matchId} not found`, detail: null }),
+      );
+    }
+
+    // Mark as promoted in mock data
+    (match as { status: string }).status = "promoted";
+    (match as { promotion_target: string }).promotion_target = "ops-tracker";
+
+    // Create a real opportunity in the database
+    const pool = getPool();
+    let opportunityId: string | null = null;
+
+    if (pool) {
+      try {
+        const oppId = `opp-ft-${matchId}`;
+        const result = await pool.query(
+          `INSERT INTO opportunities (id, title, agency, department, status, capture_stage, score, value_estimated, probability_of_win, naics, tags, source, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, 'discovery', 'interest', $5, 0, 0, '', $6, 'fast-track', NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING
+           RETURNING id`,
+          [
+            oppId,
+            match.technology,
+            match.candidate_agency ?? "TBD",
+            "TBD",
+            match.match_score,
+            JSON.stringify(match.technology_tags ?? []),
+          ],
+        );
+        if (result.rows.length > 0) {
+          opportunityId = result.rows[0].id;
+        }
+      } catch {
+        // DB insert failed, still return success for the mock promotion
+      }
+    }
+
+    return res.json(
+      successEnvelope("gda-fast-track", "promote", {
+        matchId,
+        status: "promoted",
+        opportunityId,
+        message: `${match.technology} promoted to Ops Tracker`,
+      }),
+    );
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-fast-track", "promote", { code: "INTERNAL", message: (err as Error).message, detail: null }),
     );
   }
 });

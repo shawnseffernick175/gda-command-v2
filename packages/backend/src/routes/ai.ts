@@ -1,0 +1,106 @@
+import { Router } from "express";
+import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { getPool } from "../lib/db";
+import { isLLMAvailable, chatCompletion, type ChatMessage } from "../lib/llm";
+import { getMockOpportunityById } from "../data/opportunities-mock";
+import { getMockOpportunityDetail } from "../data/opportunity-detail-mock";
+
+const router = Router();
+
+// ---------------------------------------------------------------------------
+// POST /api/ai/opportunity-chat — ask AI a question about a specific opportunity
+// ---------------------------------------------------------------------------
+router.post("/opportunity-chat", async (req, res) => {
+  const { opportunityId, question, history = [] } = req.body as {
+    opportunityId: string;
+    question: string;
+    history?: Array<{ role: string; content: string }>;
+  };
+
+  if (!question?.trim()) {
+    return res.status(400).json(
+      errorEnvelope("gda-ai", "opportunity-chat", {
+        code: "MISSING_QUESTION",
+        message: "Question is required",
+        detail: null,
+      })
+    );
+  }
+
+  // Gather opportunity context
+  let oppContext = "";
+  const pool = getPool();
+
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `SELECT id, title, agency, department, status, score, value_estimated,
+                probability_of_win, naics, psc, due_date, solicitation_number,
+                set_aside, place_of_performance, incumbent, tags
+         FROM opportunities WHERE id = $1`,
+        [opportunityId]
+      );
+      if (result.rows.length > 0) {
+        const opp = result.rows[0];
+        oppContext = `Opportunity: ${opp.title}\nAgency: ${opp.agency}\nDepartment: ${opp.department}\nStatus: ${opp.status}\nValue: $${opp.value_estimated}\nPwin: ${opp.probability_of_win}\nScore: ${opp.score}\nNAICS: ${opp.naics}\nPSC: ${opp.psc}\nDue: ${opp.due_date}\nSolicitation: ${opp.solicitation_number}\nSet-aside: ${opp.set_aside}\nLocation: ${opp.place_of_performance}\nIncumbent: ${opp.incumbent}\nTags: ${JSON.stringify(opp.tags)}`;
+      }
+    } catch {
+      // fall through to mock
+    }
+  }
+
+  if (!oppContext) {
+    const mockOpp = getMockOpportunityById(opportunityId);
+    const mockDetail = getMockOpportunityDetail(opportunityId);
+    if (mockOpp) {
+      oppContext = `Opportunity: ${mockOpp.title}\nAgency: ${mockOpp.agency}\nDepartment: ${mockOpp.department}\nStatus: ${mockOpp.status}\nValue: $${mockOpp.value_estimated}\nPwin: ${mockOpp.probability_of_win}\nScore: ${mockOpp.score}\nNAICS: ${mockOpp.naics}\nIncumbent: ${mockOpp.incumbent}`;
+      if (mockDetail) {
+        oppContext += `\n\nExecutive Summary: ${mockDetail.analysis.executive_summary}\nRecommended Action: ${mockDetail.analysis.recommended_action}`;
+        if (mockDetail.analysis.competitive_landscape) {
+          oppContext += `\nCompetitive Landscape: ${mockDetail.analysis.competitive_landscape}`;
+        }
+      }
+    }
+  }
+
+  if (!isLLMAvailable()) {
+    return res.json(
+      successEnvelope("gda-ai", "opportunity-chat", {
+        answer: `I don't have access to an AI model right now, but here's what I know about this opportunity:\n\n${oppContext || "No data available for this opportunity."}\n\nTo enable AI-powered answers, configure your OPENAI_API_KEY in Settings → AI Configuration.`,
+      })
+    );
+  }
+
+  try {
+    const systemPrompt = `You are an expert government contracting business development advisor for GDA/Envision, an environmental services and government contracting firm. You have deep knowledge of the Shipley business development process, FAR/DFARS regulations, and federal procurement.
+
+Answer the user's question about this specific opportunity using the context provided. Be concise, actionable, and specific to this opportunity. If you don't have enough data, say so and suggest what additional research would help.
+
+OPPORTUNITY CONTEXT:
+${oppContext}`;
+
+    const messages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...history.slice(-6).map((h) => ({ role: h.role as ChatMessage["role"], content: h.content })),
+      { role: "user", content: question },
+    ];
+
+    const result = await chatCompletion(messages);
+    const answer = result.content;
+
+    return res.json(
+      successEnvelope("gda-ai", "opportunity-chat", { answer })
+    );
+  } catch (err: unknown) {
+    process.stderr.write(`[ai] opportunity-chat error: ${(err as Error).message}\n`);
+    return res.status(500).json(
+      errorEnvelope("gda-ai", "opportunity-chat", {
+        code: "AI_ERROR",
+        message: "Failed to get AI response",
+        detail: null,
+      })
+    );
+  }
+});
+
+export default router;

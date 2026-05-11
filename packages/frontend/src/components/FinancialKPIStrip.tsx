@@ -1,6 +1,45 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchFinancialKPIs, type FinancialKPI } from "../api/client";
+import InfoBadge from "./InfoBadge";
+
+const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalculated?: string }> = {
+  orders: {
+    whatItIs: "Total value of new contracts and task orders booked.",
+    whatItMeans: "Measures new business secured. Target: stay above plan to ensure revenue growth.",
+    howCalculated: "Sum of all new contract awards + task order modifications in the current period.",
+  },
+  sales: {
+    whatItIs: "Revenue recognized from contract performance.",
+    whatItMeans: "Actual revenue earned and billed. Lag indicator — depends on contract execution.",
+    howCalculated: "Sum of invoiced amounts for work performed in the current period.",
+  },
+  ebit: {
+    whatItIs: "Earnings Before Interest & Taxes — measures operating profitability.",
+    whatItMeans: "Core business profitability before financing costs. Higher EBIT = healthier operations.",
+    howCalculated: "Sales − Cost of Goods Sold − Operating Expenses (SG&A).",
+  },
+  ros: {
+    whatItIs: "Return on Sales — EBIT as a percentage of Sales.",
+    whatItMeans: "Profit margin on each dollar of revenue. Industry benchmark: 8-12% for GovCon.",
+    howCalculated: "(EBIT ÷ Sales) × 100%.",
+  },
+  funded_backlog: {
+    whatItIs: "Contracted work that has received government funding authorization.",
+    whatItMeans: "Near-term revenue visibility. This work can begin immediately.",
+    howCalculated: "Sum of funded ceiling on active contracts minus revenue already recognized.",
+  },
+  backlog: {
+    whatItIs: "Total remaining value on all active contracts (funded + unfunded).",
+    whatItMeans: "Long-term revenue pipeline. Higher backlog = more future revenue security.",
+    howCalculated: "Sum of total contract ceiling minus revenue recognized across all active contracts.",
+  },
+  gross_profit: {
+    whatItIs: "Revenue minus direct costs (labor, materials, subcontractors).",
+    whatItMeans: "Measures contract-level profitability before overhead and SG&A.",
+    howCalculated: "Sales − Direct Costs (labor + materials + subcontracts + ODCs).",
+  },
+};
 
 function formatValue(kpi: FinancialKPI): string {
   if (kpi.unit === "percent") return `${(kpi.current * 100).toFixed(1)}%`;
@@ -147,8 +186,12 @@ export default function FinancialKPIStrip() {
                   textTransform: "uppercase",
                   letterSpacing: "0.5px",
                   whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
                 }}>
                   {kpi.label}
+                  {KPI_INFO[kpi.key] && <InfoBadge {...KPI_INFO[kpi.key]} size={12} />}
                 </span>
 
                 <span style={{
