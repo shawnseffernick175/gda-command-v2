@@ -23,7 +23,7 @@ router.get("/opportunities", async (_req: Request, res: Response) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, title, agency, department, status, score, pwin, value_estimated,
+      `SELECT id, title, agency, department, status, score, probability_of_win AS pwin, value_estimated,
               naics_code, set_aside, response_deadline, created_at, updated_at
        FROM opportunities ORDER BY created_at DESC`
     );
@@ -59,7 +59,7 @@ router.get("/pipeline", async (_req: Request, res: Response) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, title, agency, department, status, score, pwin, value_estimated,
+      `SELECT id, title, agency, department, status, score, probability_of_win AS pwin, value_estimated,
               naics_code, set_aside, response_deadline, created_at
        FROM opportunities
        WHERE status IN ('qualified', 'pipeline', 'won')
