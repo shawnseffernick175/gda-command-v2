@@ -257,13 +257,12 @@ function activityIcon(type: string): string {
 // ---------------------------------------------------------------------------
 
 const SHIPLEY_STAGES = [
-  { key: "interest", label: "Interest", days: 0, color: "#6b7280", desc: "Opportunity identified" },
-  { key: "qualify", label: "Qualify", days: 30, color: "#f59e0b", desc: "Assess fit, resources, competition" },
-  { key: "pursue", label: "Pursue", days: 12, color: "#3b82f6", desc: "Develop capture strategy" },
-  { key: "capture", label: "Capture", days: 45, color: "#8b5cf6", desc: "Execute capture plan, build relationships" },
-  { key: "propose", label: "Propose", days: 30, color: "#ec4899", desc: "Write and submit proposal" },
-  { key: "submit", label: "Submit", days: 5, color: "#06b6d4", desc: "Final QC and delivery" },
-  { key: "win", label: "Win", days: 0, color: "#10b981", desc: "Award and transition" },
+  { key: "pre_rfp", label: "Pre-RFP", days: 30, color: "#6b7280", desc: "Opportunity identified, assess fit" },
+  { key: "rfp_released", label: "RFP Released", days: 14, color: "#f59e0b", desc: "RFP available, develop capture strategy" },
+  { key: "proposal_prep", label: "Proposal Prep", days: 30, color: "#3b82f6", desc: "Write and assemble proposal" },
+  { key: "submitted", label: "Submitted", days: 5, color: "#8b5cf6", desc: "Proposal delivered to customer" },
+  { key: "evaluation", label: "Evaluation", days: 45, color: "#ec4899", desc: "Government evaluation in progress" },
+  { key: "awarded", label: "Awarded", days: 0, color: "#10b981", desc: "Contract awarded, begin transition" },
 ] as const;
 
 function ShipleyTimeline({

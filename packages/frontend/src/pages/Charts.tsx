@@ -4,7 +4,7 @@ import InfoBadge from "../components/InfoBadge";
 interface PipelineRow {
   id: string;
   title: string;
-  stage: string;
+  status: string;
   value_estimated: number;
   probability_of_win: number;
   agency: string;
@@ -18,9 +18,9 @@ interface GDAEnvelope<T> {
 
 async function fetchPipeline(): Promise<PipelineRow[]> {
   try {
-    const r = await fetch("/api/pipeline");
-    const env: GDAEnvelope<{ rows: PipelineRow[] }> = await r.json();
-    return env.data?.rows ?? [];
+    const r = await fetch("/api/opportunities");
+    const env: GDAEnvelope<{ opportunities: PipelineRow[] }> = await r.json();
+    return env.data?.opportunities ?? [];
   } catch {
     return [];
   }
@@ -104,7 +104,7 @@ export default function Charts() {
 
 function PipelineByPhase({ rows }: { rows: PipelineRow[] }) {
   const stageData = STAGE_ORDER.map((stage) => {
-    const stageRows = rows.filter((r) => r.stage === stage);
+    const stageRows = rows.filter((r) => r.status === stage);
     return {
       stage,
       count: stageRows.length,
