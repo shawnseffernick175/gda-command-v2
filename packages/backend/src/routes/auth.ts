@@ -218,25 +218,33 @@ router.get("/me", authMiddleware, async (req: Request, res: Response) => {
     return;
   }
 
-  const { rows } = await pool.query(
-    "SELECT id, email, display_name, role, avatar_url, is_active, last_login_at, created_at FROM users WHERE id = $1",
-    [req.user.userId]
-  );
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, email, display_name, role, avatar_url, is_active, last_login_at, created_at FROM users WHERE id = $1",
+      [req.user.userId]
+    );
 
-  if (rows.length === 0) {
-    res.status(404).json(errorEnvelope("USER_NOT_FOUND", "User not found", "me", 404));
-    return;
+    if (rows.length === 0) {
+      res.status(404).json(errorEnvelope("USER_NOT_FOUND", "User not found", "me", 404));
+      return;
+    }
+
+    res.json(envelope(rows[0], "me"));
+  } catch (err) {
+    process.stderr.write(`[auth] /me error: ${(err as Error).message}\n`);
+    res.status(500).json(errorEnvelope("DB_ERROR", "Failed to fetch user profile", "me", 500));
   }
-
-  res.json(envelope(rows[0], "me"));
 });
 
 // POST /api/auth/logout
 router.post("/logout", authMiddleware, async (req: Request, res: Response) => {
   const pool = getPool();
   if (pool && req.user) {
-    // Revoke all refresh tokens for this user
-    await pool.query("DELETE FROM refresh_tokens WHERE user_id = $1", [req.user.userId]);
+    try {
+      await pool.query("DELETE FROM refresh_tokens WHERE user_id = $1", [req.user.userId]);
+    } catch (err) {
+      process.stderr.write(`[auth] logout error: ${(err as Error).message}\n`);
+    }
   }
   res.json(envelope({ message: "Logged out" }, "logout"));
 });

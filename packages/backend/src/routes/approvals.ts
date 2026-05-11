@@ -1,17 +1,56 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { getPool } from "../lib/db";
 import { MOCK_APPROVALS } from "../data/approvals-mock";
-import type { ApprovalItem, ApprovalStatus, ApprovalCategory } from "@gda/shared";
+import type { ApprovalItem } from "@gda/shared";
 
 const router = Router();
+
+function rowToApproval(r: Record<string, unknown>): ApprovalItem {
+  return {
+    id: r.id as string,
+    title: r.title as string,
+    description: r.description as string,
+    category: r.category as ApprovalItem["category"],
+    priority: r.priority as ApprovalItem["priority"],
+    status: r.status as ApprovalItem["status"],
+    requester: r.requester as string,
+    assignee: r.assignee as string,
+    correlation_id: (r.correlation_id as string) ?? null,
+    related_entity_id: (r.related_entity_id as string) ?? null,
+    related_entity_type: (r.related_entity_type as string) ?? null,
+    dry_run_result: (r.dry_run_result as ApprovalItem["dry_run_result"]) ?? null,
+    created_at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
+    updated_at: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
+    expires_at: r.expires_at instanceof Date ? r.expires_at.toISOString() : r.expires_at ? String(r.expires_at) : null,
+    resolved_at: r.resolved_at instanceof Date ? r.resolved_at.toISOString() : r.resolved_at ? String(r.resolved_at) : null,
+    resolved_by: (r.resolved_by as string) ?? null,
+    resolution_notes: (r.resolution_notes as string) ?? null,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/approvals — list all approval items with optional filters
 // ---------------------------------------------------------------------------
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    let items: ApprovalItem[] = [...MOCK_APPROVALS];
+    const pool = getPool();
+    let allItems: ApprovalItem[];
+    let source: "db" | "mock" = "mock";
 
+    if (pool) {
+      try {
+        const result = await pool.query("SELECT * FROM approvals ORDER BY created_at DESC");
+        allItems = result.rows.map(rowToApproval);
+        source = "db";
+      } catch {
+        allItems = [...MOCK_APPROVALS];
+      }
+    } else {
+      allItems = [...MOCK_APPROVALS];
+    }
+
+    let items = [...allItems];
     const { status, category, priority, search } = req.query;
 
     if (status && typeof status === "string") {
@@ -33,22 +72,19 @@ router.get("/", (req, res) => {
       );
     }
 
-    // Summary stats from full set (before filtering)
-    const all = MOCK_APPROVALS;
-    const pending = all.filter((a) => a.status === "pending").length;
-    const approved = all.filter((a) => a.status === "approved").length;
-    const rejected = all.filter((a) => a.status === "rejected").length;
-    const expired = all.filter((a) => a.status === "expired").length;
-    const critical = all.filter((a) => a.status === "pending" && a.priority === "critical").length;
-    const expiringSoon = all.filter((a) => {
+    const pending = allItems.filter((a) => a.status === "pending").length;
+    const approved = allItems.filter((a) => a.status === "approved").length;
+    const rejected = allItems.filter((a) => a.status === "rejected").length;
+    const expired = allItems.filter((a) => a.status === "expired").length;
+    const critical = allItems.filter((a) => a.status === "pending" && a.priority === "critical").length;
+    const expiringSoon = allItems.filter((a) => {
       if (a.status !== "pending" || !a.expires_at) return false;
       const diff = new Date(a.expires_at).getTime() - Date.now();
-      return diff > 0 && diff < 3 * 24 * 60 * 60 * 1000; // within 3 days
+      return diff > 0 && diff < 3 * 24 * 60 * 60 * 1000;
     }).length;
 
-    // Categories breakdown
     const categories: Record<string, number> = {};
-    for (const a of all.filter((x) => x.status === "pending")) {
+    for (const a of allItems.filter((x) => x.status === "pending")) {
       categories[a.category] = (categories[a.category] || 0) + 1;
     }
 
@@ -58,7 +94,7 @@ router.get("/", (req, res) => {
         total: items.length,
         summary: { pending, approved, rejected, expired, critical, expiringSoon },
         categories,
-        source: "mock",
+        source,
       }),
     );
   } catch (err) {
@@ -71,27 +107,43 @@ router.get("/", (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/approvals/:id — single approval detail
 // ---------------------------------------------------------------------------
-router.get("/:id", (req, res) => {
-  const item = MOCK_APPROVALS.find((a) => a.id === req.params.id);
-  if (!item) {
-    return res.status(404).json(
-      errorEnvelope("GDA.approvals", "get", { code: "NOT_FOUND", message: `Approval ${req.params.id} not found`, detail: null }),
+router.get("/:id", async (req, res) => {
+  try {
+    const pool = getPool();
+    let item: ApprovalItem | undefined;
+    let source: "db" | "mock" = "mock";
+
+    if (pool) {
+      try {
+        const result = await pool.query("SELECT * FROM approvals WHERE id = $1", [req.params.id]);
+        if (result.rows.length > 0) {
+          item = rowToApproval(result.rows[0]);
+          source = "db";
+        }
+      } catch { /* fall through */ }
+    }
+
+    if (!item) {
+      item = MOCK_APPROVALS.find((a) => a.id === req.params.id);
+    }
+
+    if (!item) {
+      return res.status(404).json(
+        errorEnvelope("GDA.approvals", "get", { code: "NOT_FOUND", message: `Approval ${req.params.id} not found`, detail: null }),
+      );
+    }
+    res.json(successEnvelope("GDA.approvals", "get", { approval: item, source }));
+  } catch (err) {
+    res.status(500).json(
+      errorEnvelope("GDA.approvals", "get", { code: "APPROVALS_ERROR", message: String(err), detail: null }),
     );
   }
-  res.json(successEnvelope("GDA.approvals", "get", { approval: item, source: "mock" }));
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/approvals/:id/resolve — approve or reject (dry-run by default)
+// POST /api/approvals/:id/resolve — approve or reject
 // ---------------------------------------------------------------------------
-router.post("/:id/resolve", (req, res) => {
-  const item = MOCK_APPROVALS.find((a) => a.id === req.params.id);
-  if (!item) {
-    return res.status(404).json(
-      errorEnvelope("GDA.approvals", "resolve", { code: "NOT_FOUND", message: `Approval ${req.params.id} not found`, detail: null }),
-    );
-  }
-
+router.post("/:id/resolve", async (req, res) => {
   const { action, notes } = req.body as { action?: string; notes?: string };
   if (!action || !["approve", "reject"].includes(action)) {
     return res.status(400).json(
@@ -99,40 +151,66 @@ router.post("/:id/resolve", (req, res) => {
     );
   }
 
-  const dryRun = req.query.dryRun !== "false";
   const correlationId = `GDA-RESOLVE-${Date.now()}`;
+  const newStatus = action === "approve" ? "approved" : "rejected";
+  const now = new Date().toISOString();
+  const resolvedBy = (req as unknown as { user?: { email?: string } }).user?.email ?? "system";
+  const pool = getPool();
 
-  if (dryRun) {
-    res.json(
-      successEnvelope(
-        "GDA.approvals",
-        "resolve",
-        {
-          approval_id: item.id,
-          proposed_action: action,
-          current_status: item.status,
-          would_change_to: action === "approve" ? "approved" : "rejected",
-          dry_run_result: item.dry_run_result,
+  if (pool) {
+    try {
+      const current = await pool.query("SELECT * FROM approvals WHERE id = $1", [req.params.id]);
+      if (current.rows.length === 0) {
+        return res.status(404).json(
+          errorEnvelope("GDA.approvals", "resolve", { code: "NOT_FOUND", message: `Approval ${req.params.id} not found`, detail: null }),
+        );
+      }
+
+      const prev = rowToApproval(current.rows[0]);
+
+      await pool.query(
+        `UPDATE approvals SET status = $1, resolved_at = $2, resolved_by = $3, resolution_notes = $4, updated_at = $2 WHERE id = $5`,
+        [newStatus, now, resolvedBy, notes ?? null, req.params.id],
+      );
+
+      return res.json(
+        successEnvelope("GDA.approvals", "resolve", {
+          approval_id: prev.id,
+          previous_status: prev.status,
+          new_status: newStatus,
+          resolved_by: resolvedBy,
+          resolved_at: now,
+          resolution_notes: notes ?? null,
           correlation_id: correlationId,
-        },
-        {},
-        true,
-      ),
-    );
-  } else {
-    // In production this would mutate DB; for mock we return simulated result
-    res.json(
-      successEnvelope("GDA.approvals", "resolve", {
-        approval_id: item.id,
-        previous_status: item.status,
-        new_status: action === "approve" ? "approved" : "rejected",
-        resolved_by: "Shawn Seffernick",
-        resolved_at: new Date().toISOString(),
-        resolution_notes: notes ?? null,
-        correlation_id: correlationId,
-      }),
+        }),
+      );
+    } catch (err) {
+      process.stderr.write(`[approvals] resolve error: ${(err as Error).message}\n`);
+      return res.status(500).json(
+        errorEnvelope("GDA.approvals", "resolve", { code: "DB_ERROR", message: "Failed to resolve approval", detail: null }),
+      );
+    }
+  }
+
+  // Mock fallback
+  const item = MOCK_APPROVALS.find((a) => a.id === req.params.id);
+  if (!item) {
+    return res.status(404).json(
+      errorEnvelope("GDA.approvals", "resolve", { code: "NOT_FOUND", message: `Approval ${req.params.id} not found`, detail: null }),
     );
   }
+
+  res.json(
+    successEnvelope("GDA.approvals", "resolve", {
+      approval_id: item.id,
+      previous_status: item.status,
+      new_status: newStatus,
+      resolved_by: resolvedBy,
+      resolved_at: now,
+      resolution_notes: notes ?? null,
+      correlation_id: correlationId,
+    }, {}, true),
+  );
 });
 
 export default router;
