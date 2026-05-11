@@ -49,6 +49,17 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       return "";
     }
   }
+  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mammoth = require("mammoth") as { extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }> };
+      const result = await mammoth.extractRawText({ buffer });
+      return result.value;
+    } catch (err) {
+      log.error("docx_parse_error", { error: String(err) });
+      return "";
+    }
+  }
   return "";
 }
 
@@ -242,11 +253,10 @@ const proposalUpload = multer({
       "application/pdf",
       "text/plain",
       "text/markdown",
-      "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ]);
     if (!allowed.has(file.mimetype)) {
-      cb(new Error(`File type ${file.mimetype} not allowed. Upload PDF, DOC, DOCX, or TXT.`));
+      cb(new Error(`File type ${file.mimetype} not allowed. Upload PDF, DOCX, or TXT.`));
       return;
     }
     cb(null, true);
@@ -296,7 +306,19 @@ router.post(
       documentText = await extractText(file.buffer, file.mimetype);
     }
 
-    // Save uploaded file
+    if (!documentText) {
+      return res.status(400).json(
+        errorEnvelope("GDA.color-review", "run", {
+          code: "VALIDATION",
+          message: file
+            ? "Could not extract text from the uploaded file. Try uploading a PDF, DOCX, or TXT file, or paste the document text."
+            : "Upload a document file or provide proposal_text to review.",
+          detail: null,
+        }),
+      );
+    }
+
+    // Save uploaded file (only after text extraction succeeds to avoid orphaned files)
     let fileId: string | null = null;
     if (file) {
       const storageKey = generateStorageKey(file.originalname);
@@ -316,18 +338,6 @@ router.post(
         }
       }
       log.info("color_review_file_uploaded", { fileId, fileName: file.originalname, sizeBytes: file.size });
-    }
-
-    if (!documentText) {
-      return res.status(400).json(
-        errorEnvelope("GDA.color-review", "run", {
-          code: "VALIDATION",
-          message: file
-            ? "Could not extract text from the uploaded file. Try uploading a PDF or TXT file, or paste the document text."
-            : "Upload a document file or provide proposal_text to review.",
-          detail: null,
-        }),
-      );
     }
 
     if (!isLLMAvailable()) {

@@ -950,7 +950,7 @@ function UploadReviewForm({ onSubmit, result, reviewing }: {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.txt,.doc,.docx"
+            accept=".pdf,.txt,.docx"
             onChange={(e) => { if (e.target.files?.[0]) setFile(e.target.files[0]); }}
             style={{ display: "none" }}
           />
@@ -966,7 +966,7 @@ function UploadReviewForm({ onSubmit, result, reviewing }: {
                 Drag & drop your proposal document here
               </div>
               <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>
-                PDF, TXT, DOC, DOCX — up to 50 MB
+                PDF, TXT, DOCX — up to 50 MB
               </div>
             </div>
           )}
