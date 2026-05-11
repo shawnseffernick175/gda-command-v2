@@ -8,6 +8,11 @@ import {
   triggerFeedSync,
   fetchEmbeddingStats,
   triggerEmbedAll,
+  fetchEmailStatus,
+  fetchEmailPreferences,
+  updateEmailPreferences,
+  testSmtpConnection as apiTestSmtp,
+  sendTestEmail,
   type SettingsData,
   type ConnectorStatus,
   type FeatureFlag,
@@ -17,6 +22,8 @@ import {
   type FeedSyncData,
   type EmbeddingStatsData,
   type EmbedResult,
+  type EmailStatusData,
+  type EmailPreferencesData,
 } from "../api/client";
 
 function formatUptime(seconds: number): string {
@@ -45,6 +52,11 @@ export default function Settings() {
   const [embeddingStats, setEmbeddingStats] = useState<EmbeddingStatsData | null>(null);
   const [embedding, setEmbedding] = useState(false);
   const [embedResult, setEmbedResult] = useState<EmbedResult | null>(null);
+  const [emailStatus, setEmailStatus] = useState<EmailStatusData | null>(null);
+  const [emailPrefs, setEmailPrefs] = useState<EmailPreferencesData | null>(null);
+  const [emailTesting, setEmailTesting] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState<string | null>(null);
+  const [savingPrefs, setSavingPrefs] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -72,6 +84,16 @@ export default function Settings() {
           if (env.success && env.data) setEmbeddingStats(env.data);
         })
         .catch(() => { /* embeddings endpoint may not exist yet */ }),
+      fetchEmailStatus()
+        .then((env) => {
+          if (env.success && env.data) setEmailStatus(env.data);
+        })
+        .catch(() => { /* email endpoint may not exist yet */ }),
+      fetchEmailPreferences()
+        .then((env) => {
+          if (env.success && env.data) setEmailPrefs(env.data);
+        })
+        .catch(() => { /* email prefs may not exist yet */ }),
     ])
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -456,6 +478,207 @@ export default function Settings() {
           Use <code style={{ fontSize: 12, background: "var(--color-surface)", padding: "2px 6px", borderRadius: 4 }}>npm run db:backup</code> for CLI backups
           or <code style={{ fontSize: 12, background: "var(--color-surface)", padding: "2px 6px", borderRadius: 4 }}>npm run db:restore &lt;file&gt;</code> to restore.
         </div>
+      </Section>
+
+      {/* Email Notifications */}
+      <Section title="Email Notifications">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <InfoCard label="SMTP Status" value={emailStatus?.configured ? "Configured" : "Not Configured"} />
+          {emailStatus?.configured && <InfoCard label="SMTP Host" value={emailStatus.smtp_host ?? "—"} />}
+          <InfoCard label="Emails Sent" value={String(emailStatus?.total_sent ?? 0)} />
+          <InfoCard label="Failed" value={String(emailStatus?.total_failed ?? 0)} />
+        </div>
+
+        {/* SMTP Test */}
+        {emailStatus?.configured && (
+          <div style={{ marginBottom: 16, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={async () => {
+                setEmailTesting(true);
+                setEmailTestResult(null);
+                try {
+                  const env = await apiTestSmtp();
+                  if (env.success && env.data?.connected) {
+                    setEmailTestResult("SMTP connection successful");
+                  } else {
+                    setEmailTestResult(`SMTP connection failed: ${env.data?.error ?? env.error?.message}`);
+                  }
+                } catch (err) {
+                  setEmailTestResult(`Error: ${(err as Error).message}`);
+                } finally {
+                  setEmailTesting(false);
+                }
+              }}
+              disabled={emailTesting}
+              style={{
+                background: "#3b82f6",
+                color: "#fff",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: 6,
+                cursor: emailTesting ? "wait" : "pointer",
+                opacity: emailTesting ? 0.7 : 1,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              {emailTesting ? "Testing..." : "Test SMTP Connection"}
+            </button>
+            <button
+              onClick={async () => {
+                setEmailTesting(true);
+                setEmailTestResult(null);
+                try {
+                  const env = await sendTestEmail(emailPrefs ? "" : "");
+                  if (env.success && env.data?.sent) {
+                    setEmailTestResult("Test email sent successfully!");
+                  } else {
+                    setEmailTestResult(`Send failed: ${env.data?.error ?? env.error?.message}`);
+                  }
+                } catch (err) {
+                  setEmailTestResult(`Error: ${(err as Error).message}`);
+                } finally {
+                  setEmailTesting(false);
+                }
+              }}
+              disabled={emailTesting}
+              style={{
+                background: "transparent",
+                color: "#3b82f6",
+                border: "1px solid #3b82f6",
+                padding: "8px 16px",
+                borderRadius: 6,
+                cursor: emailTesting ? "wait" : "pointer",
+                opacity: emailTesting ? 0.7 : 1,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              Send Test Email
+            </button>
+            {emailTestResult && (
+              <span style={{ fontSize: 13, color: emailTestResult.includes("successful") || emailTestResult.includes("sent") ? "#22c55e" : "#ef4444" }}>
+                {emailTestResult}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* User Notification Preferences */}
+        <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 16, marginTop: 8 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--color-text)" }}>Your Notification Preferences</h3>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Email notifications toggle */}
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={emailPrefs?.email_notifications_enabled ?? false}
+                onChange={async (e) => {
+                  setSavingPrefs(true);
+                  const env = await updateEmailPreferences({ email_notifications_enabled: e.target.checked });
+                  if (env.success && env.data) setEmailPrefs(env.data);
+                  setSavingPrefs(false);
+                }}
+                disabled={savingPrefs}
+                style={{ width: 18, height: 18, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: 14 }}>Enable email notifications</span>
+            </label>
+
+            {/* Digest toggle */}
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={emailPrefs?.email_digest_enabled ?? false}
+                onChange={async (e) => {
+                  setSavingPrefs(true);
+                  const env = await updateEmailPreferences({ email_digest_enabled: e.target.checked });
+                  if (env.success && env.data) setEmailPrefs(env.data);
+                  setSavingPrefs(false);
+                }}
+                disabled={savingPrefs}
+                style={{ width: 18, height: 18, cursor: "pointer" }}
+              />
+              <span style={{ fontSize: 14 }}>Email digest summary</span>
+            </label>
+
+            {/* Digest frequency */}
+            {emailPrefs?.email_digest_enabled && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 28 }}>
+                <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Frequency:</span>
+                <select
+                  value={emailPrefs?.email_digest_frequency ?? "daily"}
+                  onChange={async (e) => {
+                    setSavingPrefs(true);
+                    const env = await updateEmailPreferences({ email_digest_frequency: e.target.value });
+                    if (env.success && env.data) setEmailPrefs(env.data);
+                    setSavingPrefs(false);
+                  }}
+                  disabled={savingPrefs}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: 4,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-surface)",
+                    color: "var(--color-text)",
+                    fontSize: 13,
+                  }}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+            )}
+
+            {/* Category toggles */}
+            <div style={{ marginTop: 4 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 8 }}>
+                Notification Categories
+              </span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {["critical", "approval", "deadline", "anomaly", "system"].map((cat) => {
+                  const cats = emailPrefs?.notification_categories ?? [];
+                  const active = cats.includes(cat);
+                  return (
+                    <button
+                      key={cat}
+                      onClick={async () => {
+                        setSavingPrefs(true);
+                        const updated = active
+                          ? cats.filter((c) => c !== cat)
+                          : [...cats, cat];
+                        const env = await updateEmailPreferences({ notification_categories: updated });
+                        if (env.success && env.data) setEmailPrefs(env.data);
+                        setSavingPrefs(false);
+                      }}
+                      disabled={savingPrefs}
+                      style={{
+                        padding: "4px 12px",
+                        borderRadius: 16,
+                        border: active ? "1px solid #3b82f6" : "1px solid var(--color-border)",
+                        background: active ? "rgba(59,130,246,0.1)" : "transparent",
+                        color: active ? "#3b82f6" : "var(--color-text-muted)",
+                        cursor: "pointer",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {!emailStatus?.configured && (
+          <div style={{ marginTop: 16, padding: 12, background: "rgba(245,158,11,0.08)", borderRadius: 6, fontSize: 13, color: "#f59e0b" }}>
+            SMTP is not configured. Set <code>SMTP_HOST</code>, <code>SMTP_USER</code>, and <code>SMTP_PASS</code> environment variables to enable email delivery.
+          </div>
+        )}
       </Section>
 
       {/* API Endpoints Reference */}

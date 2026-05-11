@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { notify } from "../lib/email";
 import { requireRole } from "../lib/auth";
 import { MOCK_APPROVALS } from "../data/approvals-mock";
 import type { ApprovalItem } from "@gda/shared";
@@ -173,6 +174,17 @@ router.post("/:id/resolve", requireRole("admin", "bd_manager"), async (req, res)
         `UPDATE approvals SET status = $1, resolved_at = $2, resolved_by = $3, resolution_notes = $4, updated_at = $2 WHERE id = $5`,
         [newStatus, now, resolvedBy, notes ?? null, req.params.id],
       );
+
+      // Send email notification for resolved approval
+      notify({
+        title: `Approval ${newStatus}: ${prev.title}`,
+        message: `${prev.title} was ${newStatus} by ${resolvedBy}.${notes ? ` Notes: ${notes}` : ""}`,
+        severity: newStatus === "approved" ? "success" : "warning",
+        category: "approval",
+        link: "/approvals",
+        emailTemplate: "approval_resolved",
+        emailData: { title: prev.title, decision: newStatus, notes: notes ?? "" },
+      }).catch(() => {});
 
       return res.json(
         successEnvelope("GDA.approvals", "resolve", {

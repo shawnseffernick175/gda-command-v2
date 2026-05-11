@@ -2886,3 +2886,65 @@ export function triggerEmbedAll() {
     method: "POST",
   });
 }
+
+// ---------------------------------------------------------------------------
+// Email Notifications
+// ---------------------------------------------------------------------------
+
+export interface EmailStatusData {
+  configured: boolean;
+  smtp_host: string | null;
+  total_sent: number;
+  total_failed: number;
+  recent: Array<{
+    id: string;
+    recipient_email: string;
+    subject: string;
+    template: string;
+    status: string;
+    created_at: string;
+  }>;
+}
+
+export interface EmailPreferencesData {
+  email_notifications_enabled: boolean;
+  email_digest_enabled: boolean;
+  email_digest_frequency: string;
+  notification_categories: string[];
+  email_configured?: boolean;
+}
+
+export interface EmailTestResult {
+  connected?: boolean;
+  sent?: boolean;
+  to?: string;
+  error?: string;
+}
+
+export function fetchEmailStatus() {
+  return request<EmailStatusData>("/email/status");
+}
+
+export function testSmtpConnection() {
+  return request<EmailTestResult>("/email/test", { method: "POST" });
+}
+
+export function sendTestEmail(to: string) {
+  return request<EmailTestResult>("/email/send-test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ to }),
+  });
+}
+
+export function fetchEmailPreferences() {
+  return request<EmailPreferencesData>("/email/preferences");
+}
+
+export function updateEmailPreferences(prefs: Partial<EmailPreferencesData>) {
+  return request<EmailPreferencesData>("/email/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(prefs),
+  });
+}

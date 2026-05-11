@@ -10,6 +10,7 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
+import { notify } from "../lib/email";
 
 const router = Router();
 
@@ -502,6 +503,21 @@ router.post("/anomalies", async (req, res) => {
         a.root_cause ?? null, a.recommended_actions ?? [],
       ]);
       upserted++;
+
+      // Email notification for critical/high anomalies
+      if (a.severity === "critical" || a.severity === "high") {
+        notify({
+          title: `Anomaly: ${a.title}`,
+          message: a.description ?? `${a.severity} anomaly detected`,
+          severity: a.severity === "critical" ? "critical" : "warning",
+          category: "anomaly",
+          link: "/anomalies",
+          relatedEntityId: a.id,
+          relatedEntityType: "anomaly",
+          emailTemplate: "anomaly_detected",
+          emailData: { title: a.title, severity: a.severity, description: a.description ?? "" },
+        }).catch(() => {});
+      }
     } catch (e) {
       errors++;
       process.stderr.write(`[ingest] anomaly error: ${(e as Error).message}\n`);

@@ -3,6 +3,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import { sendEmail } from "../lib/email";
 import crypto from "crypto";
 import {
   hashPassword,
@@ -80,6 +81,9 @@ router.post("/register", async (req: Request, res: Response) => {
      VALUES ($1, $2, NOW() + INTERVAL '7 days')`,
     [id, tokenHash]
   );
+
+  // Send welcome email (async, don't block registration)
+  sendEmail(email, "welcome", { display_name }, { userId: id }).catch(() => {});
 
   res.status(201).json(envelope({ accessToken, refreshToken, user: { id, email, display_name, role: "viewer" } }, "register"));
 });
