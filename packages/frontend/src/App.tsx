@@ -93,7 +93,7 @@ function isActive(pathname: string, itemPath: string): boolean {
 export default function App() {
   const { pathname } = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
-  const [authed, setAuthed] = useState(() => isAuthenticated());
+  const [authed, setAuthed] = useState<boolean | null>(null); // null = loading
   const sidebarWidth = sidebarOpen ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
   const handleLogout = useCallback(async () => {
@@ -101,9 +101,29 @@ export default function App() {
     setAuthed(false);
   }, []);
 
-  // Check auth status periodically (picks up token refresh)
+  // On mount, probe /api/auth/me to determine auth state.
+  // In dev mode (AUTH_REQUIRED=false), backend injects admin — no token needed.
   useEffect(() => {
-    const check = () => setAuthed(isAuthenticated());
+    async function checkAuth() {
+      try {
+        const res = await fetch("/api/auth/me", {
+          headers: isAuthenticated()
+            ? { Authorization: `Bearer ${localStorage.getItem("gda_access_token")}` }
+            : {},
+        });
+        setAuthed(res.ok);
+      } catch {
+        setAuthed(false);
+      }
+    }
+    checkAuth();
+  }, []);
+
+  // Listen for storage changes (picks up token refresh / logout in other tabs)
+  useEffect(() => {
+    const check = () => {
+      if (!isAuthenticated()) setAuthed(false);
+    };
     window.addEventListener("storage", check);
     return () => window.removeEventListener("storage", check);
   }, []);
@@ -118,6 +138,20 @@ export default function App() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Loading state while checking auth
+  if (authed === null) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f172a", color: "#94a3b8" }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // Gate: show login when not authenticated
+  if (!authed) {
+    return <Login onAuth={() => setAuthed(true)} />;
+  }
 
   return (
     <div style={{ minHeight: "100vh", display: "flex" }}>

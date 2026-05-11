@@ -176,7 +176,19 @@ router.post("/refresh", async (req: Request, res: Response) => {
     // Rotate: delete old, issue new
     await pool.query("DELETE FROM refresh_tokens WHERE token_hash = $1", [tokenHash]);
 
-    const payload = { userId: decoded.userId, email: decoded.email, role: decoded.role };
+    // Re-read user from DB to get current role/active status
+    const userResult = await pool.query(
+      "SELECT id, email, role, is_active FROM users WHERE id = $1",
+      [decoded.userId]
+    );
+    if (userResult.rows.length === 0 || !userResult.rows[0].is_active) {
+      await pool.query("DELETE FROM refresh_tokens WHERE user_id = $1", [decoded.userId]);
+      res.status(403).json(errorEnvelope("ACCOUNT_DISABLED", "Account deactivated or not found", "refresh", 403));
+      return;
+    }
+
+    const user = userResult.rows[0];
+    const payload = { userId: user.id, email: user.email, role: user.role };
     const newAccess = generateAccessToken(payload);
     const newRefresh = generateRefreshToken(payload);
     const newHash = crypto.createHash("sha256").update(newRefresh).digest("hex");
@@ -184,7 +196,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
     await pool.query(
       `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
        VALUES ($1, $2, NOW() + INTERVAL '7 days')`,
-      [decoded.userId, newHash]
+      [user.id, newHash]
     );
 
     res.json(envelope({ accessToken: newAccess, refreshToken: newRefresh }, "refresh"));

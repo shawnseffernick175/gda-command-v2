@@ -266,7 +266,7 @@ async function seed() {
       await client.query(
         `INSERT INTO fast_track_matches (id, signal_type, signal_title, signal_source, signal_date, company_name, company_role, technology_tags, contract_path, score, status, executive_summary, risks_and_gaps, recommended_action, ooda, sources, needs_attention, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-        [m.id, m.signal_type, m.signal_summary, m.signal_type, m.created_at, m.company_name, m.company_role, pgArray(m.technology_tags), m.contract_path_hypothesis, m.match_score, m.status, m.analysis?.executive_summary ?? null, pgArray(m.analysis?.risks_or_gaps as string[]), m.recommended_next_action, JSON.stringify(m.ooda), JSON.stringify(m.sources), m.status === "new" || m.status === "reviewing", m.created_at, m.updated_at]
+        [m.id, m.signal_type, m.signal_summary, m.sources?.[0]?.publisher ?? m.signal_type, m.sources?.[0]?.published_at ?? m.created_at, m.company_name, m.company_role, pgArray(m.technology_tags), m.contract_path_hypothesis, m.match_score, m.status, m.analysis?.executive_summary ?? null, pgArray(m.analysis?.risks_or_gaps as string[]), m.recommended_next_action, JSON.stringify(m.ooda), JSON.stringify(m.sources), m.status === "new" || m.status === "reviewing", m.created_at, m.updated_at]
       );
     }
     process.stdout.write(`[seed] ${MOCK_FAST_TRACK_MATCHES.length} fast track matches\n`);
