@@ -150,6 +150,7 @@ export interface OpportunityRow {
   qualified_by: string | null;
   tags: string[];
   raw_source_url: string | null;
+  data_source: string | null;
   created_at: string;
   updated_at: string;
 }

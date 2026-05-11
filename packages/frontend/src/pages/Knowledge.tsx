@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import InfoBadge from "../components/InfoBadge";
 import {
   fetchKnowledgeSummary,
   fetchKnowledgeCollections,
@@ -73,12 +74,12 @@ const TYPE_COLORS: Record<string, string> = {
 
 function SummaryStrip({ summary }: { summary: KnowledgeSummaryData }) {
   const cards = [
-    { label: "Documents", value: summary.total_documents, color: "#3b82f6" },
-    { label: "Indexed", value: summary.indexed_count, color: "#22c55e" },
-    { label: "Processing", value: summary.processing_count, color: "#f59e0b" },
-    { label: "Chunks", value: summary.total_chunks.toLocaleString(), color: "#8b5cf6" },
-    { label: "Collections", value: summary.collection_count, color: "#06b6d4" },
-    { label: "Total Lookups", value: summary.total_access_count, color: "#6366f1" },
+    { label: "Documents", value: summary.total_documents, color: "#3b82f6", info: { whatItIs: "Total documents uploaded to Knowledge Base.", whatItMeans: "More documents = smarter AI across all features." } },
+    { label: "Indexed", value: summary.indexed_count, color: "#22c55e", info: { whatItIs: "Documents fully processed and searchable.", whatItMeans: "These documents are available for RAG queries and AI analysis." } },
+    { label: "Processing", value: summary.processing_count, color: "#f59e0b", info: { whatItIs: "Documents being chunked and embedded.", whatItMeans: "Recently uploaded — will be searchable once processing completes." } },
+    { label: "Chunks", value: summary.total_chunks.toLocaleString(), color: "#8b5cf6", info: { whatItIs: "Text segments created for semantic search.", whatItMeans: "Documents split into searchable passages for precise AI retrieval.", howCalculated: "Each document split into overlapping ~500-token segments." } },
+    { label: "Collections", value: summary.collection_count, color: "#06b6d4", info: { whatItIs: "Organized groups of related documents.", whatItMeans: "Categories like Past Performance, Proposals, Compliance for targeted search." } },
+    { label: "Total Lookups", value: summary.total_access_count, color: "#6366f1", info: { whatItIs: "Times documents have been accessed or referenced.", whatItMeans: "High lookup count = frequently used by AI and users.", howCalculated: "Cumulative access count across all documents." } },
   ];
 
   return (
@@ -95,8 +96,9 @@ function SummaryStrip({ summary }: { summary: KnowledgeSummaryData }) {
             minWidth: 120,
           }}
         >
-          <div style={{ fontSize: 11, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+          <div style={{ fontSize: 11, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 4 }}>
             {c.label}
+            {c.info && <InfoBadge size={14} {...c.info} />}
           </div>
           <div style={{ fontSize: 24, fontWeight: 700, color: c.color, marginTop: 2 }}>{c.value}</div>
         </div>

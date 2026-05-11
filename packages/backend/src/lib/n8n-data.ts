@@ -113,6 +113,7 @@ function mapOpportunity(raw: N8nOpportunity): Opportunity {
       raw.assigned_ou,
     ].filter((t): t is string => !!t),
     raw_source_url: raw.source_url ?? null,
+    data_source: raw.data_source ?? null,
     created_at: raw.last_refreshed ?? new Date().toISOString(),
     updated_at: raw.last_refreshed ?? new Date().toISOString(),
   };

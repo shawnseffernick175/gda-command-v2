@@ -1,7 +1,7 @@
 /**
  * Mock financial data for the Financial KPI Strip and Financial Bible.
  *
- * KPIs: Orders, Sales, EBIT, ROS, Funded Backlog, Backlog, Gross Profit
+ * KPIs: Orders, Sales, EBIT, Gross Profit, ROS, Funded Backlog, Contract Backlog
  * Each KPI has a current value, prior period, plan/target, and constituent records.
  */
 
@@ -77,6 +77,16 @@ export const MOCK_FINANCIAL_KPIS: FinancialKPI[] = [
     updated_at: UPDATED_AT,
   },
   {
+    key: "gross_profit",
+    label: "Gross Profit",
+    current: 9_540_000,
+    prior: 8_555_000,
+    plan: 9_900_000,
+    unit: "currency",
+    period: CURRENT_PERIOD,
+    updated_at: UPDATED_AT,
+  },
+  {
     key: "ros",
     label: "ROS",
     current: 0.15,
@@ -98,20 +108,10 @@ export const MOCK_FINANCIAL_KPIS: FinancialKPI[] = [
   },
   {
     key: "backlog",
-    label: "Backlog",
+    label: "Contract Backlog",
     current: 124_600_000,
     prior: 118_300_000,
     plan: 130_000_000,
-    unit: "currency",
-    period: CURRENT_PERIOD,
-    updated_at: UPDATED_AT,
-  },
-  {
-    key: "gross_profit",
-    label: "Gross Profit",
-    current: 9_540_000,
-    prior: 8_555_000,
-    plan: 9_900_000,
     unit: "currency",
     period: CURRENT_PERIOD,
     updated_at: UPDATED_AT,

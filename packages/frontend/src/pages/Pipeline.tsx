@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import ExportButton from "../components/ExportButton";
+import InfoBadge from "../components/InfoBadge";
 import {
   fetchPipelineOpportunities,
   type OpportunityRow,
@@ -186,20 +187,24 @@ export default function Pipeline() {
           fontSize: 14,
         }}
       >
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Pipeline Count </span>
+          <InfoBadge size={14} whatItIs="Number of opportunities in your active pipeline." whatItMeans="Qualified opportunities being actively pursued." />
           <strong>{summary.total}</strong>
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Total Value </span>
+          <InfoBadge size={14} whatItIs="Sum of estimated contract values in the pipeline." whatItMeans="Total revenue potential of all active pursuits." howCalculated="Sum of value_estimated for Qualified + Pipeline status opps." />
           <strong>{formatCurrency(summary.totalValue)}</strong>
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Avg Pwin </span>
+          <InfoBadge size={14} whatItIs="Average probability of win across pipeline." whatItMeans="Higher = stronger pipeline. Below 40% signals weak positioning." howCalculated="Mean of all opportunity Pwin values in pipeline." />
           <strong>{formatPwin(summary.avgPwin)}</strong>
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ color: "var(--color-text-muted)" }}>Avg Score </span>
+          <InfoBadge size={14} whatItIs="Average opportunity score across pipeline." whatItMeans="Composite score factoring Pwin, value, and strategic fit." />
           <strong>{summary.avgScore.toFixed(1)}</strong>
         </div>
       </div>

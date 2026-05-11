@@ -42,51 +42,54 @@ import QuickEntry from "./components/QuickEntry";
 
 const NAV_GROUPS = [
   {
-    label: "BD Tools",
+    label: "Operations",
     items: [
       { path: "/", label: "Launchpad", icon: "🏠" },
       { path: "/fast-track", label: "Fast Track", icon: "🚀" },
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
-      { path: "/capture", label: "Capture", icon: "🎯" },
       { path: "/approvals", label: "Approvals", icon: "✓" },
-      { path: "/rfp-shredder", label: "RFP Shredder", icon: "✂" },
-      { path: "/sam-monitor", label: "SAM.gov Monitor", icon: "📡" },
-      { path: "/fpds-monitor", label: "FPDS Monitor", icon: "📈" },
     ],
   },
   {
-    label: "Analysis",
+    label: "Capture",
+    items: [
+      { path: "/capture", label: "Capture Plans", icon: "🎯" },
+      { path: "/proposals", label: "Proposals", icon: "📄" },
+      { path: "/rfp-shredder", label: "RFP Shredder", icon: "✂" },
+      { path: "/compliance", label: "Compliance", icon: "📋" },
+      { path: "/color-review", label: "Color Review", icon: "🎨" },
+    ],
+  },
+  {
+    label: "Intelligence",
     items: [
       { path: "/intel", label: "Intel Hub", icon: "🔍" },
-      { path: "/compliance", label: "Compliance", icon: "📋" },
-      { path: "/proposals", label: "Proposals", icon: "📄" },
-      { path: "/contacts", label: "Contacts", icon: "👤" },
-      { path: "/financial-bible", label: "Financials", icon: "💰" },
-      { path: "/reports", label: "Reports", icon: "📑" },
-      { path: "/knowledge", label: "Knowledge", icon: "📚" },
       { path: "/predictive", label: "Predictive", icon: "🧠" },
-      { path: "/color-review", label: "Color Review", icon: "🎨" },
       { path: "/anomaly", label: "Anomaly Detection", icon: "🔔" },
+      { path: "/contacts", label: "Contacts", icon: "👤" },
+      { path: "/knowledge", label: "Knowledge Base", icon: "📚" },
       { path: "/cpars", label: "CPARS Builder", icon: "📊" },
     ],
   },
   {
-    label: "Collaboration",
+    label: "Reporting",
     items: [
+      { path: "/financial-bible", label: "Financials", icon: "💰" },
+      { path: "/reports", label: "Reports", icon: "📑" },
       { path: "/discussions", label: "Discussions", icon: "💬" },
     ],
   },
   {
-    label: "Platform",
+    label: "Admin",
     items: [
-      { path: "/qa-center", label: "QA Center", icon: "🧪" },
-      { path: "/doctrine", label: "Doctrine", icon: "📖" },
-      { path: "/prompts", label: "Prompts", icon: "📝" },
-      { path: "/workflows", label: "Workflows", icon: "⚙" },
       { path: "/settings", label: "Settings", icon: "⚡" },
+      { path: "/qa-center", label: "Health", icon: "🧪" },
+      { path: "/workflows", label: "Workflows", icon: "⚙" },
       { path: "/admin/users", label: "Users", icon: "👥" },
       { path: "/admin/audit", label: "Audit Log", icon: "📜" },
+      { path: "/doctrine", label: "Doctrine", icon: "📖" },
+      { path: "/prompts", label: "Prompts", icon: "📝" },
     ],
   },
 ] as const;

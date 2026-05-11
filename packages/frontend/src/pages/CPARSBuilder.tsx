@@ -7,6 +7,7 @@ import {
   type CPARSSummaryData,
   type CPARSRecordRow,
 } from "../api/client";
+import InfoBadge from "../components/InfoBadge";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "#d97706",
@@ -40,14 +41,14 @@ function Pill({ label, color }: { label: string; color: string }) {
   );
 }
 
-function SummaryBox({ label, value, color, onClick }: { label: string; value: string | number; color?: string; onClick?: () => void }) {
+function SummaryBox({ label, value, color, onClick, info }: { label: string; value: string | number; color?: string; onClick?: () => void; info?: { whatItIs: string; whatItMeans: string; howCalculated?: string } }) {
   return (
     <div onClick={onClick} style={{
       padding: "12px 16px", background: "var(--color-surface)", borderRadius: 10,
       border: "1px solid var(--color-border)", textAlign: "center", minWidth: 100,
       cursor: onClick ? "pointer" : "default",
     }}>
-      <div style={{ fontSize: 10, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 10, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>{label}{info && <InfoBadge size={14} {...info} />}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: color ?? "var(--color-text)" }}>{value}</div>
     </div>
   );
@@ -92,14 +93,14 @@ export default function CPARSBuilder() {
       {/* Summary Strip */}
       {summary && (
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-          <SummaryBox label="Records" value={summary.total} />
-          <SummaryBox label="Finalized" value={summary.finalized} color="#16a34a" onClick={() => setStatusFilter(statusFilter === "finalized" ? null : "finalized")} />
+          <SummaryBox label="Records" value={summary.total} info={{ whatItIs: "Total CPARS/past performance records.", whatItMeans: "Your documented contract history for future proposals." }} />
+          <SummaryBox label="Finalized" value={summary.finalized} color="#16a34a" onClick={() => setStatusFilter(statusFilter === "finalized" ? null : "finalized")} info={{ whatItIs: "Records reviewed and approved.", whatItMeans: "Ready to cite in proposals." }} />
           <SummaryBox label="In Review" value={summary.in_review} color="#3b82f6" onClick={() => setStatusFilter(statusFilter === "in_review" ? null : "in_review")} />
           <SummaryBox label="Draft" value={summary.draft} color="#d97706" onClick={() => setStatusFilter(statusFilter === "draft" ? null : "draft")} />
           <SummaryBox label="Submitted" value={summary.submitted} color="#8b5cf6" onClick={() => setStatusFilter(statusFilter === "submitted" ? null : "submitted")} />
-          <SummaryBox label="Total Value" value={fmt$(summary.total_value)} />
-          <SummaryBox label="Exceptional" value={summary.exceptional} color="#16a34a" />
-          <SummaryBox label="AI Generated" value={summary.ai_generated} color="#6366f1" />
+          <SummaryBox label="Total Value" value={fmt$(summary.total_value)} info={{ whatItIs: "Combined value of all tracked contracts.", whatItMeans: "Your total contract portfolio size.", howCalculated: "Sum of contract_value across all CPARS records." }} />
+          <SummaryBox label="Exceptional" value={summary.exceptional} color="#16a34a" info={{ whatItIs: "Contracts rated Exceptional by the government.", whatItMeans: "Highest CPARS rating — strong differentiator in proposals." }} />
+          <SummaryBox label="AI Generated" value={summary.ai_generated} color="#6366f1" info={{ whatItIs: "Narratives drafted by AI from contract data.", whatItMeans: "Auto-generated first drafts — review and finalize before use." }} />
         </div>
       )}
 

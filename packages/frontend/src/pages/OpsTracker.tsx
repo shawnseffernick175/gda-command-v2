@@ -491,10 +491,26 @@ export default function OpsTracker() {
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                       title={opp.title}
                     >
                       {opp.title}
+                      {opp.data_source && opp.data_source !== "manual" && (
+                        <span style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "1px 5px",
+                          borderRadius: 4,
+                          flexShrink: 0,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          background: opp.data_source === "sam.gov" ? "rgba(14,165,233,0.15)" : opp.data_source === "fpds" ? "rgba(234,88,12,0.15)" : opp.data_source === "govwin" ? "rgba(168,85,247,0.15)" : "rgba(107,114,128,0.15)",
+                          color: opp.data_source === "sam.gov" ? "#0ea5e9" : opp.data_source === "fpds" ? "#ea580c" : opp.data_source === "govwin" ? "#a855f7" : "#6b7280",
+                        }}>{opp.data_source}</span>
+                      )}
                     </div>
                   </td>
                   <td

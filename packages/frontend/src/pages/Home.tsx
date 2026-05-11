@@ -671,7 +671,7 @@ const QUICK_ACCESS_CARDS = [
   { title: "Proposal Review", description: "Track proposals, evaluate volumes, red team findings, scorecards, and submission timelines.", to: "/proposals", statusColor: "#8b5cf6" },
   { title: "Contacts & Relationships", description: "Contact directory, relationship tracking, meeting notes, and teaming partner management.", to: "/contacts", statusColor: "#14b8a6" },
   { title: "Reporting & Export", description: "Generate reports, schedule automated delivery, and export data across all GDA modules.", to: "/reports", statusColor: "#f97316" },
-  { title: "Financial Bible", description: "Drill-down behind every KPI — Orders, Sales, EBIT, ROS, Backlog, Gross Profit.", to: "/financial-bible", statusColor: "#3b82f6" },
+  { title: "Financial Bible", description: "Drill-down behind every KPI — Orders, Sales, EBIT, Gross Profit, ROS, Funded Backlog, Contract Backlog.", to: "/financial-bible", statusColor: "#3b82f6" },
   { title: "Prompt Architect", description: "Versioned prompt library for capture, compliance, proposals, and research.", to: "/prompts", statusColor: "#8b5cf6" },
   { title: "Workflows", description: "Browse and manage all n8n automation workflows.", to: "/workflows", statusColor: "#06b6d4" },
   { title: "Settings", description: "System configuration, connectors, and feature flags.", to: "/settings", statusColor: "#6b7280" },
@@ -680,10 +680,8 @@ const QUICK_ACCESS_CARDS = [
   { title: "Predictive Analytics", description: "ML-powered Pwin models, Monte Carlo revenue forecasting, bid/no-bid optimizer, and win/loss pattern analysis.", to: "/predictive", statusColor: "#7c3aed" },
   { title: "Color Review", description: "AI-powered Pink, Red, and Gold team reviews — compliance checks, section scoring, go/no-go recommendations.", to: "/color-review", statusColor: "#ec4899" },
   { title: "Anomaly Detection", description: "Portfolio anomaly monitoring, competitor movement tracking, and smart deadline/risk escalation engine.", to: "/anomaly", statusColor: "#dc2626" },
-  { title: "SAM.gov Monitor", description: "Automated opportunity scanning from SAM.gov with AI relevance scoring, NAICS matching, and qualification workflows.", to: "/sam-monitor", statusColor: "#0ea5e9" },
   { title: "Discussions", description: "Threaded conversations on opportunities, captures, and proposals — centralized team collaboration.", to: "/discussions", statusColor: "#6366f1" },
   { title: "CPARS Builder", description: "Past performance narrative generation, rating tracking, and AI-powered CPARS draft authoring.", to: "/cpars", statusColor: "#f97316" },
-  { title: "FPDS Award Monitor", description: "Federal contract award tracking, competitor win alerts, and recompete opportunity identification.", to: "/fpds-monitor", statusColor: "#ea580c" },
 ];
 
 function QuickAccessSection() {
