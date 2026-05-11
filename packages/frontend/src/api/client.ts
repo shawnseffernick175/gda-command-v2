@@ -2303,11 +2303,50 @@ export function fetchColorReviews() {
   return request<ColorReviewData>("/color-review");
 }
 
-export function runColorReview(proposal_id: string, phase: string) {
-  return request<{ correlationId: string; proposal_id: string; phase: string; status: string; message: string }>("/color-review/run", {
+export interface ColorReviewRunResult {
+  reviewId: string;
+  proposal_id: string;
+  phase: string;
+  status: string;
+  proposal_title?: string;
+  overall_score?: number;
+  go_no_go?: string;
+  confidence?: number;
+  pass_rate?: number;
+  total_checks?: number;
+  passed_checks?: number;
+  failed_checks?: number;
+  warning_checks?: number;
+  summary?: string;
+  requirement_checks?: ColorReviewRequirementCheckRow[];
+  section_scores?: ColorReviewSectionScoreRow[];
+  gold_checks?: ColorReviewGoldCheckRow[];
+  cost_line_items?: ColorReviewCostLineItemRow[];
+  green_checks?: ColorReviewGreenCheckRow[];
+  format_checks?: ColorReviewFormatCheckRow[];
+  risk_factors?: string[];
+  file_id?: string;
+  message?: string;
+  ai?: { model: string; tokens: number };
+}
+
+export function runColorReviewWithFile(file: File, phase: string, proposalTitle?: string, agency?: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("phase", phase);
+  if (proposalTitle) formData.append("proposal_title", proposalTitle);
+  if (agency) formData.append("agency", agency);
+  return request<ColorReviewRunResult>("/color-review/run", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function runColorReviewWithText(proposalText: string, phase: string, proposalTitle?: string, agency?: string) {
+  return request<ColorReviewRunResult>("/color-review/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ proposal_id, phase }),
+    body: JSON.stringify({ proposal_text: proposalText, phase, proposal_title: proposalTitle, agency }),
   });
 }
 
