@@ -1,31 +1,65 @@
 /**
- * LLM Service — centralized OpenAI integration for GDA Command v2.
+ * LLM Service — dual-model AI integration for GDA Command v2.
+ *
+ * Models:
+ *   - "fast" → OpenAI GPT-4o  (scoring, briefings, structured output)
+ *   - "deep" → Anthropic Claude Sonnet  (RFP analysis, proposals, strategy)
  *
  * Features:
- *   - Single OpenAI client instance, lazy-initialized
- *   - Graceful fallback when OPENAI_API_KEY is not set
+ *   - Lazy-initialized clients for both providers
+ *   - Graceful fallback: deep → fast if ANTHROPIC_API_KEY not set
  *   - Typed helper for chat completions with system/user messages
  *   - Streaming support for real-time responses
  */
 
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 // ---------------------------------------------------------------------------
-// Client singleton
+// Model tiers
 // ---------------------------------------------------------------------------
 
-let _client: OpenAI | null = null;
+export type ModelTier = "fast" | "deep";
 
-function getClient(): OpenAI | null {
-  if (_client) return _client;
+const OPENAI_MODEL = "gpt-4o";
+const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+
+// ---------------------------------------------------------------------------
+// Client singletons
+// ---------------------------------------------------------------------------
+
+let _openaiClient: OpenAI | null = null;
+let _anthropicClient: Anthropic | null = null;
+
+function getOpenAIClient(): OpenAI | null {
+  if (_openaiClient) return _openaiClient;
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
-  _client = new OpenAI({ apiKey: key });
-  return _client;
+  _openaiClient = new OpenAI({ apiKey: key });
+  return _openaiClient;
+}
+
+function getAnthropicClient(): Anthropic | null {
+  if (_anthropicClient) return _anthropicClient;
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return null;
+  _anthropicClient = new Anthropic({ apiKey: key });
+  return _anthropicClient;
 }
 
 export function isLLMAvailable(): boolean {
-  return !!process.env.OPENAI_API_KEY;
+  return !!process.env.OPENAI_API_KEY || !!process.env.ANTHROPIC_API_KEY;
+}
+
+export function isDeepModelAvailable(): boolean {
+  return !!process.env.ANTHROPIC_API_KEY;
+}
+
+export function getAvailableModels(): { fast: boolean; deep: boolean } {
+  return {
+    fast: !!process.env.OPENAI_API_KEY,
+    deep: !!process.env.ANTHROPIC_API_KEY,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -40,16 +74,58 @@ export interface ChatMessage {
 export interface LLMResponse {
   content: string;
   model: string;
+  tier: ModelTier;
   usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
 
 // ---------------------------------------------------------------------------
-// Chat completion (non-streaming)
+// Anthropic chat completion
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MODEL = "gpt-4o";
+async function anthropicCompletion(
+  messages: ChatMessage[],
+  opts?: {
+    temperature?: number;
+    max_tokens?: number;
+  },
+): Promise<LLMResponse> {
+  const client = getAnthropicClient();
+  if (!client) {
+    throw new Error("ANTHROPIC_API_KEY not configured — deep model unavailable");
+  }
 
-export async function chatCompletion(
+  const systemMsg = messages.find((m) => m.role === "system");
+  const nonSystemMsgs = messages.filter((m) => m.role !== "system");
+
+  const response = await client.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: opts?.max_tokens ?? 4096,
+    temperature: opts?.temperature ?? 0.7,
+    ...(systemMsg ? { system: systemMsg.content } : {}),
+    messages: nonSystemMsgs.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })),
+  });
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  return {
+    content: textBlock?.text ?? "",
+    model: response.model,
+    tier: "deep",
+    usage: {
+      prompt_tokens: response.usage.input_tokens,
+      completion_tokens: response.usage.output_tokens,
+      total_tokens: response.usage.input_tokens + response.usage.output_tokens,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI chat completion
+// ---------------------------------------------------------------------------
+
+async function openaiCompletion(
   messages: ChatMessage[],
   opts?: {
     model?: string;
@@ -58,13 +134,13 @@ export async function chatCompletion(
     response_format?: { type: "json_object" | "text" };
   },
 ): Promise<LLMResponse> {
-  const client = getClient();
+  const client = getOpenAIClient();
   if (!client) {
-    throw new Error("OPENAI_API_KEY not configured — LLM calls unavailable");
+    throw new Error("OPENAI_API_KEY not configured — fast model unavailable");
   }
 
   const response = await client.chat.completions.create({
-    model: opts?.model ?? DEFAULT_MODEL,
+    model: opts?.model ?? OPENAI_MODEL,
     messages,
     temperature: opts?.temperature ?? 0.7,
     max_tokens: opts?.max_tokens ?? 2048,
@@ -75,6 +151,7 @@ export async function chatCompletion(
   return {
     content: choice?.message?.content ?? "",
     model: response.model,
+    tier: "fast",
     usage: {
       prompt_tokens: response.usage?.prompt_tokens ?? 0,
       completion_tokens: response.usage?.completion_tokens ?? 0,
@@ -84,7 +161,37 @@ export async function chatCompletion(
 }
 
 // ---------------------------------------------------------------------------
-// Streaming chat completion
+// Unified chat completion — pick tier, with fallback
+// ---------------------------------------------------------------------------
+
+export async function chatCompletion(
+  messages: ChatMessage[],
+  opts?: {
+    tier?: ModelTier;
+    model?: string;
+    temperature?: number;
+    max_tokens?: number;
+    response_format?: { type: "json_object" | "text" };
+  },
+): Promise<LLMResponse> {
+  const tier = opts?.tier ?? "fast";
+
+  if (tier === "deep" && getAnthropicClient()) {
+    return anthropicCompletion(messages, opts);
+  }
+
+  // Fallback: if deep requested but unavailable, use fast
+  if (tier === "deep" && !getAnthropicClient() && getOpenAIClient()) {
+    const result = await openaiCompletion(messages, opts);
+    result.tier = "fast"; // mark that we fell back
+    return result;
+  }
+
+  return openaiCompletion(messages, opts);
+}
+
+// ---------------------------------------------------------------------------
+// Streaming chat completion (OpenAI only — Claude streaming added later)
 // ---------------------------------------------------------------------------
 
 export async function* chatCompletionStream(
@@ -95,13 +202,13 @@ export async function* chatCompletionStream(
     max_tokens?: number;
   },
 ): AsyncGenerator<string> {
-  const client = getClient();
+  const client = getOpenAIClient();
   if (!client) {
-    throw new Error("OPENAI_API_KEY not configured — LLM calls unavailable");
+    throw new Error("OPENAI_API_KEY not configured — streaming unavailable");
   }
 
   const stream = await client.chat.completions.create({
-    model: opts?.model ?? DEFAULT_MODEL,
+    model: opts?.model ?? OPENAI_MODEL,
     messages,
     temperature: opts?.temperature ?? 0.7,
     max_tokens: opts?.max_tokens ?? 2048,

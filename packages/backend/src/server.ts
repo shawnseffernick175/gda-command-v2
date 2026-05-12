@@ -42,11 +42,12 @@ import bookOfTruthsRouter from "./routes/book-of-truths";
 import govwinRouter from "./routes/govwin";
 import riskRegisterRouter from "./routes/risk-register";
 import companyProfileRouter from "./routes/company-profile";
+import agentsRouter from "./routes/agents";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
 import { WEBHOOK_REGISTRY, getRegistrySummary } from "./lib/webhook-registry";
-import { isLLMAvailable } from "./lib/llm";
+import { isLLMAvailable, getAvailableModels } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
 import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
@@ -156,6 +157,7 @@ app.use("/api/book-of-truths", bookOfTruthsRouter);
 app.use("/api/govwin", govwinRouter);
 app.use("/api/risk-register", riskRegisterRouter);
 app.use("/api/company-profile", companyProfileRouter);
+app.use("/api/agents", agentsRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {
@@ -201,8 +203,9 @@ app.get("/health/detailed", async (_req, res) => {
       missing: api.missing,
     },
     {
-      name: "openai_llm",
+      name: "ai_models",
       status: isLLMAvailable() ? "configured" : "not_configured",
+      models: getAvailableModels(),
     },
   ];
 
