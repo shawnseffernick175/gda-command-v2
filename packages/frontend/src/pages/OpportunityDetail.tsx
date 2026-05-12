@@ -166,7 +166,7 @@ export default function OpportunityDetail() {
             background: STATUS_COLORS[opp.status] ?? "#6b7280",
           }}
         >
-          {opp.status.charAt(0).toUpperCase() + opp.status.slice(1)}
+          {({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}
         </span>
         <span style={{ fontSize: 18, fontWeight: 700, color: scoreColor(opp.score) }}>
           {opp.score}

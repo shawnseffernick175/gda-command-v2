@@ -23,209 +23,214 @@ const detailSeeds: Record<string, DetailSeed> = {
   "opp-001": {
     analysis: {
       executive_summary:
-        "USACE Environmental Remediation Services for the OU3 Site Cleanup at Fort Bragg represents a strong mid-tier opportunity ($24.5M) in Envision's core remediation practice. The solicitation is full and open with AECOM as the likely incumbent. Envision has relevant past performance on similar USACE remediation task orders and a competitive Pwin of 72%.",
+        "Army PEO IEW&S SETA Support for Next-Gen ISR Systems represents a strong opportunity ($28.5M) directly aligned with Envision's C4ISR SETA core practice. Booz Allen Hamilton is the likely incumbent. Envision has extensive past performance under PEO IEW&S and a presence at APG that provides a competitive edge.",
       strengths: [
-        "Direct alignment with Envision's environmental remediation core capability",
-        "Prior USACE work under FUDS program demonstrates relevant past performance",
-        "Fort Bragg location is within Envision's operational footprint",
-        "Score of 87.5 indicates strong quantitative alignment",
+        "Direct alignment with Envision's Army C4ISR and SETA core capability",
+        "Existing PEO IEW&S customer relationships and APG presence",
+        "NAICS 541512 is a primary Envision code with strong past performance",
+        "Score of 88.5 indicates strong quantitative alignment",
       ],
       risks: [
-        "AECOM is the incumbent with established site knowledge",
+        "Booz Allen Hamilton is the incumbent with deep ISR domain expertise",
         "Full and Open competition increases field size",
-        "OU3 sites may have complex contaminant profiles requiring specialized subcontractors",
+        "Next-gen ISR may require specialized clearances and niche technical SMEs",
       ],
       competitive_landscape:
-        "AECOM is the primary competitive threat as incumbent. Other likely bidders include Tetra Tech, Arcadis, and Parsons given the contract value and USACE customer. Small business teaming may be required for competitive scoring.",
+        "Booz Allen Hamilton is the primary competitive threat as incumbent. Other likely bidders include CACI, Leidos, and L3Harris given C4ISR focus. Envision's APG presence and PEO IEW&S past performance are key differentiators.",
       relevance_rationale:
-        "This opportunity scores 87.5 due to direct NAICS 562910 alignment, prior USACE remediation experience, geographic proximity, and contract value within Envision's sweet spot ($10M–$50M).",
+        "This opportunity scores 88.5 due to direct NAICS 541512 alignment, existing PEO IEW&S relationship, APG location, and contract value within Envision's sweet spot.",
       recommended_action:
-        "Pursue aggressively. Begin capture plan development, identify Fort Bragg site-specific SMEs, and schedule a pre-proposal meeting with the USACE contracting officer.",
-      confidence: 0.82,
-      last_analyzed_at: "2026-05-08T16:20:00Z",
+        "Begin qualification research. Identify ISR-specific SMEs, review Envision's PEO IEW&S past performance citations, and assess teaming strategy.",
+      confidence: 0.78,
+      last_analyzed_at: "2026-05-10T16:20:00Z",
       analyst_feedback: null,
       analysis_version: "gda-analysis-v2.1",
     },
     ooda: {
       observe: {
         summary:
-          "Key facts gathered from SAM.gov posting, USACE procurement history, and incumbent contract data.",
+          "Key facts gathered from GovWin intelligence, PEO IEW&S procurement history, and incumbent contract data.",
         items: [
-          { label: "Solicitation Number", value: "W912DY-26-R-0045", source_ids: ["src-001-a"] },
-          { label: "Contract Value", value: "$24.5M estimated", source_ids: ["src-001-a"] },
-          { label: "Incumbent", value: "AECOM — current OU3 remediation contractor", source_ids: ["src-001-b"] },
+          { label: "Contract Value", value: "$28.5M estimated", source_ids: ["src-001-a"] },
+          { label: "Incumbent", value: "Booz Allen Hamilton — current ISR SETA provider", source_ids: ["src-001-b"] },
           { label: "Set-Aside", value: "Full and Open Competition", source_ids: ["src-001-a"] },
-          { label: "NAICS", value: "562910 — Remediation Services", source_ids: ["src-001-a"] },
+          { label: "NAICS", value: "541512 — Computer Systems Design Services", source_ids: ["src-001-a"] },
+          { label: "Location", value: "Aberdeen Proving Ground, MD", source_ids: ["src-001-a"] },
         ],
       },
       orient: {
         summary:
-          "Envision is well-positioned but faces incumbent advantage. Key differentiator is FUDS past performance.",
+          "Envision is well-positioned with APG presence and PEO IEW&S experience, but faces strong incumbent.",
         items: [
-          { label: "Incumbent Advantage", value: "AECOM has 5+ years of site-specific knowledge at OU3", source_ids: ["src-001-b"], type: "risk" },
-          { label: "Past Performance Match", value: "Envision's FUDS Region 5 win demonstrates directly relevant experience", source_ids: ["src-001-c"], type: "strength" },
-          { label: "Price Competition", value: "Full and Open means price will be a significant evaluation factor", source_ids: ["src-001-a"], type: "inference" },
-          { label: "Geographic Proximity", value: "Fort Bragg is within Envision's Southeast operational footprint", source_ids: [], type: "strength" },
+          { label: "Incumbent Advantage", value: "BAH has deep ISR domain knowledge and existing cleared staff", source_ids: ["src-001-b"], type: "risk" },
+          { label: "Past Performance Match", value: "Envision's PEO IEW&S SETA work demonstrates directly relevant experience", source_ids: ["src-001-c"], type: "strength" },
+          { label: "APG Presence", value: "Envision has an established office at Aberdeen Proving Ground", source_ids: [], type: "strength" },
+          { label: "Competition", value: "Full and Open means price and technical volume equally weighted", source_ids: ["src-001-a"], type: "inference" },
         ],
       },
       decide: {
-        summary: "Three strategic options evaluated. Aggressive pursuit recommended.",
+        summary: "Three strategic options evaluated. Pursue as prime recommended.",
         options: [
-          { label: "Pursue as Prime", rationale: "Leverage FUDS past performance and competitive pricing to unseat AECOM. Higher risk but highest potential return.", recommended: true },
-          { label: "Pursue as Sub to SB", rationale: "Partner with a small business prime to improve scoring on socioeconomic factors. Reduces risk but limits fee.", recommended: false },
-          { label: "No-bid", rationale: "Strong incumbent and full competition may not justify capture investment. Not recommended given score and alignment.", recommended: false },
+          { label: "Pursue as Prime", rationale: "Leverage APG presence and PEO IEW&S past performance to compete directly. Strong alignment justifies investment.", recommended: true },
+          { label: "Team with Large Prime", rationale: "Partner with L3Harris or similar to strengthen ISR technical depth. Reduces risk but limits fee.", recommended: false },
+          { label: "No-bid", rationale: "Strong incumbent may be difficult to unseat. Not recommended given high score and direct alignment.", recommended: false },
         ],
       },
       act: {
-        summary: "Immediate actions to initiate capture sequence.",
+        summary: "Immediate actions to begin qualification research.",
         next_steps: [
-          { action: "Draft capture plan and assign capture manager", owner: "BD Lead", due_date: "2026-05-15", priority: "high" },
-          { action: "Schedule introductory meeting with USACE contracting officer", owner: "Capture Manager", due_date: "2026-05-20", priority: "high" },
-          { action: "Identify Fort Bragg site-specific SMEs and subcontractors", owner: "Technical Lead", due_date: "2026-05-25", priority: "medium" },
-          { action: "Begin competitive price analysis", owner: "Pricing Team", due_date: "2026-05-30", priority: "medium" },
+          { action: "Research PEO IEW&S procurement timeline and requirements", owner: "BD Lead", due_date: "2026-05-20", priority: "high" },
+          { action: "Identify cleared ISR SMEs for proposal team", owner: "Technical Director", due_date: "2026-05-25", priority: "high" },
+          { action: "Review Envision past performance citations for relevance", owner: "Capture Manager", due_date: "2026-05-22", priority: "medium" },
+          { action: "Assess teaming partners for ISR niche capabilities", owner: "BD Lead", due_date: "2026-06-01", priority: "medium" },
         ],
       },
     },
     sources: [
-      { id: "src-001-a", title: "SAM.gov Opportunity Listing — W912DY-26-R-0045", type: "sam_gov", url: "https://sam.gov/opp/example-001", publisher: "SAM.gov", published_at: "2026-04-15", retrieved_at: "2026-05-08T16:00:00Z", snippet: "Environmental Remediation Services for Operable Unit 3 at Fort Bragg, NC. Full and Open competition.", relevance_reason: "Primary solicitation source for opportunity details and requirements." },
-      { id: "src-001-b", title: "AECOM USACE Environmental Contract Award History", type: "contract_award", url: null, publisher: "FPDS.gov", published_at: "2024-09-15", retrieved_at: "2026-05-08T16:05:00Z", snippet: "AECOM awarded $18.2M for OU3 environmental remediation services at Fort Bragg under previous contract cycle.", relevance_reason: "Identifies incumbent and prior contract value for competitive analysis." },
-      { id: "src-001-c", title: "Envision FUDS Region 5 Task Order Award", type: "contract_award", url: null, publisher: "USACE", published_at: "2026-03-20", retrieved_at: "2026-05-08T16:10:00Z", snippet: "Envision Environmental awarded FUDS Region 5 task order for $18.5M covering multiple Midwest FUDS sites.", relevance_reason: "Demonstrates Envision's recent relevant past performance with USACE remediation programs." },
+      { id: "src-001-a", title: "GovWin IQ — PEO IEW&S SETA Opportunity Profile", type: "govwin", url: null, publisher: "GovWin IQ", published_at: "2026-04-28", retrieved_at: "2026-05-10T16:00:00Z", snippet: "PEO IEW&S seeking SETA support for next-generation ISR systems development and integration at Aberdeen Proving Ground.", relevance_reason: "Primary intelligence source for this opportunity." },
+      { id: "src-001-b", title: "FPDS — BAH PEO IEW&S SETA Contract History", type: "contract_award", url: null, publisher: "FPDS.gov", published_at: "2024-03-15", retrieved_at: "2026-05-10T16:15:00Z", snippet: "Booz Allen Hamilton awarded $24.8M SETA contract under PEO IEW&S for ISR systems support.", relevance_reason: "Identifies incumbent, prior contract value, and history." },
+      { id: "src-001-c", title: "Envision PEO IEW&S Past Performance", type: "internal", url: null, publisher: "Envision BD Database", published_at: "2025-12-01", retrieved_at: "2026-05-10T16:20:00Z", snippet: "Envision has supported PEO IEW&S under PM IS&A with SETA services since 2018.", relevance_reason: "Demonstrates directly relevant past performance." },
     ],
-    learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 3, coverage_gaps: ["No direct intel on AECOM's re-bid strategy", "Missing subcontractor availability data for Fort Bragg area"], next_review_at: "2026-05-20T00:00:00Z" },
+    learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 3, coverage_gaps: ["No draft RFP or SOW available yet"], next_review_at: "2026-05-25T00:00:00Z" },
   },
-
   "opp-004": {
     analysis: {
       executive_summary:
-        "The Air Force Tyndall AFB Rebuild is a major construction opportunity ($42M) following Hurricane Michael recovery. Jacobs Engineering is the incumbent. This is Envision's highest-scoring pipeline opportunity at 91.3 with an 81% Pwin, driven by strong alignment with the company's civil engineering and environmental restoration capabilities.",
+        "PEO C3T Mission Command Software Engineering represents Envision's highest-priority recompete ($35M). As the incumbent, Envision has deep Mission Command knowledge, established customer relationships, and proven delivery. Maintaining this contract is critical to Envision's Army C3T practice.",
       strengths: [
-        "Highest pipeline score (91.3) indicates exceptional alignment",
-        "Pwin of 81% reflects strong competitive position",
-        "Tyndall rebuild aligns with Envision's disaster recovery experience",
-        "Largest pipeline opportunity at $42M",
+        "Envision is the incumbent with proven delivery track record",
+        "Deep institutional knowledge of Mission Command systems",
+        "Established team of cleared engineers at APG",
+        "Score of 91.0 — highest in current pipeline",
       ],
       risks: [
-        "Jacobs Engineering has deep embedded presence at Tyndall",
-        "Construction-heavy scope may require significant subcontracting",
-        "Hurricane recovery projects have complex regulatory requirements",
+        "Recompete may attract aggressive pricing from competitors",
+        "Government may restructure requirements in follow-on",
+        "Competitor teaming could combine capabilities to challenge Envision",
       ],
       competitive_landscape:
-        "Jacobs Engineering is the primary competitor as incumbent. KBR and Fluor are also likely bidders given the contract scale. The rebuild program has been ongoing since 2019, giving established contractors significant institutional knowledge.",
+        "As a recompete, primary threats include CACI, Leidos, and Perspecta who have Mission Command adjacent experience. Envision's incumbency and past performance provide significant competitive advantage.",
       relevance_rationale:
-        "Score of 91.3 driven by NAICS 237990 alignment, prior disaster recovery experience, DoD construction past performance, and contract value within Envision's capability range.",
+        "Score of 91.0 reflects incumbent status, direct NAICS alignment (541511), established APG presence, and critical revenue significance.",
       recommended_action:
-        "Pursue with dedicated capture team. Tyndall is a priority pursuit given the score, value, and strategic importance of establishing Air Force construction presence.",
+        "Treat as must-win. Begin early capture planning, engage customer for feedback on current performance, and prepare competitive pricing strategy.",
       confidence: 0.88,
-      last_analyzed_at: "2026-05-06T11:30:00Z",
+      last_analyzed_at: "2026-05-08T11:30:00Z",
       analyst_feedback: null,
       analysis_version: "gda-analysis-v2.1",
     },
     ooda: {
       observe: {
-        summary: "Key facts from SAM.gov posting and Air Force civil engineering program data.",
+        summary:
+          "Key facts gathered from SAM.gov pre-solicitation notice and internal contract records.",
         items: [
-          { label: "Solicitation Number", value: "FA4819-26-R-0003", source_ids: ["src-004-a"] },
-          { label: "Contract Value", value: "$42M estimated", source_ids: ["src-004-a"] },
-          { label: "Incumbent", value: "Jacobs Engineering — current Tyndall rebuild contractor", source_ids: ["src-004-b"] },
-          { label: "NAICS", value: "237990 — Other Heavy & Civil Engineering Construction", source_ids: ["src-004-a"] },
+          { label: "Contract Value", value: "$35M estimated (recompete)", source_ids: ["src-004-a"] },
+          { label: "Incumbent", value: "Envision Innovative Solutions (current contractor)", source_ids: ["src-004-b"] },
+          { label: "Set-Aside", value: "Full and Open Competition", source_ids: ["src-004-a"] },
+          { label: "NAICS", value: "541511 — Custom Computer Programming", source_ids: ["src-004-a"] },
+          { label: "Current Period", value: "Option Year 3 — ends Q4 FY26", source_ids: ["src-004-b"] },
         ],
       },
       orient: {
-        summary: "High-value opportunity with strong alignment but significant incumbent barrier.",
+        summary:
+          "Strong incumbent position with excellent CPARS ratings. Key risk is competitor underbidding.",
         items: [
-          { label: "Rebuild Complexity", value: "Tyndall rebuild is a multi-year, multi-billion dollar program with complex phasing", source_ids: ["src-004-b"], type: "fact" },
-          { label: "Incumbent Depth", value: "Jacobs has been embedded at Tyndall since 2019 post-hurricane", source_ids: ["src-004-b"], type: "risk" },
-          { label: "Environmental Overlay", value: "Environmental monitoring and compliance requirements create an entry point for Envision's core expertise", source_ids: ["src-004-a"], type: "strength" },
+          { label: "Incumbent Strength", value: "Envision has Exceptional CPARS ratings on current contract", source_ids: ["src-004-b"], type: "strength" },
+          { label: "Team Continuity", value: "95% of current team expected to continue under recompete", source_ids: [], type: "strength" },
+          { label: "Pricing Pressure", value: "Competitors may undercut on price to unseat incumbent", source_ids: [], type: "risk" },
+          { label: "Requirements Shift", value: "Government may restructure into smaller task orders", source_ids: ["src-004-a"], type: "inference" },
         ],
       },
       decide: {
-        summary: "Recommended: pursue as prime with environmental differentiation strategy.",
+        summary: "Must-win recompete. Full capture investment recommended.",
         options: [
-          { label: "Pursue as Prime — Environmental Differentiation", rationale: "Lead with environmental expertise as differentiator against construction-focused competitors. Highest margin potential.", recommended: true },
-          { label: "Pursue as Sub to Construction Prime", rationale: "Team with a construction firm to handle civil engineering scope while Envision leads environmental. Lower risk, lower return.", recommended: false },
+          { label: "Full Capture Investment", rationale: "Leverage incumbency, CPARS, and team continuity. Invest in sharpened pricing and enhanced technical approach.", recommended: true },
+          { label: "Strategic Teaming", rationale: "Bring in a teaming partner to strengthen specific capability gaps. Could strengthen proposal but adds complexity.", recommended: false },
+          { label: "No-bid", rationale: "Not recommended — this is a must-win recompete with critical revenue implications.", recommended: false },
         ],
       },
       act: {
-        summary: "Priority actions for Tyndall capture.",
+        summary: "Early capture actions for must-win recompete.",
         next_steps: [
-          { action: "Assign dedicated capture manager for Tyndall pursuit", owner: "VP Business Development", due_date: "2026-05-12", priority: "high" },
-          { action: "Conduct site visit to Tyndall AFB", owner: "Capture Manager", due_date: "2026-05-20", priority: "high" },
-          { action: "Develop environmental differentiation strategy", owner: "Technical Director", due_date: "2026-05-18", priority: "high" },
+          { action: "Schedule customer feedback session with PEO C3T PM", owner: "Program Manager", due_date: "2026-05-18", priority: "high" },
+          { action: "Begin competitive price-to-win analysis", owner: "Pricing Team", due_date: "2026-05-25", priority: "high" },
+          { action: "Document past performance citations and CPARS", owner: "Capture Manager", due_date: "2026-05-20", priority: "high" },
+          { action: "Assess and lock key personnel commitments", owner: "HR / Program Manager", due_date: "2026-06-01", priority: "medium" },
         ],
       },
     },
     sources: [
-      { id: "src-004-a", title: "SAM.gov — FA4819-26-R-0003 Tyndall AFB Civil Engineering", type: "sam_gov", url: "https://sam.gov/opp/example-004", publisher: "SAM.gov", published_at: "2026-03-28", retrieved_at: "2026-05-06T11:00:00Z", snippet: "Civil Engineering Support for Tyndall Air Force Base rebuild and restoration program.", relevance_reason: "Primary solicitation listing for the Tyndall rebuild opportunity." },
-      { id: "src-004-b", title: "Tyndall AFB Rebuild Program Overview — Air Force Civil Engineer Center", type: "report", url: null, publisher: "AFCEC", published_at: "2025-12-01", retrieved_at: "2026-05-06T11:15:00Z", snippet: "The Tyndall rebuild program has invested $4.9B since Hurricane Michael. Current phase focuses on environmental restoration and infrastructure modernization.", relevance_reason: "Provides context on program scale, phasing, and incumbent contractor involvement." },
+      { id: "src-004-a", title: "SAM.gov — PEO C3T Mission Command Sources Sought", type: "sam_gov", url: "https://sam.gov/opp/example-004", publisher: "SAM.gov", published_at: "2026-04-15", retrieved_at: "2026-05-08T11:00:00Z", snippet: "Sources Sought for Mission Command Software Engineering Services at Aberdeen Proving Ground, MD.", relevance_reason: "Primary solicitation source for recompete opportunity." },
+      { id: "src-004-b", title: "Envision Current PEO C3T Contract Records", type: "internal", url: null, publisher: "Envision Contracts Database", published_at: "2026-01-15", retrieved_at: "2026-05-08T11:15:00Z", snippet: "Envision holds current Mission Command software engineering contract, Option Year 3 performance with Exceptional CPARS.", relevance_reason: "Documents incumbent status and performance history." },
     ],
-    learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 2, coverage_gaps: ["No direct pricing intelligence from previous Tyndall task orders"], next_review_at: "2026-05-15T00:00:00Z" },
+    learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 2, coverage_gaps: ["Draft SOW not yet released"], next_review_at: "2026-05-22T00:00:00Z" },
   },
-
-  "opp-010": {
+  "opp-006": {
     analysis: {
       executive_summary:
-        "NASA Kennedy Space Center Environmental Monitoring & Compliance is a $12.8M opportunity in Envision's environmental monitoring practice. Leidos is the incumbent. The opportunity has a solid Pwin of 68% and score of 82.7, with NASA's commitment to environmental compliance creating a stable long-term revenue base.",
+        "Air Force Hanscom Enterprise IT Network Modernization is a large ($42M) opportunity aligned with Envision's enterprise IT and network engineering capabilities. SAIC is the incumbent. Envision has existing Hanscom AFB work that provides customer access, but the contract size and SAIC's incumbency present challenges.",
       strengths: [
-        "Environmental monitoring is a core Envision capability",
-        "NASA facilities have stringent compliance requirements favoring experienced firms",
-        "Full and Open competition allows direct prime bidding",
-        "KSC location in Florida aligns with Envision's Southeast presence",
+        "Existing Hanscom AFB customer relationships",
+        "NAICS 541512 alignment with enterprise IT core capability",
+        "Envision's CMMI ML3 and ISO 9001:2015 certifications add credibility",
+        "Network modernization aligns with Envision's infrastructure practice",
       ],
       risks: [
-        "Leidos has established NASA relationships and security clearances",
-        "NASA procurement cycles can be lengthy and unpredictable",
-        "Lower value ($12.8M) relative to other pipeline opportunities",
+        "SAIC is a large, well-resourced incumbent",
+        "$42M value is above Envision's typical contract range",
+        "Air Force may favor large business prime for risk mitigation",
       ],
       competitive_landscape:
-        "Leidos is the primary competitor as incumbent. Jacobs, AECOM, and Tetra Tech are also likely bidders. NASA's preference for firms with existing Kennedy Space Center access may create a barrier.",
+        "SAIC has strong incumbency with dedicated Hanscom team. Other likely bidders include Leidos, Peraton, and ManTech. Envision could compete as prime or pursue subcontract role for specific modernization scope.",
       relevance_rationale:
-        "Score of 82.7 based on NAICS 541620 alignment, environmental monitoring expertise, and Florida operational presence. Slightly lower than other pipeline opportunities due to incumbent strength.",
+        "Score of 85.2 reflects Hanscom AFB presence, NAICS alignment, and network modernization capability match.",
       recommended_action:
-        "Pursue with targeted capture plan. Focus on demonstrating superior environmental monitoring technology and cost efficiency versus incumbent.",
-      confidence: 0.75,
-      last_analyzed_at: "2026-05-07T16:45:00Z",
+        "Assess feasibility of prime vs. subcontractor role. Begin customer engagement to understand modernization priorities and timeline.",
+      confidence: 0.65,
+      last_analyzed_at: "2026-05-09T08:20:00Z",
       analyst_feedback: null,
       analysis_version: "gda-analysis-v2.1",
     },
     ooda: {
       observe: {
-        summary: "Key facts from SAM.gov and NASA procurement history.",
+        summary: "Intelligence gathered from GovWin and Air Force procurement forecasts.",
         items: [
-          { label: "Solicitation Number", value: "80KSC024R0015", source_ids: ["src-010-a"] },
-          { label: "Contract Value", value: "$12.8M estimated", source_ids: ["src-010-a"] },
-          { label: "Incumbent", value: "Leidos — current KSC environmental monitoring contractor", source_ids: ["src-010-b"] },
-          { label: "Set-Aside", value: "Full and Open Competition", source_ids: ["src-010-a"] },
+          { label: "Contract Value", value: "$42M estimated", source_ids: ["src-006-a"] },
+          { label: "Incumbent", value: "SAIC — current enterprise IT provider", source_ids: ["src-006-b"] },
+          { label: "Set-Aside", value: "Full and Open Competition", source_ids: ["src-006-a"] },
+          { label: "Scope", value: "Network modernization including cloud migration and zero trust", source_ids: ["src-006-a"] },
         ],
       },
       orient: {
-        summary: "Solid opportunity with manageable incumbent risk and strong capability alignment.",
+        summary: "Envision has relevant capabilities but faces a formidable incumbent in SAIC.",
         items: [
-          { label: "NASA Compliance Standards", value: "KSC has some of the most stringent environmental monitoring requirements in the federal space", source_ids: ["src-010-a"], type: "fact" },
-          { label: "Incumbent Position", value: "Leidos has held the monitoring contract for 3 years with generally positive CPARs", source_ids: ["src-010-b"], type: "risk" },
-          { label: "Technology Advantage", value: "Envision's real-time monitoring platform could offer performance improvements over legacy systems", source_ids: [], type: "strength" },
+          { label: "Incumbent Scale", value: "SAIC has 200+ personnel on current Hanscom IT contract", source_ids: ["src-006-b"], type: "risk" },
+          { label: "Hanscom Presence", value: "Envision has existing work at Hanscom providing customer access", source_ids: [], type: "strength" },
+          { label: "Modernization Focus", value: "Zero trust and cloud migration align with Envision capabilities", source_ids: ["src-006-a"], type: "strength" },
         ],
       },
       decide: {
-        summary: "Recommended: pursue as prime with technology differentiation.",
+        summary: "Decision pending — prime vs. subcontractor strategy to be determined.",
         options: [
-          { label: "Pursue as Prime", rationale: "Lead with advanced monitoring technology and cost-competitive pricing. Best path to win.", recommended: true },
-          { label: "No-bid", rationale: "Lower value and strong incumbent make ROI uncertain. Not recommended given good alignment score.", recommended: false },
+          { label: "Pursue as Prime", rationale: "Leverage Hanscom presence and modernization expertise. High risk given SAIC incumbency but highest potential return.", recommended: false },
+          { label: "Pursue as Subcontractor", rationale: "Target specific modernization scope under alternative prime. Lower risk with guaranteed work share.", recommended: true },
+          { label: "No-bid", rationale: "SAIC incumbency and contract size may exceed Envision risk tolerance.", recommended: false },
         ],
       },
       act: {
-        summary: "Standard capture actions for NASA KSC pursuit.",
+        summary: "Research and customer engagement actions.",
         next_steps: [
-          { action: "Develop technology differentiation brief for NASA evaluation team", owner: "Technical Lead", due_date: "2026-05-20", priority: "high" },
-          { action: "Request NASA KSC site access for pre-proposal research", owner: "Capture Manager", due_date: "2026-05-25", priority: "medium" },
-          { action: "Prepare competitive pricing model", owner: "Pricing Team", due_date: "2026-06-01", priority: "medium" },
+          { action: "Meet with Hanscom AFB customer to understand priorities", owner: "BD Lead", due_date: "2026-05-25", priority: "high" },
+          { action: "Evaluate prime vs. sub strategy with leadership", owner: "VP of BD", due_date: "2026-06-01", priority: "high" },
+          { action: "Identify potential prime teaming partners", owner: "BD Lead", due_date: "2026-06-05", priority: "medium" },
         ],
       },
     },
     sources: [
-      { id: "src-010-a", title: "SAM.gov — 80KSC024R0015 KSC Environmental Monitoring", type: "sam_gov", url: "https://sam.gov/opp/example-010", publisher: "SAM.gov", published_at: "2026-04-01", retrieved_at: "2026-05-07T16:00:00Z", snippet: "Environmental Monitoring and Compliance Services for NASA Kennedy Space Center, FL.", relevance_reason: "Primary solicitation source for KSC environmental monitoring opportunity." },
-      { id: "src-010-b", title: "Leidos NASA Environmental Services Contract Award", type: "contract_award", url: null, publisher: "FPDS.gov", published_at: "2023-06-15", retrieved_at: "2026-05-07T16:15:00Z", snippet: "Leidos awarded $11.2M contract for environmental monitoring services at Kennedy Space Center.", relevance_reason: "Identifies incumbent, prior contract value, and contract history." },
+      { id: "src-006-a", title: "GovWin IQ — Hanscom Enterprise IT Modernization Profile", type: "govwin", url: null, publisher: "GovWin IQ", published_at: "2026-04-20", retrieved_at: "2026-05-09T08:00:00Z", snippet: "Air Force LCMC seeking enterprise IT modernization including zero trust architecture and cloud migration at Hanscom AFB.", relevance_reason: "Primary intelligence source for Hanscom IT opportunity." },
+      { id: "src-006-b", title: "FPDS — SAIC Hanscom IT Contract Award", type: "contract_award", url: null, publisher: "FPDS.gov", published_at: "2023-09-01", retrieved_at: "2026-05-09T08:10:00Z", snippet: "SAIC awarded $38.5M enterprise IT support contract at Hanscom AFB.", relevance_reason: "Identifies incumbent and prior contract baseline." },
     ],
-    learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 2, coverage_gaps: ["No NASA CPARS data available for incumbent evaluation"], next_review_at: "2026-05-22T00:00:00Z" },
+    learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 2, coverage_gaps: ["No RFI or draft SOW released yet", "SAIC staffing details unavailable"], next_review_at: "2026-06-01T00:00:00Z" },
   },
 };
 
@@ -242,20 +247,20 @@ function generateGenericDetail(opp: Opportunity): DetailSeed {
 
   return {
     analysis: {
-      executive_summary: `${opp.title} is a ${valueFmt} opportunity with ${opp.department ?? "a federal agency"}. Current status is ${opp.status} with a score of ${opp.score} and Pwin of ${pwinPct}. ${opp.incumbent ? `${opp.incumbent} is the known incumbent.` : "No incumbent has been identified."} Further analysis is recommended to develop a comprehensive capture strategy.`,
+      executive_summary: `${opp.title} is a ${valueFmt} opportunity with ${opp.department ?? "a federal agency"}. Current stage is Interest with a score of ${opp.score} and Pwin of ${pwinPct}. ${opp.incumbent ? `${opp.incumbent} is the known incumbent.` : "No incumbent has been identified."} Further analysis is recommended to develop a comprehensive capture strategy.`,
       strengths: [
         `Score of ${opp.score} indicates ${opp.score >= 80 ? "strong" : opp.score >= 60 ? "moderate" : "developing"} alignment`,
         opp.naics ? `NAICS ${opp.naics} aligns with Envision capabilities` : "Broad capability alignment identified",
       ],
       risks: [
         opp.incumbent ? `${opp.incumbent} is the established incumbent` : "Unknown incumbent creates uncertainty",
-        `${opp.status} status — additional qualification work may be needed`,
+        "Interest stage — additional qualification research needed before committing capture resources",
       ],
       competitive_landscape: opp.incumbent
         ? `${opp.incumbent} is the primary competitive threat as incumbent. Additional competitive intelligence is needed.`
         : "No competitive intelligence available for this opportunity.",
       relevance_rationale: `Score of ${opp.score} based on NAICS alignment, agency relationship potential, and estimated contract value.`,
-      recommended_action: `Continue ${opp.status === "discovery" ? "qualification research" : "capture development"} and gather additional competitive intelligence.`,
+      recommended_action: "Continue qualification research and gather additional competitive intelligence before advancing to Qualify stage.",
       confidence: null,
       last_analyzed_at: opp.updated_at,
       analyst_feedback: null,

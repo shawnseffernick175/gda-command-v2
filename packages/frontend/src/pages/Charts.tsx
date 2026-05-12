@@ -38,6 +38,14 @@ const STAGE_COLORS: Record<string, string> = {
 
 const STAGE_ORDER = ["discovery", "qualified", "pipeline", "proposal", "submitted", "won", "lost"];
 
+const STAGE_LABELS: Record<string, string> = {
+  discovery: "Interest",
+  qualified: "Qualify",
+  pipeline: "Pursue",
+  won: "Won",
+  lost: "Lost",
+};
+
 function fmtCurrency(v: number): string {
   if (v >= 1_000_000_000) return `$${(v / 1_000_000_000).toFixed(1)}B`;
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
@@ -126,8 +134,8 @@ function PipelineByPhase({ rows }: { rows: PipelineRow[] }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {stageData.map((d) => (
           <div key={d.stage} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 90, fontSize: 13, fontWeight: 600, color: STAGE_COLORS[d.stage] ?? "#6b7280", textTransform: "capitalize" }}>
-              {d.stage}
+            <div style={{ width: 90, fontSize: 13, fontWeight: 600, color: STAGE_COLORS[d.stage] ?? "#6b7280" }}>
+              {STAGE_LABELS[d.stage] ?? d.stage}
             </div>
             <div style={{ flex: 1, background: "#161b22", borderRadius: 6, height: 32, position: "relative", overflow: "hidden" }}>
               <div

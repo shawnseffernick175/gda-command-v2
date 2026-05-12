@@ -59,6 +59,17 @@ function statusToShipley(status: string): string {
   return map[status] ?? "interest";
 }
 
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    discovery: "Interest",
+    qualified: "Qualify",
+    pipeline: "Pursue",
+    won: "Won",
+    lost: "Lost",
+  };
+  return labels[status] ?? status;
+}
+
 export default function OpsTracker() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -319,7 +330,7 @@ export default function OpsTracker() {
           }}
         >
           <option value="">All statuses</option>
-          <option value="discovery">Discovery</option>
+          <option value="discovery">Interest</option>
           <option value="qualified">Qualified</option>
           <option value="pipeline">Pipeline</option>
           <option value="won">Won</option>
@@ -553,7 +564,7 @@ export default function OpsTracker() {
                         textTransform: "capitalize",
                       }}
                     >
-                      {opp.status}
+                      {statusLabel(opp.status)}
                     </span>
                   </td>
                   <td
@@ -719,7 +730,7 @@ export default function OpsTracker() {
               <strong>{qualifyTarget.title}</strong>
             </p>
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-text-muted)" }}>
-              Current status: <strong style={{ textTransform: "capitalize" }}>{qualifyTarget.status}</strong>
+              Current status: <strong>{statusLabel(qualifyTarget.status)}</strong>
               {" → "}
               <strong style={{ color: "#3b82f6" }}>Qualified</strong>
             </p>
