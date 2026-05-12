@@ -199,11 +199,19 @@ export default function OpportunityDetail() {
 
       {/* Section 2: Executive Summary */}
       <Section title="Executive Summary">
-        <p style={{ margin: 0, lineHeight: 1.6 }}>{analysis.executive_summary}</p>
-        {analysis.recommended_action && (
-          <div style={styles.recommendBox}>
-            <strong style={{ fontSize: 13, color: "#22c55e" }}>Recommended Action</strong>
-            <p style={{ margin: "4px 0 0" }}>{analysis.recommended_action}</p>
+        {analysis.executive_summary ? (
+          <>
+            <p style={{ margin: 0, lineHeight: 1.6 }}>{analysis.executive_summary}</p>
+            {analysis.recommended_action && (
+              <div style={styles.recommendBox}>
+                <strong style={{ fontSize: 13, color: "#22c55e" }}>Recommended Action</strong>
+                <p style={{ margin: "4px 0 0" }}>{analysis.recommended_action}</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ padding: "12px 16px", borderRadius: 8, background: "rgba(245,158,11,0.08)", color: "#f59e0b", fontSize: 13 }}>
+            AI analysis has not been generated for this opportunity yet. Analysis includes executive summary, competitive landscape, strengths, risks, and recommended actions.
           </div>
         )}
       </Section>
