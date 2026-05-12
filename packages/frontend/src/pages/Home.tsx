@@ -405,6 +405,7 @@ export default function Home() {
 // ---------------------------------------------------------------------------
 
 function KPISection({ kpis }: { kpis: DashboardKPIs }) {
+  const navigate = useNavigate();
   return (
     <div className="kpi-grid" style={{
       display: "grid",
@@ -414,6 +415,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
       <KPICard
         label="Total Opportunities"
         value={String(kpis.totalOpportunities)}
+        onClick={() => navigate("/ops-tracker")}
         info={{
           whatItIs: "Count of all tracked opportunities (Interest + Qualify status).",
           whatItMeans: "Total number of potential contracts being evaluated or actively pursued.",
@@ -422,14 +424,14 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
       />
       {kpis.n8nKpis ? (
         <>
-          <KPICard label="Weighted Pipeline" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" info={{
+          <KPICard label="Weighted Pipeline" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" onClick={() => navigate("/pipeline")} info={{
             whatItIs: "Pipeline value weighted by probability of win.",
             whatItMeans: "Risk-adjusted revenue forecast from your active pipeline.",
             howCalculated: "Sum of (contract value × Pwin) for all Qualified and Pipeline opportunities.",
           }} />
-          <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" />
-          <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" />
-          <KPICard label="Monitor" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" />
+          <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" onClick={() => navigate("/ops-tracker?status=pipeline")} />
+          <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" onClick={() => navigate("/ops-tracker")} />
+          <KPICard label="Monitor" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" onClick={() => navigate("/ops-tracker")} />
         </>
       ) : (
         <>
@@ -437,6 +439,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             label="Pipeline Value"
             value={formatCurrency(kpis.totalPipelineValue)}
             accent="#8b5cf6"
+            onClick={() => navigate("/pipeline")}
             info={{
               whatItIs: "Total estimated value of approved pipeline opportunities.",
               whatItMeans: "The dollar amount of contracts you are actively pursuing (Qualified + Pipeline status only).",
@@ -446,6 +449,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
           <KPICard
             label="Avg Pwin"
             value={formatPwin(kpis.avgPwin)}
+            onClick={() => navigate("/predictive")}
             info={{
               whatItIs: "Average probability of win across all tracked opportunities.",
               whatItMeans: "Higher Pwin means stronger competitive position. Below 40% suggests heavy competition or weak positioning.",
@@ -455,6 +459,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
           <KPICard
             label="Avg Score"
             value={kpis.avgScore.toFixed(1)}
+            onClick={() => navigate("/ops-tracker")}
             info={{
               whatItIs: "Average opportunity quality score across all tracked opportunities.",
               whatItMeans: "Measures overall opportunity attractiveness. Above 70 is strong, 50-70 is moderate, below 50 needs review.",
@@ -469,15 +474,12 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
 
 function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
   const navigate = useNavigate();
-  const clickableRow = (oppId: string | undefined): React.CSSProperties => ({
+  const clickableRow = (target: string | undefined): React.CSSProperties => ({
     padding: "8px 0",
-    cursor: oppId ? "pointer" : "default",
+    cursor: target ? "pointer" : "default",
     borderRadius: 4,
     transition: "background 0.15s",
   });
-  const goToOpp = (oppId: string | undefined) => {
-    if (oppId) navigate(`/opportunities/${oppId}`, { state: { from: "/" } });
-  };
 
   return (
     <div className="signal-grid" style={{
@@ -489,7 +491,13 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
       <SignalCard title="Accelerators" icon="⚡" count={signals.accelerators.length} accentColor="#f59e0b"
         info={{ whatItIs: "Fast-track signals requiring immediate attention.", whatItMeans: "These opportunities have time-sensitive windows — act now or miss the chance.", howCalculated: "Flagged when RFP response windows are < 14 days, incumbent contracts are expiring, or draft RFPs are posted." }}>
         {signals.accelerators.map((ft, i) => (
-          <div key={i} style={{ ...clickableRow(undefined), borderBottom: i < signals.accelerators.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+          <div
+            key={i}
+            style={{ ...clickableRow("search"), borderBottom: i < signals.accelerators.length - 1 ? "1px solid var(--color-border)" : "none" }}
+            onClick={() => navigate(`/ops-tracker?search=${encodeURIComponent(ft.opportunity_title.replace(/^\[(PDF|XLS|DOC)\]\s*/i, "").slice(0, 40))}`)}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+          >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{
                 width: 6, height: 6, borderRadius: "50%",
@@ -509,9 +517,9 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
         {signals.activeRisks.slice(0, 4).map((risk, i) => (
           <div
             key={i}
-            style={{ ...clickableRow(risk.opportunity_id), borderBottom: i < Math.min(signals.activeRisks.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
-            onClick={() => goToOpp(risk.opportunity_id)}
-            onMouseEnter={(e) => { if (risk.opportunity_id) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+            style={{ ...clickableRow("risk"), borderBottom: i < Math.min(signals.activeRisks.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
+            onClick={() => navigate("/risk-register")}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
@@ -541,9 +549,9 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
         {signals.upcomingDecisions.slice(0, 4).map((dec, i) => (
           <div
             key={i}
-            style={{ ...clickableRow(dec.opportunity_id), borderBottom: i < Math.min(signals.upcomingDecisions.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
-            onClick={() => goToOpp(dec.opportunity_id)}
-            onMouseEnter={(e) => { if (dec.opportunity_id) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+            style={{ ...clickableRow("decision"), borderBottom: i < Math.min(signals.upcomingDecisions.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
+            onClick={() => navigate("/capture")}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{dec.opportunity_title}</div>
@@ -584,9 +592,9 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
         {signals.dueSoonItems.slice(0, 4).map((item, i) => (
           <div
             key={i}
-            style={{ ...clickableRow(item.opportunity_id), borderBottom: i < Math.min(signals.dueSoonItems.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
-            onClick={() => goToOpp(item.opportunity_id)}
-            onMouseEnter={(e) => { if (item.opportunity_id) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
+            style={{ ...clickableRow("due-soon"), borderBottom: i < Math.min(signals.dueSoonItems.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
+            onClick={() => navigate("/capture")}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
@@ -718,19 +726,28 @@ function KPICard({
   value,
   accent,
   info,
+  onClick,
 }: {
   label: string;
   value: string;
   accent?: string;
   info?: { whatItIs: string; whatItMeans: string; howCalculated?: string };
+  onClick?: () => void;
 }) {
   return (
-    <div style={{
-      background: "var(--color-surface)",
-      border: "1px solid var(--color-border)",
-      borderRadius: 8,
-      padding: "16px 20px",
-    }}>
+    <div
+      style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        padding: "16px 20px",
+        cursor: onClick ? "pointer" : "default",
+        transition: "border-color 0.15s, transform 0.1s",
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => { if (onClick) { (e.currentTarget as HTMLElement).style.borderColor = accent ?? "var(--color-primary)"; (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)"; } }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "var(--color-border)"; (e.currentTarget as HTMLElement).style.transform = "none"; }}
+    >
       <div style={{
         fontSize: 12,
         fontWeight: 600,
