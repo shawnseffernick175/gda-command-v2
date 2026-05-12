@@ -120,45 +120,45 @@ export const MOCK_FINANCIAL_KPIS: FinancialKPI[] = [
 
 export const MOCK_FINANCIAL_LINE_ITEMS: FinancialLineItem[] = [
   // Orders
-  { id: "fin-001", kpi_key: "orders", label: "USACE FUDS IDIQ Task Order 3", amount: 12_400_000, category: "Task Order", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Environmental remediation — Fort Ord" },
-  { id: "fin-002", kpi_key: "orders", label: "EPA Superfund RI/FS", amount: 8_500_000, category: "New Award", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Remedial investigation at Portland Harbor" },
-  { id: "fin-003", kpi_key: "orders", label: "Air Force Tyndall MILCON", amount: 14_200_000, category: "Modification", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "Hurricane recovery infrastructure rebuild" },
-  { id: "fin-004", kpi_key: "orders", label: "DOE Oak Ridge D&D", amount: 5_200_000, category: "Option Exercise", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Decontamination & decommissioning — K-25" },
-  { id: "fin-005", kpi_key: "orders", label: "NASA KSC Environmental", amount: 2_200_000, category: "Task Order", contract_id: "80KSC023CA006", period: CURRENT_PERIOD, notes: "Launch pad environmental compliance" },
+  { id: "fin-001", kpi_key: "orders", label: "PEO IEW&S SETA IDIQ Task Order 3", amount: 12_400_000, category: "Task Order", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Defense IT systems engineering — Fort Ord" },
+  { id: "fin-002", kpi_key: "orders", label: "DISA SETA RI/FS", amount: 8_500_000, category: "New Award", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Remedial investigation at Portland Harbor" },
+  { id: "fin-003", kpi_key: "orders", label: "DEVCOM C5ISR MILCON", amount: 14_200_000, category: "Modification", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "Hurricane recovery infrastructure rebuild" },
+  { id: "fin-004", kpi_key: "orders", label: "Army CECOM D&D", amount: 5_200_000, category: "Option Exercise", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Devulnerability & decommissioning — K-25" },
+  { id: "fin-005", kpi_key: "orders", label: "Hanscom AFB Defense IT", amount: 2_200_000, category: "Task Order", contract_id: "80KSC023CA006", period: CURRENT_PERIOD, notes: "Launch pad cyber compliance" },
 
   // Sales
-  { id: "fin-006", kpi_key: "sales", label: "USACE FUDS — Fort Ord Execution", amount: 9_800_000, category: "Contract Revenue", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Revenue recognized on milestone deliverables" },
-  { id: "fin-007", kpi_key: "sales", label: "EPA Superfund — Portland Harbor", amount: 6_200_000, category: "Contract Revenue", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Phase 1 field investigation complete" },
-  { id: "fin-008", kpi_key: "sales", label: "Air Force Tyndall — Design Phase", amount: 8_400_000, category: "Contract Revenue", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "65% design review approved" },
-  { id: "fin-009", kpi_key: "sales", label: "DOE Oak Ridge — Demolition", amount: 4_600_000, category: "Contract Revenue", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Building 9204-4 demolition on schedule" },
+  { id: "fin-006", kpi_key: "sales", label: "PEO IEW&S SETA — Fort Ord Execution", amount: 9_800_000, category: "Contract Revenue", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Revenue recognized on milestone deliverables" },
+  { id: "fin-007", kpi_key: "sales", label: "DISA SETA — Portland Harbor", amount: 6_200_000, category: "Contract Revenue", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Phase 1 field investigation complete" },
+  { id: "fin-008", kpi_key: "sales", label: "DEVCOM C5ISR — Design Phase", amount: 8_400_000, category: "Contract Revenue", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "65% design review approved" },
+  { id: "fin-009", kpi_key: "sales", label: "Army CECOM — Demolition", amount: 4_600_000, category: "Contract Revenue", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Building 9204-4 demolition on schedule" },
   { id: "fin-010", kpi_key: "sales", label: "Navy NAVFAC — Guam Relocation", amount: 2_800_000, category: "Contract Revenue", contract_id: "N62742-23-D-1234", period: CURRENT_PERIOD, notes: "Site preparation phase" },
 
   // EBIT
-  { id: "fin-011", kpi_key: "ebit", label: "USACE FUDS Program", amount: 1_470_000, category: "Program Margin", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "15% margin on $9.8M revenue" },
-  { id: "fin-012", kpi_key: "ebit", label: "EPA Superfund Program", amount: 930_000, category: "Program Margin", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "15% margin on $6.2M revenue" },
-  { id: "fin-013", kpi_key: "ebit", label: "Air Force Tyndall Program", amount: 1_260_000, category: "Program Margin", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "15% margin on $8.4M revenue" },
-  { id: "fin-014", kpi_key: "ebit", label: "DOE Oak Ridge Program", amount: 690_000, category: "Program Margin", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "15% margin on $4.6M revenue" },
+  { id: "fin-011", kpi_key: "ebit", label: "PEO IEW&S SETA Program", amount: 1_470_000, category: "Program Margin", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "15% margin on $9.8M revenue" },
+  { id: "fin-012", kpi_key: "ebit", label: "DISA SETA Program", amount: 930_000, category: "Program Margin", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "15% margin on $6.2M revenue" },
+  { id: "fin-013", kpi_key: "ebit", label: "DEVCOM C5ISR Program", amount: 1_260_000, category: "Program Margin", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "15% margin on $8.4M revenue" },
+  { id: "fin-014", kpi_key: "ebit", label: "Army CECOM Program", amount: 690_000, category: "Program Margin", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "15% margin on $4.6M revenue" },
   { id: "fin-015", kpi_key: "ebit", label: "G&A / Overhead Absorption", amount: 420_000, category: "Overhead", contract_id: null, period: CURRENT_PERIOD, notes: "Favorable overhead rate variance" },
 
   // Funded Backlog
-  { id: "fin-016", kpi_key: "funded_backlog", label: "USACE FUDS — Remaining Funded", amount: 22_600_000, category: "Funded CLINs", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Task orders 1-3 remaining funded value" },
-  { id: "fin-017", kpi_key: "funded_backlog", label: "Air Force Tyndall — Remaining", amount: 19_800_000, category: "Funded CLINs", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "Construction phase funding obligated" },
-  { id: "fin-018", kpi_key: "funded_backlog", label: "EPA Superfund — Remaining", amount: 12_400_000, category: "Funded CLINs", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Phase 2 feasibility study funded" },
-  { id: "fin-019", kpi_key: "funded_backlog", label: "DOE Oak Ridge — Remaining", amount: 8_200_000, category: "Funded CLINs", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Option year 2 exercised and funded" },
+  { id: "fin-016", kpi_key: "funded_backlog", label: "PEO IEW&S SETA — Remaining Funded", amount: 22_600_000, category: "Funded CLINs", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Task orders 1-3 remaining funded value" },
+  { id: "fin-017", kpi_key: "funded_backlog", label: "DEVCOM C5ISR — Remaining", amount: 19_800_000, category: "Funded CLINs", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "Construction phase funding obligated" },
+  { id: "fin-018", kpi_key: "funded_backlog", label: "DISA SETA — Remaining", amount: 12_400_000, category: "Funded CLINs", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Phase 2 feasibility study funded" },
+  { id: "fin-019", kpi_key: "funded_backlog", label: "Army CECOM — Remaining", amount: 8_200_000, category: "Funded CLINs", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Option year 2 exercised and funded" },
   { id: "fin-020", kpi_key: "funded_backlog", label: "Other Active Contracts", amount: 5_400_000, category: "Funded CLINs", contract_id: null, period: CURRENT_PERIOD, notes: "Smaller task orders and support contracts" },
 
   // Backlog (total = funded + unfunded)
-  { id: "fin-021", kpi_key: "backlog", label: "USACE FUDS — Total Remaining", amount: 45_200_000, category: "Total Contract Value", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Includes unfunded option years 3-5" },
-  { id: "fin-022", kpi_key: "backlog", label: "Air Force Tyndall — Total", amount: 33_600_000, category: "Total Contract Value", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "Includes construction + commissioning phases" },
-  { id: "fin-023", kpi_key: "backlog", label: "EPA Superfund — Total", amount: 18_500_000, category: "Total Contract Value", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Includes unfunded remedial design phase" },
-  { id: "fin-024", kpi_key: "backlog", label: "DOE Oak Ridge — Total", amount: 15_200_000, category: "Total Contract Value", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Includes option years 3-4" },
-  { id: "fin-025", kpi_key: "backlog", label: "Other Contracts — Total", amount: 12_100_000, category: "Total Contract Value", contract_id: null, period: CURRENT_PERIOD, notes: "Navy NAVFAC, NASA KSC, smaller contracts" },
+  { id: "fin-021", kpi_key: "backlog", label: "PEO IEW&S SETA — Total Remaining", amount: 45_200_000, category: "Total Contract Value", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "Includes unfunded option years 3-5" },
+  { id: "fin-022", kpi_key: "backlog", label: "DEVCOM C5ISR — Total", amount: 33_600_000, category: "Total Contract Value", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "Includes construction + commissioning phases" },
+  { id: "fin-023", kpi_key: "backlog", label: "DISA SETA — Total", amount: 18_500_000, category: "Total Contract Value", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "Includes unfunded remedial design phase" },
+  { id: "fin-024", kpi_key: "backlog", label: "Army CECOM — Total", amount: 15_200_000, category: "Total Contract Value", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "Includes option years 3-4" },
+  { id: "fin-025", kpi_key: "backlog", label: "Other Contracts — Total", amount: 12_100_000, category: "Total Contract Value", contract_id: null, period: CURRENT_PERIOD, notes: "Navy NAVFAC, Hanscom AFB, smaller contracts" },
 
   // Gross Profit
-  { id: "fin-026", kpi_key: "gross_profit", label: "USACE FUDS — Gross Margin", amount: 2_940_000, category: "Direct Margin", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "30% gross margin on $9.8M revenue" },
-  { id: "fin-027", kpi_key: "gross_profit", label: "Air Force Tyndall — Gross Margin", amount: 2_520_000, category: "Direct Margin", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "30% gross margin on $8.4M revenue" },
-  { id: "fin-028", kpi_key: "gross_profit", label: "EPA Superfund — Gross Margin", amount: 1_860_000, category: "Direct Margin", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "30% gross margin on $6.2M revenue" },
-  { id: "fin-029", kpi_key: "gross_profit", label: "DOE Oak Ridge — Gross Margin", amount: 1_380_000, category: "Direct Margin", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "30% gross margin on $4.6M revenue" },
+  { id: "fin-026", kpi_key: "gross_profit", label: "PEO IEW&S SETA — Gross Margin", amount: 2_940_000, category: "Direct Margin", contract_id: "W912DY-22-D-0042", period: CURRENT_PERIOD, notes: "30% gross margin on $9.8M revenue" },
+  { id: "fin-027", kpi_key: "gross_profit", label: "DEVCOM C5ISR — Gross Margin", amount: 2_520_000, category: "Direct Margin", contract_id: "FA4819-23-C-0008", period: CURRENT_PERIOD, notes: "30% gross margin on $8.4M revenue" },
+  { id: "fin-028", kpi_key: "gross_profit", label: "DISA SETA — Gross Margin", amount: 1_860_000, category: "Direct Margin", contract_id: "68HE0523F0041", period: CURRENT_PERIOD, notes: "30% gross margin on $6.2M revenue" },
+  { id: "fin-029", kpi_key: "gross_profit", label: "Army CECOM — Gross Margin", amount: 1_380_000, category: "Direct Margin", contract_id: "DE-EM0005106", period: CURRENT_PERIOD, notes: "30% gross margin on $4.6M revenue" },
   { id: "fin-030", kpi_key: "gross_profit", label: "Other Programs — Gross Margin", amount: 840_000, category: "Direct Margin", contract_id: null, period: CURRENT_PERIOD, notes: "Combined smaller programs" },
 ];
 

@@ -343,7 +343,7 @@ export default function RFPShredder() {
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>Solicitation Title *</label>
                 <input value={shredTitle} onChange={(e) => setShredTitle(e.target.value)}
-                  placeholder="e.g., USACE Environmental Services IDIQ"
+                  placeholder="e.g., Army SETA Support Services IDIQ"
                   style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4, boxSizing: "border-box" }} />
               </div>
               <div>
@@ -673,8 +673,8 @@ function RequirementsTab({
         <select value={jobFilter} onChange={(e) => onJobFilter(e.target.value)}
           style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)" }}>
           <option value="">All Jobs</option>
-          <option value="SJ-001">SJ-001: USACE FUDS</option>
-          <option value="SJ-002">SJ-002: Tyndall AFB</option>
+          <option value="SJ-001">SJ-001: PEO IEW&S SETA</option>
+          <option value="SJ-002">SJ-002: DEVCOM C5ISR</option>
         </select>
         <select value={typeFilter} onChange={(e) => onTypeFilter(e.target.value)}
           style={{ padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)" }}>

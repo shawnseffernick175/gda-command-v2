@@ -507,7 +507,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Tags (comma-separated)</label>
               <input
                 type="text"
-                placeholder="USACE, environmental, remediation"
+                placeholder="Army, SETA, cybersecurity"
                 value={tagsInput}
                 onChange={(e) => setTagsInput(e.target.value)}
                 style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13, boxSizing: "border-box" }}
@@ -628,7 +628,7 @@ function SearchTab() {
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         <input
           type="text"
-          placeholder="Search your knowledge base... (e.g., 'PFAS remediation past performance')"
+          placeholder="Search your knowledge base... (e.g., 'Army SETA past performance')"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -927,7 +927,7 @@ function ChatTab() {
                 Ask questions about your past performance, proposals, compliance records, and capture plans.
               </div>
               <div style={{ fontSize: 12, marginTop: 12, color: "var(--color-text-muted)" }}>
-                Try: "What past performance do we have for PFAS remediation work?"
+                Try: "What past performance do we have for Army SETA work?"
               </div>
               <div style={{ fontSize: 11, marginTop: 4, color: "var(--color-text-muted)" }}>
                 Powered by n8n (GDA.api.agentic-chat + GDA.api.rag-query)

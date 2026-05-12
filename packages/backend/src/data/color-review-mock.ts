@@ -1,11 +1,11 @@
 import type { ColorReview } from "@gda/shared";
 
 export const MOCK_COLOR_REVIEWS: ColorReview[] = [
-  // ─── PROP-001: USACE FUDS — Pink Team (completed) ─────────────────────
+  // ─── PROP-001: PEO IEW&S SETA — Pink Team (completed) ─────────────────────
   {
     id: "CR-001",
     proposal_id: "PROP-001",
-    proposal_title: "USACE FUDS IDIQ Environmental Remediation — Technical & Cost Volume",
+    proposal_title: "Army PEO IEW&S SETA Support Services — Technical & Cost Volume",
     agency: "US Army Corps of Engineers",
     phase: "pink",
     status: "completed",
@@ -19,17 +19,17 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     failed_checks: 3,
     warning_checks: 2,
     reviewer: "AI Pink Team Engine",
-    summary: "Overall compliance is strong at 85%. Three mandatory requirements lack corresponding responses — primarily in the environmental monitoring and reporting sections. Two warnings on page limit proximity (Technical Vol at 44/45 pages).",
+    summary: "Overall compliance is strong at 85%. Three mandatory requirements lack corresponding responses — primarily in the cybersecurity monitoring and reporting sections. Two warnings on page limit proximity (Technical Vol at 44/45 pages).",
     go_no_go: null,
     confidence: null,
     requirement_checks: [
       { id: "PC-001-01", requirement_id: "REQ-L-001", requirement_text: "Offeror SHALL provide a detailed transition plan within 30 calendar days of award", source_reference: "SOW C.5.1", verdict: "fail", response_location: null, gap_detail: "No transition plan section found in Technical Volume. SOW C.5.1 requires detailed 30-day transition with staffing ramp-up.", suggestion: "Add Section 3.2 — Transition Plan addressing 30-day assumption of responsibility, staffing ramp-up milestones, and predecessor coordination." },
-      { id: "PC-001-02", requirement_id: "REQ-L-002", requirement_text: "Technical approach SHALL include PFAS remediation methodology per latest EPA guidance", source_reference: "SOW C.2.3", verdict: "pass", response_location: "Tech Vol Section 2.1, pp. 8-12", gap_detail: null, suggestion: null },
-      { id: "PC-001-03", requirement_id: "REQ-L-003", requirement_text: "Offeror SHALL demonstrate ISO 14001 Environmental Management System certification", source_reference: "SOW C.3.7", verdict: "warning", response_location: "Mgmt Vol Section 2.4, p. 18", gap_detail: "ISO 14001 mentioned but not explicitly cited as certified. Section references EMS framework without stating current certification status.", suggestion: "Add ISO 14001 certification number and expiration date. Include copy of certificate as an attachment." },
+      { id: "PC-001-02", requirement_id: "REQ-L-002", requirement_text: "Technical approach SHALL include C5ISR systems engineering methodology per latest DISA guidance", source_reference: "SOW C.2.3", verdict: "pass", response_location: "Tech Vol Section 2.1, pp. 8-12", gap_detail: null, suggestion: null },
+      { id: "PC-001-03", requirement_id: "REQ-L-003", requirement_text: "Offeror SHALL demonstrate CMMI Level 3 maturity model appraisal", source_reference: "SOW C.3.7", verdict: "warning", response_location: "Mgmt Vol Section 2.4, p. 18", gap_detail: "CMMI Level 3 referenced but not explicitly stated as appraised. Section discusses process maturity without citing current appraisal status.", suggestion: "Add CMMI Level 3 appraisal ID and expiration date. Include copy of appraisal results as an attachment." },
       { id: "PC-001-04", requirement_id: "REQ-L-004", requirement_text: "Cost volume SHALL include basis of estimate for all proposed labor categories", source_reference: "Section L.5.2", verdict: "pass", response_location: "Cost Vol Tab 2, pp. 3-8", gap_detail: null, suggestion: null },
-      { id: "PC-001-05", requirement_id: "REQ-L-005", requirement_text: "Past performance references SHALL include CPARS ratings for all cited contracts", source_reference: "Section L.4.1", verdict: "warning", response_location: "PP Vol Section 1-3", gap_detail: "EPA Superfund reference states 'Exceptional' without specifying CPARS rating period or individual elements.", suggestion: "Add specific CPARS rating period (e.g., FY23) and individual element ratings (Quality, Schedule, Cost, Management)." },
+      { id: "PC-001-05", requirement_id: "REQ-L-005", requirement_text: "Past performance references SHALL include CPARS ratings for all cited contracts", source_reference: "Section L.4.1", verdict: "warning", response_location: "PP Vol Section 1-3", gap_detail: "DISA SETA reference states 'Exceptional' without specifying CPARS rating period or individual elements.", suggestion: "Add specific CPARS rating period (e.g., FY23) and individual element ratings (Quality, Schedule, Cost, Management)." },
       { id: "PC-001-06", requirement_id: "REQ-L-006", requirement_text: "Technical volume SHALL not exceed 45 pages (excluding cover and TOC)", source_reference: "Section L.2.1", verdict: "pass", response_location: "Tech Vol, 44 pages", gap_detail: null, suggestion: null },
-      { id: "PC-001-07", requirement_id: "REQ-L-007", requirement_text: "Offeror SHALL provide environmental monitoring and reporting plan per AR 200-1", source_reference: "SOW C.4.2", verdict: "fail", response_location: null, gap_detail: "No dedicated environmental monitoring section found. AR 200-1 compliance plan not addressed.", suggestion: "Add Section 4.1 — Environmental Monitoring Plan referencing AR 200-1 requirements, sampling protocols, and reporting cadence." },
+      { id: "PC-001-07", requirement_id: "REQ-L-007", requirement_text: "Offeror SHALL provide cybersecurity monitoring and reporting plan per AR 200-1", source_reference: "SOW C.4.2", verdict: "fail", response_location: null, gap_detail: "No dedicated cybersecurity monitoring section found. AR 200-1 compliance plan not addressed.", suggestion: "Add Section 4.1 — Cybersecurity Monitoring Plan referencing NIST 800-137 continuous monitoring requirements and reporting cadence." },
       { id: "PC-001-08", requirement_id: "REQ-L-008", requirement_text: "Management plan SHALL include Quality Control Plan with inspection procedures", source_reference: "SOW C.3.5", verdict: "pass", response_location: "Mgmt Vol Section 3.1, pp. 22-26", gap_detail: null, suggestion: null },
       { id: "PC-001-09", requirement_id: "REQ-L-009", requirement_text: "Offeror SHALL identify all key personnel with resumes in prescribed format", source_reference: "Section L.3.2", verdict: "pass", response_location: "Tech Vol Appendix A", gap_detail: null, suggestion: null },
       { id: "PC-001-10", requirement_id: "REQ-L-010", requirement_text: "Subcontractor management plan SHALL address performance monitoring and corrective actions", source_reference: "SOW C.6.1", verdict: "pass", response_location: "Mgmt Vol Section 4.2, pp. 28-30", gap_detail: null, suggestion: null },
@@ -52,11 +52,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-05T16:30:00Z",
   },
 
-  // ─── PROP-001: USACE FUDS — Red Team (completed) ──────────────────────
+  // ─── PROP-001: PEO IEW&S SETA — Red Team (completed) ──────────────────────
   {
     id: "CR-002",
     proposal_id: "PROP-001",
-    proposal_title: "USACE FUDS IDIQ Environmental Remediation — Technical & Cost Volume",
+    proposal_title: "Army PEO IEW&S SETA Support Services — Technical & Cost Volume",
     agency: "US Army Corps of Engineers",
     phase: "red",
     status: "completed",
@@ -70,7 +70,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     failed_checks: 0,
     warning_checks: 0,
     reviewer: "AI Red Team Engine",
-    summary: "Technical approach scores well (8.5/10) with strong PFAS methodology. Management plan has ISO 14001 gap. Cost volume subcontractor rates exceed GSA schedule by 12%. Past performance is excellent but needs CPARS specificity. Overall competitive position is strong with targeted improvements.",
+    summary: "Technical approach scores well (8.5/10) with strong STIG validation methodology. Management plan has ISO 14001 gap. Cost volume subcontractor rates exceed GSA schedule by 12%. Past performance is excellent but needs CPARS specificity. Overall competitive position is strong with targeted improvements.",
     go_no_go: null,
     confidence: null,
     requirement_checks: [],
@@ -78,29 +78,29 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
       {
         id: "RS-001-01", section: "Technical Approach", volume: "Technical Volume I",
         score: 85, max_score: 100,
-        strengths: ["Comprehensive PFAS remediation methodology aligned with latest EPA guidance", "Clear phased approach with well-defined milestones", "Strong staffing plan with demonstrated environmental remediation expertise", "Innovative use of bioremediation techniques for cost reduction"],
-        weaknesses: ["Transition plan gap — no 30-day assumption plan per SOW C.5.1", "Environmental monitoring plan (AR 200-1) not addressed", "Limited discussion of technology insertion for emerging contaminants"],
-        discriminators_found: ["PFAS-specific bioremediation methodology not commonly proposed", "Integrated GIS-based site monitoring dashboard"],
-        discriminators_missing: ["No mention of AI/ML for contamination modeling", "No reference to sustainability metrics or green remediation practices"],
-        improvement_actions: ["Add detailed 30-day transition timeline with staffing ramp", "Include AR 200-1 environmental monitoring section", "Add discriminator: AI-powered contamination plume prediction model"],
-        evaluator_notes: "Strong technical approach that demonstrates deep domain expertise. Critical gaps in transition plan and environmental monitoring could result in deductions under Technical Approach evaluation factor."
+        strengths: ["Comprehensive C5ISR systems engineering methodology aligned with latest DISA guidance", "Clear phased approach with well-defined milestones", "Strong staffing plan with demonstrated defense IT services expertise", "Innovative use of biosystems engineering techniques for cost reduction"],
+        weaknesses: ["Transition plan gap — no 30-day assumption plan per SOW C.5.1", "Cybersecurity monitoring plan (NIST 800-137) not addressed", "Limited discussion of technology insertion for emerging cyber threats"],
+        discriminators_found: ["STIG validation-specific biosystems engineering methodology not commonly proposed", "Integrated GIS-based site monitoring dashboard"],
+        discriminators_missing: ["No mention of AI/ML for vulnerability modeling", "No reference to sustainability metrics or green systems engineering practices"],
+        improvement_actions: ["Add detailed 30-day transition timeline with staffing ramp", "Include AR 200-1 cybersecurity monitoring section", "Add discriminator: AI-powered vulnerability plume prediction model"],
+        evaluator_notes: "Strong technical approach that demonstrates deep domain expertise. Critical gaps in transition plan and cybersecurity monitoring could result in deductions under Technical Approach evaluation factor."
       },
       {
         id: "RS-001-02", section: "Management Plan", volume: "Management Volume II",
         score: 72, max_score: 100,
         strengths: ["Well-structured org chart with clear lines of authority", "Comprehensive QCP with inspection procedures", "Strong subcontractor management framework"],
         weaknesses: ["ISO 14001 certification not explicitly documented", "Risk management section lacks quantitative risk scoring", "No mention of lessons learned system for continuous improvement"],
-        discriminators_found: ["Integrated safety and environmental management approach"],
+        discriminators_found: ["Integrated safety and defense IT management approach"],
         discriminators_missing: ["No digital twin or BIM integration for project management", "No predictive analytics for schedule risk"],
-        improvement_actions: ["Add ISO 14001 certification number and expiration date", "Include quantitative risk register with probability × impact scoring", "Add lessons learned database referencing past FUDS projects"],
+        improvement_actions: ["Add ISO 14001 certification number and expiration date", "Include quantitative risk register with probability × impact scoring", "Add lessons learned database referencing past SETA projects"],
         evaluator_notes: "Solid management plan but needs ISO 14001 documentation fix and risk quantification to score higher."
       },
       {
         id: "RS-001-03", section: "Past Performance", volume: "Past Performance Volume III",
         score: 88, max_score: 100,
-        strengths: ["Five relevant contracts with strong relevance to FUDS scope", "Demonstrated USACE experience across multiple districts", "Clear narrative linking past work to proposed approach"],
-        weaknesses: ["EPA Superfund reference lacks specific CPARS rating period", "No quantified outcomes (remediation volumes, closure rates, cost savings)"],
-        discriminators_found: ["47 FUDS sites remediated across 3 USACE districts", "12 No Further Action (NFA) closures in 18 months"],
+        strengths: ["Five relevant contracts with strong relevance to SETA scope", "Demonstrated USACE experience across multiple districts", "Clear narrative linking past work to proposed approach"],
+        weaknesses: ["DISA SETA reference lacks specific CPARS rating period", "No quantified outcomes (systems engineering volumes, closure rates, cost savings)"],
+        discriminators_found: ["47 SETA sites remediated across 3 USACE districts", "12 No Further Action (NFA) closures in 18 months"],
         discriminators_missing: ["No client testimonials or award recognition referenced"],
         improvement_actions: ["Add CPARS rating periods and individual element scores", "Quantify outcomes: sites remediated, NFA closures, schedule performance", "Reference any USACE Contractor of the Year or safety awards"],
         evaluator_notes: "Excellent past performance portfolio. Minor documentation improvements would strengthen an already strong section."
@@ -109,17 +109,17 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
         id: "RS-001-04", section: "Cost/Price Volume", volume: "Cost/Price Volume IV",
         score: 65, max_score: 100,
         strengths: ["Detailed basis of estimate for all labor categories", "Competitive direct labor rates aligned with market"],
-        weaknesses: ["Arcadis subcontractor rates exceed GSA schedule by 12%", "No independent cost estimate comparison", "ODC estimates lack supporting documentation for equipment rental"],
+        weaknesses: ["ManTech subcontractor rates exceed GSA schedule by 12%", "No independent cost estimate comparison", "ODC estimates lack supporting documentation for equipment rental"],
         discriminators_found: [],
         discriminators_missing: ["No value engineering proposals to demonstrate cost consciousness", "No price-to-win analysis referenced"],
-        improvement_actions: ["Negotiate Arcadis rates to within GSA schedule or provide justification memo", "Add independent cost estimate crosswalk", "Include equipment rental quotes as supporting documentation", "Add value engineering section showing potential cost savings"],
+        improvement_actions: ["Negotiate ManTech rates to within GSA schedule or provide justification memo", "Add independent cost estimate crosswalk", "Include equipment rental quotes as supporting documentation", "Add value engineering section showing potential cost savings"],
         evaluator_notes: "Cost volume needs work. Subcontractor rate issue is the highest-risk item — could trigger TINA deficiency or cost reasonableness concern."
       },
       {
         id: "RS-001-05", section: "Executive Summary", volume: "Executive Summary",
         score: 76, max_score: 100,
         strengths: ["Clear articulation of 3 win themes", "Strong opening that connects to customer mission", "Effective use of graphics and callout boxes"],
-        weaknesses: ["Win theme #3 ('proven environmental stewardship') lacks substantiating metrics", "No explicit connection to evaluation criteria", "Missing 'why us' differentiator statement"],
+        weaknesses: ["Win theme #3 ('proven defense IT stewardship') lacks substantiating metrics", "No explicit connection to evaluation criteria", "Missing 'why us' differentiator statement"],
         discriminators_found: ["Mission-first framing aligned with USACE priorities"],
         discriminators_missing: ["No quantified discriminator statement", "No competitive advantage summary table"],
         improvement_actions: ["Substantiate win theme #3 with '47 sites remediated, 12 NFA closures'", "Map each paragraph to Section M evaluation criteria", "Add 'Why GDA' discriminator table"],
@@ -133,7 +133,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     blue_assessments: [],
     black_hat_findings: [],
     risk_factors: [
-      "Cost reasonableness risk: Arcadis sub rates 12% above GSA schedule",
+      "Cost reasonableness risk: ManTech sub rates 12% above GSA schedule",
       "Compliance risk: Missing transition plan could cause Technical deduction",
       "Competitive risk: Without value engineering, cost score may lag competitors",
     ],
@@ -141,11 +141,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-09T14:00:00Z",
   },
 
-  // ─── PROP-001: USACE FUDS — Gold Team (completed) ─────────────────────
+  // ─── PROP-001: PEO IEW&S SETA — Gold Team (completed) ─────────────────────
   {
     id: "CR-003",
     proposal_id: "PROP-001",
-    proposal_title: "USACE FUDS IDIQ Environmental Remediation — Technical & Cost Volume",
+    proposal_title: "Army PEO IEW&S SETA Support Services — Technical & Cost Volume",
     agency: "US Army Corps of Engineers",
     phase: "gold",
     status: "completed",
@@ -168,26 +168,26 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
       {
         id: "GC-001-01", category: "win_theme_consistency", label: "Win Theme Consistency",
         verdict: "pass", score: 14, max_score: 20,
-        detail: "Three win themes identified: (1) FUDS domain expertise, (2) innovative remediation technology, (3) proven environmental stewardship. Themes appear in all volumes but theme #3 lacks quantified evidence in Executive Summary and Technical approach.",
+        detail: "Three win themes identified: (1) SETA domain expertise, (2) innovative systems engineering technology, (3) proven defense IT stewardship. Themes appear in all volumes but theme #3 lacks quantified evidence in Executive Summary and Technical approach.",
         recommendations: ["Add quantified evidence for theme #3 in Executive Summary (47 sites, 12 NFA closures)", "Ensure theme callout boxes appear at least once per volume section"]
       },
       {
         id: "GC-001-02", category: "discriminator_reinforcement", label: "Discriminator Reinforcement",
         verdict: "warning", score: 10, max_score: 20,
-        detail: "Two strong discriminators identified (PFAS bioremediation methodology, GIS monitoring dashboard) but neither is reinforced in the Executive Summary or Cost volume. Discriminators appear only in Technical Volume.",
+        detail: "Two strong discriminators identified (STIG validation biosystems engineering methodology, GIS monitoring dashboard) but neither is reinforced in the Executive Summary or Cost volume. Discriminators appear only in Technical Volume.",
         recommendations: ["Add discriminator summary table to Executive Summary", "Reference GIS dashboard cost savings in Cost volume", "Add 'Why GDA' callout box in Management volume"]
       },
       {
         id: "GC-001-03", category: "pricing_alignment", label: "Pricing Strategy Alignment",
         verdict: "fail", score: 8, max_score: 15,
         detail: "Subcontractor rates exceed GSA schedule by 12% without justification. No value engineering proposals included. Price-to-win analysis not referenced. Competitive position on cost is at risk.",
-        recommendations: ["Negotiate Arcadis rates or provide basis-of-estimate justification", "Add value engineering section with quantified savings", "Include price-to-win summary showing competitive positioning"]
+        recommendations: ["Negotiate ManTech rates or provide basis-of-estimate justification", "Add value engineering section with quantified savings", "Include price-to-win summary showing competitive positioning"]
       },
       {
         id: "GC-001-04", category: "exec_summary_effectiveness", label: "Executive Summary Effectiveness",
         verdict: "pass", score: 12, max_score: 15,
         detail: "Executive summary effectively captures the customer's mission and positions GDA as the right partner. Opening paragraph is compelling. Graphics and callout boxes enhance readability. Weakness: metric substantiation needed for win theme #3.",
-        recommendations: ["Add metrics to support 'proven environmental stewardship' claim"]
+        recommendations: ["Add metrics to support 'proven defense IT stewardship' claim"]
       },
       {
         id: "GC-001-05", category: "compliance_completeness", label: "Compliance Completeness",
@@ -209,7 +209,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     black_hat_findings: [],
     risk_factors: [
       "CRITICAL: Missing transition plan — potential non-responsive finding",
-      "HIGH: Arcadis subcontractor rates above GSA schedule — cost reasonableness risk",
+      "HIGH: ManTech subcontractor rates above GSA schedule — cost reasonableness risk",
       "MEDIUM: Small business subcontracting plan missing — compliance gap",
       "LOW: Discriminators not reinforced across all volumes",
     ],
@@ -217,11 +217,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-10T15:00:00Z",
   },
 
-  // ─── PROP-002: Air Force Tyndall — Pink Team (completed) ───────────────
+  // ─── PROP-002: DEVCOM C5ISR Cyber IA — Pink Team (completed) ───────────────
   {
     id: "CR-004",
     proposal_id: "PROP-002",
-    proposal_title: "Air Force Tyndall AFB Smart Base Infrastructure Modernization",
+    proposal_title: "Air Force DEVCOM C5ISR Smart Base Infrastructure Modernization",
     agency: "US Air Force",
     phase: "pink",
     status: "completed",
@@ -262,11 +262,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-04-28T14:00:00Z",
   },
 
-  // ─── PROP-002: Air Force Tyndall — Red Team (in_progress) ─────────────
+  // ─── PROP-002: DEVCOM C5ISR Cyber IA — Red Team (in_progress) ─────────────
   {
     id: "CR-005",
     proposal_id: "PROP-002",
-    proposal_title: "Air Force Tyndall AFB Smart Base Infrastructure Modernization",
+    proposal_title: "Air Force DEVCOM C5ISR Smart Base Infrastructure Modernization",
     agency: "US Air Force",
     phase: "red",
     status: "in_progress",
@@ -296,12 +296,12 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-10T09:00:00Z",
   },
 
-  // ─── PROP-003: NASA KSC — Pink Team (completed) ───────────────────────
+  // ─── PROP-003: Hanscom AFB — Pink Team (completed) ───────────────────────
   {
     id: "CR-006",
     proposal_id: "PROP-003",
-    proposal_title: "NASA KSC Ground Systems Support — Launch Operations",
-    agency: "NASA",
+    proposal_title: "Hanscom AFB IT Modernization Support — Launch Operations",
+    agency: "USAF",
     phase: "pink",
     status: "completed",
     started_at: "2025-05-01T08:00:00Z",
@@ -319,7 +319,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     confidence: null,
     requirement_checks: [
       { id: "PC-003-01", requirement_id: "REQ-N-001", requirement_text: "Offeror SHALL demonstrate compliance with NPR 8715.3 NASA Safety Program", source_reference: "SOW 4.1.1", verdict: "fail", response_location: null, gap_detail: "NPR 8715.3 not referenced anywhere in the proposal. NASA safety program compliance is a critical requirement.", suggestion: "Add dedicated NASA Safety Compliance section addressing NPR 8715.3 requirements, safety reporting, and mishap investigation procedures." },
-      { id: "PC-003-02", requirement_id: "REQ-N-002", requirement_text: "Key personnel SHALL hold current NASA KSC badging eligibility", source_reference: "SOW 4.2.1", verdict: "pass", response_location: "Tech Vol Section 1.3, p. 6", gap_detail: null, suggestion: null },
+      { id: "PC-003-02", requirement_id: "REQ-N-002", requirement_text: "Key personnel SHALL hold current Hanscom AFB badging eligibility", source_reference: "SOW 4.2.1", verdict: "pass", response_location: "Tech Vol Section 1.3, p. 6", gap_detail: null, suggestion: null },
       { id: "PC-003-03", requirement_id: "REQ-N-003", requirement_text: "Launch operations support plan SHALL address SLS and commercial crew integration", source_reference: "SOW 4.3.2", verdict: "fail", response_location: "Tech Vol Section 3.1, p. 15", gap_detail: "Only SLS addressed. Commercial crew (SpaceX Crew Dragon, Boeing Starliner) integration support not discussed.", suggestion: "Add subsection on commercial crew vehicle ground support integration, including turnaround operations and GSE interfaces." },
       { id: "PC-003-04", requirement_id: "REQ-N-004", requirement_text: "Quality management system SHALL be AS9100D certified", source_reference: "SOW 4.5.1", verdict: "fail", response_location: null, gap_detail: "AS9100D certification not mentioned. Only ISO 9001 referenced.", suggestion: "Verify AS9100D certification status. If not certified, discuss certification timeline or equivalent aerospace quality standards." },
       { id: "PC-003-05", requirement_id: "REQ-N-005", requirement_text: "Proposal SHALL include Organizational Conflict of Interest mitigation plan", source_reference: "Section L.7.1", verdict: "warning", response_location: "Mgmt Vol Section 6.1, p. 24", gap_detail: "OCI plan is generic — does not address specific conflicts related to launch operations support contractor role.", suggestion: "Tailor OCI plan to identify specific potential conflicts and describe mitigation measures for each." },
@@ -379,12 +379,12 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-11T10:00:00Z",
   },
 
-  // ─── PROP-005: EPA Superfund — Red Team (completed) ────────────────────
+  // ─── PROP-005: DISA SETA — Red Team (completed) ────────────────────
   {
     id: "CR-008",
     proposal_id: "PROP-005",
-    proposal_title: "EPA Superfund Technical Support — Environmental Assessment",
-    agency: "Environmental Protection Agency",
+    proposal_title: "DISA SETA Technical Support — Cyber Assessment",
+    agency: "Defense Information Systems Agency",
     phase: "red",
     status: "completed",
     started_at: "2025-05-03T08:00:00Z",
@@ -397,7 +397,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     failed_checks: 0,
     warning_checks: 0,
     reviewer: "AI Red Team Engine",
-    summary: "Strong technical approach leveraging CERCLA expertise. Past performance references are compelling. Management plan needs risk quantification. Cost volume is lean and competitive. Executive summary could better differentiate from competitors.",
+    summary: "Strong technical approach leveraging NIST 800-53 expertise. Past performance references are compelling. Management plan needs risk quantification. Cost volume is lean and competitive. Executive summary could better differentiate from competitors.",
     go_no_go: null,
     confidence: null,
     requirement_checks: [],
@@ -405,17 +405,17 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
       {
         id: "RS-005-01", section: "Technical Approach", volume: "Technical Volume",
         score: 88, max_score: 100,
-        strengths: ["Deep CERCLA expertise demonstrated through 15+ Superfund site references", "Innovative risk assessment methodology using probabilistic exposure modeling", "Strong community engagement approach for stakeholder management"],
-        weaknesses: ["Limited discussion of emerging contaminant assessment (PFOA/PFOS beyond PFAS)", "No mention of digital tools for site characterization"],
+        strengths: ["Deep NIST 800-53 expertise demonstrated through 15+ SETA site references", "Innovative risk assessment methodology using probabilistic exposure modeling", "Strong community engagement approach for stakeholder management"],
+        weaknesses: ["Limited discussion of emerging threat assessment (SCAP automation beyond STIG validation)", "No mention of digital tools for security assessment"],
         discriminators_found: ["Probabilistic exposure modeling approach", "Community Health Assessment Integration methodology"],
-        discriminators_missing: ["No AI/ML-based contamination prediction capabilities mentioned"],
-        improvement_actions: ["Add emerging contaminant assessment capability discussion", "Include digital site characterization tools (LiDAR, drone surveys)"],
-        evaluator_notes: "Excellent technical approach that demonstrates deep EPA Superfund domain knowledge."
+        discriminators_missing: ["No AI/ML-based vulnerability prediction capabilities mentioned"],
+        improvement_actions: ["Add emerging threat assessment capability discussion", "Include digital security assessment tools (LiDAR, drone surveys)"],
+        evaluator_notes: "Excellent technical approach that demonstrates deep DISA SETA domain knowledge."
       },
       {
         id: "RS-005-02", section: "Management Plan", volume: "Management Volume",
         score: 75, max_score: 100,
-        strengths: ["Clear project governance structure", "Well-defined communication plan with EPA RPMs"],
+        strengths: ["Clear project governance structure", "Well-defined communication plan with DISA RPMs"],
         weaknesses: ["Risk management lacks quantitative scoring", "No continuous improvement or lessons learned framework"],
         discriminators_found: [],
         discriminators_missing: ["No innovation management process"],
@@ -425,7 +425,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
       {
         id: "RS-005-03", section: "Past Performance", volume: "Past Performance Volume",
         score: 90, max_score: 100,
-        strengths: ["4 directly relevant EPA contracts with Exceptional/Very Good ratings", "Quantified outcomes: 23 RODs completed, 8 Five-Year Reviews", "Clear narrative linking past work to proposed approach"],
+        strengths: ["4 directly relevant DISA contracts with Exceptional/Very Good ratings", "Quantified outcomes: 23 RODs completed, 8 Five-Year Reviews", "Clear narrative linking past work to proposed approach"],
         weaknesses: ["One reference from 2019 — approaching 5-year recency threshold"],
         discriminators_found: ["23 Records of Decision completed on schedule", "Zero cost overruns across all referenced contracts"],
         discriminators_missing: [],
@@ -435,7 +435,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
       {
         id: "RS-005-04", section: "Cost/Price Volume", volume: "Cost Volume",
         score: 82, max_score: 100,
-        strengths: ["Competitive labor rates within EPA rate guidelines", "Lean overhead structure", "Clear basis of estimate methodology"],
+        strengths: ["Competitive labor rates within DISA rate guidelines", "Lean overhead structure", "Clear basis of estimate methodology"],
         weaknesses: ["No value engineering proposals", "Travel costs seem underestimated for multi-site work"],
         discriminators_found: ["15% lower overhead rate than industry average"],
         discriminators_missing: [],
@@ -533,11 +533,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-06T12:00:00Z",
   },
 
-  // ─── PROP-001: USACE FUDS — Green Team (completed) ─────────────────────
+  // ─── PROP-001: PEO IEW&S SETA — Green Team (completed) ─────────────────────
   {
     id: "CR-010",
     proposal_id: "PROP-001",
-    proposal_title: "USACE FUDS IDIQ Environmental Remediation — Technical & Cost Volume",
+    proposal_title: "Army PEO IEW&S SETA Support Services — Technical & Cost Volume",
     agency: "US Army Corps of Engineers",
     phase: "green",
     status: "completed",
@@ -558,15 +558,15 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     section_scores: [],
     gold_checks: [],
     cost_line_items: [
-      { id: "CLI-001-01", category: "Direct Labor", proposed_amount: 42500000, government_estimate: 40000000, variance_pct: 6.25, verdict: "pass", basis_of_estimate: "Wrapped rates from approved rate agreements; historical actuals from 3 comparable FUDS TOs", notes: "Rates within 7% of IGCE — acceptable variance." },
+      { id: "CLI-001-01", category: "Direct Labor", proposed_amount: 42500000, government_estimate: 40000000, variance_pct: 6.25, verdict: "pass", basis_of_estimate: "Wrapped rates from approved rate agreements; historical actuals from 3 comparable SETA TOs", notes: "Rates within 7% of IGCE — acceptable variance." },
       { id: "CLI-001-02", category: "Subcontractors", proposed_amount: 28000000, government_estimate: 25000000, variance_pct: 12.0, verdict: "fail", basis_of_estimate: "Subcontractor quotes from 2 firms; rates based on prior USACE work", notes: "12% above GSA schedule rates. Need rate justification or renegotiation." },
-      { id: "CLI-001-03", category: "ODCs", proposed_amount: 8500000, government_estimate: 9000000, variance_pct: -5.6, verdict: "pass", basis_of_estimate: "Historical spending patterns from FUDS TO-1 and TO-2", notes: "Below IGCE — favorable positioning." },
-      { id: "CLI-001-04", category: "Travel", proposed_amount: 3200000, government_estimate: 3500000, variance_pct: -8.6, verdict: "pass", basis_of_estimate: "GSA per diem rates; estimated 480 trips to 12 FUDS sites over contract period", notes: "Conservative estimate using current GSA rates." },
+      { id: "CLI-001-03", category: "ODCs", proposed_amount: 8500000, government_estimate: 9000000, variance_pct: -5.6, verdict: "pass", basis_of_estimate: "Historical spending patterns from SETA TO-1 and TO-2", notes: "Below IGCE — favorable positioning." },
+      { id: "CLI-001-04", category: "Travel", proposed_amount: 3200000, government_estimate: 3500000, variance_pct: -8.6, verdict: "pass", basis_of_estimate: "GSA per diem rates; estimated 480 trips to 12 SETA sites over contract period", notes: "Conservative estimate using current GSA rates." },
       { id: "CLI-001-05", category: "Materials & Equipment", proposed_amount: 12000000, government_estimate: 11500000, variance_pct: 4.3, verdict: "warning", basis_of_estimate: "Vendor quotes for sampling equipment; rental rates for heavy equipment", notes: "Slightly above IGCE — equipment rental costs may be aggressive." },
       { id: "CLI-001-06", category: "Fee/Profit", proposed_amount: 7520000, government_estimate: null, variance_pct: null, verdict: "pass", basis_of_estimate: "8% weighted guideline fee per DFARS 215.404-71", notes: "Within acceptable range for CPAF contract type." },
     ],
     green_checks: [
-      { id: "GR-001-01", area: "labor_rates", label: "Labor Rate Reasonableness", verdict: "pass", detail: "Proposed labor rates are within 7% of government estimate across all categories. Senior Environmental Scientist at $185/hr vs IGCE $178/hr. Rates supported by approved forward pricing rate agreements.", benchmark: "IGCE ± 10%", recommendation: null },
+      { id: "GR-001-01", area: "labor_rates", label: "Labor Rate Reasonableness", verdict: "pass", detail: "Proposed labor rates are within 7% of government estimate across all categories. Senior Systems Engineer at $185/hr vs IGCE $178/hr. Rates supported by approved forward pricing rate agreements.", benchmark: "IGCE ± 10%", recommendation: null },
       { id: "GR-001-02", area: "subcontract", label: "Subcontractor Cost Realism", verdict: "fail", detail: "Subcontractor rates exceed GSA schedule by 12%. Two subcontractor quotes provided but neither references GSA pricing or explains premium. DCAA may question cost realism.", benchmark: "GSA Schedule rates", recommendation: "Renegotiate subcontractor rates to within 5% of GSA schedule, or provide detailed justification for premium (specialized certifications, sole-source capability)." },
       { id: "GR-001-03", area: "odc", label: "ODC Projections", verdict: "warning", detail: "ODC projections based on historical data from prior TOs but lack detailed breakdown by CLIN. Total is 5.6% below IGCE which is favorable, but methodology documentation is thin.", benchmark: "Historical actuals ± 15%", recommendation: "Add CLIN-level ODC breakdown with specific quantities and unit costs for major items." },
       { id: "GR-001-04", area: "travel", label: "Travel Cost Analysis", verdict: "pass", detail: "Travel costs based on current GSA per diem rates. Trip estimates (480 over 5 years) are reasonable for 12-site program. Includes provisions for travel cost escalation.", benchmark: "GSA per diem rates", recommendation: null },
@@ -587,11 +587,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-10T18:00:00Z",
   },
 
-  // ─── PROP-002: Air Force Tyndall — Green Team (in_progress) ────────────
+  // ─── PROP-002: DEVCOM C5ISR Cyber IA — Green Team (in_progress) ────────────
   {
     id: "CR-011",
     proposal_id: "PROP-002",
-    proposal_title: "Air Force Tyndall AFB Smart Base Infrastructure Modernization",
+    proposal_title: "Air Force DEVCOM C5ISR Smart Base Infrastructure Modernization",
     agency: "US Air Force",
     phase: "green",
     status: "in_progress",
@@ -621,12 +621,12 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-12T09:00:00Z",
   },
 
-  // ─── PROP-005: EPA Superfund — Green Team (completed) ──────────────────
+  // ─── PROP-005: DISA SETA — Green Team (completed) ──────────────────
   {
     id: "CR-012",
     proposal_id: "PROP-005",
-    proposal_title: "EPA Superfund Technical Support — Environmental Assessment",
-    agency: "Environmental Protection Agency",
+    proposal_title: "DISA SETA Technical Support — Cyber Assessment",
+    agency: "Defense Information Systems Agency",
     phase: "green",
     status: "completed",
     started_at: "2025-05-08T08:00:00Z",
@@ -646,16 +646,16 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     section_scores: [],
     gold_checks: [],
     cost_line_items: [
-      { id: "CLI-005-01", category: "Direct Labor", proposed_amount: 5100000, government_estimate: 5300000, variance_pct: -3.8, verdict: "pass", basis_of_estimate: "Forward pricing rate agreements; labor mix based on 2 prior EPA contracts", notes: "Below IGCE — competitive advantage." },
-      { id: "CLI-005-02", category: "Subcontractors", proposed_amount: 1200000, government_estimate: 1250000, variance_pct: -4.0, verdict: "pass", basis_of_estimate: "Competitively bid subcontracts with 3 environmental labs", notes: "Strong pricing through competitive sourcing." },
-      { id: "CLI-005-03", category: "ODCs", proposed_amount: 850000, government_estimate: 900000, variance_pct: -5.6, verdict: "pass", basis_of_estimate: "Site-specific sampling and analysis costs from prior EPA TSCA work", notes: "Well-supported estimates." },
+      { id: "CLI-005-01", category: "Direct Labor", proposed_amount: 5100000, government_estimate: 5300000, variance_pct: -3.8, verdict: "pass", basis_of_estimate: "Forward pricing rate agreements; labor mix based on 2 prior DISA contracts", notes: "Below IGCE — competitive advantage." },
+      { id: "CLI-005-02", category: "Subcontractors", proposed_amount: 1200000, government_estimate: 1250000, variance_pct: -4.0, verdict: "pass", basis_of_estimate: "Competitively bid subcontracts with 3 defense IT labs", notes: "Strong pricing through competitive sourcing." },
+      { id: "CLI-005-03", category: "ODCs", proposed_amount: 850000, government_estimate: 900000, variance_pct: -5.6, verdict: "pass", basis_of_estimate: "Site-specific sampling and analysis costs from prior DISA TSCA work", notes: "Well-supported estimates." },
       { id: "CLI-005-04", category: "Travel", proposed_amount: 420000, government_estimate: 400000, variance_pct: 5.0, verdict: "warning", basis_of_estimate: "GSA per diem with 4.5% annual escalation", notes: "Escalation factor above BLS — consider reducing to 3.2%." },
       { id: "CLI-005-05", category: "Fee/Profit", proposed_amount: 630000, government_estimate: null, variance_pct: null, verdict: "pass", basis_of_estimate: "7.7% fee per weighted guidelines", notes: "Conservative fee supports competitive positioning." },
     ],
     green_checks: [
-      { id: "GR-005-01", area: "labor_rates", label: "Labor Rate Reasonableness", verdict: "pass", detail: "All labor rates within 5% of government estimate. Environmental Scientist III at $145/hr vs IGCE $150/hr.", benchmark: "IGCE ± 10%", recommendation: null },
+      { id: "GR-005-01", area: "labor_rates", label: "Labor Rate Reasonableness", verdict: "pass", detail: "All labor rates within 5% of government estimate. Systems Engineer III at $145/hr vs IGCE $150/hr.", benchmark: "IGCE ± 10%", recommendation: null },
       { id: "GR-005-02", area: "subcontract", label: "Subcontractor Cost Realism", verdict: "pass", detail: "Three competitive quotes obtained for analytical lab services. Pricing 4% below IGCE.", benchmark: "Market rates", recommendation: null },
-      { id: "GR-005-03", area: "odc", label: "ODC Projections", verdict: "pass", detail: "Site-specific cost models based on 2 years of actual EPA program data. CLIN-level detail provided.", benchmark: "Historical actuals", recommendation: null },
+      { id: "GR-005-03", area: "odc", label: "ODC Projections", verdict: "pass", detail: "Site-specific cost models based on 2 years of actual DISA program data. CLIN-level detail provided.", benchmark: "Historical actuals", recommendation: null },
       { id: "GR-005-04", area: "travel", label: "Travel Cost Analysis", verdict: "warning", detail: "Travel escalation at 4.5% annual exceeds current BLS Employment Cost Index of 3.1%.", benchmark: "BLS ECI 3.1%", recommendation: "Reduce travel escalation to 3.2% to align with BLS data and improve cost competitiveness." },
       { id: "GR-005-05", area: "fee_profit", label: "Fee/Profit Analysis", verdict: "pass", detail: "Fee at 7.7% is below the 8% norm — demonstrates cost consciousness to evaluators.", benchmark: "DFARS 215.404-71", recommendation: null },
       { id: "GR-005-06", area: "boe_completeness", label: "Basis of Estimate Completeness", verdict: "pass", detail: "All BOEs traceable to WBS. Includes detailed methodology narratives for each cost element.", benchmark: "FAR 15.404-1", recommendation: null },
@@ -672,11 +672,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-08T16:00:00Z",
   },
 
-  // ─── PROP-001: USACE FUDS — White Team (completed) ─────────────────────
+  // ─── PROP-001: PEO IEW&S SETA — White Team (completed) ─────────────────────
   {
     id: "CR-013",
     proposal_id: "PROP-001",
-    proposal_title: "USACE FUDS IDIQ Environmental Remediation — Technical & Cost Volume",
+    proposal_title: "Army PEO IEW&S SETA Support Services — Technical & Cost Volume",
     agency: "US Army Corps of Engineers",
     phase: "white",
     status: "completed",
@@ -703,12 +703,12 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
       { id: "FC-001-02", category: "page_count", label: "Management Volume Page Count", verdict: "pass", expected: "≤ 30 pages", actual: "33 pages (cover + TOC excluded)", volume: "Management Volume II", detail: "Per Section L, cover page and TOC are excluded from page count." },
       { id: "FC-001-03", category: "font_compliance", label: "Font Type & Size Compliance", verdict: "pass", expected: "Times New Roman, 12pt", actual: "Times New Roman, 12pt", volume: "All Volumes", detail: null },
       { id: "FC-001-04", category: "margin", label: "Margin Compliance", verdict: "pass", expected: "1\" all sides", actual: "1\" all sides", volume: "All Volumes", detail: null },
-      { id: "FC-001-05", category: "header_footer", label: "Header/Footer Format", verdict: "warning", expected: "Solicitation # in header, page # in footer", actual: "Project title in header (pp. 22-30)", volume: "Management Volume II", detail: "Pages 22-30 use project title 'USACE FUDS IDIQ' instead of solicitation number 'W912DR-25-R-0042' in the header." },
+      { id: "FC-001-05", category: "header_footer", label: "Header/Footer Format", verdict: "warning", expected: "Solicitation # in header, page # in footer", actual: "Project title in header (pp. 22-30)", volume: "Management Volume II", detail: "Pages 22-30 use project title 'PEO IEW&S SETA IDIQ' instead of solicitation number 'W912DR-25-R-0042' in the header." },
       { id: "FC-001-06", category: "numbering", label: "Section Numbering", verdict: "pass", expected: "Sequential, no gaps", actual: "1.0 through 5.3, sequential", volume: "Technical Volume I", detail: null },
       { id: "FC-001-07", category: "toc", label: "Table of Contents Accuracy", verdict: "pass", expected: "All sections referenced with correct page numbers", actual: "18 entries, all page references verified", volume: "Technical Volume I", detail: null },
       { id: "FC-001-08", category: "cross_reference", label: "Internal Cross-References", verdict: "pass", expected: "All cross-refs resolve to valid sections", actual: "12 cross-references, all valid", volume: "All Volumes", detail: null },
       { id: "FC-001-09", category: "acronym", label: "Acronym List Completeness", verdict: "pass", expected: "All acronyms defined on first use + in acronym list", actual: "47 acronyms, all defined", volume: "All Volumes", detail: null },
-      { id: "FC-001-10", category: "naming_convention", label: "File Naming Convention", verdict: "pass", expected: "Per Section L.2.4 naming standard", actual: "GDA-FUDS-TV-001.pdf, GDA-FUDS-MV-001.pdf, etc.", volume: "All Volumes", detail: null },
+      { id: "FC-001-10", category: "naming_convention", label: "File Naming Convention", verdict: "pass", expected: "Per Section L.2.4 naming standard", actual: "GDA-SETA-TV-001.pdf, GDA-SETA-MV-001.pdf, etc.", volume: "All Volumes", detail: null },
     ],
     blue_assessments: [],
     black_hat_findings: [],
@@ -719,12 +719,12 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-04T14:00:00Z",
   },
 
-  // ─── PROP-003: NASA KSC — White Team (completed) ───────────────────────
+  // ─── PROP-003: Hanscom AFB — White Team (completed) ───────────────────────
   {
     id: "CR-014",
     proposal_id: "PROP-003",
-    proposal_title: "NASA KSC Ground Systems Support — Launch Operations",
-    agency: "National Aeronautics and Space Administration",
+    proposal_title: "Hanscom AFB IT Modernization Support — Network Operations",
+    agency: "US Air Force",
     phase: "white",
     status: "completed",
     started_at: "2025-05-07T08:00:00Z",
@@ -803,11 +803,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-05-14T08:00:00Z",
   },
 
-  // ─── PROP-001: USACE FUDS — Blue Team (capture strategy assessment) ───
+  // ─── PROP-001: PEO IEW&S SETA — Blue Team (capture strategy assessment) ───
   {
     id: "CR-016",
     proposal_id: "PROP-001",
-    proposal_title: "USACE FUDS IDIQ Environmental Remediation — Technical & Cost Volume",
+    proposal_title: "Army PEO IEW&S SETA Support Services — Technical & Cost Volume",
     agency: "US Army Corps of Engineers",
     phase: "blue",
     status: "completed",
@@ -821,7 +821,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     failed_checks: 0,
     warning_checks: 1,
     reviewer: "AI Blue Team Engine",
-    summary: "Strong strategic fit for this USACE FUDS environmental remediation IDIQ. Past performance on 3 relevant USACE contracts (Exceptional/Very Good ratings) provides strong competitive position. NAICS 562910 confirmed. One gap: need to formalize Arcadis teaming arrangement for PFAS capabilities.",
+    summary: "Strong strategic fit for this PEO IEW&S SETA defense IT services IDIQ. Past performance on 3 relevant USACE contracts (Exceptional/Very Good ratings) provides strong competitive position. NAICS 541330 confirmed. One gap: need to formalize ManTech teaming arrangement for STIG validation capabilities.",
     go_no_go: "go",
     confidence: 85,
     requirement_checks: [],
@@ -831,30 +831,30 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     green_checks: [],
     format_checks: [],
     blue_assessments: [
-      { id: "BA-001-01", category: "past_performance", label: "Relevant Past Performance", verdict: "pass", detail: "3 USACE environmental remediation contracts in last 5 years: FUDS Region 3 ($28.5M, Exceptional), HTRW Jax ($15.6M, Very Good), OU3 Cleanup ($24.5M, in progress). All directly relevant to this IDIQ scope.", evidence: "CPARS records CR-003, CR-008, active contract C-001", recommendation: null },
-      { id: "BA-001-02", category: "naics_fit", label: "NAICS Code Match", verdict: "pass", detail: "Primary NAICS 562910 (Remediation Services) — matches our SBA-verified NAICS registration. Size standard $22M, our 3-year avg $18.2M qualifies as small business.", evidence: "SAM.gov registration, SBA profile", recommendation: null },
-      { id: "BA-001-03", category: "certifications", label: "Required Certifications", verdict: "pass", detail: "ISO 14001 EMS certified (exp 2027), OSHA 40-hr HAZWOPER for all field staff, CQM-certified PM assigned.", evidence: "ISO cert #EMS-2025-4481, training records", recommendation: null },
+      { id: "BA-001-01", category: "past_performance", label: "Relevant Past Performance", verdict: "pass", detail: "3 USACE defense IT services contracts in last 5 years: SETA Region 3 ($28.5M, Exceptional), RMF Jax ($15.6M, Very Good), OU3 Cleanup ($24.5M, in progress). All directly relevant to this IDIQ scope.", evidence: "CPARS records CR-003, CR-008, active contract C-001", recommendation: null },
+      { id: "BA-001-02", category: "naics_fit", label: "NAICS Code Match", verdict: "pass", detail: "Primary NAICS 541330 (Engineering Services) — matches our SBA-verified NAICS registration. Size standard $22M, our 3-year avg $18.2M qualifies as small business.", evidence: "SAM.gov registration, SBA profile", recommendation: null },
+      { id: "BA-001-03", category: "certifications", label: "Required Certifications", verdict: "pass", detail: "ISO 14001 EMS certified (exp 2027), OSHA 40-hr CISSP for all field staff, CQM-certified PM assigned.", evidence: "ISO cert #EMS-2025-4481, training records", recommendation: null },
       { id: "BA-001-04", category: "clearances", label: "Security Clearances", verdict: "pass", detail: "Facility Clearance (FCL) at SECRET level. 4 key personnel hold active SECRET clearances. No SAP or SCI required for this work.", evidence: "DCSA FCL verification", recommendation: null },
       { id: "BA-001-05", category: "set_aside", label: "Set-Aside Eligibility", verdict: "pass", detail: "Full and open competition — no set-aside restrictions. Small business subcontracting plan required per FAR 52.219-9.", evidence: "Solicitation Section B", recommendation: null },
-      { id: "BA-001-06", category: "competitive_position", label: "Competitive Position Analysis", verdict: "pass", detail: "Incumbent on Region 3 FUDS (Tetra Tech is the main competitor). Our PFAS remediation experience and USACE relationship provide differentiation. 3 of 5 evaluation factors align with our strengths.", evidence: "Market intelligence, competitor watch data", recommendation: null },
-      { id: "BA-001-07", category: "teaming", label: "Teaming Strategy", verdict: "warning", detail: "Arcadis identified as preferred PFAS treatment technology partner. Teaming agreement drafted but not yet executed. Need to finalize before proposal start.", evidence: "Draft TA dated 2025-04-15", recommendation: "Execute teaming agreement with Arcadis within 2 weeks. Confirm their exclusivity commitment for this pursuit." },
+      { id: "BA-001-06", category: "competitive_position", label: "Competitive Position Analysis", verdict: "pass", detail: "Incumbent on Region 3 SETA (Leidos is the main competitor). Our C5ISR systems engineering experience and USACE relationship provide differentiation. 3 of 5 evaluation factors align with our strengths.", evidence: "Market intelligence, competitor watch data", recommendation: null },
+      { id: "BA-001-07", category: "teaming", label: "Teaming Strategy", verdict: "warning", detail: "ManTech identified as preferred cyber IA services technology partner. Teaming agreement drafted but not yet executed. Need to finalize before proposal start.", evidence: "Draft TA dated 2025-04-15", recommendation: "Execute teaming agreement with ManTech within 2 weeks. Confirm their exclusivity commitment for this pursuit." },
       { id: "BA-001-08", category: "pwin_estimate", label: "Pre-Capture Pwin Estimate", verdict: "pass", detail: "Estimated Pwin: 62% based on past performance strength (High), incumbent advantage (Medium), competitive pricing (Medium), and team composition (High). Above 50% threshold for full pursuit.", evidence: "Pwin model v3.2 output", recommendation: null },
     ],
     black_hat_findings: [],
     risk_factors: [
-      "Arcadis teaming agreement not yet executed — risk of losing preferred partner",
-      "Tetra Tech incumbent has strong USACE relationships and cost data advantage",
+      "ManTech teaming agreement not yet executed — risk of losing preferred partner",
+      "Leidos incumbent has strong USACE relationships and cost data advantage",
     ],
     created_at: "2025-04-28T08:00:00Z",
     updated_at: "2025-04-28T17:00:00Z",
   },
 
-  // ─── PROP-005: EPA Superfund — Blue Team ──────────────────────────────
+  // ─── PROP-005: DISA SETA — Blue Team ──────────────────────────────
   {
     id: "CR-017",
     proposal_id: "PROP-005",
-    proposal_title: "EPA Superfund Technical Support — Region 4",
-    agency: "Environmental Protection Agency",
+    proposal_title: "DISA SETA Technical Support — Region 4",
+    agency: "Defense Information Systems Agency",
     phase: "blue",
     status: "completed",
     started_at: "2025-04-20T08:00:00Z",
@@ -867,7 +867,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     failed_checks: 1,
     warning_checks: 1,
     reviewer: "AI Blue Team Engine",
-    summary: "Moderate fit for EPA Superfund technical support. Strong environmental credentials but limited EPA-specific past performance — only 1 relevant contract vs. 3 required references. Consider teaming with an EPA incumbent to strengthen position.",
+    summary: "Moderate fit for DISA SETA technical support. Strong defense IT credentials but limited DISA-specific past performance — only 1 relevant contract vs. 3 required references. Consider teaming with an DISA incumbent to strengthen position.",
     go_no_go: "conditional_go",
     confidence: 68,
     requirement_checks: [],
@@ -877,18 +877,18 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     green_checks: [],
     format_checks: [],
     blue_assessments: [
-      { id: "BA-002-01", category: "past_performance", label: "Relevant Past Performance", verdict: "warning", detail: "Only 1 EPA contract in last 5 years (Region 4 Superfund, $22.8M, Very Good). Solicitation requires minimum 3 references. USACE work is adjacent but not directly EPA.", evidence: "CPARS records", recommendation: "Highlight USACE remediation as analogous work. Seek teaming partner with EPA past performance." },
-      { id: "BA-002-02", category: "naics_fit", label: "NAICS Code Match", verdict: "pass", detail: "Primary NAICS 541620 (Environmental Consulting) — confirmed in SAM.gov registration.", evidence: "SAM.gov profile", recommendation: null },
-      { id: "BA-002-03", category: "certifications", label: "Required Certifications", verdict: "pass", detail: "ISO 14001, HAZWOPER, and PE-licensed environmental engineers available.", evidence: "Professional licenses on file", recommendation: null },
-      { id: "BA-002-04", category: "clearances", label: "Security Clearances", verdict: "pass", detail: "No clearance requirements for this EPA work.", evidence: "Solicitation review", recommendation: null },
+      { id: "BA-002-01", category: "past_performance", label: "Relevant Past Performance", verdict: "warning", detail: "Only 1 DISA contract in last 5 years (Region 4 SETA, $22.8M, Very Good). Solicitation requires minimum 3 references. USACE work is adjacent but not directly DISA.", evidence: "CPARS records", recommendation: "Highlight USACE systems engineering as analogous work. Seek teaming partner with DISA past performance." },
+      { id: "BA-002-02", category: "naics_fit", label: "NAICS Code Match", verdict: "pass", detail: "Primary NAICS 541330 (Engineering Services) — confirmed in SAM.gov registration.", evidence: "SAM.gov profile", recommendation: null },
+      { id: "BA-002-03", category: "certifications", label: "Required Certifications", verdict: "pass", detail: "ISO 14001, CISSP, and PE-licensed defense IT engineers available.", evidence: "Professional licenses on file", recommendation: null },
+      { id: "BA-002-04", category: "clearances", label: "Security Clearances", verdict: "pass", detail: "No clearance requirements for this DISA work.", evidence: "Solicitation review", recommendation: null },
       { id: "BA-002-05", category: "set_aside", label: "Set-Aside Eligibility", verdict: "pass", detail: "8(a) set-aside — requires SBA 8(a) certification or teaming with 8(a) firm.", evidence: "Solicitation Section B", recommendation: null },
-      { id: "BA-002-06", category: "competitive_position", label: "Competitive Position", verdict: "fail", detail: "Jacobs is the incumbent with 10+ years of EPA Region 4 work. We lack direct EPA relationship history. Significant competitive disadvantage on past performance factor.", evidence: "Market intelligence", recommendation: "Partner with an 8(a) firm that has EPA Region 4 experience to strengthen position." },
-      { id: "BA-002-07", category: "teaming", label: "Teaming Strategy", verdict: "pass", detail: "Identified 2 potential 8(a) teaming partners with EPA experience. Preliminary discussions underway.", evidence: "Partner screening results", recommendation: null },
-      { id: "BA-002-08", category: "pwin_estimate", label: "Pre-Capture Pwin Estimate", verdict: "pass", detail: "Estimated Pwin: 35% — below typical pursuit threshold but strategic entry into EPA market justifies investment.", evidence: "Pwin model output", recommendation: null },
+      { id: "BA-002-06", category: "competitive_position", label: "Competitive Position", verdict: "fail", detail: "Jacobs is the incumbent with 10+ years of DISA Enterprise work. We lack direct DISA relationship history. Significant competitive disadvantage on past performance factor.", evidence: "Market intelligence", recommendation: "Partner with an 8(a) firm that has DISA Enterprise experience to strengthen position." },
+      { id: "BA-002-07", category: "teaming", label: "Teaming Strategy", verdict: "pass", detail: "Identified 2 potential 8(a) teaming partners with DISA experience. Preliminary discussions underway.", evidence: "Partner screening results", recommendation: null },
+      { id: "BA-002-08", category: "pwin_estimate", label: "Pre-Capture Pwin Estimate", verdict: "pass", detail: "Estimated Pwin: 35% — below typical pursuit threshold but strategic entry into DISA market justifies investment.", evidence: "Pwin model output", recommendation: null },
     ],
     black_hat_findings: [],
     risk_factors: [
-      "Insufficient EPA past performance — may not meet minimum qualification threshold",
+      "Insufficient DISA past performance — may not meet minimum qualification threshold",
       "Jacobs incumbent has deep agency relationships and institutional knowledge",
       "8(a) set-aside adds complexity to teaming arrangement",
     ],
@@ -943,11 +943,11 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     updated_at: "2025-04-25T15:00:00Z",
   },
 
-  // ─── PROP-001: USACE FUDS — Black Hat (competitor analysis) ───────────
+  // ─── PROP-001: PEO IEW&S SETA — Black Hat (competitor analysis) ───────────
   {
     id: "CR-019",
     proposal_id: "PROP-001",
-    proposal_title: "USACE FUDS IDIQ Environmental Remediation — Technical & Cost Volume",
+    proposal_title: "Army PEO IEW&S SETA Support Services — Technical & Cost Volume",
     agency: "US Army Corps of Engineers",
     phase: "black_hat",
     status: "completed",
@@ -961,7 +961,7 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     failed_checks: 0,
     warning_checks: 0,
     reviewer: "AI Black Hat Engine",
-    summary: "Primary competitor Tetra Tech has incumbent advantage with established USACE relationships and historical cost data. Arcadis is a secondary threat with strong PFAS capabilities. Our differentiation must center on AI-enhanced remediation modeling and integrated GIS monitoring — capabilities neither competitor currently offers.",
+    summary: "Primary competitor Leidos has incumbent advantage with established USACE relationships and historical cost data. ManTech is a secondary threat with strong STIG validation capabilities. Our differentiation must center on AI-enhanced systems engineering modeling and integrated GIS monitoring — capabilities neither competitor currently offers.",
     go_no_go: null,
     confidence: null,
     requirement_checks: [],
@@ -972,17 +972,17 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
     format_checks: [],
     blue_assessments: [],
     black_hat_findings: [
-      { id: "BH-001-01", competitor: "Tetra Tech", area: "past_performance", assessment: "Incumbent on FUDS Region 3 — 8 years of continuous performance with Exceptional CPARS. Has intimate knowledge of site conditions, cost history, and USACE stakeholder preferences.", threat_level: "high", counter_strategy: "Emphasize our fresh perspective and willingness to introduce innovative approaches. Highlight areas where incumbent may have become complacent." },
-      { id: "BH-001-02", competitor: "Tetra Tech", area: "pricing", assessment: "Has historical cost data from current contract giving them pricing advantage. Can realistically price lower while maintaining margins.", threat_level: "high", counter_strategy: "Focus on best-value technical differentiators rather than competing on price alone. Propose AI-driven efficiencies that reduce total lifecycle cost." },
-      { id: "BH-001-03", competitor: "Tetra Tech", area: "technical_approach", assessment: "Strong traditional remediation capabilities but limited AI/ML integration. Their approach will likely be conservative and proven.", threat_level: "medium", counter_strategy: "Position AI-enhanced contamination modeling as a discriminator — show 30-40% time reduction with ML plume prediction." },
-      { id: "BH-001-04", competitor: "Arcadis", area: "technical_approach", assessment: "Recent investment in PFAS + AI capabilities (ERDC partnership). Could propose similar AI integration with more established PFAS treatment technology.", threat_level: "medium", counter_strategy: "Accelerate Arcadis teaming agreement — make them our partner, not our competitor. Their PFAS treatment expertise + our AI modeling = strongest possible team." },
-      { id: "BH-001-05", competitor: "Arcadis", area: "teaming", assessment: "May team with Tetra Tech instead if we don't secure exclusivity. Arcadis-Tetra Tech team would be extremely competitive.", threat_level: "high", counter_strategy: "Finalize Arcadis teaming agreement with exclusivity clause within 2 weeks. Offer them a meaningful scope share (30%+) to prevent competitor poaching." },
-      { id: "BH-001-06", competitor: "AECOM", area: "past_performance", assessment: "AECOM has FUDS experience in other regions but is not incumbent in Region 3. Likely competitor but not the primary threat.", threat_level: "low", counter_strategy: "Monitor AECOM teaming activity. Our Region 3 specific experience is an advantage over their general FUDS background." },
+      { id: "BH-001-01", competitor: "Leidos", area: "past_performance", assessment: "Incumbent on SETA Region 3 — 8 years of continuous performance with Exceptional CPARS. Has intimate knowledge of site conditions, cost history, and USACE stakeholder preferences.", threat_level: "high", counter_strategy: "Emphasize our fresh perspective and willingness to introduce innovative approaches. Highlight areas where incumbent may have become complacent." },
+      { id: "BH-001-02", competitor: "Leidos", area: "pricing", assessment: "Has historical cost data from current contract giving them pricing advantage. Can realistically price lower while maintaining margins.", threat_level: "high", counter_strategy: "Focus on best-value technical differentiators rather than competing on price alone. Propose AI-driven efficiencies that reduce total lifecycle cost." },
+      { id: "BH-001-03", competitor: "Leidos", area: "technical_approach", assessment: "Strong traditional systems engineering capabilities but limited AI/ML integration. Their approach will likely be conservative and proven.", threat_level: "medium", counter_strategy: "Position AI-enhanced vulnerability modeling as a discriminator — show 30-40% time reduction with ML plume prediction." },
+      { id: "BH-001-04", competitor: "ManTech", area: "technical_approach", assessment: "Recent investment in STIG validation + AI capabilities (DEVCOM research partnership). Could propose similar AI integration with more established cyber IA services technology.", threat_level: "medium", counter_strategy: "Accelerate ManTech teaming agreement — make them our partner, not our competitor. Their cyber IA services expertise + our AI modeling = strongest possible team." },
+      { id: "BH-001-05", competitor: "ManTech", area: "teaming", assessment: "May team with Leidos instead if we don't secure exclusivity. ManTech-Leidos team would be extremely competitive.", threat_level: "high", counter_strategy: "Finalize ManTech teaming agreement with exclusivity clause within 2 weeks. Offer them a meaningful scope share (30%+) to prevent competitor poaching." },
+      { id: "BH-001-06", competitor: "SAIC", area: "past_performance", assessment: "SAIC has SETA experience in other regions but is not incumbent in Region 3. Likely competitor but not the primary threat.", threat_level: "low", counter_strategy: "Monitor SAIC teaming activity. Our Region 3 specific experience is an advantage over their general SETA background." },
     ],
     risk_factors: [
-      "Tetra Tech incumbent advantage — they know the sites, the stakeholders, and the cost history",
-      "Arcadis could team with Tetra Tech if we don't secure exclusivity quickly",
-      "AECOM dark horse — could submit an innovative proposal at aggressive pricing",
+      "Leidos incumbent advantage — they know the sites, the stakeholders, and the cost history",
+      "ManTech could team with Leidos if we don't secure exclusivity quickly",
+      "SAIC dark horse — could submit an innovative proposal at aggressive pricing",
     ],
     created_at: "2025-05-01T08:00:00Z",
     updated_at: "2025-05-01T16:00:00Z",

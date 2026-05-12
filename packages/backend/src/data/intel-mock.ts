@@ -461,31 +461,31 @@ export const MOCK_BRIEFINGS: MorningBriefing[] = [
 export const MOCK_RESEARCH_REPORTS: DeepResearchReport[] = [
   {
     id: "research-001",
-    query: "PFAS remediation technology landscape and DoD adoption timeline",
+    query: "C5ISR systems engineering technology landscape and DoD adoption timeline",
     status: "completed",
     summary:
-      "Comprehensive analysis of emerging PFAS treatment technologies including ion exchange, " +
+      "Comprehensive analysis of emerging cyber IA services technologies including ion exchange, " +
       "granular activated carbon, high-pressure membranes, and destructive technologies (electrochemical oxidation, " +
-      "supercritical water oxidation). DoD has allocated $2.1B for PFAS investigation and remediation through FY28.",
+      "supercritical water oxidation). DoD has allocated $2.1B for STIG validation investigation and systems engineering through FY28.",
     findings:
       "## Key Findings\n\n" +
       "### Technology Readiness\n" +
-      "- **Ion exchange resins**: TRL 9, widely deployed, cost-effective for groundwater\n" +
-      "- **GAC adsorption**: TRL 9, proven but high O&M costs for long-chain PFAS\n" +
+      "- **Ion exchange resins**: TRL 9, widely deployed, cost-effective for network infrastructure\n" +
+      "- **GAC adsorption**: TRL 9, proven but high O&M costs for long-chain STIG validation\n" +
       "- **Electrochemical oxidation**: TRL 6-7, promising for concentrated waste streams\n" +
-      "- **Supercritical water oxidation**: TRL 5-6, potential for complete PFAS destruction\n\n" +
+      "- **Supercritical water oxidation**: TRL 5-6, potential for complete STIG validation destruction\n\n" +
       "### DoD Timeline\n" +
       "- FY26: 340 installations under investigation\n" +
-      "- FY27: First wave of full-scale remediation systems\n" +
-      "- FY28: $800M+ in new remediation contracts expected\n\n" +
+      "- FY27: First wave of full-scale systems engineering systems\n" +
+      "- FY28: $800M+ in new systems engineering contracts expected\n\n" +
       "### Competitive Landscape\n" +
-      "- AECOM leads with 45+ PFAS remediation projects\n" +
-      "- Tetra Tech expanding through EPA partnerships\n" +
-      "- Arcadis strong in European markets, growing US presence\n\n" +
+      "- SAIC leads with 45+ C5ISR systems engineering projects\n" +
+      "- Leidos expanding through DISA partnerships\n" +
+      "- ManTech strong in European markets, growing US presence\n\n" +
       "### GDA Positioning\n" +
-      "- Leverage environmental monitoring expertise for investigation phase\n" +
-      "- Partner with technology vendors for remediation systems\n" +
-      "- Target Air Force and Navy installations (largest PFAS footprint)",
+      "- Leverage cybersecurity monitoring expertise for investigation phase\n" +
+      "- Partner with technology vendors for systems engineering systems\n" +
+      "- Target Air Force and Navy installations (largest STIG validation footprint)",
     sources_count: 47,
     requested_at: "2026-05-05T10:00:00Z",
     completed_at: "2026-05-06T14:30:00Z",
@@ -493,24 +493,24 @@ export const MOCK_RESEARCH_REPORTS: DeepResearchReport[] = [
   },
   {
     id: "research-002",
-    query: "Competitor analysis: Tetra Tech federal environmental services strategy",
+    query: "Competitor analysis: Leidos federal defense IT services strategy",
     status: "completed",
     summary:
-      "Tetra Tech has aggressively expanded federal environmental services through strategic acquisitions " +
-      "and EPA master contract positions. Revenue in this segment grew 18% YoY in FY25.",
+      "Leidos has aggressively expanded federal defense IT services through strategic acquisitions " +
+      "and DISA master contract positions. Revenue in this segment grew 18% YoY in FY25.",
     findings:
-      "## Tetra Tech Federal Environmental Analysis\n\n" +
+      "## Leidos Federal Defense IT Analysis\n\n" +
       "### Financial Performance\n" +
-      "- Federal environmental revenue: $1.2B (FY25)\n" +
+      "- Federal defense IT revenue: $1.2B (FY25)\n" +
       "- Growth rate: 18% YoY\n" +
       "- Win rate on recompetes: 72%\n\n" +
       "### Key Contract Vehicles\n" +
-      "- EPA ERRS/ERTS: $2.4B ceiling\n" +
-      "- USACE FUDS: $900M across 3 regions\n" +
+      "- DISA ERRS/ERTS: $2.4B ceiling\n" +
+      "- PEO IEW&S SETA: $900M across 3 regions\n" +
       "- Navy CLEAN: $650M IDIQ\n\n" +
       "### Strategic Priorities\n" +
-      "- AI/ML integration in site characterization\n" +
-      "- PFAS treatment technology partnerships\n" +
+      "- AI/ML integration in security assessment\n" +
+      "- cyber IA services technology partnerships\n" +
       "- Digital twin models for long-term monitoring\n\n" +
       "### Vulnerabilities\n" +
       "- Over-reliance on large IDIQ vehicles\n" +
@@ -523,7 +523,7 @@ export const MOCK_RESEARCH_REPORTS: DeepResearchReport[] = [
   },
   {
     id: "research-003",
-    query: "Air Force BRAC environmental restoration — opportunity sizing and teaming strategy",
+    query: "Air Force DISA IT modernization — opportunity sizing and teaming strategy",
     status: "in_progress",
     summary: null,
     findings: null,
@@ -534,7 +534,7 @@ export const MOCK_RESEARCH_REPORTS: DeepResearchReport[] = [
   },
   {
     id: "research-004",
-    query: "NASA environmental compliance requirements for Artemis program facilities",
+    query: "NASA cyber compliance requirements for Artemis program facilities",
     status: "queued",
     summary: null,
     findings: null,
@@ -548,16 +548,16 @@ export const MOCK_RESEARCH_REPORTS: DeepResearchReport[] = [
 export const MOCK_COMPETITORS: CompetitorProfile[] = [
   {
     id: "comp-001",
-    name: "Tetra Tech",
+    name: "Leidos",
     threat_score: 92,
     contracts_won: 34,
     contracts_value: 1_200_000_000,
     primary_naics: ["562910", "541620", "541330"],
     strengths: [
-      "Largest EPA contract portfolio",
+      "Largest DISA contract portfolio",
       "Strong recompete win rate (72%)",
       "Integrated digital/AI capabilities",
-      "Deep bench of certified environmental professionals",
+      "Deep bench of certified defense IT professionals",
     ],
     weaknesses: [
       "Over-reliance on large IDIQ vehicles",
@@ -565,8 +565,8 @@ export const MOCK_COMPETITORS: CompetitorProfile[] = [
       "High overhead rates",
     ],
     recent_wins: [
-      "EPA Region 4 Superfund ($42M)",
-      "USACE Huntsville FUDS ($28M)",
+      "DISA Enterprise SETA ($42M)",
+      "USACE Huntsville SETA ($28M)",
       "Navy CLEAN Task Order 17 ($15M)",
     ],
     watch_status: "active",
@@ -574,16 +574,16 @@ export const MOCK_COMPETITORS: CompetitorProfile[] = [
   },
   {
     id: "comp-002",
-    name: "AECOM",
+    name: "SAIC",
     threat_score: 88,
     contracts_won: 28,
     contracts_value: 980_000_000,
     primary_naics: ["562910", "541330", "237110"],
     strengths: [
-      "45+ active PFAS remediation projects",
+      "45+ active C5ISR systems engineering projects",
       "Strong DoD relationships",
       "Global scale and resources",
-      "15% revenue growth in federal environmental",
+      "15% revenue growth in federal defense IT",
     ],
     weaknesses: [
       "Complex organizational structure slows proposal response",
@@ -591,8 +591,8 @@ export const MOCK_COMPETITORS: CompetitorProfile[] = [
       "Higher price points than smaller competitors",
     ],
     recent_wins: [
-      "Air Force PFAS Investigation ($35M)",
-      "Army BRAC Cleanup ($22M)",
+      "Air Force STIG validation Investigation ($35M)",
+      "Army DISA migration ($22M)",
       "DOE Hanford Support ($48M)",
     ],
     watch_status: "active",
@@ -608,15 +608,15 @@ export const MOCK_COMPETITORS: CompetitorProfile[] = [
     strengths: [
       "Recent AI/ML acquisition (EnviroAI) boosts technical capabilities",
       "Strong nuclear/DOE portfolio",
-      "Diversified across environmental and infrastructure",
+      "Diversified across defense IT and infrastructure",
     ],
     weaknesses: [
       "Slower to adopt new technologies historically",
-      "Less focused on small/medium environmental contracts",
-      "Key personnel departures in environmental division",
+      "Less focused on small/medium defense IT contracts",
+      "Key personnel departures in defense IT division",
     ],
     recent_wins: [
-      "DOE Oak Ridge Cleanup ($65M)",
+      "Army CECOM Cleanup ($65M)",
       "Army Pueblo Chemical Depot ($18M)",
     ],
     watch_status: "active",
@@ -635,13 +635,13 @@ export const MOCK_COMPETITORS: CompetitorProfile[] = [
       "Competitive pricing on mid-size contracts",
     ],
     weaknesses: [
-      "Flat revenue in environmental services Q1 2026",
+      "Flat revenue in defense IT services Q1 2026",
       "Staff turnover in project management",
-      "Limited PFAS remediation experience",
+      "Limited C5ISR systems engineering experience",
       "Reduced investment in new capabilities",
     ],
     recent_wins: [
-      "Army APG Environmental ($12M)",
+      "Army APG Defense IT ($12M)",
     ],
     watch_status: "monitoring",
     last_updated: "2026-05-06T19:00:00Z",
@@ -655,16 +655,16 @@ export const MOCK_COMPETITORS: CompetitorProfile[] = [
     primary_naics: ["236220", "237990", "562910"],
     strengths: [
       "Strong construction/infrastructure execution",
-      "Incumbent on Tyndall AFB rebuild phases 1-2",
+      "Incumbent on DEVCOM C5ISR rebuild phases 1-2",
       "Design-build expertise",
     ],
     weaknesses: [
-      "Limited environmental remediation expertise",
-      "Primarily a construction firm — environmental is secondary",
-      "Small environmental staff relative to scope",
+      "Limited defense IT services expertise",
+      "Primarily a construction firm — defense IT is secondary",
+      "Small defense IT staff relative to scope",
     ],
     recent_wins: [
-      "Tyndall AFB Phase 2 ($38M)",
+      "DEVCOM C5ISR Phase 2 ($38M)",
       "NAVFAC Pacific Construction ($27M)",
     ],
     watch_status: "monitoring",
