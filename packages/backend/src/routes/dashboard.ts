@@ -215,23 +215,48 @@ router.get("/command-signals", async (_req, res) => {
     plans = [];
   }
 
-  // --- Active risks: high likelihood or high impact ---
-  const activeRisks = plans
-    .flatMap((p) =>
-      p.risks
-        .filter((r) => r.likelihood === "high" || r.impact === "high")
-        .map((r) => ({
-          plan_id: p.id,
-          opportunity_id: p.opportunity_id,
-          opportunity_title: p.opportunity_title,
-          agency: p.agency,
-          description: r.description,
-          likelihood: r.likelihood,
-          impact: r.impact,
-          mitigation: r.mitigation,
-        }))
-    )
-    .slice(0, 8);
+  // --- Active risks: pull from risk_register table first, fall back to capture plans ---
+  let activeRisks: Array<Record<string, unknown>> = [];
+  const pool = getPool();
+  if (pool) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, opportunity_id, opportunity_title, category, if_statement, then_statement,
+                likelihood, impact, risk_score, status, mitigation_plan, mitigation_owner
+         FROM risk_register WHERE status != 'closed' ORDER BY risk_score DESC LIMIT 8`,
+      );
+      activeRisks = rows.map((r) => ({
+        risk_id: r.id,
+        opportunity_id: r.opportunity_id,
+        opportunity_title: r.opportunity_title,
+        category: r.category,
+        description: r.if_statement,
+        likelihood: r.likelihood,
+        impact: r.impact,
+        risk_score: parseFloat(r.risk_score) || 0,
+        mitigation: r.mitigation_plan,
+        status: r.status,
+      }));
+    } catch { /* fall through to capture plan risks */ }
+  }
+  if (activeRisks.length === 0) {
+    activeRisks = plans
+      .flatMap((p) =>
+        p.risks
+          .filter((r) => r.likelihood === "high" || r.impact === "high")
+          .map((r) => ({
+            plan_id: p.id,
+            opportunity_id: p.opportunity_id,
+            opportunity_title: p.opportunity_title,
+            agency: p.agency,
+            description: r.description,
+            likelihood: r.likelihood,
+            impact: r.impact,
+            mitigation: r.mitigation,
+          }))
+      )
+      .slice(0, 8);
+  }
 
   // --- Upcoming decisions: pending bid decisions ---
   const upcomingDecisions = plans

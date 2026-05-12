@@ -14,9 +14,27 @@ router.get("/", async (_req, res) => {
     try {
       const result = await pool.query("SELECT * FROM risk_register ORDER BY risk_score DESC, created_at DESC");
       if (result.rows.length > 0) {
+        const risks = result.rows;
+        const byStatus: Record<string, number> = {};
+        const byCategory: Record<string, number> = {};
+        const byLikelihood: Record<string, number> = {};
+        const byImpact: Record<string, number> = {};
+        let critical = 0;
+        for (const r of risks) {
+          byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+          byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
+          byLikelihood[r.likelihood] = (byLikelihood[r.likelihood] ?? 0) + 1;
+          byImpact[r.impact] = (byImpact[r.impact] ?? 0) + 1;
+          if (parseFloat(r.risk_score) >= 15 && r.status !== "closed") critical++;
+        }
         return res.json(successEnvelope("gda-risk-register", "list", {
-          risks: result.rows,
-          total: result.rows.length,
+          risks,
+          total: risks.length,
+          critical,
+          byStatus,
+          byCategory,
+          byLikelihood,
+          byImpact,
           source: "database",
         }));
       }

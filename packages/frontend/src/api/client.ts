@@ -3344,3 +3344,34 @@ export function promoteGovWinOpportunity(id: string) {
     { method: "POST" }
   );
 }
+
+// ---------------------------------------------------------------------------
+// Company Profile
+// ---------------------------------------------------------------------------
+
+export interface CompanyProfileData {
+  id: string | null;
+  name: string;
+  dba: string | null;
+  cage_code: string | null;
+  uei: string | null;
+  duns: string | null;
+  revenue: number | null;
+  employees: number | null;
+  naics_codes: string[];
+  psc_codes: string[];
+  capabilities: string[];
+  past_performance: string[];
+  set_aside_types: string[];
+  address_city: string | null;
+  address_state: string | null;
+  website: string | null;
+  contract_vehicles: string[];
+  certifications: string[];
+  core_competencies: string[];
+  source: string;
+}
+
+export function fetchCompanyProfile() {
+  return request<CompanyProfileData>("/company-profile");
+}
