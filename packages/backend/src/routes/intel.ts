@@ -217,12 +217,137 @@ router.get("/research/:id", async (req: Request, res: Response) => {
   });
 });
 
-// GET /api/intel/competitors — list competitor profiles
-// Wired to n8n gda-deep-research-history webhook (competitor type) with mock fallback.
+// GET /api/intel/competitors — list competitor profiles with movements
+// Reads from DB (competitor_profiles + competitor_movements), n8n as secondary source.
 router.get("/competitors", async (_req: Request, res: Response) => {
   const { watch_status, search, sortBy = "threat_score", sortDir = "desc" } = _req.query;
 
-  // 1. Try n8n webhook
+  const pool = getPool();
+
+  // 1. Try DB first — competitor_profiles joined with competitor_movements
+  if (pool) {
+    try {
+      const { rows: profiles } = await pool.query(
+        "SELECT * FROM competitor_profiles ORDER BY threat_score DESC"
+      );
+      if (profiles.length > 0) {
+        const { rows: movements } = await pool.query(
+          "SELECT * FROM competitor_movements ORDER BY detected_at DESC"
+        );
+
+        const movementsByCompetitor = new Map<string, typeof movements>();
+        for (const m of movements) {
+          const key = (m.competitor_name as string).toLowerCase();
+          // Exact match first, then best prefix match (longest profile name wins)
+          let bestMatch: { id: string; len: number } | null = null;
+          for (const p of profiles) {
+            const pName = (p.name as string).toLowerCase();
+            if (pName === key) {
+              bestMatch = { id: p.id as string, len: pName.length };
+              break; // exact match — stop searching
+            }
+            if (key.startsWith(pName) && pName.length >= 4 && (!bestMatch || pName.length > bestMatch.len)) {
+              bestMatch = { id: p.id as string, len: pName.length };
+            }
+          }
+          if (bestMatch) {
+            const existing = movementsByCompetitor.get(bestMatch.id) ?? [];
+            existing.push(m);
+            movementsByCompetitor.set(bestMatch.id, existing);
+          }
+        }
+
+        let competitors = profiles.map((p) => ({
+          id: p.id as string,
+          name: p.name as string,
+          threat_score: Number(p.threat_score),
+          contracts_won: Number(p.contracts_won),
+          contracts_value: Number(p.contracts_value),
+          primary_naics: (p.primary_naics ?? []) as string[],
+          strengths: (p.strengths ?? []) as string[],
+          weaknesses: (p.weaknesses ?? []) as string[],
+          recent_wins: (p.recent_wins ?? []) as string[],
+          watch_status: p.watch_status as string,
+          last_updated: p.last_updated as string,
+          movements: (movementsByCompetitor.get(p.id as string) ?? []).map((m) => ({
+            id: m.id as string,
+            movement_type: m.movement_type as string,
+            title: m.title as string,
+            description: (m.description ?? "") as string,
+            impact_assessment: (m.impact_assessment ?? "") as string,
+            threat_level: m.threat_level as string,
+            source: (m.source ?? "") as string,
+            source_url: (m.source_url ?? null) as string | null,
+            detected_at: m.detected_at as string,
+            verified: m.verified as boolean,
+          })),
+        }));
+
+        // Collect all teaming_announcement movements for summary
+        const teamingOpportunities = movements
+          .filter((m) => m.movement_type === "teaming_announcement")
+          .map((m) => ({
+            id: m.id as string,
+            competitor_name: m.competitor_name as string,
+            title: m.title as string,
+            description: (m.description ?? "") as string,
+            detected_at: m.detected_at as string,
+          }));
+
+        const allCount = competitors.length;
+
+        if (watch_status && typeof watch_status === "string") {
+          competitors = competitors.filter((c) => c.watch_status === watch_status);
+        }
+        if (search && typeof search === "string") {
+          const q = search.toLowerCase();
+          competitors = competitors.filter(
+            (c) =>
+              c.name.toLowerCase().includes(q) ||
+              c.strengths.some((s) => s.toLowerCase().includes(q)) ||
+              c.recent_wins.some((w) => w.toLowerCase().includes(q)) ||
+              c.movements.some((m) => m.title.toLowerCase().includes(q))
+          );
+        }
+
+        const key = String(sortBy) as keyof (typeof competitors)[0];
+        competitors.sort((a, b) => {
+          const av = a[key];
+          const bv = b[key];
+          if (av === bv) return 0;
+          if (av === null || av === undefined) return 1;
+          if (bv === null || bv === undefined) return -1;
+          if (typeof av === "number" && typeof bv === "number") {
+            return sortDir === "asc" ? av - bv : bv - av;
+          }
+          const cmp = String(av).localeCompare(String(bv));
+          return sortDir === "asc" ? cmp : -cmp;
+        });
+
+        res.json(
+          successEnvelope("GDA.api.competitor-watchlist", "list", {
+            competitors,
+            total: allCount,
+            filtered: competitors.length,
+            teamingOpportunities,
+            movementCounts: {
+              total: movements.length,
+              teaming: movements.filter((m) => m.movement_type === "teaming_announcement").length,
+              contract_wins: movements.filter((m) => m.movement_type === "contract_win").length,
+              personnel: movements.filter((m) => m.movement_type === "leadership_change" || m.movement_type === "hiring_surge").length,
+              mergers: movements.filter((m) => m.movement_type === "merger_acquisition").length,
+            },
+            source: "db" as const,
+          })
+        );
+        return;
+      }
+    } catch {
+      // fall through to n8n
+    }
+  }
+
+  // 2. Try n8n webhook as fallback
   if (n8nWebhookConfigured()) {
     try {
       const n8nResult = await fetchCompetitorsFromN8n();
@@ -261,13 +386,15 @@ router.get("/competitors", async (_req: Request, res: Response) => {
             competitors,
             total: n8nResult.competitors.length,
             filtered: competitors.length,
+            teamingOpportunities: [],
+            movementCounts: { total: 0, teaming: 0, contract_wins: 0, personnel: 0, mergers: 0 },
             source: "n8n" as const,
           })
         );
         return;
       }
     } catch {
-      // fall through to mock
+      // fall through to empty
     }
   }
 
@@ -276,6 +403,8 @@ router.get("/competitors", async (_req: Request, res: Response) => {
       competitors: [],
       total: 0,
       filtered: 0,
+      teamingOpportunities: [],
+      movementCounts: { total: 0, teaming: 0, contract_wins: 0, personnel: 0, mergers: 0 },
       source: "db" as const,
     })
   );
