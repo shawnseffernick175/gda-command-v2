@@ -238,12 +238,22 @@ router.get("/competitors", async (_req: Request, res: Response) => {
         const movementsByCompetitor = new Map<string, typeof movements>();
         for (const m of movements) {
           const key = (m.competitor_name as string).toLowerCase();
+          // Exact match first, then best prefix match (longest profile name wins)
+          let bestMatch: { id: string; len: number } | null = null;
           for (const p of profiles) {
-            if ((p.name as string).toLowerCase() === key || key.includes((p.name as string).toLowerCase())) {
-              const existing = movementsByCompetitor.get(p.id as string) ?? [];
-              existing.push(m);
-              movementsByCompetitor.set(p.id as string, existing);
+            const pName = (p.name as string).toLowerCase();
+            if (pName === key) {
+              bestMatch = { id: p.id as string, len: pName.length };
+              break; // exact match — stop searching
             }
+            if (key.startsWith(pName) && pName.length >= 4 && (!bestMatch || pName.length > bestMatch.len)) {
+              bestMatch = { id: p.id as string, len: pName.length };
+            }
+          }
+          if (bestMatch) {
+            const existing = movementsByCompetitor.get(bestMatch.id) ?? [];
+            existing.push(m);
+            movementsByCompetitor.set(bestMatch.id, existing);
           }
         }
 
