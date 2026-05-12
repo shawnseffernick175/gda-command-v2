@@ -164,6 +164,14 @@ export async function fetchOpsTrackerFromN8n(): Promise<N8nOpsTrackerResult> {
   };
 }
 
+// --- Single opportunity detail from n8n (find by ID in tracker list) ---
+
+export async function fetchOpportunityDetailFromN8n(id: string): Promise<Opportunity | null> {
+  const tracker = await fetchOpsTrackerFromN8n();
+  if (!tracker.ok) return null;
+  return tracker.opportunities.find((o) => String(o.id) === String(id)) ?? null;
+}
+
 // --- Pipeline data ---
 
 export interface N8nPipelineResult {
