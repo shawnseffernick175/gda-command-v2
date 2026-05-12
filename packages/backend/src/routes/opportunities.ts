@@ -260,12 +260,18 @@ router.get("/", async (req, res) => {
     `;
 
     const result = await pool.query(sql, params);
-    const rows: Opportunity[] = result.rows.map((r) => ({
+    const rawRows: Opportunity[] = result.rows.map((r) => ({
       ...r,
       score: parseFloat(r.score) || 0,
       value_estimated: r.value_estimated ? parseFloat(r.value_estimated) : null,
       probability_of_win: r.probability_of_win ? parseFloat(r.probability_of_win) : null,
     }));
+
+    // Enrich with NAICS size classification and apply naics_size filter
+    let rows = enrichWithNaicsSize(rawRows);
+    if (naicsSizeFilter === "small" || naicsSizeFilter === "large") {
+      rows = rows.filter((o) => o.naics_size === naicsSizeFilter);
+    }
 
     return res.json(
       successEnvelope(
@@ -274,7 +280,7 @@ router.get("/", async (req, res) => {
         { opportunities: rows, source: "db" as const },
         {
           count: rows.length,
-          filters_applied: { search, status: statusFilter, department: deptFilter, minPwin },
+          filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
         }
       )
     );

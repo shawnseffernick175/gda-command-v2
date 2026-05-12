@@ -173,33 +173,41 @@ router.post("/promote", async (req, res) => {
     const pool = getPool();
     let opportunityId: string | null = null;
 
-    if (pool) {
-      try {
-        const ftResult = await pool.query("SELECT * FROM fast_track_matches WHERE id = $1", [matchId]);
-        if (ftResult.rows.length > 0) {
-          const ftMatch = ftResult.rows[0];
-          const oppId = `opp-ft-${matchId}`;
-          const result = await pool.query(
-            `INSERT INTO opportunities (id, title, agency, department, status, capture_stage, score, value_estimated, probability_of_win, naics, tags, data_source, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, 'discovery', 'interest', $5, 0, 0, '', $6, 'fast-track', NOW(), NOW())
-             ON CONFLICT (id) DO NOTHING
-             RETURNING id`,
-            [
-              oppId,
-              ftMatch.technology,
-              ftMatch.candidate_agency ?? "TBD",
-              "TBD",
-              ftMatch.match_score,
-              ftMatch.technology_tags ?? [],
-            ],
-          );
-          if (result.rows.length > 0) {
-            opportunityId = result.rows[0].id;
-          }
-        }
-      } catch {
-        // DB insert failed
+    if (!pool) {
+      return res.status(503).json(
+        errorEnvelope("gda-fast-track", "promote", { code: "NO_DB", message: "Database unavailable", detail: null }),
+      );
+    }
+
+    const ftResult = await pool.query("SELECT * FROM fast_track_matches WHERE id = $1", [matchId]);
+    if (ftResult.rows.length === 0) {
+      return res.status(404).json(
+        errorEnvelope("gda-fast-track", "promote", { code: "NOT_FOUND", message: `Match ${matchId} not found`, detail: null }),
+      );
+    }
+
+    const ftMatch = ftResult.rows[0];
+    const oppId = `opp-ft-${matchId}`;
+    try {
+      const result = await pool.query(
+        `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, tags, data_source, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'discovery', $5, 0, 0, '', $6, 'fast-track', NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING
+         RETURNING id`,
+        [
+          oppId,
+          ftMatch.technology,
+          ftMatch.candidate_agency ?? "TBD",
+          "TBD",
+          ftMatch.match_score,
+          ftMatch.technology_tags ?? [],
+        ],
+      );
+      if (result.rows.length > 0) {
+        opportunityId = result.rows[0].id;
       }
+    } catch {
+      // DB insert failed — match exists but promotion insert failed
     }
 
     return res.json(
@@ -207,7 +215,7 @@ router.post("/promote", async (req, res) => {
         matchId,
         status: "promoted",
         opportunityId,
-        message: `Match ${matchId} promoted to Ops Tracker`,
+        message: `${ftMatch.technology} promoted to Ops Tracker`,
       }),
     );
   } catch (err) {
