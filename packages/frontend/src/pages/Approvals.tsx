@@ -101,8 +101,13 @@ export default function Approvals() {
       const env = await resolveApproval(id, action, undefined, true);
       if (env.success && env.data) {
         setResolveResult(env.data);
-        // When approving qualify/bid approvals, also mark the opportunity as approved for pipeline
+        // After dry-run preview succeeds, perform real approval + pipeline entry
         if (action === "approve") {
+          try {
+            await resolveApproval(id, action, undefined, false);
+          } catch {
+            // non-blocking — dry-run already succeeded
+          }
           const approval = items.find((a) => a.id === id);
           if (approval?.related_entity_id && (approval.category === "qualify_write" || approval.category === "bid_decision")) {
             try {

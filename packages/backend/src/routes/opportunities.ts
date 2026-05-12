@@ -460,7 +460,7 @@ router.get("/pipeline", async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/opportunities/:id/approve — mark opportunity as approved
 // ---------------------------------------------------------------------------
-router.post("/:id/approve", async (req, res) => {
+router.post("/:id/approve", requireRole("admin", "bd_manager"), async (req, res) => {
   const { id } = req.params;
   const pool = getPool();
   if (!pool) {
