@@ -40,6 +40,14 @@ const STAGE_COLORS: Record<string, string> = {
   lost: "#ef4444",
 };
 
+const STAGE_LABELS: Record<string, string> = {
+  discovery: "Interest",
+  qualified: "Qualify",
+  pipeline: "Pursue",
+  won: "Won",
+  lost: "Lost",
+};
+
 const URGENCY_COLORS: Record<string, string> = {
   high: "#ef4444",
   medium: "#f59e0b",
@@ -407,9 +415,9 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
         label="Total Opportunities"
         value={String(kpis.totalOpportunities)}
         info={{
-          whatItIs: "Count of all tracked opportunities (Discovery + Qualified status).",
+          whatItIs: "Count of all tracked opportunities (Interest + Qualify status).",
           whatItMeans: "Total number of potential contracts being evaluated or actively pursued.",
-          howCalculated: "Count of opportunities in Discovery and Qualified stages. Does not include Fast Track R&D signals.",
+          howCalculated: "Count of opportunities in Interest and Qualify stages. Does not include Fast Track R&D signals.",
         }}
       />
       {kpis.n8nKpis ? (
@@ -432,7 +440,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             info={{
               whatItIs: "Total estimated value of approved pipeline opportunities.",
               whatItMeans: "The dollar amount of contracts you are actively pursuing (Qualified + Pipeline status only).",
-              howCalculated: "Sum of estimated values for opportunities in Qualified and Pipeline stages. Discovery items are excluded — they are prospects, not pipeline.",
+              howCalculated: "Sum of estimated values for opportunities in Qualify and Pursue stages. Interest items are excluded — they are prospects, not pipeline.",
             }}
           />
           <KPICard
@@ -588,7 +596,7 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
                 color: STATUS_COLORS[item.status] ?? "#6b7280",
                 textTransform: "uppercase",
               }}>
-                {item.status.replace("_", " ")}
+                {STAGE_LABELS[item.status] ?? item.status.replace("_", " ")}
               </span>
               {item.title}
             </div>
@@ -620,7 +628,7 @@ function FunnelSection({ kpis }: { kpis: DashboardKPIs }) {
         <InfoBadge
           whatItIs="Visual breakdown of opportunities by pipeline stage."
           whatItMeans="Shows how many opportunities are at each stage. Click any bar to filter the Ops Tracker by that stage."
-          howCalculated="Count and total value of opportunities grouped by status: Discovery → Qualified → Pipeline → Won → Lost."
+          howCalculated="Count and total value of opportunities grouped by status: Interest → Qualify → Pursue → Won → Lost."
           size={16}
         />
       </h2>
@@ -662,7 +670,7 @@ function TopOpportunitiesSection({ kpis }: { kpis: DashboardKPIs }) {
 const QUICK_ACCESS_CARDS = [
   { title: "Fast Track", description: "Emerging signals, technology matching, and contract-path discovery.", to: "/fast-track", statusColor: "#ef4444" },
   { title: "QA Center", description: "Platform health checks, smoke tests, and latest failures.", to: "/qa-center", statusColor: "var(--color-success)" },
-  { title: "Ops Tracker", description: "Opportunity discovery, filtering, sorting, and qualify dry-run.", to: "/ops-tracker", statusColor: "#f59e0b" },
+  { title: "Ops Tracker", description: "Opportunity tracking, filtering, sorting, and qualify dry-run.", to: "/ops-tracker", statusColor: "#f59e0b" },
   { title: "Pipeline", description: "Read-only view of qualified pipeline opportunities.", to: "/pipeline", statusColor: "#8b5cf6" },
   { title: "Doctrine", description: "Sprint doctrine drafts, finalization gates, and publish history.", to: "/doctrine", statusColor: "#06b6d4" },
   { title: "Intel Hub", description: "Intelligence feed, morning briefings, deep research, and competitor watch.", to: "/intel", statusColor: "#ec4899" },
@@ -813,10 +821,9 @@ function FunnelRow({
         width: 90,
         fontSize: 13,
         fontWeight: 600,
-        textTransform: "capitalize",
         color,
       }}>
-        {stage.stage}
+        {STAGE_LABELS[stage.stage] ?? stage.stage}
       </div>
       <div style={{
         flex: 1,
@@ -912,7 +919,7 @@ function TopOppRow({ opp }: { opp: OpportunityRow }) {
         color: stageColor,
         textTransform: "capitalize",
       }}>
-        {opp.status}
+        {STAGE_LABELS[opp.status] ?? opp.status}
       </span>
     </Link>
   );
