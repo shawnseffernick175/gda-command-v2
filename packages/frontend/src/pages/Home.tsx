@@ -632,6 +632,12 @@ function FunnelSection({ kpis }: { kpis: DashboardKPIs }) {
           size={16}
         />
       </h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "0 0 8px", borderBottom: "1px solid rgba(255,255,255,0.06)", marginBottom: 4 }}>
+        <div style={{ width: 110, fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Stage</div>
+        <div style={{ flex: 1, fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Count</div>
+        <div style={{ width: 100, fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>Value</div>
+        <div style={{ width: 70, fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>Avg Pwin</div>
+      </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {kpis.funnel.map((stage) => (
           <FunnelRow key={stage.stage} stage={stage} maxCount={kpis.totalOpportunities} />
@@ -812,13 +818,13 @@ function FunnelRow({
 
   return (
     <div
-      style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", padding: "4px 0", borderRadius: 4, transition: "background 0.15s" }}
+      style={{ display: "flex", alignItems: "center", gap: 20, cursor: "pointer", padding: "6px 0", borderRadius: 4, transition: "background 0.15s" }}
       onClick={() => navigate(`/ops-tracker?status=${stage.stage}`)}
       onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <div style={{
-        width: 90,
+        width: 110,
         fontSize: 13,
         fontWeight: 600,
         color,
@@ -852,10 +858,10 @@ function FunnelRow({
           {stage.count}
         </span>
       </div>
-      <div style={{ width: 90, fontSize: 12, color: "var(--color-text-muted)", textAlign: "right" }}>
+      <div style={{ width: 100, fontSize: 12, color: "var(--color-text-muted)", textAlign: "right", fontWeight: 500 }}>
         {formatCurrency(stage.totalValue)}
       </div>
-      <div style={{ width: 60, fontSize: 12, color: "var(--color-text-muted)", textAlign: "right" }}>
+      <div style={{ width: 70, fontSize: 12, color: "var(--color-text-muted)", textAlign: "right" }}>
         {stage.count > 0 ? formatPwin(stage.avgPwin) : "—"}
       </div>
     </div>
