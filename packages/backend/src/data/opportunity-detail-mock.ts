@@ -237,6 +237,14 @@ const detailSeeds: Record<string, DetailSeed> = {
 // ---------------------------------------------------------------------------
 // Generate a generic detail seed for opportunities without specific data.
 // ---------------------------------------------------------------------------
+const STAGE_LABELS: Record<string, string> = {
+  discovery: "Interest",
+  qualified: "Qualify",
+  pipeline: "Pursue",
+  won: "Won",
+  lost: "Lost",
+};
+
 function generateGenericDetail(opp: Opportunity): DetailSeed {
   const valueFmt = opp.value_estimated
     ? `$${(opp.value_estimated / 1e6).toFixed(1)}M`
@@ -244,23 +252,27 @@ function generateGenericDetail(opp: Opportunity): DetailSeed {
   const pwinPct = opp.probability_of_win
     ? `${Math.round(opp.probability_of_win * 100)}%`
     : "unknown";
+  const stageLabel = STAGE_LABELS[opp.status] ?? opp.status;
+  const isEarlyStage = opp.status === "discovery" || opp.status === "qualified";
 
   return {
     analysis: {
-      executive_summary: `${opp.title} is a ${valueFmt} opportunity with ${opp.department ?? "a federal agency"}. Current stage is Interest with a score of ${opp.score} and Pwin of ${pwinPct}. ${opp.incumbent ? `${opp.incumbent} is the known incumbent.` : "No incumbent has been identified."} Further analysis is recommended to develop a comprehensive capture strategy.`,
+      executive_summary: `${opp.title} is a ${valueFmt} opportunity with ${opp.department ?? "a federal agency"}. Current stage is ${stageLabel} with a score of ${opp.score} and Pwin of ${pwinPct}. ${opp.incumbent ? `${opp.incumbent} is the known incumbent.` : "No incumbent has been identified."} Further analysis is recommended to develop a comprehensive capture strategy.`,
       strengths: [
         `Score of ${opp.score} indicates ${opp.score >= 80 ? "strong" : opp.score >= 60 ? "moderate" : "developing"} alignment`,
         opp.naics ? `NAICS ${opp.naics} aligns with Envision capabilities` : "Broad capability alignment identified",
       ],
       risks: [
         opp.incumbent ? `${opp.incumbent} is the established incumbent` : "Unknown incumbent creates uncertainty",
-        "Interest stage — additional qualification research needed before committing capture resources",
+        `${stageLabel} stage — ${isEarlyStage ? "additional qualification research needed before committing capture resources" : "continued capture development and competitive positioning required"}`,
       ],
       competitive_landscape: opp.incumbent
         ? `${opp.incumbent} is the primary competitive threat as incumbent. Additional competitive intelligence is needed.`
         : "No competitive intelligence available for this opportunity.",
       relevance_rationale: `Score of ${opp.score} based on NAICS alignment, agency relationship potential, and estimated contract value.`,
-      recommended_action: "Continue qualification research and gather additional competitive intelligence before advancing to Qualify stage.",
+      recommended_action: isEarlyStage
+        ? "Continue qualification research and gather additional competitive intelligence before advancing to Qualify stage."
+        : "Continue capture development and refine competitive positioning to strengthen win probability.",
       confidence: null,
       last_analyzed_at: opp.updated_at,
       analyst_feedback: null,

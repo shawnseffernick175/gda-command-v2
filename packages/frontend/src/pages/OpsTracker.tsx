@@ -331,8 +331,8 @@ export default function OpsTracker() {
         >
           <option value="">All statuses</option>
           <option value="discovery">Interest</option>
-          <option value="qualified">Qualified</option>
-          <option value="pipeline">Pipeline</option>
+          <option value="qualified">Qualify</option>
+          <option value="pipeline">Pursue</option>
           <option value="won">Won</option>
           <option value="lost">Lost</option>
         </select>
