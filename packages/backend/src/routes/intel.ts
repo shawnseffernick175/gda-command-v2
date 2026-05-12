@@ -102,28 +102,78 @@ router.get("/feed", async (_req: Request, res: Response) => {
   );
 });
 
-// GET /api/intel/briefings — list morning briefings
-// NOTE: n8n gda-daily-brief webhook references a deleted credential.
-// Keeping mock data until the n8n workflow is updated.
-router.get("/briefings", (_req: Request, res: Response) => {
+// GET /api/intel/briefings — list morning briefings from DB
+router.get("/briefings", async (_req: Request, res: Response) => {
   const { date } = _req.query;
-  let briefings: Array<Record<string, unknown>> = [];
+  const pool = getPool();
 
-  if (date && typeof date === "string") {
-    briefings = briefings.filter((b) => b.date === date);
+  if (pool) {
+    try {
+      let query = "SELECT * FROM morning_briefings ORDER BY date DESC";
+      const params: string[] = [];
+      if (date && typeof date === "string") {
+        query = "SELECT * FROM morning_briefings WHERE date = $1 ORDER BY date DESC";
+        params.push(date);
+      }
+      const { rows } = await pool.query(query, params);
+      if (rows.length > 0) {
+        const briefings = rows.map((r) => ({
+          id: r.id,
+          date: typeof r.date === "string" ? r.date : (r.date as Date).toISOString().slice(0, 10),
+          headline: r.headline,
+          key_metrics: r.key_metrics ?? [],
+          alerts: r.alerts ?? [],
+          action_items: r.action_items ?? [],
+          market_snapshot: r.market_snapshot ?? "",
+          generated_at: r.generated_at,
+        }));
+        return res.json(
+          successEnvelope("GDA.api.daily-brief", "list", {
+            briefings,
+            total: briefings.length,
+            source: "db" as const,
+          })
+        );
+      }
+    } catch { /* fall through to empty */ }
   }
 
   res.json(
     successEnvelope("GDA.api.daily-brief", "list", {
-      briefings,
-      total: briefings.length,
+      briefings: [],
+      total: 0,
       source: "db" as const,
     })
   );
 });
 
-// GET /api/intel/briefings/:id — single briefing detail
-router.get("/briefings/:id", (req: Request, res: Response) => {
+// GET /api/intel/briefings/:id — single briefing detail from DB
+router.get("/briefings/:id", async (req: Request, res: Response) => {
+  const pool = getPool();
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM morning_briefings WHERE id = $1", [req.params.id]);
+      if (rows.length > 0) {
+        const r = rows[0];
+        return res.json(
+          successEnvelope("GDA.api.daily-brief", "detail", {
+            briefing: {
+              id: r.id,
+              date: typeof r.date === "string" ? r.date : (r.date as Date).toISOString().slice(0, 10),
+              headline: r.headline,
+              key_metrics: r.key_metrics ?? [],
+              alerts: r.alerts ?? [],
+              action_items: r.action_items ?? [],
+              market_snapshot: r.market_snapshot ?? "",
+              generated_at: r.generated_at,
+            },
+            source: "db" as const,
+          })
+        );
+      }
+    } catch { /* fall through to 404 */ }
+  }
+
   res.status(404).json({
     success: false,
     workflow: "GDA.api.daily-brief",

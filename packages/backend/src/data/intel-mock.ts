@@ -8,381 +8,453 @@ import type {
 export const MOCK_INTEL_ITEMS: IntelItem[] = [
   {
     id: "intel-001",
-    title: "USACE announces $180M FUDS remediation IDIQ",
+    title: "Army PEO IEW&S releases SETA follow-on RFP — $28.5M ceiling",
     summary:
-      "Army Corps posted a new pre-solicitation for Formerly Used Defense Sites environmental remediation. " +
-      "Multiple award IDIQ, 5-year base plus 2 option years. Set-aside: Full & Open with SB reserve.",
+      "PEO Intelligence, Electronic Warfare & Sensors posted the final RFP for next-gen ISR SETA support. " +
+      "Full & Open with SDVOSB set-aside evaluation factor. Incumbent is Leidos. Proposal due Aug 15, 2026.",
     category: "opportunity",
     priority: "critical",
     source: "sam_gov",
-    source_url: "https://sam.gov/opp/abc123",
+    source_url: "https://sam.gov/opp/iews-seta-2026",
     related_opportunity_id: "opp-001",
-    related_competitor: null,
-    tags: ["USACE", "FUDS", "environmental", "IDIQ"],
-    created_at: "2026-05-10T06:00:00Z",
+    related_competitor: "Leidos",
+    tags: ["Army", "PEO IEW&S", "SETA", "ISR", "SDVOSB"],
+    created_at: "2026-05-12T06:00:00Z",
     data_source: "sam.gov",
     read: false,
   },
   {
     id: "intel-002",
-    title: "Tetra Tech wins $42M EPA Superfund contract",
+    title: "DoD CIO mandates zero trust architecture by FY28 for all networks",
     summary:
-      "Tetra Tech was awarded EPA Region 4 Superfund Technical Support contract. " +
-      "This was a recompete we were tracking — incumbent advantage played out as expected.",
-    category: "competitive",
-    priority: "high",
-    source: "fpds",
-    source_url: "https://www.fpds.gov/ezsearch/search.do?q=tetra+tech+epa",
-    related_opportunity_id: "opp-003",
-    related_competitor: "Tetra Tech",
-    tags: ["Tetra Tech", "EPA", "Superfund", "loss analysis"],
-    created_at: "2026-05-09T18:30:00Z",
-    data_source: "fpds",
-    read: true,
-  },
-  {
-    id: "intel-003",
-    title: "New PFAS regulation draft published by EPA",
-    summary:
-      "EPA released proposed rule for PFAS maximum contaminant levels in drinking water. " +
-      "This will drive significant new remediation requirements at DoD installations. " +
-      "Potential pipeline impact: $500M+ in new PFAS remediation contracts over 3 years.",
+      "The DoD CIO issued a directive requiring all DoD components to implement zero trust architecture " +
+      "per the DoD Zero Trust Reference Architecture v2.0 by end of FY28. This creates significant " +
+      "demand for cybersecurity engineering and migration services across all military branches.",
     category: "regulatory",
-    priority: "high",
+    priority: "critical",
     source: "news",
-    source_url: "https://www.epa.gov/pfas/proposed-pfas-rule",
+    source_url: "https://dodcio.defense.gov/zero-trust",
     related_opportunity_id: null,
     related_competitor: null,
-    tags: ["PFAS", "EPA", "regulation", "remediation", "DoD"],
-    created_at: "2026-05-09T14:00:00Z",
+    tags: ["DoD", "zero trust", "cybersecurity", "policy", "FY28"],
+    created_at: "2026-05-11T18:30:00Z",
     data_source: "manual",
     read: false,
   },
   {
-    id: "intel-004",
-    title: "Jacobs acquires small AI/ML environmental analytics firm",
+    id: "intel-003",
+    title: "Leidos wins $450M DISA Global Information Grid contract",
     summary:
-      "Jacobs Engineering announced acquisition of EnviroAI, a 50-person firm specializing in " +
-      "machine learning for contamination plume modeling. Signals increased competitor investment in AI capabilities.",
+      "Leidos was awarded the DISA GIG Engineering & Sustainment contract, beating SAIC and Booz Allen. " +
+      "5-year IDIQ with $450M ceiling. Strengthens Leidos position on Army network programs and may " +
+      "signal aggressive pricing on follow-on SETA work.",
     category: "competitive",
-    priority: "medium",
-    source: "news",
-    source_url: null,
+    priority: "high",
+    source: "fpds",
+    source_url: "https://www.fpds.gov/ezsearch/search.do?q=leidos+disa+gig",
     related_opportunity_id: null,
-    related_competitor: "Jacobs Engineering",
-    tags: ["Jacobs", "AI", "acquisition", "competitive"],
-    created_at: "2026-05-09T10:15:00Z",
-    data_source: "manual",
+    related_competitor: "Leidos",
+    tags: ["Leidos", "DISA", "GIG", "network", "award"],
+    created_at: "2026-05-11T14:00:00Z",
+    data_source: "fpds",
     read: true,
   },
   {
-    id: "intel-005",
-    title: "Navy NAVFAC solicitation for Tyndall AFB rebuild — Phase 3",
+    id: "intel-004",
+    title: "CMMC 2.0 Level 2 assessment timeline accelerated — C3PAOs ramping up",
     summary:
-      "NAVFAC Southeast released Phase 3 of the Tyndall AFB resilient infrastructure rebuild. " +
-      "Scope: $42M for utilities modernization and climate-resilient building systems. " +
-      "Due date: June 15, 2026. Prior phases awarded to Hensel Phelps.",
+      "The Cyber AB announced that CMMC Level 2 assessments are running ahead of schedule with 40+ " +
+      "C3PAOs now accredited. Companies without assessments scheduled by Q4 2026 risk being locked " +
+      "out of DoD contracts requiring CMMC compliance.",
+    category: "regulatory",
+    priority: "high",
+    source: "news",
+    source_url: null,
+    related_opportunity_id: null,
+    related_competitor: null,
+    tags: ["CMMC", "cybersecurity", "compliance", "DoD", "C3PAO"],
+    created_at: "2026-05-11T10:15:00Z",
+    data_source: "manual",
+    read: false,
+  },
+  {
+    id: "intel-005",
+    title: "DEVCOM C5ISR posts Sources Sought for cyber security IA services",
+    summary:
+      "DEVCOM C5ISR Center published a Sources Sought notice for Cyber Security & Information Assurance " +
+      "engineering support. Scope includes RMF assessment, STIG compliance, and penetration testing. " +
+      "$22M estimated value. Responses due June 15.",
     category: "opportunity",
     priority: "high",
     source: "sam_gov",
-    source_url: "https://sam.gov/opp/def456",
-    related_opportunity_id: "opp-005",
-    related_competitor: "Hensel Phelps",
-    tags: ["Navy", "NAVFAC", "Tyndall", "infrastructure", "resilience"],
-    created_at: "2026-05-08T22:00:00Z",
+    source_url: "https://sam.gov/opp/c5isr-cyber-2026",
+    related_opportunity_id: "opp-003",
+    related_competitor: null,
+    tags: ["C5ISR", "DEVCOM", "cybersecurity", "RMF", "STIG"],
+    created_at: "2026-05-10T22:00:00Z",
     data_source: "sam.gov",
     read: false,
   },
   {
     id: "intel-006",
-    title: "DOE NNSA security upgrades — insider threat detected in competitor bid",
+    title: "FAR Case 2024-006: New cybersecurity incident reporting requirements",
     summary:
-      "Intelligence from industry sources suggests a competitor's bid for NNSA security upgrades " +
-      "has personnel clearance issues. This may create a re-bid opportunity for GDA if the award is protested.",
-    category: "threat",
-    priority: "medium",
-    source: "manual",
-    source_url: null,
-    related_opportunity_id: "opp-007",
+      "FAR Council issued final rule requiring contractors to report cybersecurity incidents within 8 hours " +
+      "(down from 72 hours). Applies to all contracts over $250K handling CUI. Effective October 1, 2026. " +
+      "Companies need updated incident response plans and 24/7 SOC capability.",
+    category: "regulatory",
+    priority: "high",
+    source: "news",
+    source_url: "https://www.federalregister.gov/documents/far-case-2024-006",
+    related_opportunity_id: null,
     related_competitor: null,
-    tags: ["DOE", "NNSA", "security", "protest", "recompete"],
-    created_at: "2026-05-08T16:45:00Z",
+    tags: ["FAR", "cybersecurity", "incident reporting", "CUI", "compliance"],
+    created_at: "2026-05-10T16:45:00Z",
     data_source: "manual",
     read: true,
   },
   {
     id: "intel-007",
-    title: "NASA KSC Launch Complex modernization RFI published",
+    title: "SAIC acquires small AI/ML defense analytics firm for $180M",
     summary:
-      "NASA Kennedy Space Center issued an RFI for next-generation launch pad environmental systems. " +
-      "Includes acoustic suppression, flame trench water recovery, and emissions monitoring. " +
-      "Responses due May 30.",
-    category: "opportunity",
-    priority: "medium",
-    source: "sam_gov",
-    source_url: "https://sam.gov/opp/ghi789",
-    related_opportunity_id: "opp-009",
-    related_competitor: null,
-    tags: ["NASA", "KSC", "launch complex", "environmental", "RFI"],
-    created_at: "2026-05-08T12:00:00Z",
-    data_source: "sam.gov",
-    read: false,
-  },
-  {
-    id: "intel-008",
-    title: "AECOM reports 15% revenue growth in federal environmental segment",
-    summary:
-      "AECOM's Q2 2026 earnings call highlighted 15% YoY revenue growth in their federal environmental " +
-      "segment, driven by PFAS remediation and military base cleanup contracts. They plan to hire 200+ " +
-      "environmental engineers this year.",
+      "SAIC announced acquisition of DefenseAI, a 120-person firm specializing in machine learning " +
+      "for ISR data fusion and predictive maintenance. Signals increased competitor investment in AI " +
+      "capabilities for defense IT programs.",
     category: "competitive",
-    priority: "low",
+    priority: "medium",
     source: "news",
     source_url: null,
     related_opportunity_id: null,
-    related_competitor: "AECOM",
-    tags: ["AECOM", "earnings", "growth", "environmental", "hiring"],
-    created_at: "2026-05-07T20:00:00Z",
+    related_competitor: "SAIC",
+    tags: ["SAIC", "AI", "acquisition", "ISR", "competitive"],
+    created_at: "2026-05-10T12:00:00Z",
     data_source: "manual",
     read: true,
   },
   {
-    id: "intel-009",
-    title: "AI-assisted proposal scoring gains traction in DoD evaluations",
+    id: "intel-008",
+    title: "DoD FY27 budget request: +8% for cyber operations, +12% for AI/ML",
     summary:
-      "Multiple DoD agencies are piloting AI-assisted proposal evaluation tools. Early reports suggest " +
-      "proposals with structured data formats and clear compliance matrices score higher. " +
-      "GDA should consider adapting proposal templates.",
-    category: "technology",
-    priority: "medium",
-    source: "research",
+      "The FY27 President's Budget Request includes $14.5B for cyberspace operations (+8% over FY26) " +
+      "and $3.2B for AI/ML initiatives (+12%). Key growth areas: zero trust implementation, cloud " +
+      "migration, autonomous systems, and AI-enabled decision support.",
+    category: "market",
+    priority: "critical",
+    source: "news",
     source_url: null,
     related_opportunity_id: null,
     related_competitor: null,
-    tags: ["AI", "proposal", "DoD", "evaluation", "technology"],
-    created_at: "2026-05-07T14:30:00Z",
+    tags: ["DoD", "budget", "FY27", "cyber", "AI", "funding"],
+    created_at: "2026-05-09T20:00:00Z",
+    data_source: "manual",
+    read: false,
+  },
+  {
+    id: "intel-009",
+    title: "ManTech posts weak Q1 — potential teaming opportunity on Army programs",
+    summary:
+      "ManTech Q1 2026 earnings show 5% revenue decline in defense IT segment citing " +
+      "staff turnover and delayed task order awards. May signal weakened competitive positioning " +
+      "on Army SETA recompetes. Consider teaming approach for PEO IEW&S follow-on.",
+    category: "competitive",
+    priority: "medium",
+    source: "news",
+    source_url: null,
+    related_opportunity_id: "opp-001",
+    related_competitor: "ManTech",
+    tags: ["ManTech", "earnings", "weakness", "teaming", "Army"],
+    created_at: "2026-05-09T14:30:00Z",
     data_source: "manual",
     read: false,
   },
   {
     id: "intel-010",
-    title: "EPA Region 2 budget increase for environmental justice programs",
+    title: "OMB Memo M-26-12: AI governance framework for federal agencies",
     summary:
-      "EPA Region 2 (NY/NJ/PR/VI) announced a 25% budget increase for environmental justice grants " +
-      "and technical assistance. New funding for community air monitoring and lead remediation. " +
-      "GDA has strong past performance in Region 2.",
-    category: "market",
-    priority: "high",
-    source: "n8n_crawl",
-    source_url: "https://www.epa.gov/aboutepa/epa-region-2",
+      "OMB issued guidance requiring agencies to establish AI governance boards and conduct impact " +
+      "assessments for all AI systems in production by December 2026. Creates demand for AI governance " +
+      "consulting and compliance assessment services.",
+    category: "regulatory",
+    priority: "medium",
+    source: "news",
+    source_url: "https://www.whitehouse.gov/omb/memo-m-26-12",
     related_opportunity_id: null,
     related_competitor: null,
-    tags: ["EPA", "Region 2", "environmental justice", "budget", "lead"],
-    created_at: "2026-05-07T08:00:00Z",
+    tags: ["OMB", "AI", "governance", "policy", "federal"],
+    created_at: "2026-05-09T08:00:00Z",
     data_source: "manual",
     read: true,
   },
   {
     id: "intel-011",
-    title: "Competitor Parsons posts weak Q1 in environmental services",
+    title: "DISA awards Enterprise Cloud Computing contract modifications worth $620M",
     summary:
-      "Parsons Corp Q1 2026 results show flat revenue in environmental services segment, " +
-      "citing project delays and staff turnover. May signal weakened competitive positioning " +
-      "on upcoming recompetes.",
-    category: "competitive",
-    priority: "low",
-    source: "news",
+      "DISA issued contract modifications to milCloud 2.0 and JEDI follow-on for DoD enterprise cloud. " +
+      "AWS and Azure split the awards. Creates downstream demand for cloud migration engineering, " +
+      "security accreditation (ATO), and DevSecOps pipeline development.",
+    category: "market",
+    priority: "high",
+    source: "fpds",
     source_url: null,
     related_opportunity_id: null,
-    related_competitor: "Parsons",
-    tags: ["Parsons", "earnings", "weakness", "recompete"],
-    created_at: "2026-05-06T19:00:00Z",
-    data_source: "manual",
+    related_competitor: null,
+    tags: ["DISA", "cloud", "AWS", "Azure", "migration", "DevSecOps"],
+    created_at: "2026-05-08T19:00:00Z",
+    data_source: "fpds",
     read: true,
   },
   {
     id: "intel-012",
-    title: "Air Force announces comprehensive BRAC environmental restoration plan",
+    title: "Air Force Hanscom issues draft RFP for Enterprise IT Network Modernization",
     summary:
-      "Air Force Civil Engineer Center published a 5-year plan for accelerating environmental " +
-      "restoration at 120+ BRAC sites. Total estimated value: $2.1B. Multiple IDIQ vehicles " +
-      "expected in Q3-Q4 2026.",
-    category: "market",
+      "Hanscom AFB released draft RFP for the $42M Enterprise IT Network Modernization program. " +
+      "Scope includes SD-WAN deployment, zero trust perimeter, and network operations center automation. " +
+      "Final RFP expected June 2026. Strong fit for Envision capabilities.",
+    category: "opportunity",
     priority: "critical",
-    source: "n8n_crawl",
+    source: "sam_gov",
+    source_url: "https://sam.gov/opp/hanscom-eit-2026",
+    related_opportunity_id: "opp-006",
+    related_competitor: null,
+    tags: ["Air Force", "Hanscom", "network", "SD-WAN", "zero trust"],
+    created_at: "2026-05-08T11:00:00Z",
+    data_source: "sam.gov",
+    read: false,
+  },
+  {
+    id: "intel-013",
+    title: "Executive Order on strengthening federal cybersecurity workforce",
+    summary:
+      "New EO directs agencies to increase cybersecurity hiring by 15% and establish cyber excepted service " +
+      "positions. Also mandates contractor workforce development programs. Good signal for SETA contracts " +
+      "that include training components.",
+    category: "regulatory",
+    priority: "medium",
+    source: "news",
     source_url: null,
     related_opportunity_id: null,
     related_competitor: null,
-    tags: ["Air Force", "BRAC", "restoration", "IDIQ", "pipeline"],
-    created_at: "2026-05-06T11:00:00Z",
+    tags: ["EO", "cybersecurity", "workforce", "training", "SETA"],
+    created_at: "2026-05-07T15:00:00Z",
+    data_source: "manual",
+    read: true,
+  },
+  {
+    id: "intel-014",
+    title: "Booz Allen Hamilton restructures defense IT division — 200 layoffs",
+    summary:
+      "BAH announced restructuring of its defense IT consulting division, cutting 200 positions " +
+      "and consolidating three business units. May weaken their bench for upcoming Army and DISA " +
+      "recompetes in the C5ISR space.",
+    category: "competitive",
+    priority: "medium",
+    source: "news",
+    source_url: null,
+    related_opportunity_id: null,
+    related_competitor: "Booz Allen Hamilton",
+    tags: ["BAH", "restructuring", "layoffs", "defense IT"],
+    created_at: "2026-05-07T10:00:00Z",
     data_source: "manual",
     read: false,
+  },
+  {
+    id: "intel-015",
+    title: "DFARS Case 2025-D001: Enhanced security requirements for controlled technical information",
+    summary:
+      "DFARS interim rule adds new security controls for handling controlled technical information " +
+      "on defense IT systems. Requires encryption at rest using FIPS 140-3 validated modules. " +
+      "Affects all contracts with DFARS 252.204-7012 clause.",
+    category: "regulatory",
+    priority: "high",
+    source: "news",
+    source_url: "https://www.federalregister.gov/dfars-2025-d001",
+    related_opportunity_id: null,
+    related_competitor: null,
+    tags: ["DFARS", "security", "CTI", "FIPS", "encryption"],
+    created_at: "2026-05-06T14:00:00Z",
+    data_source: "manual",
+    read: true,
   },
 ];
 
 export const MOCK_BRIEFINGS: MorningBriefing[] = [
   {
     id: "brief-001",
-    date: "2026-05-10",
-    headline: "Critical: USACE FUDS IDIQ posted — matches our top-priority capture target",
+    date: "2026-05-12",
+    headline: "DoD zero trust mandate accelerates — FY28 deadline creates $14.5B cyber market",
     key_metrics: [
-      { label: "Active Opportunities", value: "10", change: "+1", trend: "up" },
-      { label: "Pipeline Value", value: "$79.3M", change: "+$24.5M", trend: "up" },
-      { label: "Avg Win Probability", value: "58%", change: "-2%", trend: "down" },
-      { label: "Intel Items (7d)", value: "12", change: "+4", trend: "up" },
-      { label: "Competitor Alerts", value: "5", change: "+2", trend: "up" },
-      { label: "Due This Month", value: "3", change: null, trend: "flat" },
+      { label: "Active Opportunities", value: "10", change: "+2", trend: "up" },
+      { label: "Pipeline Value", value: "$208.8M", change: "+$42M", trend: "up" },
+      { label: "Avg Win Probability", value: "46%", change: "-1%", trend: "down" },
+      { label: "Intel Items (7d)", value: "15", change: "+6", trend: "up" },
+      { label: "Active Risks", value: "7", change: "+2", trend: "up" },
+      { label: "Due This Quarter", value: "3", change: null, trend: "flat" },
     ],
     alerts: [
       {
         severity: "critical",
-        message: "USACE FUDS IDIQ ($180M) posted on SAM.gov — aligns with opp-001 capture strategy",
+        message: "DoD CIO mandates zero trust architecture by FY28 — $14.5B budget for cyber operations",
+        source: "DoD CIO Directive",
+        action_required: true,
+      },
+      {
+        severity: "critical",
+        message: "Air Force Hanscom Enterprise IT Network Modernization draft RFP released ($42M)",
         source: "SAM.gov crawler",
         action_required: true,
       },
       {
         severity: "high",
-        message: "Tetra Tech won EPA Superfund contract we were tracking (opp-003)",
+        message: "Leidos wins $450M DISA GIG contract — strengthens position on Army network programs",
         source: "FPDS monitor",
         action_required: false,
       },
       {
         severity: "high",
-        message: "New PFAS regulation could drive $500M+ in new remediation contracts",
-        source: "Federal Register monitor",
+        message: "FAR Case 2024-006: New 8-hour cyber incident reporting requirement effective Oct 1",
+        source: "Federal Register",
         action_required: true,
-      },
-      {
-        severity: "medium",
-        message: "Jacobs acquired AI/ML environmental analytics firm — competitive signal",
-        source: "News crawler",
-        action_required: false,
       },
     ],
     action_items: [
       {
-        action: "Review and respond to USACE FUDS IDIQ pre-solicitation",
+        action: "Respond to Army PEO IEW&S SETA RFP — finalize pricing strategy vs. Leidos incumbent",
         priority: "critical",
-        due: "2026-05-17",
-        context: "Must submit capability statement within 7 days of posting",
+        due: "2026-08-15",
+        context: "$28.5M ceiling, SDVOSB evaluation factor favors Envision. Need competitive pricing model.",
       },
       {
-        action: "Update loss analysis for EPA Superfund recompete (opp-003)",
+        action: "Review Air Force Hanscom draft RFP and prepare capability brief",
+        priority: "critical",
+        due: "2026-06-15",
+        context: "$42M SD-WAN + zero trust perimeter. Strong fit for Envision capabilities.",
+      },
+      {
+        action: "Schedule CMMC Level 2 C3PAO assessment — timeline accelerating",
         priority: "high",
-        due: "2026-05-12",
-        context: "Document lessons learned from Tetra Tech win",
+        due: "2026-06-30",
+        context: "40+ C3PAOs now accredited. Companies without assessments by Q4 risk being locked out.",
       },
       {
-        action: "Assess PFAS regulation impact on current pipeline",
+        action: "Update incident response plan for new FAR 8-hour reporting requirement",
         priority: "high",
-        due: "2026-05-15",
-        context: "Identify which existing opportunities benefit from new PFAS MCLs",
-      },
-      {
-        action: "Review Tyndall AFB Phase 3 solicitation details",
-        priority: "medium",
-        due: "2026-06-01",
-        context: "Proposal due June 15 — need teaming partner decision by June 1",
+        due: "2026-09-30",
+        context: "Applies to all contracts >$250K with CUI. Need 24/7 SOC capability.",
       },
     ],
     market_snapshot:
-      "Federal environmental services market showing strong momentum heading into Q3 FY26. " +
-      "DoD environmental restoration budgets up 12% YoY with PFAS driving new requirements. " +
-      "Key competitors AECOM and Tetra Tech posting growth while Parsons shows weakness. " +
-      "Air Force BRAC restoration plan ($2.1B) creates significant near-term pipeline opportunity. " +
-      "Regulatory environment favoring increased environmental compliance spending across all agencies.",
-    generated_at: "2026-05-10T05:00:00Z",
+      "Defense IT and cybersecurity market accelerating into FY27. DoD cyber budget up 8% to $14.5B with " +
+      "zero trust implementation as the top priority. AI/ML funding up 12% to $3.2B. Key competitors " +
+      "Leidos and SAIC strengthening through acquisitions while ManTech and BAH show weakness. " +
+      "CMMC 2.0 enforcement creating compliance demand across the DIB. Envision well-positioned with " +
+      "SDVOSB status and Army SETA past performance. Focus areas: zero trust migration, cloud security " +
+      "accreditation, and AI-enabled C5ISR systems engineering.",
+    generated_at: "2026-05-12T05:00:00Z",
   },
   {
     id: "brief-002",
-    date: "2026-05-09",
-    headline: "EPA PFAS rule and competitor movements drive busy intel day",
+    date: "2026-05-11",
+    headline: "CMMC 2.0 assessment timeline accelerated — SAIC acquires AI defense firm",
     key_metrics: [
-      { label: "Active Opportunities", value: "9", change: null, trend: "flat" },
-      { label: "Pipeline Value", value: "$54.8M", change: null, trend: "flat" },
-      { label: "Avg Win Probability", value: "60%", change: "+1%", trend: "up" },
-      { label: "Intel Items (7d)", value: "8", change: "+3", trend: "up" },
-      { label: "Competitor Alerts", value: "3", change: "+1", trend: "up" },
-      { label: "Due This Month", value: "2", change: null, trend: "flat" },
+      { label: "Active Opportunities", value: "10", change: null, trend: "flat" },
+      { label: "Pipeline Value", value: "$166.8M", change: null, trend: "flat" },
+      { label: "Avg Win Probability", value: "47%", change: null, trend: "flat" },
+      { label: "Intel Items (7d)", value: "12", change: "+4", trend: "up" },
+      { label: "Active Risks", value: "5", change: null, trend: "flat" },
+      { label: "Due This Quarter", value: "3", change: null, trend: "flat" },
     ],
     alerts: [
       {
         severity: "high",
-        message: "EPA proposed PFAS MCL rule — major market expansion signal",
-        source: "Federal Register monitor",
+        message: "CMMC Level 2 assessments running ahead of schedule — 40+ C3PAOs accredited",
+        source: "Cyber AB",
         action_required: true,
       },
       {
         severity: "medium",
-        message: "Jacobs M&A activity — acquired AI environmental analytics startup",
+        message: "SAIC acquires DefenseAI ($180M) — strengthening AI/ML for ISR programs",
         source: "News crawler",
         action_required: false,
       },
     ],
     action_items: [
       {
-        action: "Review EPA PFAS proposed rule and identify pipeline impact",
+        action: "Accelerate CMMC Level 2 readiness — engage C3PAO for assessment",
         priority: "high",
-        due: "2026-05-12",
-        context: "30-day public comment period — consider submitting industry comment",
+        due: "2026-06-15",
+        context: "Risk-004 in register: if delayed beyond Q3, ineligible for 40% of target opps",
       },
       {
-        action: "Update competitor profile for Jacobs Engineering",
+        action: "Update competitor profile for SAIC — assess DefenseAI acquisition impact",
         priority: "medium",
-        due: "2026-05-14",
-        context: "Assess impact of EnviroAI acquisition on competitive landscape",
+        due: "2026-05-18",
+        context: "120-person AI/ML firm for ISR data fusion. Strengthens SAIC on C5ISR programs.",
       },
     ],
     market_snapshot:
-      "Regulatory activity increasing with EPA PFAS rule publication. " +
-      "Competitor consolidation continues as Jacobs acquires AI capability. " +
-      "DoD budget execution on track for year-end spending surge.",
-    generated_at: "2026-05-09T05:00:00Z",
+      "CMMC enforcement creating urgency across the defense industrial base. Companies without " +
+      "assessments scheduled by Q4 2026 face exclusion from major contract vehicles. Competitor " +
+      "consolidation continues with SAIC's AI acquisition. ManTech showing weakness in defense IT.",
+    generated_at: "2026-05-11T05:00:00Z",
   },
   {
     id: "brief-003",
-    date: "2026-05-08",
-    headline: "Air Force BRAC plan unlocks $2.1B restoration pipeline",
+    date: "2026-05-10",
+    headline: "DEVCOM C5ISR cyber RFP and DoD FY27 budget signal strong demand",
     key_metrics: [
-      { label: "Active Opportunities", value: "9", change: null, trend: "flat" },
-      { label: "Pipeline Value", value: "$54.8M", change: null, trend: "flat" },
-      { label: "Avg Win Probability", value: "59%", change: null, trend: "flat" },
-      { label: "Intel Items (7d)", value: "5", change: "+2", trend: "up" },
-      { label: "Competitor Alerts", value: "2", change: null, trend: "flat" },
-      { label: "Due This Month", value: "2", change: null, trend: "flat" },
+      { label: "Active Opportunities", value: "10", change: "+1", trend: "up" },
+      { label: "Pipeline Value", value: "$166.8M", change: "+$22M", trend: "up" },
+      { label: "Avg Win Probability", value: "47%", change: "+1%", trend: "up" },
+      { label: "Intel Items (7d)", value: "8", change: "+3", trend: "up" },
+      { label: "Active Risks", value: "5", change: null, trend: "flat" },
+      { label: "Due This Quarter", value: "3", change: null, trend: "flat" },
     ],
     alerts: [
       {
         severity: "critical",
-        message: "Air Force 5-year BRAC restoration plan ($2.1B) published — new IDIQ vehicles expected Q3-Q4",
-        source: "n8n crawl",
+        message: "FY27 DoD budget: cyber operations +8% ($14.5B), AI/ML +12% ($3.2B)",
+        source: "DoD Comptroller",
+        action_required: true,
+      },
+      {
+        severity: "high",
+        message: "DEVCOM C5ISR Sources Sought for cyber IA services — $22M, responses due June 15",
+        source: "SAM.gov crawler",
         action_required: true,
       },
       {
         severity: "medium",
-        message: "NASA KSC RFI for launch complex environmental systems — responses due May 30",
-        source: "SAM.gov crawler",
-        action_required: true,
+        message: "ManTech Q1 defense IT revenue down 5% — potential teaming opportunity",
+        source: "News crawler",
+        action_required: false,
       },
     ],
     action_items: [
       {
-        action: "Analyze Air Force BRAC restoration plan for capture targets",
+        action: "Prepare C5ISR Sources Sought response — highlight RMF and STIG expertise",
         priority: "critical",
-        due: "2026-05-15",
-        context: "120+ sites, multiple IDIQ vehicles — identify top 10 targets",
+        due: "2026-06-10",
+        context: "$22M cyber IA scope. Envision has direct C5ISR past performance.",
       },
       {
-        action: "Draft NASA KSC RFI response",
+        action: "Map FY27 budget increases to pipeline opportunities",
+        priority: "high",
+        due: "2026-05-20",
+        context: "Identify which tracked opps benefit from +8% cyber / +12% AI budget growth",
+      },
+      {
+        action: "Explore teaming with ManTech on Army IEW&S follow-on",
         priority: "medium",
-        due: "2026-05-28",
-        context: "Environmental systems for launch complex — strong past performance at KSC",
+        due: "2026-05-25",
+        context: "ManTech weakness + our SDVOSB status could create strong teaming arrangement",
       },
     ],
     market_snapshot:
-      "Air Force BRAC plan is the biggest pipeline signal this quarter. " +
-      "Combined with ongoing PFAS remediation demand, environmental services market outlook remains bullish.",
-    generated_at: "2026-05-08T05:00:00Z",
+      "DoD FY27 budget signals sustained growth in cyber and AI. Army C5ISR center actively seeking " +
+      "industry partners for cyber security and IA support. Competitor ManTech showing vulnerability " +
+      "that could be leveraged for teaming. DISA cloud contract expansions create downstream demand " +
+      "for migration and security accreditation services.",
+    generated_at: "2026-05-10T05:00:00Z",
   },
 ];
 
