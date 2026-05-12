@@ -176,18 +176,27 @@ export async function chatCompletion(
 ): Promise<LLMResponse> {
   const tier = opts?.tier ?? "fast";
 
+  // Deep tier: prefer Anthropic, fall back to OpenAI
   if (tier === "deep" && getAnthropicClient()) {
     return anthropicCompletion(messages, opts);
   }
-
-  // Fallback: if deep requested but unavailable, use fast
   if (tier === "deep" && !getAnthropicClient() && getOpenAIClient()) {
     const result = await openaiCompletion(messages, opts);
-    result.tier = "fast"; // mark that we fell back
+    result.tier = "fast";
     return result;
   }
 
-  return openaiCompletion(messages, opts);
+  // Fast tier: prefer OpenAI, fall back to Anthropic
+  if (getOpenAIClient()) {
+    return openaiCompletion(messages, opts);
+  }
+  if (getAnthropicClient()) {
+    const result = await anthropicCompletion(messages, opts);
+    result.tier = "deep";
+    return result;
+  }
+
+  throw new Error("No AI model configured — set OPENAI_API_KEY or ANTHROPIC_API_KEY");
 }
 
 // ---------------------------------------------------------------------------
