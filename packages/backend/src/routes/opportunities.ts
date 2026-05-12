@@ -8,6 +8,7 @@ import {
   n8nWebhookConfigured,
   fetchOpsTrackerFromN8n,
   fetchPipelineFromN8n,
+  fetchOpportunityDetailFromN8n,
 } from "../lib/n8n-data";
 
 const router = Router();
@@ -470,6 +471,14 @@ router.get("/:id/detail", async (req, res) => {
     try {
       const result = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
       if (result.rows.length > 0) opp = result.rows[0] as Opportunity;
+    } catch { /* empty */ }
+  }
+
+  // Fall back to n8n if not in DB
+  if (!opp && n8nWebhookConfigured()) {
+    try {
+      const n8nOpp = await fetchOpportunityDetailFromN8n(id);
+      if (n8nOpp) opp = n8nOpp;
     } catch { /* empty */ }
   }
 
