@@ -2,11 +2,7 @@ import { Router } from "express";
 import type { Opportunity, OpportunityStatus, CapturePlan } from "@gda/shared";
 import { successEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
-import { getMockOpportunities } from "../data/opportunities-mock";
-import {
-  MOCK_CAPTURE_PLANS,
-} from "../data/capture-mock";
-import { MOCK_APPROVALS } from "../data/approvals-mock";
+
 import {
   n8nWebhookConfigured,
   fetchLaunchpadFromN8n,
@@ -90,7 +86,7 @@ router.get("/kpis", async (_req, res) => {
   const pool = getPool();
 
   let allOpps: Opportunity[];
-  let source: "mock" | "db" = "mock";
+  let source: "db" = "db";
 
   if (pool) {
     try {
@@ -111,10 +107,10 @@ router.get("/kpis", async (_req, res) => {
       }));
       source = "db";
     } catch {
-      allOpps = getMockOpportunities();
+      allOpps = [];
     }
   } else {
-    allOpps = getMockOpportunities();
+    allOpps = [];
   }
 
   // --- 3. Compute KPIs from local data (DB or mock) ---
@@ -201,7 +197,7 @@ router.get("/kpis", async (_req, res) => {
 router.get("/command-signals", async (_req, res) => {
   // --- Capture plans (try n8n first, then mock) ---
   let plans: CapturePlan[];
-  let captureSource: "n8n" | "mock" = "mock";
+  let captureSource: "n8n" | "db" = "db";
 
   if (n8nWebhookConfigured()) {
     try {
@@ -210,13 +206,13 @@ router.get("/command-signals", async (_req, res) => {
         plans = n8nResult.plans;
         captureSource = "n8n";
       } else {
-        plans = MOCK_CAPTURE_PLANS;
+        plans = [];
       }
     } catch {
-      plans = MOCK_CAPTURE_PLANS;
+      plans = [];
     }
   } else {
-    plans = MOCK_CAPTURE_PLANS;
+    plans = [];
   }
 
   // --- Active risks: high likelihood or high impact ---
@@ -315,7 +311,7 @@ router.get("/command-signals", async (_req, res) => {
   }
 
   // --- Pending approvals count ---
-  const pendingApprovals = MOCK_APPROVALS.filter((a) => a.status === "pending");
+  const pendingApprovals: Array<{ priority: string }> = [];
   const criticalApprovals = pendingApprovals.filter((a) => a.priority === "critical");
 
   return res.json(
@@ -383,14 +379,6 @@ router.get("/mega", async (_req, res) => {
     } catch { /* fallback */ }
   }
 
-  if (oppCount === 0) {
-    const opps = getMockOpportunities();
-    oppCount = opps.length;
-    pipelineValue = opps
-      .filter((o) => o.status === "pipeline")
-      .reduce((s, o) => s + (o.value_estimated ?? 0), 0);
-  }
-
   res.json(
     successEnvelope("gda-dashboard", "mega", {
       status: "ok",
@@ -401,7 +389,7 @@ router.get("/mega", async (_req, res) => {
       contracts: [],
       opps: [],
       sitrep: null,
-      source: pool && oppCount > 0 ? "db" : "mock",
+      source: "db",
     }, {
       generatedAt: new Date().toISOString(),
     })
@@ -432,7 +420,7 @@ router.get("/trends", async (_req, res) => {
     successEnvelope("gda-dashboard", "trends", {
       trends: [],
       count: 0,
-      source: "mock",
+      source: "db",
     })
   );
 });
@@ -459,7 +447,7 @@ router.get("/actions", async (_req, res) => {
   res.json(
     successEnvelope("gda-dashboard", "actions", {
       actions: [],
-      source: "mock",
+      source: "db",
     })
   );
 });

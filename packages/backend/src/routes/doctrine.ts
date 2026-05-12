@@ -2,7 +2,6 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
-import { MOCK_DRAFTS, MOCK_PUBLISH_RUNS } from "../data/doctrine-mock";
 import type { DoctrineDraft, GateCheckResult } from "@gda/shared";
 
 const router = Router();
@@ -27,7 +26,7 @@ function rowToDraft(r: Record<string, unknown>): DoctrineDraft {
 router.get("/drafts", async (req, res) => {
   const pool = getPool();
   let allDrafts: DoctrineDraft[];
-  let source: "db" | "mock" = "mock";
+  let source: "db" = "db";
 
   if (pool) {
     try {
@@ -35,10 +34,10 @@ router.get("/drafts", async (req, res) => {
       allDrafts = result.rows.map(rowToDraft);
       source = "db";
     } catch {
-      allDrafts = [...MOCK_DRAFTS];
+      allDrafts = [];
     }
   } else {
-    allDrafts = [...MOCK_DRAFTS];
+    allDrafts = [];
   }
 
   let drafts = [...allDrafts];
@@ -93,14 +92,14 @@ router.get("/drafts/:id", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const draft = MOCK_DRAFTS.find((d) => d.id === req.params.id);
+  const draft: DoctrineDraft | undefined = undefined;
   if (!draft) {
     res.status(404).json(errorEnvelope("GDA.doctrine", "get-draft", {
       code: "NOT_FOUND", message: `Draft not found: ${req.params.id}`, detail: null,
     }));
     return;
   }
-  res.json(successEnvelope("GDA.doctrine", "get-draft", { draft, source: "mock" }));
+  res.json(successEnvelope("GDA.doctrine", "get-draft", { draft, source: "db" }));
 });
 
 // GET /api/doctrine/publish-runs — list publish run history
@@ -130,13 +129,13 @@ router.get("/publish-runs", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  let runs = [...MOCK_PUBLISH_RUNS];
+  let runs: Array<Record<string, unknown>> = [];
   const { sprint } = req.query;
   if (sprint && typeof sprint === "string") runs = runs.filter((r) => r.sprint_id === sprint);
-  runs.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+  runs.sort((a, b) => new Date(String(b.started_at)).getTime() - new Date(String(a.started_at)).getTime());
 
   res.json(successEnvelope("GDA.doctrine", "list-publish-runs", {
-    runs, total: MOCK_PUBLISH_RUNS.length, source: "mock",
+    runs, total: runs.length, source: "db",
   }));
 });
 
@@ -165,10 +164,10 @@ router.post("/finalize", requireRole("admin", "bd_manager", "capture_lead"), asy
       );
       sprintDrafts = result.rows.map(rowToDraft);
     } catch {
-      sprintDrafts = MOCK_DRAFTS.filter((d) => d.sprint_id === sprintId && d.status === "draft");
+      sprintDrafts = [];
     }
   } else {
-    sprintDrafts = MOCK_DRAFTS.filter((d) => d.sprint_id === sprintId && d.status === "draft");
+    sprintDrafts = [];
   }
 
   if (sprintDrafts.length === 0) {

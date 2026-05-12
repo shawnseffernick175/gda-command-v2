@@ -78,7 +78,7 @@ export default function Pipeline() {
   }, [load]);
 
   const opportunities = data?.opportunities ?? [];
-  const source = data?.source ?? "mock";
+  const source = data?.source ?? "db";
 
   // Derive unique departments for filter dropdown
   const departments = useMemo(() => {
@@ -172,7 +172,7 @@ export default function Pipeline() {
             color: source === "n8n" ? "#a855f7" : source === "db" ? "#22c55e" : "#3b82f6",
           }}
         >
-          {source === "n8n" ? "Live n8n" : source === "db" ? "Live DB" : "Mock data"}
+          {source === "n8n" ? "Live n8n" : "Live DB"}
         </span>
       </div>
 

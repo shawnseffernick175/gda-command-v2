@@ -217,7 +217,7 @@ export default function ColorReview() {
           borderRadius: 4,
           background: source === "n8n" ? "#166534" : "#1e3a5f",
           color: source === "n8n" ? "#4ade80" : "#60a5fa",
-        }}>{source === "n8n" ? "Live n8n" : "Mock data"}</span>
+        }}>{source === "n8n" ? "Live n8n" : "Live DB"}</span>
         <div style={{ flex: 1 }} />
         <button
           onClick={() => { setRunModal(true); setRunResult(null); }}

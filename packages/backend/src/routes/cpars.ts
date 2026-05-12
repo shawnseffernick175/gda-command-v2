@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
-import { MOCK_CPARS_RECORDS } from "../data/cpars-mock";
 import { getPool } from "../lib/db";
-import type { CPARSRecord } from "../data/cpars-mock";
+
+interface CPARSRecord { id: string; contract_title: string; agency: string; contract_number: string; status: string; overall_rating?: string; contract_value?: number; ai_generated_narrative?: boolean; relevance_tags?: string[]; updated_at: string; [key: string]: unknown }
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 
 const router = Router();
 
-async function loadRecords(): Promise<{ items: CPARSRecord[]; source: "db" | "mock" }> {
+async function loadRecords(): Promise<{ items: CPARSRecord[]; source: "db" }> {
   const pool = getPool();
   if (pool) {
     try {
@@ -16,7 +16,7 @@ async function loadRecords(): Promise<{ items: CPARSRecord[]; source: "db" | "mo
       if (rows.length > 0) return { items: rows as CPARSRecord[], source: "db" };
     } catch { /* fall through */ }
   }
-  return { items: [...MOCK_CPARS_RECORDS], source: "mock" };
+  return { items: [], source: "db" };
 }
 
 router.get("/summary", async (_req, res) => {
@@ -83,7 +83,7 @@ router.get("/records/:id", async (req, res) => {
       if (rows.length > 0) return res.json(successEnvelope("gda-cpars", "detail", rows[0]));
     } catch { /* fall through */ }
   }
-  const item = MOCK_CPARS_RECORDS.find((r) => r.id === req.params.id);
+  const item: CPARSRecord | undefined = undefined;
   if (!item) {
     return res.status(404).json(
       errorEnvelope("gda-cpars", "detail", { code: "NOT_FOUND", message: `CPARS record ${req.params.id} not found`, detail: null }),
@@ -102,7 +102,7 @@ router.post("/records/:id/generate-narrative", requireRole("admin", "bd_manager"
         if (rows.length > 0) item = rows[0] as CPARSRecord;
       } catch { /* fall through */ }
     }
-    if (!item) item = MOCK_CPARS_RECORDS.find((r) => r.id === req.params.id);
+    if (!item) { /* no data available */ }
 
     if (!item) {
       return res.status(404).json(
@@ -132,8 +132,8 @@ router.post("/records/:id/generate-narrative", requireRole("admin", "bd_manager"
       `Cost: ${item.cost_rating ?? "N/A"}`,
       `Management: ${item.management_rating ?? "N/A"}`,
       item.narrative ? `Existing Narrative: ${item.narrative}` : "",
-      (item.key_accomplishments ?? []).length > 0
-        ? `Key Accomplishments:\n${item.key_accomplishments.map((a: string) => `- ${a}`).join("\n")}`
+      (Array.isArray(item.key_accomplishments) && item.key_accomplishments.length > 0)
+        ? `Key Accomplishments:\n${(item.key_accomplishments as string[]).map((a: string) => `- ${a}`).join("\n")}`
         : "",
     ].filter(Boolean).join("\n");
 

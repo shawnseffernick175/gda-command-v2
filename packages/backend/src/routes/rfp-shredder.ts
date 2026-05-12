@@ -2,12 +2,6 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
-import {
-  MOCK_SHRED_JOBS,
-  ALL_MOCK_REQUIREMENTS,
-  MOCK_COMPLIANCE_MAP_SJ001,
-  MOCK_RESPONSE_OUTLINE_SJ001,
-} from "../data/rfp-shredder-mock";
 import type {
   ShredJob,
   ShredJobStatus,
@@ -31,7 +25,7 @@ const WF = "GDA.api.rfp-shredder";
 // ---------------------------------------------------------------------------
 router.get("/jobs", (req, res) => {
   try {
-    let items: ShredJob[] = [...MOCK_SHRED_JOBS];
+    let items: ShredJob[] = [];
     const { status, search, agency } = req.query;
 
     if (status && typeof status === "string") {
@@ -52,7 +46,7 @@ router.get("/jobs", (req, res) => {
     }
 
     // Summary stats from full set
-    const all = MOCK_SHRED_JOBS;
+    const all = items;
     const completed = all.filter((j) => j.status === "completed").length;
     const processing = all.filter((j) => j.status === "processing").length;
     const failed = all.filter((j) => j.status === "failed").length;
@@ -90,9 +84,16 @@ router.get("/jobs", (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/rfp-shredder/jobs/:id — single shred job detail
 // ---------------------------------------------------------------------------
-router.get("/jobs/:id", (req, res) => {
+router.get("/jobs/:id", async (req, res) => {
   try {
-    const job = MOCK_SHRED_JOBS.find((j) => j.id === req.params.id);
+    const pool = getPool();
+    let job: ShredJob | undefined;
+    if (pool) {
+      try {
+        const { rows } = await pool.query("SELECT * FROM shred_jobs WHERE id = $1", [req.params.id]);
+        if (rows.length > 0) job = rows[0] as ShredJob;
+      } catch { /* fall through */ }
+    }
     if (!job) {
       return res.status(404).json(
         errorEnvelope(WF, "get-job", {
@@ -261,7 +262,7 @@ router.post(
 // ---------------------------------------------------------------------------
 router.get("/requirements", (req, res) => {
   try {
-    let items: ExtractedRequirement[] = [...ALL_MOCK_REQUIREMENTS];
+    let items: ExtractedRequirement[] = [];
     const { job_id, type, complexity, match, search, sort } = req.query;
 
     if (job_id && typeof job_id === "string") {
@@ -347,30 +348,7 @@ router.get("/requirements", (req, res) => {
 router.get("/compliance-map/:jobId", (req, res) => {
   try {
     const jobId = req.params.jobId;
-    const job = MOCK_SHRED_JOBS.find((j) => j.id === jobId);
-
-    if (!job) {
-      return res.status(404).json(
-        errorEnvelope(WF, "compliance-map", {
-          code: "NOT_FOUND",
-          message: `Shred job ${jobId} not found`,
-          detail: null,
-        }),
-      );
-    }
-
-    if (job.status !== "completed") {
-      return res.status(400).json(
-        errorEnvelope(WF, "compliance-map", {
-          code: "NOT_READY",
-          message: `Shred job ${jobId} has status '${job.status}' — compliance mapping requires completed shred`,
-          detail: null,
-        }),
-      );
-    }
-
-    // Only SJ-001 has compliance map in mock data
-    const entries = jobId === "SJ-001" ? MOCK_COMPLIANCE_MAP_SJ001 : [];
+    const entries: Array<{ match_level: string }> = [];
 
     const full = entries.filter((e) => e.match_level === "full").length;
     const partial = entries.filter((e) => e.match_level === "partial").length;
@@ -382,7 +360,7 @@ router.get("/compliance-map/:jobId", (req, res) => {
     res.json(
       successEnvelope(WF, "compliance-map", {
         job_id: jobId,
-        solicitation_title: job.solicitation_title,
+        solicitation_title: "",
         entries,
         summary: {
           total: entries.length,
@@ -410,30 +388,7 @@ router.get("/compliance-map/:jobId", (req, res) => {
 router.get("/response-outline/:jobId", (req, res) => {
   try {
     const jobId = req.params.jobId;
-    const job = MOCK_SHRED_JOBS.find((j) => j.id === jobId);
-
-    if (!job) {
-      return res.status(404).json(
-        errorEnvelope(WF, "response-outline", {
-          code: "NOT_FOUND",
-          message: `Shred job ${jobId} not found`,
-          detail: null,
-        }),
-      );
-    }
-
-    if (job.status !== "completed") {
-      return res.status(400).json(
-        errorEnvelope(WF, "response-outline", {
-          code: "NOT_READY",
-          message: `Shred job ${jobId} has status '${job.status}' — response outline requires completed shred`,
-          detail: null,
-        }),
-      );
-    }
-
-    // Only SJ-001 has outline in mock data
-    const sections = jobId === "SJ-001" ? MOCK_RESPONSE_OUTLINE_SJ001 : [];
+    const sections: Array<{ page_estimate: number; status: string }> = [];
 
     const totalPages = sections.reduce((s, sec) => s + sec.page_estimate, 0);
     const reusable = sections.filter((s) => s.status === "reuse_available").length;
@@ -443,7 +398,7 @@ router.get("/response-outline/:jobId", (req, res) => {
     res.json(
       successEnvelope(WF, "response-outline", {
         job_id: jobId,
-        solicitation_title: job.solicitation_title,
+        solicitation_title: "",
         sections,
         summary: {
           total_sections: sections.length,

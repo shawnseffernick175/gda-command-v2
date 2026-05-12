@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import { MOCK_FPDS_AWARDS } from "../data/fpds-mock";
 import { getPool } from "../lib/db";
-import type { FPDSAward } from "../data/fpds-mock";
+
+interface FPDSAward { id: string; award_amount?: number; is_competitor?: boolean; competitor_name?: string; is_recompete_candidate?: boolean; relevance_score?: number; [key: string]: unknown }
 
 const router = Router();
 
-async function loadAwards(): Promise<{ items: FPDSAward[]; source: "db" | "mock" }> {
+async function loadAwards(): Promise<{ items: FPDSAward[]; source: "db" }> {
   const pool = getPool();
   if (pool) {
     try {
@@ -14,7 +14,7 @@ async function loadAwards(): Promise<{ items: FPDSAward[]; source: "db" | "mock"
       if (rows.length > 0) return { items: rows as FPDSAward[], source: "db" };
     } catch { /* fall through */ }
   }
-  return { items: [...MOCK_FPDS_AWARDS], source: "mock" };
+  return { items: [], source: "db" };
 }
 
 router.get("/summary", async (_req, res) => {
@@ -53,14 +53,14 @@ router.get("/awards", async (req, res) => {
     if (search && typeof search === "string") {
       const q = search.toLowerCase();
       items = items.filter((a) =>
-        a.title.toLowerCase().includes(q) ||
-        a.agency.toLowerCase().includes(q) ||
-        a.vendor.toLowerCase().includes(q) ||
-        a.piid.toLowerCase().includes(q),
+        String(a.title ?? "").toLowerCase().includes(q) ||
+        String(a.agency ?? "").toLowerCase().includes(q) ||
+        String(a.vendor ?? "").toLowerCase().includes(q) ||
+        String(a.piid ?? "").toLowerCase().includes(q),
       );
     }
 
-    items.sort((a, b) => new Date(b.award_date).getTime() - new Date(a.award_date).getTime());
+    items.sort((a, b) => new Date(String(b.award_date)).getTime() - new Date(String(a.award_date)).getTime());
 
     return res.json(
       successEnvelope("gda-fpds", "list", items, { total: items.length, source }),
@@ -80,7 +80,7 @@ router.get("/awards/:id", async (req, res) => {
       if (rows.length > 0) return res.json(successEnvelope("gda-fpds", "detail", rows[0]));
     } catch { /* fall through */ }
   }
-  const item = MOCK_FPDS_AWARDS.find((a) => a.id === req.params.id);
+  const item: FPDSAward | undefined = undefined;
   if (!item) {
     return res.status(404).json(
       errorEnvelope("gda-fpds", "detail", { code: "NOT_FOUND", message: `FPDS award ${req.params.id} not found`, detail: null }),

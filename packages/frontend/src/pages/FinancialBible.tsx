@@ -238,10 +238,10 @@ function DrillDownView({ data }: { data: FinancialDrillDownData }) {
           borderRadius: 12,
           fontSize: 11,
           fontWeight: 600,
-          background: data.source === "mock" ? "rgba(245,158,11,0.15)" : "rgba(34,197,94,0.15)",
-          color: data.source === "mock" ? "#f59e0b" : "#22c55e",
+          background: "rgba(34,197,94,0.15)",
+          color: "#22c55e",
         }}>
-          {data.source === "mock" ? "Mock data" : data.source === "db" ? "Live DB" : "Live n8n"}
+          {data.source === "n8n" ? "Live n8n" : "Live DB"}
         </span>
         <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
           Updated {new Date(kpi.updated_at).toLocaleDateString()}

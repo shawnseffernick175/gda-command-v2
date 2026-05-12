@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import { MOCK_REQUIREMENTS, MOCK_CLAUSES } from "../data/compliance-mock";
 import { getPool } from "../lib/db";
 import type { ComplianceRequirement, ClauseReference } from "@gda/shared";
 
 const router = Router();
 
-async function loadRequirements(): Promise<{ items: ComplianceRequirement[]; source: "db" | "mock" }> {
+async function loadRequirements(): Promise<{ items: ComplianceRequirement[]; source: "db" }> {
   const pool = getPool();
   if (pool) {
     try {
@@ -14,10 +13,10 @@ async function loadRequirements(): Promise<{ items: ComplianceRequirement[]; sou
       if (rows.length > 0) return { items: rows as ComplianceRequirement[], source: "db" };
     } catch { /* fall through */ }
   }
-  return { items: [...MOCK_REQUIREMENTS], source: "mock" };
+  return { items: [], source: "db" };
 }
 
-async function loadClauses(): Promise<{ items: ClauseReference[]; source: "db" | "mock" }> {
+async function loadClauses(): Promise<{ items: ClauseReference[]; source: "db" }> {
   const pool = getPool();
   if (pool) {
     try {
@@ -25,7 +24,7 @@ async function loadClauses(): Promise<{ items: ClauseReference[]; source: "db" |
       if (rows.length > 0) return { items: rows as ClauseReference[], source: "db" };
     } catch { /* fall through */ }
   }
-  return { items: [...MOCK_CLAUSES], source: "mock" };
+  return { items: [], source: "db" };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,11 +136,7 @@ router.get("/clauses/:id", async (req, res) => {
       if (rows.length > 0) return res.json(successEnvelope("GDA.compliance", "get-clause", { clause: rows[0], source: "db" }));
     } catch { /* fall through */ }
   }
-  const clause = MOCK_CLAUSES.find((c) => c.id === req.params.id);
-  if (!clause) {
-    return res.status(404).json(errorEnvelope("GDA.compliance", "get-clause", { code: "NOT_FOUND", message: `Clause ${req.params.id} not found`, detail: null }));
-  }
-  res.json(successEnvelope("GDA.compliance", "get-clause", { clause, source: "mock" }));
+  return res.status(404).json(errorEnvelope("GDA.compliance", "get-clause", { code: "NOT_FOUND", message: `Clause ${req.params.id} not found`, detail: null }));
 });
 
 export default router;

@@ -89,7 +89,7 @@ export default function Compliance() {
   if (error) return <p style={{ color: "#ef4444" }}>Error: {error}</p>;
   if (!reqData) return null;
 
-  const source = tab === "requirements" ? reqData.source : (clauseData?.source ?? "mock");
+  const source = tab === "requirements" ? reqData.source : (clauseData?.source ?? "db");
 
   // Filter requirements
   let requirements = reqData.requirements;
@@ -139,12 +139,12 @@ export default function Compliance() {
           fontWeight: 600,
           padding: "2px 8px",
           borderRadius: 4,
-          background: source === "mock" ? "rgba(59,130,246,0.15)" : "rgba(34,197,94,0.15)",
-          color: source === "mock" ? "#3b82f6" : "#22c55e",
+          background: "rgba(34,197,94,0.15)",
+          color: "#22c55e",
           marginBottom: 16,
         }}
       >
-        {source === "n8n" ? "Live \u2014 n8n" : source === "db" ? "Live \u2014 database" : "Mock data"}
+        {source === "n8n" ? "Live \u2014 n8n" : "Live \u2014 database"}
       </span>
 
       {/* Summary strip */}

@@ -38,7 +38,7 @@ interface IntelFeedData {
   unreadCount: number;
   categoryCounts: Record<string, number>;
   priorityCounts: Record<string, number>;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 interface BriefingMetric {
@@ -76,7 +76,7 @@ interface MorningBriefing {
 interface BriefingsData {
   briefings: MorningBriefing[];
   total: number;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 interface DeepResearchReport {
@@ -96,7 +96,7 @@ interface ResearchData {
   total: number;
   filtered: number;
   statusCounts: Record<string, number>;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 interface CompetitorProfile {
@@ -117,7 +117,7 @@ interface CompetitorsData {
   competitors: CompetitorProfile[];
   total: number;
   filtered: number;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 // ---------------------------------------------------------------------------
@@ -205,13 +205,13 @@ function formatDateTime(iso: string): string {
 
 export default function Intel() {
   const [tab, setTab] = useState<TabId>("briefing");
-  const [dataSource, setDataSource] = useState<"mock" | "db" | "n8n">("mock");
+  const [dataSource, setDataSource] = useState<"db" | "n8n">("db");
 
   const sourceBadge = dataSource === "n8n"
     ? { label: "Live \u2014 n8n", bg: "rgba(34,197,94,0.15)", color: "#22c55e" }
     : dataSource === "db"
     ? { label: "Live \u2014 database", bg: "rgba(34,197,94,0.15)", color: "#22c55e" }
-    : { label: "Mock data", bg: "rgba(59,130,246,0.15)", color: "#3b82f6" };
+    : { label: "Live \u2014 database", bg: "rgba(34,197,94,0.15)", color: "#22c55e" };
 
   return (
     <div>
@@ -275,7 +275,7 @@ export default function Intel() {
 // Briefing Tab
 // ---------------------------------------------------------------------------
 
-function BriefingTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
+function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [briefings, setBriefings] = useState<MorningBriefing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -448,7 +448,7 @@ function BriefingTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => voi
 // Feed Tab
 // ---------------------------------------------------------------------------
 
-function FeedTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
+function FeedTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [data, setData] = useState<IntelFeedData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -595,7 +595,7 @@ function FeedTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void })
 // Research Tab
 // ---------------------------------------------------------------------------
 
-function ResearchTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
+function ResearchTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [data, setData] = useState<ResearchData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -707,7 +707,7 @@ function ResearchTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => voi
 // Competitors Tab
 // ---------------------------------------------------------------------------
 
-function CompetitorsTab({ onSource }: { onSource: (s: "mock" | "db" | "n8n") => void }) {
+function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [data, setData] = useState<CompetitorsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

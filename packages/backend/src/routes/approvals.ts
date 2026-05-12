@@ -3,7 +3,6 @@ import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { notify } from "../lib/email";
 import { requireRole } from "../lib/auth";
-import { MOCK_APPROVALS } from "../data/approvals-mock";
 import type { ApprovalItem } from "@gda/shared";
 
 const router = Router();
@@ -39,7 +38,7 @@ router.get("/", async (req, res) => {
   try {
     const pool = getPool();
     let allItems: ApprovalItem[];
-    let source: "db" | "mock" = "mock";
+    let source: "db" = "db";
 
     if (pool) {
       try {
@@ -47,10 +46,10 @@ router.get("/", async (req, res) => {
         allItems = result.rows.map(rowToApproval);
         source = "db";
       } catch {
-        allItems = [...MOCK_APPROVALS];
+        allItems = [];
       }
     } else {
-      allItems = [...MOCK_APPROVALS];
+      allItems = [];
     }
 
     let items = [...allItems];
@@ -114,7 +113,7 @@ router.get("/:id", async (req, res) => {
   try {
     const pool = getPool();
     let item: ApprovalItem | undefined;
-    let source: "db" | "mock" = "mock";
+    let source: "db" = "db";
 
     if (pool) {
       try {
@@ -124,10 +123,6 @@ router.get("/:id", async (req, res) => {
           source = "db";
         }
       } catch { /* fall through */ }
-    }
-
-    if (!item) {
-      item = MOCK_APPROVALS.find((a) => a.id === req.params.id);
     }
 
     if (!item) {
@@ -206,24 +201,8 @@ router.post("/:id/resolve", requireRole("admin", "bd_manager"), async (req, res)
     }
   }
 
-  // Mock fallback
-  const item = MOCK_APPROVALS.find((a) => a.id === req.params.id);
-  if (!item) {
-    return res.status(404).json(
-      errorEnvelope("GDA.approvals", "resolve", { code: "NOT_FOUND", message: `Approval ${req.params.id} not found`, detail: null }),
-    );
-  }
-
-  res.json(
-    successEnvelope("GDA.approvals", "resolve", {
-      approval_id: item.id,
-      previous_status: item.status,
-      new_status: newStatus,
-      resolved_by: resolvedBy,
-      resolved_at: now,
-      resolution_notes: notes ?? null,
-      correlation_id: correlationId,
-    }, {}, true),
+  return res.status(404).json(
+    errorEnvelope("GDA.approvals", "resolve", { code: "NOT_FOUND", message: `Approval ${req.params.id} not found`, detail: null }),
   );
 });
 

@@ -2,7 +2,6 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
-import { MOCK_COLOR_REVIEWS } from "../data/color-review-mock";
 import { getPool } from "../lib/db";
 import type { ColorReviewPhase, ColorReviewStatus } from "@gda/shared";
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
@@ -14,7 +13,7 @@ const router = Router();
 
 type ReviewItem = Record<string, unknown> & { phase: string; status: string; proposal_id: string; proposal_title: string; agency: string; overall_score: number; go_no_go?: string; summary?: string };
 
-async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" | "mock" }> {
+async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" }> {
   const pool = getPool();
   if (pool) {
     try {
@@ -35,7 +34,7 @@ async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" | "moc
       }
     } catch { /* fall through */ }
   }
-  return { items: [...MOCK_COLOR_REVIEWS] as unknown as ReviewItem[], source: "mock" };
+  return { items: [], source: "db" };
 }
 
 // ---------------------------------------------------------------------------
@@ -254,13 +253,9 @@ router.get("/:id", async (req, res) => {
         }
       } catch { /* fall through */ }
     }
-    const review = MOCK_COLOR_REVIEWS.find((r) => r.id === req.params.id);
-    if (!review) {
-      return res.status(404).json(
-        errorEnvelope("GDA.color-review", "get-detail", { code: "NOT_FOUND", message: `Color review ${req.params.id} not found`, detail: null }),
-      );
-    }
-    res.json(successEnvelope("GDA.color-review", "get-detail", { review, source: "mock" }));
+    return res.status(404).json(
+      errorEnvelope("GDA.color-review", "get-detail", { code: "NOT_FOUND", message: `Color review ${req.params.id} not found`, detail: null }),
+    );
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.color-review", "get-detail", { code: "INTERNAL", message: String(err), detail: null }));
   }

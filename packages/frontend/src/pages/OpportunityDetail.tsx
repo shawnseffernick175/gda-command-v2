@@ -174,7 +174,7 @@ export default function OpportunityDetail() {
       </div>
       <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 20 }}>
         <span style={{ ...styles.sourceBadge, background: data.source === "db" ? "#166534" : "#1e3a5f" }}>
-          {data.source === "db" ? "Live DB" : "Mock data"}
+          {data.source === "n8n" ? "Live n8n" : "Live DB"}
         </span>
         {opp.id}
       </div>

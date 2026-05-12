@@ -2,10 +2,6 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
-import {
-  MOCK_CAPTURE_PLANS,
-  MOCK_CAPTURE_ACTIVITIES,
-} from "../data/capture-mock";
 import { n8nWebhookConfigured, fetchCapturePlansFromN8n } from "../lib/n8n-data";
 import type { CapturePlan } from "@gda/shared";
 
@@ -87,7 +83,7 @@ router.get("/plans", async (_req, res) => {
   } = _req.query as Record<string, string | undefined>;
 
   let allPlans: CapturePlan[];
-  let source: "n8n" | "db" | "mock" = "mock";
+  let source: "n8n" | "db" = "db";
 
   // Try n8n first
   if (n8nWebhookConfigured()) {
@@ -97,10 +93,10 @@ router.get("/plans", async (_req, res) => {
         allPlans = result.plans;
         source = "n8n";
       } else {
-        allPlans = [...MOCK_CAPTURE_PLANS];
+        allPlans = [];
       }
     } catch {
-      allPlans = [...MOCK_CAPTURE_PLANS];
+      allPlans = [];
     }
   } else {
     // Try DB
@@ -112,13 +108,13 @@ router.get("/plans", async (_req, res) => {
           allPlans = result.rows.map(rowToCapturePlan);
           source = "db";
         } else {
-          allPlans = [...MOCK_CAPTURE_PLANS];
+          allPlans = [];
         }
       } catch {
-        allPlans = [...MOCK_CAPTURE_PLANS];
+        allPlans = [];
       }
     } else {
-      allPlans = [...MOCK_CAPTURE_PLANS];
+      allPlans = [];
     }
   }
 
@@ -157,7 +153,7 @@ router.get("/plans", async (_req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/plans/:id", async (req, res) => {
   let plan: CapturePlan | undefined;
-  let source: "n8n" | "db" | "mock" = "mock";
+  let source: "n8n" | "db" = "db";
 
   if (n8nWebhookConfigured()) {
     try {
@@ -183,7 +179,6 @@ router.get("/plans/:id", async (req, res) => {
   }
 
   if (!plan) {
-    plan = MOCK_CAPTURE_PLANS.find((p) => p.id === req.params.id);
   }
 
   if (!plan) {
@@ -207,12 +202,10 @@ router.get("/plans/:id", async (req, res) => {
         performed_at: r.performed_at instanceof Date ? r.performed_at.toISOString() : r.performed_at,
       }));
     } catch {
-      activities = MOCK_CAPTURE_ACTIVITIES.filter((a) => a.capture_plan_id === plan!.id)
-        .sort((a, b) => new Date(b.performed_at).getTime() - new Date(a.performed_at).getTime());
+      activities = [];
     }
   } else {
-    activities = MOCK_CAPTURE_ACTIVITIES.filter((a) => a.capture_plan_id === plan!.id)
-      .sort((a, b) => new Date(b.performed_at).getTime() - new Date(a.performed_at).getTime());
+    activities = [];
   }
 
   res.json(
@@ -227,7 +220,7 @@ router.get("/activities", async (_req, res) => {
   const { type, search, limit = "20" } = _req.query as Record<string, string | undefined>;
 
   const pool = getPool();
-  let allActivities = MOCK_CAPTURE_ACTIVITIES;
+  let allActivities: Array<Record<string, unknown>> = [];
 
   if (pool) {
     try {
@@ -248,16 +241,16 @@ router.get("/activities", async (_req, res) => {
     const q = search.toLowerCase();
     activities = activities.filter(
       (a) =>
-        a.description.toLowerCase().includes(q) ||
-        a.opportunity_title.toLowerCase().includes(q) ||
-        a.performed_by.toLowerCase().includes(q)
+        String(a.description ?? "").toLowerCase().includes(q) ||
+        String(a.opportunity_title ?? "").toLowerCase().includes(q) ||
+        String(a.performed_by ?? "").toLowerCase().includes(q)
     );
   }
 
-  activities.sort((a, b) => new Date(b.performed_at).getTime() - new Date(a.performed_at).getTime());
+  activities.sort((a, b) => new Date(String(b.performed_at)).getTime() - new Date(String(a.performed_at)).getTime());
 
   const typeCounts: Record<string, number> = {};
-  for (const a of allActivities) typeCounts[a.activity_type] = (typeCounts[a.activity_type] || 0) + 1;
+  for (const a of allActivities) typeCounts[String(a.activity_type)] = (typeCounts[String(a.activity_type)] || 0) + 1;
 
   const limited = activities.slice(0, parseInt(limit!, 10));
 
@@ -294,10 +287,6 @@ router.post("/gate-review", requireRole("admin", "bd_manager", "capture_lead"), 
       const result = await pool.query("SELECT * FROM capture_plans WHERE id = $1", [capture_plan_id]);
       if (result.rows.length > 0) plan = rowToCapturePlan(result.rows[0]);
     } catch { /* fall through */ }
-  }
-
-  if (!plan) {
-    plan = MOCK_CAPTURE_PLANS.find((p) => p.id === capture_plan_id);
   }
 
   if (!plan) {
