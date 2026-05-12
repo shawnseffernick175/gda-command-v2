@@ -626,7 +626,7 @@ CREATE TABLE color_reviews (
   proposal_id TEXT,
   proposal_title TEXT NOT NULL,
   agency TEXT,
-  phase TEXT NOT NULL CHECK (phase IN ('white', 'pink', 'green', 'red', 'gold')),
+  phase TEXT NOT NULL CHECK (phase IN ('white', 'pink', 'green', 'red', 'gold', 'blue', 'black_hat', 'white_glove')),
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'in_progress', 'completed', 'failed')),
   started_at TIMESTAMPTZ,
