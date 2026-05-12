@@ -153,7 +153,6 @@ export default function ProposalReview() {
         {[
           { label: "Total", value: String(data.total), color: "var(--color-text)" },
           { label: "Active", value: String(active), color: "#3b82f6" },
-          { label: "Red Team Open", value: String(summary.totalRedTeamOpen), color: summary.totalRedTeamOpen > 0 ? "#ef4444" : "#22c55e" },
           { label: "Avg Compliance", value: `${summary.avgCompliance}%`, color: summary.avgCompliance >= 80 ? "#22c55e" : summary.avgCompliance >= 60 ? "#f59e0b" : "#ef4444" },
           { label: "Pipeline Value", value: formatCurrency(summary.totalValue), color: "#8b5cf6" },
           { label: "Agencies", value: String(summary.agencies.length), color: "var(--color-text-muted)" },
