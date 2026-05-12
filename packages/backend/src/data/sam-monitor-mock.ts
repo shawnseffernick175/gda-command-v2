@@ -6,7 +6,7 @@ export const MOCK_SAM_OPPORTUNITIES: SAMMonitorOpportunity[] = [
   {
     id: "sam-001",
     notice_id: "W912DY-26-R-0042",
-    title: "USACE Mobile District SETA Support Services Services MATOC",
+    title: "USACE Mobile District SETA Support Services MATOC",
     agency: "Department of Defense",
     sub_agency: "U.S. Army Corps of Engineers",
     type: "presolicitation",
@@ -79,7 +79,7 @@ export const MOCK_SAM_OPPORTUNITIES: SAMMonitorOpportunity[] = [
     id: "sam-004",
     notice_id: "68HE0726R0008",
     title: "DISA Region 6 SETA Technical Assessment & Response Team (START)",
-    agency: "Defense IT Protection Agency",
+    agency: "Defense Information Systems Agency",
     sub_agency: "Region 6",
     type: "presolicitation",
     set_aside: "8(a)",

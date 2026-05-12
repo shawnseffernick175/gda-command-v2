@@ -34,7 +34,7 @@ export const MOCK_GOVWIN_OPPORTUNITIES: GovWinOpportunity[] = [
     id: "gw-002",
     govwin_id: "GW-2026-51034",
     title: "DISA SETA Technical Assistance — Region 4",
-    agency: "Defense IT Protection Agency",
+    agency: "Defense Information Systems Agency",
     sub_agency: "Office of Land and Emergency Management",
     status: "new",
     stage: "Forecast",

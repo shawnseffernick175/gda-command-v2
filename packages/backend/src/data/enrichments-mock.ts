@@ -390,7 +390,7 @@ export interface Notification {
 }
 
 const NOTIFICATIONS: Notification[] = [
-  { id: "n-001", type: "deadline", severity: "critical", title: "RFP Response Due in 5 Days", message: "USACE SETA Support Services Services (opp-001) proposal is due June 15. Final review not yet scheduled.", timestamp: "2026-05-10T08:00:00Z", read: false, link: "/opportunities/opp-001", source: "GDA.cron.deadline-escalation" },
+  { id: "n-001", type: "deadline", severity: "critical", title: "RFP Response Due in 5 Days", message: "USACE SETA Support Services (opp-001) proposal is due June 15. Final review not yet scheduled.", timestamp: "2026-05-10T08:00:00Z", read: false, link: "/opportunities/opp-001", source: "GDA.cron.deadline-escalation" },
   { id: "n-002", type: "approval", severity: "warning", title: "Bid Decision Pending — DISA SETA", message: "Bid/no-bid decision for DISA SETA Technical Support (opp-002) requires VP approval. Current Pwin: 58%.", timestamp: "2026-05-10T07:30:00Z", read: false, link: "/approvals", source: "GDA.api.approvals-queue" },
   { id: "n-003", type: "intel", severity: "info", title: "Competitor Alert: SAIC Restructuring", message: "SAIC announced defense IT division restructuring. 15% staff reduction may impact incumbent performance on opp-001.", timestamp: "2026-05-09T16:00:00Z", read: false, link: "/intel", source: "GDA.cron.competitor-crawler" },
   { id: "n-004", type: "milestone", severity: "warning", title: "Capture Plan Milestone Overdue", message: "Customer engagement meeting for PEO IEW&S SETA was due May 5. Not yet completed.", timestamp: "2026-05-09T09:00:00Z", read: true, link: "/capture", source: "GDA.cron.capture-milestone-alerts" },

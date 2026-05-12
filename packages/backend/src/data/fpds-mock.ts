@@ -107,7 +107,7 @@ export const MOCK_FPDS_AWARDS: FPDSAward[] = [
     id: "fpds-005",
     piid: "68HE0726C0015",
     title: "DISA Region 6 Cybersecurity Incident Response Support",
-    agency: "Defense IT Protection Agency",
+    agency: "Defense Information Systems Agency",
     vendor: "Leidos",
     vendor_duns: "058124672",
     award_amount: 12400000,

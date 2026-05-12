@@ -80,7 +80,7 @@ const PWIN_MODELS: PwinModelOutput[] = [
   {
     opp_id: "opp-002",
     opp_title: "DISA SETA Technical Support",
-    agency: "Defense IT Protection Agency",
+    agency: "Defense Information Systems Agency",
     ml_pwin: 0.54,
     static_pwin: 0.58,
     confidence_interval: { lower: 0.42, upper: 0.66 },
@@ -431,7 +431,7 @@ const BID_ASSESSMENTS: BidNoBidAssessment[] = [
   {
     opp_id: "opp-002",
     opp_title: "DISA SETA Technical Support",
-    agency: "Defense IT Protection Agency",
+    agency: "Defense Information Systems Agency",
     value: 8_200_000,
     recommendation: "watch",
     overall_score: 52,
@@ -611,7 +611,7 @@ const WIN_LOSS_ANALYSIS: WinLossAnalysis = {
     { agency: "US Air Force", wins: 12, losses: 11, win_rate: 0.522, total_value_won: 72_000_000, avg_pwin_accuracy: 0.88, trend: "stable" },
     { agency: "Department of Homeland Security", wins: 8, losses: 12, win_rate: 0.400, total_value_won: 34_800_000, avg_pwin_accuracy: 0.85, trend: "improving" },
     { agency: "NASA", wins: 4, losses: 14, win_rate: 0.222, total_value_won: 18_000_000, avg_pwin_accuracy: 0.82, trend: "declining" },
-    { agency: "Defense IT Protection Agency", wins: 5, losses: 13, win_rate: 0.278, total_value_won: 12_400_000, avg_pwin_accuracy: 0.79, trend: "stable" },
+    { agency: "Defense Information Systems Agency", wins: 5, losses: 13, win_rate: 0.278, total_value_won: 12_400_000, avg_pwin_accuracy: 0.79, trend: "stable" },
     { agency: "Defense Counterintelligence and Security Agency", wins: 2, losses: 8, win_rate: 0.200, total_value_won: 3_200_000, avg_pwin_accuracy: 0.76, trend: "stable" },
     { agency: "Department of Energy", wins: 6, losses: 7, win_rate: 0.462, total_value_won: 28_500_000, avg_pwin_accuracy: 0.87, trend: "improving" },
     { agency: "Other DoD", wins: 5, losses: 6, win_rate: 0.455, total_value_won: 17_200_000, avg_pwin_accuracy: 0.84, trend: "stable" },

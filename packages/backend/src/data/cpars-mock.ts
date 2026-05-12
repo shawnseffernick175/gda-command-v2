@@ -6,7 +6,7 @@ export const MOCK_CPARS_RECORDS: CPARSRecord[] = [
   {
     id: "cpars-001",
     contract_number: "W912DY-21-D-0045",
-    contract_title: "USACE Mobile District SETA SETA Support Services",
+    contract_title: "USACE Mobile District SETA Support Services",
     agency: "U.S. Army Corps of Engineers",
     period_of_performance: "2021-09-01 to 2026-08-31",
     contract_value: 28500000,
@@ -93,7 +93,7 @@ export const MOCK_CPARS_RECORDS: CPARSRecord[] = [
     id: "cpars-004",
     contract_number: "68HE0719D0003",
     contract_title: "DISA Enterprise SETA Technical Support",
-    agency: "Defense IT Protection Agency",
+    agency: "Defense Information Systems Agency",
     period_of_performance: "2019-07-01 to 2024-06-30",
     contract_value: 22800000,
     status: "finalized",

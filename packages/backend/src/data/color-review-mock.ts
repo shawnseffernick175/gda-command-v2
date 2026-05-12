@@ -723,8 +723,8 @@ export const MOCK_COLOR_REVIEWS: ColorReview[] = [
   {
     id: "CR-014",
     proposal_id: "PROP-003",
-    proposal_title: "Hanscom AFB IT Modernization Support — Launch Operations",
-    agency: "National Aeronautics and Space Administration",
+    proposal_title: "Hanscom AFB IT Modernization Support — Network Operations",
+    agency: "US Air Force",
     phase: "white",
     status: "completed",
     started_at: "2025-05-07T08:00:00Z",
