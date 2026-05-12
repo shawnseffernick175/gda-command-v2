@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import type { FastTrackMatch } from "@gda/shared";
 import { getPool } from "../lib/db";
 
 const router = Router();
@@ -147,49 +146,37 @@ router.get("/matches", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const pool = getPool();
-    let match: FastTrackMatch | undefined;
+    let rawRow: Record<string, unknown> | undefined;
     if (pool) {
       try {
         const { rows } = await pool.query("SELECT * FROM fast_track_matches WHERE id = $1", [req.params.id]);
-        if (rows.length > 0) match = rows[0] as FastTrackMatch;
+        if (rows.length > 0) rawRow = rows[0] as Record<string, unknown>;
       } catch { /* empty */ }
     }
-    if (!match) {
+    if (!rawRow) {
       return res.status(404).json(
         errorEnvelope("gda-fast-track", "detail", { code: "NOT_FOUND", message: `Match ${req.params.id} not found`, detail: null }),
       );
     }
 
+    const mapped = mapDbRow(rawRow);
     return res.json(
       successEnvelope("gda-fast-track", "detail", {
         match: {
-          id: match.id,
-          status: match.status,
-          signal_type: match.signal_type,
-          signal_summary: match.signal_summary,
-          technology: match.technology,
-          company_name: match.company_name,
-          company_role: match.company_role,
-          candidate_agency: match.candidate_agency,
-          candidate_requirement: match.candidate_requirement,
-          contract_path_hypothesis: match.contract_path_hypothesis,
-          match_score: match.match_score,
-          recommended_next_action: match.recommended_next_action,
-          safety_lane: match.safety_lane,
-          sources: match.sources,
-          created_at: match.created_at,
-          updated_at: match.updated_at,
-          technology_tags: match.technology_tags,
-          company_url: match.company_url,
-          incumbent_or_competitor_context: match.incumbent_or_competitor_context,
-          buyer_problem: match.buyer_problem,
-          next_review_at: match.next_review_at,
-          promotion_target: match.promotion_target,
+          ...mapped,
+          candidate_agency: rawRow.candidate_agency ?? null,
+          candidate_requirement: rawRow.candidate_requirement ?? null,
+          safety_lane: rawRow.safety_lane ?? null,
+          company_url: rawRow.company_url ?? null,
+          incumbent_or_competitor_context: rawRow.incumbent_or_competitor_context ?? null,
+          buyer_problem: rawRow.buyer_problem ?? null,
+          next_review_at: rawRow.next_review_at ?? null,
+          promotion_target: rawRow.promotion_target ?? null,
         },
-        analysis: match.analysis ?? null,
-        ooda: match.ooda ?? null,
-        sources: match.sources,
-        learning: match.learning ?? { notes: [], reserved: true },
+        analysis: rawRow.analysis ?? null,
+        ooda: rawRow.ooda ?? null,
+        sources: mapped.sources,
+        learning: rawRow.learning ?? { notes: [], reserved: true },
       }),
     );
   } catch (err) {
