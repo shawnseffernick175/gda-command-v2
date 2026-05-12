@@ -13,11 +13,12 @@ export async function extractText(buffer: Buffer, mimeType: string): Promise<str
     return extractPdf(buffer);
   }
 
-  if (
-    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    mimeType === "application/msword"
-  ) {
+  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
     return extractDocx(buffer);
+  }
+
+  if (mimeType === "application/msword") {
+    return extractOffice(buffer);
   }
 
   if (
@@ -28,7 +29,7 @@ export async function extractText(buffer: Buffer, mimeType: string): Promise<str
   }
 
   if (mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
-    return extractPptx(buffer);
+    return extractOffice(buffer);
   }
 
   return "";
@@ -84,7 +85,7 @@ function extractXlsx(buffer: Buffer): string {
   }
 }
 
-async function extractPptx(buffer: Buffer): Promise<string> {
+async function extractOffice(buffer: Buffer): Promise<string> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { parseOfficeAsync } = require("officeparser") as {
@@ -93,7 +94,7 @@ async function extractPptx(buffer: Buffer): Promise<string> {
     const text = await parseOfficeAsync(buffer);
     return text;
   } catch (err) {
-    log.error("pptx_parse_error", { error: String(err) });
+    log.error("office_parse_error", { error: String(err) });
     return "";
   }
 }
