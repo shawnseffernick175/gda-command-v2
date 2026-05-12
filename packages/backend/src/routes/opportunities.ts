@@ -467,6 +467,7 @@ router.get("/:id/detail", async (req, res) => {
   const pool = getPool();
   // Try DB for opportunity detail
   let opp: Opportunity | undefined;
+  let source: "db" | "n8n" = "db";
   if (pool) {
     try {
       const result = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
@@ -478,7 +479,10 @@ router.get("/:id/detail", async (req, res) => {
   if (!opp && n8nWebhookConfigured()) {
     try {
       const n8nOpp = await fetchOpportunityDetailFromN8n(id);
-      if (n8nOpp) opp = n8nOpp;
+      if (n8nOpp) {
+        opp = n8nOpp;
+        source = "n8n";
+      }
     } catch { /* empty */ }
   }
 
@@ -504,7 +508,7 @@ router.get("/:id/detail", async (req, res) => {
         ooda: { observe: { summary: "", items: [] }, orient: { summary: "", items: [] }, decide: { summary: "", options: [] }, act: { summary: "", next_steps: [] } },
         sources: [],
         learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 0, coverage_gaps: [], next_review_at: null },
-        source: "db" as const,
+        source,
       },
       {
         requestedAt,
