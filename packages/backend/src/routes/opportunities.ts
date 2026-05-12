@@ -253,7 +253,7 @@ router.get("/", async (req, res) => {
       SELECT id, title, agency, department, status, score, value_estimated,
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
-             qualified_by, tags, raw_source_url, data_source, created_at, updated_at
+             qualified_by, tags, raw_source_url, created_at, updated_at
       FROM opportunities
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
@@ -415,7 +415,7 @@ router.get("/pipeline", async (req, res) => {
       SELECT id, title, agency, department, status, score, value_estimated,
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
-             qualified_by, tags, raw_source_url, data_source, created_at, updated_at
+             qualified_by, tags, raw_source_url, created_at, updated_at
       FROM opportunities
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
