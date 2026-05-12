@@ -858,7 +858,7 @@ export const MOCK_CHAT_SESSIONS: ChatSession[] = [
           {
             document_id: "doc-001",
             document_title: "Army PEO IEW&S SETA Support Services — Past Performance Narrative",
-            chunk_text: "STIG validation and RMF assessment activities were performed at Fort Belvoir (VA), Aberdeen Proving Ground (MD), and Hanscom AFB (MA). Cybersecurity approaches included automated SCAP scanning, STIG remediation automation with Ansible, and continuous monitoring dashboards. All three systems achieved ATO milestones within the contract period of performance.",
+            chunk_text: "STIG validation and RMF assessment activities were performed at Fort Belvoir (VA), Aberdeen Proving Ground (MD), and Hanscom AFB (MA). Cybersecurity approaches included automated SCAP scanning, STIG compliance automation with Ansible, and continuous monitoring dashboards. All three systems achieved ATO milestones within the contract period of performance.",
             page: 7,
             relevance: 0.96,
           },

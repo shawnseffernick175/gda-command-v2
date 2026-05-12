@@ -196,7 +196,7 @@ export const MOCK_FAST_TRACK_MATCHES: FastTrackMatch[] = [
       orient: [
         "RFI-to-BAA cycle at AFRL is typically 6-9 months — this suggests a Q1 2027 procurement",
         "Shield AI needs DoD integration partners who understand AFRL procurement patterns",
-        "Our Tyndall AFB past performance provides an Air Force relationship entry point",
+        "Our DEVCOM C5ISR past performance provides an Army cyber relationship entry point",
         "Combining Shield AI's autonomy platform with our systems integration creates a compelling teaming arrangement",
       ],
       decide: "Submit capability statement emphasizing AI integration experience and DoD systems integration track record. Simultaneously initiate Shield AI teaming discussion.",

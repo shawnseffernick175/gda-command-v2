@@ -329,9 +329,9 @@ router.get("/command-signals", async (_req, res) => {
 
   if (accelerators.length === 0) {
     accelerators = [
-      { opportunity_title: "USACE FUDS IDIQ TO-3", signal: "RFP response window < 14 days — accelerate draft", urgency: "high" },
-      { opportunity_title: "NASA KSC Launch Ops", signal: "Incumbent contract expiring Q3 — early engagement window", urgency: "medium" },
-      { opportunity_title: "DHA MHS GENESIS Phase 4", signal: "Draft RFP posted — begin compliance matrix", urgency: "high" },
+      { opportunity_title: "Army PEO IEW&S SETA Follow-on", signal: "RFP response window < 14 days — finalize pricing strategy vs. Leidos", urgency: "high" },
+      { opportunity_title: "DEVCOM C5ISR Cyber IA Services", signal: "Sources Sought response due — highlight RMF and STIG expertise", urgency: "medium" },
+      { opportunity_title: "Air Force Hanscom IT Modernization", signal: "Draft RFP posted — begin compliance matrix for SD-WAN + zero trust", urgency: "high" },
     ];
   }
 

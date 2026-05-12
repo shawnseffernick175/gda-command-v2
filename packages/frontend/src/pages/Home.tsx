@@ -283,7 +283,7 @@ export default function Home() {
       </div>
 
       <p style={{ color: "var(--color-text-muted)", marginBottom: 24 }}>
-        Shawn's operating system for Golden Dome / GDA business development,
+        Shawn's operating system for Envision / GDA business development,
         capture, competitive intelligence, opportunity management, and platform
         health.
       </p>
