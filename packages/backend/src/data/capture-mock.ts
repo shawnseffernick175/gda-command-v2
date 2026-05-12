@@ -259,7 +259,7 @@ export const MOCK_CAPTURE_PLANS: CapturePlan[] = [
       },
       {
         name: "Palo Alto Networks",
-        role: "technology_partner",
+        role: "sub",
         capability: "Prisma SASE platform, SD-WAN technology, FedRAMP authorized",
         status: "negotiating",
         past_performance_score: 87,
@@ -337,7 +337,7 @@ export const MOCK_CAPTURE_PLANS: CapturePlan[] = [
       },
       {
         name: "AWS",
-        role: "technology_partner",
+        role: "sub",
         capability: "GovCloud infrastructure, IL5 hosting, managed services",
         status: "confirmed",
         past_performance_score: 91,
