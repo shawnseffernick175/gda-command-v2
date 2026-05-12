@@ -20,11 +20,11 @@ async function loadAwards(): Promise<{ items: FPDSAward[]; source: "db" }> {
 router.get("/summary", async (_req, res) => {
   try {
     const { items: all, source } = await loadAwards();
-    const totalValue = all.reduce((s, a) => s + (a.award_amount ?? 0), 0);
+    const totalValue = all.reduce((s, a) => s + (Number(a.award_amount) || 0), 0);
     const competitorAwards = all.filter((a) => a.is_competitor).length;
     const uniqueCompetitors = new Set(all.filter((a) => a.competitor_name).map((a) => a.competitor_name)).size;
     const recompeteCandidates = all.filter((a) => a.is_recompete_candidate).length;
-    const avgRelevance = all.length > 0 ? Math.round(all.reduce((s, a) => s + (a.relevance_score ?? 0), 0) / all.length) : 0;
+    const avgRelevance = all.length > 0 ? Math.round(all.reduce((s, a) => s + (Number(a.relevance_score) || 0), 0) / all.length) : 0;
 
     return res.json(
       successEnvelope("gda-fpds", "summary", {
