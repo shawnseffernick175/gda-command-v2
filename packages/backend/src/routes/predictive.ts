@@ -61,7 +61,26 @@ router.get("/forecast", async (_req, res) => {
     } catch { /* fall through */ }
   }
 
-  res.json(successEnvelope("gda-predictive", "forecast", { quarters: [], total_weighted: 0, confidence: 0, source: "db" }));
+  res.json(successEnvelope("gda-predictive", "forecast", {
+    summary: {
+      total_pipeline: 0,
+      weighted_pipeline: 0,
+      p10_revenue: 0,
+      p50_revenue: 0,
+      p90_revenue: 0,
+      annual_target: 0,
+      gap_to_target: 0,
+      pipeline_coverage_ratio: 0,
+      simulations_run: 0,
+      model_version: "n/a",
+      last_updated: new Date().toISOString(),
+    },
+    monthly: [],
+    scenarios: [],
+    risk_factors: [],
+    top_contributors: [],
+    source: "db",
+  }));
 });
 
 // ---------------------------------------------------------------------------
@@ -122,7 +141,25 @@ router.get("/win-loss", async (_req, res) => {
     } catch { /* fall through */ }
   }
 
-  res.json(successEnvelope("gda-predictive", "win-loss", { patterns: [], total_analyzed: 0, source: "db" }));
+  res.json(successEnvelope("gda-predictive", "win-loss", {
+    summary: {
+      total_opportunities: 0,
+      total_wins: 0,
+      total_losses: 0,
+      overall_win_rate: 0,
+      avg_pwin_accuracy: 0,
+      total_value_won: 0,
+      total_value_lost: 0,
+      model_calibration: "well_calibrated",
+      analysis_period: "No data",
+      last_updated: new Date().toISOString(),
+    },
+    patterns: [],
+    agency_performance: [],
+    pwin_calibration: [],
+    quarterly_trends: [],
+    source: "db",
+  }));
 });
 
 export default router;

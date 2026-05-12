@@ -794,7 +794,7 @@ export default function Predictive() {
       <h1 style={{ margin: "0 0 16px", fontSize: 24, fontWeight: 700 }}>Predictive Analytics</h1>
 
       {/* Summary strip */}
-      {winLossData && forecastData && (
+      {winLossData?.summary && forecastData?.summary && (
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
@@ -849,14 +849,20 @@ export default function Predictive() {
       {!loading && tab === "pwin" && (
         <PwinModelsTab models={pwinModels} selectedId={selectedPwinId} onSelect={setSelectedPwinId} />
       )}
-      {!loading && tab === "forecast" && forecastData && (
+      {!loading && tab === "forecast" && forecastData?.summary && (
         <ForecastTab data={forecastData} />
+      )}
+      {!loading && tab === "forecast" && !forecastData?.summary && (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>No forecast data available. Seed pipeline data or connect n8n to populate.</div>
       )}
       {!loading && tab === "bid" && bidData && (
         <BidNoBidTab data={bidData} selectedId={selectedBidId} onSelect={setSelectedBidId} />
       )}
-      {!loading && tab === "patterns" && winLossData && (
+      {!loading && tab === "patterns" && winLossData?.summary && (
         <WinLossTab data={winLossData} />
+      )}
+      {!loading && tab === "patterns" && !winLossData?.summary && (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>No win/loss data available. Resolve opportunities to populate analysis.</div>
       )}
     </div>
   );
