@@ -8,27 +8,41 @@ const router = Router();
 // ---------------------------------------------------------------------------
 // GET /api/fast-track/summary — top-line summary cards
 // ---------------------------------------------------------------------------
-router.get("/summary", (_req, res) => {
+router.get("/summary", async (_req, res) => {
   try {
-    const all: FastTrackMatch[] = [];
-    const newCount = all.filter((m) => m.status === "new").length;
-    const reviewingCount = all.filter((m) => m.status === "reviewing").length;
-    const watchingCount = all.filter((m) => m.status === "watching").length;
-    const promotedCount = all.filter((m) => m.status === "promoted").length;
-    const discardedCount = all.filter((m) => m.status === "discarded").length;
-    const needsAttentionCount = all.filter(
-      (m) => m.status === "new" || (m.status === "reviewing" && m.match_score >= 75),
-    ).length;
+    const pool = getPool();
+    let counts = { total: 0, new_count: 0, reviewing_count: 0, watching_count: 0, promoted_count: 0, discarded_count: 0, needs_attention_count: 0 };
+    if (pool) {
+      try {
+        const { rows } = await pool.query(
+          `SELECT status, count(*)::int as cnt, count(*) FILTER (WHERE status = 'new' OR (status = 'reviewing' AND score >= 75))::int as attention
+           FROM fast_track_matches GROUP BY status`,
+        );
+        let total = 0;
+        let attention = 0;
+        for (const r of rows) {
+          total += r.cnt;
+          attention += r.attention;
+          if (r.status === "new") counts.new_count = r.cnt;
+          else if (r.status === "reviewing") counts.reviewing_count = r.cnt;
+          else if (r.status === "watching") counts.watching_count = r.cnt;
+          else if (r.status === "promoted") counts.promoted_count = r.cnt;
+          else if (r.status === "discarded") counts.discarded_count = r.cnt;
+        }
+        counts.total = total;
+        counts.needs_attention_count = attention;
+      } catch { /* fall through to zeros */ }
+    }
 
     return res.json(
       successEnvelope("gda-fast-track", "summary", {
-        new_count: newCount,
-        reviewing_count: reviewingCount,
-        watching_count: watchingCount,
-        promoted_count: promotedCount,
-        discarded_count: discardedCount,
-        needs_attention_count: needsAttentionCount,
-        total_count: all.length,
+        new_count: counts.new_count,
+        reviewing_count: counts.reviewing_count,
+        watching_count: counts.watching_count,
+        promoted_count: counts.promoted_count,
+        discarded_count: counts.discarded_count,
+        needs_attention_count: counts.needs_attention_count,
+        total_count: counts.total,
       }),
     );
   } catch (err) {
@@ -38,12 +52,41 @@ router.get("/summary", (_req, res) => {
   }
 });
 
+function mapDbRow(r: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: r.id,
+    status: r.status,
+    signal_type: r.signal_type,
+    signal_summary: r.signal_title ?? r.signal_summary ?? "",
+    technology: (r.technology_tags as string[] | null)?.[0] ?? r.signal_type ?? "",
+    company_name: r.company_name ?? "",
+    company_role: r.company_role ?? "unknown",
+    contract_path_hypothesis: r.contract_path ?? "",
+    match_score: parseFloat(String(r.score ?? 0)),
+    recommended_next_action: r.recommended_action ?? "",
+    technology_tags: r.technology_tags ?? [],
+    sources: r.sources ?? [],
+    needs_attention: r.needs_attention ?? false,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/fast-track/matches — list view with filters
 // ---------------------------------------------------------------------------
-router.get("/matches", (req, res) => {
+router.get("/matches", async (req, res) => {
   try {
-    let items: FastTrackMatch[] = [];
+    const pool = getPool();
+    let dbRows: Record<string, unknown>[] = [];
+    if (pool) {
+      try {
+        const { rows } = await pool.query("SELECT * FROM fast_track_matches ORDER BY score DESC");
+        dbRows = rows;
+      } catch { /* empty */ }
+    }
+
+    let items = dbRows.map(mapDbRow);
     const { status, signal_type, technology, company_role, min_match_score, search } = req.query;
 
     if (status && typeof status === "string") {
@@ -54,7 +97,7 @@ router.get("/matches", (req, res) => {
     }
     if (technology && typeof technology === "string") {
       const q = technology.toLowerCase();
-      items = items.filter((m) => m.technology.toLowerCase().includes(q));
+      items = items.filter((m) => String(m.technology).toLowerCase().includes(q));
     }
     if (company_role && typeof company_role === "string") {
       items = items.filter((m) => m.company_role === company_role);
@@ -62,32 +105,24 @@ router.get("/matches", (req, res) => {
     if (min_match_score && typeof min_match_score === "string") {
       const minScore = parseInt(min_match_score, 10);
       if (!isNaN(minScore)) {
-        items = items.filter((m) => m.match_score >= minScore);
+        items = items.filter((m) => (m.match_score as number) >= minScore);
       }
     }
     if (search && typeof search === "string") {
       const q = search.toLowerCase();
       items = items.filter(
         (m) =>
-          m.signal_summary.toLowerCase().includes(q) ||
-          m.technology.toLowerCase().includes(q) ||
-          m.company_name.toLowerCase().includes(q) ||
-          (m.candidate_agency && m.candidate_agency.toLowerCase().includes(q)) ||
-          (m.candidate_requirement && m.candidate_requirement.toLowerCase().includes(q)),
+          String(m.signal_summary).toLowerCase().includes(q) ||
+          String(m.technology).toLowerCase().includes(q) ||
+          String(m.company_name).toLowerCase().includes(q),
       );
     }
 
-    // Sort by match_score descending
-    items.sort((a, b) => b.match_score - a.match_score);
-
-    // Strip detail-only fields for list view
-    const listItems = items.map(({ analysis, ooda, learning, ...rest }) => rest);
-
     return res.json(
       successEnvelope("gda-fast-track", "list", {
-        matches: listItems,
+        matches: items,
         meta: {
-          count: listItems.length,
+          count: items.length,
           filtersApplied: {
             ...(status ? { status } : {}),
             ...(signal_type ? { signal_type } : {}),

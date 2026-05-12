@@ -8,11 +8,13 @@ import {
   fetchDashboardLayout,
   saveDashboardLayout,
   resetDashboardLayout,
+  fetchCompanyProfile,
   type DashboardKPIs,
   type DashboardFunnelStage,
   type OpportunityRow,
   type CommandSignalsData,
   type WidgetLayout,
+  type CompanyProfileData,
 } from "../api/client";
 import { useToast } from "../components/Toast";
 import InfoBadge from "../components/InfoBadge";
@@ -78,9 +80,19 @@ const DEFAULT_LAYOUT: WidgetLayout[] = WIDGET_DEFS.map((w, i) => ({
   order: i,
 }));
 
+function CompanyChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", gap: 4, alignItems: "baseline", fontSize: 12 }}>
+      <span style={{ color: "var(--color-text-muted)", fontWeight: 500 }}>{label}:</span>
+      <span style={{ color: "var(--color-text)", fontWeight: 600 }}>{value}</span>
+    </div>
+  );
+}
+
 export default function Home() {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [signals, setSignals] = useState<CommandSignalsData | null>(null);
+  const [company, setCompany] = useState<CompanyProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layout, setLayout] = useState<WidgetLayout[]>(DEFAULT_LAYOUT);
@@ -95,14 +107,15 @@ export default function Home() {
       fetchDashboardKPIs(),
       fetchCommandSignals(),
       fetchDashboardLayout().catch(() => null),
+      fetchCompanyProfile().catch(() => null),
     ])
-      .then(([kpiEnv, sigEnv, layoutEnv]) => {
+      .then(([kpiEnv, sigEnv, layoutEnv, companyEnv]) => {
         if (kpiEnv.success && kpiEnv.data) setKpis(kpiEnv.data);
         else setError(kpiEnv.error?.message ?? "Failed to load dashboard");
         if (sigEnv.success && sigEnv.data) setSignals(sigEnv.data);
+        if (companyEnv?.success && companyEnv.data && companyEnv.data.id) setCompany(companyEnv.data);
         if (layoutEnv?.success && layoutEnv.data?.layout) {
           const saved = layoutEnv.data.layout;
-          // Merge saved layout with defaults (in case new widgets were added)
           const merged = DEFAULT_LAYOUT.map((def) => {
             const found = saved.find((s: WidgetLayout) => s.id === def.id);
             return found ?? def;
@@ -274,6 +287,31 @@ export default function Home() {
         capture, competitive intelligence, opportunity management, and platform
         health.
       </p>
+
+      {company && (
+        <div style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 16,
+          padding: "12px 16px",
+          marginBottom: 20,
+          borderRadius: 8,
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          alignItems: "center",
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--color-text)" }}>{company.name}</div>
+          <CompanyChip label="Revenue" value={formatCurrency(company.revenue)} />
+          <CompanyChip label="Employees" value={String(company.employees ?? "—")} />
+          <CompanyChip label="CAGE" value={company.cage_code ?? "—"} />
+          <CompanyChip label="UEI" value={company.uei ?? "—"} />
+          <CompanyChip label="Location" value={company.address_city && company.address_state ? `${company.address_city}, ${company.address_state}` : "—"} />
+          <CompanyChip label="Set-Aside" value={company.set_aside_types?.join(", ") || "—"} />
+          {company.naics_codes && company.naics_codes.length > 0 && (
+            <CompanyChip label="NAICS" value={company.naics_codes.slice(0, 3).join(", ") + (company.naics_codes.length > 3 ? ` +${company.naics_codes.length - 3}` : "")} />
+          )}
+        </div>
+      )}
 
       {loading && (
         <div style={{ padding: "20px 0", color: "var(--color-text-muted)", fontSize: 14 }}>
