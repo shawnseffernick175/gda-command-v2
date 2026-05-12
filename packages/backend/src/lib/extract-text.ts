@@ -1,0 +1,112 @@
+import { log } from "./logger";
+
+/**
+ * Extract plain text from a file buffer based on its MIME type.
+ * Supports: PDF, DOCX, DOC, XLSX, XLS, PPTX, TXT, CSV, Markdown.
+ */
+export async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
+  if (mimeType === "text/plain" || mimeType === "text/markdown" || mimeType === "text/csv") {
+    return buffer.toString("utf-8");
+  }
+
+  if (mimeType === "application/pdf") {
+    return extractPdf(buffer);
+  }
+
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mimeType === "application/msword"
+  ) {
+    return extractDocx(buffer);
+  }
+
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    mimeType === "application/vnd.ms-excel"
+  ) {
+    return extractXlsx(buffer);
+  }
+
+  if (mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
+    return extractPptx(buffer);
+  }
+
+  return "";
+}
+
+async function extractPdf(buffer: Buffer): Promise<string> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+    const result = await pdfParse(buffer);
+    return result.text;
+  } catch (err) {
+    log.error("pdf_parse_error", { error: String(err) });
+    return "";
+  }
+}
+
+async function extractDocx(buffer: Buffer): Promise<string> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mammoth = require("mammoth") as {
+      extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }>;
+    };
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value;
+  } catch (err) {
+    log.error("docx_parse_error", { error: String(err) });
+    return "";
+  }
+}
+
+function extractXlsx(buffer: Buffer): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const XLSX = require("xlsx") as typeof import("xlsx");
+    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const lines: string[] = [];
+
+    for (const sheetName of workbook.SheetNames) {
+      lines.push(`--- Sheet: ${sheetName} ---`);
+      const sheet = workbook.Sheets[sheetName];
+      const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      for (const row of rows) {
+        const text = row.map(String).filter(Boolean).join(" | ");
+        if (text.trim()) lines.push(text);
+      }
+    }
+
+    return lines.join("\n");
+  } catch (err) {
+    log.error("xlsx_parse_error", { error: String(err) });
+    return "";
+  }
+}
+
+async function extractPptx(buffer: Buffer): Promise<string> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { parseOfficeAsync } = require("officeparser") as {
+      parseOfficeAsync: (buf: Buffer) => Promise<string>;
+    };
+    const text = await parseOfficeAsync(buffer);
+    return text;
+  } catch (err) {
+    log.error("pptx_parse_error", { error: String(err) });
+    return "";
+  }
+}
+
+/** MIME types supported for text extraction */
+export const EXTRACTABLE_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "text/markdown",
+]);
