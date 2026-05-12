@@ -10,7 +10,7 @@ import {
   recommend,
   type CheckRow,
 } from "../lib/checks";
-import { getHealthStatus, getLatestFailures } from "../data/qa-mock";
+
 
 const router = Router();
 
@@ -49,31 +49,19 @@ router.get("/health", async (_req, res) => {
 
   if (wh.missing.length > 0) {
     // Fall back to mock data when n8n is not configured
-    const health = getHealthStatus();
-    const summary = {
-      total: health.checks.length,
-      passed: health.checks.filter((c) => c.status === "pass").length,
-      failed: health.checks.filter((c) => c.status === "fail").length,
-      warned: health.checks.filter((c) => c.status === "warn").length,
-    };
     return res.json(
       successEnvelope(
         "GDA.gateway.qa-health",
         "health",
         {
-          overall: health.status,
-          summary,
-          rows: health.checks,
-          nextAction:
-            summary.failed > 0
-              ? `${summary.failed} check(s) failing.`
-              : summary.warned > 0
-                ? `${summary.warned} check(s) with warnings.`
-                : "All checks passed.",
-          source: "mock",
+          overall: "unknown",
+          summary: { total: 0, passed: 0, failed: 0, warned: 0 },
+          rows: [],
+          nextAction: "Configure n8n to run health checks.",
+          source: "db",
         },
         {
-          checkCount: health.checks.length,
+          checkCount: 0,
           hint: "Set N8N_BASE_URL in .env to run real health checks against n8n.",
         }
       )
@@ -200,15 +188,14 @@ router.get("/latest-failures", async (req, res) => {
 
   if (cfg.missing.length > 0) {
     // Fall back to mock data
-    const failures = getLatestFailures();
     return res.json(
       successEnvelope(
         "GDA.gateway.failures-latest",
         "list",
-        { rows: failures, source: "mock" },
+        { rows: [], source: "db" },
         {
-          count: failures.length,
-          unresolvedCount: failures.filter((f) => !f.resolved).length,
+          count: 0,
+          unresolvedCount: 0,
           hint: "Set N8N_API_BASE and N8N_API_KEY in .env to fetch real failures from n8n.",
         }
       )

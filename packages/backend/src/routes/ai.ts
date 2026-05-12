@@ -2,8 +2,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { isLLMAvailable, chatCompletion, type ChatMessage } from "../lib/llm";
-import { getMockOpportunityById } from "../data/opportunities-mock";
-import { getMockOpportunityDetail } from "../data/opportunity-detail-mock";
+
 
 const router = Router();
 
@@ -49,19 +48,7 @@ router.post("/opportunity-chat", async (req, res) => {
     }
   }
 
-  if (!oppContext) {
-    const mockOpp = getMockOpportunityById(opportunityId);
-    const mockDetail = getMockOpportunityDetail(opportunityId);
-    if (mockOpp) {
-      oppContext = `Opportunity: ${mockOpp.title}\nAgency: ${mockOpp.agency}\nDepartment: ${mockOpp.department}\nStatus: ${mockOpp.status}\nValue: $${mockOpp.value_estimated}\nPwin: ${mockOpp.probability_of_win}\nScore: ${mockOpp.score}\nNAICS: ${mockOpp.naics}\nIncumbent: ${mockOpp.incumbent}`;
-      if (mockDetail) {
-        oppContext += `\n\nExecutive Summary: ${mockDetail.analysis.executive_summary}\nRecommended Action: ${mockDetail.analysis.recommended_action}`;
-        if (mockDetail.analysis.competitive_landscape) {
-          oppContext += `\nCompetitive Landscape: ${mockDetail.analysis.competitive_landscape}`;
-        }
-      }
-    }
-  }
+  /* No mock fallback — oppContext stays empty if DB has no data */
 
   if (!isLLMAvailable()) {
     return res.json(

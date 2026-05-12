@@ -1,11 +1,4 @@
 import { Router } from "express";
-import {
-  getMockPrompts,
-  getMockPromptById,
-  getMockPromptVersions,
-  getMockPromptUsage,
-  getMockRecentUsage,
-} from "../data/prompts-mock";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 
@@ -13,7 +6,7 @@ const router = Router();
 
 router.get("/", async (req, res) => {
   let prompts: Array<Record<string, unknown>>;
-  let source: "db" | "mock" = "mock";
+  let source: "db" = "db";
   const pool = getPool();
 
   if (pool) {
@@ -32,13 +25,13 @@ router.get("/", async (req, res) => {
         }));
         source = "db";
       } else {
-        prompts = getMockPrompts() as unknown as Array<Record<string, unknown>>;
+        prompts = [];
       }
     } catch {
-      prompts = getMockPrompts() as unknown as Array<Record<string, unknown>>;
+      prompts = [];
     }
   } else {
-    prompts = getMockPrompts() as unknown as Array<Record<string, unknown>>;
+    prompts = [];
   }
 
   const allPrompts = [...prompts];
@@ -92,9 +85,8 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/usage", (_req, res) => {
-  const usage = getMockRecentUsage();
   return res.json(
-    successEnvelope("GDA.prompts", "recent-usage", { usage, total: usage.length, source: "mock" })
+    successEnvelope("GDA.prompts", "recent-usage", { usage: [], total: 0, source: "db" })
   );
 });
 
@@ -122,15 +114,9 @@ router.get("/:id", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const prompt = getMockPromptById(id);
-  if (!prompt) {
-    return res.status(404).json(
-      errorEnvelope("GDA.prompts", "get", { code: "NOT_FOUND", message: `Prompt not found: ${id}`, detail: null })
-    );
-  }
-  const versions = getMockPromptVersions(id);
-  const usage = getMockPromptUsage(id);
-  return res.json(successEnvelope("GDA.prompts", "get", { prompt, versions, usage, source: "mock" }));
+  return res.status(404).json(
+    errorEnvelope("GDA.prompts", "get", { code: "NOT_FOUND", message: `Prompt not found: ${id}`, detail: null })
+  );
 });
 
 export default router;

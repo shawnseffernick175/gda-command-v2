@@ -462,7 +462,7 @@ export default function Capture() {
               marginBottom: 16,
             }}
           >
-            {src === "n8n" ? "Live — n8n" : src === "db" ? "Live — database" : "Mock data"}
+            {src === "n8n" ? "Live — n8n" : "Live — database"}
           </span>
         );
       })()}

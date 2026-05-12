@@ -121,12 +121,12 @@ export default function Approvals() {
           fontWeight: 600,
           padding: "2px 8px",
           borderRadius: 4,
-          background: data.source === "mock" ? "rgba(59,130,246,0.15)" : "rgba(34,197,94,0.15)",
-          color: data.source === "mock" ? "#3b82f6" : "#22c55e",
+          background: "rgba(34,197,94,0.15)",
+          color: "#22c55e",
           marginBottom: 16,
         }}
       >
-        {data.source === "n8n" ? "Live \u2014 n8n" : data.source === "db" ? "Live \u2014 database" : "Mock data"}
+        {data.source === "n8n" ? "Live \u2014 n8n" : "Live \u2014 database"}
       </span>
 
       {/* Summary strip */}

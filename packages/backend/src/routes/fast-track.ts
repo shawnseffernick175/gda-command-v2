@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import { MOCK_FAST_TRACK_MATCHES } from "../data/fast-track-mock";
-import type { FastTrackMatch } from "../data/fast-track-mock";
+import type { FastTrackMatch } from "@gda/shared";
 import { getPool } from "../lib/db";
 
 const router = Router();
@@ -11,7 +10,7 @@ const router = Router();
 // ---------------------------------------------------------------------------
 router.get("/summary", (_req, res) => {
   try {
-    const all = MOCK_FAST_TRACK_MATCHES;
+    const all: FastTrackMatch[] = [];
     const newCount = all.filter((m) => m.status === "new").length;
     const reviewingCount = all.filter((m) => m.status === "reviewing").length;
     const watchingCount = all.filter((m) => m.status === "watching").length;
@@ -44,7 +43,7 @@ router.get("/summary", (_req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/matches", (req, res) => {
   try {
-    let items: FastTrackMatch[] = [...MOCK_FAST_TRACK_MATCHES];
+    let items: FastTrackMatch[] = [];
     const { status, signal_type, technology, company_role, min_match_score, search } = req.query;
 
     if (status && typeof status === "string") {
@@ -110,9 +109,16 @@ router.get("/matches", (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/fast-track/:id — detail view for one match candidate
 // ---------------------------------------------------------------------------
-router.get("/:id", (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    const match = MOCK_FAST_TRACK_MATCHES.find((m) => m.id === req.params.id);
+    const pool = getPool();
+    let match: FastTrackMatch | undefined;
+    if (pool) {
+      try {
+        const { rows } = await pool.query("SELECT * FROM fast_track_matches WHERE id = $1", [req.params.id]);
+        if (rows.length > 0) match = rows[0] as FastTrackMatch;
+      } catch { /* empty */ }
+    }
     if (!match) {
       return res.status(404).json(
         errorEnvelope("gda-fast-track", "detail", { code: "NOT_FOUND", message: `Match ${req.params.id} not found`, detail: null }),
@@ -164,44 +170,44 @@ router.get("/:id", (req, res) => {
 router.post("/promote", async (req, res) => {
   try {
     const { matchId } = req.body as { matchId: string };
-    const match = MOCK_FAST_TRACK_MATCHES.find((m) => m.id === matchId);
-    if (!match) {
+    const pool = getPool();
+    let opportunityId: string | null = null;
+
+    if (!pool) {
+      return res.status(503).json(
+        errorEnvelope("gda-fast-track", "promote", { code: "NO_DB", message: "Database unavailable", detail: null }),
+      );
+    }
+
+    const ftResult = await pool.query("SELECT * FROM fast_track_matches WHERE id = $1", [matchId]);
+    if (ftResult.rows.length === 0) {
       return res.status(404).json(
         errorEnvelope("gda-fast-track", "promote", { code: "NOT_FOUND", message: `Match ${matchId} not found`, detail: null }),
       );
     }
 
-    // Mark as promoted in mock data
-    (match as { status: string }).status = "promoted";
-    (match as { promotion_target: string }).promotion_target = "ops-tracker";
-
-    // Create a real opportunity in the database
-    const pool = getPool();
-    let opportunityId: string | null = null;
-
-    if (pool) {
-      try {
-        const oppId = `opp-ft-${matchId}`;
-        const result = await pool.query(
-          `INSERT INTO opportunities (id, title, agency, department, status, capture_stage, score, value_estimated, probability_of_win, naics, tags, data_source, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, 'discovery', 'interest', $5, 0, 0, '', $6, 'fast-track', NOW(), NOW())
-           ON CONFLICT (id) DO NOTHING
-           RETURNING id`,
-          [
-            oppId,
-            match.technology,
-            match.candidate_agency ?? "TBD",
-            "TBD",
-            match.match_score,
-            match.technology_tags ?? [],
-          ],
-        );
-        if (result.rows.length > 0) {
-          opportunityId = result.rows[0].id;
-        }
-      } catch {
-        // DB insert failed, still return success for the mock promotion
+    const ftMatch = ftResult.rows[0];
+    const oppId = `opp-ft-${matchId}`;
+    try {
+      const result = await pool.query(
+        `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, tags, data_source, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'discovery', $5, 0, 0, '', $6, 'fast-track', NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING
+         RETURNING id`,
+        [
+          oppId,
+          ftMatch.technology,
+          ftMatch.candidate_agency ?? "TBD",
+          "TBD",
+          ftMatch.match_score,
+          ftMatch.technology_tags ?? [],
+        ],
+      );
+      if (result.rows.length > 0) {
+        opportunityId = result.rows[0].id;
       }
+    } catch {
+      // DB insert failed — match exists but promotion insert failed
     }
 
     return res.json(
@@ -209,7 +215,7 @@ router.post("/promote", async (req, res) => {
         matchId,
         status: "promoted",
         opportunityId,
-        message: `${match.technology} promoted to Ops Tracker`,
+        message: `${ftMatch.technology} promoted to Ops Tracker`,
       }),
     );
   } catch (err) {

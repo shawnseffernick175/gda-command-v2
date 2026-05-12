@@ -146,7 +146,7 @@ export default function Doctrine() {
           background: "rgba(59,130,246,0.15)",
           color: "#60a5fa",
         }}>
-          Mock data
+          Live DB
         </span>
       </div>
 

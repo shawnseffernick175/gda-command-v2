@@ -1,13 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import {
-  getPwinModels,
-  getPwinModel,
-  getPipelineForecast,
-  getBidAssessments,
-  getBidAssessment,
-  getWinLossAnalysis,
-} from "../data/predictive-mock";
+
 import { callWebhook } from "../lib/n8n-client";
 import { n8nWebhookConfigured } from "../lib/n8n-data";
 
@@ -28,11 +21,10 @@ router.get("/pwin-models", async (_req, res) => {
     } catch { /* fall through to mock */ }
   }
 
-  const models = getPwinModels();
   res.json(successEnvelope("gda-predictive", "pwin-models", {
-    models,
-    total: models.length,
-    source: "mock",
+    models: [],
+    total: 0,
+    source: "db",
   }));
 });
 
@@ -48,15 +40,11 @@ router.get("/pwin-models/:oppId", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const model = getPwinModel(oppId);
-  if (!model) {
-    return res.status(404).json(errorEnvelope("gda-predictive", "pwin-model", {
-      code: "NOT_FOUND",
-      message: `No ML Pwin model for opportunity ${oppId}`,
-      detail: null,
-    }));
-  }
-  res.json(successEnvelope("gda-predictive", "pwin-model", { ...model, source: "mock" }));
+  return res.status(404).json(errorEnvelope("gda-predictive", "pwin-model", {
+    code: "NOT_FOUND",
+    message: `No ML Pwin model for opportunity ${oppId}`,
+    detail: null,
+  }));
 });
 
 // ---------------------------------------------------------------------------
@@ -73,8 +61,7 @@ router.get("/forecast", async (_req, res) => {
     } catch { /* fall through */ }
   }
 
-  const forecast = getPipelineForecast();
-  res.json(successEnvelope("gda-predictive", "forecast", { ...forecast, source: "mock" }));
+  res.json(successEnvelope("gda-predictive", "forecast", { quarters: [], total_weighted: 0, confidence: 0, source: "db" }));
 });
 
 // ---------------------------------------------------------------------------
@@ -92,14 +79,13 @@ router.get("/bid-assessments", async (_req, res) => {
     } catch { /* fall through */ }
   }
 
-  const assessments = getBidAssessments();
   res.json(successEnvelope("gda-predictive", "bid-assessments", {
-    assessments,
-    total: assessments.length,
-    bid: assessments.filter((a) => a.recommendation === "bid").length,
-    no_bid: assessments.filter((a) => a.recommendation === "no_bid").length,
-    watch: assessments.filter((a) => a.recommendation === "watch").length,
-    source: "mock",
+    assessments: [],
+    total: 0,
+    bid: 0,
+    no_bid: 0,
+    watch: 0,
+    source: "db",
   }));
 });
 
@@ -115,15 +101,11 @@ router.get("/bid-assessments/:oppId", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const assessment = getBidAssessment(oppId);
-  if (!assessment) {
-    return res.status(404).json(errorEnvelope("gda-predictive", "bid-assessment", {
-      code: "NOT_FOUND",
-      message: `No bid assessment for opportunity ${oppId}`,
-      detail: null,
-    }));
-  }
-  res.json(successEnvelope("gda-predictive", "bid-assessment", { ...assessment, source: "mock" }));
+  return res.status(404).json(errorEnvelope("gda-predictive", "bid-assessment", {
+    code: "NOT_FOUND",
+    message: `No bid assessment for opportunity ${oppId}`,
+    detail: null,
+  }));
 });
 
 // ---------------------------------------------------------------------------
@@ -140,8 +122,7 @@ router.get("/win-loss", async (_req, res) => {
     } catch { /* fall through */ }
   }
 
-  const analysis = getWinLossAnalysis();
-  res.json(successEnvelope("gda-predictive", "win-loss", { ...analysis, source: "mock" }));
+  res.json(successEnvelope("gda-predictive", "win-loss", { patterns: [], total_analyzed: 0, source: "db" }));
 });
 
 export default router;

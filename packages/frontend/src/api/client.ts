@@ -53,7 +53,7 @@ export interface QAHealthData {
   summary: QAHealthSummary;
   rows: QACheckRow[];
   nextAction: string;
-  source?: "mock" | "live";
+  source?: "db" | "live";
 }
 
 // Failure row — supports both mock and live (n8n execution) shapes
@@ -77,7 +77,7 @@ export interface QAFailure {
 
 export interface QAFailuresData {
   rows: QAFailure[];
-  source?: "mock" | "live";
+  source?: "db" | "live";
 }
 
 export interface WorkflowSummary {
@@ -140,6 +140,7 @@ export interface OpportunityRow {
   value_estimated: number | null;
   probability_of_win: number | null;
   naics: string | null;
+  naics_size?: "small" | "large" | null;
   psc: string | null;
   due_date: string | null;
   solicitation_number: string | null;
@@ -157,7 +158,7 @@ export interface OpportunityRow {
 
 export interface OpportunitiesData {
   opportunities: OpportunityRow[];
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface QualifyResultData {
@@ -175,6 +176,7 @@ export interface OpportunityQueryParams {
   search?: string;
   status?: string;
   department?: string;
+  naics_size?: string;
   minPwin?: number;
   sortBy?: string;
   sortDir?: "asc" | "desc";
@@ -185,6 +187,7 @@ export function fetchOpportunities(params: OpportunityQueryParams = {}) {
   if (params.search) qs.set("search", params.search);
   if (params.status) qs.set("status", params.status);
   if (params.department) qs.set("department", params.department);
+  if (params.naics_size) qs.set("naics_size", params.naics_size);
   if (params.minPwin !== undefined) qs.set("minPwin", String(params.minPwin));
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
@@ -314,7 +317,7 @@ export interface OpportunityDetailData {
   ooda: OodaBlock;
   sources: OpportunitySourceRow[];
   learning: OpportunityLearningData;
-  source: "mock" | "db";
+  source: "db" | "n8n";
 }
 
 export function fetchOpportunityDetail(id: string) {
@@ -338,7 +341,7 @@ export interface DashboardKPIs {
   avgScore: number;
   funnel: DashboardFunnelStage[];
   topByScore: OpportunityRow[];
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
   n8nKpis?: {
     pursueCount: number;
     evaluateCount: number;
@@ -421,7 +424,7 @@ export interface CommandSignalsData {
   dueSoonItems: CommandDueSoon[];
   accelerators: CommandAccelerator[];
   approvalsSummary: { pending: number; critical: number };
-  captureSource: "n8n" | "mock";
+  captureSource: "n8n" | "db";
 }
 
 export function fetchCommandSignals() {
@@ -457,12 +460,12 @@ export interface DoctrineDraftsData {
   filtered: number;
   sprints: string[];
   statusCounts: DoctrineStatusCounts;
-  source: "mock" | "db";
+  source: "db";
 }
 
 export interface DoctrineDraftDetailData {
   draft: DoctrineDraftRow;
-  source: "mock" | "db";
+  source: "db";
 }
 
 export interface GateCheckResultRow {
@@ -487,7 +490,7 @@ export interface DoctrinePublishRunRow {
 export interface DoctrinePublishRunsData {
   runs: DoctrinePublishRunRow[];
   total: number;
-  source: "mock" | "db";
+  source: "db";
 }
 
 export interface DoctrineFinalizeData {
@@ -598,7 +601,7 @@ export interface FinancialKPI {
 export interface FinancialKPIsData {
   kpis: FinancialKPI[];
   period: string;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface FinancialLineItem {
@@ -624,7 +627,7 @@ export interface FinancialDrillDownData {
   variance_from_plan: number;
   variance_pct: number;
   insights: string[];
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchFinancialKPIs() {
@@ -686,7 +689,7 @@ export interface ApprovalsData {
     expiringSoon: number;
   };
   categories: Record<string, number>;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface ApprovalResolveData {
@@ -753,7 +756,7 @@ export interface ComplianceRequirementsData {
   };
   solicitations: ComplianceSolicitation[];
   categories: Record<string, number>;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface ClauseReferenceRow {
@@ -774,12 +777,12 @@ export interface ClauseLibraryData {
   total: number;
   filtered: number;
   typeCounts: Record<string, number>;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface ClauseDetailData {
   clause: ClauseReferenceRow;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchComplianceRequirements(params?: Record<string, string>) {
@@ -875,12 +878,12 @@ export interface ProposalsData {
     totalRedTeamOpen: number;
     agencies: string[];
   };
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface ProposalDetailData {
   proposal: ProposalRow;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchProposals(params?: Record<string, string>) {
@@ -974,12 +977,12 @@ export interface ContactsData {
     teamingGaps: number;
     agencies: string[];
   };
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface ContactDetailData {
   contact: ContactRow;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchContacts(params?: Record<string, string>) {
@@ -1072,7 +1075,7 @@ export interface ReportTemplatesData {
     totalUses: number;
     categories: number;
   };
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface GeneratedReportsData {
@@ -1084,20 +1087,20 @@ export interface GeneratedReportsData {
     categoryCounts: Record<string, number>;
     totalSizeBytes: number;
   };
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface ScheduledReportsData {
   schedules: ScheduledReportRow[];
   total: number;
   summary: { enabled: number; disabled: number };
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface ExportJobsData {
   exports: ExportJobRow[];
   total: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface GenerateReportResult {
@@ -1181,7 +1184,7 @@ export interface PwinBreakdownData {
   confidence: "high" | "medium" | "low";
   last_calculated: string;
   methodology: string;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchPwinBreakdown(oppId: string) {
@@ -1203,7 +1206,7 @@ export interface SmartRecommendation {
 export interface RecommendationsData {
   recommendations: SmartRecommendation[];
   total: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchRecommendations(oppId?: string) {
@@ -1225,7 +1228,7 @@ export interface IncumbentData {
   key_personnel: Array<{ name: string; role: string; years_on_contract: number }>;
   protest_risk: string;
   notes: string;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchIncumbentAnalysis(oppId: string) {
@@ -1251,7 +1254,7 @@ export interface CompetitorFieldData {
   our_position: number;
   total_expected_bidders: number;
   market_analysis: string;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchCompetitorField(oppId: string) {
@@ -1274,7 +1277,7 @@ export interface BlackHatAnalysisData {
   scenarios: BlackHatScenario[];
   our_discriminators: string[];
   key_takeaways: string[];
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchBlackHatAnalysis(oppId: string) {
@@ -1297,7 +1300,7 @@ export interface WargameAnalysisData {
   scenarios: WargameScenario[];
   recommended_strategy: string;
   confidence: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchWargameAnalysis(oppId: string) {
@@ -1320,7 +1323,7 @@ export interface IntelModule {
 export interface IntelModulesData {
   modules: IntelModule[];
   total: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchIntelModules(capturePlanId?: string) {
@@ -1349,7 +1352,7 @@ export interface TeamingData {
   candidates: TeamingCandidate[];
   gaps_identified: string[];
   recommended_team: string[];
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchTeamingCandidates(oppId: string) {
@@ -1369,7 +1372,7 @@ export interface SearchData {
   query: string;
   results: SearchResult[];
   total: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchSearchResults(query: string) {
@@ -1396,7 +1399,7 @@ export interface NotificationsData {
   notifications: NotificationItem[];
   total: number;
   unread: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchNotifications(unreadOnly?: boolean) {
@@ -1437,7 +1440,7 @@ export interface PromptsSummary {
 export interface PromptsData {
   prompts: PromptRow[];
   summary: PromptsSummary;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface PromptVersion {
@@ -1462,7 +1465,7 @@ export interface PromptDetailData {
   prompt: PromptRow;
   versions: PromptVersion[];
   usage: PromptUsage[];
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export interface PromptQueryParams {
@@ -1493,7 +1496,7 @@ export function fetchPromptDetail(id: string) {
 export interface RecentUsageData {
   usage: PromptUsage[];
   total: number;
-  source: "mock" | "db" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchRecentUsage() {
@@ -1674,7 +1677,7 @@ export interface KnowledgeSearchData {
   query: string;
   results: KnowledgeSearchResult[];
   total_results: number;
-  source?: "pgvector" | "mock";
+  source?: "pgvector" | "db";
 }
 
 export interface ChatMessageSource {
@@ -2345,7 +2348,7 @@ export interface ColorReviewData {
     noGoCount: number;
     proposalsReviewed: number;
   };
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchColorReviews() {
@@ -2443,7 +2446,7 @@ export interface AnomalyData {
   dismissed: number;
   critical: number;
   high: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchAnomalies() {
@@ -2471,7 +2474,7 @@ export interface CompetitorMovementData {
   competitors: number;
   critical: number;
   high: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchCompetitorMovements() {
@@ -2512,7 +2515,7 @@ export interface EscalationData {
   overdue: number;
   resolved: number;
   critical: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchEscalations() {
@@ -2522,7 +2525,7 @@ export function fetchEscalations() {
 export interface EscalationRulesData {
   rules: EscalationRuleRow[];
   total: number;
-  source: "mock" | "n8n";
+  source: "db" | "n8n";
 }
 
 export function fetchEscalationRules() {
@@ -3224,7 +3227,7 @@ export interface BookOfTruthsData {
   sources: BookOfTruthsSourceRow[];
   categoryCounts: { entity: number; rule: number; glossary: number; source: number };
   modules: string[];
-  source: "mock" | "db";
+  source: "db";
 }
 
 export function fetchBookOfTruths(params: { search?: string; category?: string; module?: string } = {}) {
@@ -3290,7 +3293,7 @@ export interface GovWinSummaryData {
   avg_relevance: number;
   total_pipeline_value: number;
   last_sync: string | null;
-  source: "mock" | "db";
+  source: "db";
 }
 
 export function fetchGovWinSummary() {

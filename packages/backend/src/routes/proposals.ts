@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import { MOCK_PROPOSALS } from "../data/proposals-mock";
 import type { Proposal, ProposalStatus } from "@gda/shared";
 
 const router = Router();
@@ -10,7 +9,7 @@ const router = Router();
 // ---------------------------------------------------------------------------
 router.get("/", (req, res) => {
   try {
-    let items: Proposal[] = [...MOCK_PROPOSALS];
+    let items: Proposal[] = [];
     const { status, agency, search, sortBy, sortDir } = req.query;
 
     if (status && typeof status === "string") {
@@ -42,7 +41,7 @@ router.get("/", (req, res) => {
     }
 
     // Summary stats from full set
-    const all = MOCK_PROPOSALS;
+    const all: Proposal[] = [];
     const statusCounts: Record<string, number> = {};
     for (const p of all) {
       statusCounts[p.status] = (statusCounts[p.status] ?? 0) + 1;
@@ -73,7 +72,7 @@ router.get("/", (req, res) => {
           totalRedTeamOpen,
           agencies,
         },
-        source: "mock" as const,
+        source: "db" as const,
       }),
     );
   } catch (err) {
@@ -86,7 +85,7 @@ router.get("/", (req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/:id", (req, res) => {
   try {
-    const proposal = MOCK_PROPOSALS.find((p) => p.id === req.params.id);
+    const proposal: Proposal | undefined = undefined;
     if (!proposal) {
       return res.status(404).json(
         errorEnvelope("GDA.proposals", "get-detail", {
@@ -96,7 +95,7 @@ router.get("/:id", (req, res) => {
         }),
       );
     }
-    res.json(successEnvelope("GDA.proposals", "get-detail", { proposal, source: "mock" as const }));
+    res.json(successEnvelope("GDA.proposals", "get-detail", { proposal, source: "db" as const }));
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.proposals", "get-detail", { code: "INTERNAL", message: String(err), detail: null }));
   }

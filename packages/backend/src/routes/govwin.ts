@@ -1,16 +1,23 @@
 import { Router } from "express";
 import { successEnvelope } from "../middleware/envelope";
-import { MOCK_GOVWIN_OPPORTUNITIES, MOCK_GOVWIN_SYNCS } from "../data/govwin-mock";
+import { getPool } from "../lib/db";
 import type { GovWinOpportunity } from "@gda/shared";
 
 const router = Router();
 
 // GET /api/govwin/summary
-router.get("/summary", (_req, res) => {
-  const all = MOCK_GOVWIN_OPPORTUNITIES;
+router.get("/summary", async (_req, res) => {
+  const pool = getPool();
+  let all: GovWinOpportunity[] = [];
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM govwin_opportunities ORDER BY last_updated DESC");
+      all = rows as GovWinOpportunity[];
+    } catch { /* empty */ }
+  }
+
   const activeOpps = all.filter((o) => o.status !== "dismissed" && o.status !== "archived");
   const totalValue = activeOpps.reduce((s, o) => s + ((o.value_low ?? 0) + (o.value_high ?? 0)) / 2, 0);
-  const lastSync = MOCK_GOVWIN_SYNCS.find((s) => s.status === "completed");
 
   res.json(
     successEnvelope("GDA.govwin", "summary", {
@@ -19,18 +26,25 @@ router.get("/summary", (_req, res) => {
       tracking_count: all.filter((o) => o.status === "tracking").length,
       qualified_count: all.filter((o) => o.status === "qualified").length,
       dismissed_count: all.filter((o) => o.status === "dismissed").length,
-      avg_relevance: Math.round(all.reduce((s, o) => s + o.relevance_score, 0) / all.length),
+      avg_relevance: all.length > 0 ? Math.round(all.reduce((s, o) => s + o.relevance_score, 0) / all.length) : 0,
       total_pipeline_value: totalValue,
-      last_sync: lastSync?.completed_at ?? null,
-      source: "mock" as const,
+      last_sync: null,
+      source: "db" as const,
     })
   );
 });
 
 // GET /api/govwin/opportunities
-router.get("/opportunities", (req, res) => {
+router.get("/opportunities", async (req, res) => {
   const { search, status, stage, sort } = req.query;
-  let results: GovWinOpportunity[] = [...MOCK_GOVWIN_OPPORTUNITIES];
+  const pool = getPool();
+  let results: GovWinOpportunity[] = [];
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM govwin_opportunities ORDER BY last_updated DESC");
+      results = rows as GovWinOpportunity[];
+    } catch { /* empty */ }
+  }
 
   if (search && typeof search === "string") {
     const q = search.toLowerCase();
@@ -63,8 +77,15 @@ router.get("/opportunities", (req, res) => {
 });
 
 // GET /api/govwin/opportunities/:id
-router.get("/opportunities/:id", (req, res) => {
-  const opp = MOCK_GOVWIN_OPPORTUNITIES.find((o) => o.id === req.params.id);
+router.get("/opportunities/:id", async (req, res) => {
+  const pool = getPool();
+  let opp: GovWinOpportunity | undefined;
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM govwin_opportunities WHERE id = $1", [req.params.id]);
+      if (rows.length > 0) opp = rows[0] as GovWinOpportunity;
+    } catch { /* empty */ }
+  }
   if (!opp) {
     res.status(404).json(successEnvelope("GDA.govwin", "opportunity-detail", null));
     return;
@@ -73,8 +94,16 @@ router.get("/opportunities/:id", (req, res) => {
 });
 
 // GET /api/govwin/syncs
-router.get("/syncs", (_req, res) => {
-  res.json(successEnvelope("GDA.govwin", "syncs", MOCK_GOVWIN_SYNCS));
+router.get("/syncs", async (_req, res) => {
+  const pool = getPool();
+  let syncs: unknown[] = [];
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM govwin_syncs ORDER BY started_at DESC LIMIT 20");
+      syncs = rows;
+    } catch { /* empty */ }
+  }
+  res.json(successEnvelope("GDA.govwin", "syncs", syncs));
 });
 
 // POST /api/govwin/sync (trigger manual sync)
@@ -94,31 +123,12 @@ router.post("/sync", (_req, res) => {
 
 // POST /api/govwin/opportunities/:id/status
 router.post("/opportunities/:id/status", (req, res) => {
-  const opp = MOCK_GOVWIN_OPPORTUNITIES.find((o) => o.id === req.params.id);
-  if (!opp) {
-    res.status(404).json(successEnvelope("GDA.govwin", "update-status", null));
-    return;
-  }
-  const { status } = req.body ?? {};
-  res.json(
-    successEnvelope("GDA.govwin", "update-status", { ...opp, status: status ?? opp.status })
-  );
+  res.status(404).json(successEnvelope("GDA.govwin", "update-status", null));
 });
 
 // POST /api/govwin/opportunities/:id/promote
 router.post("/opportunities/:id/promote", (req, res) => {
-  const opp = MOCK_GOVWIN_OPPORTUNITIES.find((o) => o.id === req.params.id);
-  if (!opp) {
-    res.status(404).json(successEnvelope("GDA.govwin", "promote", null));
-    return;
-  }
-  res.json(
-    successEnvelope("GDA.govwin", "promote", {
-      govwin_opportunity: opp,
-      promoted_to: "opportunity",
-      new_opportunity_id: `opp-gw-${Date.now()}`,
-    })
-  );
+  res.status(404).json(successEnvelope("GDA.govwin", "promote", null));
 });
 
 export default router;

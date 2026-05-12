@@ -2,12 +2,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
-import {
-  MOCK_REPORT_TEMPLATES,
-  MOCK_GENERATED_REPORTS,
-  MOCK_SCHEDULED_REPORTS,
-  MOCK_EXPORT_JOBS,
-} from "../data/reports-mock";
+
 import type { ReportCategory, ExportFormat, ReportStatus } from "@gda/shared";
 
 const router = Router();
@@ -18,7 +13,7 @@ const router = Router();
 router.get("/templates", async (req, res) => {
   try {
     const pool = getPool();
-    let allTemplates = MOCK_REPORT_TEMPLATES;
+    let allTemplates: Array<Record<string, unknown>> = [];
 
     if (pool) {
       try {
@@ -42,15 +37,15 @@ router.get("/templates", async (req, res) => {
       const q = search.toLowerCase();
       items = items.filter(
         (t) =>
-          t.name.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q) ||
-          t.tags.some((tag: string) => tag.toLowerCase().includes(q)),
+          String(t.name ?? "").toLowerCase().includes(q) ||
+          String(t.description ?? "").toLowerCase().includes(q) ||
+          (Array.isArray(t.tags) && t.tags.some((tag: string) => tag.toLowerCase().includes(q))),
       );
     }
 
     const categoryCounts: Record<string, number> = {};
     for (const t of allTemplates) {
-      categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
+      categoryCounts[String(t.category)] = (categoryCounts[String(t.category)] ?? 0) + 1;
     }
 
     res.json(
@@ -58,7 +53,7 @@ router.get("/templates", async (req, res) => {
         templates: items, total: allTemplates.length, filtered: items.length,
         summary: {
           categoryCounts,
-          totalUses: allTemplates.reduce((sum, t) => sum + t.use_count, 0),
+          totalUses: allTemplates.reduce((sum, t) => sum + Number(t.use_count ?? 0), 0),
           categories: Object.keys(categoryCounts).length,
         },
       }),
@@ -87,13 +82,9 @@ router.get("/templates/:id", async (req, res) => {
       } catch { /* fall through */ }
     }
 
-    const template = MOCK_REPORT_TEMPLATES.find((t) => t.id === req.params.id);
-    if (!template) {
-      return res.status(404).json(
-        errorEnvelope("GDA.reports", "get-template", { code: "NOT_FOUND", message: `Template ${req.params.id} not found`, detail: null }),
-      );
-    }
-    res.json(successEnvelope("GDA.reports", "get-template", { template }));
+    return res.status(404).json(
+      errorEnvelope("GDA.reports", "get-template", { code: "NOT_FOUND", message: `Template ${req.params.id} not found`, detail: null }),
+    );
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.reports", "get-template", { code: "INTERNAL", message: String(err), detail: null }));
   }
@@ -105,7 +96,7 @@ router.get("/templates/:id", async (req, res) => {
 router.get("/generated", async (req, res) => {
   try {
     const pool = getPool();
-    let allReports = MOCK_GENERATED_REPORTS;
+    let allReports: Array<Record<string, unknown>> = [];
 
     if (pool) {
       try {
@@ -129,21 +120,21 @@ router.get("/generated", async (req, res) => {
     if (search && typeof search === "string") {
       const q = search.toLowerCase();
       items = items.filter((r) =>
-        r.title.toLowerCase().includes(q) ||
-        r.template_name.toLowerCase().includes(q) ||
-        (r.notes ?? "").toLowerCase().includes(q),
+        String(r.title ?? "").toLowerCase().includes(q) ||
+        String(r.template_name ?? "").toLowerCase().includes(q) ||
+        String(r.notes ?? "").toLowerCase().includes(q),
       );
     }
 
-    items.sort((a, b) => new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime());
+    items.sort((a, b) => new Date(String(b.generated_at)).getTime() - new Date(String(a.generated_at)).getTime());
 
     const statusCounts: Record<string, number> = {};
-    for (const r of allReports) statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
+    for (const r of allReports) statusCounts[String(r.status)] = (statusCounts[String(r.status)] ?? 0) + 1;
 
     const categoryCounts: Record<string, number> = {};
-    for (const r of allReports) categoryCounts[r.category] = (categoryCounts[r.category] ?? 0) + 1;
+    for (const r of allReports) categoryCounts[String(r.category)] = (categoryCounts[String(r.category)] ?? 0) + 1;
 
-    const totalSizeBytes = allReports.reduce((sum, r) => sum + (r.file_size_bytes ?? 0), 0);
+    const totalSizeBytes = allReports.reduce((sum, r) => sum + Number(r.file_size_bytes ?? 0), 0);
 
     res.json(
       successEnvelope("GDA.reports", "list-generated", {
@@ -184,7 +175,7 @@ router.post("/generate", requireRole("admin", "bd_manager", "capture_lead", "ana
     }
 
     if (!template) {
-      template = MOCK_REPORT_TEMPLATES.find((t) => t.id === template_id) as typeof template;
+      /* no mock fallback */
     }
 
     if (!template) {
@@ -272,12 +263,8 @@ router.get("/scheduled", async (_req, res) => {
       } catch { /* fall through */ }
     }
 
-    const items = [...MOCK_SCHEDULED_REPORTS];
-    const enabled = items.filter((s) => s.enabled).length;
-    const disabled = items.filter((s) => !s.enabled).length;
-
     res.json(successEnvelope("GDA.reports", "list-scheduled", {
-      schedules: items, total: items.length, summary: { enabled, disabled },
+      schedules: [], total: 0, summary: { enabled: 0, disabled: 0 },
     }));
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.reports", "list-scheduled", { code: "INTERNAL", message: String(err), detail: null }));
@@ -305,10 +292,7 @@ router.get("/exports", async (_req, res) => {
       } catch { /* fall through */ }
     }
 
-    const items = [...MOCK_EXPORT_JOBS].sort(
-      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime(),
-    );
-    res.json(successEnvelope("GDA.reports", "list-exports", { exports: items, total: items.length }));
+    res.json(successEnvelope("GDA.reports", "list-exports", { exports: [], total: 0 }));
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.reports", "list-exports", { code: "INTERNAL", message: String(err), detail: null }));
   }

@@ -2,9 +2,9 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
-import { MOCK_THREADS, MOCK_MESSAGES } from "../data/discussions-mock";
-import type { DiscussionThread } from "../data/discussions-mock";
 import type { DiscussionEntityType } from "@gda/shared";
+
+interface DiscussionThread { id: string; entity_type: DiscussionEntityType; entity_id: string; entity_title: string; title: string; created_by: string; created_at: string; updated_at: string; message_count: number; last_message_at: string; participants: string[]; is_resolved: boolean; tags: string[]; }
 
 const router = Router();
 
@@ -36,10 +36,10 @@ router.get("/summary", async (_req, res) => {
         const result = await pool.query("SELECT * FROM discussion_threads");
         all = result.rows.map(rowToThread);
       } catch {
-        all = MOCK_THREADS;
+        all = [];
       }
     } else {
-      all = MOCK_THREADS;
+      all = [];
     }
 
     const active = all.filter((t) => !t.is_resolved).length;
@@ -77,10 +77,10 @@ router.get("/threads", async (req, res) => {
         const result = await pool.query("SELECT * FROM discussion_threads ORDER BY last_message_at DESC NULLS LAST");
         items = result.rows.map(rowToThread);
       } catch {
-        items = [...MOCK_THREADS];
+        items = [];
       }
     } else {
-      items = [...MOCK_THREADS];
+      items = [];
     }
 
     const { entity_type, resolved, search } = req.query;
@@ -120,13 +120,9 @@ router.get("/threads/:id", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const thread = MOCK_THREADS.find((t) => t.id === req.params.id);
-  if (!thread) {
-    return res.status(404).json(
-      errorEnvelope("gda-discussions", "thread-detail", { code: "NOT_FOUND", message: `Thread ${req.params.id} not found`, detail: null }),
-    );
-  }
-  return res.json(successEnvelope("gda-discussions", "thread-detail", thread));
+  return res.status(404).json(
+    errorEnvelope("gda-discussions", "thread-detail", { code: "NOT_FOUND", message: `Thread ${req.params.id} not found`, detail: null }),
+  );
 });
 
 router.get("/threads/:id/messages", async (req, res) => {
@@ -151,9 +147,8 @@ router.get("/threads/:id/messages", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const messages = MOCK_MESSAGES[req.params.id] ?? [];
   return res.json(
-    successEnvelope("gda-discussions", "messages", messages, { total: messages.length }),
+    successEnvelope("gda-discussions", "messages", [], { total: 0 }),
   );
 });
 

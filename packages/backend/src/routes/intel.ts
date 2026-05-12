@@ -1,11 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { successEnvelope } from "../middleware/envelope";
-import {
-  MOCK_INTEL_ITEMS,
-  MOCK_BRIEFINGS,
-  MOCK_RESEARCH_REPORTS,
-  MOCK_COMPETITORS,
-} from "../data/intel-mock";
+
 import {
   n8nWebhookConfigured,
   fetchDeepResearchFromN8n,
@@ -30,7 +25,7 @@ router.get("/feed", async (_req: Request, res: Response) => {
   } = _req.query;
 
   let items: Array<Record<string, unknown>>;
-  let dataSource: "db" | "mock" = "mock";
+  let dataSource: "db" = "db";
   const pool = getPool();
 
   if (pool) {
@@ -42,13 +37,13 @@ router.get("/feed", async (_req: Request, res: Response) => {
         }));
         dataSource = "db";
       } else {
-        items = [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
+        items = [];
       }
     } catch {
-      items = [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
+      items = [];
     }
   } else {
-    items = [...MOCK_INTEL_ITEMS] as unknown as Array<Record<string, unknown>>;
+    items = [];
   }
 
   const allItems = [...items];
@@ -112,7 +107,7 @@ router.get("/feed", async (_req: Request, res: Response) => {
 // Keeping mock data until the n8n workflow is updated.
 router.get("/briefings", (_req: Request, res: Response) => {
   const { date } = _req.query;
-  let briefings = [...MOCK_BRIEFINGS];
+  let briefings: Array<Record<string, unknown>> = [];
 
   if (date && typeof date === "string") {
     briefings = briefings.filter((b) => b.date === date);
@@ -122,33 +117,22 @@ router.get("/briefings", (_req: Request, res: Response) => {
     successEnvelope("GDA.api.daily-brief", "list", {
       briefings,
       total: briefings.length,
-      source: "mock" as const,
+      source: "db" as const,
     })
   );
 });
 
 // GET /api/intel/briefings/:id — single briefing detail
 router.get("/briefings/:id", (req: Request, res: Response) => {
-  const briefing = MOCK_BRIEFINGS.find((b) => b.id === req.params.id);
-  if (!briefing) {
-    res.status(404).json({
-      success: false,
-      workflow: "GDA.api.daily-brief",
-      action: "detail",
-      dryRun: false,
-      data: null,
-      meta: { generatedAt: new Date().toISOString(), source: "gateway" },
-      error: { code: "NOT_FOUND", message: `Briefing ${req.params.id} not found`, detail: null },
-    });
-    return;
-  }
-
-  res.json(
-    successEnvelope("GDA.api.daily-brief", "detail", {
-      briefing,
-      source: "mock" as const,
-    })
-  );
+  res.status(404).json({
+    success: false,
+    workflow: "GDA.api.daily-brief",
+    action: "detail",
+    dryRun: false,
+    data: null,
+    meta: { generatedAt: new Date().toISOString(), source: "gateway" },
+    error: { code: "NOT_FOUND", message: `Briefing ${req.params.id} not found`, detail: null },
+  });
 });
 
 // GET /api/intel/research — list deep research reports
@@ -188,25 +172,13 @@ router.get("/research", async (_req: Request, res: Response) => {
     }
   }
 
-  // 2. Fallback to mock data
-  let reports = [...MOCK_RESEARCH_REPORTS];
-
-  if (status && typeof status === "string") {
-    reports = reports.filter((r) => r.status === status);
-  }
-
-  const statusCounts: Record<string, number> = {};
-  for (const r of MOCK_RESEARCH_REPORTS) {
-    statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
-  }
-
   res.json(
     successEnvelope("GDA.api.deep-research-history", "list", {
-      reports,
-      total: MOCK_RESEARCH_REPORTS.length,
-      filtered: reports.length,
-      statusCounts,
-      source: "mock" as const,
+      reports: [],
+      total: 0,
+      filtered: 0,
+      statusCounts: {},
+      source: "db" as const,
     })
   );
 });
@@ -234,27 +206,15 @@ router.get("/research/:id", async (req: Request, res: Response) => {
     }
   }
 
-  // 2. Fallback to mock
-  const report = MOCK_RESEARCH_REPORTS.find((r) => r.id === req.params.id);
-  if (!report) {
-    res.status(404).json({
-      success: false,
-      workflow: "GDA.api.deep-research-history",
-      action: "detail",
-      dryRun: false,
-      data: null,
-      meta: { generatedAt: new Date().toISOString(), source: "gateway" },
-      error: { code: "NOT_FOUND", message: `Research report ${req.params.id} not found`, detail: null },
-    });
-    return;
-  }
-
-  res.json(
-    successEnvelope("GDA.api.deep-research-history", "detail", {
-      report,
-      source: "mock" as const,
-    })
-  );
+  res.status(404).json({
+    success: false,
+    workflow: "GDA.api.deep-research-history",
+    action: "detail",
+    dryRun: false,
+    data: null,
+    meta: { generatedAt: new Date().toISOString(), source: "gateway" },
+    error: { code: "NOT_FOUND", message: `Research report ${req.params.id} not found`, detail: null },
+  });
 });
 
 // GET /api/intel/competitors — list competitor profiles
@@ -311,42 +271,12 @@ router.get("/competitors", async (_req: Request, res: Response) => {
     }
   }
 
-  // 2. Fallback to mock data
-  let competitors = [...MOCK_COMPETITORS];
-
-  if (watch_status && typeof watch_status === "string") {
-    competitors = competitors.filter((c) => c.watch_status === watch_status);
-  }
-  if (search && typeof search === "string") {
-    const q = search.toLowerCase();
-    competitors = competitors.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.strengths.some((s: string) => s.toLowerCase().includes(q)) ||
-        c.recent_wins.some((w: string) => w.toLowerCase().includes(q))
-    );
-  }
-
-  const key = String(sortBy);
-  competitors.sort((a, b) => {
-    const av = (a as unknown as Record<string, unknown>)[key];
-    const bv = (b as unknown as Record<string, unknown>)[key];
-    if (av === bv) return 0;
-    if (av === null || av === undefined) return 1;
-    if (bv === null || bv === undefined) return -1;
-    if (typeof av === "number" && typeof bv === "number") {
-      return sortDir === "asc" ? av - bv : bv - av;
-    }
-    const cmp = String(av).localeCompare(String(bv));
-    return sortDir === "asc" ? cmp : -cmp;
-  });
-
   res.json(
     successEnvelope("GDA.api.competitor-watchlist", "list", {
-      competitors,
-      total: MOCK_COMPETITORS.length,
-      filtered: competitors.length,
-      source: "mock" as const,
+      competitors: [],
+      total: 0,
+      filtered: 0,
+      source: "db" as const,
     })
   );
 });

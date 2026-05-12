@@ -2,8 +2,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
-import { MOCK_SAM_OPPORTUNITIES, MOCK_SCAN_RUNS } from "../data/sam-monitor-mock";
-import type { SAMMonitorOpportunity } from "../data/sam-monitor-mock";
+interface SAMMonitorOpportunity { id: string; notice_id: string; title: string; agency: string; sub_agency: string; type: string; set_aside: string | null; naics: string; naics_description: string; psc: string; value_estimate: number | null; response_deadline: string; posted_date: string; place_of_performance: string; relevance_score: number; relevance_reasons: string[]; ai_summary: string; scan_status: string; matched_naics: boolean; matched_keywords: string[]; sam_url: string; created_at: string; [key: string]: unknown }
 
 const router = Router();
 
@@ -50,12 +49,12 @@ router.get("/summary", async (_req, res) => {
           lastScanAt = ca instanceof Date ? ca.toISOString() : ca ? String(ca) : null;
         }
       } catch {
-        all = MOCK_SAM_OPPORTUNITIES;
-        lastScanAt = MOCK_SCAN_RUNS[0]?.completed_at ?? null;
+        all = [];
+        lastScanAt = null;
       }
     } else {
-      all = MOCK_SAM_OPPORTUNITIES;
-      lastScanAt = MOCK_SCAN_RUNS[0]?.completed_at ?? null;
+      all = [];
+      lastScanAt = null;
     }
 
     const newCount = all.filter((o) => o.scan_status === "new").length;
@@ -89,10 +88,10 @@ router.get("/opportunities", async (req, res) => {
         const result = await pool.query("SELECT * FROM sam_opportunities ORDER BY relevance_score DESC");
         items = result.rows.map(rowToSamOpp);
       } catch {
-        items = [...MOCK_SAM_OPPORTUNITIES];
+        items = [];
       }
     } else {
-      items = [...MOCK_SAM_OPPORTUNITIES];
+      items = [];
     }
 
     const { status, type, naics, search, min_relevance } = req.query;
@@ -138,7 +137,7 @@ router.get("/opportunities/:id", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const item = MOCK_SAM_OPPORTUNITIES.find((o) => o.id === req.params.id);
+  const item: SAMMonitorOpportunity | undefined = undefined;
   if (!item) {
     return res.status(404).json(
       errorEnvelope("gda-sam-monitor", "detail", { code: "NOT_FOUND", message: `SAM opportunity ${req.params.id} not found`, detail: null }),
@@ -163,7 +162,7 @@ router.get("/scans", async (_req, res) => {
   }
 
   return res.json(
-    successEnvelope("gda-sam-monitor", "scans", MOCK_SCAN_RUNS, { total: MOCK_SCAN_RUNS.length }),
+    successEnvelope("gda-sam-monitor", "scans", [], { total: 0 }),
   );
 });
 
@@ -214,17 +213,8 @@ router.post("/opportunities/:id/qualify", requireRole("admin", "bd_manager"), as
     }
   }
 
-  // Mock fallback
-  const item = MOCK_SAM_OPPORTUNITIES.find((o) => o.id === id);
-  if (!item) {
-    return res.status(404).json(
-      errorEnvelope("gda-sam-monitor", "qualify", { code: "NOT_FOUND", message: `SAM opportunity ${id} not found`, detail: null }),
-    );
-  }
-  return res.json(
-    successEnvelope("gda-sam-monitor", "qualify", {
-      id: item.id, previous_status: item.scan_status, new_status: "qualified",
-    }, {}, true),
+  return res.status(404).json(
+    errorEnvelope("gda-sam-monitor", "qualify", { code: "NOT_FOUND", message: `SAM opportunity ${id} not found`, detail: null }),
   );
 });
 

@@ -10,7 +10,7 @@ import {
 export default function QACenter() {
   const [health, setHealth] = useState<QAHealthData | null>(null);
   const [failures, setFailures] = useState<QAFailure[]>([]);
-  const [source, setSource] = useState<"mock" | "live" | null>(null);
+  const [source, setSource] = useState<"db" | "live" | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +58,7 @@ export default function QACenter() {
             color: source === "live" ? "var(--color-success)" : "var(--color-accent, #3b82f6)",
             fontWeight: 500,
           }}>
-            {source === "live" ? "Live n8n" : "Mock data"}
+            {source === "live" ? "Live n8n" : "Live DB"}
           </span>
         )}
       </div>

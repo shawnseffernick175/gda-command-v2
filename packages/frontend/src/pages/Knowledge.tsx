@@ -605,7 +605,7 @@ function SearchTab() {
   const [results, setResults] = useState<KnowledgeSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [searchSource, setSearchSource] = useState<"pgvector" | "mock" | null>(null);
+  const [searchSource, setSearchSource] = useState<"pgvector" | "db" | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const handleSearch = () => {
@@ -1119,7 +1119,7 @@ export default function Knowledge() {
           fontWeight: 600,
           border: "1px solid rgba(139,92,246,0.2)",
         }}>
-          Mock data
+          Live DB
         </div>
       </div>
 

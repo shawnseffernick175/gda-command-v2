@@ -81,6 +81,7 @@ export default function OpsTracker() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
   const [deptFilter, setDeptFilter] = useState("");
+  const [naicsSizeFilter, setNaicsSizeFilter] = useState("");
   const [minPwin, setMinPwin] = useState("");
 
   // Sort
@@ -103,6 +104,7 @@ export default function OpsTracker() {
         search: search || undefined,
         status: statusFilter || undefined,
         department: deptFilter || undefined,
+        naics_size: naicsSizeFilter || undefined,
         minPwin: minPwin ? parseFloat(minPwin) : undefined,
         sortBy,
         sortDir,
@@ -117,7 +119,7 @@ export default function OpsTracker() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, deptFilter, minPwin, sortBy, sortDir]);
+  }, [search, statusFilter, deptFilter, naicsSizeFilter, minPwin, sortBy, sortDir]);
 
   useEffect(() => {
     load();
@@ -127,7 +129,7 @@ export default function OpsTracker() {
   }, [load]);
 
   const opportunities = data?.opportunities ?? [];
-  const source = data?.source ?? "mock";
+  const source = data?.source ?? "db";
 
   // Derive unique departments for filter dropdown
   const departments = useMemo(() => {
@@ -241,7 +243,7 @@ export default function OpsTracker() {
             color: source === "n8n" ? "#a855f7" : source === "db" ? "#22c55e" : "#3b82f6",
           }}
         >
-          {source === "n8n" ? "Live n8n" : source === "db" ? "Live DB" : "Mock data"}
+          {source === "n8n" ? "Live n8n" : "Live DB"}
         </span>
       </div>
 
@@ -355,6 +357,22 @@ export default function OpsTracker() {
             </option>
           ))}
         </select>
+        <select
+          value={naicsSizeFilter}
+          onChange={(e) => setNaicsSizeFilter(e.target.value)}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 6,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
+            color: "var(--color-text)",
+            fontSize: 14,
+          }}
+        >
+          <option value="">All NAICS sizes</option>
+          <option value="small">Small Business</option>
+          <option value="large">Large Business</option>
+        </select>
         <input
           type="number"
           placeholder="Min Pwin (0-1)"
@@ -373,12 +391,13 @@ export default function OpsTracker() {
             width: 130,
           }}
         />
-        {(search || statusFilter || deptFilter || minPwin) && (
+        {(search || statusFilter || deptFilter || naicsSizeFilter || minPwin) && (
           <button
             onClick={() => {
               setSearch("");
               setStatusFilter("");
               setDeptFilter("");
+              setNaicsSizeFilter("");
               setMinPwin("");
             }}
             style={{
@@ -450,6 +469,7 @@ export default function OpsTracker() {
                 <th style={thStyle} onClick={() => handleSort("status")}>
                   Status{sortArrow("status")}
                 </th>
+                <th style={thStyle}>NAICS Size</th>
                 <th style={thStyle} onClick={() => handleSort("due_date")}>
                   Due{sortArrow("due_date")}
                 </th>
@@ -460,7 +480,7 @@ export default function OpsTracker() {
               {opportunities.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     style={{
                       ...tdStyle,
                       textAlign: "center",
@@ -468,7 +488,7 @@ export default function OpsTracker() {
                       padding: "40px 12px",
                     }}
                   >
-                    {search || statusFilter || deptFilter || minPwin
+                    {search || statusFilter || deptFilter || naicsSizeFilter || minPwin
                       ? "No opportunities match your filters."
                       : "No opportunities found."}
                   </td>
@@ -566,6 +586,25 @@ export default function OpsTracker() {
                     >
                       {statusLabel(opp.status)}
                     </span>
+                  </td>
+                  <td style={tdStyle}>
+                    {opp.naics_size ? (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          background: opp.naics_size === "small" ? "rgba(59,130,246,0.15)" : "rgba(245,158,11,0.15)",
+                          color: opp.naics_size === "small" ? "#3b82f6" : "#f59e0b",
+                        }}
+                      >
+                        {opp.naics_size === "small" ? "Small" : "Large"}
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>—</span>
+                    )}
                   </td>
                   <td
                     style={{

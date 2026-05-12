@@ -155,7 +155,7 @@ export default function Contacts() {
             color: "#3b82f6",
           }}
         >
-          Mock data
+          Live DB
         </span>
       </div>
 

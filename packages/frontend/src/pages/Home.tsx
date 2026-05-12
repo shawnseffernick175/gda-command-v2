@@ -304,7 +304,7 @@ export default function Home() {
               background: kpis.source === "n8n" ? "rgba(168,85,247,0.15)" : kpis.source === "db" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
               color: kpis.source === "n8n" ? "#a855f7" : kpis.source === "db" ? "#22c55e" : "#3b82f6",
             }}>
-              {kpis.source === "n8n" ? "Live n8n" : kpis.source === "db" ? "Live DB" : "Mock data"}
+              {kpis.source === "n8n" ? "Live n8n" : "Live DB"}
             </span>
           </div>
         </>

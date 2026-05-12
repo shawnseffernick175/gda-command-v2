@@ -1,16 +1,37 @@
 import { Router } from "express";
 import { successEnvelope } from "../middleware/envelope";
-import { MOCK_ENTITIES, MOCK_GLOSSARY, MOCK_SOURCES } from "../data/book-of-truths-mock";
+import { getPool } from "../lib/db";
 
 const router = Router();
 
+interface BotEntity { name: string; description: string; category: string; module: string; rules?: string[] }
+interface BotGlossary { term: string; acronym?: string; definition: string }
+interface BotSource { name: string; description: string }
+
 // GET /api/book-of-truths — full data dictionary
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   const { search, category, module: mod } = req.query;
 
-  let entities = [...MOCK_ENTITIES];
-  let glossary = [...MOCK_GLOSSARY];
-  let sources = [...MOCK_SOURCES];
+  const pool = getPool();
+  let allEntities: BotEntity[] = [];
+  let allGlossary: BotGlossary[] = [];
+  let allSources: BotSource[] = [];
+  if (pool) {
+    try {
+      const [eRes, gRes, sRes] = await Promise.all([
+        pool.query("SELECT * FROM bot_entities ORDER BY name"),
+        pool.query("SELECT * FROM bot_glossary ORDER BY term"),
+        pool.query("SELECT * FROM bot_sources ORDER BY name"),
+      ]);
+      allEntities = eRes.rows as BotEntity[];
+      allGlossary = gRes.rows as BotGlossary[];
+      allSources = sRes.rows as BotSource[];
+    } catch { /* empty */ }
+  }
+
+  let entities = [...allEntities];
+  let glossary = [...allGlossary];
+  let sources = [...allSources];
 
   if (search && typeof search === "string") {
     const q = search.toLowerCase();
@@ -41,12 +62,11 @@ router.get("/", (req, res) => {
     entities = entities.filter((e) => e.module.toLowerCase() === mod.toLowerCase());
   }
 
-  const allEntities = MOCK_ENTITIES;
   const categoryCounts = {
     entity: allEntities.filter((e) => e.category === "entity").length,
     rule: allEntities.filter((e) => e.category === "rule").length,
-    glossary: MOCK_GLOSSARY.length,
-    source: MOCK_SOURCES.length,
+    glossary: allGlossary.length,
+    source: allSources.length,
   };
 
   const modules = [...new Set(allEntities.map((e) => e.module))];
@@ -58,7 +78,7 @@ router.get("/", (req, res) => {
       sources,
       categoryCounts,
       modules,
-      source: "mock" as const,
+      source: "db" as const,
     })
   );
 });

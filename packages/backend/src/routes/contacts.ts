@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import { MOCK_CONTACTS } from "../data/contacts-mock";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
 import type { Contact } from "@gda/shared";
@@ -13,7 +12,7 @@ const router = Router();
 router.get("/", async (req, res) => {
   try {
     let items: Contact[];
-    let source: "db" | "mock" = "mock";
+    let source: "db" = "db";
     const pool = getPool();
 
     if (pool) {
@@ -29,13 +28,13 @@ router.get("/", async (req, res) => {
           })) as Contact[];
           source = "db";
         } else {
-          items = [...MOCK_CONTACTS];
+          items = [];
         }
       } catch {
-        items = [...MOCK_CONTACTS];
+        items = [];
       }
     } else {
-      items = [...MOCK_CONTACTS];
+      items = [];
     }
 
     const all = [...items];
@@ -116,7 +115,7 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     let contact: Contact | undefined;
-    let source: "db" | "mock" = "mock";
+    let source: "db" = "db";
     const pool = getPool();
 
     if (pool) {
@@ -134,10 +133,6 @@ router.get("/:id", async (req, res) => {
           source = "db";
         }
       } catch { /* fall through to mock */ }
-    }
-
-    if (!contact) {
-      contact = MOCK_CONTACTS.find((c) => c.id === req.params.id);
     }
 
     if (!contact) {

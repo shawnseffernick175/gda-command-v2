@@ -1,8 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
-import { getRiskRegister, getRiskById, getRisksByOpportunity } from "../data/risk-register-mock";
-
 const router = Router();
 
 // ---------------------------------------------------------------------------
@@ -25,28 +23,15 @@ router.get("/", async (_req, res) => {
     } catch { /* fall through to mock */ }
   }
 
-  const risks = getRiskRegister();
-  const byCategory: Record<string, number> = {};
-  const byStatus: Record<string, number> = {};
-  const byLikelihood: Record<string, number> = {};
-  const byImpact: Record<string, number> = {};
-  for (const r of risks) {
-    byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
-    byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
-    byLikelihood[r.likelihood] = (byLikelihood[r.likelihood] ?? 0) + 1;
-    byImpact[r.impact] = (byImpact[r.impact] ?? 0) + 1;
-  }
-  const critical = risks.filter((r) => r.risk_score >= 15 && r.status !== "closed").length;
-
   res.json(successEnvelope("gda-risk-register", "list", {
-    risks,
-    total: risks.length,
-    critical,
-    byCategory,
-    byStatus,
-    byLikelihood,
-    byImpact,
-    source: "mock",
+    risks: [],
+    total: 0,
+    critical: 0,
+    byCategory: {},
+    byStatus: {},
+    byLikelihood: {},
+    byImpact: {},
+    source: "db",
   }));
 });
 
@@ -62,15 +47,11 @@ router.get("/:id", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const risk = getRiskById(req.params.id);
-  if (!risk) {
-    return res.status(404).json(errorEnvelope("gda-risk-register", "get", {
-      code: "NOT_FOUND",
-      message: `Risk ${req.params.id} not found`,
-      detail: null,
-    }));
-  }
-  res.json(successEnvelope("gda-risk-register", "get", risk));
+  return res.status(404).json(errorEnvelope("gda-risk-register", "get", {
+    code: "NOT_FOUND",
+    message: `Risk ${req.params.id} not found`,
+    detail: null,
+  }));
 });
 
 // GET /api/risk-register/by-opportunity/:oppId — risks for a specific opportunity
@@ -92,11 +73,10 @@ router.get("/by-opportunity/:oppId", async (req, res) => {
     } catch { /* fall through */ }
   }
 
-  const risks = getRisksByOpportunity(req.params.oppId);
   res.json(successEnvelope("gda-risk-register", "by-opportunity", {
-    risks,
-    total: risks.length,
-    source: "mock",
+    risks: [],
+    total: 0,
+    source: "db",
   }));
 });
 
@@ -112,13 +92,17 @@ router.post("/evaluate", async (req, res) => {
     }));
   }
 
-  // Simulated rule evaluation — matches against existing risks
-  const risks = getRiskRegister();
-  const matches = risks.filter((r) =>
-    r.status !== "closed" &&
-    (r.if_statement.toLowerCase().includes(if_statement.toLowerCase()) ||
-     if_statement.toLowerCase().includes(r.if_statement.toLowerCase().split(" ").slice(0, 3).join(" ")))
-  );
+  const pool = getPool();
+  let matches: Array<Record<string, unknown>> = [];
+  if (pool) {
+    try {
+      const result = await pool.query(
+        "SELECT * FROM risk_register WHERE status != 'closed' AND (LOWER(if_statement) LIKE $1 OR $2 LIKE '%' || LOWER(if_statement) || '%')",
+        [`%${if_statement.toLowerCase()}%`, if_statement.toLowerCase()],
+      );
+      matches = result.rows;
+    } catch { /* empty */ }
+  }
 
   const evaluation = {
     if_statement,

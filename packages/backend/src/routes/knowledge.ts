@@ -2,18 +2,10 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
-import {
-  MOCK_DOCUMENTS,
-  MOCK_COLLECTIONS,
-  MOCK_CHAT_SESSIONS,
-  mockSemanticSearch,
-} from "../data/knowledge-mock";
-import type {
-  KnowledgeDocument,
-  DocumentType,
-  DocumentStatus,
-  ChatMessage,
-} from "../data/knowledge-mock";
+type DocumentType = string;
+type DocumentStatus = string;
+interface KnowledgeDocument { id: string; title: string; collection: string; doc_type: DocumentType; status: DocumentStatus; chunks_indexed: number; access_count: number; created_at: string; tags: string[]; summary?: string; metadata?: Record<string, string>; file_size_bytes?: number; uploaded_at?: string; [key: string]: unknown }
+interface ChatMessage { role: string; content: string; [key: string]: unknown }
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
@@ -34,27 +26,15 @@ const router = Router();
 // ---------------------------------------------------------------------------
 router.get("/summary", (_req, res) => {
   try {
-    const indexed = MOCK_DOCUMENTS.filter((d) => d.status === "indexed");
-    const processing = MOCK_DOCUMENTS.filter((d) => d.status === "processing");
-
-    const totalChunks = MOCK_DOCUMENTS.reduce((sum, d) => sum + d.chunks_indexed, 0);
-    const totalAccess = MOCK_DOCUMENTS.reduce((sum, d) => sum + d.access_count, 0);
-
-    // Most accessed documents
-    const topDocs = [...indexed]
-      .sort((a, b) => b.access_count - a.access_count)
-      .slice(0, 5)
-      .map((d) => ({ id: d.id, title: d.title, access_count: d.access_count }));
-
     return res.json(
       successEnvelope("gda-knowledge", "summary", {
-        total_documents: MOCK_DOCUMENTS.length,
-        indexed_count: indexed.length,
-        processing_count: processing.length,
-        total_chunks: totalChunks,
-        total_access_count: totalAccess,
-        collection_count: MOCK_COLLECTIONS.length,
-        top_documents: topDocs,
+        total_documents: 0,
+        indexed_count: 0,
+        processing_count: 0,
+        total_chunks: 0,
+        total_access_count: 0,
+        collection_count: 0,
+        top_documents: [],
       }),
     );
   } catch (err) {
@@ -74,7 +54,7 @@ router.get("/summary", (_req, res) => {
 router.get("/collections", (_req, res) => {
   try {
     return res.json(
-      successEnvelope("gda-knowledge", "collections", MOCK_COLLECTIONS),
+      successEnvelope("gda-knowledge", "collections", []),
     );
   } catch (err) {
     return res.status(500).json(
@@ -92,7 +72,7 @@ router.get("/collections", (_req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/documents", (req, res) => {
   try {
-    let results: KnowledgeDocument[] = [...MOCK_DOCUMENTS];
+    let results: KnowledgeDocument[] = [];
 
     const { collection, type, status, search, sort } = req.query;
 
@@ -113,9 +93,9 @@ router.get("/documents", (req, res) => {
       results = results.filter(
         (d) =>
           d.title.toLowerCase().includes(q) ||
-          d.summary.toLowerCase().includes(q) ||
+          (d.summary ?? "").toLowerCase().includes(q) ||
           d.tags.some((t) => t.toLowerCase().includes(q)) ||
-          (d.metadata.agency && d.metadata.agency.toLowerCase().includes(q)),
+          (d.metadata?.agency && d.metadata.agency.toLowerCase().includes(q)),
       );
     }
 
@@ -126,12 +106,12 @@ router.get("/documents", (req, res) => {
     } else if (sortBy === "name") {
       results.sort((a, b) => a.title.localeCompare(b.title));
     } else if (sortBy === "size") {
-      results.sort((a, b) => b.file_size_bytes - a.file_size_bytes);
+      results.sort((a, b) => (b.file_size_bytes ?? 0) - (a.file_size_bytes ?? 0));
     } else {
       // "recent" — sort by uploaded_at descending
       results.sort(
         (a, b) =>
-          new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime(),
+          new Date(b.uploaded_at ?? "").getTime() - new Date(a.uploaded_at ?? "").getTime(),
       );
     }
 
@@ -156,7 +136,7 @@ router.get("/documents", (req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/documents/:id", (req, res) => {
   try {
-    const doc = MOCK_DOCUMENTS.find((d) => d.id === req.params.id);
+    const doc: KnowledgeDocument | undefined = undefined;
     if (!doc) {
       return res.status(404).json(
         errorEnvelope("gda-knowledge", "document-detail", {
@@ -238,15 +218,12 @@ router.get("/search", async (req, res) => {
       }
     }
 
-    // Fallback to mock keyword search
-    const results = mockSemanticSearch(q.trim(), maxResults);
-
     return res.json(
       successEnvelope("gda-knowledge", "search", {
         query: q.trim(),
-        results,
-        total_results: results.length,
-        source: "mock",
+        results: [],
+        total_results: 0,
+        source: "db",
       }),
     );
   } catch (err) {
@@ -265,16 +242,8 @@ router.get("/search", async (req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/chat/sessions", (_req, res) => {
   try {
-    const sessions = MOCK_CHAT_SESSIONS.map((s) => ({
-      id: s.id,
-      title: s.title,
-      message_count: s.messages.length,
-      created_at: s.created_at,
-      last_message: s.messages[s.messages.length - 1]?.content.slice(0, 100) ?? "",
-    }));
-
     return res.json(
-      successEnvelope("gda-knowledge", "chat-sessions", sessions),
+      successEnvelope("gda-knowledge", "chat-sessions", []),
     );
   } catch (err) {
     return res.status(500).json(
@@ -292,19 +261,12 @@ router.get("/chat/sessions", (_req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/chat/sessions/:id", (req, res) => {
   try {
-    const session = MOCK_CHAT_SESSIONS.find((s) => s.id === req.params.id);
-    if (!session) {
-      return res.status(404).json(
-        errorEnvelope("gda-knowledge", "chat-session", {
-          code: "NOT_FOUND",
-          message: `Chat session ${req.params.id} not found`,
-          detail: null,
-        }),
-      );
-    }
-
-    return res.json(
-      successEnvelope("gda-knowledge", "chat-session", session),
+    return res.status(404).json(
+      errorEnvelope("gda-knowledge", "chat-session", {
+        code: "NOT_FOUND",
+        message: `Chat session ${req.params.id} not found`,
+        detail: null,
+      }),
     );
   } catch (err) {
     return res.status(500).json(
@@ -341,7 +303,7 @@ router.post("/chat", requireRole("admin", "bd_manager", "capture_lead", "analyst
     // Try real vector search first, fall back to mock
     let sourceDocs: Array<{document_id: string; document_title: string; chunk_text: string; page: number | null; relevance: number}> = [];
     let ragContext = "";
-    let searchSource = "mock";
+    let searchSource = "db";
 
     if (isEmbeddingAvailable()) {
       try {
@@ -367,22 +329,7 @@ router.post("/chat", requireRole("admin", "bd_manager", "capture_lead", "analyst
       }
     }
 
-    if (sourceDocs.length === 0) {
-      const searchResults = mockSemanticSearch(message.trim(), 5);
-      sourceDocs = searchResults.map((r) => ({
-        document_id: r.document_id,
-        document_title: r.document_title,
-        chunk_text: r.chunks[0]?.text ?? "",
-        page: r.chunks[0]?.page ?? null,
-        relevance: r.relevance_score,
-      }));
-      ragContext = searchResults
-        .map(
-          (r, i) =>
-            `[Document ${i + 1}: "${r.document_title}" (${Math.round(r.relevance_score * 100)}% relevance)]\n${r.highlight}\n${r.chunks.map((c) => c.text).join("\n")}`,
-        )
-        .join("\n\n---\n\n");
-    }
+    /* No mock fallback for search results */
 
     if (isLLMAvailable() && sourceDocs.length > 0) {
       // Real LLM call with RAG context

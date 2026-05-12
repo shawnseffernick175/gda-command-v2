@@ -49,6 +49,9 @@ export type OpportunityStatus =
   | "lost"
   | "won";
 
+/** SBA size standard classification for a given NAICS code. */
+export type NaicsSize = "small" | "large" | null;
+
 /** Opportunity record matching Postgres schema + S-009 spec. */
 export interface Opportunity {
   id: string;
@@ -60,6 +63,7 @@ export interface Opportunity {
   value_estimated: number | null;
   probability_of_win: number | null;
   naics: string | null;
+  naics_size?: NaicsSize;
   psc: string | null;
   due_date: string | null;
   solicitation_number: string | null;
@@ -1491,4 +1495,60 @@ export interface QuickEntry {
   created_at: string;
   processed: boolean;
   processed_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Fast Track types
+// ---------------------------------------------------------------------------
+
+export interface FastTrackSource {
+  source_id: string;
+  type: string;
+  title: string;
+  url: string | null;
+  publisher: string;
+  published_at: string;
+  retrieved_at: string;
+  claim_support: string;
+}
+
+export interface FastTrackMatch {
+  id: string;
+  status: "new" | "reviewing" | "watching" | "promoted" | "discarded";
+  signal_type: string;
+  signal_summary: string;
+  technology: string;
+  company_name: string;
+  company_role: "internal" | "partner" | "target" | "competitor" | "unknown";
+  candidate_agency: string | null;
+  candidate_requirement: string | null;
+  contract_path_hypothesis: string;
+  match_score: number;
+  recommended_next_action: string;
+  safety_lane: "read-only" | "dry-run";
+  data_source: string | null;
+  sources: FastTrackSource[];
+  created_at: string;
+  updated_at: string;
+  technology_tags: string[];
+  company_url: string | null;
+  incumbent_or_competitor_context: string | null;
+  buyer_problem: string | null;
+  next_review_at: string | null;
+  promotion_target: string | null;
+  analysis?: {
+    executive_summary: string;
+    why_it_matters: string;
+    risks_or_gaps: string[];
+  };
+  ooda?: {
+    observe: string[];
+    orient: string[];
+    decide: string;
+    act: string;
+  };
+  learning?: {
+    notes: string[];
+    reserved: boolean;
+  };
 }

@@ -3,11 +3,7 @@ import type { Opportunity, OpportunityStatus } from "@gda/shared";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
-import {
-  getMockOpportunities,
-  getMockOpportunityById,
-} from "../data/opportunities-mock";
-import { getMockOpportunityDetail } from "../data/opportunity-detail-mock";
+
 import {
   n8nWebhookConfigured,
   fetchOpsTrackerFromN8n,
@@ -50,6 +46,59 @@ const SHIPLEY_TO_STATUS: Record<string, OpportunityStatus> = {
   gov_cancelled: "lost",
 };
 
+// ---------------------------------------------------------------------------
+// NAICS size classification — SBA size standard lookup
+// Revenue-based NAICS codes (threshold in $M): if company revenue exceeds
+// the threshold, the company is "large" for that NAICS code.
+// Employee-based codes use headcount threshold instead.
+// ---------------------------------------------------------------------------
+type SbaSizeStandard = { type: "revenue"; thresholdM: number } | { type: "employees"; threshold: number };
+
+const SBA_SIZE_STANDARDS: Record<string, SbaSizeStandard> = {
+  // Professional, Scientific, and Technical Services
+  "541330": { type: "revenue", thresholdM: 25.5 },   // Engineering Services
+  "541511": { type: "revenue", thresholdM: 34 },      // Custom Computer Programming
+  "541512": { type: "revenue", thresholdM: 34 },      // Computer Systems Design
+  "541513": { type: "revenue", thresholdM: 34 },      // Computer Facilities Management
+  "541519": { type: "revenue", thresholdM: 34 },      // Other Computer Related Services
+  "541611": { type: "revenue", thresholdM: 24.5 },    // Admin Management Consulting
+  "541612": { type: "revenue", thresholdM: 19 },      // Human Resources Consulting
+  "541613": { type: "revenue", thresholdM: 19 },      // Marketing Consulting
+  "541614": { type: "revenue", thresholdM: 19 },      // Process/Physical Distribution Consulting
+  "541618": { type: "revenue", thresholdM: 19 },      // Other Management Consulting
+  "541690": { type: "revenue", thresholdM: 19.5 },    // Other Scientific/Technical Consulting
+  "541711": { type: "revenue", thresholdM: 1000 },    // R&D Physical/Engineering/Life Sciences
+  "541712": { type: "revenue", thresholdM: 1000 },    // R&D Social Sciences/Humanities
+  "541715": { type: "employees", threshold: 1000 },   // R&D Physical/Engineering (employee based)
+  "541990": { type: "revenue", thresholdM: 19.5 },    // All Other Professional Services
+  // Information Technology
+  "511210": { type: "employees", threshold: 500 },    // Software Publishers
+  "518210": { type: "revenue", thresholdM: 40 },      // Data Processing/Hosting
+  "519130": { type: "employees", threshold: 1000 },   // Internet Publishing
+  // Manufacturing
+  "334111": { type: "employees", threshold: 1250 },   // Electronic Computer Manufacturing
+  "334511": { type: "employees", threshold: 1250 },   // Search/Navigation Equipment
+  "336414": { type: "employees", threshold: 1500 },   // Guided Missile/Space Vehicle Mfg
+};
+
+// Default: revenue-based at $30M for unknown NAICS
+const DEFAULT_SBA: SbaSizeStandard = { type: "revenue", thresholdM: 30 };
+
+// Envision Innovative Solutions context: ~$382M revenue, ~41 employees
+const COMPANY_REVENUE_M = 382;
+const COMPANY_EMPLOYEES = 41;
+
+function classifyNaicsSize(naicsCode: string | null): "small" | "large" | null {
+  if (!naicsCode) return null;
+  const code = naicsCode.replace(/\D/g, "").slice(0, 6);
+  if (!code) return null;
+  const standard = SBA_SIZE_STANDARDS[code] ?? DEFAULT_SBA;
+  if (standard.type === "revenue") {
+    return COMPANY_REVENUE_M <= standard.thresholdM ? "small" : "large";
+  }
+  return COMPANY_EMPLOYEES <= standard.threshold ? "small" : "large";
+}
+
 const SORTABLE_COLUMNS: Record<string, string> = {
   title: "title",
   department: "department",
@@ -70,6 +119,7 @@ router.get("/", async (req, res) => {
   const search = (req.query.search as string) ?? "";
   const statusFilter = req.query.status as string | undefined;
   const deptFilter = req.query.department as string | undefined;
+  const naicsSizeFilter = req.query.naics_size as string | undefined;
   const minPwin = req.query.minPwin ? parseFloat(req.query.minPwin as string) : undefined;
   const sortBy = (req.query.sortBy as string) ?? "updated_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
@@ -84,9 +134,13 @@ router.get("/", async (req, res) => {
     );
   }
 
-  // --- Helper: apply filters & sort to in-memory opportunity array ---
+  // --- Helper: apply NAICS size classification & filters ---
+  function enrichWithNaicsSize(rows: Opportunity[]): Opportunity[] {
+    return rows.map((o) => ({ ...o, naics_size: o.naics_size ?? classifyNaicsSize(o.naics) }));
+  }
+
   function filterAndSort(rows: Opportunity[]): Opportunity[] {
-    let filtered = [...rows];
+    let filtered = enrichWithNaicsSize(rows);
     if (search) {
       const q = search.toLowerCase();
       filtered = filtered.filter(
@@ -99,6 +153,9 @@ router.get("/", async (req, res) => {
     }
     if (deptFilter) {
       filtered = filtered.filter((o) => o.department === deptFilter);
+    }
+    if (naicsSizeFilter === "small" || naicsSizeFilter === "large") {
+      filtered = filtered.filter((o) => o.naics_size === naicsSizeFilter);
     }
     if (minPwin !== undefined && !isNaN(minPwin)) {
       filtered = filtered.filter(
@@ -148,15 +205,13 @@ router.get("/", async (req, res) => {
   const pool = getPool();
 
   if (!pool) {
-    // 3. Mock fallback
-    const rows = filterAndSort(getMockOpportunities());
     return res.json(
       successEnvelope(
         "gda-opportunities",
         "list",
-        { opportunities: rows, source: "mock" as const },
+        { opportunities: [], source: "db" as const },
         {
-          count: rows.length,
+          count: 0,
           filters_applied: { search, status: statusFilter, department: deptFilter, minPwin },
         }
       )
@@ -198,19 +253,25 @@ router.get("/", async (req, res) => {
       SELECT id, title, agency, department, status, score, value_estimated,
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
-             qualified_by, tags, raw_source_url, data_source, created_at, updated_at
+             qualified_by, tags, raw_source_url, created_at, updated_at
       FROM opportunities
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
     `;
 
     const result = await pool.query(sql, params);
-    const rows: Opportunity[] = result.rows.map((r) => ({
+    const rawRows: Opportunity[] = result.rows.map((r) => ({
       ...r,
       score: parseFloat(r.score) || 0,
       value_estimated: r.value_estimated ? parseFloat(r.value_estimated) : null,
       probability_of_win: r.probability_of_win ? parseFloat(r.probability_of_win) : null,
     }));
+
+    // Enrich with NAICS size classification and apply naics_size filter
+    let rows = enrichWithNaicsSize(rawRows);
+    if (naicsSizeFilter === "small" || naicsSizeFilter === "large") {
+      rows = rows.filter((o) => o.naics_size === naicsSizeFilter);
+    }
 
     return res.json(
       successEnvelope(
@@ -219,20 +280,19 @@ router.get("/", async (req, res) => {
         { opportunities: rows, source: "db" as const },
         {
           count: rows.length,
-          filters_applied: { search, status: statusFilter, department: deptFilter, minPwin },
+          filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
         }
       )
     );
   } catch (err: unknown) {
-    process.stderr.write(`[opportunities] query error, falling back to mock: ${(err as Error).message}\n`);
-    const rows = filterAndSort(getMockOpportunities());
+    process.stderr.write(`[opportunities] query error: ${(err as Error).message}\n`);
     return res.json(
       successEnvelope(
         "gda-opportunities",
         "list",
-        { opportunities: rows, source: "mock" as const },
+        { opportunities: [], source: "db" as const },
         {
-          count: rows.length,
+          count: 0,
           filters_applied: { search, status: statusFilter, department: deptFilter, minPwin },
         }
       )
@@ -312,17 +372,13 @@ router.get("/pipeline", async (req, res) => {
   const pool = getPool();
 
   if (!pool) {
-    // 3. Mock fallback — filter pipeline-status opportunities
-    const rows = pipelineFilterAndSort(
-      getMockOpportunities().filter((o) => o.status === "pipeline")
-    );
     return res.json(
       successEnvelope(
         "gda-opportunities",
         "pipeline-list",
-        { opportunities: rows, source: "mock" as const },
+        { opportunities: [], source: "db" as const },
         {
-          count: rows.length,
+          count: 0,
           filters_applied: { search, department: deptFilter, minPwin },
         }
       )
@@ -359,7 +415,7 @@ router.get("/pipeline", async (req, res) => {
       SELECT id, title, agency, department, status, score, value_estimated,
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
-             qualified_by, tags, raw_source_url, data_source, created_at, updated_at
+             qualified_by, tags, raw_source_url, created_at, updated_at
       FROM opportunities
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
@@ -385,17 +441,14 @@ router.get("/pipeline", async (req, res) => {
       )
     );
   } catch (err: unknown) {
-    process.stderr.write(`[opportunities] pipeline query error, falling back to mock: ${(err as Error).message}\n`);
-    const rows = pipelineFilterAndSort(
-      getMockOpportunities().filter((o) => o.status === "pipeline")
-    );
+    process.stderr.write(`[opportunities] pipeline query error: ${(err as Error).message}\n`);
     return res.json(
       successEnvelope(
         "gda-opportunities",
         "pipeline-list",
-        { opportunities: rows, source: "mock" as const },
+        { opportunities: [], source: "db" as const },
         {
-          count: rows.length,
+          count: 0,
           filters_applied: { search, department: deptFilter, minPwin },
         }
       )
@@ -411,9 +464,16 @@ router.get("/:id/detail", async (req, res) => {
   const requestedAt = new Date().toISOString();
 
   const pool = getPool();
-  const detail = getMockOpportunityDetail(id);
+  // Try DB for opportunity detail
+  let opp: Opportunity | undefined;
+  if (pool) {
+    try {
+      const result = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
+      if (result.rows.length > 0) opp = result.rows[0] as Opportunity;
+    } catch { /* empty */ }
+  }
 
-  if (!detail) {
+  if (!opp) {
     return res.status(404).json(
       errorEnvelope("gda-opportunity-detail", "read", {
         code: "OPPORTUNITY_NOT_FOUND",
@@ -430,24 +490,24 @@ router.get("/:id/detail", async (req, res) => {
       "gda-opportunity-detail",
       "read",
       {
-        opportunity: detail.opportunity,
-        analysis: detail.analysis,
-        ooda: detail.ooda,
-        sources: detail.sources,
-        learning: detail.learning,
-        source: "mock" as const,
+        opportunity: opp,
+        analysis: { executive_summary: "", strengths: [], risks: [], competitive_landscape: null, relevance_rationale: null, recommended_action: null, confidence: null, last_analyzed_at: null, analyst_feedback: null, analysis_version: "1.0" },
+        ooda: { observe: { summary: "", items: [] }, orient: { summary: "", items: [] }, decide: { summary: "", options: [] }, act: { summary: "", next_steps: [] } },
+        sources: [],
+        learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 0, coverage_gaps: [], next_review_at: null },
+        source: "db" as const,
       },
       {
         requestedAt,
         respondedAt,
         opportunityId: id,
-        sourceCount: detail.sources.length,
-        analysisGeneratedAt: detail.analysis.last_analyzed_at,
+        sourceCount: 0,
+        analysisGeneratedAt: null,
         coverageFlags: {
-          hasAnalysis: true,
-          hasOoda: true,
-          hasSources: detail.sources.length > 0,
-          hasLearning: true,
+          hasAnalysis: false,
+          hasOoda: false,
+          hasSources: false,
+          hasLearning: false,
         },
       }
     )
@@ -525,9 +585,6 @@ router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res)
       } catch {
         // Fall through to mock
       }
-    }
-    if (!opp) {
-      opp = getMockOpportunityById(id);
     }
 
     if (!opp) {
