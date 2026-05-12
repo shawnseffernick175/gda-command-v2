@@ -8,6 +8,7 @@ import type { ColorReviewPhase, ColorReviewStatus } from "@gda/shared";
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { generateStorageKey, saveFile, getMaxFileSize } from "../lib/storage";
 import { log } from "../lib/logger";
+import { extractText } from "../lib/extract-text";
 
 const router = Router();
 
@@ -35,38 +36,6 @@ async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" | "moc
     } catch { /* fall through */ }
   }
   return { items: [...MOCK_COLOR_REVIEWS] as unknown as ReviewItem[], source: "mock" };
-}
-
-// ---------------------------------------------------------------------------
-// Extract text from uploaded file buffer
-// ---------------------------------------------------------------------------
-async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
-  if (mimeType === "text/plain" || mimeType === "text/markdown") {
-    return buffer.toString("utf-8");
-  }
-  if (mimeType === "application/pdf") {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
-      const result = await pdfParse(buffer);
-      return result.text;
-    } catch (err) {
-      log.error("pdf_parse_error", { error: String(err) });
-      return "";
-    }
-  }
-  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mammoth = require("mammoth") as { extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }> };
-      const result = await mammoth.extractRawText({ buffer });
-      return result.value;
-    } catch (err) {
-      log.error("docx_parse_error", { error: String(err) });
-      return "";
-    }
-  }
-  return "";
 }
 
 // ---------------------------------------------------------------------------

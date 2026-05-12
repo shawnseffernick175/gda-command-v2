@@ -20,6 +20,7 @@ import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
 import { generateStorageKey, saveFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
+import { extractText, EXTRACTABLE_MIME_TYPES } from "../lib/extract-text";
 
 const router = Router();
 
@@ -120,9 +121,8 @@ const rfpUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: getMaxFileSize() },
   fileFilter: (_req, file, cb) => {
-    const allowed = new Set(["application/pdf", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
-    if (!allowed.has(file.mimetype)) {
-      cb(new Error(`File type ${file.mimetype} is not allowed for RFP shredding. Use PDF, DOC, DOCX, or TXT.`));
+    if (!EXTRACTABLE_MIME_TYPES.has(file.mimetype)) {
+      cb(new Error(`File type ${file.mimetype} is not allowed for RFP shredding. Use PDF, DOC, DOCX, XLSX, XLS, PPTX, TXT, or CSV.`));
       return;
     }
     cb(null, true);
@@ -175,14 +175,10 @@ router.post(
       }
     }
 
-    // Extract text from uploaded file if available (plain text only for now)
+    // Extract text from uploaded file
     let effectiveText = document_text ?? "";
     if (file && !document_text) {
-      if (file.mimetype === "text/plain") {
-        effectiveText = file.buffer.toString("utf-8");
-      }
-      // PDF/DOCX text extraction would require additional libraries (pdf-parse, mammoth)
-      // For now, users can paste text or upload .txt files
+      effectiveText = await extractText(file.buffer, file.mimetype);
     }
 
     if (!isLLMAvailable() || !effectiveText) {
@@ -201,7 +197,7 @@ router.post(
             message: effectiveText
               ? "Set OPENAI_API_KEY to enable AI-powered requirement extraction."
               : file
-                ? "File uploaded and stored. Paste document text or use a .txt file for AI extraction."
+                ? "File uploaded and stored. Text could not be extracted — try a different file format (PDF, DOCX, XLSX, PPTX, TXT)."
                 : "Shred job queued. Upload an RFP document or provide document_text for AI extraction.",
             estimated_processing_time: "3-5 minutes",
             pipeline: "GDA.batch.doc-ingest → GDA.api.rfp-shredder → GDA.api.compliance-matrix",

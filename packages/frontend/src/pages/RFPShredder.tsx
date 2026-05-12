@@ -347,7 +347,7 @@ export default function RFPShredder() {
                   style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", marginTop: 4, boxSizing: "border-box" }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>RFP Document (PDF, DOC, DOCX, or TXT)</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>RFP Document (PDF, DOCX, XLSX, PPTX, DOC, TXT, CSV)</label>
                 <div
                   onClick={() => shredFileRef.current?.click()}
                   style={{
@@ -362,7 +362,7 @@ export default function RFPShredder() {
                   <input
                     ref={shredFileRef}
                     type="file"
-                    accept=".pdf,.doc,.docx,.txt"
+                    accept=".pdf,.doc,.docx,.xlsx,.xls,.pptx,.txt,.csv"
                     style={{ display: "none" }}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
