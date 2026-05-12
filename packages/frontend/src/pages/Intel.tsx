@@ -99,6 +99,19 @@ interface ResearchData {
   source: "db" | "n8n";
 }
 
+interface CompetitorMovement {
+  id: string;
+  movement_type: string;
+  title: string;
+  description: string;
+  impact_assessment: string;
+  threat_level: string;
+  source: string;
+  source_url: string | null;
+  detected_at: string;
+  verified: boolean;
+}
+
 interface CompetitorProfile {
   id: string;
   name: string;
@@ -111,12 +124,31 @@ interface CompetitorProfile {
   recent_wins: string[];
   watch_status: string;
   last_updated: string;
+  movements?: CompetitorMovement[];
+}
+
+interface TeamingOpportunity {
+  id: string;
+  competitor_name: string;
+  title: string;
+  description: string;
+  detected_at: string;
+}
+
+interface MovementCounts {
+  total: number;
+  teaming: number;
+  contract_wins: number;
+  personnel: number;
+  mergers: number;
 }
 
 interface CompetitorsData {
   competitors: CompetitorProfile[];
   total: number;
   filtered: number;
+  teamingOpportunities?: TeamingOpportunity[];
+  movementCounts?: MovementCounts;
   source: "db" | "n8n";
 }
 
@@ -707,6 +739,17 @@ function ResearchTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
 // Competitors Tab
 // ---------------------------------------------------------------------------
 
+const MOVEMENT_TYPE_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
+  teaming_announcement: { label: "Teaming", color: "#8b5cf6", icon: "\ud83e\udd1d" },
+  contract_win: { label: "Contract Win", color: "#22c55e", icon: "\ud83c\udfc6" },
+  leadership_change: { label: "Personnel", color: "#f59e0b", icon: "\ud83d\udc64" },
+  hiring_surge: { label: "Hiring", color: "#3b82f6", icon: "\ud83d\udcca" },
+  merger_acquisition: { label: "M&A", color: "#ef4444", icon: "\ud83c\udfed" },
+  capability_expansion: { label: "Expansion", color: "#06b6d4", icon: "\ud83d\ude80" },
+  protest_filed: { label: "Protest", color: "#f97316", icon: "\u2696\ufe0f" },
+  cpars_change: { label: "CPARS", color: "#a855f7", icon: "\ud83d\udccb" },
+};
+
 function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [data, setData] = useState<CompetitorsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -735,13 +778,56 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   if (error && !data) return <ErrorMsg msg={error} />;
   if (!data) return null;
 
+  const mc = data.movementCounts;
+
   return (
     <div>
-      {/* Summary */}
-      <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+      {/* KPI Summary */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <SummaryChip label="Tracked" value={String(data.total)} />
         <SummaryChip label="Shown" value={String(data.filtered)} />
+        {mc && mc.total > 0 && (
+          <>
+            <SummaryChip label="Movements" value={String(mc.total)} accent="#3b82f6" />
+            {mc.teaming > 0 && <SummaryChip label="Teaming" value={String(mc.teaming)} accent="#8b5cf6" />}
+            {mc.contract_wins > 0 && <SummaryChip label="Wins" value={String(mc.contract_wins)} accent="#22c55e" />}
+            {mc.personnel > 0 && <SummaryChip label="Personnel" value={String(mc.personnel)} accent="#f59e0b" />}
+            {mc.mergers > 0 && <SummaryChip label="M&A" value={String(mc.mergers)} accent="#ef4444" />}
+          </>
+        )}
       </div>
+
+      {/* Teaming Opportunities Alert */}
+      {data.teamingOpportunities && data.teamingOpportunities.length > 0 && (
+        <div style={{
+          padding: "14px 18px",
+          background: "rgba(139,92,246,0.08)",
+          border: "1px solid rgba(139,92,246,0.25)",
+          borderRadius: 8,
+          marginBottom: 18,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#8b5cf6", marginBottom: 8 }}>
+            \ud83e\udd1d Teaming Opportunities ({data.teamingOpportunities.length})
+          </div>
+          {data.teamingOpportunities.map((t) => (
+            <div key={t.id} style={{
+              padding: "8px 0",
+              borderBottom: "1px solid rgba(139,92,246,0.1)",
+              fontSize: 13,
+            }}>
+              <div style={{ fontWeight: 600 }}>{t.title}</div>
+              <div style={{ color: "var(--color-text-muted)", marginTop: 2 }}>
+                {t.competitor_name} · {formatDate(t.detected_at)}
+              </div>
+              {t.description && (
+                <div style={{ color: "var(--color-text-muted)", marginTop: 4, fontSize: 12 }}>
+                  {t.description}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Search */}
       <div style={{ marginBottom: 16 }}>
@@ -757,6 +843,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {data.competitors.map((c) => {
           const scoreColor = c.threat_score >= 85 ? "#ef4444" : c.threat_score >= 70 ? "#f59e0b" : "#22c55e";
+          const movements = c.movements ?? [];
           return (
             <div key={c.id} style={{
               border: "1px solid var(--color-border)",
@@ -788,7 +875,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                 </div>
 
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 16, fontWeight: 700 }}>{c.name}</span>
                     <span style={{
                       padding: "1px 8px",
@@ -801,6 +888,18 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                     }}>
                       {c.watch_status}
                     </span>
+                    {movements.length > 0 && (
+                      <span style={{
+                        padding: "1px 8px",
+                        borderRadius: 10,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        background: "rgba(59,130,246,0.15)",
+                        color: "#3b82f6",
+                      }}>
+                        {movements.length} update{movements.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
                     {c.contracts_won} contracts · {formatCurrency(c.contracts_value)} total value · Updated {formatDate(c.last_updated)}
@@ -818,6 +917,92 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                   borderTop: "1px solid var(--color-border)",
                   paddingTop: 14,
                 }}>
+                  {/* News & Activity */}
+                  {movements.length > 0 && (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "#3b82f6", marginBottom: 8 }}>
+                        News & Activity
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {movements.map((m) => {
+                          const cfg = MOVEMENT_TYPE_CONFIG[m.movement_type] ?? { label: m.movement_type, color: "#6b7280", icon: "\ud83d\udccc" };
+                          return (
+                            <div key={m.id} style={{
+                              padding: "8px 12px",
+                              borderRadius: 6,
+                              background: `${cfg.color}08`,
+                              border: `1px solid ${cfg.color}20`,
+                              display: "flex",
+                              gap: 10,
+                              alignItems: "flex-start",
+                            }}>
+                              <span style={{ fontSize: 16, flexShrink: 0 }}>{cfg.icon}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                  <span style={{
+                                    padding: "1px 6px",
+                                    borderRadius: 4,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    textTransform: "uppercase",
+                                    background: `${cfg.color}20`,
+                                    color: cfg.color,
+                                  }}>
+                                    {cfg.label}
+                                  </span>
+                                  <span style={{
+                                    padding: "1px 6px",
+                                    borderRadius: 4,
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    textTransform: "capitalize",
+                                    background: `${PRIORITY_COLORS[m.threat_level] ?? "#6b7280"}20`,
+                                    color: PRIORITY_COLORS[m.threat_level] ?? "#6b7280",
+                                  }}>
+                                    {m.threat_level}
+                                  </span>
+                                  {m.verified && (
+                                    <span style={{
+                                      padding: "1px 6px",
+                                      borderRadius: 4,
+                                      fontSize: 10,
+                                      fontWeight: 600,
+                                      background: "rgba(34,197,94,0.15)",
+                                      color: "#22c55e",
+                                    }}>
+                                      verified
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                                    {formatDate(m.detected_at)}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>{m.title}</div>
+                                {m.description && (
+                                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
+                                    {m.description}
+                                  </div>
+                                )}
+                                {m.impact_assessment && (
+                                  <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 4, fontStyle: "italic" }}>
+                                    Impact: {m.impact_assessment}
+                                  </div>
+                                )}
+                                {m.source_url && (
+                                  <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{
+                                    fontSize: 11, color: "#3b82f6", marginTop: 4, display: "inline-block",
+                                  }}>
+                                    {m.source || "Source"} \u2197
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 14 }}>
                     {/* Strengths */}
                     <div>
