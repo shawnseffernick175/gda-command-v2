@@ -386,9 +386,9 @@ router.get("/pipeline", async (req, res) => {
     );
   }
 
-  // Real DB query — pipeline status only
+  // Real DB query — only approved opportunities with 30+ days runway
   try {
-    const conditions: string[] = ["status = 'pipeline'"];
+    const conditions: string[] = ["approved_at IS NOT NULL", "COALESCE(due_date, NOW() + INTERVAL '365 days') > NOW() + INTERVAL '30 days'"];
     const params: unknown[] = [];
     let paramIdx = 1;
 
@@ -416,7 +416,7 @@ router.get("/pipeline", async (req, res) => {
       SELECT id, title, agency, department, status, score, value_estimated,
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
-             qualified_by, tags, raw_source_url, created_at, updated_at
+             qualified_by, approved_at, approved_by, tags, raw_source_url, created_at, updated_at
       FROM opportunities
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
@@ -453,6 +453,77 @@ router.get("/pipeline", async (req, res) => {
           filters_applied: { search, department: deptFilter, minPwin },
         }
       )
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/opportunities/:id/approve — mark opportunity as approved
+// ---------------------------------------------------------------------------
+router.post("/:id/approve", requireRole("admin", "bd_manager"), async (req, res) => {
+  const { id } = req.params;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(500).json(
+      successEnvelope("gda-opportunities", "approve", null, { error: "no database" })
+    );
+  }
+  try {
+    const approvedBy = (req.body?.approved_by as string) || "system";
+    const result = await pool.query(
+      "UPDATE opportunities SET approved_at = NOW(), approved_by = $1 WHERE id = $2 RETURNING id, title, approved_at, approved_by",
+      [approvedBy, id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json(
+        successEnvelope("gda-opportunities", "approve", null, { error: "not found" })
+      );
+    }
+    return res.json(
+      successEnvelope("gda-opportunities", "approve", result.rows[0], {})
+    );
+  } catch (err: unknown) {
+    process.stderr.write(`[opportunities] approve error: ${(err as Error).message}\n`);
+    return res.status(500).json(
+      successEnvelope("gda-opportunities", "approve", null, { error: (err as Error).message })
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/opportunities/no-bid — past-due or within 30 days of due date
+// ---------------------------------------------------------------------------
+router.get("/no-bid", async (_req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.json(
+      successEnvelope("gda-opportunities", "no-bid-list", { opportunities: [], source: "db" as const }, { count: 0 })
+    );
+  }
+  try {
+    const sql = `
+      SELECT id, title, agency, department, status, score, value_estimated,
+             probability_of_win, naics, psc, due_date, solicitation_number,
+             set_aside, place_of_performance, incumbent, qualified_at,
+             qualified_by, approved_at, approved_by, tags, raw_source_url, created_at, updated_at
+      FROM opportunities
+      WHERE due_date IS NOT NULL AND due_date <= NOW() + INTERVAL '30 days'
+      ORDER BY due_date ASC NULLS LAST, id ASC
+    `;
+    const result = await pool.query(sql);
+    const rows: Opportunity[] = result.rows.map((r) => ({
+      ...r,
+      score: parseFloat(r.score) || 0,
+      value_estimated: r.value_estimated ? parseFloat(r.value_estimated) : null,
+      probability_of_win: r.probability_of_win ? parseFloat(r.probability_of_win) : null,
+    }));
+    return res.json(
+      successEnvelope("gda-opportunities", "no-bid-list", { opportunities: rows, source: "db" as const }, { count: rows.length })
+    );
+  } catch (err: unknown) {
+    process.stderr.write(`[opportunities] no-bid query error: ${(err as Error).message}\n`);
+    return res.json(
+      successEnvelope("gda-opportunities", "no-bid-list", { opportunities: [], source: "db" as const }, { count: 0 })
     );
   }
 });

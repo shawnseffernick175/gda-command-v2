@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import InfoBadge from "../components/InfoBadge";
 import SourceBadge from "../components/SourceBadge";
+import OpportunityTable from "../components/OpportunityRow";
+import { fetchNoBidOpportunities, type OpportunityRow as OppRow } from "../api/client";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -365,7 +367,7 @@ function ShipleyTimeline({
 // Component
 // ---------------------------------------------------------------------------
 
-type Tab = "plans" | "activity" | "milestones" | "intel";
+type Tab = "plans" | "activity" | "milestones" | "intel" | "no_bid";
 
 interface IntelModuleItem {
   id: string;
@@ -385,6 +387,8 @@ export default function Capture() {
   const [plansData, setPlansData] = useState<PlansData | null>(null);
   const [activitiesData, setActivitiesData] = useState<ActivitiesData | null>(null);
   const [intelModules, setIntelModules] = useState<IntelModuleItem[]>([]);
+  const [noBidOpps, setNoBidOpps] = useState<OppRow[]>([]);
+  const [noBidLoading, setNoBidLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expandedPlan, setExpandedPlan] = useState<string | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
@@ -421,6 +425,15 @@ export default function Capture() {
       if (im?.modules) setIntelModules(im.modules);
       setLoading(false);
     });
+
+    // Load no-bid opportunities
+    setNoBidLoading(true);
+    fetchNoBidOpportunities()
+      .then((env) => {
+        if (env.success && env.data) setNoBidOpps(env.data.opportunities);
+      })
+      .catch(() => {})
+      .finally(() => setNoBidLoading(false));
   }, [phaseFilter, search, activityTypeFilter]);
 
   async function runGateReview(planId: string, gate: string) {
@@ -472,7 +485,7 @@ export default function Capture() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid var(--color-border)", paddingBottom: 8 }}>
-        {(["plans", "activity", "milestones", "intel"] as Tab[]).map((t) => (
+        {(["plans", "activity", "milestones", "intel", "no_bid"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -487,7 +500,7 @@ export default function Capture() {
               background: tab === t ? "rgba(59,130,246,0.1)" : "transparent",
             }}
           >
-            {t === "plans" ? "Capture Plans" : t === "activity" ? "Activity Log" : t === "milestones" ? "Milestones" : `Intel Modules (${intelModules.length})`}
+            {t === "plans" ? "Capture Plans" : t === "activity" ? "Activity Log" : t === "milestones" ? "Milestones" : t === "no_bid" ? `No Bid (${noBidOpps.length})` : `Intel Modules (${intelModules.length})`}
           </button>
         ))}
       </div>
@@ -523,6 +536,23 @@ export default function Capture() {
         />
       ) : tab === "milestones" ? (
         <MilestonesTab plansData={plansData} plans={plans} />
+      ) : tab === "no_bid" ? (
+        /* No Bid Tab — past-due or within 30 days */
+        <div>
+          <p style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 16 }}>
+            Opportunities that are past due or within 30 days of their due date.
+            These are automatically routed here for review. You can always go back and look at them.
+          </p>
+          {noBidLoading ? (
+            <p style={{ color: "var(--color-text-muted)" }}>Loading no-bid opportunities...</p>
+          ) : (
+            <OpportunityTable
+              opportunities={noBidOpps}
+              from="/capture"
+              emptyMessage="No expired or near-expiry opportunities."
+            />
+          )}
+        </div>
       ) : (
         /* Intel Modules Tab */
         <div>

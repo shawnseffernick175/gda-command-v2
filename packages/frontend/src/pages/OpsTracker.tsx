@@ -550,16 +550,15 @@ export default function OpsTracker() {
                       {opp.department ?? "—"}
                     </div>
                   </td>
-                  <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
+                  <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>
                     {formatCurrency(opp.value_estimated)}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                  <td style={tdStyle}>
                     {formatPwin(opp.probability_of_win)}
                   </td>
                   <td
                     style={{
                       ...tdStyle,
-                      textAlign: "right",
                       fontWeight: 600,
                       color:
                         opp.score >= 80

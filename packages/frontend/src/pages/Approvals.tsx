@@ -3,6 +3,7 @@ import SourceBadge from "../components/SourceBadge";
 import {
   fetchApprovals,
   resolveApproval,
+  approveOpportunity,
   type ApprovalsData,
   type ApprovalRow,
   type ApprovalResolveData,
@@ -98,7 +99,25 @@ export default function Approvals() {
     setResolving(id);
     try {
       const env = await resolveApproval(id, action, undefined, true);
-      if (env.success && env.data) setResolveResult(env.data);
+      if (env.success && env.data) {
+        setResolveResult(env.data);
+        // After dry-run preview succeeds, perform real approval + pipeline entry
+        if (action === "approve") {
+          try {
+            await resolveApproval(id, action, undefined, false);
+          } catch {
+            // non-blocking — dry-run already succeeded
+          }
+          const approval = items.find((a) => a.id === id);
+          if (approval?.related_entity_id && (approval.category === "qualify_write" || approval.category === "bid_decision")) {
+            try {
+              await approveOpportunity(approval.related_entity_id, "user");
+            } catch {
+              // non-blocking — approval still succeeded
+            }
+          }
+        }
+      }
     } catch (e) {
       // ignore for now
     }

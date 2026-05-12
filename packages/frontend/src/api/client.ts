@@ -214,6 +214,18 @@ export function fetchPipelineOpportunities(params: PipelineQueryParams = {}) {
   return request<OpportunitiesData>(`/opportunities/pipeline${query ? `?${query}` : ""}`);
 }
 
+export function fetchNoBidOpportunities() {
+  return request<OpportunitiesData>("/opportunities/no-bid");
+}
+
+export function approveOpportunity(id: string, approvedBy = "user") {
+  return request<{ id: string; title: string; approved_at: string; approved_by: string }>(`/opportunities/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved_by: approvedBy }),
+  });
+}
+
 export function qualifyOpportunity(id: string, dryRun = true, approve = false) {
   return request<QualifyResultData>(`/opportunities/${id}/qualify`, {
     method: "POST",

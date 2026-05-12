@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import SourceBadge from "../components/SourceBadge";
+import OpportunityTable from "../components/OpportunityRow";
 import {
   fetchDashboardKPIs,
   fetchCommandSignals,
@@ -663,11 +664,11 @@ function TopOpportunitiesSection({ kpis }: { kpis: DashboardKPIs }) {
           No opportunities found.
         </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {kpis.topByScore.map((opp) => (
-            <TopOppRow key={opp.id} opp={opp} />
-          ))}
-        </div>
+        <OpportunityTable
+          opportunities={kpis.topByScore}
+          from="/"
+          emptyMessage="No opportunities found."
+        />
       )}
     </div>
   );

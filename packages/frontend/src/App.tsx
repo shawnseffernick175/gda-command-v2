@@ -60,11 +60,11 @@ const NAV_GROUPS = [
   {
     label: "Capture",
     items: [
-      { path: "/capture", label: "Capture Plans", icon: "🎯" },
-      { path: "/proposals", label: "Proposals", icon: "📄" },
       { path: "/rfp-shredder", label: "RFP Shredder", icon: "✂" },
       { path: "/compliance", label: "Compliance", icon: "📋" },
+      { path: "/proposals", label: "Proposals", icon: "📄" },
       { path: "/color-review", label: "Color Review", icon: "🎨" },
+      { path: "/capture", label: "Capture Plans", icon: "🎯" },
     ],
   },
   {
