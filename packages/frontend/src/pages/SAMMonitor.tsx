@@ -10,6 +10,7 @@ import {
   type SAMOpportunityRow,
   type SAMScanRow,
 } from "../api/client";
+import { authenticatedFetch } from "../api/auth";
 
 type Tab = "opportunities" | "scans" | "gov-sources";
 
@@ -121,7 +122,7 @@ export default function SAMMonitor() {
   };
 
   const loadGovSources = () => {
-    fetch("/api/feeds/gov-sources").then((r) => r.json()).then((env) => {
+    authenticatedFetch("/api/feeds/gov-sources").then((r) => r.json()).then((env) => {
       if (env.success && env.data?.sources) setGovSources(env.data.sources);
     }).catch(() => {});
   };
@@ -130,7 +131,7 @@ export default function SAMMonitor() {
     setSyncingAll(true);
     setSyncAllMsg(null);
     try {
-      const resp = await fetch("/api/feeds/gov-sources/sync", { method: "POST" });
+      const resp = await authenticatedFetch("/api/feeds/gov-sources/sync", { method: "POST" });
       const env = await resp.json();
       if (env.success && env.data?.summary) {
         const s = env.data.summary;

@@ -227,22 +227,20 @@ export async function syncGovSources(): Promise<GovSourceResult[]> {
         try {
           await pool.query(
             `INSERT INTO opportunities (
-              id, title, description, agency, posted_date, response_deadline,
-              naics_code, set_aside_type, url, data_source, status, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'tracked', NOW())
+              id, title, agency, naics, set_aside, due_date,
+              raw_source_url, data_source, status, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'tracked', NOW())
             ON CONFLICT (id) DO UPDATE SET
               title = EXCLUDED.title,
-              description = COALESCE(EXCLUDED.description, opportunities.description),
-              response_deadline = COALESCE(EXCLUDED.response_deadline, opportunities.response_deadline)`,
+              agency = COALESCE(EXCLUDED.agency, opportunities.agency),
+              due_date = COALESCE(EXCLUDED.due_date, opportunities.due_date)`,
             [
               opp.external_id,
               opp.title,
-              opp.description ?? null,
               opp.agency ?? null,
-              opp.posted_date ?? null,
-              opp.due_date ?? null,
               opp.naics_code ?? null,
               opp.set_aside ?? null,
+              opp.due_date ?? null,
               opp.url ?? null,
               opp.source,
             ],

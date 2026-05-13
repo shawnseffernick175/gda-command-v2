@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import SourceBadge from "../components/SourceBadge";
+import { authenticatedFetch } from "../api/auth";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -1202,7 +1203,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                         e.stopPropagation();
                         const newClass = e.target.value;
                         try {
-                          const resp = await fetch(`/api/intel/competitors/${c.id}/classify`, {
+                          const resp = await authenticatedFetch(`/api/intel/competitors/${c.id}/classify`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ classification: newClass }),
@@ -1232,7 +1233,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                         btn.disabled = true;
                         btn.textContent = "Analyzing...";
                         try {
-                          const resp = await fetch(`/api/intel/competitors/${c.id}/analyze`, { method: "POST" });
+                          const resp = await authenticatedFetch(`/api/intel/competitors/${c.id}/analyze`, { method: "POST" });
                           const env = await resp.json();
                           if (env.success) {
                             loadCompetitors();
