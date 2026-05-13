@@ -102,8 +102,12 @@ app.get("/health", async (_req, res) => {
   );
 });
 
-// --- Auth routes (no auth middleware, rate-limited) ---
-app.use("/api/auth", authLimiter, authRouter);
+// --- Auth routes ---
+// Login/register get strict authLimiter (30/15min) to prevent brute-force.
+// /me and /refresh are called on every page load so they use the generous apiLimiter.
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+app.use("/api/auth", apiLimiter, authRouter);
 
 // --- Ingest routes (key-based auth, no JWT, rate-limited) ---
 app.use("/api/ingest", ingestLimiter, ingestRouter);
