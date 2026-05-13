@@ -303,8 +303,8 @@ async function analyzeOpportunity(
   }
 
   const analysis: CaptureCoachAnalysis = {
-    opportunity_id: opp.id,
     ...parsed,
+    opportunity_id: opp.id,
     model_used: result.model,
     generated_at: new Date().toISOString(),
   };
@@ -408,6 +408,9 @@ export async function triggerCaptureCoach(
   });
 
   if (!analysis) {
+    if (agentResult.summary?.skipped) {
+      throw new Error("Capture Coach agent is currently disabled. Enable it in Agent Config.");
+    }
     throw new Error("Analysis was not generated");
   }
 
