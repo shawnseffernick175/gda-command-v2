@@ -3514,3 +3514,62 @@ export function fetchOpportunityWatchLatest() {
 export function fetchOpportunityWatchHistory(limit = 20) {
   return request<{ runs: AgentRunRow[]; count: number }>(`/agents/opportunity-watch/history?limit=${limit}`);
 }
+
+// ---------------------------------------------------------------------------
+// Controlled Fix Agent
+// ---------------------------------------------------------------------------
+
+export interface FixProposalItem {
+  id: string;
+  execution_id: string | null;
+  workflow_name: string;
+  workflow_id: string | null;
+  failed_node: string | null;
+  error_message: string;
+  failed_at: string | null;
+  root_cause: string;
+  severity: "critical" | "high" | "medium" | "low";
+  suggested_fix: string;
+  fix_type: "auto" | "manual" | "restart" | "config_change";
+  risk_assessment: string | null;
+  safety_lane: string;
+  auto_fixable: boolean;
+  status: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  created_at: string;
+}
+
+export interface ControlledFixResult {
+  items_processed: number;
+  items_flagged: number;
+  summary: {
+    total_failures: number;
+    new_failures: number;
+    proposals_created: number;
+    approvals_queued: number;
+    severity_breakdown?: Record<string, number>;
+    message?: string;
+  };
+}
+
+export function triggerControlledFix() {
+  return request<ControlledFixResult>("/agents/fix-runner/trigger", { method: "POST" });
+}
+
+export function fetchPendingFixes() {
+  return request<{ fixes: FixProposalItem[]; count: number }>("/agents/fix-runner/pending-fixes");
+}
+
+export function fetchFixProposals(limit = 50) {
+  return request<{ proposals: FixProposalItem[]; count: number }>(`/agents/fix-runner/proposals?limit=${limit}`);
+}
+
+export function resolveFixProposal(id: string, action: "approve" | "reject", note?: string) {
+  return request<{ proposal: FixProposalItem; action: string }>("/agents/fix-runner/resolve/" + id, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, note }),
+  });
+}
