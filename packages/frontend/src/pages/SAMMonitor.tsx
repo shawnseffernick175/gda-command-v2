@@ -10,6 +10,8 @@ import {
   type SAMScanRow,
 } from "../api/client";
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
 type Tab = "opportunities" | "scans";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -80,6 +82,32 @@ export default function SAMMonitor() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [scoring, setScoring] = useState(false);
+  const [scoreMsg, setScoreMsg] = useState<string | null>(null);
+
+  const handleAIScore = async () => {
+    setScoring(true);
+    setScoreMsg(null);
+    try {
+      const token = localStorage.getItem("gda_access_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE}/api/agents/opportunity-watch/trigger`, { method: "POST", headers });
+      const data = await res.json();
+      if (data.success) {
+        const s = data.data?.summary ?? data.data;
+        setScoreMsg(`Scored ${s.items_processed ?? 0} opportunities: ${s.pursue ?? 0} pursue, ${s.evaluate ?? 0} evaluate, ${s.pass ?? 0} pass`);
+        // Refresh opportunities list
+        fetchSAMOpportunities().then((r) => { if (r.data) setOpps(r.data); });
+        fetchSAMSummary().then((r) => { if (r.data) setSummary(r.data); });
+      } else {
+        setScoreMsg(data.error?.message ?? "Scoring failed");
+      }
+    } catch (e) {
+      setScoreMsg(String(e));
+    }
+    setScoring(false);
+  };
 
   useEffect(() => {
     Promise.all([
@@ -152,15 +180,33 @@ export default function SAMMonitor() {
               Clear filter: {statusFilter}
             </button>
           )}
-          <button
-            onClick={() => triggerSAMScan()}
-            style={{
-              marginLeft: "auto", padding: "6px 16px", borderRadius: 6, border: "1px solid #3b82f6",
-              background: "#3b82f618", color: "#3b82f6", fontWeight: 600, fontSize: 12, cursor: "pointer",
-            }}
-          >
-            Trigger Scan
-          </button>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            {scoreMsg && (
+              <span style={{ fontSize: 11, color: scoreMsg.includes("fail") ? "#ef4444" : "#16a34a" }}>
+                {scoreMsg}
+              </span>
+            )}
+            <button
+              onClick={handleAIScore}
+              disabled={scoring}
+              style={{
+                padding: "6px 16px", borderRadius: 6, border: "1px solid #8b5cf6",
+                background: scoring ? "#8b5cf630" : "#8b5cf618", color: "#8b5cf6",
+                fontWeight: 600, fontSize: 12, cursor: scoring ? "wait" : "pointer", opacity: scoring ? 0.7 : 1,
+              }}
+            >
+              {scoring ? "Scoring..." : "AI Score All"}
+            </button>
+            <button
+              onClick={() => triggerSAMScan()}
+              style={{
+                padding: "6px 16px", borderRadius: 6, border: "1px solid #3b82f6",
+                background: "#3b82f618", color: "#3b82f6", fontWeight: 600, fontSize: 12, cursor: "pointer",
+              }}
+            >
+              Trigger Scan
+            </button>
+          </div>
         </div>
       )}
 
