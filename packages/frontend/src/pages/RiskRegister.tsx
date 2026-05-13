@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import InfoBadge from "../components/InfoBadge";
 import SourceBadge from "../components/SourceBadge";
+import { authenticatedFetch } from "../api/auth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -133,7 +134,7 @@ export default function RiskRegister() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch("/api/risk-register");
+        const r = await authenticatedFetch("/api/risk-register");
         const env: GDAEnvelope<RiskListData> = await r.json();
         if (env.data) setData(env.data);
         else setError("No data returned");
@@ -150,7 +151,7 @@ export default function RiskRegister() {
     setEvalLoading(true);
     setEvalResult(null);
     try {
-      const r = await fetch("/api/risk-register/evaluate", {
+      const r = await authenticatedFetch("/api/risk-register/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ if_statement: evalInput, dry_run: true }),

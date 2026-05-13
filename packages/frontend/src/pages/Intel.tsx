@@ -161,7 +161,7 @@ interface CompetitorsData {
 // ---------------------------------------------------------------------------
 
 async function fetchJson<T>(path: string): Promise<GDAEnvelope<T>> {
-  const res = await fetch(`/api${path}`);
+  const res = await authenticatedFetch(`/api${path}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   return res.json() as Promise<GDAEnvelope<T>>;
 }
@@ -353,7 +353,7 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
     setGenerating(true);
     setGenMsg(null);
     try {
-      const res = await fetch("/api/agents/morning-commander/trigger", { method: "POST" });
+      const res = await authenticatedFetch("/api/agents/morning-commander/trigger", { method: "POST" });
       const env = await res.json();
       if (env.success) {
         setGenMsg("Briefing generated successfully");
@@ -853,7 +853,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
     setScanning(true);
     setScanResult(null);
     try {
-      const resp = await fetch("/api/agents/competitive-intel/trigger", { method: "POST" });
+      const resp = await authenticatedFetch("/api/agents/competitive-intel/trigger", { method: "POST" });
       const env = await resp.json();
       if (env.success && env.data) {
         const s = env.data.summary ?? env.data;
