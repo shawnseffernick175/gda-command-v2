@@ -24,19 +24,30 @@ const router = Router();
 // ---------------------------------------------------------------------------
 // GET /api/knowledge/summary — top-line summary cards
 // ---------------------------------------------------------------------------
-router.get("/summary", (_req, res) => {
+router.get("/summary", async (_req, res) => {
   try {
-    return res.json(
-      successEnvelope("gda-knowledge", "summary", {
-        total_documents: 0,
-        indexed_count: 0,
-        processing_count: 0,
-        total_chunks: 0,
-        total_access_count: 0,
-        collection_count: 0,
-        top_documents: [],
-      }),
-    );
+    const pool = getPool();
+    let summary = { total_documents: 0, indexed_count: 0, processing_count: 0, total_chunks: 0, total_access_count: 0, collection_count: 0, top_documents: [] as Record<string, unknown>[] };
+    if (pool) {
+      try {
+        const [docRes, collRes, topRes] = await Promise.all([
+          pool.query(`SELECT count(*)::int as total, count(*) FILTER (WHERE status='indexed')::int as indexed, count(*) FILTER (WHERE status='processing')::int as processing, coalesce(sum(chunk_count),0)::int as chunks, coalesce(sum(CASE WHEN status='indexed' THEN 1 ELSE 0 END),0)::int as access FROM knowledge_documents`),
+          pool.query(`SELECT count(*)::int as cnt FROM knowledge_collections`),
+          pool.query(`SELECT id, title, doc_type, status, chunk_count, created_at FROM knowledge_documents ORDER BY created_at DESC LIMIT 5`),
+        ]);
+        const d = docRes.rows[0];
+        summary = {
+          total_documents: d.total,
+          indexed_count: d.indexed,
+          processing_count: d.processing,
+          total_chunks: d.chunks,
+          total_access_count: d.access,
+          collection_count: collRes.rows[0].cnt,
+          top_documents: topRes.rows,
+        };
+      } catch { /* tables may not exist */ }
+    }
+    return res.json(successEnvelope("gda-knowledge", "summary", summary));
   } catch (err) {
     return res.status(500).json(
       errorEnvelope("gda-knowledge", "summary", {
@@ -51,11 +62,17 @@ router.get("/summary", (_req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/knowledge/collections — list all collections with stats
 // ---------------------------------------------------------------------------
-router.get("/collections", (_req, res) => {
+router.get("/collections", async (_req, res) => {
   try {
-    return res.json(
-      successEnvelope("gda-knowledge", "collections", []),
-    );
+    const pool = getPool();
+    let collections: Record<string, unknown>[] = [];
+    if (pool) {
+      try {
+        const { rows } = await pool.query(`SELECT id, name, description, document_count, total_chunks, created_at FROM knowledge_collections ORDER BY name`);
+        collections = rows;
+      } catch { /* table may not exist */ }
+    }
+    return res.json(successEnvelope("gda-knowledge", "collections", collections));
   } catch (err) {
     return res.status(500).json(
       errorEnvelope("gda-knowledge", "collections", {
@@ -70,55 +87,33 @@ router.get("/collections", (_req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/knowledge/documents — list documents with filtering
 // ---------------------------------------------------------------------------
-router.get("/documents", (req, res) => {
+router.get("/documents", async (req, res) => {
   try {
+    const pool = getPool();
     let results: KnowledgeDocument[] = [];
-
-    const { collection, type, status, search, sort } = req.query;
-
-    if (collection && typeof collection === "string") {
-      results = results.filter((d) => d.collection === collection);
+    if (pool) {
+      try {
+        const { collection, type, status, search } = req.query;
+        let query = `SELECT id, collection_id as collection, title, doc_type, file_name, file_size_bytes, page_count as pages, chunk_count as chunks_indexed, status, tags, metadata, indexed_at, created_at as uploaded_at, updated_at FROM knowledge_documents WHERE 1=1`;
+        const params: unknown[] = [];
+        let idx = 1;
+        if (collection && typeof collection === "string") { query += ` AND collection_id = $${idx++}`; params.push(collection); }
+        if (type && typeof type === "string") { query += ` AND doc_type = $${idx++}`; params.push(type); }
+        if (status && typeof status === "string") { query += ` AND status = $${idx++}`; params.push(status); }
+        if (search && typeof search === "string") { query += ` AND (title ILIKE $${idx} OR array_to_string(tags,',') ILIKE $${idx})`; params.push(`%${search}%`); idx++; }
+        query += ` ORDER BY created_at DESC`;
+        const { rows } = await pool.query(query, params);
+        results = rows.map((r: Record<string, unknown>) => ({
+          id: r.id as string, title: r.title as string, collection: r.collection as string,
+          doc_type: r.doc_type as DocumentType, status: r.status as DocumentStatus,
+          chunks_indexed: (r.chunks_indexed as number) ?? 0, access_count: 0,
+          created_at: r.uploaded_at as string, tags: (r.tags as string[]) ?? [],
+          file_size_bytes: r.file_size_bytes as number, uploaded_at: r.uploaded_at as string,
+        })) as KnowledgeDocument[];
+      } catch { /* table may not exist */ }
     }
-
-    if (type && typeof type === "string") {
-      results = results.filter((d) => d.type === (type as DocumentType));
-    }
-
-    if (status && typeof status === "string") {
-      results = results.filter((d) => d.status === (status as DocumentStatus));
-    }
-
-    if (search && typeof search === "string") {
-      const q = search.toLowerCase();
-      results = results.filter(
-        (d) =>
-          d.title.toLowerCase().includes(q) ||
-          (d.summary ?? "").toLowerCase().includes(q) ||
-          d.tags.some((t) => t.toLowerCase().includes(q)) ||
-          (d.metadata?.agency && d.metadata.agency.toLowerCase().includes(q)),
-      );
-    }
-
-    // Sort
-    const sortBy = typeof sort === "string" ? sort : "recent";
-    if (sortBy === "accessed") {
-      results.sort((a, b) => b.access_count - a.access_count);
-    } else if (sortBy === "name") {
-      results.sort((a, b) => a.title.localeCompare(b.title));
-    } else if (sortBy === "size") {
-      results.sort((a, b) => (b.file_size_bytes ?? 0) - (a.file_size_bytes ?? 0));
-    } else {
-      // "recent" — sort by uploaded_at descending
-      results.sort(
-        (a, b) =>
-          new Date(b.uploaded_at ?? "").getTime() - new Date(a.uploaded_at ?? "").getTime(),
-      );
-    }
-
     return res.json(
-      successEnvelope("gda-knowledge", "documents", results, {
-        total: results.length,
-      }),
+      successEnvelope("gda-knowledge", "documents", results, { total: results.length }),
     );
   } catch (err) {
     return res.status(500).json(
@@ -134,21 +129,26 @@ router.get("/documents", (req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/knowledge/documents/:id — single document detail
 // ---------------------------------------------------------------------------
-router.get("/documents/:id", (req, res) => {
+router.get("/documents/:id", async (req, res) => {
   try {
-    const doc: KnowledgeDocument | undefined = undefined;
-    if (!doc) {
-      return res.status(404).json(
-        errorEnvelope("gda-knowledge", "document-detail", {
-          code: "NOT_FOUND",
-          message: `Document ${req.params.id} not found`,
-          detail: null,
-        }),
-      );
+    const pool = getPool();
+    if (pool) {
+      try {
+        const { rows } = await pool.query(
+          `SELECT id, collection_id as collection, title, doc_type, file_name, file_size_bytes, page_count as pages, chunk_count as chunks_indexed, status, tags, metadata, indexed_at, created_at as uploaded_at, updated_at FROM knowledge_documents WHERE id = $1`,
+          [req.params.id]
+        );
+        if (rows.length > 0) {
+          return res.json(successEnvelope("gda-knowledge", "document-detail", rows[0]));
+        }
+      } catch { /* table may not exist */ }
     }
-
-    return res.json(
-      successEnvelope("gda-knowledge", "document-detail", doc),
+    return res.status(404).json(
+      errorEnvelope("gda-knowledge", "document-detail", {
+        code: "NOT_FOUND",
+        message: `Document ${req.params.id} not found`,
+        detail: null,
+      }),
     );
   } catch (err) {
     return res.status(500).json(
