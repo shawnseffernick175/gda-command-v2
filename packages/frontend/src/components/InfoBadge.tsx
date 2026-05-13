@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 interface InfoBadgeProps {
   whatItIs: string;
@@ -9,21 +10,34 @@ interface InfoBadgeProps {
 
 export default function InfoBadge({ whatItIs, whatItMeans, howCalculated, size = 18 }: InfoBadgeProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 6, left: rect.left + rect.width / 2 });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
+    updatePos();
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (popupRef.current && !popupRef.current.contains(e.target as Node) &&
+          btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  }, [open, updatePos]);
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+    <>
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        ref={btnRef}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((o) => !o); }}
         title="More info"
         style={{
           width: size,
@@ -45,13 +59,13 @@ export default function InfoBadge({ whatItIs, whatItMeans, howCalculated, size =
       >
         ?
       </button>
-      {open && (
-        <div style={{
-          position: "absolute",
-          top: size + 6,
-          left: "50%",
+      {open && createPortal(
+        <div ref={popupRef} style={{
+          position: "fixed",
+          top: pos.top,
+          left: pos.left,
           transform: "translateX(-50%)",
-          zIndex: 1000,
+          zIndex: 10000,
           width: 300,
           background: "#1e1e2f",
           border: "1px solid #333",
@@ -79,8 +93,9 @@ export default function InfoBadge({ whatItIs, whatItMeans, howCalculated, size =
               <div style={{ fontSize: 13, color: "#e5e5e5", lineHeight: 1.4 }}>{howCalculated}</div>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
