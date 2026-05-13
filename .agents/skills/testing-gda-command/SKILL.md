@@ -29,11 +29,11 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - All API responses use `successEnvelope(workflow, action, data, meta, dryRun)` wrapper
 - Navigation: 5-group collapsible sidebar (220px expanded / 52px collapsed)
   - OPERATIONS: Launchpad, Fast Track, Ops Tracker, Pipeline, Approvals, Risk Register
-  - CAPTURE: Capture Plans, Proposals, RFP Shredder, Compliance, Color Review
-  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, CPARS Builder, GovWin IQ
+  - CAPTURE: Proposal Center, RFP Shredder, Compliance, Proposals, Color Review, Capture Plans
+  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, GovWin IQ
   - REPORTING: Financials, Reports, Charts, Discussions
   - ADMIN: Settings, Health, Workflows, Users, Audit Log, Doctrine, Book of Truths, Prompts, User Manual
-- Financial KPI strip: persistent header showing "Financial KPIs unavailable" with Retry button when no data seeded
+- Financial KPI strip: persistent header showing Orders, Sales, EBIT, Gross Profit, ROS + additional KPIs
 - Hidden routes (no sidebar link): Opportunity Detail (`/opportunities/:id`), SAM Monitor (`/sam-monitor`), FPDS Monitor (`/fpds-monitor`)
 
 ## Auth System
@@ -45,6 +45,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - **Default admin user**: `admin@gda-command.local` — **WARNING**: The seed data uses a placeholder password hash (`$2b$10$placeholder_hash_for_dev`), so login with `admin123` may fail after a fresh `db:reset`. Workaround: register a new user via `POST /api/auth/register` with `{"email":"tester@gda.local","password":"tester123","display_name":"Test User"}`.
 - **Frontend auth gate**: `App.tsx` — `authed` state: `null` = loading spinner, `false` = Login component, `true` = main app
 - **Logout**: Sidebar shows username + "Logout" button at bottom
+- **401 auto-redirect**: Frontend interceptor catches 401 responses, clears tokens, and redirects to login page automatically (PR #131)
 
 ### Auth Testing Procedure
 
@@ -55,7 +56,30 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
 6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
 
-## Full E2E Audit Pattern (38 items)
+## Rate Limiter Configuration
+
+**CRITICAL**: The backend uses two rate limiters in `packages/backend/src/middleware/rate-limit.ts`:
+
+| Limiter | Limit | Window | Applied To |
+|---------|-------|--------|------------|
+| `authLimiter` | 30 req | 15 min | `/api/auth/login`, `/api/auth/register` ONLY |
+| `apiLimiter` | 600 req | 1 min | All other routes including `/api/auth/me` and `/api/auth/refresh` |
+
+**Why this matters**: `/api/auth/me` is called on EVERY page load to verify the session. If it's on a strict limiter, normal browsing will trigger 429 errors and kick users to the login screen. This was the root cause of "nothing but errors" before PR #132.
+
+### Rate Limiter Testing Pattern
+
+To verify the rate limiter isn't blocking normal browsing:
+
+1. **Login fresh** to the production site
+2. **Rapidly click through ALL 31 sidebar pages** without pausing between clicks
+3. **Verify each page** renders with sidebar visible (not redirected to login)
+4. **Key assertion**: Zero 429 "Too Many Requests" errors across all 31 pages
+5. **Failure mode**: If pages start showing login screen after ~20 pages, the `/api/auth/me` endpoint is likely on the wrong (strict) rate limiter
+
+**IMPORTANT**: Do NOT test rate limiting by navigating slowly with pauses between pages — this won't catch the bug. The test must simulate real user behavior (rapid clicking). A Playwright script or manual rapid clicking through all pages is required.
+
+## Full E2E Audit Pattern
 
 When doing a comprehensive audit, navigate every page and verify:
 1. **Page loads**: No blank screen, no crash, no unhandled error
@@ -78,34 +102,36 @@ When doing a comprehensive audit, navigate every page and verify:
 - For hidden routes without sidebar links, use React router navigation via console:
   `window.history.pushState({}, '', '/route'); window.dispatchEvent(new PopStateEvent('popstate'));`
 - Sidebar collapse toggle: click ◀ to collapse to icon-only rail (~52px), click ▶ to expand back
+- When testing on production, scroll the sidebar to reveal all Admin links (Audit Log through User Manual may be below the fold)
 
-### Complete Page Inventory (34 pages)
+### Complete Page Inventory (31 sidebar pages + 3 hidden)
 
 | Group | Pages |
 |-------|-------|
 | Operations (6) | Launchpad `/`, Fast Track `/fast-track`, Ops Tracker `/ops-tracker`, Pipeline `/pipeline`, Approvals `/approvals`, Risk Register `/risk-register` |
-| Capture (5) | Capture Plans `/capture`, Proposals `/proposals`, RFP Shredder `/rfp-shredder`, Compliance `/compliance`, Color Review `/color-review` |
-| Intelligence (7) | Intel Hub `/intel`, Predictive `/predictive`, Anomaly Detection `/anomaly`, Contacts `/contacts`, Knowledge Base `/knowledge`, CPARS Builder `/cpars`, GovWin IQ `/govwin` |
+| Capture (6) | Proposal Center `/proposal-center`, RFP Shredder `/rfp-shredder`, Compliance `/compliance`, Proposals `/proposals`, Color Review `/color-review`, Capture Plans `/capture` |
+| Intelligence (6) | Intel Hub `/intel`, Predictive `/predictive`, Anomaly Detection `/anomaly`, Contacts `/contacts`, Knowledge Base `/knowledge`, GovWin IQ `/govwin` |
 | Reporting (4) | Financials `/financial-bible`, Reports `/reports`, Charts `/charts`, Discussions `/discussions` |
 | Admin (9) | Settings `/settings`, Health `/qa-center`, Workflows `/workflows`, Users `/admin/users`, Audit Log `/admin/audit`, Doctrine `/doctrine`, Book of Truths `/book-of-truths`, Prompts `/prompts`, User Manual `/help` |
 | Hidden (3) | Opportunity Detail `/opportunities/:id`, SAM Monitor `/sam-monitor`, FPDS Monitor `/fpds-monitor` |
 
-### Global Features (4 items)
+### Global Features (5 items)
 
 | Feature | How to test |
 |---------|-------------|
 | Sidebar collapse | Click ◀ button, verify icon-only rail, click ▶ to expand back |
 | Notifications | Click bell icon at bottom of sidebar, verify panel renders |
-| Financial KPI strip | Observe top header — shows 10 KPIs with real values when data is seeded |
+| Financial KPI strip | Observe top header — shows Orders $95.0M, Sales $382.0M, EBIT $34.4M, GP $76.4M, ROS 9.0% + more |
+| Ask AI button | Click ? floating button (bottom-right), verify chat panel opens |
 | 404 page | Navigate to `/nonexistent-page`, verify "Page not found" with Back to Launchpad link |
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
+- **Predictive Analytics crash**: `/predictive` might crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend may not handle undefined response.
+- **FPDS Monitor calculation errors**: `/fpds-monitor` may show "$NaN" for Total Value and "null%" for Avg Relevance — data parsing issue in aggregate calculations.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
-- **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
+- **n8n webhook auth**: If health checks or API calls show 403 errors, the n8n workflows might be using the old `GDA Webhook Auth` v1 credential instead of v2. Fix via n8n API by updating the credential reference.
 
 ## POST Write Persistence Testing
 
@@ -125,6 +151,7 @@ For testing endpoints that write to PostgreSQL:
 | approvals | `POST /:id/resolve` | UPDATE approvals status/resolved_by/at/notes |
 | anomaly | `POST /anomalies/:id/acknowledge` | UPDATE status + acknowledged_at |
 | anomaly | `POST /anomalies/:id/resolve` | UPDATE status + resolved_at |
+| anomaly | `POST /escalation-rules` | INSERT escalation_rules (name, condition, priority, description) |
 | discussions | `POST /threads` | INSERT discussion_threads |
 | discussions | `POST /threads/:id/messages` | INSERT message + UPDATE thread count |
 | doctrine | `POST /finalize` | UPDATE drafts + INSERT publish run |
@@ -142,6 +169,7 @@ For testing endpoints that write to PostgreSQL:
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **For rate limiter verification** — rapid-click all 31 pages without pausing, verify zero 429 errors
 
 ## Ops Tracker Testing (n8n Integration)
 
@@ -182,6 +210,7 @@ curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
 - Use `document.querySelectorAll('button')` with text matching to reliably click pagination buttons
 - When verifying summary stats across pages, compare Count + Total Value on page 1 vs page 2 — they must be identical
 - n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection failed
+- When testing production, always test with rapid navigation speed to catch rate limiter issues
 
 ## Devin Secrets Needed
 
