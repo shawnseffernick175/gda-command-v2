@@ -231,6 +231,19 @@ function formatDateTime(iso: string): string {
   });
 }
 
+function renderMarkdown(md: string): string {
+  return md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/^## (.+)$/gm, '<h3 style="margin:16px 0 8px;font-size:16px;font-weight:600">$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^\d+\.\s(.+)$/gm, '<div style="padding:2px 0 2px 16px">$1</div>')
+    .replace(/^[-*]\s(.+)$/gm, '<div style="padding:2px 0 2px 16px">&bull; $1</div>')
+    .replace(/\n{2,}/g, '<div style="margin-top:8px"></div>')
+    .replace(/\n/g, "<br>");
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -312,8 +325,10 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [genMsg, setGenMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadBriefings = () => {
     fetchJson<BriefingsData>("/intel/briefings")
       .then((env) => {
         if (env.success && env.data) {
@@ -326,7 +341,29 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadBriefings(); }, []);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setGenMsg(null);
+    try {
+      const res = await fetch("/api/agents/morning-commander/trigger", { method: "POST" });
+      const env = await res.json();
+      if (env.success) {
+        setGenMsg("Briefing generated successfully");
+        setLoading(true);
+        loadBriefings();
+      } else {
+        setGenMsg(env.error?.message ?? "Generation failed");
+      }
+    } catch (err) {
+      setGenMsg(err instanceof Error ? err.message : "Generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   if (loading) return <LoadingMsg />;
   if (error) return <ErrorMsg msg={error} />;
@@ -335,8 +372,32 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
 
   return (
     <div>
-      {/* Date selector */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+      {/* Generate Now + Date selector */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
+        <button
+          onClick={handleGenerate}
+          disabled={generating}
+          style={{
+            padding: "6px 16px",
+            borderRadius: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            border: "none",
+            background: generating ? "#6b7280" : "var(--color-primary, #3b82f6)",
+            color: "#fff",
+            cursor: generating ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          {generating ? "Generating..." : "Generate Now"}
+        </button>
+        {genMsg && (
+          <span style={{ fontSize: 12, color: genMsg.includes("success") ? "#22c55e" : "#ef4444" }}>
+            {genMsg}
+          </span>
+        )}
         {briefings.map((b) => (
           <button
             key={b.id}
@@ -457,19 +518,25 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
             ))}
           </div>
 
-          {/* Market Snapshot */}
-          <SectionHeader title="Market Snapshot" />
-          <div style={{
-            padding: 16,
-            borderRadius: 8,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            fontSize: 14,
-            lineHeight: 1.6,
-            color: "var(--color-text-muted)",
-          }}>
-            {selected.market_snapshot}
-          </div>
+          {/* AI Briefing Content */}
+          {selected.market_snapshot && (
+            <>
+              <SectionHeader title="AI Command Brief" />
+              <div
+                style={{
+                  padding: 16,
+                  borderRadius: 8,
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: renderMarkdown(selected.market_snapshot),
+                }}
+              />
+            </>
+          )}
         </>
       )}
     </div>
