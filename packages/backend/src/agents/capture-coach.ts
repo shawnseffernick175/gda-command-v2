@@ -43,9 +43,8 @@ interface CompanyProfile {
   cage_code: string;
   naics_codes: string[];
   capabilities: string[];
-  core_competencies: string[];
-  set_aside_categories: string[];
-  past_performance_summary: string;
+  set_aside_types: string[];
+  past_performance: string[];
 }
 
 interface CparsRecord {
@@ -128,9 +127,9 @@ async function fetchCompanyProfile(): Promise<CompanyProfile | null> {
   const pool = getPool();
   if (!pool) return null;
   const result = await pool.query(
-    `SELECT name, cage_code, naics_codes, capabilities, core_competencies,
-            set_aside_categories, past_performance_summary
-     FROM company_profiles LIMIT 1`,
+    `SELECT name, cage_code, naics_codes, capabilities,
+            set_aside_types, past_performance
+     FROM company_profile LIMIT 1`,
   );
   return result.rows[0] as CompanyProfile | undefined ?? null;
 }
@@ -154,11 +153,10 @@ async function fetchCompetitorIntel(agency: string): Promise<CompetitorMovement[
   const pool = getPool();
   if (!pool) return [];
   const result = await pool.query(
-    `SELECT cp.name AS competitor_name, cm.title, cm.description, cm.threat_level
-     FROM competitor_movements cm
-     JOIN competitor_profiles cp ON cp.id = cm.competitor_id
-     WHERE cm.description ILIKE $1
-     ORDER BY cm.detected_at DESC
+    `SELECT competitor_name, title, description, threat_level
+     FROM competitor_movements
+     WHERE description ILIKE $1
+     ORDER BY detected_at DESC
      LIMIT 10`,
     [`%${agency}%`],
   );
@@ -221,10 +219,9 @@ Tags: ${opp.tags?.join(", ") ?? "None"}`);
     sections.push(`## Company Profile — ${company.name}
 CAGE: ${company.cage_code}
 NAICS Codes: ${company.naics_codes?.join(", ") ?? "N/A"}
-Set-aside categories: ${company.set_aside_categories?.join(", ") ?? "N/A"}
+Set-aside types: ${company.set_aside_types?.join(", ") ?? "N/A"}
 Capabilities: ${company.capabilities?.join(", ") ?? "N/A"}
-Core competencies: ${company.core_competencies?.join(", ") ?? "N/A"}
-Past performance: ${company.past_performance_summary ?? "N/A"}`);
+Past performance: ${company.past_performance?.join(", ") ?? "N/A"}`);  
   }
 
   if (cpars.length > 0) {
