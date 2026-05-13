@@ -192,7 +192,7 @@ export default function BookOfTruths() {
       <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
         <input
           type="text"
-          placeholder="Search entities, rules, terms\u2026"
+          placeholder="Search entities, rules, terms..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           style={{

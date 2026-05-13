@@ -2,7 +2,8 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
-import { n8nWebhookConfigured, fetchCapturePlansFromN8n } from "../lib/n8n-data";
+// n8n capture plans are no longer fetched — only user-created DB plans are shown
+// import { n8nWebhookConfigured, fetchCapturePlansFromN8n } from "../lib/n8n-data";
 import type { CapturePlan } from "@gda/shared";
 
 const router = Router();
@@ -83,39 +84,20 @@ router.get("/plans", async (_req, res) => {
   } = _req.query as Record<string, string | undefined>;
 
   let allPlans: CapturePlan[];
-  let source: "n8n" | "db" = "db";
+  const source: "db" = "db";
 
-  // Try n8n first
-  if (n8nWebhookConfigured()) {
+  // Only show user-created capture plans from DB.
+  // n8n capture plans are skipped — the user must create plans explicitly.
+  const pool = getPool();
+  if (pool) {
     try {
-      const result = await fetchCapturePlansFromN8n();
-      if (result.ok && result.plans.length > 0) {
-        allPlans = result.plans;
-        source = "n8n";
-      } else {
-        allPlans = [];
-      }
+      const result = await pool.query("SELECT * FROM capture_plans ORDER BY updated_at DESC");
+      allPlans = result.rows.length > 0 ? result.rows.map(rowToCapturePlan) : [];
     } catch {
       allPlans = [];
     }
   } else {
-    // Try DB
-    const pool = getPool();
-    if (pool) {
-      try {
-        const result = await pool.query("SELECT * FROM capture_plans ORDER BY updated_at DESC");
-        if (result.rows.length > 0) {
-          allPlans = result.rows.map(rowToCapturePlan);
-          source = "db";
-        } else {
-          allPlans = [];
-        }
-      } catch {
-        allPlans = [];
-      }
-    } else {
-      allPlans = [];
-    }
+    allPlans = [];
   }
 
   let plans = [...allPlans];
@@ -153,32 +135,17 @@ router.get("/plans", async (_req, res) => {
 // ---------------------------------------------------------------------------
 router.get("/plans/:id", async (req, res) => {
   let plan: CapturePlan | undefined;
-  let source: "n8n" | "db" = "db";
+  const source: "db" = "db";
 
-  if (n8nWebhookConfigured()) {
+  // Only show user-created capture plans from DB.
+  const pool2 = getPool();
+  if (pool2) {
     try {
-      const result = await fetchCapturePlansFromN8n();
-      if (result.ok && result.plans.length > 0) {
-        plan = result.plans.find((p) => p.id === req.params.id);
-        if (plan) source = "n8n";
+      const result = await pool2.query("SELECT * FROM capture_plans WHERE id = $1", [req.params.id]);
+      if (result.rows.length > 0) {
+        plan = rowToCapturePlan(result.rows[0]);
       }
     } catch { /* fall through */ }
-  }
-
-  if (!plan) {
-    const pool = getPool();
-    if (pool) {
-      try {
-        const result = await pool.query("SELECT * FROM capture_plans WHERE id = $1", [req.params.id]);
-        if (result.rows.length > 0) {
-          plan = rowToCapturePlan(result.rows[0]);
-          source = "db";
-        }
-      } catch { /* fall through */ }
-    }
-  }
-
-  if (!plan) {
   }
 
   if (!plan) {

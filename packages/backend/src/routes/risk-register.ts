@@ -98,6 +98,47 @@ router.get("/by-opportunity/:oppId", async (req, res) => {
   }));
 });
 
+// PATCH /api/risk-register/:id/status — change risk status (Accept, Close, Escalate, Reopen)
+router.patch("/:id/status", async (req, res) => {
+  const { status, note } = req.body ?? {};
+  const validStatuses = ["open", "mitigating", "accepted", "closed", "escalated"];
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json(errorEnvelope("gda-risk-register", "update-status", {
+      code: "INVALID_STATUS",
+      message: `status must be one of: ${validStatuses.join(", ")}`,
+      detail: null,
+    }));
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-risk-register", "update-status", {
+      code: "NO_DB", message: "Database not available", detail: null,
+    }));
+  }
+
+  try {
+    const now = new Date().toISOString();
+    const result = await pool.query(
+      `UPDATE risk_register SET status = $1, updated_at = $2 WHERE id = $3 RETURNING id, status`,
+      [status, now, req.params.id],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("gda-risk-register", "update-status", {
+        code: "NOT_FOUND", message: `Risk ${req.params.id} not found`, detail: null,
+      }));
+    }
+    return res.json(successEnvelope("gda-risk-register", "update-status", {
+      ...result.rows[0],
+      note: note ?? null,
+    }));
+  } catch (err: unknown) {
+    return res.status(500).json(errorEnvelope("gda-risk-register", "update-status", {
+      code: "DB_ERROR", message: (err as Error).message, detail: null,
+    }));
+  }
+});
+
 // POST /api/risk-register/evaluate — if-this-then-that rule evaluation (dry-run capable)
 router.post("/evaluate", async (req, res) => {
   const { if_statement, context, dry_run } = req.body ?? {};

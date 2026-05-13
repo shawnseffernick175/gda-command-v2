@@ -165,6 +165,27 @@ export default function RiskRegister() {
     }
   }
 
+  async function handleStatusChange(riskId: string, newStatus: string) {
+    try {
+      const r = await authenticatedFetch(`/api/risk-register/${riskId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (r.ok) {
+        setData((prev) => {
+          if (!prev) return prev;
+          const updatedRisks = prev.risks.map((risk) =>
+            risk.id === riskId ? { ...risk, status: newStatus, updated_at: new Date().toISOString() } : risk,
+          );
+          const byStatus: Record<string, number> = {};
+          for (const r of updatedRisks) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+          return { ...prev, risks: updatedRisks, byStatus };
+        });
+      }
+    } catch { /* ignore */ }
+  }
+
   if (loading) return <div style={{ padding: 32, color: "var(--color-text-muted)" }}>Loading risk register...</div>;
   if (error) return <div style={{ padding: 32, color: "#ef4444" }}>Error: {error}</div>;
   if (!data) return null;
@@ -395,6 +416,7 @@ export default function RiskRegister() {
                   risk={risk}
                   expanded={expanded === risk.id}
                   onToggle={() => setExpanded(expanded === risk.id ? null : risk.id)}
+                  onStatusChange={handleStatusChange}
                 />
               ))
             )}
@@ -409,7 +431,7 @@ export default function RiskRegister() {
 // Risk Card
 // ---------------------------------------------------------------------------
 
-function RiskCard({ risk, expanded, onToggle }: { risk: RiskEntry; expanded: boolean; onToggle: () => void }) {
+function RiskCard({ risk, expanded, onToggle, onStatusChange }: { risk: RiskEntry; expanded: boolean; onToggle: () => void; onStatusChange: (id: string, status: string) => void }) {
   return (
     <div
       style={{
@@ -571,6 +593,35 @@ function RiskCard({ risk, expanded, onToggle }: { risk: RiskEntry; expanded: boo
           <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 11, color: "var(--color-text-muted)" }}>
             <span>Created: {formatDate(risk.created_at)}</span>
             <span>Updated: {formatDate(risk.updated_at)}</span>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+            {risk.status !== "accepted" && (
+              <button onClick={(e) => { e.stopPropagation(); onStatusChange(risk.id, "accepted"); }} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "none", cursor: "pointer", background: "#8b5cf6", color: "#fff" }}>
+                Accept Risk
+              </button>
+            )}
+            {risk.status !== "mitigating" && risk.status !== "closed" && (
+              <button onClick={(e) => { e.stopPropagation(); onStatusChange(risk.id, "mitigating"); }} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "none", cursor: "pointer", background: "#3b82f6", color: "#fff" }}>
+                Begin Mitigation
+              </button>
+            )}
+            {risk.status !== "closed" && (
+              <button onClick={(e) => { e.stopPropagation(); onStatusChange(risk.id, "closed"); }} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "none", cursor: "pointer", background: "#10b981", color: "#fff" }}>
+                Close Risk
+              </button>
+            )}
+            {risk.status !== "escalated" && risk.status !== "closed" && (
+              <button onClick={(e) => { e.stopPropagation(); onStatusChange(risk.id, "escalated"); }} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "none", cursor: "pointer", background: "#ef4444", color: "#fff" }}>
+                Escalate
+              </button>
+            )}
+            {(risk.status === "closed" || risk.status === "accepted") && (
+              <button onClick={(e) => { e.stopPropagation(); onStatusChange(risk.id, "open"); }} style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid var(--color-border)", cursor: "pointer", background: "transparent", color: "var(--color-text)" }}>
+                Reopen
+              </button>
+            )}
           </div>
         </div>
       )}

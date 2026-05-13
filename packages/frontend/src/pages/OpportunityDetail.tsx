@@ -214,6 +214,20 @@ export default function OpportunityDetail() {
 
   const { opportunity: opp, analysis, ooda, sources, learning } = data;
 
+  if (!opp) {
+    return (
+      <div style={{ padding: "2rem" }}>
+        <button onClick={() => navigate(backPath)} style={styles.backBtn}>
+          ← {backLabel}
+        </button>
+        <div style={styles.errorBox}>
+          <strong>Error loading opportunity detail</strong>
+          <p>Opportunity data is missing from the response.</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleCaptureCoach = async () => {
     if (!id) return;
     setCoachLoading(true);
