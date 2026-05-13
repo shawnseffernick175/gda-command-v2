@@ -5,8 +5,8 @@ import { getPool } from "../lib/db";
 const router = Router();
 
 interface BotEntity { name: string; description: string; category: string; module: string; rules?: string[] }
-interface BotGlossary { term: string; acronym?: string; definition: string }
-interface BotSource { name: string; description: string }
+interface BotGlossary { term: string; acronym?: string; definition: string; category?: string; related_entities?: string[] }
+interface BotSource { name: string; description: string; type?: string; endpoint?: string; entities_served?: string[]; status?: string; refresh_frequency?: string }
 
 // GET /api/book-of-truths — full data dictionary
 router.get("/", async (req, res) => {
@@ -62,12 +62,12 @@ router.get("/", async (req, res) => {
     entities = entities.filter((e) => e.module.toLowerCase() === mod.toLowerCase());
   }
 
-  const categoryCounts = {
-    entity: allEntities.filter((e) => e.category === "entity").length,
-    rule: allEntities.filter((e) => e.category === "rule").length,
-    glossary: allGlossary.length,
-    source: allSources.length,
-  };
+  const categoryCounts: Record<string, number> = {};
+  for (const e of allEntities) {
+    categoryCounts[e.category] = (categoryCounts[e.category] ?? 0) + 1;
+  }
+  categoryCounts.glossary = allGlossary.length;
+  categoryCounts.source = allSources.length;
 
   const modules = [...new Set(allEntities.map((e) => e.module))];
 

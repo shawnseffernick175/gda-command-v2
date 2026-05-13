@@ -25,6 +25,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   knowledge: "\u{1F4DA}",
   glossary: "\u{1F4D6}",
   source: "\u{1F50C}",
+  sources: "\u{1F50C}",
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -35,6 +36,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   knowledge: "Knowledge Base",
   glossary: "Glossary",
   source: "Data Sources",
+  sources: "Data Sources",
 };
 
 const MODULE_COLORS: Record<string, string> = {
@@ -510,7 +512,7 @@ function RulesTab({
 /* ===== Glossary Tab ===== */
 function GlossaryTab({ glossary }: { glossary: BookOfTruthsGlossaryRow[] }) {
   const grouped = glossary.reduce<Record<string, BookOfTruthsGlossaryRow[]>>((acc, g) => {
-    const cat = g.category;
+    const cat = g.category ?? "general";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(g);
     return acc;
@@ -537,9 +539,9 @@ function GlossaryTab({ glossary }: { glossary: BookOfTruthsGlossaryRow[] }) {
                   )}
                 </div>
                 <p style={{ color: "#d4d4d8", fontSize: 12, margin: "0 0 6px", lineHeight: 1.5 }}>{g.definition}</p>
-                {g.related_entities.length > 0 && (
+                {(g.related_entities ?? []).length > 0 && (
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {g.related_entities.map((r) => (
+                    {(g.related_entities ?? []).map((r) => (
                       <span key={r} style={{ background: "#27272a", color: "#9ca3af", padding: "1px 6px", borderRadius: 3, fontSize: 10 }}>{r}</span>
                     ))}
                   </div>
@@ -572,23 +574,23 @@ function SourcesTab({ sources }: { sources: BookOfTruthsSourceRow[] }) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 18 }}>{SOURCE_TYPE_ICONS[src.type] ?? "\u{1F50C}"}</span>
+              <span style={{ fontSize: 18 }}>{SOURCE_TYPE_ICONS[src.type ?? "api"] ?? "\u{1F50C}"}</span>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#e4e4e7" }}>{src.name}</div>
-                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{src.type}</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{src.type ?? "api"}</div>
               </div>
             </div>
             <span
               style={{
-                background: `${SOURCE_STATUS_COLORS[src.status]}22`,
-                color: SOURCE_STATUS_COLORS[src.status],
+                background: `${SOURCE_STATUS_COLORS[src.status ?? "active"] ?? "#22c55e"}22`,
+                color: SOURCE_STATUS_COLORS[src.status ?? "active"] ?? "#22c55e",
                 padding: "2px 8px",
                 borderRadius: 4,
                 fontSize: 11,
                 fontWeight: 500,
               }}
             >
-              {src.status}
+              {src.status ?? "active"}
             </span>
           </div>
           <p style={{ color: "#d4d4d8", fontSize: 12, margin: "0 0 10px", lineHeight: 1.5 }}>{src.description}</p>
@@ -602,11 +604,11 @@ function SourcesTab({ sources }: { sources: BookOfTruthsSourceRow[] }) {
           )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              {src.entities_served.map((e) => (
+              {(src.entities_served ?? []).map((e) => (
                 <span key={e} style={{ background: "#27272a", color: "#9ca3af", padding: "1px 6px", borderRadius: 3, fontSize: 10 }}>{e}</span>
               ))}
             </div>
-            <span style={{ color: "#6b7280", fontSize: 10 }}>{src.refresh_frequency}</span>
+            <span style={{ color: "#6b7280", fontSize: 10 }}>{src.refresh_frequency ?? ""}</span>
           </div>
         </div>
       ))}
