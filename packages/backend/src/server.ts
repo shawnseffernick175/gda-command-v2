@@ -46,6 +46,7 @@ import agentsRouter from "./routes/agents";
 import morningCommanderRouter from "./routes/morning-commander";
 import opportunityWatchRouter from "./routes/opportunity-watch";
 import competitiveIntelRouter from "./routes/competitive-intel";
+import captureCoachRouter from "./routes/capture-coach";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -163,6 +164,7 @@ app.use("/api/company-profile", companyProfileRouter);
 app.use("/api/agents/morning-commander", morningCommanderRouter);
 app.use("/api/agents/opportunity-watch", opportunityWatchRouter);
 app.use("/api/agents/competitive-intel", competitiveIntelRouter);
+app.use("/api/agents/capture-coach", captureCoachRouter);
 app.use("/api/agents", agentsRouter);
 
 // --- Frontend error reporting endpoint ---
