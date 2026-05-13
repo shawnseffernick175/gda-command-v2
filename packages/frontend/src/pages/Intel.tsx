@@ -823,8 +823,10 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ message: string; isError: boolean } | null>(null);
 
-  useEffect(() => {
+  const loadCompetitors = () => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     const qs = params.toString();
@@ -839,7 +841,30 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [search]);
+  };
+
+  useEffect(() => { loadCompetitors(); }, [search]);
+
+  const handleScan = async () => {
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const resp = await fetch("/api/agents/competitive-intel/trigger", { method: "POST" });
+      const env = await resp.json();
+      if (env.success && env.data) {
+        const s = env.data.summary ?? env.data;
+        const msg = `Scanned ${s.competitors_scanned ?? 0} competitors, found ${s.total_awards_found ?? 0} awards, ${s.significant_movements ?? 0} significant movements`;
+        setScanResult({ message: msg, isError: false });
+        loadCompetitors();
+      } else {
+        setScanResult({ message: env.error?.message ?? "Scan failed", isError: true });
+      }
+    } catch (err) {
+      setScanResult({ message: (err as Error).message, isError: true });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   if (loading && !data) return <LoadingMsg />;
   if (error && !data) return <ErrorMsg msg={error} />;
@@ -849,20 +874,54 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
 
   return (
     <div>
-      {/* KPI Summary */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <SummaryChip label="Tracked" value={String(data.total)} />
-        <SummaryChip label="Shown" value={String(data.filtered)} />
-        {mc && mc.total > 0 && (
-          <>
-            <SummaryChip label="Movements" value={String(mc.total)} accent="#3b82f6" />
-            {mc.teaming > 0 && <SummaryChip label="Teaming" value={String(mc.teaming)} accent="#8b5cf6" />}
-            {mc.contract_wins > 0 && <SummaryChip label="Wins" value={String(mc.contract_wins)} accent="#22c55e" />}
-            {mc.personnel > 0 && <SummaryChip label="Personnel" value={String(mc.personnel)} accent="#f59e0b" />}
-            {mc.mergers > 0 && <SummaryChip label="M&A" value={String(mc.mergers)} accent="#ef4444" />}
-          </>
-        )}
+      {/* Header + Scan Button */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <SummaryChip label="Tracked" value={String(data.total)} />
+          <SummaryChip label="Shown" value={String(data.filtered)} />
+          {mc && mc.total > 0 && (
+            <>
+              <SummaryChip label="Movements" value={String(mc.total)} accent="#3b82f6" />
+              {mc.teaming > 0 && <SummaryChip label="Teaming" value={String(mc.teaming)} accent="#8b5cf6" />}
+              {mc.contract_wins > 0 && <SummaryChip label="Wins" value={String(mc.contract_wins)} accent="#22c55e" />}
+              {mc.personnel > 0 && <SummaryChip label="Personnel" value={String(mc.personnel)} accent="#f59e0b" />}
+              {mc.mergers > 0 && <SummaryChip label="M&A" value={String(mc.mergers)} accent="#ef4444" />}
+            </>
+          )}
+        </div>
+        <button
+          onClick={handleScan}
+          disabled={scanning}
+          style={{
+            padding: "8px 18px",
+            background: scanning ? "#444" : "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            cursor: scanning ? "not-allowed" : "pointer",
+            fontWeight: 600,
+            fontSize: 13,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {scanning ? "Scanning..." : "AI Scan Competitors"}
+        </button>
       </div>
+
+      {/* Scan Result */}
+      {scanResult && (
+        <div style={{
+          padding: "10px 14px",
+          background: scanResult.isError ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.08)",
+          border: `1px solid ${scanResult.isError ? "rgba(239,68,68,0.25)" : "rgba(34,197,94,0.25)"}`,
+          borderRadius: 8,
+          marginBottom: 14,
+          fontSize: 13,
+          color: scanResult.isError ? "#ef4444" : "#22c55e",
+        }}>
+          {scanResult.message}
+        </div>
+      )}
 
       {/* Teaming Opportunities Alert */}
       {data.teamingOpportunities && data.teamingOpportunities.length > 0 && (
