@@ -59,8 +59,8 @@ router.get("/kpis", async (_req, res) => {
         const n8nFunnel = [
           {
             stage: "Identified",
-            count: totalOpportunities - userQualifiedCount,
-            totalValue: totalN8nValue - userQualifiedValue,
+            count: Math.max(0, totalOpportunities - userQualifiedCount),
+            totalValue: Math.max(0, totalN8nValue - userQualifiedValue),
             avgPwin: 0,
             avgScore: 0,
           },

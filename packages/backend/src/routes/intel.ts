@@ -289,6 +289,24 @@ router.get("/research/:id", async (req: Request, res: Response) => {
     }
   }
 
+  // 2. Try DB (for AI-generated reports from POST /research)
+  const pool = getPool();
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM deep_research_reports WHERE id = $1", [req.params.id]);
+      if (rows.length > 0) {
+        const r = rows[0];
+        const report = {
+          id: r.id, query: r.query, status: r.status, summary: r.summary,
+          findings: r.findings, sources: r.sources ?? [], sources_count: (r.sources as string[])?.length ?? 0,
+          requested_by: r.requested_by ?? "user", requested_at: r.created_at, completed_at: r.completed_at,
+        };
+        res.json(successEnvelope("GDA.api.deep-research-history", "detail", { report, source: "db" as const }));
+        return;
+      }
+    } catch { /* fall through to 404 */ }
+  }
+
   res.status(404).json({
     success: false,
     workflow: "GDA.api.deep-research-history",
