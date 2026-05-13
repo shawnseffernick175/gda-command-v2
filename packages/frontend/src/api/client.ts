@@ -3375,3 +3375,114 @@ export interface CompanyProfileData {
 export function fetchCompanyProfile() {
   return request<CompanyProfileData>("/company-profile");
 }
+
+// ---------------------------------------------------------------------------
+// Agent Approvals (universal approval queue from agent system)
+// ---------------------------------------------------------------------------
+
+export interface AgentApprovalItem {
+  id: string;
+  type: string;
+  agent: string;
+  agent_run_id: string | null;
+  title: string;
+  summary: string | null;
+  data: Record<string, unknown> | null;
+  priority: "critical" | "high" | "medium" | "low";
+  status: "pending" | "approved" | "rejected";
+  decided_by: string | null;
+  decided_at: string | null;
+  note: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface AgentApprovalsPendingData {
+  items: AgentApprovalItem[];
+  count: number;
+}
+
+export interface AgentApprovalsStatsData {
+  by_type: Array<{ type: string; pending: string; approved: string; rejected: string; total: string }>;
+  total_pending: number;
+}
+
+export function fetchAgentApprovalsPending(params?: { type?: string; agent?: string }) {
+  const qs = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
+  return request<AgentApprovalsPendingData>(`/agents/approvals/pending${qs}`);
+}
+
+export function fetchAgentApprovalsStats() {
+  return request<AgentApprovalsStatsData>("/agents/approvals/stats");
+}
+
+export function approveAgentApproval(id: string, note?: string) {
+  return request<{ id: string; status: string }>(`/agents/approvals/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function rejectAgentApproval(id: string, note?: string) {
+  return request<{ id: string; status: string }>(`/agents/approvals/${id}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Agent Management (list, enable/disable, config, runs)
+// ---------------------------------------------------------------------------
+
+export interface AgentConfigItem {
+  agent: string;
+  display_name: string;
+  description: string;
+  schedule: string | null;
+  enabled: boolean;
+  config: Record<string, unknown> | null;
+  last_run_at: string | null;
+  last_status: string | null;
+  last_duration_ms: number | null;
+  last_items_processed: number | null;
+  last_items_flagged: number | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentRunRow {
+  id: string;
+  agent: string;
+  trigger: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  items_processed: number | null;
+  items_flagged: number | null;
+  error: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export function fetchAgents() {
+  return request<{ agents: AgentConfigItem[]; count: number }>("/agents");
+}
+
+export function fetchAgentDetail(name: string) {
+  return request<{ agent: AgentConfigItem; recent_runs: AgentRunRow[] }>(`/agents/${name}`);
+}
+
+export function enableAgent(name: string) {
+  return request<{ agent: AgentConfigItem }>(`/agents/${name}/enable`, { method: "POST" });
+}
+
+export function disableAgent(name: string) {
+  return request<{ agent: AgentConfigItem }>(`/agents/${name}/disable`, { method: "POST" });
+}
+
+export function fetchRecentAgentRuns(limit = 50) {
+  return request<{ runs: AgentRunRow[]; count: number }>(`/agents/runs/recent?limit=${limit}`);
+}

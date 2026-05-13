@@ -96,6 +96,30 @@ router.get("/:name/runs", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/agents/runs/recent — all recent agent runs across all agents
+// ---------------------------------------------------------------------------
+router.get("/runs/recent", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) throw new Error("Database not available");
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const result = await pool.query(
+      "SELECT * FROM agent_runs ORDER BY started_at DESC LIMIT $1",
+      [limit],
+    );
+    res.json(successEnvelope("gda-agents", "recent-runs", { runs: result.rows, count: result.rows.length }));
+  } catch (e) {
+    res.status(500).json(
+      errorEnvelope("gda-agents", "recent-runs", {
+        code: "INTERNAL",
+        message: (e as Error).message,
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/agents/:name/enable — enable an agent
 // ---------------------------------------------------------------------------
 router.post("/:name/enable", requireRole("admin"), async (req, res) => {
