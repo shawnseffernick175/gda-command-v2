@@ -3569,6 +3569,7 @@ export function fetchFixProposals(limit = 50) {
 export function resolveFixProposal(id: string, action: "approve" | "reject", note?: string) {
   return request<{ proposal: FixProposalItem; action: string }>("/agents/fix-runner/resolve/" + id, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, note }),
   });
 }
