@@ -55,6 +55,55 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
 6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
 
+## AI Agent Testing
+
+Agents are in `packages/backend/src/agents/`. Each follows the OODA loop pattern and is triggered via POST endpoints.
+
+### Agent Endpoints
+
+| Agent | Trigger Endpoint | Status Endpoint | UI Location |
+|-------|-----------------|-----------------|-------------|
+| Morning Commander | `POST /api/agents/morning-commander/trigger` | `GET /api/agents/morning-commander/latest` | Intel Hub > Morning Briefing > "Generate Now" |
+| Opportunity Watch | `POST /api/agents/opportunity-watch/trigger` | `GET /api/agents/opportunity-watch/latest` | SAM Monitor > "AI Score All" |
+| Competitive Intel | `POST /api/agents/competitive-intel/trigger` | `GET /api/agents/competitive-intel/latest` | Intel Hub > Competitor Watch > "AI Scan Competitors" |
+
+### Agent Testing Pattern
+
+1. **Reset DB**: `cd packages/backend && npm run db:reset` to get clean baseline
+2. **Record baseline DB state**: Query counts for agent-specific tables before running
+3. **Trigger via UI**: Click the agent button on the relevant page
+4. **Verify button state**: Button should show loading text (e.g., "Scanning...") while disabled
+5. **Wait for completion**: Agents take 30-120 seconds depending on external API + LLM calls
+6. **Verify success banner**: Green banner with summary text (no red error)
+7. **Verify DB state changed**: Query counts again, compare with baseline
+8. **Check Agent Runs**: Navigate to Approvals > Agent Runs tab, verify completed run row
+
+### Idempotency Testing (for agents with deduplication)
+
+1. Run agent once (baseline run)
+2. Record post-run DB state (movements count, intel count, contracts_won for all competitors)
+3. Run agent again immediately
+4. Record post-run-2 DB state
+5. **PASS criteria**: Counts should be unchanged or only slightly different
+6. **Verify no duplicate IDs**: `SELECT id, count(*) FROM <table> GROUP BY id HAVING count(*) > 1` should return 0 rows
+
+**Note on GPT-4o non-determinism**: When testing AI agents that filter by significance, the same data may be classified differently between runs. Awards scored "low" in run 1 may be scored "medium" in run 2, creating legitimately new DB entries. This is NOT a dedup failure — verify by checking for duplicate IDs (there should be none).
+
+### Agent Scan Timing
+
+- **Competitive Intel**: ~75-120 seconds (queries USAspending API for 5 competitors, ~5-25 awards each, GPT-4o analysis per award)
+- **Opportunity Watch**: ~10-15 seconds (scores existing DB opportunities)
+- **Morning Commander**: ~5-10 seconds (synthesizes existing DB data)
+
+If an agent button stays on "Scanning..." for longer than expected, check the backend logs or query the latest run status endpoint to see if it completed or errored.
+
+### Stale Frontend State
+
+If the backend was restarted while the frontend page was open, React state may cache old errors (e.g., HTTP 500). To fix:
+- Click a different tab, then click back to the original tab (forces a re-fetch)
+- Or do a hard reload (Ctrl+Shift+R)
+- Navigating via sidebar to a different page and back also works
+
 ## Full E2E Audit Pattern (38 items)
 
 When doing a comprehensive audit, navigate every page and verify:
@@ -67,9 +116,12 @@ When doing a comprehensive audit, navigate every page and verify:
 ### Seeded Test Data
 
 - 7 opportunities (opp-001 to opp-007), all status "Interest", due dates Aug 2026 – Feb 2027
+- 5 competitor profiles (Leidos, SAIC, Jacobs, Parsons, Hensel Phelps) with threat scores and mock movements
+- 10 competitor_movements (CM-001 to CM-010)
+- 4 intel_items (category='competitive')
+- 6 agents seeded in agent_config table
 - Envision Innovative Solutions company profile: $382M revenue (Large Business), 41 employees (Small Business by SBA headcount)
 - NAICS Size classification: 1 Small Business (opp-005, NAICS 511210), 6 Large Business
-- All other tables empty — pages show proper empty states with 0 counts
 
 ### Navigation Tips
 
@@ -141,7 +193,10 @@ For testing endpoints that write to PostgreSQL:
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **For AI agents** — reset DB → record baseline → trigger via UI → verify banner → check DB delta → verify Agent Runs
 
 ## Devin Secrets Needed
 
-None — all live DB data, no external services required for testing. Auth uses local JWT with dev secret.
+- `OPENAI_API_KEY` — Required for AI agents (GPT-4o tier="fast" for scoring/filtering)
+- `ANTHROPIC_API_KEY` — Required for AI agents (Claude Sonnet tier="deep" for analysis/writing)
+- Both keys should already be available in the environment. If not, the backend LLM module falls back gracefully.
