@@ -5,7 +5,7 @@
  * Secrets read from env at call time, never logged.
  */
 
-const TIMEOUT_DEFAULT = 15_000;
+const TIMEOUT_DEFAULT = 60_000;
 
 async function fetchWithTimeout(
   url: string,

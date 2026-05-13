@@ -114,17 +114,18 @@ The Approvals page (`/approvals`) has 3 tabs:
 
 When doing a comprehensive audit, navigate every page and verify:
 1. **Page loads**: No blank screen, no crash, no unhandled error
-2. **Source badge**: Shows "Live DB" / "Live — database" (NOT "Mock data")
+2. **Source badge**: Shows "Live API" (n8n data) or "Live DB" (postgres fallback) — NOT "Mock data"
 3. **Data state**: Shows real DB data or proper empty state (0 counts, empty message)
 4. **No errors**: No console errors, no 500 badges, no broken components
 5. **Key feature**: At least one interaction works (filter, tab, button, expand)
 
-### Seeded Test Data
+### Data Sources
 
-- 7 opportunities (opp-001 to opp-007), all status "Interest", due dates Aug 2026 – Feb 2027
+- **n8n integration** (primary): Backend calls n8n webhook at `https://n8n.csr-llc.tech/webhook/gda-opp-tracker` with header `x-gda-key: gda-webhook-secret-2026`. Returns ~291 real opportunities from GovTribe, SAM.gov, GDA Tracker.
+- **Postgres fallback**: If n8n is unreachable, backend falls back to local DB (7 seeded opportunities). Source badge shows "Live DB" instead of "Live API".
 - Envision Innovative Solutions company profile: $382M revenue (Large Business), 41 employees (Small Business by SBA headcount)
-- NAICS Size classification: 1 Small Business (opp-005, NAICS 511210), 6 Large Business
-- All other tables empty — pages show proper empty states with 0 counts
+- NAICS Size classification: ~4 Small Business (employee-based NAICS like 541715), ~55 Large Business (revenue-based NAICS), rest Unclassified
+- Departments: Agriculture, Commerce, Homeland Security, Justice, Veterans Affairs, War + others
 - 6 agents seeded: morning-commander, opportunity-watch, competitive-intel, capture-coach, controlled-fix, approval-queue
 - 5 competitors seeded for competitive intel scanning
 - 5 SAM opportunities seeded for opportunity watch scoring
@@ -195,13 +196,53 @@ For testing endpoints that write to PostgreSQL:
 ## Testing Strategy
 
 1. **Navigate systematically** through all sidebar groups
-2. **Verify source badges** — "Live DB" means real data, no mock fallbacks
+2. **Verify source badges** — "Live API" means n8n data (preferred), "Live DB" means postgres fallback
 3. **Check empty states** — pages with no DB data should show 0 counts + empty message (NOT mock data)
-4. **Test NAICS Size filter** on Ops Tracker: All=7, Small=1, Large=6
+4. **Test NAICS Size filter** on Ops Tracker: All=291, Small≈4, Large≈55, Unclassified≈41
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
 8. **For AI agents** — trigger → verify banner → check Agent Runs → test idempotency (4-step pattern)
+
+## Ops Tracker Testing (n8n Integration)
+
+### Pagination
+- Default: 25 per page, `page=1&pageSize=25` query params
+- Expected: ~12 pages for 291 opportunities (ceil(291/25) = 12)
+- Pagination controls: Prev/Next buttons + "Page X of Y — showing Z of N opportunities"
+- **Summary strip must show full-dataset aggregates** (Count=291, Total Value≈$2.3B), NOT page-slice values
+- **Summary stats must NOT change when paginating** — only the table data changes
+
+### API Verification
+```bash
+# Login
+TOKEN=$(curl -s https://gda.csr-llc.tech/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"shawn.seffernick@envision-is.com","password":"admin123"}' \
+  | jq -r '.data.accessToken')
+
+# Test pagination
+curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq '{source: .meta.source, count: .meta.totalFiltered, totalPages: .meta.totalPages, totalValue: .meta.totalValue}'
+# Expected: {source: "gateway", count: 291, totalPages: 12, totalValue: ~2303223583}
+```
+
+### Production Deploy
+- VPS: `ssh root@187.77.206.105`
+- Deploy compose file: `docker-compose.deploy.yml` (NOT `docker-compose.yml` which is dev-only postgres)
+- Services: `gda-v2-frontend`, `gda-v2-backend`, `gda-v2-postgres`
+- Rebuild: `docker compose -f docker-compose.deploy.yml build --no-cache gda-backend gda-frontend`
+- Restart: `docker compose -f docker-compose.deploy.yml up -d gda-backend gda-frontend`
+- Verify: `docker ps --format 'table {{.Names}}\t{{.Status}}' | grep gda-v2`
+- Site: https://gda.csr-llc.tech
+- Login: `shawn.seffernick@envision-is.com` / `admin123`
+
+### Browser Testing Tips
+- Pagination buttons may be below the fold — scroll down to expose them
+- Use `document.querySelectorAll('button')` with text matching to reliably click pagination buttons
+- When verifying summary stats across pages, compare Count + Total Value on page 1 vs page 2 — they must be identical
+- n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection failed
 
 ## Devin Secrets Needed
 

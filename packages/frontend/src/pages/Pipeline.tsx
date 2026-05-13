@@ -126,7 +126,7 @@ export default function Pipeline() {
             color: source === "n8n" ? "#a855f7" : "#22c55e",
           }}
         >
-          {source === "n8n" ? "Live n8n" : "Live DB"}
+          {source === "n8n" ? "Live API" : "Live DB"}
         </span>
       </div>
 
