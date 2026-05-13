@@ -190,7 +190,7 @@ router.get("/escalation-rules", async (_req, res) => {
 });
 
 // POST /api/anomaly/escalation-rules — create a new rule
-router.post("/escalation-rules", async (req, res) => {
+router.post("/escalation-rules", requireRole("admin", "bd_manager"), async (req, res) => {
   const { name, condition, priority, description } = req.body;
   if (!name || !condition) {
     return res.status(400).json(errorEnvelope("gda-anomaly", "create-rule", {

@@ -92,8 +92,10 @@ ${oppContext}`;
 
 // ---------------------------------------------------------------------------
 // POST /api/ask — general purpose Q&A from any page
+// Mounted separately via askRouter to avoid double-mounting aiRouter
 // ---------------------------------------------------------------------------
-router.post("/ask", async (req, res) => {
+export const askRouter = Router();
+askRouter.post("/", async (req, res) => {
   const { question, context: pageContext = "" } = req.body as { question: string; context?: string };
 
   if (!question?.trim()) {

@@ -542,7 +542,7 @@ function AskAnythingFAB() {
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("gda_token") ?? ""}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("gda_access_token") ?? ""}` },
         body: JSON.stringify({ question: question.trim(), context: pathname }),
       });
       const data = await res.json();

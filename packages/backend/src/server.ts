@@ -37,7 +37,7 @@ import emailRouter from "./routes/email";
 import dashboardLayoutRouter from "./routes/dashboard-layout";
 import auditRouter from "./routes/audit";
 import exportRouter from "./routes/export";
-import aiRouter from "./routes/ai";
+import aiRouter, { askRouter } from "./routes/ai";
 import bookOfTruthsRouter from "./routes/book-of-truths";
 import govwinRouter from "./routes/govwin";
 import riskRegisterRouter from "./routes/risk-register";
@@ -159,7 +159,7 @@ app.use("/api/dashboard-layout", dashboardLayoutRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/export", exportRouter);
 app.use("/api/ai", aiRouter);
-app.use("/api", aiRouter); // Exposes POST /api/ask
+app.use("/api/ask", askRouter);
 app.use("/api/book-of-truths", bookOfTruthsRouter);
 app.use("/api/govwin", govwinRouter);
 app.use("/api/risk-register", riskRegisterRouter);
