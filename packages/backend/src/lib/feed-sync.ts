@@ -232,7 +232,7 @@ export async function syncFPDSAwards(
   }
 }
 
-/** Run both feeds. */
+/** Run all feeds (SAM.gov, FPDS, GovTribe, GovWin, DIBBS). */
 export async function syncAllFeeds(
   options?: {
     samDaysBack?: number;
@@ -252,6 +252,25 @@ export async function syncAllFeeds(
     options?.fpdsDaysBack ?? 90,
     options?.fpdsKeywords,
   ));
+
+  // Sync additional gov sources (GovTribe, GovWin, DIBBS)
+  try {
+    const { syncGovSources } = await import("./gov-sources");
+    const govResults = await syncGovSources();
+    for (const r of govResults) {
+      results.push({
+        feed: r.source,
+        status: r.status === "skipped" ? "success" : r.status,
+        fetched: r.fetched,
+        upserted: r.upserted,
+        errors: r.error ? 1 : 0,
+        durationMs: r.durationMs,
+        error: r.error,
+      });
+    }
+  } catch (e) {
+    log.warn("gov_sources_sync_error", { error: (e as Error).message });
+  }
 
   return results;
 }

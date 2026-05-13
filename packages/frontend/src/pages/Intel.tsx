@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import SourceBadge from "../components/SourceBadge";
+import { authenticatedFetch } from "../api/auth";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -123,6 +124,9 @@ interface CompetitorProfile {
   weaknesses: string[];
   recent_wins: string[];
   watch_status: string;
+  classification?: string;
+  ai_analysis?: Record<string, unknown> | null;
+  analyzed_at?: string | null;
   last_updated: string;
   movements?: CompetitorMovement[];
 }
@@ -1014,6 +1018,18 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                     }}>
                       {c.watch_status}
                     </span>
+                    {/* Classification badge */}
+                    <span style={{
+                      padding: "1px 8px",
+                      borderRadius: 10,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      textTransform: "capitalize",
+                      background: c.classification === "team" ? "rgba(34,197,94,0.15)" : c.classification === "threat" ? "rgba(239,68,68,0.15)" : "rgba(107,114,128,0.15)",
+                      color: c.classification === "team" ? "#22c55e" : c.classification === "threat" ? "#ef4444" : "#6b7280",
+                    }}>
+                      {c.classification ?? "neutral"}
+                    </span>
                     {movements.length > 0 && (
                       <span style={{
                         padding: "1px 8px",
@@ -1176,6 +1192,112 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                       NAICS: {c.primary_naics.join(", ")}
                     </span>
                   </div>
+
+                  {/* Classification + AI Analyze */}
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--color-border)" }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>Classification:</label>
+                    <select
+                      value={c.classification ?? "neutral"}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={async (e) => {
+                        e.stopPropagation();
+                        const newClass = e.target.value;
+                        try {
+                          const resp = await authenticatedFetch(`/api/intel/competitors/${c.id}/classify`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ classification: newClass }),
+                          });
+                          if (resp.ok) loadCompetitors();
+                        } catch { /* ignore */ }
+                      }}
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-surface)",
+                        color: "var(--color-text)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="team">Team</option>
+                      <option value="threat">Threat</option>
+                      <option value="neutral">Neutral</option>
+                    </select>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const btn = e.currentTarget;
+                        btn.disabled = true;
+                        btn.textContent = "Analyzing...";
+                        try {
+                          const resp = await authenticatedFetch(`/api/intel/competitors/${c.id}/analyze`, { method: "POST" });
+                          const env = await resp.json();
+                          if (env.success) {
+                            loadCompetitors();
+                            btn.textContent = "Done";
+                          } else {
+                            btn.textContent = "Failed";
+                          }
+                        } catch {
+                          btn.textContent = "Failed";
+                        } finally {
+                          setTimeout(() => { btn.disabled = false; btn.textContent = "AI Analyze"; }, 2000);
+                        }
+                      }}
+                      style={{
+                        padding: "4px 12px",
+                        background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        fontSize: 11,
+                        fontWeight: 600,
+                      }}
+                    >AI Analyze</button>
+                    {c.analyzed_at && (
+                      <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                        Last analyzed: {formatDate(c.analyzed_at)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* AI Analysis Results */}
+                  {c.ai_analysis && (() => {
+                    const aa = c.ai_analysis as { threat_summary?: string; overlap_areas?: string[]; teaming_potential?: string; recommended_strategy?: string };
+                    return (
+                      <div style={{ marginTop: 12, padding: 12, background: "rgba(59,130,246,0.04)", borderRadius: 6, border: "1px solid rgba(59,130,246,0.15)" }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "#3b82f6", marginBottom: 8 }}>AI Analysis</div>
+                        {aa.threat_summary && (
+                          <div style={{ fontSize: 13, marginBottom: 8 }}>{aa.threat_summary}</div>
+                        )}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {Array.isArray(aa.overlap_areas) && aa.overlap_areas.length > 0 && (
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: "#f59e0b", marginBottom: 4 }}>Overlap Areas</div>
+                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: "var(--color-text-muted)" }}>
+                                {aa.overlap_areas.map((a: string, i: number) => <li key={i}>{a}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                          {aa.teaming_potential && (
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: "#22c55e", marginBottom: 4 }}>Teaming Potential</div>
+                              <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{aa.teaming_potential}</div>
+                            </div>
+                          )}
+                        </div>
+                        {aa.recommended_strategy && (
+                          <div style={{ marginTop: 8, fontSize: 12, color: "#8b5cf6", fontStyle: "italic" }}>
+                            Strategy: {aa.recommended_strategy}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
