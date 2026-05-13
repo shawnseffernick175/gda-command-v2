@@ -18,6 +18,7 @@
     "db:backup-status": "../../scripts/backup-status.sh"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.2",
     "@gda/shared": "*",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
