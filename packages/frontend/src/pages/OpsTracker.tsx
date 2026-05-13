@@ -96,6 +96,13 @@ export default function OpsTracker() {
   // Smart recommendations
   const [recommendations, setRecommendations] = useState<SmartRecommendation[]>([]);
 
+  // Pagination
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+  const [paginationMeta, setPaginationMeta] = useState<{ totalFiltered?: number; totalPages?: number; totalAvailable?: number; totalValue?: number; avgPwin?: number; avgScore?: number; departments?: string[] }>({});
+  const totalFiltered = paginationMeta.totalFiltered;
+  const totalPages = paginationMeta.totalPages ?? 1;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -108,9 +115,23 @@ export default function OpsTracker() {
         minPwin: minPwin ? parseFloat(minPwin) : undefined,
         sortBy,
         sortDir,
+        page,
+        pageSize,
       });
       if (env.success && env.data) {
         setData(env.data);
+        const meta = env.meta as Record<string, unknown> | undefined;
+        if (meta) {
+          setPaginationMeta({
+            totalFiltered: meta.totalFiltered as number | undefined,
+            totalPages: meta.totalPages as number | undefined,
+            totalAvailable: meta.totalAvailable as number | undefined,
+            totalValue: meta.totalValue as number | undefined,
+            avgPwin: meta.avgPwin as number | undefined,
+            avgScore: meta.avgScore as number | undefined,
+            departments: meta.departments as string[] | undefined,
+          });
+        }
       } else {
         setError(env.error?.message ?? "Unknown error");
       }
@@ -119,7 +140,7 @@ export default function OpsTracker() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, deptFilter, naicsSizeFilter, minPwin, sortBy, sortDir]);
+  }, [search, statusFilter, deptFilter, naicsSizeFilter, minPwin, sortBy, sortDir, page]);
 
   useEffect(() => {
     load();
@@ -131,32 +152,36 @@ export default function OpsTracker() {
   const opportunities = data?.opportunities ?? [];
   const source = data?.source ?? "db";
 
-  // Derive unique departments for filter dropdown
+  // Derive unique departments for filter dropdown — prefer backend aggregate over page slice
   const departments = useMemo(() => {
+    if (paginationMeta.departments && paginationMeta.departments.length > 0) {
+      return paginationMeta.departments;
+    }
     const depts = new Set<string>();
     for (const o of opportunities) {
       if (o.department) depts.add(o.department);
     }
     return Array.from(depts).sort();
-  }, [opportunities]);
+  }, [opportunities, paginationMeta.departments]);
 
-  // Summary strip
+  // Summary strip — prefer backend aggregate stats over page slice
   const summary = useMemo(() => {
-    const total = opportunities.length;
-    const totalValue = opportunities.reduce(
+    const total = paginationMeta.totalFiltered ?? opportunities.length;
+    const totalValue = paginationMeta.totalValue ?? opportunities.reduce(
       (s, o) => s + (o.value_estimated ?? 0),
       0
     );
-    const withPwin = opportunities.filter((o) => o.probability_of_win !== null);
-    const avgPwin =
-      withPwin.length > 0
-        ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) /
-          withPwin.length
+    const avgPwin = paginationMeta.avgPwin ?? (() => {
+      const withPwin = opportunities.filter((o) => o.probability_of_win !== null);
+      return withPwin.length > 0
+        ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length
         : 0;
-    const avgScore =
-      total > 0 ? opportunities.reduce((s, o) => s + o.score, 0) / total : 0;
+    })();
+    const avgScore = paginationMeta.avgScore ?? (
+      opportunities.length > 0 ? opportunities.reduce((s, o) => s + o.score, 0) / opportunities.length : 0
+    );
     return { total, totalValue, avgPwin, avgScore };
-  }, [opportunities]);
+  }, [opportunities, paginationMeta]);
 
   function handleSort(col: SortKey) {
     if (sortBy === col) {
@@ -243,7 +268,7 @@ export default function OpsTracker() {
             color: source === "n8n" ? "#a855f7" : source === "db" ? "#22c55e" : "#3b82f6",
           }}
         >
-          {source === "n8n" ? "Live n8n" : "Live DB"}
+          {source === "n8n" ? "Live API" : "Live DB"}
         </span>
       </div>
 
@@ -308,7 +333,7 @@ export default function OpsTracker() {
           type="text"
           placeholder="Search by ID or title…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           style={{
             padding: "6px 12px",
             borderRadius: 6,
@@ -321,7 +346,7 @@ export default function OpsTracker() {
         />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           style={{
             padding: "6px 12px",
             borderRadius: 6,
@@ -340,7 +365,7 @@ export default function OpsTracker() {
         </select>
         <select
           value={deptFilter}
-          onChange={(e) => setDeptFilter(e.target.value)}
+          onChange={(e) => { setDeptFilter(e.target.value); setPage(1); }}
           style={{
             padding: "6px 12px",
             borderRadius: 6,
@@ -359,7 +384,7 @@ export default function OpsTracker() {
         </select>
         <select
           value={naicsSizeFilter}
-          onChange={(e) => setNaicsSizeFilter(e.target.value)}
+          onChange={(e) => { setNaicsSizeFilter(e.target.value); setPage(1); }}
           style={{
             padding: "6px 12px",
             borderRadius: 6,
@@ -377,7 +402,7 @@ export default function OpsTracker() {
           type="number"
           placeholder="Min Pwin (0-1)"
           value={minPwin}
-          onChange={(e) => setMinPwin(e.target.value)}
+          onChange={(e) => { setMinPwin(e.target.value); setPage(1); }}
           step="0.1"
           min="0"
           max="1"
@@ -399,6 +424,7 @@ export default function OpsTracker() {
               setDeptFilter("");
               setNaicsSizeFilter("");
               setMinPwin("");
+              setPage(1);
             }}
             style={{
               padding: "6px 12px",
@@ -657,16 +683,54 @@ export default function OpsTracker() {
         </div>
       )}
 
-      {/* Record count badge */}
+      {/* Pagination controls */}
       {!loading && opportunities.length > 0 && (
         <div
           style={{
             marginTop: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             fontSize: 13,
             color: "var(--color-text-muted)",
           }}
         >
-          Showing {opportunities.length} {opportunities.length !== 1 ? "opportunities" : "opportunity"}
+          <span>
+            Page {page} of {totalPages} — showing {opportunities.length} of{" "}
+            {totalFiltered ?? opportunities.length} opportunities
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              style={{
+                padding: "4px 12px",
+                borderRadius: 6,
+                border: "1px solid var(--color-border)",
+                background: page <= 1 ? "transparent" : "var(--color-surface)",
+                color: page <= 1 ? "var(--color-text-muted)" : "var(--color-text)",
+                cursor: page <= 1 ? "not-allowed" : "pointer",
+                fontSize: 13,
+              }}
+            >
+              Prev
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              style={{
+                padding: "4px 12px",
+                borderRadius: 6,
+                border: "1px solid var(--color-border)",
+                background: page >= totalPages ? "transparent" : "var(--color-surface)",
+                color: page >= totalPages ? "var(--color-text-muted)" : "var(--color-text)",
+                cursor: page >= totalPages ? "not-allowed" : "pointer",
+                fontSize: 13,
+              }}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

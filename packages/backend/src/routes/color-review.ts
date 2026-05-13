@@ -577,4 +577,162 @@ router.post(
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/color-review/:id/export — Generate exportable HTML report
+// ---------------------------------------------------------------------------
+router.get("/:id/export", requireRole("admin", "bd_manager", "capture_lead"), async (_req: Request, res: Response) => {
+  const { id } = _req.params;
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("GDA.color-review", "export", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }));
+  }
+
+  try {
+    const { rows } = await pool.query("SELECT * FROM color_reviews WHERE id = $1", [id]);
+    if (rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.color-review", "export", { code: "NOT_FOUND", message: `Review ${id} not found`, detail: null }));
+    }
+
+    const r = rows[0];
+    const phaseLabel: Record<string, string> = {
+      blue: "Blue Team", pink: "Pink Team", red: "Red Team", green: "Green Team",
+      gold: "Gold Team", white: "White Team", black_hat: "Black Hat", white_glove: "White Glove",
+    };
+    const escapeHtml = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    const esc = (v: unknown): string => escapeHtml(String(v ?? ""));
+    const verdictSymbol = (v: string) => v === "pass" ? "✓ PASS" : v === "fail" ? "✗ FAIL" : v === "warning" ? "⚠ WARN" : "— N/R";
+    const goLabel: Record<string, string> = { go: "GO", conditional_go: "CONDITIONAL GO", no_go: "NO-GO" };
+
+    const checks: Array<Record<string, string>> = r.requirement_checks ?? [];
+    const sections: Array<Record<string, string | number>> = r.section_scores ?? [];
+    const goldChecks: Array<Record<string, string>> = r.gold_checks ?? [];
+    const costItems: Array<Record<string, string | number>> = r.cost_line_items ?? [];
+    const greenChecks: Array<Record<string, string>> = r.green_checks ?? [];
+    const formatChecks: Array<Record<string, string>> = r.format_checks ?? [];
+    const blueAssessments: Array<Record<string, string>> = r.blue_assessments ?? [];
+    const blackHatFindings: Array<Record<string, string>> = r.black_hat_findings ?? [];
+    const risks: string[] = r.risk_factors ?? [];
+
+    let checksHtml = "";
+    if (checks.length > 0) {
+      checksHtml = `<h2>Requirement Checks</h2><table><tr><th>#</th><th>Requirement</th><th>Section</th><th>Verdict</th><th>Notes</th></tr>${
+        checks.map((c, i) => `<tr><td>${i + 1}</td><td>${esc(c.requirement)}</td><td>${esc(c.section_ref)}</td><td class="verdict-${esc(c.verdict) || "not_reviewed"}">${verdictSymbol(c.verdict ?? "")}</td><td>${esc(c.detail)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    if (sections.length > 0) {
+      checksHtml += `<h2>Section Scores</h2><table><tr><th>Section</th><th>Score</th><th>Max</th><th>Verdict</th><th>Strengths</th><th>Weaknesses</th></tr>${
+        sections.map((s) => `<tr><td>${esc(s.section)}</td><td>${esc(s.score)}</td><td>${esc(s.max_score)}</td><td class="verdict-${esc(s.verdict) || "not_reviewed"}">${verdictSymbol(String(s.verdict ?? ""))}</td><td>${esc(s.strengths)}</td><td>${esc(s.weaknesses)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    if (goldChecks.length > 0) {
+      checksHtml += `<h2>Gold Team Checks</h2><table><tr><th>#</th><th>Category</th><th>Criterion</th><th>Verdict</th><th>Detail</th></tr>${
+        goldChecks.map((g, i) => `<tr><td>${i + 1}</td><td>${esc(g.category)}</td><td>${esc(g.criterion ?? g.label)}</td><td class="verdict-${esc(g.verdict) || "not_reviewed"}">${verdictSymbol(g.verdict ?? "")}</td><td>${esc(g.detail)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    if (costItems.length > 0) {
+      checksHtml += `<h2>Cost Line Items</h2><table><tr><th>Category</th><th>Description</th><th>Amount</th><th>Verdict</th><th>Detail</th></tr>${
+        costItems.map((c) => `<tr><td>${esc(c.category)}</td><td>${esc(c.description)}</td><td>$${Number(c.amount ?? 0).toLocaleString()}</td><td class="verdict-${esc(c.verdict) || "not_reviewed"}">${verdictSymbol(String(c.verdict ?? ""))}</td><td>${esc(c.detail)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    if (greenChecks.length > 0) {
+      checksHtml += `<h2>Green Team (Pricing) Checks</h2><table><tr><th>#</th><th>Label</th><th>Verdict</th><th>Detail</th></tr>${
+        greenChecks.map((g, i) => `<tr><td>${i + 1}</td><td>${esc(g.label)}</td><td class="verdict-${esc(g.verdict) || "not_reviewed"}">${verdictSymbol(g.verdict ?? "")}</td><td>${esc(g.detail)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    if (formatChecks.length > 0) {
+      checksHtml += `<h2>Format / Compliance Checks</h2><table><tr><th>Label</th><th>Volume</th><th>Expected</th><th>Actual</th><th>Verdict</th><th>Detail</th></tr>${
+        formatChecks.map((f) => `<tr><td>${esc(f.label)}</td><td>${esc(f.volume)}</td><td>${esc(f.expected)}</td><td>${esc(f.actual)}</td><td class="verdict-${esc(f.verdict) || "not_reviewed"}">${verdictSymbol(f.verdict ?? "")}</td><td>${esc(f.detail)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    if (blueAssessments.length > 0) {
+      checksHtml += `<h2>Blue Team Assessments</h2><table><tr><th>ID</th><th>Category</th><th>Label</th><th>Verdict</th><th>Detail</th><th>Recommendation</th></tr>${
+        blueAssessments.map((b) => `<tr><td>${esc(b.id)}</td><td>${esc(b.category)}</td><td>${esc(b.label)}</td><td class="verdict-${esc(b.verdict) || "not_reviewed"}">${verdictSymbol(b.verdict ?? "")}</td><td>${esc(b.detail)}</td><td>${esc(b.recommendation)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    if (blackHatFindings.length > 0) {
+      checksHtml += `<h2>Black Hat Findings</h2><table><tr><th>ID</th><th>Competitor</th><th>Area</th><th>Threat</th><th>Assessment</th><th>Counter Strategy</th></tr>${
+        blackHatFindings.map((b) => `<tr><td>${esc(b.id)}</td><td>${esc(b.competitor)}</td><td>${esc(b.area)}</td><td>${esc(b.threat_level)}</td><td>${esc(b.assessment)}</td><td>${esc(b.counter_strategy)}</td></tr>`).join("")
+      }</table>`;
+    }
+
+    let risksHtml = "";
+    if (risks.length > 0) {
+      risksHtml = `<h2>Risk Factors</h2><ul>${risks.map((rk) => `<li>${esc(rk)}</li>`).join("")}</ul>`;
+    }
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${esc(phaseLabel[r.phase] ?? r.phase)} Review — ${esc(r.proposal_title ?? "Color Review Report")}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; margin: 40px; color: #1a1a1a; }
+  h1 { font-size: 22px; border-bottom: 2px solid #1a1a1a; padding-bottom: 6px; }
+  h2 { font-size: 16px; margin-top: 28px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  .meta { display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 20px; font-size: 13px; }
+  .meta-item { }
+  .meta-label { font-weight: 700; color: #666; text-transform: uppercase; font-size: 10px; }
+  .meta-value { font-size: 15px; margin-top: 2px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 12px; }
+  th { background: #f3f4f6; text-align: left; padding: 6px 8px; border: 1px solid #ddd; font-weight: 600; }
+  td { padding: 5px 8px; border: 1px solid #ddd; vertical-align: top; }
+  .verdict-pass { color: #16a34a; font-weight: 700; }
+  .verdict-fail { color: #dc2626; font-weight: 700; }
+  .verdict-warning { color: #d97706; font-weight: 700; }
+  .verdict-not_reviewed { color: #6b7280; }
+  .summary-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 16px; margin: 12px 0; }
+  .go-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-weight: 700; font-size: 13px; color: #fff; }
+  .go-go { background: #16a34a; }
+  .go-conditional_go { background: #d97706; }
+  .go-no_go { background: #dc2626; }
+  @media print { body { margin: 20px; } }
+</style>
+</head>
+<body>
+<h1>${esc(phaseLabel[r.phase] ?? r.phase)} Review Report</h1>
+<div class="meta">
+  <div class="meta-item"><div class="meta-label">Proposal</div><div class="meta-value">${esc(r.proposal_title ?? "—")}</div></div>
+  <div class="meta-item"><div class="meta-label">Agency</div><div class="meta-value">${esc(r.agency ?? "—")}</div></div>
+  <div class="meta-item"><div class="meta-label">Phase</div><div class="meta-value">${phaseLabel[r.phase] ?? r.phase}</div></div>
+  <div class="meta-item"><div class="meta-label">Overall Score</div><div class="meta-value">${r.overall_score ?? 0}/100</div></div>
+  <div class="meta-item"><div class="meta-label">Pass Rate</div><div class="meta-value">${r.pass_rate ?? 0}%</div></div>
+  ${r.go_no_go ? `<div class="meta-item"><div class="meta-label">Decision</div><div class="meta-value"><span class="go-badge go-${r.go_no_go}">${goLabel[r.go_no_go] ?? r.go_no_go}</span></div></div>` : ""}
+  <div class="meta-item"><div class="meta-label">Reviewer</div><div class="meta-value">${esc(r.reviewer ?? "AI")}</div></div>
+  <div class="meta-item"><div class="meta-label">Date</div><div class="meta-value">${r.completed_at ? new Date(r.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</div></div>
+</div>
+
+${r.summary ? `<div class="summary-box"><strong>Executive Summary:</strong> ${esc(r.summary)}</div>` : ""}
+
+<div class="meta" style="margin-top:4px;">
+  <div class="meta-item"><div class="meta-label">Total Checks</div><div class="meta-value">${r.total_checks ?? 0}</div></div>
+  <div class="meta-item"><div class="meta-label">Passed</div><div class="meta-value" style="color:#16a34a">${r.passed_checks ?? 0}</div></div>
+  <div class="meta-item"><div class="meta-label">Failed</div><div class="meta-value" style="color:#dc2626">${r.failed_checks ?? 0}</div></div>
+  <div class="meta-item"><div class="meta-label">Warnings</div><div class="meta-value" style="color:#d97706">${r.warning_checks ?? 0}</div></div>
+</div>
+
+${checksHtml}
+${risksHtml}
+
+<hr style="margin-top:40px;border:none;border-top:1px solid #ccc;">
+<p style="font-size:10px;color:#999;">Generated by GDA Command — Envision Innovative Solutions — ${new Date().toISOString()}</p>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="color-review-${r.phase}-${id.slice(0, 8)}.html"`);
+    res.send(html);
+  } catch (err) {
+    log.error("color_review_export_error", { error: String(err) });
+    res.status(500).json(errorEnvelope("GDA.color-review", "export", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
 export default router;

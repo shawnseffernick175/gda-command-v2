@@ -3,6 +3,7 @@ import InfoBadge from "../components/InfoBadge";
 import SourceBadge from "../components/SourceBadge";
 import OpportunityTable from "../components/OpportunityRow";
 import { fetchNoBidOpportunities, type OpportunityRow as OppRow } from "../api/client";
+import { authenticatedFetch } from "../api/auth";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -130,7 +131,7 @@ interface GateReviewResult {
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
-    const r = await fetch(`http://localhost:3001${path}`, init);
+    const r = await authenticatedFetch(path, init);
     const env: GDAEnvelope<T> = await r.json();
     return env.data;
   } catch {

@@ -10,6 +10,7 @@ import {
   fetchPipelineFromN8n,
   fetchOpportunityDetailFromN8n,
 } from "../lib/n8n-data";
+import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
 
 const router = Router();
 
@@ -124,6 +125,8 @@ router.get("/", async (req, res) => {
   const minPwin = req.query.minPwin ? parseFloat(req.query.minPwin as string) : undefined;
   const sortBy = (req.query.sortBy as string) ?? "updated_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
+  const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string, 10) || 25));
 
   if (statusFilter && !VALID_STATUSES.includes(statusFilter as OpportunityStatus)) {
     return res.status(400).json(
@@ -181,7 +184,18 @@ router.get("/", async (req, res) => {
     try {
       const n8nResult = await fetchOpsTrackerFromN8n();
       if (n8nResult.ok && n8nResult.opportunities.length > 0) {
-        const rows = filterAndSort(n8nResult.opportunities);
+        const allRows = filterAndSort(n8nResult.opportunities);
+        const totalFiltered = allRows.length;
+        const totalPages = Math.ceil(totalFiltered / pageSize);
+        const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
+
+        // Compute aggregate stats across ALL filtered rows (not just page slice)
+        const aggTotalValue = allRows.reduce((s, o) => s + (o.value_estimated ?? 0), 0);
+        const withPwin = allRows.filter((o) => o.probability_of_win !== null);
+        const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length : 0;
+        const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (o.score ?? 0), 0) / allRows.length : 0;
+        const aggDepartments = [...new Set(allRows.map((o) => o.department).filter(Boolean))].sort();
+
         return res.json(
           successEnvelope(
             "gda-opportunities",
@@ -189,8 +203,16 @@ router.get("/", async (req, res) => {
             { opportunities: rows, source: "n8n" as const },
             {
               count: rows.length,
+              totalFiltered,
               totalAvailable: n8nResult.meta.total,
-              filters_applied: { search, status: statusFilter, department: deptFilter, minPwin },
+              page,
+              pageSize,
+              totalPages,
+              totalValue: aggTotalValue,
+              avgPwin: aggAvgPwin,
+              avgScore: aggAvgScore,
+              departments: aggDepartments,
+              filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
               lastSync: n8nResult.meta.lastSync,
               dataSources: n8nResult.meta.dataSources,
             }
@@ -269,10 +291,22 @@ router.get("/", async (req, res) => {
     }));
 
     // Enrich with NAICS size classification and apply naics_size filter
-    let rows = enrichWithNaicsSize(rawRows);
+    let allRows = enrichWithNaicsSize(rawRows);
     if (naicsSizeFilter === "small" || naicsSizeFilter === "large") {
-      rows = rows.filter((o) => o.naics_size === naicsSizeFilter);
+      allRows = allRows.filter((o) => o.naics_size === naicsSizeFilter);
     }
+
+    // Paginate DB results (same as n8n path)
+    const totalFiltered = allRows.length;
+    const totalPages = Math.ceil(totalFiltered / pageSize);
+    const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
+
+    // Compute aggregate stats across ALL filtered rows (not just page slice)
+    const aggTotalValue = allRows.reduce((s, o) => s + (o.value_estimated ?? 0), 0);
+    const withPwin = allRows.filter((o) => o.probability_of_win !== null);
+    const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length : 0;
+    const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (o.score ?? 0), 0) / allRows.length : 0;
+    const aggDepartments = [...new Set(allRows.map((o) => o.department).filter(Boolean))].sort();
 
     return res.json(
       successEnvelope(
@@ -281,6 +315,15 @@ router.get("/", async (req, res) => {
         { opportunities: rows, source: "db" as const },
         {
           count: rows.length,
+          totalFiltered,
+          totalAvailable: rawRows.length,
+          page,
+          pageSize,
+          totalPages,
+          totalValue: aggTotalValue,
+          avgPwin: aggAvgPwin,
+          avgScore: aggAvgScore,
+          departments: aggDepartments,
           filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
         }
       )
@@ -631,6 +674,9 @@ router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"),
        VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $7)`,
       [id, title, agency ?? null, department ?? null, status ?? "discovery", value_estimated ?? null, now],
     );
+    // Auto-trigger Capture Coach for newly created opportunity (fire-and-forget)
+    queueCaptureCoachIfNeeded(id);
+
     res.json(successEnvelope("gda-opportunities", "quick-create", { id, title }));
   } catch (e) {
     res.status(500).json(
@@ -798,6 +844,9 @@ router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res)
       `[GDA QUALIFY WRITE] correlation_id=${correlationId} | opportunity_id=${id} | title=${title.replace(/\s+/g, "_")} | prev_status=${prevStatus} | new_status=qualified | qualified_at=${now} | triggered_by=GDA_REBUILD_UI\n`
     );
 
+    // Auto-trigger Capture Coach after qualifying (fire-and-forget)
+    queueCaptureCoachIfNeeded(id);
+
     return res.json(
       successEnvelope(
         "gda-opportunities",
@@ -891,6 +940,9 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
     process.stdout.write(
       `[GDA STAGE CHANGE] opportunity_id=${id} | title=${title.replace(/\s+/g, "_")} | prev_status=${prevStatus} | prev_stage=${prevStage} | new_stage=${stage} | new_status=${dbStatus}\n`
     );
+
+    // Auto-trigger Capture Coach after stage change (fire-and-forget)
+    queueCaptureCoachIfNeeded(id);
 
     return res.json(
       successEnvelope("gda-opportunities", "change-stage", {

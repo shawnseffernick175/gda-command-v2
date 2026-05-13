@@ -217,4 +217,43 @@ router.get("/config", async (_req: Request, res: Response) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/feeds/gov-sources — list all gov source feed statuses
+// ---------------------------------------------------------------------------
+router.get("/gov-sources", async (_req: Request, res: Response) => {
+  try {
+    const { getGovSourceStatus } = await import("../lib/gov-sources");
+    const sources = await getGovSourceStatus();
+    res.json(successEnvelope("gda-feeds", "gov-sources", {
+      sources,
+      total: sources.length,
+      enabled: sources.filter((s) => s.enabled).length,
+    }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("gda-feeds", "gov-sources", {
+      code: "INTERNAL", message: (err as Error).message, detail: null,
+    }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/feeds/gov-sources/sync — manually trigger all gov source syncs
+// ---------------------------------------------------------------------------
+router.post("/gov-sources/sync", requireRole("admin"), async (_req: Request, res: Response) => {
+  try {
+    const { syncGovSources } = await import("../lib/gov-sources");
+    const results = await syncGovSources();
+    const totalFetched = results.reduce((s, r) => s + r.fetched, 0);
+    const totalUpserted = results.reduce((s, r) => s + r.upserted, 0);
+    res.json(successEnvelope("gda-feeds", "gov-sources-sync", {
+      results,
+      summary: { sources_synced: results.length, total_fetched: totalFetched, total_upserted: totalUpserted },
+    }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("gda-feeds", "gov-sources-sync", {
+      code: "INTERNAL", message: (err as Error).message, detail: null,
+    }));
+  }
+});
+
 export default router;

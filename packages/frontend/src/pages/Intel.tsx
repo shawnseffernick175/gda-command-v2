@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import SourceBadge from "../components/SourceBadge";
+import { authenticatedFetch } from "../api/auth";
 
 // ---------------------------------------------------------------------------
 // Types (matching backend response shapes)
@@ -123,6 +124,9 @@ interface CompetitorProfile {
   weaknesses: string[];
   recent_wins: string[];
   watch_status: string;
+  classification?: string;
+  ai_analysis?: Record<string, unknown> | null;
+  analyzed_at?: string | null;
   last_updated: string;
   movements?: CompetitorMovement[];
 }
@@ -157,7 +161,7 @@ interface CompetitorsData {
 // ---------------------------------------------------------------------------
 
 async function fetchJson<T>(path: string): Promise<GDAEnvelope<T>> {
-  const res = await fetch(`/api${path}`);
+  const res = await authenticatedFetch(`/api${path}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   return res.json() as Promise<GDAEnvelope<T>>;
 }
@@ -349,7 +353,7 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
     setGenerating(true);
     setGenMsg(null);
     try {
-      const res = await fetch("/api/agents/morning-commander/trigger", { method: "POST" });
+      const res = await authenticatedFetch("/api/agents/morning-commander/trigger", { method: "POST" });
       const env = await res.json();
       if (env.success) {
         setGenMsg("Briefing generated successfully");
@@ -823,8 +827,10 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ message: string; isError: boolean } | null>(null);
 
-  useEffect(() => {
+  const loadCompetitors = () => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     const qs = params.toString();
@@ -839,7 +845,30 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [search]);
+  };
+
+  useEffect(() => { loadCompetitors(); }, [search]);
+
+  const handleScan = async () => {
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const resp = await authenticatedFetch("/api/agents/competitive-intel/trigger", { method: "POST" });
+      const env = await resp.json();
+      if (env.success && env.data) {
+        const s = env.data.summary ?? env.data;
+        const msg = `Scanned ${s.competitors_scanned ?? 0} competitors, found ${s.total_awards_found ?? 0} awards, ${s.significant_movements ?? 0} significant movements`;
+        setScanResult({ message: msg, isError: false });
+        loadCompetitors();
+      } else {
+        setScanResult({ message: env.error?.message ?? "Scan failed", isError: true });
+      }
+    } catch (err) {
+      setScanResult({ message: (err as Error).message, isError: true });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   if (loading && !data) return <LoadingMsg />;
   if (error && !data) return <ErrorMsg msg={error} />;
@@ -849,20 +878,54 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
 
   return (
     <div>
-      {/* KPI Summary */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <SummaryChip label="Tracked" value={String(data.total)} />
-        <SummaryChip label="Shown" value={String(data.filtered)} />
-        {mc && mc.total > 0 && (
-          <>
-            <SummaryChip label="Movements" value={String(mc.total)} accent="#3b82f6" />
-            {mc.teaming > 0 && <SummaryChip label="Teaming" value={String(mc.teaming)} accent="#8b5cf6" />}
-            {mc.contract_wins > 0 && <SummaryChip label="Wins" value={String(mc.contract_wins)} accent="#22c55e" />}
-            {mc.personnel > 0 && <SummaryChip label="Personnel" value={String(mc.personnel)} accent="#f59e0b" />}
-            {mc.mergers > 0 && <SummaryChip label="M&A" value={String(mc.mergers)} accent="#ef4444" />}
-          </>
-        )}
+      {/* Header + Scan Button */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <SummaryChip label="Tracked" value={String(data.total)} />
+          <SummaryChip label="Shown" value={String(data.filtered)} />
+          {mc && mc.total > 0 && (
+            <>
+              <SummaryChip label="Movements" value={String(mc.total)} accent="#3b82f6" />
+              {mc.teaming > 0 && <SummaryChip label="Teaming" value={String(mc.teaming)} accent="#8b5cf6" />}
+              {mc.contract_wins > 0 && <SummaryChip label="Wins" value={String(mc.contract_wins)} accent="#22c55e" />}
+              {mc.personnel > 0 && <SummaryChip label="Personnel" value={String(mc.personnel)} accent="#f59e0b" />}
+              {mc.mergers > 0 && <SummaryChip label="M&A" value={String(mc.mergers)} accent="#ef4444" />}
+            </>
+          )}
+        </div>
+        <button
+          onClick={handleScan}
+          disabled={scanning}
+          style={{
+            padding: "8px 18px",
+            background: scanning ? "#444" : "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            cursor: scanning ? "not-allowed" : "pointer",
+            fontWeight: 600,
+            fontSize: 13,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {scanning ? "Scanning..." : "AI Scan Competitors"}
+        </button>
       </div>
+
+      {/* Scan Result */}
+      {scanResult && (
+        <div style={{
+          padding: "10px 14px",
+          background: scanResult.isError ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.08)",
+          border: `1px solid ${scanResult.isError ? "rgba(239,68,68,0.25)" : "rgba(34,197,94,0.25)"}`,
+          borderRadius: 8,
+          marginBottom: 14,
+          fontSize: 13,
+          color: scanResult.isError ? "#ef4444" : "#22c55e",
+        }}>
+          {scanResult.message}
+        </div>
+      )}
 
       {/* Teaming Opportunities Alert */}
       {data.teamingOpportunities && data.teamingOpportunities.length > 0 && (
@@ -954,6 +1017,18 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                       color: c.watch_status === "active" ? "#ef4444" : "#6b7280",
                     }}>
                       {c.watch_status}
+                    </span>
+                    {/* Classification badge */}
+                    <span style={{
+                      padding: "1px 8px",
+                      borderRadius: 10,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      textTransform: "capitalize",
+                      background: c.classification === "team" ? "rgba(34,197,94,0.15)" : c.classification === "threat" ? "rgba(239,68,68,0.15)" : "rgba(107,114,128,0.15)",
+                      color: c.classification === "team" ? "#22c55e" : c.classification === "threat" ? "#ef4444" : "#6b7280",
+                    }}>
+                      {c.classification ?? "neutral"}
                     </span>
                     {movements.length > 0 && (
                       <span style={{
@@ -1117,6 +1192,112 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                       NAICS: {c.primary_naics.join(", ")}
                     </span>
                   </div>
+
+                  {/* Classification + AI Analyze */}
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--color-border)" }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)" }}>Classification:</label>
+                    <select
+                      value={c.classification ?? "neutral"}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={async (e) => {
+                        e.stopPropagation();
+                        const newClass = e.target.value;
+                        try {
+                          const resp = await authenticatedFetch(`/api/intel/competitors/${c.id}/classify`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ classification: newClass }),
+                          });
+                          if (resp.ok) loadCompetitors();
+                        } catch { /* ignore */ }
+                      }}
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-surface)",
+                        color: "var(--color-text)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="team">Team</option>
+                      <option value="threat">Threat</option>
+                      <option value="neutral">Neutral</option>
+                    </select>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const btn = e.currentTarget;
+                        btn.disabled = true;
+                        btn.textContent = "Analyzing...";
+                        try {
+                          const resp = await authenticatedFetch(`/api/intel/competitors/${c.id}/analyze`, { method: "POST" });
+                          const env = await resp.json();
+                          if (env.success) {
+                            loadCompetitors();
+                            btn.textContent = "Done";
+                          } else {
+                            btn.textContent = "Failed";
+                          }
+                        } catch {
+                          btn.textContent = "Failed";
+                        } finally {
+                          setTimeout(() => { btn.disabled = false; btn.textContent = "AI Analyze"; }, 2000);
+                        }
+                      }}
+                      style={{
+                        padding: "4px 12px",
+                        background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        fontSize: 11,
+                        fontWeight: 600,
+                      }}
+                    >AI Analyze</button>
+                    {c.analyzed_at && (
+                      <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+                        Last analyzed: {formatDate(c.analyzed_at)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* AI Analysis Results */}
+                  {c.ai_analysis && (() => {
+                    const aa = c.ai_analysis as { threat_summary?: string; overlap_areas?: string[]; teaming_potential?: string; recommended_strategy?: string };
+                    return (
+                      <div style={{ marginTop: 12, padding: 12, background: "rgba(59,130,246,0.04)", borderRadius: 6, border: "1px solid rgba(59,130,246,0.15)" }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "#3b82f6", marginBottom: 8 }}>AI Analysis</div>
+                        {aa.threat_summary && (
+                          <div style={{ fontSize: 13, marginBottom: 8 }}>{aa.threat_summary}</div>
+                        )}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {Array.isArray(aa.overlap_areas) && aa.overlap_areas.length > 0 && (
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: "#f59e0b", marginBottom: 4 }}>Overlap Areas</div>
+                              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: "var(--color-text-muted)" }}>
+                                {aa.overlap_areas.map((a: string, i: number) => <li key={i}>{a}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                          {aa.teaming_potential && (
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: "#22c55e", marginBottom: 4 }}>Teaming Potential</div>
+                              <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{aa.teaming_potential}</div>
+                            </div>
+                          )}
+                        </div>
+                        {aa.recommended_strategy && (
+                          <div style={{ marginTop: 8, fontSize: 12, color: "#8b5cf6", fontStyle: "italic" }}>
+                            Strategy: {aa.recommended_strategy}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

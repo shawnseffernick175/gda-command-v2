@@ -15,6 +15,7 @@ import {
   type ColorReviewBlueAssessmentRow,
   type ColorReviewBlackHatFindingRow,
 } from "../api/client";
+import { authenticatedFetch } from "../api/auth";
 
 const PHASE_COLORS: Record<string, string> = {
   blue: "#3b82f6",
@@ -217,7 +218,7 @@ export default function ColorReview() {
           borderRadius: 4,
           background: source === "n8n" ? "#166534" : "#1e3a5f",
           color: source === "n8n" ? "#4ade80" : "#60a5fa",
-        }}>{source === "n8n" ? "Live n8n" : "Live DB"}</span>
+        }}>{source === "n8n" ? "Live API" : "Live DB"}</span>
         <div style={{ flex: 1 }} />
         <button
           onClick={() => { setRunModal(true); setRunResult(null); }}
@@ -518,6 +519,31 @@ export default function ColorReview() {
                     {formatDate(sel.started_at)}
                     {sel.completed_at ? ` — ${formatDate(sel.completed_at)}` : ""}
                   </span>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const res = await authenticatedFetch(`/api/color-review/${sel.id}/export`);
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `color-review-${sel.phase}-${sel.id.slice(0, 8)}.html`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch { /* ignore */ }
+                    }}
+                    style={{
+                      background: "#1e3a5f",
+                      color: "#60a5fa",
+                      border: "1px solid #60a5fa",
+                      borderRadius: 4,
+                      padding: "3px 10px",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      fontSize: 11,
+                    }}
+                  >Export Report</button>
                 </div>
               </div>
 

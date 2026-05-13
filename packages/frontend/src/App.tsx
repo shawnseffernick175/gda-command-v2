@@ -36,6 +36,7 @@ import Charts from "./pages/Charts";
 import BookOfTruths from "./pages/BookOfTruths";
 import GovWin from "./pages/GovWin";
 import RiskRegister from "./pages/RiskRegister";
+import ProposalCenter from "./pages/ProposalCenter";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -60,6 +61,7 @@ const NAV_GROUPS = [
   {
     label: "Capture",
     items: [
+      { path: "/proposal-center", label: "Proposal Center", icon: "📝" },
       { path: "/rfp-shredder", label: "RFP Shredder", icon: "✂" },
       { path: "/compliance", label: "Compliance", icon: "📋" },
       { path: "/proposals", label: "Proposals", icon: "📄" },
@@ -513,6 +515,7 @@ export default function App() {
             <Route path="/book-of-truths" element={<BookOfTruths />} />
             <Route path="/help" element={<UserManual />} />
             <Route path="/risk-register" element={<RiskRegister />} />
+            <Route path="/proposal-center" element={<ProposalCenter />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

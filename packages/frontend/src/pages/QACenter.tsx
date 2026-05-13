@@ -2,10 +2,29 @@ import { useEffect, useState } from "react";
 import {
   fetchQAHealth,
   fetchQALatestFailures,
+  triggerControlledFix,
+  fetchPendingFixes,
+  resolveFixProposal as resolveFixProposalApi,
   type QAHealthData,
   type QAFailure,
   type QACheckRow,
+  type FixProposalItem,
+  type ControlledFixResult,
 } from "../api/client";
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: "#ef4444",
+  high: "#f59e0b",
+  medium: "#3b82f6",
+  low: "#6b7280",
+};
+
+const FIX_TYPE_LABELS: Record<string, string> = {
+  auto: "Auto-fix",
+  manual: "Manual",
+  restart: "Restart",
+  config_change: "Config Change",
+};
 
 export default function QACenter() {
   const [health, setHealth] = useState<QAHealthData | null>(null);
@@ -13,6 +32,13 @@ export default function QACenter() {
   const [source, setSource] = useState<"db" | "live" | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagResult, setDiagResult] = useState<ControlledFixResult | null>(null);
+  const [diagError, setDiagError] = useState<string | null>(null);
+  const [fixes, setFixes] = useState<FixProposalItem[]>([]);
+  const [fixesLoading, setFixesLoading] = useState(false);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [expandedFix, setExpandedFix] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -35,8 +61,52 @@ export default function QACenter() {
     }
   }
 
+  async function loadFixes() {
+    setFixesLoading(true);
+    try {
+      const res = await fetchPendingFixes();
+      if (res.success && res.data) setFixes(res.data.fixes);
+    } catch {
+      // silent — fixes section is supplementary
+    } finally {
+      setFixesLoading(false);
+    }
+  }
+
+  async function handleDiagnose() {
+    setDiagnosing(true);
+    setDiagResult(null);
+    setDiagError(null);
+    try {
+      const res = await triggerControlledFix();
+      if (res.success && res.data) {
+        setDiagResult(res.data);
+        loadFixes();
+      } else {
+        setDiagError(res.error?.message ?? "Diagnosis failed");
+      }
+    } catch (err) {
+      setDiagError(err instanceof Error ? err.message : "Diagnosis failed");
+    } finally {
+      setDiagnosing(false);
+    }
+  }
+
+  async function handleResolve(id: string, action: "approve" | "reject") {
+    setResolvingId(id);
+    try {
+      await resolveFixProposalApi(id, action);
+      loadFixes();
+    } catch {
+      // silent
+    } finally {
+      setResolvingId(null);
+    }
+  }
+
   useEffect(() => {
     load();
+    loadFixes();
   }, []);
 
   if (loading) return <LoadingSkeleton />;
@@ -58,7 +128,7 @@ export default function QACenter() {
             color: source === "live" ? "var(--color-success)" : "var(--color-accent, #3b82f6)",
             fontWeight: 500,
           }}>
-            {source === "live" ? "Live n8n" : "Live DB"}
+            {source === "live" ? "Live API" : "Live DB"}
           </span>
         )}
       </div>
@@ -66,20 +136,73 @@ export default function QACenter() {
       {health && <HealthPanel health={health} />}
 
       <div style={{ marginTop: 32 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
-          Latest Failures
-          <span style={{
-            marginLeft: 8,
-            padding: "2px 10px",
-            borderRadius: 12,
-            fontSize: 12,
-            fontWeight: 500,
-            background: "rgba(239,68,68,0.15)",
-            color: "var(--color-danger)",
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600 }}>
+            Latest Failures
+            <span style={{
+              marginLeft: 8,
+              padding: "2px 10px",
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 500,
+              background: "rgba(239,68,68,0.15)",
+              color: "var(--color-danger)",
+            }}>
+              {failures.length} total
+            </span>
+          </h2>
+          <button
+            onClick={handleDiagnose}
+            disabled={diagnosing}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: "none",
+              background: diagnosing
+                ? "rgba(107,114,128,0.3)"
+                : "linear-gradient(135deg, #f59e0b, #d97706)",
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: diagnosing ? "not-allowed" : "pointer",
+            }}
+          >
+            {diagnosing ? "Diagnosing Failures..." : "Diagnose Failures"}
+          </button>
+        </div>
+
+        {diagResult && (
+          <div style={{
+            padding: "10px 16px",
+            borderRadius: 8,
+            marginBottom: 12,
+            background: diagResult.summary.new_failures === 0
+              ? "rgba(59,130,246,0.12)"
+              : "rgba(34,197,94,0.12)",
+            color: diagResult.summary.new_failures === 0
+              ? "var(--color-accent, #3b82f6)"
+              : "var(--color-success)",
+            fontSize: 13,
           }}>
-            {failures.length} total
-          </span>
-        </h2>
+            {diagResult.summary.new_failures === 0
+              ? `Scanned ${diagResult.summary.total_failures} failures — no new issues to diagnose`
+              : `Diagnosed ${diagResult.summary.new_failures} new failures — ${diagResult.summary.proposals_created} fix proposals created, ${diagResult.summary.approvals_queued} queued for approval`
+            }
+          </div>
+        )}
+        {diagError && (
+          <div style={{
+            padding: "10px 16px",
+            borderRadius: 8,
+            marginBottom: 12,
+            background: "rgba(239,68,68,0.12)",
+            color: "var(--color-danger)",
+            fontSize: 13,
+          }}>
+            {diagError}
+          </div>
+        )}
+
         {failures.length === 0 ? (
           <p style={{ color: "var(--color-text-muted)" }}>
             No recent failures recorded.
@@ -88,6 +211,164 @@ export default function QACenter() {
           <LiveFailuresTable failures={failures} />
         ) : (
           <MockFailuresTable failures={failures} />
+        )}
+      </div>
+
+      {/* Fix Proposals Section */}
+      <div style={{ marginTop: 32 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12 }}>
+          Fix Proposals
+          <span style={{
+            marginLeft: 8,
+            padding: "2px 10px",
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 500,
+            background: fixes.length > 0 ? "rgba(245,158,11,0.15)" : "rgba(107,114,128,0.15)",
+            color: fixes.length > 0 ? "#f59e0b" : "var(--color-text-muted)",
+          }}>
+            {fixes.length} pending
+          </span>
+        </h2>
+
+        {fixesLoading ? (
+          <p style={{ color: "var(--color-text-muted)" }}>Loading fix proposals...</p>
+        ) : fixes.length === 0 ? (
+          <p style={{ color: "var(--color-text-muted)" }}>
+            No pending fix proposals. Click "Diagnose Failures" to scan for issues.
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {fixes.map((fix) => (
+              <div
+                key={fix.id}
+                style={{
+                  background: "var(--color-surface, #1e293b)",
+                  borderRadius: 8,
+                  padding: "16px 20px",
+                  border: `1px solid ${SEVERITY_COLORS[fix.severity] ?? "#374151"}30`,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: `${SEVERITY_COLORS[fix.severity] ?? "#6b7280"}20`,
+                        color: SEVERITY_COLORS[fix.severity] ?? "#6b7280",
+                        textTransform: "uppercase",
+                      }}>
+                        {fix.severity}
+                      </span>
+                      <span style={{
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        background: "rgba(107,114,128,0.15)",
+                        color: "var(--color-text-muted)",
+                      }}>
+                        {FIX_TYPE_LABELS[fix.fix_type] ?? fix.fix_type}
+                      </span>
+                      {fix.auto_fixable && (
+                        <span style={{
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 500,
+                          background: "rgba(34,197,94,0.15)",
+                          color: "var(--color-success)",
+                        }}>
+                          Auto-fixable
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                      {fix.workflow_name}
+                      {fix.failed_node && (
+                        <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                          {" "}→ {fix.failed_node}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--color-danger)", marginBottom: 6 }}>
+                      {fix.error_message}
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                      <strong>Root cause:</strong> {fix.root_cause}
+                    </div>
+
+                    {expandedFix === fix.id && (
+                      <div style={{ marginTop: 12, fontSize: 13 }}>
+                        <div style={{ marginBottom: 8 }}>
+                          <strong>Suggested Fix:</strong>
+                          <div style={{ marginTop: 4, padding: "8px 12px", background: "rgba(34,197,94,0.08)", borderRadius: 6 }}>
+                            {fix.suggested_fix}
+                          </div>
+                        </div>
+                        {fix.risk_assessment && (
+                          <div style={{ marginBottom: 8 }}>
+                            <strong>Risk:</strong>
+                            <div style={{ marginTop: 4, padding: "8px 12px", background: "rgba(239,68,68,0.08)", borderRadius: 6 }}>
+                              {fix.risk_assessment}
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ color: "var(--color-text-muted)" }}>
+                          Safety lane: <code>{fix.safety_lane}</code> | Created: {new Date(fix.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => setExpandedFix(expandedFix === fix.id ? null : fix.id)}
+                      style={{ background: "none", border: "none", color: "var(--color-accent, #3b82f6)", cursor: "pointer", padding: 0, marginTop: 6, fontSize: 12 }}
+                    >
+                      {expandedFix === fix.id ? "Hide details" : "Show details"}
+                    </button>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, marginLeft: 16 }}>
+                    <button
+                      onClick={() => handleResolve(fix.id, "approve")}
+                      disabled={resolvingId === fix.id}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: "rgba(34,197,94,0.2)",
+                        color: "var(--color-success)",
+                        fontWeight: 600,
+                        fontSize: 12,
+                        cursor: resolvingId === fix.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleResolve(fix.id, "reject")}
+                      disabled={resolvingId === fix.id}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: "rgba(239,68,68,0.2)",
+                        color: "var(--color-danger)",
+                        fontWeight: 600,
+                        fontSize: 12,
+                        cursor: resolvingId === fix.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

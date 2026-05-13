@@ -10,8 +10,19 @@ import {
   type SAMOpportunityRow,
   type SAMScanRow,
 } from "../api/client";
+import { authenticatedFetch } from "../api/auth";
 
-type Tab = "opportunities" | "scans";
+type Tab = "opportunities" | "scans" | "gov-sources";
+
+interface GovSourceFeed {
+  id: string;
+  source: string;
+  name: string;
+  enabled: boolean;
+  last_sync_at: string | null;
+  last_sync_count: number;
+  error_count: number;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   new: "#3b82f6",
@@ -84,6 +95,9 @@ export default function SAMMonitor() {
   const [scoring, setScoring] = useState(false);
   const [scoreMsg, setScoreMsg] = useState<string | null>(null);
   const [scoreError, setScoreError] = useState(false);
+  const [govSources, setGovSources] = useState<GovSourceFeed[]>([]);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncAllMsg, setSyncAllMsg] = useState<string | null>(null);
 
   const handleAIScore = async () => {
     setScoring(true);
@@ -107,12 +121,39 @@ export default function SAMMonitor() {
     setScoring(false);
   };
 
+  const loadGovSources = () => {
+    authenticatedFetch("/api/feeds/gov-sources").then((r) => r.json()).then((env) => {
+      if (env.success && env.data?.sources) setGovSources(env.data.sources);
+    }).catch(() => {});
+  };
+
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    setSyncAllMsg(null);
+    try {
+      const resp = await authenticatedFetch("/api/feeds/gov-sources/sync", { method: "POST" });
+      const env = await resp.json();
+      if (env.success && env.data?.summary) {
+        const s = env.data.summary;
+        setSyncAllMsg(`Synced ${s.sources_synced} sources: ${s.total_fetched} found, ${s.total_upserted} upserted`);
+        loadGovSources();
+      } else {
+        setSyncAllMsg(env.error?.message ?? "Sync failed");
+      }
+    } catch (e) {
+      setSyncAllMsg((e as Error).message);
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
   useEffect(() => {
     Promise.all([
       fetchSAMSummary().then((r) => { if (r.data) setSummary(r.data); }),
       fetchSAMOpportunities().then((r) => { if (r.data) setOpps(r.data); }),
       fetchSAMScans().then((r) => { if (r.data) setScans(r.data); }),
     ]).finally(() => setLoading(false));
+    loadGovSources();
   }, []);
 
   const filtered = opps.filter((o) => {
@@ -148,12 +189,12 @@ export default function SAMMonitor() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, marginBottom: 16, borderBottom: "1px solid var(--color-border)" }}>
-        {(["opportunities", "scans"] as Tab[]).map((t) => (
+        {(["opportunities", "scans", "gov-sources"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "8px 20px", background: "transparent", border: "none", borderBottom: tab === t ? "2px solid #3b82f6" : "2px solid transparent",
             color: tab === t ? "#3b82f6" : "var(--color-text-muted)", fontWeight: 600, fontSize: 13, cursor: "pointer",
           }}>
-            {t === "opportunities" ? `Opportunities (${filtered.length})` : `Scan History (${scans.length})`}
+            {t === "opportunities" ? `Opportunities (${filtered.length})` : t === "scans" ? `Scan History (${scans.length})` : `Gov Sources (${govSources.length})`}
           </button>
         ))}
       </div>
@@ -349,6 +390,75 @@ export default function SAMMonitor() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "gov-sources" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
+              Configured government data sources for automatic opportunity pull. Sources sync every 6 hours alongside SAM.gov and FPDS.
+            </p>
+            <button
+              onClick={handleSyncAll}
+              disabled={syncingAll}
+              style={{
+                padding: "8px 18px",
+                background: syncingAll ? "#444" : "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                cursor: syncingAll ? "not-allowed" : "pointer",
+                fontWeight: 600,
+                fontSize: 13,
+              }}
+            >{syncingAll ? "Syncing..." : "Sync All Sources"}</button>
+          </div>
+          {syncAllMsg && (
+            <div style={{ padding: "10px 14px", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 8, marginBottom: 14, fontSize: 13, color: "#22c55e" }}>
+              {syncAllMsg}
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+            {govSources.map((src) => {
+              const SOURCE_ICONS: Record<string, string> = { sam_gov: "🏛", fpds: "📜", govwin: "🌐", govtribe: "🔍", usaspending: "💰", dibbs: "🏭" };
+              return (
+                <div key={src.id} style={{
+                  padding: 16,
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 10,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>{SOURCE_ICONS[src.source] ?? "📡"}</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{src.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{src.source}</div>
+                    </div>
+                    <span style={{
+                      marginLeft: "auto",
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      background: src.enabled ? "rgba(34,197,94,0.15)" : "rgba(107,114,128,0.15)",
+                      color: src.enabled ? "#22c55e" : "#6b7280",
+                    }}>{src.enabled ? "Enabled" : "Disabled"}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--color-text-muted)" }}>
+                    <span>Last sync: {src.last_sync_at ? relTime(src.last_sync_at) : "Never"}</span>
+                    <span>Records: {src.last_sync_count}</span>
+                    {src.error_count > 0 && <span style={{ color: "#ef4444" }}>Errors: {src.error_count}</span>}
+                  </div>
+                </div>
+              );
+            })}
+            {govSources.length === 0 && (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", gridColumn: "1 / -1" }}>
+                No gov source feeds configured yet. Run the 016_company_intelligence migration to seed default feeds.
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
