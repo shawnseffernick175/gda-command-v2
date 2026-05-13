@@ -96,7 +96,7 @@ When doing a comprehensive audit, navigate every page and verify:
 |---------|-------------|
 | Sidebar collapse | Click ◀ button, verify icon-only rail, click ▶ to expand back |
 | Notifications | Click bell icon at bottom of sidebar, verify panel renders |
-| Financial KPI strip | Observe top header — shows "Financial KPIs unavailable" + Retry when no data |
+| Financial KPI strip | Observe top header — shows 10 KPIs with real values when data is seeded |
 | 404 page | Navigate to `/nonexistent-page`, verify "Page not found" with Back to Launchpad link |
 
 ## Known Issues
