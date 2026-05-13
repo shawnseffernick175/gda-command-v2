@@ -46,6 +46,9 @@ import agentsRouter from "./routes/agents";
 import morningCommanderRouter from "./routes/morning-commander";
 import opportunityWatchRouter from "./routes/opportunity-watch";
 import competitiveIntelRouter from "./routes/competitive-intel";
+import captureCoachRouter from "./routes/capture-coach";
+import controlledFixRouter from "./routes/controlled-fix";
+import n8nProxyRouter from "./routes/n8n-proxy";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -163,7 +166,12 @@ app.use("/api/company-profile", companyProfileRouter);
 app.use("/api/agents/morning-commander", morningCommanderRouter);
 app.use("/api/agents/opportunity-watch", opportunityWatchRouter);
 app.use("/api/agents/competitive-intel", competitiveIntelRouter);
+app.use("/api/agents/capture-coach", captureCoachRouter);
+app.use("/api/agents/fix-runner", controlledFixRouter);
 app.use("/api/agents", agentsRouter);
+
+// --- n8n webhook proxy (generic pass-through to any n8n workflow) ---
+app.use("/api/n8n", n8nProxyRouter);
 
 // --- Frontend error reporting endpoint ---
 app.post("/api/errors", (req, res) => {

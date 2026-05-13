@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import AskAIChat from "../components/AskAIChat";
 import SourceBadge from "../components/SourceBadge";
+import { authenticatedFetch } from "../api/auth";
 import {
   fetchOpportunityDetail,
   fetchPwinBreakdown,
@@ -21,6 +22,62 @@ import {
   type BlackHatAnalysisData,
   type WargameAnalysisData,
 } from "../api/client";
+
+// ---------------------------------------------------------------------------
+// Capture Coach types
+// ---------------------------------------------------------------------------
+
+interface CaptureCoachFactor {
+  factor: string;
+  impact: "positive" | "negative" | "neutral";
+  detail: string;
+}
+
+interface CaptureCoachGap {
+  gap: string;
+  severity: "critical" | "high" | "medium" | "low";
+  mitigation: string;
+}
+
+interface CaptureCoachRisk {
+  risk: string;
+  likelihood: "high" | "medium" | "low";
+  impact: "high" | "medium" | "low";
+  mitigation: string;
+}
+
+interface CaptureCoachAction {
+  action: string;
+  priority: "critical" | "high" | "medium" | "low";
+  owner: string;
+  timeline: string;
+}
+
+interface CaptureCoachTeaming {
+  partner_type: string;
+  rationale: string;
+}
+
+interface CaptureCoachAnalysis {
+  opportunity_id: string;
+  win_probability: {
+    score: number;
+    confidence: "high" | "medium" | "low";
+    factors: CaptureCoachFactor[];
+  };
+  capture_strategy: {
+    approach: string;
+    discriminators: string[];
+    win_themes: string[];
+    teaming_recommendations: CaptureCoachTeaming[];
+  };
+  gap_analysis: CaptureCoachGap[];
+  risk_assessment: CaptureCoachRisk[];
+  next_actions: CaptureCoachAction[];
+  executive_summary: string;
+  model_used: string;
+  generated_at: string;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   discovery: "#6b7280",
@@ -80,6 +137,11 @@ export default function OpportunityDetail() {
   const [blackHat, setBlackHat] = useState<BlackHatAnalysisData | null>(null);
   const [wargame, setWargame] = useState<WargameAnalysisData | null>(null);
 
+  // Capture Coach state
+  const [coachAnalysis, setCoachAnalysis] = useState<CaptureCoachAnalysis | null>(null);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachResult, setCoachResult] = useState<{ message: string; isError: boolean } | null>(null);
+
   const backPath = location.state?.from ?? "/ops-tracker";
   const backLabel = backPath === "/pipeline" ? "Pipeline" : backPath === "/" ? "Launchpad" : "Ops Tracker";
 
@@ -104,6 +166,8 @@ export default function OpportunityDetail() {
     setCompetitors(null);
     setBlackHat(null);
     setWargame(null);
+    setCoachAnalysis(null);
+    setCoachResult(null);
 
     // Fetch enrichments in parallel (non-blocking)
     fetchPwinBreakdown(id).then((e) => { if (e.success && e.data) setPwin(e.data); }).catch(() => {});
@@ -111,6 +175,13 @@ export default function OpportunityDetail() {
     fetchCompetitorField(id).then((e) => { if (e.success && e.data) setCompetitors(e.data); }).catch(() => {});
     fetchBlackHatAnalysis(id).then((e) => { if (e.success && e.data) setBlackHat(e.data); }).catch(() => {});
     fetchWargameAnalysis(id).then((e) => { if (e.success && e.data) setWargame(e.data); }).catch(() => {});
+    // Fetch cached Capture Coach analysis
+    authenticatedFetch(`/api/agents/capture-coach/analysis/${id}`)
+      .then((r) => r.json())
+      .then((env: { success: boolean; data: { analysis: CaptureCoachAnalysis | null } | null }) => {
+        if (env.success && env.data?.analysis) setCoachAnalysis(env.data.analysis);
+      })
+      .catch(() => {});
   }, [id]);
 
   if (loading) {
@@ -143,6 +214,34 @@ export default function OpportunityDetail() {
 
   const { opportunity: opp, analysis, ooda, sources, learning } = data;
 
+  const handleCaptureCoach = async () => {
+    if (!id) return;
+    setCoachLoading(true);
+    setCoachResult(null);
+    try {
+      const res = await authenticatedFetch("/api/agents/capture-coach/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunityId: id }),
+      });
+      const env = await res.json();
+      if (env.success && env.data?.analysis) {
+        setCoachAnalysis(env.data.analysis);
+        const wp = env.data.analysis.win_probability;
+        setCoachResult({
+          message: `Strategy generated — Win probability: ${wp.score}% (${wp.confidence} confidence) | ${env.data.analysis.next_actions?.length ?? 0} actions, ${env.data.analysis.gap_analysis?.length ?? 0} gaps, ${env.data.analysis.risk_assessment?.length ?? 0} risks`,
+          isError: false,
+        });
+      } else {
+        setCoachResult({ message: env.error?.message ?? "Failed to generate strategy", isError: true });
+      }
+    } catch (err) {
+      setCoachResult({ message: (err as Error).message, isError: true });
+    } finally {
+      setCoachLoading(false);
+    }
+  };
+
   return (
     <div style={{ padding: "1.5rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
       {/* Breadcrumb */}
@@ -174,7 +273,7 @@ export default function OpportunityDetail() {
       </div>
       <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 20 }}>
         <span style={{ ...styles.sourceBadge, background: data.source === "db" ? "#166534" : "#1e3a5f" }}>
-          {data.source === "n8n" ? "Live n8n" : "Live DB"}
+          {data.source === "n8n" ? "Live API" : "Live DB"}
         </span>
         {opp.id}
       </div>
@@ -576,7 +675,193 @@ export default function OpportunityDetail() {
         </div>
       </Section>
 
-      {/* Section 8: Ask AI */}
+      {/* Section: Capture Coach — AI Strategy Advisor */}
+      <Section title="Capture Coach — AI Strategy">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 13, color: "#9ca3af" }}>
+            {coachAnalysis
+              ? `Last generated: ${new Date(coachAnalysis.generated_at).toLocaleString()} (${coachAnalysis.model_used})`
+              : "No strategy generated yet. Click to analyze this opportunity."}
+          </div>
+          <button
+            onClick={handleCaptureCoach}
+            disabled={coachLoading}
+            style={{
+              padding: "8px 18px",
+              background: coachLoading ? "#444" : "linear-gradient(135deg, #8b5cf6, #ec4899)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: coachLoading ? "not-allowed" : "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {coachLoading ? "Generating Strategy..." : coachAnalysis ? "Regenerate Strategy" : "Generate Strategy"}
+          </button>
+        </div>
+
+        {coachResult && (
+          <div style={{
+            padding: "10px 14px",
+            background: coachResult.isError ? "rgba(239,68,68,0.08)" : "rgba(34,197,94,0.08)",
+            border: `1px solid ${coachResult.isError ? "rgba(239,68,68,0.25)" : "rgba(34,197,94,0.25)"}`,
+            borderRadius: 8,
+            marginBottom: 14,
+            fontSize: 13,
+            color: coachResult.isError ? "#ef4444" : "#22c55e",
+          }}>
+            {coachResult.message}
+          </div>
+        )}
+
+        {coachAnalysis && (
+          <div>
+            {/* Executive Summary */}
+            <div style={{ padding: "12px 16px", background: "rgba(139,92,246,0.08)", borderRadius: 8, marginBottom: 16, fontSize: 13, lineHeight: 1.6 }}>
+              <strong style={{ color: "#8b5cf6" }}>Executive Summary</strong>
+              <p style={{ margin: "6px 0 0" }}>{coachAnalysis.executive_summary}</p>
+            </div>
+
+            {/* Win Probability */}
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+              <div style={{ textAlign: "center", padding: "12px 20px", background: "var(--color-surface)", borderRadius: 8, border: "1px solid var(--color-border)" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(coachAnalysis.win_probability.score) }}>
+                  {coachAnalysis.win_probability.score}%
+                </div>
+                <div style={{ fontSize: 11, color: "#9ca3af" }}>Win Probability</div>
+                <div style={{ fontSize: 11, color: coachAnalysis.win_probability.confidence === "high" ? "#22c55e" : coachAnalysis.win_probability.confidence === "medium" ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2 }}>
+                  {coachAnalysis.win_probability.confidence} confidence
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 300 }}>
+                <strong style={{ fontSize: 13, color: "#d1d5db" }}>Win Factors</strong>
+                <div style={{ marginTop: 6 }}>
+                  {coachAnalysis.win_probability.factors.map((f, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 0", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                      <span style={{ color: f.impact === "positive" ? "#22c55e" : f.impact === "negative" ? "#ef4444" : "#9ca3af", fontWeight: 700, minWidth: 14 }}>
+                        {f.impact === "positive" ? "+" : f.impact === "negative" ? "-" : "~"}
+                      </span>
+                      <span><strong>{f.factor}:</strong> {f.detail}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Capture Strategy */}
+            <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#3b82f6" }}>Capture Strategy</summary>
+              <p style={{ margin: "8px 0", fontSize: 13, lineHeight: 1.6 }}>{coachAnalysis.capture_strategy.approach}</p>
+              {coachAnalysis.capture_strategy.win_themes.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <strong style={{ fontSize: 12, color: "#22c55e" }}>Win Themes</strong>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    {coachAnalysis.capture_strategy.win_themes.map((t, i) => (
+                      <span key={i} style={{ padding: "3px 10px", background: "rgba(34,197,94,0.12)", borderRadius: 12, fontSize: 12, color: "#22c55e" }}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {coachAnalysis.capture_strategy.discriminators.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <strong style={{ fontSize: 12, color: "#8b5cf6" }}>Discriminators</strong>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    {coachAnalysis.capture_strategy.discriminators.map((d, i) => (
+                      <span key={i} style={{ padding: "3px 10px", background: "rgba(139,92,246,0.12)", borderRadius: 12, fontSize: 12, color: "#8b5cf6" }}>{d}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {coachAnalysis.capture_strategy.teaming_recommendations.length > 0 && (
+                <div>
+                  <strong style={{ fontSize: 12, color: "#f59e0b" }}>Teaming Recommendations</strong>
+                  {coachAnalysis.capture_strategy.teaming_recommendations.map((t, i) => (
+                    <div key={i} style={{ padding: "6px 0", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                      <strong>{t.partner_type}:</strong> {t.rationale}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </details>
+
+            {/* Gap Analysis */}
+            {coachAnalysis.gap_analysis.length > 0 && (
+              <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#f59e0b" }}>Gap Analysis ({coachAnalysis.gap_analysis.length})</summary>
+                <div style={{ marginTop: 8 }}>
+                  {coachAnalysis.gap_analysis.map((g, i) => (
+                    <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 13 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <strong>{g.gap}</strong>
+                        <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: g.severity === "critical" ? "#991b1b" : g.severity === "high" ? "#92400e" : g.severity === "medium" ? "#854d0e" : "#1e3a5f", color: "#fff" }}>
+                          {g.severity}
+                        </span>
+                      </div>
+                      <div style={{ color: "#9ca3af", marginTop: 4 }}>{g.mitigation}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {/* Risk Assessment */}
+            {coachAnalysis.risk_assessment.length > 0 && (
+              <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#ef4444" }}>Risk Assessment ({coachAnalysis.risk_assessment.length})</summary>
+                <div style={{ marginTop: 8 }}>
+                  {coachAnalysis.risk_assessment.map((r, i) => (
+                    <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 13 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <strong>{r.risk}</strong>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <span style={{ fontSize: 11, color: "#9ca3af" }}>L: {r.likelihood}</span>
+                          <span style={{ fontSize: 11, color: "#9ca3af" }}>I: {r.impact}</span>
+                        </div>
+                      </div>
+                      <div style={{ color: "#9ca3af", marginTop: 4 }}>{r.mitigation}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {/* Next Actions */}
+            {coachAnalysis.next_actions.length > 0 && (
+              <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#22c55e" }}>Next Actions ({coachAnalysis.next_actions.length})</summary>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--color-border)", color: "#9ca3af", fontSize: 11 }}>Action</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--color-border)", color: "#9ca3af", fontSize: 11 }}>Priority</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--color-border)", color: "#9ca3af", fontSize: 11 }}>Owner</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--color-border)", color: "#9ca3af", fontSize: 11 }}>Timeline</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coachAnalysis.next_actions.map((a, i) => (
+                      <tr key={i}>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{a.action}</td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                          <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: a.priority === "critical" ? "#991b1b" : a.priority === "high" ? "#92400e" : a.priority === "medium" ? "#854d0e" : "#1e3a5f", color: "#fff" }}>
+                            {a.priority}
+                          </span>
+                        </td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)", color: "#9ca3af" }}>{a.owner}</td>
+                        <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)", color: "#9ca3af" }}>{a.timeline}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            )}
+          </div>
+        )}
+      </Section>
+
+      {/* Section: Ask AI */}
       <div style={{ marginTop: 24 }}>
         <AskAIChat opportunityId={id ?? ""} opportunityTitle={opp.title} />
       </div>

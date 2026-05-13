@@ -199,7 +199,7 @@ export default function Workflows() {
             color: isLive ? "#22c55e" : "#f59e0b",
           }}
         >
-          {isLive ? "Live n8n" : "Not configured"}
+          {isLive ? "Live API" : "Not configured"}
         </span>
       </div>
 

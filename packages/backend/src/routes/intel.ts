@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { successEnvelope } from "../middleware/envelope";
+import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 
 import {
   n8nWebhookConfigured,
@@ -318,6 +319,9 @@ router.get("/competitors", async (_req: Request, res: Response) => {
           weaknesses: (p.weaknesses ?? []) as string[],
           recent_wins: (p.recent_wins ?? []) as string[],
           watch_status: p.watch_status as string,
+          classification: (p.classification ?? "neutral") as string,
+          ai_analysis: p.ai_analysis as Record<string, unknown> | null,
+          analyzed_at: (p.analyzed_at ?? null) as string | null,
           last_updated: p.last_updated as string,
           movements: (movementsByCompetitor.get(p.id as string) ?? []).map((m) => ({
             id: m.id as string,
@@ -458,6 +462,141 @@ router.get("/competitors", async (_req: Request, res: Response) => {
       source: "db" as const,
     })
   );
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/intel/competitors/:id/classify — Set Team/Threat/Neutral
+// ---------------------------------------------------------------------------
+router.patch("/competitors/:id/classify", requireRole("admin", "bd_manager"), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { classification } = req.body as { classification?: string };
+  const valid = ["team", "threat", "neutral"];
+
+  if (!classification || !valid.includes(classification)) {
+    return res.status(400).json(errorEnvelope("GDA.api.competitor-classify", "update", {
+      code: "INVALID", message: `classification must be one of: ${valid.join(", ")}`, detail: null,
+    }));
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("GDA.api.competitor-classify", "update", {
+      code: "DB_UNAVAILABLE", message: "Database not available", detail: null,
+    }));
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE competitor_profiles SET classification = $2 WHERE id = $1",
+      [id, classification],
+    );
+    if (rowCount === 0) {
+      return res.status(404).json(errorEnvelope("GDA.api.competitor-classify", "update", {
+        code: "NOT_FOUND", message: `Competitor ${id} not found`, detail: null,
+      }));
+    }
+    res.json(successEnvelope("GDA.api.competitor-classify", "update", { id, classification }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.api.competitor-classify", "update", {
+      code: "INTERNAL", message: (err as Error).message, detail: null,
+    }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/intel/competitors/:id/analyze — On-demand AI analysis
+// ---------------------------------------------------------------------------
+router.post("/competitors/:id/analyze", requireRole("admin", "bd_manager"), async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("GDA.api.competitor-analyze", "run", {
+      code: "DB_UNAVAILABLE", message: "Database not available", detail: null,
+    }));
+  }
+
+  try {
+    const { rows } = await pool.query("SELECT * FROM competitor_profiles WHERE id = $1", [id]);
+    if (rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.api.competitor-analyze", "run", {
+        code: "NOT_FOUND", message: `Competitor ${id} not found`, detail: null,
+      }));
+    }
+
+    const comp = rows[0];
+
+    // Gather recent movements
+    const { rows: movements } = await pool.query(
+      "SELECT * FROM competitor_movements WHERE competitor_name ILIKE $1 ORDER BY detected_at DESC LIMIT 20",
+      [`%${comp.name}%`],
+    );
+
+    const { isLLMAvailable: llmCheck, chatCompletion: chat } = await import("../lib/llm");
+    if (!llmCheck()) {
+      return res.status(503).json(errorEnvelope("GDA.api.competitor-analyze", "run", {
+        code: "LLM_UNAVAILABLE", message: "No AI model available", detail: null,
+      }));
+    }
+
+    const prompt = `Analyze this defense contractor as a competitor to Envision Innovative Solutions (SDVOSB, defense IT/cyber/SETA/C5ISR, ~$382M revenue, ~41 employees):
+
+## Company: ${comp.name}
+- Threat Score: ${comp.threat_score}/100
+- Contracts Won: ${comp.contracts_won} ($${Number(comp.contracts_value).toLocaleString()})
+- NAICS Codes: ${(comp.primary_naics ?? []).join(", ")}
+- Strengths: ${(comp.strengths ?? []).join(", ")}
+- Weaknesses: ${(comp.weaknesses ?? []).join(", ")}
+- Recent Wins: ${(comp.recent_wins ?? []).join(", ")}
+- Classification: ${comp.classification ?? "neutral"}
+
+## Recent Movements (${movements.length})
+${movements.map((m: Record<string, unknown>) => `- [${m.movement_type}] ${m.title}: ${m.description ?? ""}`).join("\n")}
+
+Respond with ONLY valid JSON:
+{
+  "threat_summary": "2-3 sentence assessment of competitive threat",
+  "overlap_areas": ["area where they compete with Envision"],
+  "competitive_advantages": ["their advantages over Envision"],
+  "competitive_weaknesses": ["their weaknesses vs Envision"],
+  "teaming_potential": "assessment of teaming partnership potential",
+  "recommended_strategy": "1-2 sentence recommended strategy",
+  "recommended_classification": "team|threat|neutral",
+  "confidence": 0-100
+}`;
+
+    const result = await chat(
+      [{ role: "system", content: "You are a defense contracting competitive intelligence analyst." }, { role: "user", content: prompt }],
+      { tier: "fast" },
+    );
+
+    let analysis: Record<string, unknown>;
+    try {
+      const cleaned = result.content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      analysis = JSON.parse(cleaned);
+    } catch {
+      return res.status(500).json(errorEnvelope("GDA.api.competitor-analyze", "run", {
+        code: "PARSE_ERROR", message: "Failed to parse AI response", detail: null,
+      }));
+    }
+
+    // Store analysis
+    await pool.query(
+      "UPDATE competitor_profiles SET ai_analysis = $2, analyzed_at = NOW() WHERE id = $1",
+      [id, JSON.stringify(analysis)],
+    );
+
+    res.json(successEnvelope("GDA.api.competitor-analyze", "run", {
+      competitor_id: id,
+      name: comp.name,
+      analysis,
+      model: result.model,
+    }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.api.competitor-analyze", "run", {
+      code: "INTERNAL", message: (err as Error).message, detail: null,
+    }));
+  }
 });
 
 export default router;
