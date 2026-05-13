@@ -69,7 +69,7 @@ For each approved item:
 Only after CI passes and tests pass.
 
 ### Step 6: Deploy to Production VPS
-1. SSH into VPS (187.77.206.105)
+1. SSH into VPS (see internal runbook for access)
 2. `cd /root/gda-command-v2 && git pull origin main`
 3. `docker compose -f docker-compose.prod.yml build && docker compose -f docker-compose.prod.yml up -d`
 4. Run any new DB migrations
@@ -111,7 +111,7 @@ Express Backend (Node.js, port 3001)
 ```
 
 ### Infrastructure
-- **VPS:** Hostinger, IP 187.77.206.105, SSH as root
+- **VPS:** Hostinger (see internal runbook for access details)
 - **Docker:** Multi-container (frontend + backend + postgres), docker-compose.prod.yml
 - **SSL:** Traefik reverse proxy with Let's Encrypt
 - **Domain:** gda.csr-llc.tech (app), n8n.csr-llc.tech (automation)
@@ -126,7 +126,7 @@ Express Backend (Node.js, port 3001)
 ### Auth
 - JWT tokens
 - 5-tier RBAC: Administrator, BD Manager, Capture Lead, Analyst, Viewer
-- Shawn's login: shawn.seffernick@envision-is.com (admin)
+- Shawn's login: see internal runbook (admin role)
 
 ---
 
