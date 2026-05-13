@@ -351,7 +351,7 @@ export async function fetchPendingFixes(): Promise<unknown[]> {
             fix_type, risk_assessment, safety_lane, auto_fixable, status,
             decided_by, decided_at, decision_note, created_at
      FROM fix_proposals
-     WHERE status IN ('proposed', 'approved')
+     WHERE status = 'proposed'
      ORDER BY
        CASE severity
          WHEN 'critical' THEN 1
