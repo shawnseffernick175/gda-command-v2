@@ -51,6 +51,11 @@ interface ProcessedMovement {
   analysis: AwardAnalysis;
 }
 
+function deterministicId(prefix: string, competitorId: string, awardId: string): string {
+  const safe = awardId.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 40);
+  return `${prefix}-${competitorId}-${safe}`;
+}
+
 // ---------------------------------------------------------------------------
 // Data gathering
 // ---------------------------------------------------------------------------
@@ -200,16 +205,17 @@ Award details:
 async function writeMovement(
   ctx: AgentContext,
   movement: ProcessedMovement,
-): Promise<void> {
+): Promise<boolean> {
   const pool = getPool();
-  if (!pool) return;
+  if (!pool) return false;
 
   const { competitor, award, analysis } = movement;
   const amount = award["Award Amount"] ?? 0;
-  const movementId = `cm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const awardId = award["Award ID"] ?? award.generated_internal_id ?? String(award.internal_id ?? "");
+  const movementId = deterministicId("cm", competitor.id, awardId);
 
-  // 1. Insert competitor_movement
-  await pool.query(
+  // 1. Insert competitor_movement (deterministic ID prevents duplicates)
+  const movementResult = await pool.query(
     `INSERT INTO competitor_movements
        (id, competitor_name, movement_type, title, description, impact_assessment,
         threat_level, source, source_url, detected_at, verified)
@@ -228,8 +234,11 @@ async function writeMovement(
     ],
   );
 
+  const isNew = (movementResult.rowCount ?? 0) > 0;
+  if (!isNew) return false; // already processed this award
+
   // 2. Insert intel_item (category='competitive')
-  const intelId = `intel-ci-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const intelId = deterministicId("intel-ci", competitor.id, awardId);
   const priority = analysis.threat_level;
 
   await pool.query(
@@ -253,7 +262,7 @@ async function writeMovement(
     ],
   );
 
-  // 3. Update competitor profile stats
+  // 3. Update competitor profile stats (only for new movements)
   await pool.query(
     `UPDATE competitor_profiles
      SET contracts_won = contracts_won + 1,
@@ -287,6 +296,8 @@ async function writeMovement(
       },
     });
   }
+
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,8 +305,9 @@ async function writeMovement(
 // ---------------------------------------------------------------------------
 
 async function competitiveIntelScan(ctx: AgentContext): Promise<AgentResult> {
+  const pool = getPool();
   const competitors = await getTrackedCompetitors();
-  if (competitors.length === 0) {
+  if (competitors.length === 0 || !pool) {
     return {
       items_processed: 0,
       items_flagged: 0,
@@ -320,18 +332,34 @@ async function competitiveIntelScan(ctx: AgentContext): Promise<AgentResult> {
 
     if (awards.length === 0) continue;
 
-    // Analyze each award with AI
-    for (const award of awards) {
+    // Pre-filter: skip awards already recorded for this competitor
+    const existingIds = new Set<string>();
+    const existingResult = await pool.query(
+      `SELECT id FROM competitor_movements WHERE id LIKE $1`,
+      [`cm-${competitor.id}-%`],
+    );
+    for (const row of existingResult.rows) {
+      existingIds.add(row.id as string);
+    }
+
+    const newAwards = awards.filter((a) => {
+      const aId = a["Award ID"] ?? a.generated_internal_id ?? String(a.internal_id ?? "");
+      return !existingIds.has(deterministicId("cm", competitor.id, aId));
+    });
+
+    // Analyze each NEW award with AI
+    for (const award of newAwards) {
       const analysis = await analyzeAward(award, competitor, profile, activePursuits);
       if (!analysis) continue;
 
       // Filter noise — only keep high/medium significance
       if (analysis.significance === "low") continue;
 
+      const wasNew = await writeMovement(ctx, { competitor, award, analysis });
+      if (!wasNew) continue;
+
       significantItems++;
       competitorSummaries[competitor.name].significant++;
-
-      await writeMovement(ctx, { competitor, award, analysis });
 
       if (analysis.threat_level === "critical" || analysis.threat_level === "high") {
         approvalItems++;
