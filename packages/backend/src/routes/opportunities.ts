@@ -913,15 +913,29 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
     const now = new Date().toISOString();
     const dbStatus = SHIPLEY_TO_STATUS[stage] ?? "discovery";
 
-    const current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
+    let current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
+
+    // If not found in DB, try to fetch from n8n and upsert so stage can be changed
     if (current.rows.length === 0) {
-      return res.status(404).json(
-        errorEnvelope("gda-opportunities", "change-stage", {
-          code: "NOT_FOUND",
-          message: `Opportunity ${id} not found`,
-          detail: null,
-        })
-      );
+      const n8nOpp = await fetchOpportunityDetailFromN8n(id);
+      if (n8nOpp) {
+        await pool.query(
+          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
+           ON CONFLICT (id) DO NOTHING`,
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, n8nOpp.status, n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now]
+        );
+        current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
+      }
+      if (current.rows.length === 0) {
+        return res.status(404).json(
+          errorEnvelope("gda-opportunities", "change-stage", {
+            code: "NOT_FOUND",
+            message: `Opportunity ${id} not found`,
+            detail: null,
+          })
+        );
+      }
     }
 
     const prevStatus = current.rows[0].status;

@@ -31,10 +31,15 @@ router.post("/trigger", requireRole("admin"), async (_req, res) => {
     res.json(successEnvelope("fix-runner", "trigger", result));
   } catch (e) {
     const msg = (e as Error).message;
-    res.status(500).json(
+    const isLlmError = msg.includes("API key") || msg.includes("401") || msg.includes("403") || msg.includes("Unauthorized");
+    const code = isLlmError ? "LLM_UNAVAILABLE" : "AGENT_ERROR";
+    const userMsg = isLlmError
+      ? "AI diagnosis unavailable — OpenAI API key is missing or invalid. Configure it in Settings → Connectors."
+      : msg;
+    res.status(isLlmError ? 503 : 500).json(
       errorEnvelope("fix-runner", "trigger", {
-        code: "AGENT_ERROR",
-        message: msg,
+        code,
+        message: userMsg,
         detail: null,
       }),
     );

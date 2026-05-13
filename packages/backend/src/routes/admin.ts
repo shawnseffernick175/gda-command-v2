@@ -266,4 +266,68 @@ router.get("/roles", requireRole("admin"), (_req: Request, res: Response) => {
   }));
 });
 
+// POST /api/admin/invite — send email invitation
+router.post("/invite", requireRole("admin"), async (req: Request, res: Response) => {
+  const { email, role = "viewer" } = req.body;
+  if (!email) {
+    res.status(400).json({ success: false, error: "email is required" });
+    return;
+  }
+  if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) {
+    res.status(400).json({ success: false, error: `Invalid role: ${role}` });
+    return;
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    res.status(503).json({ success: false, error: "Database not configured" });
+    return;
+  }
+
+  try {
+    const token = crypto.randomBytes(32).toString("hex");
+    await pool.query(
+      `INSERT INTO user_invitations (email, role, token, invited_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT DO NOTHING`,
+      [email, role, token, req.user?.userId ?? null]
+    );
+
+    // Generate invitation link
+    const inviteUrl = `${req.protocol}://${req.get("host")}/register?token=${token}`;
+
+    log.info("admin_user_invited", { email, role, invitedBy: req.user?.userId });
+
+    res.json(successEnvelope("admin", "invite-user", {
+      email,
+      role,
+      token,
+      invite_url: inviteUrl,
+      message: `Invitation created. Share this link with ${email}: ${inviteUrl}`,
+    }));
+  } catch (err) {
+    log.error("admin_invite_error", { error: (err as Error).message });
+    res.status(500).json({ success: false, error: "Failed to create invitation" });
+  }
+});
+
+// GET /api/admin/invitations — list pending invitations
+router.get("/invitations", requireRole("admin"), async (_req: Request, res: Response) => {
+  const pool = getPool();
+  if (!pool) {
+    res.status(503).json({ success: false, error: "Database not configured" });
+    return;
+  }
+
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, email, role, created_at, expires_at, accepted_at FROM user_invitations ORDER BY created_at DESC"
+    );
+    res.json(successEnvelope("admin", "list-invitations", { invitations: rows, total: rows.length }));
+  } catch (err) {
+    log.error("admin_list_invitations_error", { error: (err as Error).message });
+    res.status(500).json({ success: false, error: "Failed to list invitations" });
+  }
+});
+
 export default router;

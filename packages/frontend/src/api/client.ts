@@ -2548,6 +2548,13 @@ export function fetchEscalationRules() {
   return request<EscalationRulesData>("/anomaly/escalation-rules");
 }
 
+export function createEscalationRule(data: { name: string; condition: string; priority: string; description?: string }) {
+  return request<{ rule: EscalationRuleRow }>("/anomaly/escalation-rules", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export function acknowledgeAnomaly(anomalyId: string) {
   return request<{ anomaly_id: string; status: string; message: string }>(`/anomaly/anomalies/${anomalyId}/acknowledge`, {
     method: "POST",
@@ -2889,6 +2896,18 @@ export function deleteUser(userId: string) {
   return request<{ id: string; deleted: boolean }>(`/admin/users/${userId}`, {
     method: "DELETE",
   });
+}
+
+export function inviteUser(email: string, role: string) {
+  return request<{ email: string; role: string; invite_url: string; message: string }>("/admin/invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, role }),
+  });
+}
+
+export function fetchInvitations() {
+  return request<{ invitations: Array<{ id: string; email: string; role: string; created_at: string; expires_at: string; accepted_at: string | null }>; total: number }>("/admin/invitations");
 }
 
 // ---------------------------------------------------------------------------

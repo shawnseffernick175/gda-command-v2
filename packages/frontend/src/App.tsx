@@ -27,7 +27,7 @@ import ColorReview from "./pages/ColorReview";
 import AnomalyDetection from "./pages/AnomalyDetection";
 import SAMMonitor from "./pages/SAMMonitor";
 import Discussions from "./pages/Discussions";
-import CPARSBuilder from "./pages/CPARSBuilder";
+
 import FPDSMonitor from "./pages/FPDSMonitor";
 import UserManagement from "./pages/UserManagement";
 import AuditLog from "./pages/AuditLog";
@@ -77,7 +77,7 @@ const NAV_GROUPS = [
       { path: "/anomaly", label: "Anomaly Detection", icon: "🔔" },
       { path: "/contacts", label: "Contacts", icon: "👤" },
       { path: "/knowledge", label: "Knowledge Base", icon: "📚" },
-      { path: "/cpars", label: "CPARS Builder", icon: "📊" },
+
       { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
     ],
   },
@@ -506,7 +506,7 @@ export default function App() {
             <Route path="/anomaly" element={<AnomalyDetection />} />
             <Route path="/sam-monitor" element={<SAMMonitor />} />
             <Route path="/discussions" element={<Discussions />} />
-            <Route path="/cpars" element={<CPARSBuilder />} />
+
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/audit" element={<AuditLog />} />
@@ -522,7 +522,78 @@ export default function App() {
       </div>
     </div>
     <QuickEntry />
+    <AskAnythingFAB />
     </ToastProvider>
     </ErrorBoundary>
+  );
+}
+
+function AskAnythingFAB() {
+  const [open, setOpen] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { pathname } = useLocation();
+
+  const handleAsk = async () => {
+    if (!question.trim() || loading) return;
+    setLoading(true);
+    setAnswer("");
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("gda_token") ?? ""}` },
+        body: JSON.stringify({ question: question.trim(), context: pathname }),
+      });
+      const data = await res.json();
+      setAnswer(data?.data?.answer ?? data?.error?.message ?? "Could not get an answer. The AI service may be unavailable.");
+    } catch {
+      setAnswer("Error connecting to AI service. Check that OpenAI API key is configured in Settings.");
+    }
+    setLoading(false);
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        title="Ask a question about anything in GDA Command"
+        style={{
+          position: "fixed", bottom: 24, right: 24, width: 52, height: 52, borderRadius: "50%",
+          background: "#3b82f6", color: "#fff", border: "none", cursor: "pointer", fontSize: 22,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.3)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >?</button>
+    );
+  }
+
+  return (
+    <div style={{
+      position: "fixed", bottom: 24, right: 24, width: 380, maxHeight: 420,
+      background: "var(--color-surface)", border: "1px solid var(--color-border)",
+      borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.3)", zIndex: 10000, display: "flex", flexDirection: "column",
+    }}>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontWeight: 700, fontSize: 14 }}>Ask a Question</span>
+        <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", fontSize: 16 }}>X</button>
+      </div>
+      {answer && (
+        <div style={{ padding: 16, fontSize: 13, lineHeight: 1.6, overflowY: "auto", maxHeight: 260, borderBottom: "1px solid var(--color-border)" }}>
+          {answer}
+        </div>
+      )}
+      <div style={{ padding: 12, display: "flex", gap: 8 }}>
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleAsk(); }}
+          placeholder="Ask about opportunities, pipeline, competitors..."
+          style={{ flex: 1, padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }}
+        />
+        <button onClick={handleAsk} disabled={loading} style={{ padding: "8px 14px", background: loading ? "#6b7280" : "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+          {loading ? "..." : "Ask"}
+        </button>
+      </div>
+    </div>
   );
 }

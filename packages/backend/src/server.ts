@@ -159,6 +159,7 @@ app.use("/api/dashboard-layout", dashboardLayoutRouter);
 app.use("/api/audit", auditRouter);
 app.use("/api/export", exportRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api", aiRouter); // Exposes POST /api/ask
 app.use("/api/book-of-truths", bookOfTruthsRouter);
 app.use("/api/govwin", govwinRouter);
 app.use("/api/risk-register", riskRegisterRouter);

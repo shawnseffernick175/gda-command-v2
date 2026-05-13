@@ -194,7 +194,7 @@ export default function RiskRegister() {
   ];
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
+    <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Risk Register</h1>
