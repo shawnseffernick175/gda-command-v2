@@ -263,8 +263,8 @@ async function storeBriefing(
       today,
       headline,
       JSON.stringify(metrics),
-      JSON.stringify(data.highRisks.map((r) => ({ id: r.id, title: r.title, severity: r.severity }))),
-      JSON.stringify(data.upcomingDeadlines.map((d) => ({ id: d.id, title: d.title, due: d.due_date }))),
+      JSON.stringify(data.highRisks.map((r) => ({ severity: r.severity as string, message: (r.title as string) ?? "", source: "risk-register", action_required: true }))),
+      JSON.stringify(data.upcomingDeadlines.map((d) => ({ action: (d.title as string) ?? "", priority: "high", due: (d.due_date as string) ?? null, context: `${(d.agency as string) ?? ""} — ${(d.status as string) ?? ""}` }))),
       content,
     ],
   );
