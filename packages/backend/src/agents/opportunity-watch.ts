@@ -89,7 +89,7 @@ async function getUnscoredOpportunities(limit = 20): Promise<RawOpportunity[]> {
             set_aside, value_estimate, response_deadline, place_of_performance, sam_url
      FROM sam_opportunities
      WHERE (ai_summary IS NULL OR ai_summary = '')
-       AND scan_status IN ('new', 'tracked')
+       AND scan_status IN ('new', 'tracked', 'qualified')
      ORDER BY created_at DESC LIMIT $1`,
     [limit],
   );
@@ -242,7 +242,11 @@ async function storeResults(scored: ScoredOpportunity[]): Promise<void> {
          SET relevance_score = $2,
              relevance_reasons = $3,
              ai_summary = $4,
-             scan_status = CASE WHEN $5 = 'pursue' THEN 'tracked' ELSE scan_status END
+             scan_status = CASE
+               WHEN scan_status = 'qualified' THEN 'qualified'
+               WHEN $5 = 'pursue' THEN 'tracked'
+               ELSE scan_status
+             END
          WHERE id = $1`,
         [
           opp.id,
@@ -262,29 +266,16 @@ async function storeResults(scored: ScoredOpportunity[]): Promise<void> {
     // Create intel feed entry for pursue and evaluate opportunities
     if (opp.classification === "pursue" || opp.classification === "evaluate") {
       await pool.query(
-        `INSERT INTO intel_items (id, type, title, summary, severity, source, raw_data, created_at)
-         VALUES (
-           $1, 'opportunity_alert',
-           $2, $3,
-           $4,
-           'opportunity-watch',
-           $5,
-           NOW()
-         )
+        `INSERT INTO intel_items (id, title, summary, category, priority, source, related_opportunity_id, tags, created_at)
+         VALUES ($1, $2, $3, 'opportunity', $4, 'sam_gov', $5, $6, NOW())
          ON CONFLICT (id) DO NOTHING`,
         [
           `opp-watch-${opp.id}`,
           `[${opp.classification.toUpperCase()}] ${opp.title}`,
           opp.rationale,
           opp.classification === "pursue" ? "high" : "medium",
-          JSON.stringify({
-            opportunity_id: opp.id,
-            score: opp.score,
-            classification: opp.classification,
-            risks: opp.risks,
-            next_actions: opp.next_actions,
-            agency: opp.agency,
-          }),
+          opp.id,
+          [`score:${opp.score}`, opp.classification, opp.agency],
         ],
       );
     }
