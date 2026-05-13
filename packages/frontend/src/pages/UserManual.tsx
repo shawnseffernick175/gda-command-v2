@@ -38,16 +38,19 @@ const PAGE_SECTIONS: PageSection[] = [
     icon: "\u{1F680}",
     group: "Operations",
     description:
-      "Quick-entry for new opportunities. Evaluate a potential opportunity in minutes by filling out key fields and getting an AI-assisted assessment. Approved items promote directly to Ops Tracker.",
+      "Pre-RFP emerging technology discovery tool. Scans innovation factories (AFWERX, DIU, DARPA, Army xTech, NavalX), academia, BAAs, and other pre-solicitation signals to find emerging tech and pair it with companies that can solve the problem — before there's even an RFI.",
     features: [
-      "Rapid opportunity assessment form",
+      "Innovation factory monitoring (AFWERX, DIU, DARPA, Army xTech, NavalX)",
+      "Academic research signal detection (university labs, SBIR/STTR)",
+      "BAA and white paper opportunity tracking",
       "AI-generated OODA analysis (Observe, Orient, Decide, Act)",
-      "One-click promote to full opportunity in Ops Tracker",
-      "Tracks fast-track history for audit",
+      "Company-to-problem matching (find who can solve the problem)",
+      "One-click promote to Ops Tracker when opportunity formalizes",
     ],
     tips: [
-      "Use Fast Track when you first hear about an opportunity to quickly assess fit",
-      "The OODA framework helps structure your go/no-go decision",
+      "Fast Track is pre-RFP, maybe even pre-RFI — the earliest stage of discovery",
+      "Look for signals from innovation factories before formal solicitations",
+      "Match emerging tech needs with companies including potential teaming partners",
       "Promoted opportunities appear immediately in Ops Tracker",
     ],
   },
@@ -502,6 +505,31 @@ const PAGE_SECTIONS: PageSection[] = [
     ],
   },
   {
+    id: "book-of-truths",
+    title: "Book of Truths",
+    icon: "\u{1F4D6}",
+    group: "Admin",
+    description:
+      "The authoritative knowledge foundation for the AI tool. A curated, regularly updated collection of organizational data structured into 5 categories: FAQs & Troubleshooting, Policies & Procedures, Product/Service Data, Goal-Oriented Guidelines (90-Day Blueprint), and a Curated Knowledge Base (RAG foundation).",
+    features: [
+      "7 tabs: FAQs, Policies, Product Data, 90-Day Goals, Knowledge Base, Glossary, Sources",
+      "FAQs — structured answers to common questions about the tool",
+      "Policies — capture lifecycle, risk management, AI governance, compliance procedures",
+      "Product Data — Envision capabilities, NAICS codes, core competencies, competitors",
+      "90-Day Blueprint — sprint goals and roadmap priorities for the AI to follow",
+      "Knowledge Base — curated wiki for RAG (Retrieval-Augmented Generation)",
+      "23 defense/government acronyms with definitions",
+      "15 authoritative data sources tracked",
+      "Export PDF for offline reference",
+    ],
+    tips: [
+      "The Book of Truths is the single source of truth that the AI agents reference",
+      "Update the 90-Day Blueprint when sprint priorities change",
+      "Add new FAQs as users ask common questions",
+      "Product Data should reflect current Envision capabilities and contract vehicles",
+    ],
+  },
+  {
     id: "prompts",
     title: "Prompt Architect",
     icon: "\u{1F4DD}",
@@ -537,10 +565,66 @@ const SHORTCUTS = [
   { keys: ["Esc"], description: "Close modals and popovers" },
 ];
 
+const WORKFLOWS = [
+  {
+    title: "New Opportunity Discovery",
+    steps: [
+      { page: "Fast Track", action: "Identify emerging signal (innovation factory, academia, pre-RFI)" },
+      { page: "Fast Track", action: "Review AI-generated OODA analysis and match score" },
+      { page: "Fast Track", action: "Click 'Promote' to move to Ops Tracker" },
+      { page: "Ops Tracker", action: "Opportunity appears with NAICS size classification" },
+      { page: "Capture Plans", action: "Create capture plan and assign Shipley stage" },
+    ],
+  },
+  {
+    title: "Proposal Development",
+    steps: [
+      { page: "Ops Tracker", action: "Select opportunity and click into detail view" },
+      { page: "RFP Shredder", action: "Upload RFP document (PDF/DOCX) for AI parsing" },
+      { page: "Compliance", action: "Review extracted requirements and mark compliance status" },
+      { page: "Proposal Center", action: "Use RFP Shredder, Compliance, and Color Review tabs" },
+      { page: "Color Review", action: "Run Blue/Pink/Red/Gold/White team reviews" },
+      { page: "Color Review", action: "Export final review report (HTML)" },
+    ],
+  },
+  {
+    title: "Competitive Intelligence",
+    steps: [
+      { page: "Intel Hub", action: "Review Morning Briefing for daily intelligence digest" },
+      { page: "Intel Hub", action: "Check Intelligence Feed for latest market signals" },
+      { page: "Company Intel", action: "Classify competitors as Team/Threat/Neutral" },
+      { page: "Company Intel", action: "Run AI Analyze on key competitors" },
+      { page: "Risk Register", action: "Log competitive risks with mitigation strategies" },
+    ],
+  },
+  {
+    title: "Pipeline Management",
+    steps: [
+      { page: "Ops Tracker", action: "Filter opportunities by NAICS size (Small/Large)" },
+      { page: "Pipeline", action: "Review qualified opportunities and pipeline value" },
+      { page: "Approvals", action: "Resolve pending bid/no-bid decisions" },
+      { page: "Charts", action: "Visualize pipeline by department, stage, value" },
+      { page: "Reports", action: "Generate pipeline report for leadership" },
+    ],
+  },
+];
+
+const GETTING_STARTED = [
+  { step: 1, title: "Login", description: "Navigate to gda.csr-llc.tech and login with your credentials. The Launchpad dashboard loads automatically showing your KPIs and command signals.", icon: "1" },
+  { step: 2, title: "Review Your Pipeline", description: "Go to Ops Tracker to see all 291+ live opportunities from SAM.gov, GovTribe, and GDA Tracker. Use the NAICS size filter to see which opportunities you qualify as Small vs Large business.", icon: "2" },
+  { step: 3, title: "Check Intelligence", description: "Visit Intel Hub for your daily Morning Briefing and latest intelligence items. Check Anomaly Detection for any unusual patterns in your data.", icon: "3" },
+  { step: 4, title: "Manage Captures", description: "For opportunities you are actively pursuing, go to Capture Plans to track Shipley stages, milestones, and gate reviews. Use Proposal Center when ready to write.", icon: "4" },
+  { step: 5, title: "Monitor Competitors", description: "Use Company Intel to classify and analyze competitors. The AI Analyze feature generates competitive assessments based on available data.", icon: "5" },
+  { step: 6, title: "Review & Export", description: "Use Charts for visual analytics, Reports for formatted output, and Color Review Export for proposal review documentation.", icon: "6" },
+];
+
+type ManualTab = "getting-started" | "workflows" | "pages" | "architecture";
+
 export default function UserManual() {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<ManualTab>("getting-started");
 
   const filtered = PAGE_SECTIONS.filter((s) => {
     if (selectedGroup && s.group !== selectedGroup) return false;
@@ -556,16 +640,213 @@ export default function UserManual() {
     return true;
   });
 
+  const TABS: { id: ManualTab; label: string; icon: string }[] = [
+    { id: "getting-started", label: "Getting Started", icon: "\u{1F680}" },
+    { id: "workflows", label: "Workflows", icon: "\u{1F504}" },
+    { id: "pages", label: "Page Reference", icon: "\u{1F4D6}" },
+    { id: "architecture", label: "Architecture", icon: "\u{1F3D7}" },
+  ];
+
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: 0, color: "#fff" }}>
-          User Manual
+          GDA Command User Manual
         </h1>
         <p style={{ color: "#9ca3af", marginTop: 6, fontSize: 14, lineHeight: 1.5 }}>
-          Reference guide for every page and feature in GDA Command. Click any section to expand details, features, and tips.
+          Complete guide to GDA Command v2 — Envision's government contract capture and intelligence platform. Explore getting started guides, workflow walkthroughs, and detailed page references.
         </p>
       </div>
+
+      {/* Tab Bar */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "1px solid #30363d", paddingBottom: 0 }}>
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: "10px 20px",
+              border: "none",
+              borderBottom: activeTab === tab.id ? "2px solid #238636" : "2px solid transparent",
+              background: "transparent",
+              color: activeTab === tab.id ? "#fff" : "#8b949e",
+              fontSize: 14,
+              fontWeight: activeTab === tab.id ? 600 : 400,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Getting Started Tab */}
+      {activeTab === "getting-started" && (
+        <div>
+          <div style={{ background: "#0d2818", border: "1px solid #238636", borderRadius: 8, padding: 20, marginBottom: 24 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#3fb950", margin: "0 0 8px" }}>Welcome to GDA Command</h2>
+            <p style={{ color: "#9ca3af", fontSize: 14, margin: 0, lineHeight: 1.6 }}>
+              GDA Command is Envision Innovative Solutions' AI-powered capture management platform. It aggregates 291+ live government opportunities from SAM.gov, GovTribe, FPDS, and other federal procurement databases, then provides AI-assisted analysis to help you win contracts. Follow the steps below to get started.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16, marginBottom: 32 }}>
+            {GETTING_STARTED.map((item) => (
+              <div key={item.step} style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "50%", background: "#238636", color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700,
+                  }}>
+                    {item.step}
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#fff" }}>{item.title}</h3>
+                </div>
+                <p style={{ margin: 0, color: "#9ca3af", fontSize: 13, lineHeight: 1.6 }}>{item.description}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20, marginBottom: 24 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: "0 0 12px" }}>Key Concepts</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+              {[
+                { term: "NAICS Size Classification", def: "Each opportunity's NAICS code has a size standard — revenue-based or employee-based. Envision ($382M revenue, 41 employees) is Large for revenue-based NAICS and Small for employee-based NAICS." },
+                { term: "Shipley Lifecycle", def: "Industry-standard BD framework: Long Range → Opportunity Assessment → Capture Planning → Proposal Prep → Proposal → Post-Submit. Each stage has gate reviews." },
+                { term: "n8n Integration", def: "GDA Command pulls live data from 100+ n8n workflows running on the automation server. Source badge shows 'Live API' for n8n data, 'Live DB' for local database." },
+                { term: "OODA Loop", def: "Observe → Orient → Decide → Act decision framework used in Fast Track to analyze emerging opportunities before they become formal solicitations." },
+                { term: "Color Reviews", def: "Shipley methodology: Blue (fit check) → Pink (outline) → Red (technical accuracy) → Gold (cost/price) → White (final compliance). Each color has specific evaluation criteria." },
+                { term: "P(Win)", def: "Probability of Win — estimated likelihood of winning a specific opportunity. Calculated from past performance, competitive position, relationship strength, and solution fit." },
+              ].map((item) => (
+                <div key={item.term} style={{ padding: 12, background: "#0d1117", borderRadius: 6, border: "1px solid #21262d" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#58a6ff", marginBottom: 4 }}>{item.term}</div>
+                  <div style={{ fontSize: 12, color: "#8b949e", lineHeight: 1.5 }}>{item.def}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Workflows Tab */}
+      {activeTab === "workflows" && (
+        <div>
+          <p style={{ color: "#9ca3af", fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
+            Step-by-step workflows for common capture and intelligence tasks. Each workflow shows the pages you'll visit and actions to take.
+          </p>
+          {WORKFLOWS.map((wf) => (
+            <div key={wf.title} style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#fff", margin: "0 0 16px" }}>{wf.title}</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {wf.steps.map((step, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "#0d1117", borderRadius: 6, border: "1px solid #21262d" }}>
+                    <div style={{
+                      minWidth: 24, height: 24, borderRadius: "50%", background: "#21262d", color: "#8b949e",
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600,
+                    }}>
+                      {i + 1}
+                    </div>
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, color: "#58a6ff", background: "#58a6ff18",
+                      padding: "2px 8px", borderRadius: 4, whiteSpace: "nowrap",
+                    }}>
+                      {step.page}
+                    </span>
+                    <span style={{ fontSize: 13, color: "#c9d1d9" }}>{step.action}</span>
+                    {i < wf.steps.length - 1 && (
+                      <span style={{ marginLeft: "auto", color: "#30363d", fontSize: 16 }}></span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Architecture Tab */}
+      {activeTab === "architecture" && (
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginBottom: 24 }}>
+            <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#58a6ff", margin: "0 0 12px" }}>Frontend</h3>
+              <ul style={{ margin: 0, paddingLeft: 20, color: "#9ca3af", fontSize: 13, lineHeight: 1.8 }}>
+                <li>React 18 + TypeScript</li>
+                <li>Vite build system</li>
+                <li>35+ pages with sidebar navigation</li>
+                <li>JWT authentication with refresh tokens</li>
+                <li>Responsive dark theme</li>
+              </ul>
+            </div>
+            <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#3fb950", margin: "0 0 12px" }}>Backend</h3>
+              <ul style={{ margin: 0, paddingLeft: 20, color: "#9ca3af", fontSize: 13, lineHeight: 1.8 }}>
+                <li>Express.js + TypeScript</li>
+                <li>PostgreSQL database (60+ tables)</li>
+                <li>n8n webhook integration (291+ live opps)</li>
+                <li>6 AI agents (Morning Commander, Opportunity Watch, etc.)</li>
+                <li>Dual LLM: GPT-4o + Claude 3.5 Sonnet</li>
+              </ul>
+            </div>
+            <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#f59e0b", margin: "0 0 12px" }}>Infrastructure</h3>
+              <ul style={{ margin: 0, paddingLeft: 20, color: "#9ca3af", fontSize: 13, lineHeight: 1.8 }}>
+                <li>Docker Compose (3 containers)</li>
+                <li>VPS hosted at gda.csr-llc.tech</li>
+                <li>n8n automation (100+ workflows)</li>
+                <li>GitHub CI/CD pipeline</li>
+                <li>JWT auth with role-based access control</li>
+              </ul>
+            </div>
+          </div>
+
+          <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20, marginBottom: 24 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "#fff", margin: "0 0 16px" }}>Data Flow</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[
+                { from: "SAM.gov / GovTribe / FPDS", to: "n8n Workflows", desc: "100+ workflows scrape, normalize, and enrich opportunity data from government sources" },
+                { from: "n8n Workflows", to: "GDA Backend", desc: "Backend calls n8n webhook which returns 291+ real opportunities with metadata" },
+                { from: "GDA Backend", to: "PostgreSQL", desc: "Capture plans, risks, intel, reviews, and user data stored in 60+ tables" },
+                { from: "GDA Backend", to: "React Frontend", desc: "REST API with JWT auth serves paginated, filtered data to the UI" },
+                { from: "AI Agents", to: "Analysis Results", desc: "6 agents run GPT-4o/Claude analysis on opportunities, competitors, and risks" },
+              ].map((flow, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", background: "#0d1117", borderRadius: 6, border: "1px solid #21262d" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#58a6ff", minWidth: 180 }}>{flow.from}</span>
+                  <span style={{ color: "#30363d", fontSize: 18 }}>{"\u2192"}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#3fb950", minWidth: 140 }}>{flow.to}</span>
+                  <span style={{ fontSize: 12, color: "#8b949e", marginLeft: 8 }}>{flow.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 20 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "#fff", margin: "0 0 16px" }}>AI Agents</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+              {[
+                { name: "Morning Commander", desc: "Generates daily executive briefing with overnight changes, new opportunities, and risk alerts", model: "GPT-4o" },
+                { name: "Opportunity Watch", desc: "Scores and analyzes new opportunities based on fit, competition, and strategic alignment", model: "GPT-4o" },
+                { name: "Competitive Intel", desc: "Monitors competitor movements, contract wins, and teaming announcements", model: "GPT-4o" },
+                { name: "Capture Coach", desc: "Provides per-opportunity strategy recommendations based on Shipley methodology", model: "Claude 3.5" },
+                { name: "Controlled Fix", desc: "Diagnoses system failures and proposes fix actions with approval workflow", model: "GPT-4o" },
+                { name: "Auto Capture Coach", desc: "Fire-and-forget analysis triggered on new/updated opportunities", model: "Claude 3.5" },
+              ].map((agent) => (
+                <div key={agent.name} style={{ padding: 12, background: "#0d1117", borderRadius: 6, border: "1px solid #21262d" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#c9d1d9" }}>{agent.name}</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: "#8b949e", background: "#21262d", padding: "2px 6px", borderRadius: 4 }}>{agent.model}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#8b949e", lineHeight: 1.5 }}>{agent.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pages Reference Tab */}
+      {activeTab === "pages" && (<div>
 
       {/* Quick Reference Cards */}
       <div
@@ -913,6 +1194,7 @@ export default function UserManual() {
           No pages match your search. Try a different term.
         </div>
       )}
+      </div>)}
 
       {/* Footer */}
       <div

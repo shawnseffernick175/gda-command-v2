@@ -3207,7 +3207,7 @@ export interface BookOfTruthsFieldRow {
 export interface BookOfTruthsEntityRow {
   id: string;
   name: string;
-  category: "entity" | "rule" | "glossary" | "source";
+  category: "entity" | "rule" | "glossary" | "source" | "faq" | "policy" | "product" | "goal" | "knowledge" | "core" | "capture" | "intelligence" | "operations" | "system" | "reference";
   module: string;
   description: string;
   fields?: BookOfTruthsFieldRow[];
@@ -3241,7 +3241,7 @@ export interface BookOfTruthsData {
   entities: BookOfTruthsEntityRow[];
   glossary: BookOfTruthsGlossaryRow[];
   sources: BookOfTruthsSourceRow[];
-  categoryCounts: { entity: number; rule: number; glossary: number; source: number };
+  categoryCounts: Record<string, number>;
   modules: string[];
   source: "db";
 }

@@ -8,17 +8,35 @@ import {
 } from "../api/client";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  entity: "#3b82f6",
-  rule: "#f59e0b",
+  faq: "#3b82f6",
+  policy: "#f59e0b",
+  product: "#22c55e",
+  goal: "#a855f7",
+  knowledge: "#06b6d4",
   glossary: "#8b5cf6",
-  source: "#06b6d4",
+  source: "#ef4444",
 };
 
 const CATEGORY_ICONS: Record<string, string> = {
-  entity: "\u{1F4E6}",
-  rule: "\u{1F4DC}",
+  faq: "\u2753",
+  policy: "\u{1F4DC}",
+  product: "\u{1F3E2}",
+  goal: "\u{1F3AF}",
+  knowledge: "\u{1F4DA}",
   glossary: "\u{1F4D6}",
   source: "\u{1F50C}",
+  sources: "\u{1F50C}",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  faq: "FAQs & Troubleshooting",
+  policy: "Policies & Procedures",
+  product: "Product/Service Data",
+  goal: "90-Day Blueprint",
+  knowledge: "Knowledge Base",
+  glossary: "Glossary",
+  source: "Data Sources",
+  sources: "Data Sources",
 };
 
 const MODULE_COLORS: Record<string, string> = {
@@ -43,14 +61,14 @@ const SOURCE_TYPE_ICONS: Record<string, string> = {
   manual: "\u{270D}",
 };
 
-type ActiveTab = "entities" | "rules" | "glossary" | "sources";
+type ActiveTab = "faq" | "policy" | "product" | "goal" | "knowledge" | "glossary" | "sources";
 
 export default function BookOfTruths() {
   const [data, setData] = useState<BookOfTruthsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("entities");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("faq");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [moduleFilter, setModuleFilter] = useState("");
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
@@ -83,16 +101,22 @@ export default function BookOfTruths() {
     searchTimeout.current = setTimeout(() => loadData(value), 300);
   }
 
-  const entities = data?.entities.filter((e) => e.category === "entity") ?? [];
-  const rules = data?.entities.filter((e) => e.category === "rule") ?? [];
+  const faqs = data?.entities.filter((e) => e.category === "faq") ?? [];
+  const policies = data?.entities.filter((e) => e.category === "policy") ?? [];
+  const products = data?.entities.filter((e) => e.category === "product") ?? [];
+  const goals = data?.entities.filter((e) => e.category === "goal") ?? [];
+  const knowledge = data?.entities.filter((e) => e.category === "knowledge") ?? [];
   const glossary = data?.glossary ?? [];
   const sources = data?.sources ?? [];
 
   const tabs: { key: ActiveTab; label: string; count: number; color: string }[] = [
-    { key: "entities", label: "Entity Dictionary", count: entities.length, color: CATEGORY_COLORS.entity },
-    { key: "rules", label: "Business Rules", count: rules.length, color: CATEGORY_COLORS.rule },
+    { key: "faq", label: "FAQs", count: faqs.length, color: CATEGORY_COLORS.faq },
+    { key: "policy", label: "Policies", count: policies.length, color: CATEGORY_COLORS.policy },
+    { key: "product", label: "Product Data", count: products.length, color: CATEGORY_COLORS.product },
+    { key: "goal", label: "90-Day Goals", count: goals.length, color: CATEGORY_COLORS.goal },
+    { key: "knowledge", label: "Knowledge Base", count: knowledge.length, color: CATEGORY_COLORS.knowledge },
     { key: "glossary", label: "Glossary", count: glossary.length, color: CATEGORY_COLORS.glossary },
-    { key: "sources", label: "Data Sources", count: sources.length, color: CATEGORY_COLORS.source },
+    { key: "sources", label: "Sources", count: sources.length, color: CATEGORY_COLORS.source },
   ];
 
   function handlePrint() {
@@ -108,7 +132,7 @@ export default function BookOfTruths() {
             {"\u{1F4D6}"} Book of Truths
           </h1>
           <p style={{ color: "#9ca3af", fontSize: 13, margin: "4px 0 0" }}>
-            Auto-generated data dictionary &middot; {data ? `${entities.length} Entities \u2022 ${rules.length} Rules \u2022 ${glossary.length} Terms \u2022 ${sources.length} Sources` : "Loading\u2026"}
+            Authoritative knowledge foundation &middot; {data ? `${faqs.length} FAQs \u2022 ${policies.length} Policies \u2022 ${products.length} Product \u2022 ${goals.length} Goals \u2022 ${knowledge.length} KB \u2022 ${glossary.length} Terms \u2022 ${sources.length} Sources` : "Loading\u2026"}
           </p>
         </div>
         <button
@@ -135,7 +159,7 @@ export default function BookOfTruths() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
             gap: 12,
             marginBottom: 20,
           }}
@@ -154,7 +178,7 @@ export default function BookOfTruths() {
               }}
             >
               <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1 }}>
-                {CATEGORY_ICONS[t.key === "entities" ? "entity" : t.key === "rules" ? "rule" : t.key === "sources" ? "source" : t.key]} {t.label}
+                {CATEGORY_ICONS[t.key] ?? ""} {t.label}
               </div>
               <div style={{ fontSize: 24, fontWeight: 700, color: t.color, marginTop: 4 }}>
                 {t.count}
@@ -181,7 +205,7 @@ export default function BookOfTruths() {
             fontSize: 13,
           }}
         />
-        {(activeTab === "entities" || activeTab === "rules") && (
+        {(activeTab !== "glossary" && activeTab !== "sources") && (
           <select
             value={moduleFilter}
             onChange={(e) => setModuleFilter(e.target.value)}
@@ -214,11 +238,20 @@ export default function BookOfTruths() {
       )}
 
       {/* Tab Content */}
-      {!loading && data && activeTab === "entities" && (
-        <EntitiesTab entities={entities} expandedId={expandedId} setExpandedId={setExpandedId} />
+      {!loading && data && activeTab === "faq" && (
+        <EntitiesTab entities={faqs} expandedId={expandedId} setExpandedId={setExpandedId} categoryColor={CATEGORY_COLORS.faq} />
       )}
-      {!loading && data && activeTab === "rules" && (
-        <RulesTab rules={rules} expandedId={expandedId} setExpandedId={setExpandedId} />
+      {!loading && data && activeTab === "policy" && (
+        <EntitiesTab entities={policies} expandedId={expandedId} setExpandedId={setExpandedId} categoryColor={CATEGORY_COLORS.policy} />
+      )}
+      {!loading && data && activeTab === "product" && (
+        <EntitiesTab entities={products} expandedId={expandedId} setExpandedId={setExpandedId} categoryColor={CATEGORY_COLORS.product} />
+      )}
+      {!loading && data && activeTab === "goal" && (
+        <EntitiesTab entities={goals} expandedId={expandedId} setExpandedId={setExpandedId} categoryColor={CATEGORY_COLORS.goal} />
+      )}
+      {!loading && data && activeTab === "knowledge" && (
+        <EntitiesTab entities={knowledge} expandedId={expandedId} setExpandedId={setExpandedId} categoryColor={CATEGORY_COLORS.knowledge} />
       )}
       {!loading && data && activeTab === "glossary" && (
         <GlossaryTab glossary={glossary} />
@@ -235,10 +268,12 @@ function EntitiesTab({
   entities,
   expandedId,
   setExpandedId,
+  categoryColor = "#3b82f6",
 }: {
   entities: BookOfTruthsEntityRow[];
   expandedId: string | null;
   setExpandedId: (id: string | null) => void;
+  categoryColor?: string;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -249,7 +284,7 @@ function EntitiesTab({
             key={entity.id}
             style={{
               background: "#18181b",
-              border: `1px solid ${isOpen ? "#3b82f6" : "#27272a"}`,
+              border: `1px solid ${isOpen ? categoryColor : "#27272a"}`,
               borderRadius: 8,
               overflow: "hidden",
             }}
@@ -477,7 +512,7 @@ function RulesTab({
 /* ===== Glossary Tab ===== */
 function GlossaryTab({ glossary }: { glossary: BookOfTruthsGlossaryRow[] }) {
   const grouped = glossary.reduce<Record<string, BookOfTruthsGlossaryRow[]>>((acc, g) => {
-    const cat = g.category;
+    const cat = g.category ?? "general";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(g);
     return acc;
@@ -504,9 +539,9 @@ function GlossaryTab({ glossary }: { glossary: BookOfTruthsGlossaryRow[] }) {
                   )}
                 </div>
                 <p style={{ color: "#d4d4d8", fontSize: 12, margin: "0 0 6px", lineHeight: 1.5 }}>{g.definition}</p>
-                {g.related_entities.length > 0 && (
+                {(g.related_entities ?? []).length > 0 && (
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {g.related_entities.map((r) => (
+                    {(g.related_entities ?? []).map((r) => (
                       <span key={r} style={{ background: "#27272a", color: "#9ca3af", padding: "1px 6px", borderRadius: 3, fontSize: 10 }}>{r}</span>
                     ))}
                   </div>
@@ -539,23 +574,23 @@ function SourcesTab({ sources }: { sources: BookOfTruthsSourceRow[] }) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 18 }}>{SOURCE_TYPE_ICONS[src.type] ?? "\u{1F50C}"}</span>
+              <span style={{ fontSize: 18 }}>{SOURCE_TYPE_ICONS[src.type ?? "api"] ?? "\u{1F50C}"}</span>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#e4e4e7" }}>{src.name}</div>
-                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{src.type}</div>
+                <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{src.type ?? "api"}</div>
               </div>
             </div>
             <span
               style={{
-                background: `${SOURCE_STATUS_COLORS[src.status]}22`,
-                color: SOURCE_STATUS_COLORS[src.status],
+                background: `${SOURCE_STATUS_COLORS[src.status ?? "active"] ?? "#22c55e"}22`,
+                color: SOURCE_STATUS_COLORS[src.status ?? "active"] ?? "#22c55e",
                 padding: "2px 8px",
                 borderRadius: 4,
                 fontSize: 11,
                 fontWeight: 500,
               }}
             >
-              {src.status}
+              {src.status ?? "active"}
             </span>
           </div>
           <p style={{ color: "#d4d4d8", fontSize: 12, margin: "0 0 10px", lineHeight: 1.5 }}>{src.description}</p>
@@ -569,11 +604,11 @@ function SourcesTab({ sources }: { sources: BookOfTruthsSourceRow[] }) {
           )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-              {src.entities_served.map((e) => (
+              {(src.entities_served ?? []).map((e) => (
                 <span key={e} style={{ background: "#27272a", color: "#9ca3af", padding: "1px 6px", borderRadius: 3, fontSize: 10 }}>{e}</span>
               ))}
             </div>
-            <span style={{ color: "#6b7280", fontSize: 10 }}>{src.refresh_frequency}</span>
+            <span style={{ color: "#6b7280", fontSize: 10 }}>{src.refresh_frequency ?? ""}</span>
           </div>
         </div>
       ))}

@@ -43,10 +43,11 @@ const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalcu
 
 function formatValue(kpi: FinancialKPI): string {
   if (kpi.unit === "percent") return `${(kpi.current * 100).toFixed(1)}%`;
-  if (kpi.current >= 1_000_000_000) return `$${(kpi.current / 1_000_000_000).toFixed(1)}B`;
-  if (kpi.current >= 1_000_000) return `$${(kpi.current / 1_000_000).toFixed(1)}M`;
-  if (kpi.current >= 1_000) return `$${(kpi.current / 1_000).toFixed(0)}K`;
-  return `$${kpi.current.toFixed(0)}`;
+  const prefix = kpi.unit === "ratio" ? "" : "$";
+  if (kpi.current >= 1_000_000_000) return `${prefix}${(kpi.current / 1_000_000_000).toFixed(1)}B`;
+  if (kpi.current >= 1_000_000) return `${prefix}${(kpi.current / 1_000_000).toFixed(1)}M`;
+  if (kpi.current >= 1_000) return `${prefix}${(kpi.current / 1_000).toFixed(0)}K`;
+  return `${prefix}${kpi.current.toFixed(0)}`;
 }
 
 function changeIndicator(kpi: FinancialKPI): { label: string; color: string; arrow: string } {
