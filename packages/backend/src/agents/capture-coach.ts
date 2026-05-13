@@ -36,7 +36,6 @@ interface OpportunityData {
   place_of_performance: string | null;
   incumbent: string | null;
   tags: string[];
-  description: string | null;
 }
 
 interface CompanyProfile {
@@ -118,7 +117,7 @@ async function fetchOpportunity(oppId: string): Promise<OpportunityData | null> 
   const result = await pool.query(
     `SELECT id, title, agency, department, status, score, value_estimated,
             probability_of_win, naics, psc, due_date, solicitation_number,
-            set_aside, place_of_performance, incumbent, tags, description
+            set_aside, place_of_performance, incumbent, tags
      FROM opportunities WHERE id = $1`,
     [oppId],
   );
@@ -216,7 +215,7 @@ Solicitation: ${opp.solicitation_number ?? "N/A"}
 Incumbent: ${opp.incumbent ?? "Unknown"}
 Current Pwin: ${opp.probability_of_win ?? "Not scored"}
 Status: ${opp.status}
-Description: ${opp.description ?? "No description available"}`);
+Tags: ${opp.tags?.join(", ") ?? "None"}`);
 
   if (company) {
     sections.push(`## Company Profile — ${company.name}
