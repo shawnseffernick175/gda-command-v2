@@ -3486,3 +3486,31 @@ export function disableAgent(name: string) {
 export function fetchRecentAgentRuns(limit = 50) {
   return request<{ runs: AgentRunRow[]; count: number }>(`/agents/runs/recent?limit=${limit}`);
 }
+
+// ---------------------------------------------------------------------------
+// Opportunity Watch Agent
+// ---------------------------------------------------------------------------
+
+export interface OpportunityWatchResult {
+  items_processed: number;
+  items_flagged: number;
+  summary: {
+    total_scored: number;
+    pursue: number;
+    evaluate: number;
+    pass: number;
+    top_opportunities: Array<{ id: string; title: string; agency: string; score: number }>;
+  };
+}
+
+export function triggerOpportunityWatch() {
+  return request<OpportunityWatchResult>("/agents/opportunity-watch/trigger", { method: "POST" });
+}
+
+export function fetchOpportunityWatchLatest() {
+  return request<{ run: AgentRunRow | null; message?: string }>("/agents/opportunity-watch/latest");
+}
+
+export function fetchOpportunityWatchHistory(limit = 20) {
+  return request<{ runs: AgentRunRow[]; count: number }>(`/agents/opportunity-watch/history?limit=${limit}`);
+}

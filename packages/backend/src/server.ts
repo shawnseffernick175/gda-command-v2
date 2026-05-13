@@ -44,6 +44,7 @@ import riskRegisterRouter from "./routes/risk-register";
 import companyProfileRouter from "./routes/company-profile";
 import agentsRouter from "./routes/agents";
 import morningCommanderRouter from "./routes/morning-commander";
+import opportunityWatchRouter from "./routes/opportunity-watch";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -159,6 +160,7 @@ app.use("/api/govwin", govwinRouter);
 app.use("/api/risk-register", riskRegisterRouter);
 app.use("/api/company-profile", companyProfileRouter);
 app.use("/api/agents/morning-commander", morningCommanderRouter);
+app.use("/api/agents/opportunity-watch", opportunityWatchRouter);
 app.use("/api/agents", agentsRouter);
 
 // --- Frontend error reporting endpoint ---
