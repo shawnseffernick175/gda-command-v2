@@ -309,8 +309,21 @@ export default function OpportunityDetail() {
             )}
           </>
         ) : (
-          <div style={{ padding: "12px 16px", borderRadius: 8, background: "rgba(245,158,11,0.08)", color: "#f59e0b", fontSize: 13 }}>
-            AI analysis has not been generated for this opportunity yet. Analysis includes executive summary, competitive landscape, strengths, risks, and recommended actions.
+          <div style={{ lineHeight: 1.6, fontSize: 13 }}>
+            <p style={{ margin: "0 0 8px" }}>
+              <strong>{opp.title}</strong> is a {opp.department ?? "federal"} opportunity
+              {opp.agency ? ` from ${opp.agency}` : ""}
+              {opp.value_estimated ? ` valued at $${(opp.value_estimated / 1_000_000).toFixed(1)}M` : ""}.
+              {opp.naics ? ` NAICS: ${opp.naics}.` : ""}
+              {opp.set_aside ? ` Set-aside: ${opp.set_aside}.` : ""}
+              {opp.due_date ? ` Response deadline: ${new Date(opp.due_date).toLocaleDateString()}.` : ""}
+            </p>
+            <p style={{ margin: "0 0 8px" }}>
+              Current stage: <strong>{({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}</strong>.
+              {opp.score > 0 ? ` Fit score: ${opp.score}/100.` : ""}
+              {opp.probability_of_win ? ` Estimated Pwin: ${(opp.probability_of_win * 100).toFixed(0)}%.` : ""}
+            </p>
+            {opp.incumbent && <p style={{ margin: 0 }}>Incumbent: {opp.incumbent}.</p>}
           </div>
         )}
       </Section>

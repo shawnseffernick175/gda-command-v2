@@ -61,6 +61,21 @@ router.get("/", async (_req, res) => {
       configured: isLLMAvailable(),
       missing: isLLMAvailable() ? [] : ["OPENAI_API_KEY"],
     },
+    {
+      name: "GovWin IQ",
+      configured: !!process.env.GOVWIN_API_KEY,
+      missing: process.env.GOVWIN_API_KEY ? [] : ["GOVWIN_API_KEY"],
+    },
+    {
+      name: "GovTribe",
+      configured: !!process.env.GOVTRIBE_API_KEY,
+      missing: process.env.GOVTRIBE_API_KEY ? [] : ["GOVTRIBE_API_KEY"],
+    },
+    {
+      name: "SAM.gov",
+      configured: !!process.env.SAM_API_KEY,
+      missing: process.env.SAM_API_KEY ? [] : ["SAM_API_KEY"],
+    },
   ];
 
   // Test DB connectivity if configured

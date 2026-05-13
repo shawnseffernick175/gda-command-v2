@@ -6,6 +6,8 @@ import {
   updateUserStatus,
   createUser,
   deleteUser,
+  inviteUser,
+  fetchInvitations,
   type AdminUser,
   type AdminRole,
 } from "../api/client";
@@ -32,6 +34,11 @@ export default function UserManagement() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState("viewer");
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("viewer");
+  const [inviting, setInviting] = useState(false);
+  const [invitations, setInvitations] = useState<Array<{ id: string; email: string; role: string; created_at: string; expires_at: string; accepted_at: string | null }>>([]);
   const currentUser = getUser();
 
   const loadUsers = useCallback(async () => {
@@ -57,7 +64,28 @@ export default function UserManagement() {
 
   useEffect(() => {
     loadUsers();
+    fetchInvitations().then((res) => {
+      if (res.success && res.data) setInvitations(res.data.invitations);
+    }).catch(() => {});
   }, [loadUsers]);
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      const res = await inviteUser(inviteEmail.trim(), inviteRole);
+      if (res.success && res.data) {
+        setActionMsg(`Invitation sent to ${inviteEmail} (${inviteRole}). Link: ${res.data.invite_url}`);
+        setInviteEmail("");
+        setShowInvite(false);
+        fetchInvitations().then((r) => { if (r.success && r.data) setInvitations(r.data.invitations); }).catch(() => {});
+      }
+    } catch (err) {
+      setActionMsg(`Error: ${err instanceof Error ? err.message : "Failed to invite"}`);
+    }
+    setInviting(false);
+    setTimeout(() => setActionMsg(null), 10000);
+  };
 
   const handleRoleChange = async (userId: string, role: string) => {
     try {
@@ -183,17 +211,40 @@ export default function UserManagement() {
             {users.filter((u) => u.is_active).length} active
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          style={{
-            ...btnStyle,
-            background: showCreate ? "#475569" : "#3b82f6",
-            color: "#fff",
-          }}
-        >
-          {showCreate ? "Cancel" : "+ New User"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setShowInvite(!showInvite)}
+            style={{ ...btnStyle, background: showInvite ? "#475569" : "#22c55e", color: "#fff" }}
+          >
+            {showInvite ? "Cancel Invite" : "Invite User"}
+          </button>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            style={{ ...btnStyle, background: showCreate ? "#475569" : "#3b82f6", color: "#fff" }}
+          >
+            {showCreate ? "Cancel" : "+ New User"}
+          </button>
+        </div>
       </div>
+
+      {/* Invite user form */}
+      {showInvite && (
+        <div style={{ ...cardStyle, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: "1 1 250px" }}>
+            <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>Email Address</label>
+            <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="user@company.com" style={{ width: "100%", padding: "8px 12px", background: "#0f172a", border: "1px solid #475569", borderRadius: 6, color: "#f1f5f9", fontSize: 14 }} />
+          </div>
+          <div style={{ flex: "0 0 160px" }}>
+            <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>Role</label>
+            <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} style={{ width: "100%", padding: "8px 12px", background: "#0f172a", border: "1px solid #475569", borderRadius: 6, color: "#f1f5f9", fontSize: 14 }}>
+              {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+            </select>
+          </div>
+          <button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} style={{ ...btnStyle, background: inviting ? "#475569" : "#22c55e", color: "#fff", padding: "8px 20px" }}>
+            {inviting ? "Sending..." : "Send Invitation"}
+          </button>
+        </div>
+      )}
 
       {/* Action message */}
       {actionMsg && (
@@ -434,6 +485,28 @@ export default function UserManagement() {
           </tbody>
         </table>
       </div>
+
+      {/* Pending Invitations */}
+      {invitations.length > 0 && (
+        <div style={{ ...cardStyle }}>
+          <h3 style={{ margin: "0 0 12px", fontSize: 16, color: "#f1f5f9" }}>
+            Pending Invitations ({invitations.filter((i) => !i.accepted_at).length})
+          </h3>
+          <div style={{ display: "grid", gap: 8 }}>
+            {invitations.map((inv) => (
+              <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#0f172a", borderRadius: 6, border: "1px solid #334155" }}>
+                <div>
+                  <span style={{ color: "#f1f5f9", fontSize: 13, fontWeight: 600 }}>{inv.email}</span>
+                  <span style={{ marginLeft: 8, fontSize: 11, padding: "1px 6px", borderRadius: 4, background: `${ROLE_COLORS[inv.role] ?? "#6b7280"}20`, color: ROLE_COLORS[inv.role] ?? "#6b7280" }}>{inv.role}</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>
+                  {inv.accepted_at ? <span style={{ color: "#22c55e" }}>Accepted</span> : `Sent ${timeAgo(inv.created_at)}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

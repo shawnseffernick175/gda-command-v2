@@ -189,6 +189,34 @@ router.get("/escalation-rules", async (_req, res) => {
   res.json(successEnvelope("gda-anomaly", "list-rules", { rules: [], total: 0, source: "db" }));
 });
 
+// POST /api/anomaly/escalation-rules — create a new rule
+router.post("/escalation-rules", requireRole("admin", "bd_manager"), async (req, res) => {
+  const { name, condition, priority, description } = req.body;
+  if (!name || !condition) {
+    return res.status(400).json(errorEnvelope("gda-anomaly", "create-rule", {
+      code: "VALIDATION", message: "name and condition are required", detail: null,
+    }));
+  }
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-anomaly", "create-rule", {
+      code: "DB_UNAVAILABLE", message: "Database not available", detail: null,
+    }));
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO escalation_rules (id, name, condition, priority, description, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW()) RETURNING *`,
+      [name, condition, priority ?? "warning", description ?? ""]
+    );
+    return res.json(successEnvelope("gda-anomaly", "create-rule", { rule: result.rows[0] }));
+  } catch (err) {
+    return res.status(500).json(errorEnvelope("gda-anomaly", "create-rule", {
+      code: "DB_ERROR", message: (err as Error).message, detail: null,
+    }));
+  }
+});
+
 router.get("/escalations", async (_req, res) => {
   if (n8nWebhookConfigured()) {
     try {

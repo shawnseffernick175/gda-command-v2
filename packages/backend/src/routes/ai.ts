@@ -90,4 +90,50 @@ ${oppContext}`;
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/ask — general purpose Q&A from any page
+// Mounted separately via askRouter to avoid double-mounting aiRouter
+// ---------------------------------------------------------------------------
+export const askRouter = Router();
+askRouter.post("/", async (req, res) => {
+  const { question, context: pageContext = "" } = req.body as { question: string; context?: string };
+
+  if (!question?.trim()) {
+    return res.status(400).json(errorEnvelope("gda-ai", "ask", { code: "MISSING_QUESTION", message: "Question is required", detail: null }));
+  }
+
+  // Gather broad system context
+  let systemContext = "";
+  const pool = getPool();
+  if (pool) {
+    try {
+      const [opps, risks, contacts] = await Promise.all([
+        pool.query("SELECT COUNT(*) AS cnt, COALESCE(SUM(value_estimated),0) AS total FROM opportunities"),
+        pool.query("SELECT COUNT(*) AS cnt FROM risks"),
+        pool.query("SELECT COUNT(*) AS cnt FROM contacts"),
+      ]);
+      systemContext = `Envision has ${opps.rows[0].cnt} opportunities worth $${(opps.rows[0].total / 1e6).toFixed(1)}M, ${risks.rows[0].cnt} risks, and ${contacts.rows[0].cnt} contacts in the system.`;
+    } catch { /* ignore */ }
+  }
+
+  if (!isLLMAvailable()) {
+    return res.json(successEnvelope("gda-ai", "ask", {
+      answer: `AI model not configured. ${systemContext || ""}\n\nTo enable AI-powered answers, configure your OPENAI_API_KEY in Settings → AI Configuration.`,
+    }));
+  }
+
+  try {
+    const messages: ChatMessage[] = [
+      { role: "system", content: `You are GDA Command's AI assistant for Envision Innovative Solutions, a SDVOSB specializing in defense IT, cybersecurity, and Army SETA. Answer the user's question concisely. Current page: ${pageContext}. ${systemContext}` },
+      { role: "user", content: question },
+    ];
+    const result = await chatCompletion(messages);
+    return res.json(successEnvelope("gda-ai", "ask", { answer: result.content }));
+  } catch {
+    return res.json(successEnvelope("gda-ai", "ask", {
+      answer: `AI service temporarily unavailable. ${systemContext}\n\nPlease try again or check Settings → AI Configuration.`,
+    }));
+  }
+});
+
 export default router;

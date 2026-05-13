@@ -463,10 +463,10 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
       />
       {kpis.n8nKpis ? (
         <>
-          <KPICard label="Weighted Pipeline" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" onClick={() => navigate("/pipeline")} info={{
-            whatItIs: "Pipeline value weighted by probability of win.",
-            whatItMeans: "Risk-adjusted revenue forecast from your active pipeline.",
-            howCalculated: "Sum of (contract value × Pwin) for all Qualified and Pipeline opportunities.",
+          <KPICard label="Weighted Op Value" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" onClick={() => navigate("/pipeline")} info={{
+            whatItIs: "Total opportunity value weighted by probability of win.",
+            whatItMeans: "Risk-adjusted forecast based on contract values and win probability.",
+            howCalculated: "Sum of (contract value × Pwin) for all tracked opportunities.",
           }} />
           <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" onClick={() => navigate("/ops-tracker?status=pipeline")} />
           <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" onClick={() => navigate("/ops-tracker")} />

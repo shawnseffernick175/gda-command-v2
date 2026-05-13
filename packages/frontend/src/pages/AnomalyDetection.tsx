@@ -4,6 +4,7 @@ import {
   fetchCompetitorMovements,
   fetchEscalations,
   fetchEscalationRules,
+  createEscalationRule,
   acknowledgeAnomaly,
   resolveAnomaly,
   type AnomalyRow,
@@ -525,33 +526,80 @@ function EscalationsTab({ escalations, selectedId, onSelect }: {
 // Escalation Rules Tab
 // ───────────────────────────────────────────────────────────
 
-function RulesTab({ rules }: { rules: EscalationRuleRow[] }) {
+function RulesTab({ rules, onRuleAdded }: { rules: EscalationRuleRow[]; onRuleAdded: () => void }) {
+  const [showForm, setShowForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCondition, setNewCondition] = useState("");
+  const [newPriority, setNewPriority] = useState("warning");
+  const [newDesc, setNewDesc] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!newName.trim() || !newCondition.trim()) return;
+    setSaving(true);
+    try {
+      await createEscalationRule({ name: newName, condition: newCondition, priority: newPriority, description: newDesc });
+      setNewName(""); setNewCondition(""); setNewDesc(""); setShowForm(false);
+      onRuleAdded();
+    } catch { /* ignore */ }
+    setSaving(false);
+  };
+
   return (
-    <div style={{ display: "grid", gap: 12, maxWidth: 800 }}>
-      {rules.map((r) => (
-        <div key={r.id} style={{
-          padding: 16,
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderLeft: `4px solid ${ESC_PRIORITY_COLORS[r.priority] ?? "#6b7280"}`,
-          borderRadius: 8,
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</span>
-            <div style={{ display: "flex", gap: 8 }}>
-              <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{r.id}</span>
-              <Pill label={r.priority} color={ESC_PRIORITY_COLORS[r.priority] ?? "#6b7280"} />
-            </div>
-          </div>
-          <div style={{
-            fontFamily: "monospace", fontSize: 12, padding: "8px 12px",
-            background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)",
-            color: "var(--color-text-muted)",
-          }}>
-            {r.condition}
+    <div style={{ maxWidth: 800 }}>
+      <div style={{ padding: 14, background: "rgba(59,130,246,0.06)", borderRadius: 8, border: "1px solid rgba(59,130,246,0.15)", marginBottom: 16, fontSize: 13, lineHeight: 1.6 }}>
+        <strong>How Rules Work:</strong> Rules define the conditions that trigger anomaly alerts and escalations. They are evaluated continuously against incoming opportunity data, competitor activity, and financial metrics. When a rule's condition is met, an anomaly is created and (optionally) escalated for review.
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <button onClick={() => setShowForm(!showForm)} style={{ padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+          {showForm ? "Cancel" : "+ Add Rule"}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ padding: 16, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, marginBottom: 16 }}>
+          <div style={{ display: "grid", gap: 10 }}>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Rule name (e.g., Pwin Drop > 15%)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }} />
+            <input value={newCondition} onChange={(e) => setNewCondition(e.target.value)} placeholder="Condition (e.g., pwin_change < -0.15)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13, fontFamily: "monospace" }} />
+            <select value={newPriority} onChange={(e) => setNewPriority(e.target.value)} style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }}>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+            <textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Description (optional)" rows={2} style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13, resize: "vertical" }} />
+            <button onClick={handleAdd} disabled={saving || !newName.trim() || !newCondition.trim()} style={{ padding: "8px 16px", background: saving ? "#6b7280" : "#22c55e", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13, justifySelf: "start" }}>
+              {saving ? "Saving..." : "Save Rule"}
+            </button>
           </div>
         </div>
-      ))}
+      )}
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {rules.map((r) => (
+          <div key={r.id} style={{
+            padding: 16,
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderLeft: `4px solid ${ESC_PRIORITY_COLORS[r.priority] ?? "#6b7280"}`,
+            borderRadius: 8,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Pill label={r.priority} color={ESC_PRIORITY_COLORS[r.priority] ?? "#6b7280"} />
+              </div>
+            </div>
+            <div style={{
+              fontFamily: "monospace", fontSize: 12, padding: "8px 12px",
+              background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)",
+              color: "var(--color-text-muted)",
+            }}>
+              {r.condition}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -672,14 +720,14 @@ export default function AnomalyDetection() {
         gap: 12,
         marginBottom: 20,
       }}>
-        <SummaryBox label="Anomalies" value={String(totalAnomalies)} />
-        <SummaryBox label="Active" value={String(activeAnomalies)} color="#dc2626" />
-        <SummaryBox label="Critical" value={String(criticalCount)} color="#dc2626" />
-        <SummaryBox label="High" value={String(highCount)} color="#ea580c" />
-        <SummaryBox label="Movements" value={String(totalMovements)} />
-        <SummaryBox label="Competitors" value={String(uniqueCompetitors)} />
-        <SummaryBox label="Escalations" value={String(totalEscalations)} />
-        <SummaryBox label="Overdue" value={String(overdueEscalations)} color={overdueEscalations > 0 ? "#dc2626" : undefined} />
+        <SummaryBox label="Anomalies" value={String(totalAnomalies)} onClick={() => { setTab("anomalies"); setSeverityFilter(""); setStatusFilter(""); }} />
+        <SummaryBox label="Active" value={String(activeAnomalies)} color="#dc2626" onClick={() => { setTab("anomalies"); setStatusFilter("active"); setSeverityFilter(""); }} />
+        <SummaryBox label="Critical" value={String(criticalCount)} color="#dc2626" onClick={() => { setTab("anomalies"); setSeverityFilter("critical"); setStatusFilter(""); }} />
+        <SummaryBox label="High" value={String(highCount)} color="#ea580c" onClick={() => { setTab("anomalies"); setSeverityFilter("high"); setStatusFilter(""); }} />
+        <SummaryBox label="Movements" value={String(totalMovements)} onClick={() => { setTab("competitors"); }} />
+        <SummaryBox label="Competitors" value={String(uniqueCompetitors)} onClick={() => { setTab("competitors"); }} />
+        <SummaryBox label="Escalations" value={String(totalEscalations)} onClick={() => { setTab("escalations"); setStatusFilter(""); }} />
+        <SummaryBox label="Overdue" value={String(overdueEscalations)} color={overdueEscalations > 0 ? "#dc2626" : undefined} onClick={() => { setTab("escalations"); setStatusFilter("overdue"); }} />
       </div>
 
       {/* Tabs */}
@@ -795,21 +843,45 @@ export default function AnomalyDetection() {
           onSelect={setSelectedEscalation}
         />
       )}
-      {tab === "rules" && <RulesTab rules={rules} />}
+      {tab === "rules" && <RulesTab rules={rules} onRuleAdded={() => { fetchEscalationRules().then((env) => { if (env.success && env.data) setRulesData(env.data); }); }} />}
     </div>
   );
 }
 
-function SummaryBox({ label, value, color }: { label: string; value: string; color?: string }) {
+const SUMMARY_INFO: Record<string, string> = {
+  "Anomalies": "Total detected anomalies across all categories and severities.",
+  "Active": "Anomalies that have not yet been acknowledged or resolved.",
+  "Critical": "Anomalies with critical severity requiring immediate attention.",
+  "High": "Anomalies with high severity — should be reviewed within 24 hours.",
+  "Movements": "Competitor actions detected (contract wins, teaming, hiring, etc.).",
+  "Competitors": "Unique competitors tracked with recent activity.",
+  "Escalations": "Items escalated for management review or decision.",
+  "Overdue": "Escalations past their resolution deadline.",
+};
+
+function SummaryBox({ label, value, color, onClick }: { label: string; value: string; color?: string; onClick?: () => void }) {
   return (
-    <div style={{
-      padding: "12px 8px",
-      background: "var(--color-surface)",
-      border: "1px solid var(--color-border)",
-      borderRadius: 8,
-      textAlign: "center",
-    }}>
-      <div style={{ fontSize: 10, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>{label}</div>
+    <div
+      onClick={onClick}
+      style={{
+        padding: "12px 8px",
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        textAlign: "center",
+        cursor: onClick ? "pointer" : "default",
+        transition: "background 0.15s, border-color 0.15s",
+        position: "relative",
+      }}
+      onMouseEnter={(e) => { if (onClick) e.currentTarget.style.borderColor = color ?? "#3b82f6"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-border)"; }}
+    >
+      <div style={{ fontSize: 10, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+        {label}
+        {SUMMARY_INFO[label] && (
+          <span title={SUMMARY_INFO[label]} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: "50%", background: "#1a1a2e", border: "1px solid var(--color-border)", fontSize: 9, color: "var(--color-text-muted)", cursor: "help", fontWeight: 700 }}>?</span>
+        )}
+      </div>
       <div style={{ fontSize: 22, fontWeight: 700, color: color ?? "var(--color-text)" }}>{value}</div>
     </div>
   );

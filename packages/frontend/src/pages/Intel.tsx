@@ -170,13 +170,14 @@ async function fetchJson<T>(path: string): Promise<GDAEnvelope<T>> {
 // Constants
 // ---------------------------------------------------------------------------
 
-type TabId = "briefing" | "feed" | "research" | "competitors";
+type TabId = "briefing" | "feed" | "research" | "competitors" | "teaming";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "briefing", label: "Morning Briefing" },
   { id: "feed", label: "Intel Feed" },
   { id: "research", label: "Deep Research" },
   { id: "competitors", label: "Competitor Watch" },
+  { id: "teaming", label: "Teaming" },
 ];
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -316,6 +317,7 @@ export default function Intel() {
       {tab === "feed" && <FeedTab onSource={setDataSource} />}
       {tab === "research" && <ResearchTab onSource={setDataSource} />}
       {tab === "competitors" && <CompetitorsTab onSource={setDataSource} />}
+      {tab === "teaming" && <TeamingTab />}
     </div>
   );
 }
@@ -1379,6 +1381,101 @@ function SummaryChip({ label, value, accent }: { label: string; value: string; a
     }}>
       <span style={{ color: "var(--color-text-muted)", marginRight: 6 }}>{label}</span>
       <span style={{ fontWeight: 700, color: accent ?? "var(--color-text)" }}>{value}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Teaming Tab — match opportunities with potential teaming partners
+// ---------------------------------------------------------------------------
+
+interface TeamingMatch {
+  opportunity_id: string;
+  opportunity_title: string;
+  department: string;
+  value: number;
+  partners: { name: string; rationale: string; capability: string; past_performance: string }[];
+}
+
+function TeamingTab() {
+  const [matches, setMatches] = useState<TeamingMatch[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIdx, setSelectedIdx] = useState<number>(0);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchJson<{ matches: TeamingMatch[] }>("/intel/teaming")
+      .then((env) => {
+        if (env.success && env.data) setMatches(env.data.matches);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{ padding: 20, color: "var(--color-text-muted)" }}>Loading teaming analysis...</div>;
+
+  if (matches.length === 0) {
+    return (
+      <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)" }}>
+        <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No Teaming Matches Available</p>
+        <p style={{ fontSize: 13 }}>Teaming analysis identifies potential partner companies for joint bids based on capability gaps, past performance, and set-aside requirements. Data is generated from active opportunity analysis.</p>
+      </div>
+    );
+  }
+
+  const sel = matches[selectedIdx] ?? null;
+
+  return (
+    <div style={{ display: "flex", gap: 20 }}>
+      <div style={{ width: 400, flexShrink: 0, maxHeight: "calc(100vh - 300px)", overflowY: "auto" }}>
+        {matches.map((m, i) => (
+          <div
+            key={m.opportunity_id}
+            onClick={() => setSelectedIdx(i)}
+            style={{
+              padding: 14,
+              background: selectedIdx === i ? "var(--color-surface-hover)" : "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderLeft: `4px solid ${m.partners.length > 2 ? "#22c55e" : m.partners.length > 0 ? "#f59e0b" : "#6b7280"}`,
+              borderRadius: 8,
+              marginBottom: 8,
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{m.opportunity_title}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--color-text-muted)" }}>
+              <span>{m.department}</span>
+              <span>{m.partners.length} potential partners</span>
+            </div>
+            {m.value > 0 && <div style={{ fontSize: 11, color: "#8b5cf6", marginTop: 4 }}>${(m.value / 1_000_000).toFixed(1)}M</div>}
+          </div>
+        ))}
+      </div>
+
+      {sel && (
+        <div style={{ flex: 1 }}>
+          <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>{sel.opportunity_title}</h3>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 16 }}>{sel.department} — ${(sel.value / 1_000_000).toFixed(1)}M</p>
+
+          <div style={{ display: "grid", gap: 12 }}>
+            {sel.partners.map((p, pi) => (
+              <div key={pi} style={{
+                padding: 16,
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "#3b82f6" }}>{p.name}</div>
+                <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
+                  <div><strong style={{ color: "var(--color-text-muted)" }}>Capability:</strong> {p.capability}</div>
+                  <div><strong style={{ color: "var(--color-text-muted)" }}>Rationale:</strong> {p.rationale}</div>
+                  <div><strong style={{ color: "var(--color-text-muted)" }}>Past Performance:</strong> {p.past_performance}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
