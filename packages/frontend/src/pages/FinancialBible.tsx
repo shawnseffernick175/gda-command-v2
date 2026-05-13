@@ -14,9 +14,21 @@ function formatCurrency(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
+function formatCount(v: number): string {
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+  return v.toFixed(0);
+}
+
+function formatByUnit(value: number, unit: string): string {
+  if (unit === "percent") return `${(value * 100).toFixed(1)}%`;
+  if (unit === "ratio") return formatCount(value);
+  return formatCurrency(value);
+}
+
 function formatKPIValue(kpi: FinancialKPI): string {
-  if (kpi.unit === "percent") return `${(kpi.current * 100).toFixed(1)}%`;
-  return formatCurrency(kpi.current);
+  return formatByUnit(kpi.current, kpi.unit);
 }
 
 const KPI_COLORS: Record<string, string> = {
@@ -210,7 +222,7 @@ function DrillDownView({ data }: { data: FinancialDrillDownData }) {
         />
         <SummaryCard
           label="Plan"
-          value={kpi.unit === "percent" ? `${(kpi.plan * 100).toFixed(1)}%` : formatCurrency(kpi.plan)}
+          value={formatByUnit(kpi.plan, kpi.unit)}
           sub="Target"
           color="#6b7280"
         />
@@ -218,13 +230,13 @@ function DrillDownView({ data }: { data: FinancialDrillDownData }) {
           label="Variance"
           value={kpi.unit === "percent"
             ? `${((kpi.current - kpi.plan) * 100).toFixed(1)}pp`
-            : formatCurrency(Math.abs(variance_from_plan))}
+            : formatByUnit(Math.abs(variance_from_plan), kpi.unit)}
           sub={`${variance_pct >= 0 ? "+" : ""}${variance_pct.toFixed(1)}% vs plan`}
           color={variance_pct >= 0 ? "#22c55e" : "#f59e0b"}
         />
         <SummaryCard
           label="Prior Period"
-          value={kpi.unit === "percent" ? `${(kpi.prior * 100).toFixed(1)}%` : formatCurrency(kpi.prior)}
+          value={formatByUnit(kpi.prior, kpi.unit)}
           sub={`FY25-Q1`}
           color="#6b7280"
         />
@@ -297,9 +309,7 @@ function DrillDownView({ data }: { data: FinancialDrillDownData }) {
                 }}
               >
                 <span style={{ fontSize: 10, color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
-                  {kpi.unit === "percent"
-                    ? `${(t.value * 100).toFixed(1)}%`
-                    : formatCurrency(t.value)}
+                  {formatByUnit(t.value, kpi.unit)}
                 </span>
                 <div
                   style={{
