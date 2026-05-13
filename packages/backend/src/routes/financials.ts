@@ -18,16 +18,25 @@ router.get("/kpis", async (_req, res) => {
         );
         // Map DB columns to frontend FinancialKPI shape
         const unitMap: Record<string, string> = { "$": "currency", "%": "percent", count: "ratio" };
-        kpis = rows.map((r: Record<string, unknown>) => ({
-          key: r.id,
-          label: r.label,
-          current: Number(r.value) || 0,
-          prior: Number(r.value) * 0.95 || 0,
-          plan: Number(r.target) || 0,
-          unit: unitMap[r.unit as string] ?? "currency",
-          period: r.period,
-          updated_at: r.updated_at,
-        }));
+        kpis = rows.map((r: Record<string, unknown>) => {
+          const rawUnit = r.unit as string;
+          const mappedUnit = unitMap[rawUnit] ?? "currency";
+          const val = Number(r.value) || 0;
+          const tgt = Number(r.target) || 0;
+          // Frontend formatValue multiplies percent by 100, so convert: 34.5 → 0.345
+          const current = mappedUnit === "percent" ? val / 100 : val;
+          const plan = mappedUnit === "percent" ? tgt / 100 : tgt;
+          return {
+            key: r.id,
+            label: r.label,
+            current,
+            prior: current * 0.95,
+            plan,
+            unit: mappedUnit,
+            period: r.period,
+            updated_at: r.updated_at,
+          };
+        });
       } catch { /* table may not exist yet */ }
     }
 
