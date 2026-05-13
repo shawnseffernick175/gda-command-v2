@@ -241,7 +241,7 @@ function DrillDownView({ data }: { data: FinancialDrillDownData }) {
           background: "rgba(34,197,94,0.15)",
           color: "#22c55e",
         }}>
-          {data.source === "n8n" ? "Live n8n" : "Live DB"}
+          {data.source === "n8n" ? "Live API" : "Live DB"}
         </span>
         <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
           Updated {new Date(kpi.updated_at).toLocaleDateString()}

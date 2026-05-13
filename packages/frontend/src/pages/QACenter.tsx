@@ -128,7 +128,7 @@ export default function QACenter() {
             color: source === "live" ? "var(--color-success)" : "var(--color-accent, #3b82f6)",
             fontWeight: 500,
           }}>
-            {source === "live" ? "Live n8n" : "Live DB"}
+            {source === "live" ? "Live API" : "Live DB"}
           </span>
         )}
       </div>
