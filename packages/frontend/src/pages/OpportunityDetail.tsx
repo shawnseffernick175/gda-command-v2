@@ -265,7 +265,7 @@ export default function OpportunityDetail() {
             background: STATUS_COLORS[opp.status] ?? "#6b7280",
           }}
         >
-          {({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}
+          {({ discovery: "Identified", qualified: "Qualified", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}
         </span>
         <span style={{ fontSize: 18, fontWeight: 700, color: scoreColor(opp.score) }}>
           {opp.score}
@@ -319,7 +319,7 @@ export default function OpportunityDetail() {
               {opp.due_date ? ` Response deadline: ${new Date(opp.due_date).toLocaleDateString()}.` : ""}
             </p>
             <p style={{ margin: "0 0 8px" }}>
-              Current stage: <strong>{({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}</strong>.
+              Current stage: <strong>{({ discovery: "Identified", qualified: "Qualified", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}</strong>.
               {opp.score > 0 ? ` Fit score: ${opp.score}/100.` : ""}
               {opp.probability_of_win ? ` Estimated Pwin: ${(opp.probability_of_win * 100).toFixed(0)}%.` : ""}
             </p>

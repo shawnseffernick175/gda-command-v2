@@ -11,8 +11,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  discovery: "Interest",
-  qualified: "Qualify",
+  discovery: "Identified",
+  qualified: "Qualified",
   pipeline: "Pursue",
   won: "Won",
   lost: "Lost",

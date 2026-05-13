@@ -239,8 +239,8 @@ export function qualifyOpportunity(id: string, dryRun = true, approve = false) {
 }
 
 export const SHIPLEY_STAGES = [
-  { value: "interest", label: "Interest", color: "#6b7280" },
-  { value: "qualify", label: "Qualify", color: "#3b82f6" },
+  { value: "interest", label: "Identified", color: "#6b7280" },
+  { value: "qualify", label: "Qualified", color: "#3b82f6" },
   { value: "pursue", label: "Pursue", color: "#22c55e" },
   { value: "solicitation", label: "Solicitation", color: "#f59e0b" },
   { value: "post_submittal", label: "Post Submittal", color: "#8b5cf6" },

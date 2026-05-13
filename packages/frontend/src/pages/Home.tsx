@@ -44,8 +44,8 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 const STAGE_LABELS: Record<string, string> = {
-  discovery: "Interest",
-  qualified: "Qualify",
+  discovery: "Identified",
+  qualified: "Qualified",
   pipeline: "Pursue",
   won: "Won",
   lost: "Lost",
@@ -456,9 +456,9 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
         value={String(kpis.totalOpportunities)}
         onClick={() => navigate("/ops-tracker")}
         info={{
-          whatItIs: "Count of all tracked opportunities (Interest + Qualify status).",
+          whatItIs: "Count of all tracked opportunities across all stages.",
           whatItMeans: "Total number of potential contracts being evaluated or actively pursued.",
-          howCalculated: "Count of opportunities in Interest and Qualify stages. Does not include Fast Track R&D signals.",
+          howCalculated: "Count of all imported opportunities. Does not include Fast Track R&D signals.",
         }}
       />
       {kpis.n8nKpis ? (
@@ -468,9 +468,21 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             whatItMeans: "Risk-adjusted forecast based on contract values and win probability.",
             howCalculated: "Sum of (contract value × Pwin) for all tracked opportunities.",
           }} />
-          <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" onClick={() => navigate("/ops-tracker?status=pipeline")} />
-          <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" onClick={() => navigate("/ops-tracker")} />
-          <KPICard label="Monitor" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" onClick={() => navigate("/ops-tracker")} />
+          <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" onClick={() => navigate("/capture")} info={{
+            whatItIs: "Opportunities you have approved to actively pursue.",
+            whatItMeans: "Only opportunities you explicitly move to Pursue appear here.",
+            howCalculated: "Count of opportunities with user-approved Pursue stage.",
+          }} />
+          <KPICard label="Qualified" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" onClick={() => navigate("/ops-tracker?status=qualified")} info={{
+            whatItIs: "Opportunities you have qualified for evaluation.",
+            whatItMeans: "Only opportunities you explicitly qualify appear here.",
+            howCalculated: "Count of opportunities with user-approved Qualify stage.",
+          }} />
+          <KPICard label="Identified" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" onClick={() => navigate("/ops-tracker")} info={{
+            whatItIs: "All imported opportunities awaiting your review.",
+            whatItMeans: "These are new opportunities from GovTribe, SAM.gov, and other sources that need your evaluation.",
+            howCalculated: "Count of all opportunities not yet qualified or pursued by you.",
+          }} />
         </>
       ) : (
         <>
@@ -482,7 +494,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             info={{
               whatItIs: "Total estimated value of approved pipeline opportunities.",
               whatItMeans: "The dollar amount of contracts you are actively pursuing (Qualified + Pipeline status only).",
-              howCalculated: "Sum of estimated values for opportunities in Qualify and Pursue stages. Interest items are excluded — they are prospects, not pipeline.",
+              howCalculated: "Sum of estimated values for opportunities you have explicitly qualified or moved to Pursue. Identified items are excluded — they are prospects, not pipeline.",
             }}
           />
           <KPICard
@@ -675,7 +687,7 @@ function FunnelSection({ kpis }: { kpis: DashboardKPIs }) {
         <InfoBadge
           whatItIs="Visual breakdown of opportunities by pipeline stage."
           whatItMeans="Shows how many opportunities are at each stage. Click any bar to filter the Ops Tracker by that stage."
-          howCalculated="Count and total value of opportunities grouped by status: Interest → Qualify → Pursue → Won → Lost."
+          howCalculated="Count and total value of opportunities grouped by status: Identified → Qualified → Pursue → Won → Lost."
           size={16}
         />
       </h2>

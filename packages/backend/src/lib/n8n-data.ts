@@ -63,16 +63,19 @@ interface N8nOpportunity {
   eis_fit_score?: number | null;
 }
 
+// All imported opportunities start as "discovery" (Interest/Identified).
+// Only explicit user qualification moves them forward. Won/Lost are
+// factual outcomes from the source and can pass through.
 const STAGE_MAP: Record<string, OpportunityStatus> = {
   identified: "discovery",
-  qualified: "qualified",
-  pipeline: "pipeline",
-  "go/no-go": "pipeline",
-  "post-submittal": "pipeline",
+  qualified: "discovery",
+  pipeline: "discovery",
+  "go/no-go": "discovery",
+  "post-submittal": "discovery",
   interest: "discovery",
-  pursuit: "pipeline",
-  pursue: "pipeline",
-  evaluate: "qualified",
+  pursuit: "discovery",
+  pursue: "discovery",
+  evaluate: "discovery",
   monitor: "discovery",
   won: "won",
   awarded: "won",
@@ -111,6 +114,7 @@ function mapOpportunity(raw: N8nOpportunity): Opportunity {
       raw.gda_label,
       raw.data_source,
       raw.assigned_ou,
+      raw.stage ? `source_stage:${raw.stage}` : undefined,
     ].filter((t): t is string => !!t),
     raw_source_url: raw.source_url ?? null,
     data_source: raw.data_source ?? null,

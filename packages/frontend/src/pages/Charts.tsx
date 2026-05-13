@@ -40,8 +40,8 @@ const STAGE_COLORS: Record<string, string> = {
 const STAGE_ORDER = ["discovery", "qualified", "pipeline", "proposal", "submitted", "won", "lost"];
 
 const STAGE_LABELS: Record<string, string> = {
-  discovery: "Interest",
-  qualified: "Qualify",
+  discovery: "Identified",
+  qualified: "Qualified",
   pipeline: "Pursue",
   won: "Won",
   lost: "Lost",

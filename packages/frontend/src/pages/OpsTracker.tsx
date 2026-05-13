@@ -61,8 +61,8 @@ function statusToShipley(status: string): string {
 
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
-    discovery: "Interest",
-    qualified: "Qualify",
+    discovery: "Identified",
+    qualified: "Qualified",
     pipeline: "Pursue",
     won: "Won",
     lost: "Lost",
@@ -357,8 +357,8 @@ export default function OpsTracker() {
           }}
         >
           <option value="">All statuses</option>
-          <option value="discovery">Interest</option>
-          <option value="qualified">Qualify</option>
+          <option value="discovery">Identified</option>
+          <option value="qualified">Qualified</option>
           <option value="pipeline">Pursue</option>
           <option value="won">Won</option>
           <option value="lost">Lost</option>

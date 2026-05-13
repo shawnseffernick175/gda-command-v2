@@ -34,18 +34,60 @@ router.get("/kpis", async (_req, res) => {
 
       if (launchpad.ok && funnel.ok) {
         const totalOpportunities = funnel.summary.totalOpps || launchpad.kpis.totalOpps;
-        const totalPipelineValue = launchpad.kpis.weightedPipelineRaw;
 
         const avgScore = launchpad.kpis.avgScore;
         const topByScore = launchpad.topOpportunities.slice(0, 10);
 
-        const n8nFunnel = funnel.oppStages.map((s) => ({
-          stage: s.stage,
-          count: s.count,
-          totalValue: s.valueM * 1_000_000,
-          avgPwin: 0,
-          avgScore: 0,
-        }));
+        // -- Qualification gate: collapse all n8n stages into "discovery"
+        // except won/lost.  Only user-qualified DB rows count as
+        // qualified / pipeline.
+        const wonLost = new Set(["won", "lost"]);
+        let discoveryCount = 0;
+        let discoveryValue = 0;
+        const keptStages: Array<{ stage: string; count: number; totalValue: number; avgPwin: number; avgScore: number }> = [];
+
+        for (const s of funnel.oppStages) {
+          const lower = s.stage.toLowerCase();
+          if (wonLost.has(lower)) {
+            keptStages.push({ stage: lower, count: s.count, totalValue: s.valueM * 1_000_000, avgPwin: 0, avgScore: 0 });
+          } else {
+            discoveryCount += s.count;
+            discoveryValue += s.valueM * 1_000_000;
+          }
+        }
+
+        // Check DB for user-qualified / pipeline opps
+        let dbQualifiedCount = 0;
+        let dbQualifiedValue = 0;
+        let dbPipelineCount = 0;
+        let dbPipelineValue = 0;
+        const dbPool = getPool();
+        if (dbPool) {
+          try {
+            const { rows } = await dbPool.query(
+              `SELECT status, COUNT(*)::int AS c, COALESCE(SUM(value_estimated),0)::float AS v
+               FROM opportunities
+               WHERE status IN ('qualified','pipeline') AND qualified_by IS NOT NULL
+               GROUP BY status`
+            );
+            for (const r of rows) {
+              if (r.status === "qualified") { dbQualifiedCount = r.c; dbQualifiedValue = r.v; }
+              if (r.status === "pipeline")  { dbPipelineCount = r.c; dbPipelineValue = r.v; }
+            }
+            // Subtract user-qualified opps from discovery (they were counted there by n8n)
+            discoveryCount = Math.max(0, discoveryCount - dbQualifiedCount - dbPipelineCount);
+            discoveryValue = Math.max(0, discoveryValue - dbQualifiedValue - dbPipelineValue);
+          } catch { /* ignore — fall back to 0 */ }
+        }
+
+        const n8nFunnel = [
+          { stage: "discovery", count: discoveryCount, totalValue: discoveryValue, avgPwin: 0, avgScore: 0 },
+          { stage: "qualified", count: dbQualifiedCount, totalValue: dbQualifiedValue, avgPwin: 0, avgScore: 0 },
+          { stage: "pipeline", count: dbPipelineCount, totalValue: dbPipelineValue, avgPwin: 0, avgScore: 0 },
+          ...keptStages,
+        ];
+
+        const totalPipelineValue = dbQualifiedValue + dbPipelineValue;
 
         return res.json(
           successEnvelope(
@@ -60,9 +102,9 @@ router.get("/kpis", async (_req, res) => {
               topByScore,
               source: "n8n" as const,
               n8nKpis: {
-                pursueCount: launchpad.kpis.pursueCount,
-                evaluateCount: launchpad.kpis.evaluateCount,
-                monitorCount: launchpad.kpis.monitorCount,
+                pursueCount: dbPipelineCount,
+                evaluateCount: dbQualifiedCount,
+                monitorCount: discoveryCount,
                 weightedPipeline: launchpad.kpis.weightedPipeline,
               },
               captureStages: funnel.captureStages,
@@ -72,7 +114,7 @@ router.get("/kpis", async (_req, res) => {
             {
               generatedAt: launchpad.generatedAt || new Date().toISOString(),
               opportunityCount: totalOpportunities,
-              pipelineCount: launchpad.kpis.pursueCount,
+              pipelineCount: dbPipelineCount,
             }
           )
         );
