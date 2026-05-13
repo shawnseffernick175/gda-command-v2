@@ -5,12 +5,11 @@ import {
   fetchSAMScans,
   triggerSAMScan,
   qualifySAMOpportunity,
+  triggerOpportunityWatch,
   type SAMSummaryData,
   type SAMOpportunityRow,
   type SAMScanRow,
 } from "../api/client";
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 type Tab = "opportunities" | "scans";
 
@@ -84,27 +83,26 @@ export default function SAMMonitor() {
   const [loading, setLoading] = useState(true);
   const [scoring, setScoring] = useState(false);
   const [scoreMsg, setScoreMsg] = useState<string | null>(null);
+  const [scoreError, setScoreError] = useState(false);
 
   const handleAIScore = async () => {
     setScoring(true);
     setScoreMsg(null);
+    setScoreError(false);
     try {
-      const token = localStorage.getItem("gda_access_token");
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE}/api/agents/opportunity-watch/trigger`, { method: "POST", headers });
-      const data = await res.json();
-      if (data.success) {
-        const s = data.data?.summary ?? data.data;
-        setScoreMsg(`Scored ${s.items_processed ?? 0} opportunities: ${s.pursue ?? 0} pursue, ${s.evaluate ?? 0} evaluate, ${s.pass ?? 0} pass`);
-        // Refresh opportunities list
+      const result = await triggerOpportunityWatch();
+      if (result.data) {
+        const s = result.data.summary;
+        setScoreMsg(`Scored ${s.total_scored} opportunities: ${s.pursue} pursue, ${s.evaluate} evaluate, ${s.pass} pass`);
         fetchSAMOpportunities().then((r) => { if (r.data) setOpps(r.data); });
         fetchSAMSummary().then((r) => { if (r.data) setSummary(r.data); });
       } else {
-        setScoreMsg(data.error?.message ?? "Scoring failed");
+        setScoreError(true);
+        setScoreMsg(result.error?.message ?? "Scoring failed");
       }
     } catch (e) {
-      setScoreMsg(String(e));
+      setScoreError(true);
+      setScoreMsg(e instanceof Error ? e.message : String(e));
     }
     setScoring(false);
   };
@@ -182,7 +180,7 @@ export default function SAMMonitor() {
           )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
             {scoreMsg && (
-              <span style={{ fontSize: 11, color: scoreMsg.includes("fail") ? "#ef4444" : "#16a34a" }}>
+              <span style={{ fontSize: 11, color: scoreError ? "#ef4444" : "#16a34a" }}>
                 {scoreMsg}
               </span>
             )}
