@@ -108,7 +108,7 @@ export async function listFailedExecutions(limit = 25): Promise<FailedExecutions
   if (missing.length > 0) {
     return { configured: false, missing, executions: [] };
   }
-  const url = `${base}/executions?status=error&limit=${encodeURIComponent(limit)}`;
+  const url = `${base}/executions?status=error&limit=${encodeURIComponent(limit)}&includeData=true`;
   try {
     const r = await fetchWithTimeout(url, {
       headers: { "X-N8N-API-KEY": key, Accept: "application/json" },
@@ -119,6 +119,26 @@ export async function listFailedExecutions(limit = 25): Promise<FailedExecutions
     }
     const json = (await r.json().catch(() => null)) as Record<string, unknown> | null;
     const data = (json && ((json.data as unknown[]) || (json.executions as unknown[]))) || [];
+
+    // Enrich with workflow names from /workflows endpoint
+    try {
+      const wfResult = await fetchWorkflows(250);
+      if (wfResult.configured && wfResult.workflows.length > 0) {
+        const nameMap = new Map<string, string>();
+        for (const wf of wfResult.workflows) {
+          const w = wf as Record<string, unknown>;
+          if (w.id && w.name) nameMap.set(String(w.id), String(w.name));
+        }
+        for (const exec of data) {
+          const e = exec as Record<string, unknown>;
+          const wfId = String(e.workflowId ?? "");
+          if (wfId && nameMap.has(wfId)) {
+            e.workflowName = nameMap.get(wfId);
+          }
+        }
+      }
+    } catch { /* ignore enrichment failures */ }
+
     return { configured: true, http: r.status, executions: data };
   } catch (e: unknown) {
     const err = e as Error;

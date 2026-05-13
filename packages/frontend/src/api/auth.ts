@@ -146,6 +146,12 @@ export async function authenticatedFetch(
         headers.set("Authorization", `Bearer ${newToken}`);
         res = await fetch(input, { ...init, headers });
       }
+    } else {
+      // Refresh failed — force re-login
+      clearAuth();
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
   }
 

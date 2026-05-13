@@ -30,10 +30,10 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - Navigation: 5-group collapsible sidebar (220px expanded / 52px collapsed)
   - OPERATIONS: Launchpad, Fast Track, Ops Tracker, Pipeline, Approvals, Risk Register
   - CAPTURE: Capture Plans, Proposals, RFP Shredder, Compliance, Color Review
-  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, CPARS Builder, GovWin IQ
+  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, GovWin IQ
   - REPORTING: Financials, Reports, Charts, Discussions
   - ADMIN: Settings, Health, Workflows, Users, Audit Log, Doctrine, Book of Truths, Prompts, User Manual
-- Financial KPI strip: persistent header showing "Financial KPIs unavailable" with Retry button when no data seeded
+- Financial KPI strip: persistent header showing Orders $95.0M, Sales $382.0M, EBIT $34.4M, Gross Profit $76.4M, ROS 9.0% (count KPIs like Active Contracts show no $ prefix)
 - Hidden routes (no sidebar link): Opportunity Detail (`/opportunities/:id`), SAM Monitor (`/sam-monitor`), FPDS Monitor (`/fpds-monitor`)
 
 ## Auth System
@@ -55,7 +55,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
 6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
 
-## Full E2E Audit Pattern (38 items)
+## Full E2E Audit Pattern (33 pages + global features)
 
 When doing a comprehensive audit, navigate every page and verify:
 1. **Page loads**: No blank screen, no crash, no unhandled error
@@ -84,11 +84,11 @@ When doing a comprehensive audit, navigate every page and verify:
 | Group | Pages |
 |-------|-------|
 | Operations (6) | Launchpad `/`, Fast Track `/fast-track`, Ops Tracker `/ops-tracker`, Pipeline `/pipeline`, Approvals `/approvals`, Risk Register `/risk-register` |
-| Capture (5) | Capture Plans `/capture`, Proposals `/proposals`, RFP Shredder `/rfp-shredder`, Compliance `/compliance`, Color Review `/color-review` |
-| Intelligence (7) | Intel Hub `/intel`, Predictive `/predictive`, Anomaly Detection `/anomaly`, Contacts `/contacts`, Knowledge Base `/knowledge`, CPARS Builder `/cpars`, GovWin IQ `/govwin` |
+|| Capture (6) | Proposal Center `/proposal-center`, RFP Shredder `/rfp-shredder`, Compliance `/compliance`, Proposals `/proposals`, Color Review `/color-review`, Capture Plans `/capture` |
+|| Intelligence (6) | Intel Hub `/intel`, Predictive `/predictive`, Anomaly Detection `/anomaly`, Contacts `/contacts`, Knowledge Base `/knowledge`, GovWin IQ `/govwin` |
 | Reporting (4) | Financials `/financial-bible`, Reports `/reports`, Charts `/charts`, Discussions `/discussions` |
 | Admin (9) | Settings `/settings`, Health `/qa-center`, Workflows `/workflows`, Users `/admin/users`, Audit Log `/admin/audit`, Doctrine `/doctrine`, Book of Truths `/book-of-truths`, Prompts `/prompts`, User Manual `/help` |
-| Hidden (3) | Opportunity Detail `/opportunities/:id`, SAM Monitor `/sam-monitor`, FPDS Monitor `/fpds-monitor` |
+|| Hidden (2) | SAM Monitor `/sam-monitor`, FPDS Monitor `/fpds-monitor` |
 
 ### Global Features (4 items)
 
@@ -101,11 +101,12 @@ When doing a comprehensive audit, navigate every page and verify:
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
-- **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
+- **Workflows page without n8n**: Shows "Workflow Engine Unavailable" gracefully when n8n is not running locally. Not a bug.
+- **Health (QA Center) without n8n**: Shows "Unknown 0/0 passed" with "Configure n8n" message. Expected in local dev.
+- **GovWin IQ empty**: Shows 0 opportunities, Last Sync "Never" — needs GovWin API subscription to populate.
+- **CPARS Builder removed**: Deleted in PR #129. Route `/cpars` no longer exists.
 
 ## POST Write Persistence Testing
 
@@ -132,6 +133,17 @@ For testing endpoints that write to PostgreSQL:
 | reports | `POST /generate` | INSERT generated_reports |
 | reports | `POST /export` | INSERT export_jobs |
 | capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+| anomaly | `POST /escalation-rules` | INSERT escalation_rules (name, condition, priority, description, created_at) |
+
+## React Form Testing Tips
+
+When testing React controlled forms via the computer tool:
+- Typing via the computer tool dispatches real keyboard events, which React usually picks up for `onChange` handlers on controlled inputs (`value={state}` + `onChange={setState}`).
+- However, the button's `onClick` handler may not fire reliably through native click coordinates. If a form button click doesn't trigger the expected action:
+  1. **Verify via API first**: Use browser console `fetch('/api/...', {method:'POST', ...})` to confirm the backend endpoint works independently of the UI.
+  2. **Try React state sync**: Use `nativeInputValueSetter.call(element, value)` + `element.dispatchEvent(new Event('input', {bubbles:true}))` to force React state update.
+  3. **Fallback to console click**: `document.querySelectorAll('button').forEach(b => { if (b.textContent.trim() === 'Save Rule') b.click() })`
+- The `catch { /* ignore */ }` pattern in some handlers silently swallows errors — always check the Network tab or console for failed requests.
 
 ## Testing Strategy
 

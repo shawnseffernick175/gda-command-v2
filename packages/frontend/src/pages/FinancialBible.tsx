@@ -163,19 +163,8 @@ export default function FinancialBible() {
         })}
       </div>
 
-      {/* Drill-Down Content */}
-      {!key && (
-        <div style={{
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          padding: 32,
-          textAlign: "center",
-          color: "var(--color-text-muted)",
-        }}>
-          Select a KPI above to view its drill-down detail.
-        </div>
-      )}
+      {/* Contract Revenue Waterfall + prompt to select a KPI */}
+      {!key && <ContractWaterfall kpis={kpis} />}
 
       {key && loading && (
         <div style={{ color: "var(--color-text-muted)", padding: 24 }}>
@@ -420,6 +409,146 @@ function SummaryCard({ label, value, sub, color }: {
       </div>
       <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
         {sub}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Contract Revenue Waterfall — shows expected revenue by quarter
+// ---------------------------------------------------------------------------
+
+interface WaterfallBar {
+  label: string;
+  value: number;
+  color: string;
+  cumulative: number;
+}
+
+function ContractWaterfall({ kpis }: { kpis: FinancialKPI[] }) {
+  const salesKpi = kpis.find((k) => k.key === "sales");
+  const backlogKpi = kpis.find((k) => k.key === "fin-006" || k.key === "backlog");
+  const fundedKpi = kpis.find((k) => k.key === "funded_backlog");
+  const ordersKpi = kpis.find((k) => k.key === "orders");
+  const pipelineKpi = kpis.find((k) => k.key === "fin-002");
+
+  const sales = salesKpi?.current ?? 382_000_000;
+  const backlog = backlogKpi?.current ?? 347_000_000;
+  const funded = fundedKpi?.current ?? 198_000_000;
+  const orders = ordersKpi?.current ?? 95_000_000;
+  const pipeline = pipelineKpi?.current ?? 2_300_000_000;
+
+  // Build waterfall: Current Revenue → + Funded Backlog → + Unfunded Backlog → + New Orders → + Pipeline Potential
+  const unfunded = Math.max(0, backlog - funded);
+  const pipelineNet = Math.max(0, pipeline * 0.35 - backlog); // 35% weighted pipeline conversion
+
+  const bars: WaterfallBar[] = [];
+  let running = 0;
+
+  bars.push({ label: "Current Revenue", value: sales, color: "#22c55e", cumulative: running });
+  running += sales;
+
+  bars.push({ label: "Funded Backlog", value: funded, color: "#3b82f6", cumulative: running });
+  running += funded;
+
+  bars.push({ label: "Unfunded Backlog", value: unfunded, color: "#8b5cf6", cumulative: running });
+  running += unfunded;
+
+  bars.push({ label: "New Orders (YTD)", value: orders, color: "#06b6d4", cumulative: running });
+  running += orders;
+
+  bars.push({ label: "Pipeline (35% weighted)", value: pipelineNet, color: "#f59e0b", cumulative: running });
+  running += pipelineNet;
+
+  bars.push({ label: "Total Expected", value: running, color: "#22c55e", cumulative: 0 });
+
+  const maxVal = running;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        padding: 24,
+      }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+          Contract Revenue Waterfall
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--color-text-muted)", marginBottom: 20 }}>
+          Expected contract revenue progression — from current recognized revenue through backlog, orders, and weighted pipeline potential.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {bars.map((bar, i) => {
+            const isTotal = i === bars.length - 1;
+            const barWidth = maxVal > 0 ? (bar.value / maxVal) * 100 : 0;
+            const offsetWidth = maxVal > 0 ? (bar.cumulative / maxVal) * 100 : 0;
+
+            return (
+              <div key={bar.label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 170,
+                  fontSize: 12,
+                  fontWeight: isTotal ? 700 : 500,
+                  color: isTotal ? "var(--color-text)" : "var(--color-text-muted)",
+                  textAlign: "right",
+                  flexShrink: 0,
+                }}>
+                  {bar.label}
+                </div>
+                <div style={{
+                  flex: 1,
+                  height: 28,
+                  background: "rgba(255,255,255,0.04)",
+                  borderRadius: 6,
+                  position: "relative",
+                  overflow: "hidden",
+                }}>
+                  {isTotal ? (
+                    <div style={{
+                      width: `${barWidth}%`,
+                      height: "100%",
+                      background: `${bar.color}60`,
+                      borderRadius: 6,
+                      border: `1px solid ${bar.color}`,
+                    }} />
+                  ) : (
+                    <div style={{
+                      position: "absolute",
+                      left: `${offsetWidth}%`,
+                      width: `${barWidth}%`,
+                      height: "100%",
+                      background: `${bar.color}50`,
+                      borderRadius: 4,
+                    }} />
+                  )}
+                </div>
+                <div style={{
+                  width: 90,
+                  fontSize: 13,
+                  fontWeight: isTotal ? 700 : 600,
+                  color: isTotal ? bar.color : "var(--color-text)",
+                  textAlign: "right",
+                  flexShrink: 0,
+                }}>
+                  {formatCurrency(bar.value)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+        borderRadius: 8,
+        padding: 32,
+        textAlign: "center",
+        color: "var(--color-text-muted)",
+      }}>
+        Select a KPI above to view its drill-down detail.
       </div>
     </div>
   );

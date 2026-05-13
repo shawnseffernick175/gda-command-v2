@@ -29,6 +29,11 @@ const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalcu
     whatItMeans: "Near-term revenue visibility. This work can begin immediately.",
     howCalculated: "Sum of funded ceiling on active contracts minus revenue already recognized.",
   },
+  "fin-006": {
+    whatItIs: "Contract Backlog — total remaining value on all active contracts (funded + unfunded).",
+    whatItMeans: "Long-term revenue pipeline. Higher contract backlog = more future revenue security.",
+    howCalculated: "Sum of total contract ceiling minus revenue recognized across all active contracts.",
+  },
   backlog: {
     whatItIs: "Contract Backlog — total remaining value on all active contracts (funded + unfunded).",
     whatItMeans: "Long-term revenue pipeline. Higher contract backlog = more future revenue security.",
@@ -39,6 +44,56 @@ const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalcu
     whatItMeans: "Measures contract-level profitability before overhead and SG&A.",
     howCalculated: "Sales − Direct Costs (labor + materials + subcontracts + ODCs).",
   },
+  "fin-005": {
+    whatItIs: "Number of active contracts currently being performed.",
+    whatItMeans: "Measures execution capacity. More contracts = more revenue streams but higher management overhead.",
+    howCalculated: "Count of contracts with active performance periods and remaining ceiling.",
+  },
+  "fin-001": {
+    whatItIs: "Total annual revenue from all contract performance.",
+    whatItMeans: "Top-line indicator of business size. Target: grow year-over-year while maintaining margins.",
+    howCalculated: "Sum of all revenue recognized in the current fiscal year.",
+  },
+  "fin-004": {
+    whatItIs: "Average dollar value per active contract.",
+    whatItMeans: "Higher ACV means larger, more strategic contracts. Lower ACV may indicate fragmented portfolio.",
+    howCalculated: "Total contract ceiling value ÷ number of active contracts.",
+  },
+  "fin-007": {
+    whatItIs: "Average probability of win across all tracked opportunities.",
+    whatItMeans: "Overall competitive strength. Above 40% is strong for GovCon; below 30% needs attention.",
+    howCalculated: "Weighted average of Pwin scores across all active pipeline opportunities.",
+  },
+  "fin-009": {
+    whatItIs: "Total number of employees at Envision Innovative Solutions.",
+    whatItMeans: "Determines SBA size standard for employee-based NAICS codes. Also affects revenue-per-employee efficiency.",
+    howCalculated: "Current headcount from HR system. Used in NAICS Small/Large classification.",
+  },
+  "fin-002": {
+    whatItIs: "Total estimated value of all opportunities in the active pipeline.",
+    whatItMeans: "Forward-looking revenue potential. Higher pipeline value = more growth opportunity.",
+    howCalculated: "Sum of estimated contract values for all opportunities in Qualify and Pursue stages.",
+  },
+  "fin-008": {
+    whatItIs: "Number of proposals submitted in the current period.",
+    whatItMeans: "Measures BD activity level. Low submissions = potential revenue gap in 6-12 months.",
+    howCalculated: "Count of proposals submitted to contracting officers in the current quarter.",
+  },
+  "fin-010": {
+    whatItIs: "Annual revenue divided by employee count.",
+    whatItMeans: "Efficiency metric. GovCon benchmark: $150K-$250K per employee. Higher = more efficient operations.",
+    howCalculated: "Annual Revenue ÷ Employee Count.",
+  },
+  "fin-003": {
+    whatItIs: "Percentage of proposals submitted that result in contract awards.",
+    whatItMeans: "Measures capture effectiveness. GovCon average: 25-35%. Above 40% is excellent.",
+    howCalculated: "Contracts Won ÷ Proposals Submitted × 100% (trailing 12-month rolling window).",
+  },
+};
+
+// Remap labels: DB stores "Backlog" but we display "Contract Backlog"
+const LABEL_OVERRIDES: Record<string, string> = {
+  "fin-006": "Contract Backlog",
 };
 
 function formatValue(kpi: FinancialKPI): string {
@@ -202,7 +257,7 @@ export default function FinancialKPIStrip() {
                   alignItems: "center",
                   gap: 3,
                 }}>
-                  {kpi.label}
+                  {LABEL_OVERRIDES[kpi.key] ?? kpi.label}
                   {KPI_INFO[kpi.key] && <InfoBadge {...KPI_INFO[kpi.key]} size={12} />}
                 </span>
 

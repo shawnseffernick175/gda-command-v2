@@ -41,6 +41,8 @@ const STAGE_COLORS: Record<string, string> = {
   pipeline: "#8b5cf6",
   won: "#22c55e",
   lost: "#ef4444",
+  Identified: "#f59e0b",
+  Qualified: "#3b82f6",
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -49,6 +51,19 @@ const STAGE_LABELS: Record<string, string> = {
   pipeline: "Pursue",
   won: "Won",
   lost: "Lost",
+  Identified: "Identified",
+  Qualified: "Qualified",
+};
+
+// Map n8n funnel stage names to valid API status filter values
+const STAGE_TO_API_STATUS: Record<string, string> = {
+  discovery: "discovery",
+  qualified: "qualified",
+  pipeline: "pipeline",
+  won: "won",
+  lost: "lost",
+  Identified: "discovery",
+  Qualified: "qualified",
 };
 
 const URGENCY_COLORS: Record<string, string> = {
@@ -468,7 +483,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             whatItMeans: "Risk-adjusted forecast based on contract values and win probability.",
             howCalculated: "Sum of (contract value × Pwin) for all tracked opportunities.",
           }} />
-          <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" onClick={() => navigate("/ops-tracker?status=pipeline")} />
+          <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" onClick={() => navigate("/capture")} />
           <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" onClick={() => navigate("/ops-tracker")} />
           <KPICard label="Monitor" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" onClick={() => navigate("/ops-tracker")} />
         </>
@@ -875,7 +890,7 @@ function FunnelRow({
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 20, cursor: "pointer", padding: "6px 0", borderRadius: 4, transition: "background 0.15s" }}
-      onClick={() => navigate(`/ops-tracker?status=${stage.stage}`)}
+      onClick={() => navigate(`/ops-tracker?status=${STAGE_TO_API_STATUS[stage.stage] ?? stage.stage}`)}
       onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >

@@ -326,6 +326,14 @@ export default function Intel() {
 // Briefing Tab
 // ---------------------------------------------------------------------------
 
+interface NewsArticle {
+  title: string;
+  link: string;
+  source: string;
+  pubDate: string;
+  snippet: string;
+}
+
 function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [briefings, setBriefings] = useState<MorningBriefing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,6 +341,8 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
 
   const loadBriefings = () => {
     fetchJson<BriefingsData>("/intel/briefings")
@@ -350,6 +360,15 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   };
 
   useEffect(() => { loadBriefings(); }, []);
+
+  useEffect(() => {
+    fetchJson<{ articles: NewsArticle[]; total: number; fetchedAt: string }>("/intel/news")
+      .then((env) => {
+        if (env.success && env.data) setNews(env.data.articles);
+      })
+      .catch(() => {})
+      .finally(() => setNewsLoading(false));
+  }, []);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -545,6 +564,57 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
           )}
         </>
       )}
+
+      {/* Live Defense/GovCon News */}
+      <div style={{ marginTop: 32 }}>
+        <SectionHeader title="Today's Defense & GovCon News" />
+        {newsLoading ? (
+          <LoadingMsg />
+        ) : news.length === 0 ? (
+          <p style={{ color: "var(--color-text-muted)", fontStyle: "italic" }}>No news articles available.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {news.map((article, i) => (
+              <a
+                key={i}
+                href={article.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "block",
+                  padding: "12px 16px",
+                  borderRadius: 8,
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                  textDecoration: "none",
+                  color: "inherit",
+                  transition: "border-color 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-border)"; }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: "var(--color-text)" }}>
+                      {article.title}
+                    </div>
+                    {article.snippet && (
+                      <div style={{ fontSize: 12, color: "var(--color-text-muted)", lineHeight: 1.5, marginBottom: 4 }}>
+                        {article.snippet}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 12, fontSize: 11, color: "var(--color-text-muted)" }}>
+                      <span style={{ fontWeight: 600, color: "#3b82f6" }}>{article.source}</span>
+                      {article.pubDate && <span>{new Date(article.pubDate).toLocaleDateString()}</span>}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 16, color: "var(--color-text-muted)", flexShrink: 0 }}>→</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -705,8 +775,11 @@ function ResearchTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [researchQuery, setResearchQuery] = useState("");
+  const [researching, setResearching] = useState(false);
+  const [researchMsg, setResearchMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadResearch = () => {
     fetchJson<ResearchData>("/intel/research")
       .then((env) => {
         if (env.success && env.data) {
@@ -718,7 +791,35 @@ function ResearchTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadResearch(); }, []);
+
+  const handleResearch = async () => {
+    if (!researchQuery.trim()) return;
+    setResearching(true);
+    setResearchMsg(null);
+    try {
+      const res = await authenticatedFetch("/api/intel/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: researchQuery.trim() }),
+      });
+      const env = await res.json();
+      if (env.success) {
+        setResearchMsg("Research complete");
+        setResearchQuery("");
+        setLoading(true);
+        loadResearch();
+      } else {
+        setResearchMsg(env.error?.message ?? "Research failed");
+      }
+    } catch (err) {
+      setResearchMsg(err instanceof Error ? err.message : "Research failed");
+    } finally {
+      setResearching(false);
+    }
+  };
 
   if (loading) return <LoadingMsg />;
   if (error) return <ErrorMsg msg={error} />;
@@ -726,6 +827,47 @@ function ResearchTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
 
   return (
     <div>
+      {/* Research Input */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
+        <input
+          type="text"
+          value={researchQuery}
+          onChange={(e) => setResearchQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleResearch(); }}
+          placeholder="Enter a topic, competitor, agency, or market segment..."
+          style={{
+            flex: 1,
+            padding: "8px 14px",
+            borderRadius: 6,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-surface)",
+            color: "var(--color-text)",
+            fontSize: 14,
+          }}
+        />
+        <button
+          onClick={handleResearch}
+          disabled={researching || !researchQuery.trim()}
+          style={{
+            padding: "8px 20px",
+            borderRadius: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            border: "none",
+            background: researching ? "#6b7280" : "var(--color-primary, #3b82f6)",
+            color: "#fff",
+            cursor: researching ? "not-allowed" : "pointer",
+          }}
+        >
+          {researching ? "Researching..." : "Run Deep Research"}
+        </button>
+        {researchMsg && (
+          <span style={{ fontSize: 12, color: researchMsg.includes("complete") ? "#22c55e" : "#ef4444" }}>
+            {researchMsg}
+          </span>
+        )}
+      </div>
+
       {/* Summary */}
       <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
         <SummaryChip label="Total" value={String(data.total)} />
@@ -787,17 +929,17 @@ function ResearchTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                   {r.summary}
                 </p>
                 {r.findings && (
-                  <div style={{
-                    padding: 16,
-                    borderRadius: 6,
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid var(--color-border)",
-                    fontSize: 14,
-                    lineHeight: 1.7,
-                    whiteSpace: "pre-wrap",
-                  }}>
-                    {r.findings}
-                  </div>
+                  <div
+                    style={{
+                      padding: 16,
+                      borderRadius: 6,
+                      background: "rgba(255,255,255,0.02)",
+                      border: "1px solid var(--color-border)",
+                      fontSize: 14,
+                      lineHeight: 1.7,
+                    }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(r.findings) }}
+                  />
                 )}
               </div>
             )}

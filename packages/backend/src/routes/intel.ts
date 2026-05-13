@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
+import { chatCompletion, type ChatMessage } from "../lib/llm";
 
 import {
   n8nWebhookConfigured,
@@ -188,49 +189,79 @@ router.get("/briefings/:id", async (req: Request, res: Response) => {
 });
 
 // GET /api/intel/research — list deep research reports
-// Wired to n8n gda-deep-research-history webhook with mock fallback.
+// Merges n8n research + DB-stored AI research reports.
 router.get("/research", async (_req: Request, res: Response) => {
   const { status } = _req.query;
+  let allReports: Array<Record<string, unknown>> = [];
+  let dataSource: "n8n" | "db" = "db";
 
   // 1. Try n8n webhook
   if (n8nWebhookConfigured()) {
     try {
       const n8nResult = await fetchDeepResearchFromN8n();
       if (n8nResult.ok && n8nResult.reports.length > 0) {
-        let reports = [...n8nResult.reports];
-
-        if (status && typeof status === "string") {
-          reports = reports.filter((r) => r.status === status);
-        }
-
-        const statusCounts: Record<string, number> = {};
-        for (const r of n8nResult.reports) {
-          statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
-        }
-
-        res.json(
-          successEnvelope("GDA.api.deep-research-history", "list", {
-            reports,
-            total: n8nResult.reports.length,
-            filtered: reports.length,
-            statusCounts,
-            source: "n8n" as const,
-          })
-        );
-        return;
+        allReports = n8nResult.reports.map((r) => ({ ...r } as Record<string, unknown>));
+        dataSource = "n8n";
       }
-    } catch {
-      // fall through to mock
-    }
+    } catch { /* continue to DB */ }
+  }
+
+  // 2. Merge DB-stored reports (from POST /research)
+  const pool = getPool();
+  if (pool) {
+    try {
+      const { rows } = await pool.query("SELECT * FROM deep_research_reports ORDER BY created_at DESC LIMIT 50");
+      for (const r of rows) {
+        allReports.push({
+          id: r.id,
+          query: r.query,
+          status: r.status,
+          summary: r.summary,
+          findings: r.findings,
+          sources: r.sources ?? [],
+          sources_count: (r.sources as string[])?.length ?? 0,
+          requested_by: r.requested_by ?? "user",
+          requested_at: r.created_at,
+          completed_at: r.completed_at,
+        });
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Sort by date descending
+  allReports.sort((a, b) => {
+    const da = new Date(String(a.completed_at ?? a.requested_at ?? "")).getTime() || 0;
+    const db = new Date(String(b.completed_at ?? b.requested_at ?? "")).getTime() || 0;
+    return db - da;
+  });
+
+  // Deduplicate by id
+  const seen = new Set<string>();
+  allReports = allReports.filter((r) => {
+    const id = String(r.id);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+
+  let filtered = allReports;
+  if (status && typeof status === "string") {
+    filtered = allReports.filter((r) => r.status === status);
+  }
+
+  const statusCounts: Record<string, number> = {};
+  for (const r of allReports) {
+    const s = String(r.status);
+    statusCounts[s] = (statusCounts[s] ?? 0) + 1;
   }
 
   res.json(
     successEnvelope("GDA.api.deep-research-history", "list", {
-      reports: [],
-      total: 0,
-      filtered: 0,
-      statusCounts: {},
-      source: "db" as const,
+      reports: filtered,
+      total: allReports.length,
+      filtered: filtered.length,
+      statusCounts,
+      source: dataSource,
     })
   );
 });
@@ -267,6 +298,92 @@ router.get("/research/:id", async (req: Request, res: Response) => {
     meta: { generatedAt: new Date().toISOString(), source: "gateway" },
     error: { code: "NOT_FOUND", message: `Research report ${req.params.id} not found`, detail: null },
   });
+});
+
+// POST /api/intel/research — run deep research on a topic using GPT-4o
+router.post("/research", requireRole("admin", "analyst", "viewer"), async (req: Request, res: Response) => {
+  const { query } = req.body;
+  if (!query || typeof query !== "string" || query.trim().length === 0) {
+    return res.status(400).json(
+      errorEnvelope("GDA.api.deep-research", "create", {
+        code: "MISSING_QUERY",
+        message: "Research query is required",
+        detail: null,
+      })
+    );
+  }
+
+  const researchPrompt: ChatMessage[] = [
+    {
+      role: "system",
+      content: `You are a senior defense intelligence analyst conducting deep research for a GovCon business development team (Envision Innovative Solutions — a small business doing defense IT, cyber, training, and SETA work).
+
+Produce a comprehensive research report with these sections:
+1. **Executive Summary** (3-4 sentences)
+2. **Market Position & Size** (revenue, market share, employees, key contracts)
+3. **Strengths** (competitive advantages, certifications, contract vehicles)
+4. **Weaknesses** (vulnerabilities, limitations, recent problems)
+5. **Key Contract Wins** (recent notable awards, agencies, values)
+6. **Teaming & Partnerships** (who they team with, JVs, mentor-protégé)
+7. **Threat Assessment** (direct competitive overlap with Envision, areas of conflict)
+8. **Actionable Intelligence** (specific recommendations for BD team)
+9. **Sources** (cite specific contract databases, news articles, FPDS data where possible)
+
+Be specific with numbers, contract names, agency names. Do NOT be vague or generic. If you don't have specific data, say "requires further verification" rather than making up numbers.
+
+Format in Markdown.`,
+    },
+    { role: "user", content: `Deep research on: ${query.trim()}` },
+  ];
+
+  try {
+    const aiResponse = await chatCompletion(researchPrompt, { temperature: 0.3, max_tokens: 4000 });
+    const findings = aiResponse.content ?? "Research generation failed — no response from AI model.";
+
+    // Extract summary (first paragraph or exec summary section)
+    const findingsStr = typeof findings === "string" ? findings : String(findings);
+    const summaryMatch = findingsStr.match(/\*\*Executive Summary\*\*[:\s]*([\s\S]*?)(?=\n\n|\n##|\n\*\*)/);
+    const summary = summaryMatch ? summaryMatch[1].trim().slice(0, 500) : findingsStr.slice(0, 300);
+
+    const id = `research-${Date.now()}`;
+    const report = {
+      id,
+      query: query.trim(),
+      status: "completed",
+      summary,
+      findings,
+      sources: ["GPT-4o Analysis", "GovCon Market Intelligence"],
+      created_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      requested_by: "user",
+    };
+
+    // Persist to DB if available
+    const pool = getPool();
+    if (pool) {
+      try {
+        await pool.query(
+          `INSERT INTO deep_research_reports (id, query, status, summary, findings, sources, created_at, completed_at, requested_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (id) DO NOTHING`,
+          [report.id, report.query, report.status, report.summary, report.findings,
+           JSON.stringify(report.sources), report.created_at, report.completed_at, report.requested_by]
+        );
+      } catch { /* ignore DB errors — report still returned */ }
+    }
+
+    return res.json(
+      successEnvelope("GDA.api.deep-research", "create", { report })
+    );
+  } catch (err: unknown) {
+    return res.status(500).json(
+      errorEnvelope("GDA.api.deep-research", "create", {
+        code: "LLM_ERROR",
+        message: `Research generation failed: ${(err as Error).message}`,
+        detail: null,
+      })
+    );
+  }
 });
 
 // GET /api/intel/competitors — list competitor profiles with movements
@@ -683,6 +800,88 @@ router.get("/teaming", async (_req: Request, res: Response) => {
   });
 
   res.json(successEnvelope("GDA.api.teaming", "list", { matches, total: matches.length }));
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/intel/news — Live defense/GovCon news from RSS feeds
+// ---------------------------------------------------------------------------
+const NEWS_FEEDS = [
+  { name: "Defense News", url: "https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml" },
+  { name: "Federal News Network", url: "https://federalnewsnetwork.com/feed/" },
+  { name: "GovConWire", url: "https://www.govconwire.com/feed/" },
+  { name: "ExecutiveGov", url: "https://executivegov.com/feed/" },
+  { name: "Breaking Defense", url: "https://breakingdefense.com/feed/" },
+];
+
+interface NewsArticle {
+  title: string;
+  link: string;
+  source: string;
+  pubDate: string;
+  snippet: string;
+}
+
+function parseRSSItems(xml: string, sourceName: string): NewsArticle[] {
+  const items: NewsArticle[] = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const itemXml = match[1];
+    const title = (/<title[^>]*>([\s\S]*?)<\/title>/.exec(itemXml)?.[1] ?? "")
+      .replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    const link = (/<link[^>]*>([\s\S]*?)<\/link>/.exec(itemXml)?.[1] ?? "").trim();
+    const pubDate = (/<pubDate>([\s\S]*?)<\/pubDate>/.exec(itemXml)?.[1] ?? "").trim();
+    const desc = (/<description[^>]*>([\s\S]*?)<\/description>/.exec(itemXml)?.[1] ?? "")
+      .replace(/<!\[CDATA\[|\]\]>/g, "")
+      .replace(/<[^>]+>/g, "")
+      .trim()
+      .slice(0, 200);
+    if (title && link) {
+      items.push({ title, link, source: sourceName, pubDate, snippet: desc });
+    }
+  }
+  return items;
+}
+
+router.get("/news", async (_req: Request, res: Response) => {
+  const allArticles: NewsArticle[] = [];
+  const fetchPromises = NEWS_FEEDS.map(async (feed) => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const resp = await fetch(feed.url, {
+        signal: controller.signal,
+        headers: { "User-Agent": "GDA-Command/2.0" },
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const xml = await resp.text();
+        return parseRSSItems(xml, feed.name).slice(0, 5);
+      }
+    } catch { /* skip this feed on error */ }
+    return [];
+  });
+
+  const results = await Promise.allSettled(fetchPromises);
+  for (const r of results) {
+    if (r.status === "fulfilled") allArticles.push(...r.value);
+  }
+
+  // Sort by date descending
+  allArticles.sort((a, b) => {
+    const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+    return db - da;
+  });
+
+  res.json(
+    successEnvelope("GDA.api.news", "list", {
+      articles: allArticles.slice(0, 20),
+      total: allArticles.length,
+      sources: NEWS_FEEDS.map((f) => f.name),
+      fetchedAt: new Date().toISOString(),
+    })
+  );
 });
 
 export default router;

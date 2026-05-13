@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import InfoBadge from "../components/InfoBadge";
 import {
   fetchAnomalies,
   fetchCompetitorMovements,
@@ -848,15 +849,47 @@ export default function AnomalyDetection() {
   );
 }
 
-const SUMMARY_INFO: Record<string, string> = {
-  "Anomalies": "Total detected anomalies across all categories and severities.",
-  "Active": "Anomalies that have not yet been acknowledged or resolved.",
-  "Critical": "Anomalies with critical severity requiring immediate attention.",
-  "High": "Anomalies with high severity — should be reviewed within 24 hours.",
-  "Movements": "Competitor actions detected (contract wins, teaming, hiring, etc.).",
-  "Competitors": "Unique competitors tracked with recent activity.",
-  "Escalations": "Items escalated for management review or decision.",
-  "Overdue": "Escalations past their resolution deadline.",
+const SUMMARY_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalculated?: string }> = {
+  "Anomalies": {
+    whatItIs: "Total detected anomalies across all categories and severities.",
+    whatItMeans: "Higher count means more potential issues need review. Zero is ideal.",
+    howCalculated: "Count of all anomaly records in the system regardless of status.",
+  },
+  "Active": {
+    whatItIs: "Anomalies that have not yet been acknowledged or resolved.",
+    whatItMeans: "Items requiring attention. Acknowledge to mark as reviewed, resolve to close.",
+    howCalculated: "Count of anomalies with status = 'active' (not acknowledged or resolved).",
+  },
+  "Critical": {
+    whatItIs: "Anomalies with critical severity requiring immediate attention.",
+    whatItMeans: "These could impact active captures or contract performance. Act within hours.",
+    howCalculated: "Count of anomalies where severity = 'critical'.",
+  },
+  "High": {
+    whatItIs: "Anomalies with high severity — should be reviewed within 24 hours.",
+    whatItMeans: "Potential risks that need prompt evaluation and mitigation planning.",
+    howCalculated: "Count of anomalies where severity = 'high'.",
+  },
+  "Movements": {
+    whatItIs: "Competitor actions detected (contract wins, teaming, hiring, etc.).",
+    whatItMeans: "Tracks competitor behavior that may impact your pipeline positioning.",
+    howCalculated: "Count of competitor movement records from intel feeds and monitoring.",
+  },
+  "Competitors": {
+    whatItIs: "Unique competitors tracked with recent activity.",
+    whatItMeans: "Number of distinct competitors being monitored across your opportunity space.",
+    howCalculated: "Count of unique competitor names across all movement records.",
+  },
+  "Escalations": {
+    whatItIs: "Items escalated for management review or decision.",
+    whatItMeans: "Issues that require leadership attention — bid/no-bid decisions, risk acceptance, etc.",
+    howCalculated: "Count of escalation records created by rules or manual escalation.",
+  },
+  "Overdue": {
+    whatItIs: "Escalations past their resolution deadline.",
+    whatItMeans: "These items need immediate resolution — delays may impact capture timelines.",
+    howCalculated: "Count of escalations where status = 'overdue' based on SLA deadlines.",
+  },
 };
 
 function SummaryBox({ label, value, color, onClick }: { label: string; value: string; color?: string; onClick?: () => void }) {
@@ -879,7 +912,7 @@ function SummaryBox({ label, value, color, onClick }: { label: string; value: st
       <div style={{ fontSize: 10, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
         {label}
         {SUMMARY_INFO[label] && (
-          <span title={SUMMARY_INFO[label]} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: "50%", background: "#1a1a2e", border: "1px solid var(--color-border)", fontSize: 9, color: "var(--color-text-muted)", cursor: "help", fontWeight: 700 }}>?</span>
+          <InfoBadge {...SUMMARY_INFO[label]} size={14} />
         )}
       </div>
       <div style={{ fontSize: 22, fontWeight: 700, color: color ?? "var(--color-text)" }}>{value}</div>

@@ -39,13 +39,39 @@ router.get("/kpis", async (_req, res) => {
         const avgScore = launchpad.kpis.avgScore;
         const topByScore = launchpad.topOpportunities.slice(0, 10);
 
-        const n8nFunnel = funnel.oppStages.map((s) => ({
-          stage: s.stage,
-          count: s.count,
-          totalValue: s.valueM * 1_000_000,
-          avgPwin: 0,
-          avgScore: 0,
-        }));
+        // Count user-qualified opportunities from DB
+        let userQualifiedCount = 0;
+        let userQualifiedValue = 0;
+        const dbPool = getPool();
+        if (dbPool) {
+          try {
+            const qResult = await dbPool.query(
+              `SELECT COUNT(*) as cnt, COALESCE(SUM(value_estimated), 0) as total_value
+               FROM opportunities WHERE qualified_by IS NOT NULL`
+            );
+            userQualifiedCount = parseInt(qResult.rows[0]?.cnt ?? "0", 10);
+            userQualifiedValue = parseFloat(qResult.rows[0]?.total_value ?? "0");
+          } catch { /* ignore — fall back to 0 */ }
+        }
+
+        // Override funnel: all n8n opps are "Identified" until user qualifies them
+        const totalN8nValue = funnel.oppStages.reduce((s, st) => s + st.valueM * 1_000_000, 0);
+        const n8nFunnel = [
+          {
+            stage: "Identified",
+            count: totalOpportunities - userQualifiedCount,
+            totalValue: totalN8nValue - userQualifiedValue,
+            avgPwin: 0,
+            avgScore: 0,
+          },
+          ...(userQualifiedCount > 0 ? [{
+            stage: "Qualified",
+            count: userQualifiedCount,
+            totalValue: userQualifiedValue,
+            avgPwin: 0,
+            avgScore: 0,
+          }] : []),
+        ];
 
         return res.json(
           successEnvelope(
