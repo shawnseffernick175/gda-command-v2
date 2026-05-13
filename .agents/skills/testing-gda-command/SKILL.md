@@ -12,13 +12,13 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
    - Connection: `postgresql://gda:gda_dev_password@localhost:5432/gda_command`
    - **IMPORTANT**: The VM may have a system-level `DATABASE_URL` env var pointing to a different database (e.g., n8n). Always start the backend with explicit override: `DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev`
 2. **Database migrations**: `cd packages/backend && npm run db:migrate` (runs SQL migrations)
-3. **Database seed**: `cd packages/backend && npm run db:seed` (populates 7 opportunities + 1 test user)
+3. **Database seed**: `cd packages/backend && npm run db:seed` (populates opportunities, intel items, risks, company profile, etc.)
 4. **Database reset**: `cd packages/backend && npm run db:reset` (drops all, re-migrates, re-seeds)
-5. Backend: `cd packages/backend && DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev` → runs on port 3001
+5. Backend: `cd packages/backend && DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command AUTH_REQUIRED=false npm run dev` → runs on port 3001
 6. Frontend: `cd packages/frontend && npm run dev` → runs on port 3000
 7. If ports are occupied, kill old processes: `fuser -k 3001/tcp; fuser -k 3000/tcp`
 8. Frontend proxies `/api/*` to backend via Vite config
-9. No CI configured — repo has no automated checks
+9. CI: GitHub Actions runs Build/Typecheck and Test checks on PRs
 
 ## Architecture
 
@@ -55,6 +55,60 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
 6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
 
+## AI Agent Testing
+
+### Dual-Model LLM
+
+- Backend uses GPT-4o (`tier="fast"`) for scoring/briefings and Claude Sonnet (`tier="deep"`) for analysis/writing
+- Requires `OPENAI_API_KEY` env var for agent scoring features
+- Requires `ANTHROPIC_API_KEY` for deep analysis features
+- Health check: `GET /health/detailed` → `ai_models` component shows `models.fast: true`
+
+### Agent Infrastructure
+
+- **Agent runner framework**: `packages/backend/src/lib/agent-runner.ts` — tracks runs in `agent_runs` table
+- **Agent config**: `packages/backend/src/db/migrations/013_agent_infrastructure.sql` — seeds 6 agents
+- **Agent management API**: `GET /api/agents` (list all), `GET /api/agents/:name` (detail), `POST /api/agents/:name/toggle` (enable/disable)
+- **Approval queue API**: `GET /api/agents/approvals/pending`, `POST /api/agents/approvals/:id/approve`, `POST /api/agents/approvals/:id/reject`
+
+### Testing Opportunity Watch Agent
+
+1. **Setup test data**: After `db:reset`, clear AI scores on specific opps to make them unscored:
+   ```sql
+   UPDATE sam_opportunities SET ai_summary = NULL, relevance_score = 0
+   WHERE id IN ('sam-001','sam-002','sam-003','sam-004','sam-005');
+   ```
+2. **Test qualified status preservation**: Set one opp to qualified before scoring:
+   ```sql
+   UPDATE sam_opportunities SET scan_status = 'qualified' WHERE id = 'sam-005';
+   ```
+3. **Navigate to SAM Monitor**: `http://localhost:3000/sam-monitor` (hidden route, no sidebar link)
+4. **Click "AI Score All"** button in toolbar (purple button next to "Trigger Scan")
+5. **Wait ~15-30 seconds** for GPT-4o to score all unscored opportunities
+6. **Verify success message**: Green text showing "Scored N opportunities: X pursue, Y evaluate, Z pass"
+7. **Verify qualified preservation**: Check DB: `SELECT scan_status FROM sam_opportunities WHERE id = 'sam-005'` — should still be 'qualified'
+8. **Verify agent run**: Navigate to Agent Command Center (`/approvals`) → Agent Runs tab → should show Opportunity Watch | completed | N items
+9. **Verify intel entries**: If any opps scored as evaluate/pursue, check intel_items table for new entries
+
+### Testing Morning Commander Agent
+
+1. Navigate to Intel Hub (`/intel`) → Morning Briefing tab
+2. Click "Generate Now" button
+3. Wait ~10-20 seconds for GPT-4o to synthesize briefing
+4. Verify briefing content appears with sections (pipeline, risks, deadlines, etc.)
+
+### Agent Command Center (`/approvals`)
+
+- **Agent Actions tab**: Shows pending approval queue items from all agents
+- **Agent Runs tab**: Shows execution history (agent name, trigger, status, duration, items processed, errors)
+- **Agent Config tab**: Shows all 6 agents with enable/disable toggles and schedules
+
+## SPA Caching Gotcha
+
+**IMPORTANT**: When testing with the React SPA, the browser may show stale data after a `db:reset` or DB update if the page was already loaded. The SPA keeps React state in memory even after browser refresh attempts.
+
+**Workaround**: Navigate away to a different page (e.g., click Launchpad in sidebar) then navigate back to the test page. This forces React to unmount and remount the component, triggering fresh API fetches. A simple F5 or Ctrl+Shift+R may NOT clear the SPA state.
+
 ## Full E2E Audit Pattern (38 items)
 
 When doing a comprehensive audit, navigate every page and verify:
@@ -66,17 +120,18 @@ When doing a comprehensive audit, navigate every page and verify:
 
 ### Seeded Test Data
 
-- 7 opportunities (opp-001 to opp-007), all status "Interest", due dates Aug 2026 – Feb 2027
-- Envision Innovative Solutions company profile: $382M revenue (Large Business), 41 employees (Small Business by SBA headcount)
-- NAICS Size classification: 1 Small Business (opp-005, NAICS 511210), 6 Large Business
-- All other tables empty — pages show proper empty states with 0 counts
+- 10 opportunities (opp-001 to opp-010), all status "Interest", due dates Aug 2026 – Feb 2027
+- 12 SAM opportunities (sam-001 to sam-012), various scan_status (new/tracked/qualified/dismissed)
+- 15 intel items, 7 risks, 6 morning briefings, 10 FPDS awards
+- Envision Innovative Solutions company profile: $382M revenue, 41 employees, SDVOSB/Small Business
+- NAICS: 541512, 541519, 541611 +5 more
 
 ### Navigation Tips
 
 - Use sidebar links for navigation (not address bar) to preserve session/auth state
-- For hidden routes without sidebar links, use React router navigation via console:
-  `window.history.pushState({}, '', '/route'); window.dispatchEvent(new PopStateEvent('popstate'));`
+- For hidden routes without sidebar links, type URL directly in address bar
 - Sidebar collapse toggle: click ◀ to collapse to icon-only rail (~52px), click ▶ to expand back
+- **After db:reset**: Navigate away and back to force fresh data fetch (see SPA Caching Gotcha above)
 
 ### Complete Page Inventory (34 pages)
 
@@ -100,8 +155,8 @@ When doing a comprehensive audit, navigate every page and verify:
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
+- **Predictive Analytics crash**: `/predictive` might crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend might not handle undefined response.
+- **FPDS Monitor calculation errors**: `/fpds-monitor` might show Total Value as "$NaN" and Avg Relevance as "null%" — data parsing issue in aggregate calculations.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
@@ -128,20 +183,27 @@ For testing endpoints that write to PostgreSQL:
 | discussions | `POST /threads/:id/messages` | INSERT message + UPDATE thread count |
 | doctrine | `POST /finalize` | UPDATE drafts + INSERT publish run |
 | sam-monitor | `POST /opportunities/:id/qualify` | UPDATE scan_status |
+| sam-monitor | `POST /trigger-opportunity-watch` | Run AI scoring agent on unscored opps |
 | reports | `POST /generate` | INSERT generated_reports |
 | reports | `POST /export` | INSERT export_jobs |
 | capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+| agents | `POST /:name/toggle` | UPDATE agent_config enabled status |
+| agents/approvals | `POST /:id/approve` | UPDATE approval_queue status |
+| agents/approvals | `POST /:id/reject` | UPDATE approval_queue status |
 
 ## Testing Strategy
 
 1. **Navigate systematically** through all sidebar groups
 2. **Verify source badges** — "Live DB" means real data, no mock fallbacks
 3. **Check empty states** — pages with no DB data should show 0 counts + empty message (NOT mock data)
-4. **Test NAICS Size filter** on Ops Tracker: All=7, Small=1, Large=6
+4. **Test NAICS Size filter** on Ops Tracker: All=10, Small varies, Large varies
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **For AI agents** — set up test data in DB, trigger via UI, verify results in UI + DB + Agent Command Center
 
 ## Devin Secrets Needed
 
-None — all live DB data, no external services required for testing. Auth uses local JWT with dev secret.
+- `OPENAI_API_KEY` — Required for AI agent scoring (Opportunity Watch, Morning Commander)
+- `ANTHROPIC_API_KEY` — Required for deep analysis features (Capture Coach, proposal writing)
+- No secrets needed for basic UI testing with `AUTH_REQUIRED=false`
