@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import InfoBadge from "../components/InfoBadge";
+import { authenticatedFetch } from "../api/auth";
 
 interface PipelineRow {
   id: string;
@@ -18,7 +19,7 @@ interface GDAEnvelope<T> {
 
 async function fetchPipeline(): Promise<PipelineRow[]> {
   try {
-    const r = await fetch("/api/opportunities");
+    const r = await authenticatedFetch("/api/opportunities");
     const env: GDAEnvelope<{ opportunities: PipelineRow[] }> = await r.json();
     return env.data?.opportunities ?? [];
   } catch {
