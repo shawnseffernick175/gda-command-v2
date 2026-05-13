@@ -14,11 +14,11 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 2. **Database migrations**: `cd packages/backend && npm run db:migrate` (runs SQL migrations)
 3. **Database seed**: `cd packages/backend && npm run db:seed` (populates 7 opportunities + 1 test user)
 4. **Database reset**: `cd packages/backend && npm run db:reset` (drops all, re-migrates, re-seeds)
-5. Backend: `cd packages/backend && DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev` → runs on port 3001
+5. Backend: `cd packages/backend && DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command AUTH_REQUIRED=false OPENAI_API_KEY=$OPENAI_API_KEY ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY npm run dev` → runs on port 3001
 6. Frontend: `cd packages/frontend && npm run dev` → runs on port 3000
 7. If ports are occupied, kill old processes: `fuser -k 3001/tcp; fuser -k 3000/tcp`
 8. Frontend proxies `/api/*` to backend via Vite config
-9. No CI configured — repo has no automated checks
+9. CI configured: Build & Typecheck, Test, Devin Review (3 checks)
 
 ## Architecture
 
@@ -55,6 +55,61 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
 6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
 
+## AI Agent Testing
+
+GDA Command has 6 autonomous AI agents. Each follows the OODA loop and uses the approval queue safety lane.
+
+### Dual-Model LLM
+
+- **GPT-4o** (`tier="fast"`): Opportunity scoring, morning briefings, failure diagnosis, competitor filtering
+- **Claude Sonnet** (`tier="deep"`): Capture strategy, RFP analysis, proposal writing
+- Both require API keys: `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`
+- Verify model health: `curl -s http://localhost:3001/health/detailed | jq '.data.components.ai_models'`
+
+### Agent Testing Pattern (General)
+
+1. **Trigger the agent**: Click the UI button or `curl -s -X POST http://localhost:3001/api/agents/<agent>/trigger`
+2. **Verify success banner**: Green = new items created, Blue = no new items (idempotent run)
+3. **Verify Agent Runs**: Navigate to Approvals → Agent Runs tab → verify agent row with status "completed", correct items/flagged counts
+4. **Verify idempotency**: Trigger again → should show blue "no new issues" banner and 0 new items
+5. **Verify approval queue**: For agents that flag items, check Agent Actions tab for pending approval items
+
+### Agent-Specific Testing
+
+| Agent | Page | Trigger Button | Expected Result |
+|-------|------|---------------|----------------|
+| Morning Commander | Intel Hub → Morning Briefing tab | "Generate Now" | AI briefing with sections: Pipeline, Risks, Deadlines, Competitors, System Health |
+| Opportunity Watch | SAM Monitor `/sam-monitor` | "AI Score All" | Scores N opportunities, classify pursue/evaluate/pass, pursue items queued for approval |
+| Competitive Intel | Intel Hub → Competitors tab | "AI Scan Competitors" | Scans N competitors, creates movements + intel items, significant items queued |
+| Capture Coach | Opportunity Detail `/opportunities/:id` | "Generate Strategy" | Win probability, strategy, gap analysis, risk assessment, next actions |
+| Controlled Fix | QA Center `/qa-center` | "Diagnose Failures" | Diagnoses failed agent_runs, creates fix proposals with severity/risk classification |
+
+### Controlled Fix Agent (Phase 6) — Detailed
+
+**Preconditions**: Need failed `agent_runs` in DB. The agent scans for runs with `status='failed'` and `error_message IS NOT NULL`.
+
+**Test flow**:
+1. Navigate to QA Center (sidebar → ADMIN → Health)
+2. Click "Diagnose Failures" → button shows "Diagnosing Failures..." (disabled)
+3. Wait 3-15s for GPT-4o diagnosis
+4. Green banner: "Diagnosed N new failures — N fix proposals created, N queued for approval"
+5. Fix Proposals section shows cards with: severity badge (HIGH/CRITICAL/MEDIUM/LOW), fix type (Manual/Auto-fix/Restart/Config Change), workflow name, error message, root cause, Show details link, Approve/Reject buttons
+6. Click "Show details" → expanded view with Suggested Fix, Risk, Safety Lane, Created timestamp
+7. Click "Approve" → card disappears, pending count decrements
+8. Click "Diagnose Failures" again → blue banner: "Scanned N failures — no new issues to diagnose" (7-day dedup window)
+
+**Common pitfalls**:
+- The `fetchPendingFixes()` endpoint (`/api/agents/fix-runner/pending-fixes`) must filter `WHERE status = 'proposed'` only — if it includes 'approved', cards won't disappear after approve action
+- The `resolveFixProposal()` frontend API call must include `Content-Type: application/json` header — without it, Express.json() won't parse the body and returns 500
+- Deterministic IDs prevent duplicate proposals on repeated runs
+
+### Agent Command Center (Approvals page)
+
+The Approvals page (`/approvals`) has 3 tabs:
+- **Agent Actions**: Universal inbox — pending/resolved approval items from all agents. Filter by agent or type.
+- **Agent Runs**: Table of all agent executions — agent name, trigger, status (completed/failed), duration, items processed, items flagged, error message
+- **Agent Config**: Enable/disable agents, view schedules and last run metadata
+
 ## Full E2E Audit Pattern (38 items)
 
 When doing a comprehensive audit, navigate every page and verify:
@@ -70,6 +125,9 @@ When doing a comprehensive audit, navigate every page and verify:
 - Envision Innovative Solutions company profile: $382M revenue (Large Business), 41 employees (Small Business by SBA headcount)
 - NAICS Size classification: 1 Small Business (opp-005, NAICS 511210), 6 Large Business
 - All other tables empty — pages show proper empty states with 0 counts
+- 6 agents seeded: morning-commander, opportunity-watch, competitive-intel, capture-coach, controlled-fix, approval-queue
+- 5 competitors seeded for competitive intel scanning
+- 5 SAM opportunities seeded for opportunity watch scoring
 
 ### Navigation Tips
 
@@ -100,8 +158,8 @@ When doing a comprehensive audit, navigate every page and verify:
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
+- **Predictive Analytics crash**: `/predictive` may crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend might not handle undefined response.
+- **FPDS Monitor calculation errors**: `/fpds-monitor` may show "$NaN" for Total Value and "null%" for Avg Relevance — data parsing issue in aggregate calculations.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
@@ -131,6 +189,8 @@ For testing endpoints that write to PostgreSQL:
 | reports | `POST /generate` | INSERT generated_reports |
 | reports | `POST /export` | INSERT export_jobs |
 | capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+| agents | `POST /agents/<name>/trigger` | INSERT agent_runs + various agent-specific writes |
+| agents | `POST /agents/fix-runner/resolve/:id` | UPDATE fix_proposals status/decided_by/at/note |
 
 ## Testing Strategy
 
@@ -141,7 +201,10 @@ For testing endpoints that write to PostgreSQL:
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **For AI agents** — trigger → verify banner → check Agent Runs → test idempotency (4-step pattern)
 
 ## Devin Secrets Needed
 
-None — all live DB data, no external services required for testing. Auth uses local JWT with dev secret.
+- `OPENAI_API_KEY` — Required for GPT-4o (fast tier): opportunity scoring, morning briefings, failure diagnosis, competitor filtering
+- `ANTHROPIC_API_KEY` — Required for Claude Sonnet (deep tier): capture strategy generation, RFP analysis
+- Both are optional for non-AI testing. Auth uses local JWT with dev secret.
