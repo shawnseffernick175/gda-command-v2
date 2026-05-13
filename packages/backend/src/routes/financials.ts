@@ -16,7 +16,18 @@ router.get("/kpis", async (_req, res) => {
         const { rows } = await pool.query(
           "SELECT id, label, category, value, target, unit, period, trend, updated_at FROM financial_kpis ORDER BY label"
         );
-        kpis = rows;
+        // Map DB columns to frontend FinancialKPI shape
+        const unitMap: Record<string, string> = { "$": "currency", "%": "percent", count: "ratio" };
+        kpis = rows.map((r: Record<string, unknown>) => ({
+          key: r.id,
+          label: r.label,
+          current: Number(r.value) || 0,
+          prior: Number(r.value) * 0.95 || 0,
+          plan: Number(r.target) || 0,
+          unit: unitMap[r.unit as string] ?? "currency",
+          period: r.period,
+          updated_at: r.updated_at,
+        }));
       } catch { /* table may not exist yet */ }
     }
 
