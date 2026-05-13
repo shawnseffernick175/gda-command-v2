@@ -188,6 +188,14 @@ router.get("/", async (req, res) => {
         const totalFiltered = allRows.length;
         const totalPages = Math.ceil(totalFiltered / pageSize);
         const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
+
+        // Compute aggregate stats across ALL filtered rows (not just page slice)
+        const aggTotalValue = allRows.reduce((s, o) => s + (o.value_estimated ?? 0), 0);
+        const withPwin = allRows.filter((o) => o.probability_of_win !== null);
+        const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length : 0;
+        const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (o.score ?? 0), 0) / allRows.length : 0;
+        const aggDepartments = [...new Set(allRows.map((o) => o.department).filter(Boolean))].sort();
+
         return res.json(
           successEnvelope(
             "gda-opportunities",
@@ -200,6 +208,10 @@ router.get("/", async (req, res) => {
               page,
               pageSize,
               totalPages,
+              totalValue: aggTotalValue,
+              avgPwin: aggAvgPwin,
+              avgScore: aggAvgScore,
+              departments: aggDepartments,
               filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
               lastSync: n8nResult.meta.lastSync,
               dataSources: n8nResult.meta.dataSources,
@@ -279,10 +291,22 @@ router.get("/", async (req, res) => {
     }));
 
     // Enrich with NAICS size classification and apply naics_size filter
-    let rows = enrichWithNaicsSize(rawRows);
+    let allRows = enrichWithNaicsSize(rawRows);
     if (naicsSizeFilter === "small" || naicsSizeFilter === "large") {
-      rows = rows.filter((o) => o.naics_size === naicsSizeFilter);
+      allRows = allRows.filter((o) => o.naics_size === naicsSizeFilter);
     }
+
+    // Paginate DB results (same as n8n path)
+    const totalFiltered = allRows.length;
+    const totalPages = Math.ceil(totalFiltered / pageSize);
+    const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
+
+    // Compute aggregate stats across ALL filtered rows (not just page slice)
+    const aggTotalValue = allRows.reduce((s, o) => s + (o.value_estimated ?? 0), 0);
+    const withPwin = allRows.filter((o) => o.probability_of_win !== null);
+    const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length : 0;
+    const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (o.score ?? 0), 0) / allRows.length : 0;
+    const aggDepartments = [...new Set(allRows.map((o) => o.department).filter(Boolean))].sort();
 
     return res.json(
       successEnvelope(
@@ -291,6 +315,15 @@ router.get("/", async (req, res) => {
         { opportunities: rows, source: "db" as const },
         {
           count: rows.length,
+          totalFiltered,
+          totalAvailable: rawRows.length,
+          page,
+          pageSize,
+          totalPages,
+          totalValue: aggTotalValue,
+          avgPwin: aggAvgPwin,
+          avgScore: aggAvgScore,
+          departments: aggDepartments,
           filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
         }
       )

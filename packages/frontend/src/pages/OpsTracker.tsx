@@ -99,7 +99,7 @@ export default function OpsTracker() {
   // Pagination
   const [page, setPage] = useState(1);
   const pageSize = 25;
-  const [paginationMeta, setPaginationMeta] = useState<{ totalFiltered?: number; totalPages?: number; totalAvailable?: number }>({});
+  const [paginationMeta, setPaginationMeta] = useState<{ totalFiltered?: number; totalPages?: number; totalAvailable?: number; totalValue?: number; avgPwin?: number; avgScore?: number; departments?: string[] }>({});
   const totalFiltered = paginationMeta.totalFiltered;
   const totalPages = paginationMeta.totalPages ?? 1;
 
@@ -126,6 +126,10 @@ export default function OpsTracker() {
             totalFiltered: meta.totalFiltered as number | undefined,
             totalPages: meta.totalPages as number | undefined,
             totalAvailable: meta.totalAvailable as number | undefined,
+            totalValue: meta.totalValue as number | undefined,
+            avgPwin: meta.avgPwin as number | undefined,
+            avgScore: meta.avgScore as number | undefined,
+            departments: meta.departments as string[] | undefined,
           });
         }
       } else {
@@ -148,32 +152,36 @@ export default function OpsTracker() {
   const opportunities = data?.opportunities ?? [];
   const source = data?.source ?? "db";
 
-  // Derive unique departments for filter dropdown
+  // Derive unique departments for filter dropdown — prefer backend aggregate over page slice
   const departments = useMemo(() => {
+    if (paginationMeta.departments && paginationMeta.departments.length > 0) {
+      return paginationMeta.departments;
+    }
     const depts = new Set<string>();
     for (const o of opportunities) {
       if (o.department) depts.add(o.department);
     }
     return Array.from(depts).sort();
-  }, [opportunities]);
+  }, [opportunities, paginationMeta.departments]);
 
-  // Summary strip
+  // Summary strip — prefer backend aggregate stats over page slice
   const summary = useMemo(() => {
-    const total = opportunities.length;
-    const totalValue = opportunities.reduce(
+    const total = paginationMeta.totalFiltered ?? opportunities.length;
+    const totalValue = paginationMeta.totalValue ?? opportunities.reduce(
       (s, o) => s + (o.value_estimated ?? 0),
       0
     );
-    const withPwin = opportunities.filter((o) => o.probability_of_win !== null);
-    const avgPwin =
-      withPwin.length > 0
-        ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) /
-          withPwin.length
+    const avgPwin = paginationMeta.avgPwin ?? (() => {
+      const withPwin = opportunities.filter((o) => o.probability_of_win !== null);
+      return withPwin.length > 0
+        ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length
         : 0;
-    const avgScore =
-      total > 0 ? opportunities.reduce((s, o) => s + o.score, 0) / total : 0;
+    })();
+    const avgScore = paginationMeta.avgScore ?? (
+      opportunities.length > 0 ? opportunities.reduce((s, o) => s + o.score, 0) / opportunities.length : 0
+    );
     return { total, totalValue, avgPwin, avgScore };
-  }, [opportunities]);
+  }, [opportunities, paginationMeta]);
 
   function handleSort(col: SortKey) {
     if (sortBy === col) {
