@@ -10,6 +10,7 @@ import {
   fetchPipelineFromN8n,
   fetchOpportunityDetailFromN8n,
 } from "../lib/n8n-data";
+import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
 
 const router = Router();
 
@@ -631,6 +632,9 @@ router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"),
        VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $7)`,
       [id, title, agency ?? null, department ?? null, status ?? "discovery", value_estimated ?? null, now],
     );
+    // Auto-trigger Capture Coach for newly created opportunity (fire-and-forget)
+    queueCaptureCoachIfNeeded(id);
+
     res.json(successEnvelope("gda-opportunities", "quick-create", { id, title }));
   } catch (e) {
     res.status(500).json(
@@ -798,6 +802,9 @@ router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res)
       `[GDA QUALIFY WRITE] correlation_id=${correlationId} | opportunity_id=${id} | title=${title.replace(/\s+/g, "_")} | prev_status=${prevStatus} | new_status=qualified | qualified_at=${now} | triggered_by=GDA_REBUILD_UI\n`
     );
 
+    // Auto-trigger Capture Coach after qualifying (fire-and-forget)
+    queueCaptureCoachIfNeeded(id);
+
     return res.json(
       successEnvelope(
         "gda-opportunities",
@@ -891,6 +898,9 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
     process.stdout.write(
       `[GDA STAGE CHANGE] opportunity_id=${id} | title=${title.replace(/\s+/g, "_")} | prev_status=${prevStatus} | prev_stage=${prevStage} | new_stage=${stage} | new_status=${dbStatus}\n`
     );
+
+    // Auto-trigger Capture Coach after stage change (fire-and-forget)
+    queueCaptureCoachIfNeeded(id);
 
     return res.json(
       successEnvelope("gda-opportunities", "change-stage", {

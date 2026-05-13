@@ -11,6 +11,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { notify } from "../lib/email";
+import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
 
 const router = Router();
 
@@ -93,6 +94,11 @@ router.post("/opportunities", async (req, res) => {
       errors++;
       process.stderr.write(`[ingest] opp error: ${(e as Error).message}\n`);
     }
+  }
+
+  // Auto-trigger Capture Coach for ingested opportunities (fire-and-forget)
+  for (const opp of items) {
+    if (opp.id) queueCaptureCoachIfNeeded(opp.id);
   }
 
   res.json(successEnvelope("gda-ingest", "opportunities", {
