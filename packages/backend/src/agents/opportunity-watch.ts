@@ -242,7 +242,11 @@ async function storeResults(scored: ScoredOpportunity[]): Promise<void> {
          SET relevance_score = $2,
              relevance_reasons = $3,
              ai_summary = $4,
-             scan_status = CASE WHEN $5 = 'pursue' THEN 'tracked' ELSE scan_status END
+             scan_status = CASE
+               WHEN scan_status = 'qualified' THEN 'qualified'
+               WHEN $5 = 'pursue' THEN 'tracked'
+               ELSE scan_status
+             END
          WHERE id = $1`,
         [
           opp.id,
