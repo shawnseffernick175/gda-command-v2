@@ -180,6 +180,8 @@ export interface OpportunityQueryParams {
   minPwin?: number;
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  page?: number;
+  pageSize?: number;
 }
 
 export function fetchOpportunities(params: OpportunityQueryParams = {}) {
@@ -191,6 +193,8 @@ export function fetchOpportunities(params: OpportunityQueryParams = {}) {
   if (params.minPwin !== undefined) qs.set("minPwin", String(params.minPwin));
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
+  if (params.page !== undefined) qs.set("page", String(params.page));
+  if (params.pageSize !== undefined) qs.set("pageSize", String(params.pageSize));
   const query = qs.toString();
   return request<OpportunitiesData>(`/opportunities${query ? `?${query}` : ""}`);
 }
