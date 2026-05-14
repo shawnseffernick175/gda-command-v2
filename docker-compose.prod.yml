@@ -64,14 +64,22 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "${APP_PORT:-80}:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gda-app.rule=Host(`app.csr-llc.tech`) || Host(`gda.csr-llc.tech`)"
+      - "traefik.http.routers.gda-app.tls=true"
+      - "traefik.http.routers.gda-app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gda-app.loadbalancer.server.port=80"
     networks:
       - gda
+      - traefik
 
 networks:
   gda:
     driver: bridge
+  traefik:
+    external: true
+    name: n8n_default
 
 volumes:
   pgdata:
