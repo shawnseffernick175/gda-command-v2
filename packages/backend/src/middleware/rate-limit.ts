@@ -68,13 +68,19 @@ export function rateLimit(opts: RateLimitOptions) {
 // Pre-configured limiters
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 20,                      // 20 login/register attempts per 15min
+  max: 30,                      // 30 login/register attempts per 15min
   keyPrefix: "auth",
+});
+
+export const sessionLimiter = rateLimit({
+  windowMs: 60 * 1000,          // 1 minute
+  max: 600,                     // 600/min — /api/auth/me is called on every page load
+  keyPrefix: "session",
 });
 
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,          // 1 minute
-  max: 120,                     // 120 requests per minute
+  max: 600,                     // 600 requests per minute (normal browsing)
   keyPrefix: "api",
 });
 
