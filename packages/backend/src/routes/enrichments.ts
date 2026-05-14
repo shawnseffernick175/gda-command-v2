@@ -67,7 +67,7 @@ async function aiJson<T>(systemPrompt: string, userPrompt: string): Promise<T | 
 function isValidShape(body: unknown, requiredKey: string): boolean {
   if (!body || typeof body !== "object") return false;
   const obj = body as Record<string, unknown>;
-  if (obj.status === "ok" || obj.error || obj.updated) return false;
+  if (obj.status === "ok" || obj.error || obj.updated === true) return false;
   return requiredKey in obj;
 }
 

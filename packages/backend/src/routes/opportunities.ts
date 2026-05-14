@@ -611,8 +611,6 @@ router.get("/:id/detail", async (req, res) => {
     );
   }
 
-  const respondedAt = new Date().toISOString();
-
   // Generate AI-powered analysis and OODA if LLM is available
   let analysis = { executive_summary: "", strengths: [] as string[], risks: [] as string[], competitive_landscape: null as string | null, relevance_rationale: null as string | null, recommended_action: null as string | null, confidence: null as string | null, last_analyzed_at: null as string | null, analyst_feedback: null, analysis_version: "1.0" };
   let oodaData = { observe: { summary: "", items: [] as unknown[] }, orient: { summary: "", items: [] as unknown[] }, decide: { summary: "", options: [] as unknown[] }, act: { summary: "", next_steps: [] as unknown[] } };
@@ -703,7 +701,7 @@ Place of Performance: ${opp.place_of_performance ?? "N/A"}` },
       },
       {
         requestedAt,
-        respondedAt,
+        respondedAt: new Date().toISOString(),
         opportunityId: id,
         sourceCount: 0,
         analysisGeneratedAt: analysisGenerated ? new Date().toISOString() : null,
