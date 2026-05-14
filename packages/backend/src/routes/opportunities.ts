@@ -3,6 +3,7 @@ import type { Opportunity, OpportunityStatus } from "@gda/shared";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
+import { chatCompletion, isLLMAvailable } from "../lib/llm";
 
 import {
   n8nWebhookConfigured,
@@ -612,14 +613,90 @@ router.get("/:id/detail", async (req, res) => {
 
   const respondedAt = new Date().toISOString();
 
+  // Generate AI-powered analysis and OODA if LLM is available
+  let analysis = { executive_summary: "", strengths: [] as string[], risks: [] as string[], competitive_landscape: null as string | null, relevance_rationale: null as string | null, recommended_action: null as string | null, confidence: null as string | null, last_analyzed_at: null as string | null, analyst_feedback: null, analysis_version: "1.0" };
+  let oodaData = { observe: { summary: "", items: [] as unknown[] }, orient: { summary: "", items: [] as unknown[] }, decide: { summary: "", options: [] as unknown[] }, act: { summary: "", next_steps: [] as unknown[] } };
+  let analysisGenerated = false;
+
+  if (isLLMAvailable()) {
+    try {
+      const aiResp = await chatCompletion(
+        [
+          { role: "system", content: `You are a government contracting opportunity analyst. Generate a comprehensive analysis and OODA framework for the given opportunity.
+Return JSON with this exact schema:
+{
+  "executive_summary": string (3-4 sentences summarizing the opportunity, agency needs, and our position),
+  "strengths": [string array, 3-5 strengths for pursuing this opportunity],
+  "risks": [string array, 2-4 risks or challenges],
+  "competitive_landscape": string (2 sentences about competition),
+  "recommended_action": string (1 sentence recommended next step),
+  "confidence": "high"|"medium"|"low",
+  "observe": {
+    "summary": string (what we know about this opportunity),
+    "items": [{"category": string, "observation": string, "confidence": "high"|"medium"|"low", "source_ids": []}]
+  },
+  "orient": {
+    "summary": string (how this opportunity fits our strategy),
+    "items": [{"factor": string, "assessment": string, "impact": "positive"|"negative"|"neutral", "weight": number}]
+  },
+  "decide": {
+    "summary": string (our decision framework),
+    "options": [{"option": string, "pros": [string], "cons": [string], "recommended": boolean, "effort": "high"|"medium"|"low"}]
+  },
+  "act": {
+    "summary": string (what we need to do next),
+    "next_steps": [{"action": string, "owner": string, "due_date": string, "priority": "high"|"medium"|"low", "status": "pending"}]
+  }
+}` },
+          { role: "user", content: `Opportunity: "${opp.title}"
+ID: ${opp.id}
+Agency: ${opp.agency ?? "Unknown"}
+Department: ${opp.department ?? "Unknown"}
+NAICS: ${opp.naics ?? "N/A"}
+Set-aside: ${opp.set_aside ?? "Full & Open"}
+Estimated Value: ${opp.value_estimated ? `$${(opp.value_estimated / 1e6).toFixed(1)}M` : "Unknown"}
+Due Date: ${opp.due_date ?? "TBD"}
+Incumbent: ${opp.incumbent ?? "Unknown"}
+Status: ${opp.status}
+Score: ${opp.score ?? 0}/100
+Solicitation: ${opp.solicitation_number ?? "N/A"}
+Place of Performance: ${opp.place_of_performance ?? "N/A"}` },
+        ],
+        { tier: "fast", temperature: 0.5, max_tokens: 2500, response_format: { type: "json_object" } },
+      );
+      const parsed = JSON.parse(aiResp.content);
+      if (parsed.executive_summary) {
+        analysis = {
+          executive_summary: parsed.executive_summary,
+          strengths: parsed.strengths ?? [],
+          risks: parsed.risks ?? [],
+          competitive_landscape: parsed.competitive_landscape ?? null,
+          relevance_rationale: null,
+          recommended_action: parsed.recommended_action ?? null,
+          confidence: parsed.confidence ?? "medium",
+          last_analyzed_at: new Date().toISOString(),
+          analyst_feedback: null,
+          analysis_version: "2.0-ai",
+        };
+        oodaData = {
+          observe: { summary: parsed.observe?.summary ?? "", items: parsed.observe?.items ?? [] },
+          orient: { summary: parsed.orient?.summary ?? "", items: parsed.orient?.items ?? [] },
+          decide: { summary: parsed.decide?.summary ?? "", options: parsed.decide?.options ?? [] },
+          act: { summary: parsed.act?.summary ?? "", next_steps: parsed.act?.next_steps ?? [] },
+        };
+        analysisGenerated = true;
+      }
+    } catch { /* non-blocking: fall through to empty analysis */ }
+  }
+
   return res.json(
     successEnvelope(
       "gda-opportunity-detail",
       "read",
       {
         opportunity: opp,
-        analysis: { executive_summary: "", strengths: [], risks: [], competitive_landscape: null, relevance_rationale: null, recommended_action: null, confidence: null, last_analyzed_at: null, analyst_feedback: null, analysis_version: "1.0" },
-        ooda: { observe: { summary: "", items: [] }, orient: { summary: "", items: [] }, decide: { summary: "", options: [] }, act: { summary: "", next_steps: [] } },
+        analysis,
+        ooda: oodaData,
         sources: [],
         learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 0, coverage_gaps: [], next_review_at: null },
         source,
@@ -629,10 +706,10 @@ router.get("/:id/detail", async (req, res) => {
         respondedAt,
         opportunityId: id,
         sourceCount: 0,
-        analysisGeneratedAt: null,
+        analysisGeneratedAt: analysisGenerated ? new Date().toISOString() : null,
         coverageFlags: {
-          hasAnalysis: false,
-          hasOoda: false,
+          hasAnalysis: analysisGenerated,
+          hasOoda: analysisGenerated,
           hasSources: false,
           hasLearning: false,
         },
