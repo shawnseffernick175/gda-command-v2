@@ -319,6 +319,47 @@ export default function OpsTracker() {
         </div>
       </div>
 
+      {/* NAICS Size Tabs */}
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          marginBottom: 16,
+          background: "var(--color-surface)",
+          borderRadius: 8,
+          overflow: "hidden",
+          border: "1px solid var(--color-border)",
+          width: "fit-content",
+        }}
+      >
+        {([
+          { value: "", label: "All Opportunities" },
+          { value: "small", label: "Small Business" },
+          { value: "large", label: "Large Business" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => { setNaicsSizeFilter(tab.value); setPage(1); }}
+            style={{
+              padding: "10px 24px",
+              border: "none",
+              background: naicsSizeFilter === tab.value
+                ? "var(--color-accent, #3b82f6)"
+                : "transparent",
+              color: naicsSizeFilter === tab.value
+                ? "#fff"
+                : "var(--color-text)",
+              fontWeight: naicsSizeFilter === tab.value ? 700 : 500,
+              fontSize: 14,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters */}
       <div
         style={{
@@ -357,8 +398,8 @@ export default function OpsTracker() {
           }}
         >
           <option value="">All statuses</option>
-          <option value="discovery">Interest</option>
-          <option value="qualified">Qualify</option>
+          <option value="discovery">Identified</option>
+          <option value="qualified">Qualified</option>
           <option value="pipeline">Pursue</option>
           <option value="won">Won</option>
           <option value="lost">Lost</option>
@@ -381,22 +422,6 @@ export default function OpsTracker() {
               {d}
             </option>
           ))}
-        </select>
-        <select
-          value={naicsSizeFilter}
-          onChange={(e) => { setNaicsSizeFilter(e.target.value); setPage(1); }}
-          style={{
-            padding: "6px 12px",
-            borderRadius: 6,
-            border: "1px solid var(--color-border)",
-            background: "var(--color-surface)",
-            color: "var(--color-text)",
-            fontSize: 14,
-          }}
-        >
-          <option value="">All NAICS sizes</option>
-          <option value="small">Small Business</option>
-          <option value="large">Large Business</option>
         </select>
         <input
           type="number"

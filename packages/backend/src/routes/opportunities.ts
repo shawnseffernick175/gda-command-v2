@@ -7,7 +7,6 @@ import { requireRole } from "../lib/auth";
 import {
   n8nWebhookConfigured,
   fetchOpsTrackerFromN8n,
-  fetchPipelineFromN8n,
   fetchOpportunityDetailFromN8n,
 } from "../lib/n8n-data";
 import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
@@ -383,36 +382,8 @@ router.get("/pipeline", async (req, res) => {
     return filtered;
   }
 
-  // --- Source priority: n8n webhook → Postgres → mock ---
-
-  // 1. Try n8n webhook (pipeline-specific endpoint)
-  if (n8nWebhookConfigured()) {
-    try {
-      const n8nResult = await fetchPipelineFromN8n();
-      if (n8nResult.ok && n8nResult.opportunities.length > 0) {
-        // n8n gda-pipeline webhook already curates pipeline-worthy opportunities;
-        // their n8n stages (Qualified, Go/No-Go, Post-Submittal) are more granular
-        // than our simple "pipeline" status, so we trust the webhook's curation.
-        const rows = pipelineFilterAndSort(n8nResult.opportunities);
-        return res.json(
-          successEnvelope(
-            "gda-opportunities",
-            "pipeline-list",
-            { opportunities: rows, source: "n8n" as const },
-            {
-              count: rows.length,
-              totalAvailable: n8nResult.meta.count,
-              filters_applied: { search, department: deptFilter, minPwin },
-            }
-          )
-        );
-      }
-    } catch (err: unknown) {
-      process.stderr.write(`[opportunities] pipeline n8n fallback: ${(err as Error).message}\n`);
-    }
-  }
-
-  // 2. Try Postgres
+  // Pipeline uses DB only — n8n data bypasses the qualification gate.
+  // Only user-approved opportunities (approved_at IS NOT NULL) belong here.
   const pool = getPool();
 
   if (!pool) {
