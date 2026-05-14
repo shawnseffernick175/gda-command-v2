@@ -30,7 +30,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - Navigation: 5-group collapsible sidebar (220px expanded / 52px collapsed)
   - OPERATIONS: Launchpad, Fast Track, Ops Tracker, Pipeline, Approvals, Risk Register
   - CAPTURE: Capture Plans, Proposals, RFP Shredder, Compliance, Color Review
-  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, CPARS Builder, GovWin IQ
+  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, GovWin IQ
   - REPORTING: Financials, Reports, Charts, Discussions
   - ADMIN: Settings, Health, Workflows, Users, Audit Log, Doctrine, Book of Truths, Prompts, User Manual
 - Financial KPI strip: persistent header showing "Financial KPIs unavailable" with Retry button when no data seeded
@@ -121,7 +121,7 @@ For testing endpoints that write to PostgreSQL:
 ### POST Endpoints with Real DB Writes
 
 | Route | Endpoint | DB Operation |
-|-------|----------|-------------|
+|-------|----------|--------------|
 | approvals | `POST /:id/resolve` | UPDATE approvals status/resolved_by/at/notes |
 | anomaly | `POST /anomalies/:id/acknowledge` | UPDATE status + acknowledged_at |
 | anomaly | `POST /anomalies/:id/resolve` | UPDATE status + resolved_at |
