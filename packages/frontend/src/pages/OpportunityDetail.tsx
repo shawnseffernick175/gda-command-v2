@@ -87,8 +87,8 @@ const STATUS_COLORS: Record<string, string> = {
   won: "#eab308",
 };
 
-function formatCurrency(n: number | null): string {
-  if (n === null) return "—";
+function formatCurrency(n: number | null | undefined): string {
+  if (n == null) return "—";
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
   if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
@@ -212,7 +212,15 @@ export default function OpportunityDetail() {
     );
   }
 
-  const { opportunity: opp, analysis, ooda, sources, learning } = data;
+  const { opportunity: opp, analysis: rawAnalysis, ooda: rawOoda, sources, learning } = data;
+  const analysis = rawAnalysis ?? { executive_summary: null, recommended_action: null, key_risks: [], competitive_landscape: null };
+  const emptyOodaPhase = { summary: null, items: [] };
+  const ooda = {
+    observe: rawOoda?.observe ?? emptyOodaPhase,
+    orient: rawOoda?.orient ?? { summary: null, items: [] },
+    decide: rawOoda?.decide ?? { summary: null, options: [] },
+    act: rawOoda?.act ?? { summary: null, steps: [] },
+  };
 
   const handleCaptureCoach = async () => {
     if (!id) return;
@@ -267,8 +275,8 @@ export default function OpportunityDetail() {
         >
           {({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}
         </span>
-        <span style={{ fontSize: 18, fontWeight: 700, color: scoreColor(opp.score) }}>
-          {opp.score}
+        <span style={{ fontSize: 18, fontWeight: 700, color: scoreColor(opp.score ?? 0) }}>
+          {opp.score ?? 0}
         </span>
       </div>
       <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 20 }}>
@@ -287,12 +295,12 @@ export default function OpportunityDetail() {
           <Field label="NAICS" value={opp.naics} />
           <Field label="PSC" value={opp.psc} />
           <Field label="Estimated Value" value={formatCurrency(opp.value_estimated)} />
-          <Field label="Probability of Win" value={opp.probability_of_win !== null ? `${Math.round(opp.probability_of_win * 100)}%` : "—"} />
+          <Field label="Probability of Win" value={opp.probability_of_win != null ? `${Math.round(opp.probability_of_win * 100)}%` : "—"} />
           <Field label="Due Date" value={formatDate(opp.due_date)} />
           <Field label="Set-Aside" value={opp.set_aside} />
           <Field label="Place of Performance" value={opp.place_of_performance} />
           <Field label="Incumbent" value={opp.incumbent} />
-          <Field label="Tags" value={opp.tags.length > 0 ? opp.tags.join(", ") : "—"} />
+          <Field label="Tags" value={(opp.tags ?? []).length > 0 ? (opp.tags ?? []).join(", ") : "—"} />
         </div>
       </Section>
 
