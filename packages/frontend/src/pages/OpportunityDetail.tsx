@@ -213,13 +213,13 @@ export default function OpportunityDetail() {
   }
 
   const { opportunity: opp, analysis: rawAnalysis, ooda: rawOoda, sources, learning } = data;
-  const analysis = rawAnalysis ?? { executive_summary: null, recommended_action: null, key_risks: [], competitive_landscape: null };
+  const analysis = rawAnalysis ?? { executive_summary: null, recommended_action: null, strengths: [], risks: [], competitive_landscape: null };
   const emptyOodaPhase = { summary: null, items: [] };
   const ooda = {
     observe: rawOoda?.observe ?? emptyOodaPhase,
     orient: rawOoda?.orient ?? { summary: null, items: [] },
     decide: rawOoda?.decide ?? { summary: null, options: [] },
-    act: rawOoda?.act ?? { summary: null, steps: [] },
+    act: rawOoda?.act ?? { summary: null, next_steps: [] },
   };
 
   const handleCaptureCoach = async () => {
