@@ -677,10 +677,43 @@ Place of Performance: ${opp.place_of_performance ?? "N/A"}` },
           analysis_version: "2.0-ai",
         };
         oodaData = {
-          observe: { summary: parsed.observe?.summary ?? "", items: parsed.observe?.items ?? [] },
-          orient: { summary: parsed.orient?.summary ?? "", items: parsed.orient?.items ?? [] },
-          decide: { summary: parsed.decide?.summary ?? "", options: parsed.decide?.options ?? [] },
-          act: { summary: parsed.act?.summary ?? "", next_steps: parsed.act?.next_steps ?? [] },
+          observe: {
+            summary: parsed.observe?.summary ?? "",
+            items: (parsed.observe?.items ?? []).map((it: Record<string, unknown>) => ({
+              label: it.label ?? it.category ?? "",
+              value: it.value ?? it.observation ?? "",
+              source_ids: it.source_ids ?? [],
+            })),
+          },
+          orient: {
+            summary: parsed.orient?.summary ?? "",
+            items: (parsed.orient?.items ?? []).map((it: Record<string, unknown>) => ({
+              label: it.label ?? it.factor ?? "",
+              value: it.value ?? it.assessment ?? "",
+              type: it.type ?? it.impact ?? "neutral",
+              source_ids: it.source_ids ?? [],
+            })),
+          },
+          decide: {
+            summary: parsed.decide?.summary ?? "",
+            options: (parsed.decide?.options ?? []).map((it: Record<string, unknown>) => ({
+              label: it.label ?? it.option ?? "",
+              rationale: (it.rationale as string) ?? ([
+                ...((it.pros as string[]) ?? []).map((p: string) => `Pro: ${p}`),
+                ...((it.cons as string[]) ?? []).map((c: string) => `Con: ${c}`),
+              ].join("; ") || "No rationale provided"),
+              recommended: it.recommended ?? false,
+            })),
+          },
+          act: {
+            summary: parsed.act?.summary ?? "",
+            next_steps: (parsed.act?.next_steps ?? []).map((it: Record<string, unknown>) => ({
+              action: it.action ?? "",
+              owner: it.owner ?? null,
+              due_date: it.due_date ?? null,
+              priority: it.priority ?? "medium",
+            })),
+          },
         };
         analysisGenerated = true;
       }

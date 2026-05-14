@@ -957,7 +957,7 @@ function ObserveCard({ item, sources }: { item: OodaObserveItem; sources: Opport
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <strong style={{ fontSize: 13 }}>{item.label}</strong>
         <div style={{ display: "flex", gap: 4 }}>
-          {item.source_ids.map((sid) => (
+          {(item.source_ids ?? []).map((sid) => (
             <SourceChip key={sid} sourceId={sid} sources={sources} />
           ))}
         </div>
@@ -976,15 +976,15 @@ function OrientCard({ item, sources }: { item: OodaOrientItem; sources: Opportun
           <span
             style={{
               ...styles.typeBadge,
-              background: `${orientTypeColor(item.type)}22`,
-              color: orientTypeColor(item.type),
+              background: `${orientTypeColor(item.type ?? "neutral")}22`,
+              color: orientTypeColor(item.type ?? "neutral"),
             }}
           >
-            {item.type}
+            {item.type ?? "neutral"}
           </span>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
-          {item.source_ids.map((sid) => (
+          {(item.source_ids ?? []).map((sid) => (
             <SourceChip key={sid} sourceId={sid} sources={sources} />
           ))}
         </div>
