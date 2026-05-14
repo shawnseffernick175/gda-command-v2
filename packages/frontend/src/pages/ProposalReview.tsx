@@ -620,7 +620,7 @@ function RedTeamTab({ findings }: { findings: RedTeamFindingRow[] }) {
           const isExpanded = expanded === f.id;
           const sevColor = SEVERITY_COLORS[f.severity] ?? "#6b7280";
           const statColor = FINDING_STATUS_COLORS[f.status] ?? "#6b7280";
-          const statLabel = f.status === "accepted_risk" ? "Accepted Risk" : f.status.charAt(0).toUpperCase() + f.status.slice(1);
+          const statLabel = f.status === "accepted_risk" ? "Accepted Risk" : f.status ? f.status.charAt(0).toUpperCase() + f.status.slice(1) : "—";
 
           return (
             <div

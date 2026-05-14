@@ -1409,7 +1409,7 @@ function ReviewResultView({ result, onClose }: { result: ColorReviewRunResult; o
 
       {result.ai && (
         <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 12 }}>
-          Reviewed by {result.ai.model} — {result.ai.tokens.toLocaleString()} tokens used
+          Reviewed by {result.ai.model} — {(result.ai.tokens ?? 0).toLocaleString()} tokens used
         </div>
       )}
 

@@ -77,7 +77,7 @@ function SummaryStrip({ summary }: { summary: KnowledgeSummaryData }) {
     { label: "Documents", value: summary.total_documents, color: "#3b82f6", info: { whatItIs: "Total documents uploaded to Knowledge Base.", whatItMeans: "More documents = smarter AI across all features." } },
     { label: "Indexed", value: summary.indexed_count, color: "#22c55e", info: { whatItIs: "Documents fully processed and searchable.", whatItMeans: "These documents are available for RAG queries and AI analysis." } },
     { label: "Processing", value: summary.processing_count, color: "#f59e0b", info: { whatItIs: "Documents being chunked and embedded.", whatItMeans: "Recently uploaded — will be searchable once processing completes." } },
-    { label: "Chunks", value: summary.total_chunks.toLocaleString(), color: "#8b5cf6", info: { whatItIs: "Text segments created for semantic search.", whatItMeans: "Documents split into searchable passages for precise AI retrieval.", howCalculated: "Each document split into overlapping ~500-token segments." } },
+    { label: "Chunks", value: (summary.total_chunks ?? 0).toLocaleString(), color: "#8b5cf6", info: { whatItIs: "Text segments created for semantic search.", whatItMeans: "Documents split into searchable passages for precise AI retrieval.", howCalculated: "Each document split into overlapping ~500-token segments." } },
     { label: "Collections", value: summary.collection_count, color: "#06b6d4", info: { whatItIs: "Organized groups of related documents.", whatItMeans: "Categories like Past Performance, Proposals, Compliance for targeted search." } },
     { label: "Total Lookups", value: summary.total_access_count, color: "#6366f1", info: { whatItIs: "Times documents have been accessed or referenced.", whatItMeans: "High lookup count = frequently used by AI and users.", howCalculated: "Cumulative access count across all documents." } },
   ];
@@ -587,7 +587,7 @@ function CollectionsTab() {
             </div>
             <div>
               <span style={{ color: "var(--color-text-muted)" }}>Chunks: </span>
-              <span style={{ fontWeight: 600, color: "#8b5cf6" }}>{col.total_chunks.toLocaleString()}</span>
+              <span style={{ fontWeight: 600, color: "#8b5cf6" }}>{(col.total_chunks ?? 0).toLocaleString()}</span>
             </div>
           </div>
         </div>
