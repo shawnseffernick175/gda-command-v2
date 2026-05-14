@@ -392,7 +392,7 @@ export default function UserManagement() {
                           fontWeight: 600,
                         }}
                       >
-                        {u.display_name.charAt(0).toUpperCase()}
+                        {(u.display_name ?? "?").charAt(0).toUpperCase()}
                       </div>
                       <span>
                         {u.display_name}

@@ -169,12 +169,12 @@ export default function OpportunityDetail() {
     setCoachAnalysis(null);
     setCoachResult(null);
 
-    // Fetch enrichments in parallel (non-blocking)
-    fetchPwinBreakdown(id).then((e) => { if (e.success && e.data) setPwin(e.data); }).catch(() => {});
-    fetchIncumbentAnalysis(id).then((e) => { if (e.success && e.data) setIncumbent(e.data); }).catch(() => {});
-    fetchCompetitorField(id).then((e) => { if (e.success && e.data) setCompetitors(e.data); }).catch(() => {});
-    fetchBlackHatAnalysis(id).then((e) => { if (e.success && e.data) setBlackHat(e.data); }).catch(() => {});
-    fetchWargameAnalysis(id).then((e) => { if (e.success && e.data) setWargame(e.data); }).catch(() => {});
+    // Fetch enrichments in parallel (non-blocking) — validate data shape before setting state
+    fetchPwinBreakdown(id).then((e) => { if (e.success && e.data && typeof e.data.overall_pwin === "number" && Array.isArray(e.data.factors)) setPwin(e.data); }).catch(() => {});
+    fetchIncumbentAnalysis(id).then((e) => { if (e.success && e.data && typeof e.data.incumbent_name === "string") setIncumbent(e.data); }).catch(() => {});
+    fetchCompetitorField(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.competitors)) setCompetitors(e.data); }).catch(() => {});
+    fetchBlackHatAnalysis(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.scenarios)) setBlackHat(e.data); }).catch(() => {});
+    fetchWargameAnalysis(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.scenarios)) setWargame(e.data); }).catch(() => {});
     // Fetch cached Capture Coach analysis
     authenticatedFetch(`/api/agents/capture-coach/analysis/${id}`)
       .then((r) => r.json())
@@ -433,16 +433,16 @@ export default function OpportunityDetail() {
 
       {/* Section 5: Pwin Breakdown */}
       {pwin && (
-        <Section title={`Pwin Analysis — ${Math.round(pwin.overall_pwin * 100)}%`}>
+        <Section title={`Pwin Analysis — ${Math.round((pwin.overall_pwin ?? 0) * 100)}%`}>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 16 }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: pwin.overall_pwin >= 0.6 ? "#22c55e" : pwin.overall_pwin >= 0.4 ? "#f59e0b" : "#ef4444" }}>
-                {Math.round(pwin.overall_pwin * 100)}%
+              <div style={{ fontSize: 28, fontWeight: 700, color: (pwin.overall_pwin ?? 0) >= 0.6 ? "#22c55e" : (pwin.overall_pwin ?? 0) >= 0.4 ? "#f59e0b" : "#ef4444" }}>
+                {Math.round((pwin.overall_pwin ?? 0) * 100)}%
               </div>
               <div style={{ fontSize: 11, color: "#9ca3af" }}>Overall Pwin</div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: "#6b7280" }}>{Math.round(pwin.historical_win_rate * 100)}%</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "#6b7280" }}>{Math.round((pwin.historical_win_rate ?? 0) * 100)}%</div>
               <div style={{ fontSize: 11, color: "#9ca3af" }}>Historical Win Rate</div>
             </div>
             <div style={{ textAlign: "center" }}>
@@ -462,7 +462,7 @@ export default function OpportunityDetail() {
               </tr>
             </thead>
             <tbody>
-              {pwin.factors.map((f) => (
+              {(pwin.factors ?? []).map((f) => (
                 <tr key={f.name}>
                   <td style={{ ...styles.sourceTd, fontWeight: 600 }}>{f.name}</td>
                   <td style={{ ...styles.sourceTd, textAlign: "center" }}>{Math.round(f.weight * 100)}%</td>
@@ -488,25 +488,25 @@ export default function OpportunityDetail() {
             <Field label="Contract" value={incumbent.contract_number} />
             <Field label="Value" value={formatCurrency(incumbent.contract_value)} />
             <Field label="Period" value={`${formatDate(incumbent.contract_start)} — ${formatDate(incumbent.contract_end)}`} />
-            <Field label="CPARS Rating" value={incumbent.performance_rating.charAt(0).toUpperCase() + incumbent.performance_rating.slice(1)} />
-            <Field label="Recompete Advantage" value={`+${Math.round(incumbent.recompete_advantage * 100)}%`} />
-            <Field label="Protest Risk" value={incumbent.protest_risk.charAt(0).toUpperCase() + incumbent.protest_risk.slice(1)} />
+            <Field label="CPARS Rating" value={incumbent.performance_rating ? incumbent.performance_rating.charAt(0).toUpperCase() + incumbent.performance_rating.slice(1) : "—"} />
+            <Field label="Recompete Advantage" value={incumbent.recompete_advantage != null ? `+${Math.round(incumbent.recompete_advantage * 100)}%` : "—"} />
+            <Field label="Protest Risk" value={incumbent.protest_risk ? incumbent.protest_risk.charAt(0).toUpperCase() + incumbent.protest_risk.slice(1) : "—"} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
             <div>
               <strong style={{ fontSize: 13, color: "#22c55e" }}>Strengths</strong>
-              <ul style={styles.bulletList}>{incumbent.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+              <ul style={styles.bulletList}>{(incumbent.strengths ?? []).map((s, i) => <li key={i}>{s}</li>)}</ul>
             </div>
             <div>
               <strong style={{ fontSize: 13, color: "#ef4444" }}>Weaknesses</strong>
-              <ul style={styles.bulletList}>{incumbent.weaknesses.map((w, i) => <li key={i}>{w}</li>)}</ul>
+              <ul style={styles.bulletList}>{(incumbent.weaknesses ?? []).map((w, i) => <li key={i}>{w}</li>)}</ul>
             </div>
           </div>
-          {incumbent.key_personnel.length > 0 && (
+          {(incumbent.key_personnel ?? []).length > 0 && (
             <div style={{ marginTop: 12 }}>
               <strong style={{ fontSize: 13 }}>Key Personnel</strong>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 6 }}>
-                {incumbent.key_personnel.map((p) => (
+                {(incumbent.key_personnel ?? []).map((p) => (
                   <span key={p.name} style={{ padding: "4px 10px", background: "rgba(107,114,128,0.1)", borderRadius: 4, fontSize: 12 }}>
                     {p.name} — {p.role} ({p.years_on_contract}yr)
                   </span>
@@ -520,9 +520,9 @@ export default function OpportunityDetail() {
 
       {/* Section 7: Competitor Field */}
       {competitors && (
-        <Section title={`Competitor Field — ${competitors.total_expected_bidders} Expected Bidders (We're #${competitors.our_position})`}>
+        <Section title={`Competitor Field — ${competitors.total_expected_bidders ?? 0} Expected Bidders (We're #${competitors.our_position ?? "?"})`}>
           <p style={{ margin: "0 0 12px", lineHeight: 1.6, fontSize: 13, color: "#9ca3af" }}>{competitors.market_analysis}</p>
-          {competitors.competitors.map((c) => (
+          {(competitors.competitors ?? []).map((c) => (
             <div key={c.id} style={{ padding: 12, marginBottom: 8, background: "rgba(107,114,128,0.05)", borderRadius: 6, border: "1px solid var(--color-border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -530,18 +530,18 @@ export default function OpportunityDetail() {
                   <span style={{ ...styles.badge, background: c.threat_level === "high" ? "#991b1b" : c.threat_level === "medium" ? "#92400e" : "#166534" }}>
                     {c.threat_level} threat
                   </span>
-                  <span style={{ fontSize: 12, color: "#6b7280" }}>{c.size_status.toUpperCase()}</span>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>{c.size_status?.toUpperCase() ?? ""}</span>
                 </div>
-                <span style={{ fontWeight: 600, color: c.estimated_pwin >= 0.3 ? "#ef4444" : "#f59e0b" }}>
-                  Est. Pwin: {Math.round(c.estimated_pwin * 100)}%
+                <span style={{ fontWeight: 600, color: (c.estimated_pwin ?? 0) >= 0.3 ? "#ef4444" : "#f59e0b" }}>
+                  Est. Pwin: {Math.round((c.estimated_pwin ?? 0) * 100)}%
                 </span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
-                <div><span style={{ color: "#22c55e" }}>+</span> {c.strengths.slice(0, 3).join(" · ")}</div>
-                <div><span style={{ color: "#ef4444" }}>−</span> {c.weaknesses.slice(0, 2).join(" · ")}</div>
+                <div><span style={{ color: "#22c55e" }}>+</span> {(c.strengths ?? []).slice(0, 3).join(" · ")}</div>
+                <div><span style={{ color: "#ef4444" }}>−</span> {(c.weaknesses ?? []).slice(0, 2).join(" · ")}</div>
               </div>
-              {c.likely_teaming.length > 0 && (
-                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Likely teaming: {c.likely_teaming.join(", ")}</div>
+              {(c.likely_teaming ?? []).length > 0 && (
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Likely teaming: {(c.likely_teaming ?? []).join(", ")}</div>
               )}
             </div>
           ))}
@@ -554,14 +554,14 @@ export default function OpportunityDetail() {
           <div style={{ marginBottom: 12 }}>
             <strong style={{ fontSize: 13, color: "#3b82f6" }}>Our Discriminators</strong>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-              {blackHat.our_discriminators.map((d, i) => (
+              {(blackHat.our_discriminators ?? []).map((d, i) => (
                 <span key={i} style={{ padding: "4px 10px", background: "rgba(59,130,246,0.1)", borderRadius: 12, fontSize: 12, color: "#60a5fa" }}>
                   {d}
                 </span>
               ))}
             </div>
           </div>
-          {blackHat.scenarios.map((s, i) => (
+          {(blackHat.scenarios ?? []).map((s, i) => (
             <details key={i} style={{ marginBottom: 8, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
               <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>🎯 {s.competitor} — Black Hat Scenario</summary>
               <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6 }}>
@@ -572,11 +572,11 @@ export default function OpportunityDetail() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 8 }}>
                   <div>
                     <strong style={{ color: "#ef4444", fontSize: 12 }}>Their Discriminators</strong>
-                    <ul style={styles.bulletList}>{s.discriminators.map((d, j) => <li key={j}>{d}</li>)}</ul>
+                    <ul style={styles.bulletList}>{(s.discriminators ?? []).map((d, j) => <li key={j}>{d}</li>)}</ul>
                   </div>
                   <div>
                     <strong style={{ color: "#22c55e", fontSize: 12 }}>Their Vulnerabilities</strong>
-                    <ul style={styles.bulletList}>{s.vulnerabilities.map((v, j) => <li key={j}>{v}</li>)}</ul>
+                    <ul style={styles.bulletList}>{(s.vulnerabilities ?? []).map((v, j) => <li key={j}>{v}</li>)}</ul>
                   </div>
                 </div>
                 <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(59,130,246,0.08)", borderRadius: 6 }}>
@@ -588,7 +588,7 @@ export default function OpportunityDetail() {
           ))}
           <div style={{ marginTop: 12 }}>
             <strong style={{ fontSize: 13 }}>Key Takeaways</strong>
-            <ul style={styles.bulletList}>{blackHat.key_takeaways.map((t, i) => <li key={i}>{t}</li>)}</ul>
+            <ul style={styles.bulletList}>{(blackHat.key_takeaways ?? []).map((t, i) => <li key={i}>{t}</li>)}</ul>
           </div>
         </Section>
       )}
@@ -598,14 +598,14 @@ export default function OpportunityDetail() {
         <Section title="Wargame Scenarios">
           <div style={{ padding: "10px 14px", background: "rgba(59,130,246,0.08)", borderRadius: 6, marginBottom: 16, fontSize: 13 }}>
             <strong>Recommended Strategy:</strong> {wargame.recommended_strategy}
-            <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>Confidence: {Math.round(wargame.confidence * 100)}%</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>Confidence: {Math.round((wargame.confidence ?? 0) * 100)}%</div>
           </div>
-          {wargame.scenarios.map((s) => (
+          {(wargame.scenarios ?? []).map((s) => (
             <div key={s.id} style={{ padding: 12, marginBottom: 8, border: "1px solid var(--color-border)", borderRadius: 6, borderLeft: `3px solid ${s.risk_level === "high" ? "#ef4444" : s.risk_level === "medium" ? "#f59e0b" : "#22c55e"}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <strong>{s.name}</strong>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "#9ca3af" }}>Probability: {Math.round(s.probability * 100)}%</span>
+                  <span style={{ fontSize: 12, color: "#9ca3af" }}>Probability: {Math.round((s.probability ?? 0) * 100)}%</span>
                   <span style={{ ...styles.badge, background: s.risk_level === "high" ? "#991b1b" : s.risk_level === "medium" ? "#92400e" : "#166534" }}>
                     {s.risk_level}
                   </span>
@@ -633,7 +633,7 @@ export default function OpportunityDetail() {
 
       {/* Section 11: Sources */}
       <Section title="Sources">
-        {sources.length === 0 ? (
+        {(sources ?? []).length === 0 ? (
           <EmptyState text="No external sources are associated with this analysis." />
         ) : (
           <table style={styles.sourceTable}>
@@ -647,7 +647,7 @@ export default function OpportunityDetail() {
               </tr>
             </thead>
             <tbody>
-              {sources.map((src) => (
+              {(sources ?? []).map((src) => (
                 <tr key={src.id} id={`source-${src.id}`}>
                   <td style={styles.sourceTd}>
                     {src.url ? (
@@ -659,7 +659,7 @@ export default function OpportunityDetail() {
                     )}
                   </td>
                   <td style={styles.sourceTd}>
-                    <span style={{ ...styles.typeBadge }}>{src.type.replace(/_/g, " ")}</span>
+                    <span style={{ ...styles.typeBadge }}>{(src.type ?? "").replace(/_/g, " ")}</span>
                   </td>
                   <td style={styles.sourceTd}>{src.publisher ?? "—"}</td>
                   <td style={styles.sourceTd}>{formatDate(src.published_at)}</td>
@@ -681,11 +681,11 @@ export default function OpportunityDetail() {
           <Field label="Feedback Submitted" value={learning.feedback_submitted ? "Yes" : "No"} />
           <Field label="Next Review" value={formatDate(learning.next_review_at)} />
         </div>
-        {learning.coverage_gaps.length > 0 && (
+        {(learning?.coverage_gaps ?? []).length > 0 && (
           <div style={{ marginTop: 12 }}>
             <strong style={{ fontSize: 13, color: "#f59e0b" }}>Coverage Gaps</strong>
             <ul style={styles.bulletList}>
-              {learning.coverage_gaps.map((g, i) => (
+              {(learning?.coverage_gaps ?? []).map((g, i) => (
                 <li key={i}>{g}</li>
               ))}
             </ul>
@@ -701,7 +701,7 @@ export default function OpportunityDetail() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 13, color: "#9ca3af" }}>
             {coachAnalysis
-              ? `Last generated: ${new Date(coachAnalysis.generated_at).toLocaleString()} (${coachAnalysis.model_used})`
+              ? `Last generated: ${coachAnalysis.generated_at ? new Date(coachAnalysis.generated_at).toLocaleString() : "Unknown"} (${coachAnalysis.model_used ?? "Unknown"})`
               : "No strategy generated yet. Click to analyze this opportunity."}
           </div>
           <button
@@ -748,18 +748,18 @@ export default function OpportunityDetail() {
             {/* Win Probability */}
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
               <div style={{ textAlign: "center", padding: "12px 20px", background: "var(--color-surface)", borderRadius: 8, border: "1px solid var(--color-border)" }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(coachAnalysis.win_probability.score) }}>
-                  {coachAnalysis.win_probability.score}%
+                <div style={{ fontSize: 28, fontWeight: 700, color: scoreColor(coachAnalysis.win_probability?.score ?? 0) }}>
+                  {coachAnalysis.win_probability?.score ?? 0}%
                 </div>
                 <div style={{ fontSize: 11, color: "#9ca3af" }}>Win Probability</div>
-                <div style={{ fontSize: 11, color: coachAnalysis.win_probability.confidence === "high" ? "#22c55e" : coachAnalysis.win_probability.confidence === "medium" ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2 }}>
-                  {coachAnalysis.win_probability.confidence} confidence
+                <div style={{ fontSize: 11, color: coachAnalysis.win_probability?.confidence === "high" ? "#22c55e" : coachAnalysis.win_probability?.confidence === "medium" ? "#f59e0b" : "#ef4444", fontWeight: 600, marginTop: 2 }}>
+                  {coachAnalysis.win_probability?.confidence ?? "low"} confidence
                 </div>
               </div>
               <div style={{ flex: 1, minWidth: 300 }}>
                 <strong style={{ fontSize: 13, color: "#d1d5db" }}>Win Factors</strong>
                 <div style={{ marginTop: 6 }}>
-                  {coachAnalysis.win_probability.factors.map((f, i) => (
+                  {(coachAnalysis.win_probability?.factors ?? []).map((f, i) => (
                     <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "4px 0", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                       <span style={{ color: f.impact === "positive" ? "#22c55e" : f.impact === "negative" ? "#ef4444" : "#9ca3af", fontWeight: 700, minWidth: 14 }}>
                         {f.impact === "positive" ? "+" : f.impact === "negative" ? "-" : "~"}
@@ -774,31 +774,31 @@ export default function OpportunityDetail() {
             {/* Capture Strategy */}
             <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
               <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#3b82f6" }}>Capture Strategy</summary>
-              <p style={{ margin: "8px 0", fontSize: 13, lineHeight: 1.6 }}>{coachAnalysis.capture_strategy.approach}</p>
-              {coachAnalysis.capture_strategy.win_themes.length > 0 && (
+              <p style={{ margin: "8px 0", fontSize: 13, lineHeight: 1.6 }}>{coachAnalysis.capture_strategy?.approach ?? ""}</p>
+              {(coachAnalysis.capture_strategy?.win_themes ?? []).length > 0 && (
                 <div style={{ marginBottom: 8 }}>
                   <strong style={{ fontSize: 12, color: "#22c55e" }}>Win Themes</strong>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                    {coachAnalysis.capture_strategy.win_themes.map((t, i) => (
+                    {(coachAnalysis.capture_strategy?.win_themes ?? []).map((t, i) => (
                       <span key={i} style={{ padding: "3px 10px", background: "rgba(34,197,94,0.12)", borderRadius: 12, fontSize: 12, color: "#22c55e" }}>{t}</span>
                     ))}
                   </div>
                 </div>
               )}
-              {coachAnalysis.capture_strategy.discriminators.length > 0 && (
+              {(coachAnalysis.capture_strategy?.discriminators ?? []).length > 0 && (
                 <div style={{ marginBottom: 8 }}>
                   <strong style={{ fontSize: 12, color: "#8b5cf6" }}>Discriminators</strong>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
-                    {coachAnalysis.capture_strategy.discriminators.map((d, i) => (
+                    {(coachAnalysis.capture_strategy?.discriminators ?? []).map((d, i) => (
                       <span key={i} style={{ padding: "3px 10px", background: "rgba(139,92,246,0.12)", borderRadius: 12, fontSize: 12, color: "#8b5cf6" }}>{d}</span>
                     ))}
                   </div>
                 </div>
               )}
-              {coachAnalysis.capture_strategy.teaming_recommendations.length > 0 && (
+              {(coachAnalysis.capture_strategy?.teaming_recommendations ?? []).length > 0 && (
                 <div>
                   <strong style={{ fontSize: 12, color: "#f59e0b" }}>Teaming Recommendations</strong>
-                  {coachAnalysis.capture_strategy.teaming_recommendations.map((t, i) => (
+                  {(coachAnalysis.capture_strategy?.teaming_recommendations ?? []).map((t, i) => (
                     <div key={i} style={{ padding: "6px 0", fontSize: 13, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                       <strong>{t.partner_type}:</strong> {t.rationale}
                     </div>
@@ -808,11 +808,11 @@ export default function OpportunityDetail() {
             </details>
 
             {/* Gap Analysis */}
-            {coachAnalysis.gap_analysis.length > 0 && (
+            {(coachAnalysis.gap_analysis ?? []).length > 0 && (
               <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#f59e0b" }}>Gap Analysis ({coachAnalysis.gap_analysis.length})</summary>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#f59e0b" }}>Gap Analysis ({(coachAnalysis.gap_analysis ?? []).length})</summary>
                 <div style={{ marginTop: 8 }}>
-                  {coachAnalysis.gap_analysis.map((g, i) => (
+                  {(coachAnalysis.gap_analysis ?? []).map((g, i) => (
                     <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 13 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <strong>{g.gap}</strong>
@@ -828,11 +828,11 @@ export default function OpportunityDetail() {
             )}
 
             {/* Risk Assessment */}
-            {coachAnalysis.risk_assessment.length > 0 && (
+            {(coachAnalysis.risk_assessment ?? []).length > 0 && (
               <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#ef4444" }}>Risk Assessment ({coachAnalysis.risk_assessment.length})</summary>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#ef4444" }}>Risk Assessment ({(coachAnalysis.risk_assessment ?? []).length})</summary>
                 <div style={{ marginTop: 8 }}>
-                  {coachAnalysis.risk_assessment.map((r, i) => (
+                  {(coachAnalysis.risk_assessment ?? []).map((r, i) => (
                     <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", fontSize: 13 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <strong>{r.risk}</strong>
@@ -849,9 +849,9 @@ export default function OpportunityDetail() {
             )}
 
             {/* Next Actions */}
-            {coachAnalysis.next_actions.length > 0 && (
+            {(coachAnalysis.next_actions ?? []).length > 0 && (
               <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
-                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#22c55e" }}>Next Actions ({coachAnalysis.next_actions.length})</summary>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#22c55e" }}>Next Actions ({(coachAnalysis.next_actions ?? []).length})</summary>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
                   <thead>
                     <tr>
@@ -862,7 +862,7 @@ export default function OpportunityDetail() {
                     </tr>
                   </thead>
                   <tbody>
-                    {coachAnalysis.next_actions.map((a, i) => (
+                    {(coachAnalysis.next_actions ?? []).map((a, i) => (
                       <tr key={i}>
                         <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>{a.action}</td>
                         <td style={{ padding: "6px 8px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
