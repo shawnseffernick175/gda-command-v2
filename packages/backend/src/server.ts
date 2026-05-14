@@ -59,7 +59,7 @@ import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
 import { getPool } from "./lib/db";
 import { auditMiddleware } from "./middleware/audit-middleware";
-import { authLimiter, apiLimiter, ingestLimiter } from "./middleware/rate-limit";
+import { authLimiter, sessionLimiter, apiLimiter, ingestLimiter } from "./middleware/rate-limit";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -102,8 +102,15 @@ app.get("/health", async (_req, res) => {
   );
 });
 
-// --- Auth routes (no auth middleware, rate-limited) ---
-app.use("/api/auth", authLimiter, authRouter);
+// --- Auth routes ---
+// /api/auth/me is called on every page load, so it uses a generous limiter.
+// Login/register use the strict authLimiter to prevent brute-force.
+app.use("/api/auth", (req, _res, next) => {
+  if (req.method === "GET" && req.path === "/me") {
+    return sessionLimiter(req, _res, next);
+  }
+  return authLimiter(req, _res, next);
+}, authRouter);
 
 // --- Ingest routes (key-based auth, no JWT, rate-limited) ---
 app.use("/api/ingest", ingestLimiter, ingestRouter);
