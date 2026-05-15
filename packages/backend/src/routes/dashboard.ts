@@ -52,21 +52,25 @@ router.get("/kpis", async (_req, res) => {
         const pool = getPool();
         if (pool) {
           try {
-            const overrides = await pool.query(
-              `SELECT status, COUNT(*) as cnt FROM opportunities WHERE status != 'discovery' AND id NOT LIKE 'opp-%' GROUP BY status`
+            // Query all statuses directly from DB (not just overrides)
+            const statusCounts = await pool.query(
+              `SELECT status, COUNT(*) as cnt FROM opportunities WHERE id NOT LIKE 'opp-%' GROUP BY status`
             );
-            const overrideCounts = new Map<string, number>();
-            let totalOverridden = 0;
-            for (const row of overrides.rows) {
-              overrideCounts.set(row.status as string, parseInt(row.cnt as string, 10));
-              totalOverridden += parseInt(row.cnt as string, 10);
+            const statusMap = new Map<string, number>();
+            let dbTotal = 0;
+            for (const row of statusCounts.rows) {
+              statusMap.set(row.status as string, parseInt(row.cnt as string, 10));
+              dbTotal += parseInt(row.cnt as string, 10);
             }
 
-            // Rebuild funnel: all opps start as Identified, then add user overrides
-            const identifiedCount = totalOpportunities - totalOverridden;
+            // Opps in n8n but not yet in DB are also in Identified
+            const unsyncedCount = Math.max(0, totalOpportunities - dbTotal);
+            const discoveryCount = (statusMap.get("discovery") ?? 0) + unsyncedCount;
+
             const funnelMap = new Map<string, { count: number; totalValue: number }>();
-            funnelMap.set("Identified", { count: Math.max(0, identifiedCount), totalValue: 0 });
-            for (const [status, cnt] of overrideCounts) {
+            funnelMap.set("Identified", { count: discoveryCount, totalValue: 0 });
+            for (const [status, cnt] of statusMap) {
+              if (status === "discovery") continue;
               const label = status === "qualified" ? "Qualified" : status === "pipeline" ? "Pipeline" : status.charAt(0).toUpperCase() + status.slice(1);
               funnelMap.set(label, { count: cnt, totalValue: 0 });
             }
