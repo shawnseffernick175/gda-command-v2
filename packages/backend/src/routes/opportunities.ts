@@ -401,35 +401,6 @@ router.get("/pipeline", async (req, res) => {
   const sortBy = (req.query.sortBy as string) ?? "qualified_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
 
-  // --- Helper: apply pipeline filters & sort ---
-  function pipelineFilterAndSort(rows: Opportunity[]): Opportunity[] {
-    let filtered = [...rows];
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (o) =>
-          o.id.toLowerCase().includes(q) || o.title.toLowerCase().includes(q)
-      );
-    }
-    if (deptFilter) {
-      filtered = filtered.filter((o) => o.department === deptFilter);
-    }
-    if (minPwin !== undefined && !isNaN(minPwin)) {
-      filtered = filtered.filter(
-        (o) => o.probability_of_win !== null && o.probability_of_win >= minPwin
-      );
-    }
-    const col = sortBy as keyof Opportunity;
-    filtered.sort((a, b) => {
-      const av = a[col] ?? "";
-      const bv = b[col] ?? "";
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-    return filtered;
-  }
-
   // --- Source: Postgres only (n8n webhook bypasses approval gate) ---
   // Pipeline must ONLY show opportunities the user explicitly approved
   // (approved_at IS NOT NULL). n8n returns all opportunities with
