@@ -229,7 +229,7 @@ export async function syncGovSources(): Promise<GovSourceResult[]> {
             `INSERT INTO opportunities (
               id, title, agency, naics, set_aside, due_date,
               raw_source_url, data_source, status, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'tracked', NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'discovery', NOW())
             ON CONFLICT (id) DO UPDATE SET
               title = EXCLUDED.title,
               agency = COALESCE(EXCLUDED.agency, opportunities.agency),
