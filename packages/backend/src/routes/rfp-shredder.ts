@@ -23,44 +23,53 @@ const WF = "GDA.api.rfp-shredder";
 // ---------------------------------------------------------------------------
 // GET /api/rfp-shredder/jobs — list all shred jobs with optional filters
 // ---------------------------------------------------------------------------
-router.get("/jobs", (req, res) => {
+router.get("/jobs", async (req, res) => {
   try {
+    const pool = getPool();
     let items: ShredJob[] = [];
-    const { status, search, agency } = req.query;
 
-    if (status && typeof status === "string") {
-      items = items.filter((j) => j.status === status);
-    }
-    if (agency && typeof agency === "string") {
-      const q = agency.toLowerCase();
-      items = items.filter((j) => j.agency.toLowerCase().includes(q));
-    }
-    if (search && typeof search === "string") {
-      const q = search.toLowerCase();
-      items = items.filter(
-        (j) =>
-          j.solicitation_title.toLowerCase().includes(q) ||
-          j.agency.toLowerCase().includes(q) ||
-          j.file_name.toLowerCase().includes(q),
+    if (pool) {
+      const conditions: string[] = [];
+      const params: string[] = [];
+      let idx = 1;
+      const { status, search, agency } = req.query;
+
+      if (status && typeof status === "string") {
+        conditions.push(`status = $${idx++}`);
+        params.push(status);
+      }
+      if (agency && typeof agency === "string") {
+        conditions.push(`agency ILIKE $${idx++}`);
+        params.push(`%${agency}%`);
+      }
+      if (search && typeof search === "string") {
+        conditions.push(`(solicitation_title ILIKE $${idx} OR agency ILIKE $${idx} OR file_name ILIKE $${idx})`);
+        params.push(`%${search}%`);
+        idx++;
+      }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const { rows } = await pool.query(
+        `SELECT * FROM shred_jobs ${where} ORDER BY started_at DESC`,
+        params,
       );
+      items = rows as ShredJob[];
     }
 
-    // Summary stats from full set
-    const all = items;
-    const completed = all.filter((j) => j.status === "completed").length;
-    const processing = all.filter((j) => j.status === "processing").length;
-    const failed = all.filter((j) => j.status === "failed").length;
-    const queued = all.filter((j) => j.status === "queued").length;
-    const totalRequirements = all
+    const completed = items.filter((j) => j.status === "completed").length;
+    const processing = items.filter((j) => j.status === "processing").length;
+    const failed = items.filter((j) => j.status === "failed").length;
+    const queued = items.filter((j) => j.status === "queued").length;
+    const totalRequirements = items
       .filter((j) => j.status === "completed")
       .reduce((sum, j) => sum + j.requirements_found, 0);
-    const totalPages = all.reduce((sum, j) => sum + j.page_count, 0);
+    const totalPages = items.reduce((sum, j) => sum + j.page_count, 0);
 
     res.json(
       successEnvelope(WF, "list-jobs", {
         jobs: items,
         summary: {
-          total: all.length,
+          total: items.length,
           completed,
           processing,
           failed,
@@ -182,7 +191,36 @@ router.post(
       effectiveText = await extractText(file.buffer, file.mimetype);
     }
 
+    const persistJob = async (status: ShredJobStatus, reqsFound: number, pageCount: number, errorMsg?: string) => {
+      const pool = getPool();
+      if (!pool) return;
+      try {
+        await pool.query(
+          `INSERT INTO shred_jobs (id, solicitation_title, agency, file_name, file_size_bytes, page_count, status, requirements_found, correlation_id, file_id, error_message, completed_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           ON CONFLICT (id) DO UPDATE SET status = $7, requirements_found = $8, error_message = $11, completed_at = $12`,
+          [
+            jobId,
+            solicitation_title,
+            agency ?? "Unknown",
+            effectiveFileName,
+            file ? file.size : null,
+            pageCount,
+            status,
+            reqsFound,
+            correlationId,
+            fileId,
+            errorMsg ?? null,
+            status === "queued" || status === "processing" ? null : new Date().toISOString(),
+          ],
+        );
+      } catch (e) {
+        log.error("shred_job_persist_error", { jobId, error: (e as Error).message });
+      }
+    };
+
     if (!isLLMAvailable() || !effectiveText) {
+      await persistJob("queued", 0, 0);
       res.json(
         successEnvelope(
           WF,
@@ -231,6 +269,34 @@ router.post(
       extractedRequirements = [];
     }
 
+    await persistJob("completed", extractedRequirements.length, 0);
+
+    // Persist extracted requirements to DB
+    const pool2 = getPool();
+    if (pool2 && extractedRequirements.length > 0) {
+      for (const r of extractedRequirements) {
+        const reqId = `REQ-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        try {
+          await pool2.query(
+            `INSERT INTO extracted_requirements (id, shred_job_id, section, requirement_text, requirement_type, complexity, keyword, confidence)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+              reqId,
+              jobId,
+              (r.section as string) ?? "General",
+              (r.requirement_text as string) ?? (r.text as string) ?? "",
+              (r.requirement_type as string) ?? (r.type as string) ?? "technical",
+              (r.complexity as string) ?? "moderate",
+              (r.keyword as string) ?? null,
+              typeof r.confidence === "number" ? r.confidence : 0.8,
+            ],
+          );
+        } catch (e) {
+          log.error("shred_req_persist_error", { reqId, error: (e as Error).message });
+        }
+      }
+    }
+
     res.json(
       successEnvelope(WF, "shred", {
         id: jobId,
@@ -260,47 +326,53 @@ router.post(
 // ---------------------------------------------------------------------------
 // GET /api/rfp-shredder/requirements — extracted requirements (optionally by job)
 // ---------------------------------------------------------------------------
-router.get("/requirements", (req, res) => {
+router.get("/requirements", async (req, res) => {
   try {
+    const pool = getPool();
     let items: ExtractedRequirement[] = [];
-    const { job_id, type, complexity, match, search, sort } = req.query;
 
-    if (job_id && typeof job_id === "string") {
-      items = items.filter((r) => r.shred_job_id === job_id);
-    }
-    if (type && typeof type === "string") {
-      items = items.filter((r) => r.requirement_type === type);
-    }
-    if (complexity && typeof complexity === "string") {
-      items = items.filter((r) => r.complexity === complexity);
-    }
-    if (match && typeof match === "string") {
-      items = items.filter((r) => r.compliance_match === match);
-    }
-    if (search && typeof search === "string") {
-      const q = search.toLowerCase();
-      items = items.filter(
-        (r) =>
-          r.requirement_text.toLowerCase().includes(q) ||
-          r.section.toLowerCase().includes(q) ||
-          (r.matched_evidence && r.matched_evidence.toLowerCase().includes(q)),
+    if (pool) {
+      const conditions: string[] = [];
+      const params: string[] = [];
+      let idx = 1;
+      const { job_id, type, complexity, match, search, sort } = req.query;
+
+      if (job_id && typeof job_id === "string") {
+        conditions.push(`shred_job_id = $${idx++}`);
+        params.push(job_id);
+      }
+      if (type && typeof type === "string") {
+        conditions.push(`requirement_type = $${idx++}`);
+        params.push(type);
+      }
+      if (complexity && typeof complexity === "string") {
+        conditions.push(`complexity = $${idx++}`);
+        params.push(complexity);
+      }
+      if (match && typeof match === "string") {
+        conditions.push(`compliance_match = $${idx++}`);
+        params.push(match);
+      }
+      if (search && typeof search === "string") {
+        conditions.push(`(requirement_text ILIKE $${idx} OR section ILIKE $${idx} OR matched_evidence ILIKE $${idx})`);
+        params.push(`%${search}%`);
+        idx++;
+      }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      let orderBy = "ORDER BY id";
+      if (sort === "section") orderBy = "ORDER BY section";
+      else if (sort === "confidence") orderBy = "ORDER BY confidence DESC";
+      else if (sort === "complexity") orderBy = "ORDER BY CASE complexity WHEN 'complex' THEN 0 WHEN 'moderate' THEN 1 ELSE 2 END";
+      else if (sort === "match") orderBy = "ORDER BY CASE compliance_match WHEN 'none' THEN 0 WHEN 'partial' THEN 1 ELSE 2 END";
+
+      const { rows } = await pool.query(
+        `SELECT * FROM extracted_requirements ${where} ${orderBy}`,
+        params,
       );
+      items = rows as ExtractedRequirement[];
     }
 
-    // Sort
-    if (sort === "section") {
-      items.sort((a, b) => a.section.localeCompare(b.section));
-    } else if (sort === "confidence") {
-      items.sort((a, b) => b.confidence - a.confidence);
-    } else if (sort === "complexity") {
-      const order: Record<string, number> = { complex: 0, moderate: 1, simple: 2 };
-      items.sort((a, b) => (order[a.complexity] ?? 1) - (order[b.complexity] ?? 1));
-    } else if (sort === "match") {
-      const order: Record<string, number> = { none: 0, partial: 1, full: 2 };
-      items.sort((a, b) => (order[a.compliance_match] ?? 1) - (order[b.compliance_match] ?? 1));
-    }
-
-    // Summary breakdown
     const full = items.filter((r) => r.compliance_match === "full").length;
     const partial = items.filter((r) => r.compliance_match === "partial").length;
     const none = items.filter((r) => r.compliance_match === "none").length;

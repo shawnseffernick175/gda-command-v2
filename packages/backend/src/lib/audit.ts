@@ -23,8 +23,8 @@ export async function recordAudit(req: Request, entry: AuditEntry): Promise<void
 
   try {
     await pool.query(
-      `INSERT INTO audit_log (user_id, user_email, action, resource_type, resource_id, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+      `INSERT INTO audit_log (user_id, user_email, action, entity_type, entity_id, resource_type, resource_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $4, $5, $6::jsonb, $7)`,
       [
         userId,
         userEmail,
