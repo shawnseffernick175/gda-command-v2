@@ -645,11 +645,10 @@ router.get("/:id/detail", async (req, res) => {
 // POST /api/opportunities/quick-create — create a new opportunity (Quick Entry)
 // ---------------------------------------------------------------------------
 router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
-  const { title, agency, department, status, value_estimated } = req.body as {
+  const { title, agency, department, value_estimated } = req.body as {
     title?: string;
     agency?: string;
     department?: string;
-    status?: string;
     value_estimated?: number;
   };
 
