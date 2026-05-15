@@ -10,7 +10,6 @@ import { callWebhook, webhookConfig } from "./n8n-client";
 // Webhook paths (distinct from workflow names)
 const WEBHOOKS = {
   oppTracker: "gda-opp-tracker",
-  pipeline: "gda-pipeline",
   launchpad: "gda-launchpad",
   launchpadFunnel: "gda-launchpad-funnel",
   opportunityDetail: "gda-opportunity-detail",
@@ -170,37 +169,6 @@ export async function fetchOpportunityDetailFromN8n(id: string): Promise<Opportu
   const tracker = await fetchOpsTrackerFromN8n();
   if (!tracker.ok) return null;
   return tracker.opportunities.find((o) => String(o.id) === String(id)) ?? null;
-}
-
-// --- Pipeline data ---
-
-export interface N8nPipelineResult {
-  ok: boolean;
-  opportunities: Opportunity[];
-  meta: { count: number };
-  error?: string;
-}
-
-export async function fetchPipelineFromN8n(): Promise<N8nPipelineResult> {
-  const result = await callWebhook(WEBHOOKS.pipeline, {}, { timeoutMs: 30_000 });
-  if (!result.ok || !result.body) {
-    return {
-      ok: false,
-      opportunities: [],
-      meta: { count: 0 },
-      error: result.error ?? `HTTP ${result.http}`,
-    };
-  }
-
-  const data = result.body as Record<string, unknown>;
-  const rawPipeline = (data.pipeline ?? []) as N8nOpportunity[];
-  const opportunities = rawPipeline.map(mapOpportunity);
-
-  return {
-    ok: true,
-    opportunities,
-    meta: { count: (data.count as number) ?? opportunities.length },
-  };
 }
 
 // --- Launchpad / Dashboard data ---

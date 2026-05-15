@@ -1,23 +1,38 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 
-import { callWebhook, webhookConfig } from "../lib/n8n-client";
+import { callWebhook } from "../lib/n8n-client";
 import { n8nWebhookConfigured } from "../lib/n8n-data";
 
 const router = Router();
+
+// ---------------------------------------------------------------------------
+// n8n response validator — reject status objects and malformed payloads
+// n8n webhooks frequently return { status: "ok", updated: { error: ... } }
+// instead of actual enrichment data. This guard prevents bad shapes from
+// reaching the frontend, which previously caused crashes (PR #141).
+// ---------------------------------------------------------------------------
+function isValidEnrichment(body: unknown): body is Record<string, unknown> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const b = body as Record<string, unknown>;
+  // Reject n8n status wrapper objects
+  if ("status" in b && Object.keys(b).length <= 3 && !("factors" in b) && !("incumbent_name" in b) && !("competitors" in b)) {
+    return false;
+  }
+  return true;
+}
 
 // --- Pwin Calculator ---
 router.get("/pwin/:oppId", async (req, res) => {
   const { oppId } = req.params;
 
-  // Try n8n first
   if (n8nWebhookConfigured()) {
     try {
       const result = await callWebhook("gda-pwin-calculator", { opp_id: oppId }, { timeoutMs: 15_000 });
-      if (result.ok && result.body) {
+      if (result.ok && result.body && isValidEnrichment(result.body)) {
         return res.json(successEnvelope("gda-enrichments", "pwin", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through to mock */ }
+    } catch { /* fall through */ }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "pwin", {
@@ -53,7 +68,7 @@ router.get("/incumbent/:oppId", async (req, res) => {
   if (n8nWebhookConfigured()) {
     try {
       const result = await callWebhook("gda-incumbent-analysis", { opp_id: oppId }, { timeoutMs: 15_000 });
-      if (result.ok && result.body) {
+      if (result.ok && result.body && isValidEnrichment(result.body)) {
         return res.json(successEnvelope("gda-enrichments", "incumbent", { ...result.body, source: "n8n" }));
       }
     } catch { /* fall through */ }
@@ -71,7 +86,7 @@ router.get("/competitors/:oppId", async (req, res) => {
   if (n8nWebhookConfigured()) {
     try {
       const result = await callWebhook("gda-competitor-field", { opp_id: oppId }, { timeoutMs: 15_000 });
-      if (result.ok && result.body) {
+      if (result.ok && result.body && isValidEnrichment(result.body)) {
         return res.json(successEnvelope("gda-enrichments", "competitors", { ...result.body, source: "n8n" }));
       }
     } catch { /* fall through */ }
@@ -89,7 +104,7 @@ router.get("/blackhat/:oppId", async (req, res) => {
   if (n8nWebhookConfigured()) {
     try {
       const result = await callWebhook("gda-black-hat", { opp_id: oppId }, { timeoutMs: 15_000 });
-      if (result.ok && result.body) {
+      if (result.ok && result.body && isValidEnrichment(result.body)) {
         return res.json(successEnvelope("gda-enrichments", "blackhat", { ...result.body, source: "n8n" }));
       }
     } catch { /* fall through */ }
@@ -107,7 +122,7 @@ router.get("/wargame/:oppId", async (req, res) => {
   if (n8nWebhookConfigured()) {
     try {
       const result = await callWebhook("gda-wargame", { opp_id: oppId }, { timeoutMs: 15_000 });
-      if (result.ok && result.body) {
+      if (result.ok && result.body && isValidEnrichment(result.body)) {
         return res.json(successEnvelope("gda-enrichments", "wargame", { ...result.body, source: "n8n" }));
       }
     } catch { /* fall through */ }
@@ -146,7 +161,7 @@ router.get("/teaming/:oppId", async (req, res) => {
   if (n8nWebhookConfigured()) {
     try {
       const result = await callWebhook("gda-teaming-finder", { opp_id: oppId }, { timeoutMs: 15_000 });
-      if (result.ok && result.body) {
+      if (result.ok && result.body && isValidEnrichment(result.body)) {
         return res.json(successEnvelope("gda-enrichments", "teaming", { ...result.body, source: "n8n" }));
       }
     } catch { /* fall through */ }

@@ -286,12 +286,6 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-// Auto-No Bid DISABLED — only the user can change opportunity stages.
-// Previously this timer auto-archived unqualified opps due within 30 days,
-// which violates the rule that all stage changes require explicit user action.
-function startAutoNoBidCheck() { /* disabled */ }
-function stopAutoNoBidCheck() { /* disabled */ }
-
 const server = app.listen(PORT, () => {
   log.info("server_started", { port: Number(PORT), env: process.env.NODE_ENV ?? "development" });
 
@@ -301,15 +295,12 @@ const server = app.listen(PORT, () => {
     startScheduledSync(syncInterval);
   }
 
-  // Auto-No Bid rule: daily check for unqualified opps due within 30 days
-  startAutoNoBidCheck();
 });
 
 // Graceful shutdown
 function shutdown(signal: string) {
   log.info("shutdown_initiated", { signal });
   stopScheduledSync();
-  stopAutoNoBidCheck();
   server.close(() => {
     log.info("server_closed");
     process.exit(0);
