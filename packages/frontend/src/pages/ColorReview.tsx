@@ -343,7 +343,7 @@ export default function ColorReview() {
               const isExpanded = expandedOpps.has(oppId);
               const completedReviews = group.reviews.filter((r) => r.status === "completed");
               const avgOppScore = completedReviews.length > 0
-                ? Math.round(completedReviews.reduce((s, r) => s + r.overall_score, 0) / completedReviews.length)
+                ? Math.round(completedReviews.reduce((s, r) => s + (Number(r.overall_score) || 0), 0) / completedReviews.length)
                 : null;
               const latestGoNoGo = completedReviews.filter((r) => r.go_no_go).pop();
               return (

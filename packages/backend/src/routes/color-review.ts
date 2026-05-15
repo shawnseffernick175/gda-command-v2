@@ -203,7 +203,7 @@ router.get("/", async (req, res) => {
 
     const completed = all.filter((r) => r.status === "completed");
     const avgScore = completed.length > 0
-      ? Math.round(completed.reduce((s, r) => s + (r.overall_score ?? 0), 0) / completed.length)
+      ? Math.round(completed.reduce((s, r) => s + (Number(r.overall_score) || 0), 0) / completed.length)
       : 0;
 
     const goCount = completed.filter((r) => r.go_no_go === "go").length;

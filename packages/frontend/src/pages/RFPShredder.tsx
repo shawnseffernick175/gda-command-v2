@@ -19,7 +19,8 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatBytes(bytes: number): string {
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null || bytes <= 0) return "";
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
   if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(0)} KB`;
   return `${bytes} B`;
@@ -194,7 +195,7 @@ export default function RFPShredder() {
     initiateShred(shredTitle, shredAgency || undefined, shredFile || undefined, shredDocText.trim() || undefined)
       .then((env) => {
         if (env.success && env.data) {
-          setShredResult(`Job queued: ${env.data.correlation_id}\n${env.data.message}`);
+          setShredResult(`Job queued: ${env.data.correlation_id}${env.data.message ? `\n${env.data.message}` : ""}`);
         } else if (env.error) {
           setShredError(env.error.message);
         }
@@ -498,7 +499,7 @@ function JobsTab({
             <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--color-text-muted)" }}>
               <span>{job.agency}</span>
               <span>{job.page_count} pages</span>
-              <span>{formatBytes(job.file_size_bytes)}</span>
+              {formatBytes(job.file_size_bytes) && <span>{formatBytes(job.file_size_bytes)}</span>}
               {job.status === "completed" && <span style={{ color: "#7c3aed", fontWeight: 600 }}>{job.requirements_found} requirements</span>}
             </div>
           </div>
@@ -538,7 +539,7 @@ function JobsTab({
             </div>
             <div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 11, marginBottom: 2 }}>File Size</div>
-              <div>{formatBytes(selectedJob.file_size_bytes)}</div>
+              <div>{formatBytes(selectedJob.file_size_bytes) || "—"}</div>
             </div>
             <div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 11, marginBottom: 2 }}>Requirements Found</div>
