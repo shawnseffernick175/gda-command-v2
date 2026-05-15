@@ -373,7 +373,7 @@ export default function RFPShredder() {
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{shredFile.name}</div>
                       <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                        {shredFile.size >= 1_000_000 ? `${(shredFile.size / 1_000_000).toFixed(1)} MB` : `${(shredFile.size / 1_000).toFixed(0)} KB`}
+                        {formatBytes(shredFile.size)}
                       </div>
                     </div>
                   ) : (

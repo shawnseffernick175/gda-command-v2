@@ -69,13 +69,18 @@ export default function Approvals() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [resolving, setResolving] = useState<string | null>(null);
   const [resolveResult, setResolveResult] = useState<ApprovalResolveData | null>(null);
+  const [agentPending, setAgentPending] = useState(0);
 
   useEffect(() => {
     setLoading(true);
-    fetchApprovals()
-      .then((env) => {
-        if (env.success && env.data) setData(env.data);
-        else setError(env.error?.message ?? "Failed to load approvals");
+    Promise.all([
+      fetchApprovals(),
+      fetchAgentApprovalsStats(),
+    ])
+      .then(([appEnv, statsEnv]) => {
+        if (appEnv.success && appEnv.data) setData(appEnv.data);
+        else setError(appEnv.error?.message ?? "Failed to load approvals");
+        if (statsEnv.success && statsEnv.data) setAgentPending(statsEnv.data.total_pending);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
@@ -167,7 +172,7 @@ export default function Approvals() {
         flexWrap: "wrap",
       }}>
         {[
-          { label: "Pending", value: summary.pending, color: "#f59e0b" },
+          { label: "Pending", value: summary.pending + agentPending, color: "#f59e0b" },
           { label: "Critical", value: summary.critical, color: "#ef4444" },
           { label: "Expiring Soon", value: summary.expiringSoon, color: "#f97316" },
           { label: "Approved", value: summary.approved, color: "#22c55e" },

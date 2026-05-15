@@ -39,6 +39,46 @@ const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalcu
     whatItMeans: "Measures contract-level profitability before overhead and SG&A.",
     howCalculated: "Sales − Direct Costs (labor + materials + subcontracts + ODCs).",
   },
+  active_contracts: {
+    whatItIs: "Number of active contracts currently being executed.",
+    whatItMeans: "Indicates current workload and revenue-generating capacity.",
+  },
+  annual_revenue: {
+    whatItIs: "Total revenue recognized in the current fiscal year.",
+    whatItMeans: "Top-line revenue indicator for the organization.",
+  },
+  avg_contract_value: {
+    whatItIs: "Average dollar value per active contract.",
+    whatItMeans: "Higher values indicate larger, more complex contract wins.",
+    howCalculated: "Total Contract Value ÷ Number of Active Contracts.",
+  },
+  avg_pwin: {
+    whatItIs: "Average Probability of Win across all active opportunities.",
+    whatItMeans: "Overall competitiveness of the current pipeline.",
+    howCalculated: "Sum of all opportunity P(Win) scores ÷ Number of opportunities.",
+  },
+  employee_count: {
+    whatItIs: "Total number of employees in the organization.",
+    whatItMeans: "Workforce capacity for contract execution and growth.",
+  },
+  pipeline_value: {
+    whatItIs: "Total estimated value of all opportunities in the pipeline.",
+    whatItMeans: "Future revenue potential if all opportunities are won.",
+  },
+  proposals_submitted: {
+    whatItIs: "Number of proposals submitted in the current period.",
+    whatItMeans: "Measures business development activity and pursuit volume.",
+  },
+  revenue_per_employee: {
+    whatItIs: "Annual revenue divided by employee count.",
+    whatItMeans: "Efficiency metric — higher values indicate better utilization.",
+    howCalculated: "Annual Revenue ÷ Employee Count.",
+  },
+  win_rate: {
+    whatItIs: "Percentage of proposals that result in contract awards.",
+    whatItMeans: "Overall capture effectiveness. Industry benchmark: 30-50% for GovCon.",
+    howCalculated: "Contracts Won ÷ Total Proposals Submitted × 100%.",
+  },
 };
 
 function formatValue(kpi: FinancialKPI): string {

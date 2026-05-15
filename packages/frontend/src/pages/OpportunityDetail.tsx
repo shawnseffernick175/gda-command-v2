@@ -251,7 +251,7 @@ export default function OpportunityDetail() {
   };
 
   return (
-    <div style={{ padding: "1.5rem 2rem", maxWidth: 1100, margin: "0 auto" }}>
+    <div style={{ padding: "1.5rem 2rem", maxWidth: 1100 }}>
       {/* Breadcrumb */}
       <div style={{ marginBottom: 8, fontSize: 13, color: "#9ca3af" }}>
         <span
