@@ -209,10 +209,10 @@ export default function FinancialKPIStrip() {
                   whiteSpace: "nowrap",
                   display: "flex",
                   alignItems: "center",
-                  gap: 3,
+                  gap: 6,
                 }}>
                   {kpi.label}
-                  {KPI_INFO[kpi.key] && <InfoBadge {...KPI_INFO[kpi.key]} size={12} />}
+                  {KPI_INFO[kpi.key] && <InfoBadge {...KPI_INFO[kpi.key]} size={20} />}
                 </span>
 
                 <span style={{

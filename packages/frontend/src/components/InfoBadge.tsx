@@ -36,7 +36,7 @@ export default function InfoBadge({ whatItIs, whatItMeans, howCalculated, size =
           justifyContent: "center",
           cursor: "pointer",
           padding: 2,
-          marginLeft: 2,
+          marginLeft: 4,
           fontSize: size * 0.6,
           fontWeight: 800,
           color: "#facc15",
