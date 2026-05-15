@@ -12,7 +12,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
    - Connection: `postgresql://gda:gda_dev_password@localhost:5432/gda_command`
    - **IMPORTANT**: The VM may have a system-level `DATABASE_URL` env var pointing to a different database (e.g., n8n). Always start the backend with explicit override: `DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev`
 2. **Database migrations**: `cd packages/backend && npm run db:migrate` (runs SQL migrations)
-3. **Database seed**: `cd packages/backend && npm run db:seed` (populates 7 opportunities + 1 test user)
+3. **Database seed**: `cd packages/backend && npm run db:seed` (populates opportunities + 1 test user)
 4. **Database reset**: `cd packages/backend && npm run db:reset` (drops all, re-migrates, re-seeds)
 5. Backend: `cd packages/backend && DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev` → runs on port 3001
 6. Frontend: `cd packages/frontend && npm run dev` → runs on port 3000
@@ -67,7 +67,7 @@ When doing a comprehensive audit, navigate every page and verify:
 ### Data Sources
 
 - **n8n integration** (primary): Backend calls n8n webhook at `https://n8n.csr-llc.tech/webhook/gda-opp-tracker` with header `x-gda-key: gda-webhook-secret-2026`. Returns ~291 real opportunities from GovTribe, SAM.gov, GDA Tracker.
-- **Postgres fallback**: If n8n is unreachable, backend falls back to local DB (7 seeded opportunities). Source badge shows "Live DB" instead of "Live API".
+- **Postgres fallback**: If n8n is unreachable, backend falls back to local DB (seeded opportunities). Source badge shows "Live DB" instead of "Live API".
 - Envision Innovative Solutions company profile: $382M revenue (Large Business), 41 employees (Small Business by SBA headcount)
 - NAICS Size classification: ~4 Small Business (employee-based NAICS like 541715), ~55 Large Business (revenue-based NAICS), rest Unclassified
 - Departments: Agriculture, Commerce, Homeland Security, Justice, Veterans Affairs, War + others
@@ -107,6 +107,62 @@ When doing a comprehensive audit, navigate every page and verify:
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
 
+## Ops Tracker Stage Change Testing
+
+The Ops Tracker has inline Shipley stage dropdowns in the Actions column. Stage changes persist to PostgreSQL and update the Launchpad funnel.
+
+### Inline Stage Change Procedure
+
+1. Navigate to Ops Tracker (`/ops-tracker`)
+2. Find the target opportunity row — the Actions column has a `<select>` dropdown
+3. Click the dropdown and select the new stage (Interest, Qualify, Pursue, Solicitation, Post Submittal, Won, Lost, No Bid, Gov Cancelled)
+4. The change fires `changeOpportunityStage(opp.id, newStage)` API call and auto-refreshes the table
+5. Verify in DB: `docker exec gda-postgres psql -U gda -d gda_command -c "SELECT id, status FROM opportunities WHERE id = '<opp-id>'"`
+
+### Stage Name Mapping
+
+| UI Label | DB `status` value | API value |
+|----------|------------------|-----------|
+| Interest | `discovery` | `interest` |
+| Qualify | `qualified` | `qualify` |
+| Pursue | `pipeline` | `pursue` |
+| Won | `won` | `won` |
+| Lost | `lost` | `lost` |
+
+Note: The UI dropdown sends `interest`/`qualify`/`pursue` but the backend maps these to `discovery`/`qualified`/`pipeline` in the DB.
+
+### Launchpad Funnel Verification
+
+After stage changes, navigate to Launchpad (`/`) and verify the Opportunity Funnel section:
+- Each stage row shows: Stage name, Count, Value ($), Avg Pwin (%)
+- Counts should match the DB: `SELECT status, COUNT(*) FROM opportunities GROUP BY status`
+- With all opps in discovery (baseline), funnel shows Interest=N, all others=0
+
+### n8n vs DB Fallback Path
+
+**Critical distinction for testing**: The dashboard has two code paths:
+1. **n8n path** (dashboard.ts lines ~55-83): Used when `N8N_BASE_URL` and `GDA_WEBHOOK_KEY` are configured and n8n responds. Funnel counts come from a `GROUP BY status` query overlaid on n8n totals.
+2. **DB fallback path** (dashboard.ts lines ~177-204): Used when n8n is unavailable. Funnel counts computed via `filter()` per stage from DB results.
+
+Locally, n8n webhook auth may fail with `"Authorization data is wrong!"` — this means the app falls back to the DB path. The API response includes `source: "db"` (fallback) vs `source: "gateway"` (n8n). Check this to know which path you're testing.
+
+### Seed Data
+
+After a fresh `db:reset` with current migrations, the seed creates:
+- 10 QuickEntry opportunities (`opp-001` through `opp-010`) — all start in `discovery` status
+- 3 DIBBS opportunities (`dibbs-check-*`) — all start in `discovery` status
+- Total: 13 opportunities
+- QuickEntry opps have `id LIKE 'opp-%'` and are excluded from the n8n funnel overlay query
+- DIBBS opps have `id LIKE 'dibbs-check-%'` and ARE included in the n8n funnel overlay
+
+### Reverting Test Changes
+
+After testing stage changes, revert to baseline via direct DB update:
+```sql
+docker exec gda-postgres psql -U gda -d gda_command -c "UPDATE opportunities SET status = 'discovery' WHERE id IN ('opp-001', 'opp-004') RETURNING id, status"
+```
+Then refresh the UI to confirm all opps show Interest status and funnel returns to baseline.
+
 ## POST Write Persistence Testing
 
 For testing endpoints that write to PostgreSQL:
@@ -132,6 +188,7 @@ For testing endpoints that write to PostgreSQL:
 | reports | `POST /generate` | INSERT generated_reports |
 | reports | `POST /export` | INSERT export_jobs |
 | capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+| opportunities | `POST /api/opportunities/:id/stage` | UPDATE opportunities status (stage change) |
 
 ## Testing Strategy
 
@@ -142,6 +199,7 @@ For testing endpoints that write to PostgreSQL:
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **For stage changes** — use Ops Tracker inline dropdown → psql verify → navigate to Launchpad → verify funnel counts
 
 ## Ops Tracker Testing (n8n Integration)
 
@@ -182,6 +240,8 @@ curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
 - Use `document.querySelectorAll('button')` with text matching to reliably click pagination buttons
 - When verifying summary stats across pages, compare Count + Total Value on page 1 vs page 2 — they must be identical
 - n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection failed
+- When using Ops Tracker dropdowns, click precisely on the select element — clicking nearby may miss the target
+- After a DB revert via psql, refresh the page (F5) to pick up the updated state
 
 ## Devin Secrets Needed
 
