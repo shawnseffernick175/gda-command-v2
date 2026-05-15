@@ -33,7 +33,9 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
   - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, CPARS Builder, GovWin IQ
   - REPORTING: Financials, Reports, Charts, Discussions
   - ADMIN: Settings, Health, Workflows, Users, Audit Log, Doctrine, Book of Truths, Prompts, User Manual
-- Financial KPI strip: persistent header showing "Financial KPIs unavailable" with Retry button when no data seeded
+- Financial KPI strip: persistent header showing 16 KPIs (Orders, Sales, EBIT, Gross Profit, ROS, etc.)
+  - Each KPI with a "?" button has an InfoBadge tooltip with "What it is", "What it means", "How it's calculated"
+  - KPI cards are `<div>` elements (not `<a>` links) — clicking them should NOT navigate
 - Hidden routes (no sidebar link): Opportunity Detail (`/opportunities/:id`), SAM Monitor (`/sam-monitor`), FPDS Monitor (`/fpds-monitor`)
 
 ## Auth System
@@ -66,8 +68,9 @@ When doing a comprehensive audit, navigate every page and verify:
 
 ### Data Sources
 
-- **n8n integration** (primary): Backend calls n8n webhook at `https://n8n.csr-llc.tech/webhook/gda-opp-tracker` with header `x-gda-key: gda-webhook-secret-2026`. Returns ~291 real opportunities from GovTribe, SAM.gov, GDA Tracker.
-- **Postgres fallback**: If n8n is unreachable, backend falls back to local DB (7 seeded opportunities). Source badge shows "Live DB" instead of "Live API".
+- **n8n integration** (primary): Backend calls n8n webhook at `https://n8n.csr-llc.tech/webhook/gda-opp-tracker` with header `x-gda-key: gda-webhook-secret-2026`. Returns ~302 real opportunities from GovTribe, SAM.gov, GDA Tracker.
+- **Postgres fallback**: If n8n is unreachable, backend falls back to local DB. Source badge shows "Live DB" instead of "Live API".
+- **Pipeline data source**: Pipeline endpoint reads ONLY from Postgres (`approved_at IS NOT NULL`). n8n webhook was removed because it bypassed the approval gate. Source badge always shows "Live DB".
 - Envision Innovative Solutions company profile: $382M revenue (Large Business), 41 employees (Small Business by SBA headcount)
 - NAICS Size classification: ~4 Small Business (employee-based NAICS like 541715), ~55 Large Business (revenue-based NAICS), rest Unclassified
 - Departments: Agriculture, Commerce, Homeland Security, Justice, Veterans Affairs, War + others
@@ -96,13 +99,13 @@ When doing a comprehensive audit, navigate every page and verify:
 |---------|-------------|
 | Sidebar collapse | Click ◀ button, verify icon-only rail, click ▶ to expand back |
 | Notifications | Click bell icon at bottom of sidebar, verify panel renders |
-| Financial KPI strip | Observe top header — shows 10 KPIs with real values when data is seeded |
+| Financial KPI strip | Observe top header — shows 16 KPIs with real values when data is seeded |
 | 404 page | Navigate to `/nonexistent-page`, verify "Page not found" with Back to Launchpad link |
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
+- **Predictive Analytics crash**: `/predictive` might crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend may not handle undefined response after mock data removal.
+- **FPDS Monitor calculation errors**: `/fpds-monitor` might load 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
@@ -138,18 +141,48 @@ For testing endpoints that write to PostgreSQL:
 1. **Navigate systematically** through all sidebar groups
 2. **Verify source badges** — "Live API" means n8n data (preferred), "Live DB" means postgres fallback
 3. **Check empty states** — pages with no DB data should show 0 counts + empty message (NOT mock data)
-4. **Test NAICS Size filter** on Ops Tracker: All=291, Small≈4, Large≈55, Unclassified≈41
+4. **Test NAICS Size filter** on Ops Tracker: All=302, Small≈varies, Large≈varies, Unclassified≈varies
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+
+## Stage Enforcement Testing
+
+**Critical rule**: ALL opportunities must default to "Interest" (discovery status). Only the user can change them via the Approvals queue. No automated process should change stages.
+
+### Pipeline Approval Gate
+
+1. Navigate to `/pipeline`
+2. Verify source badge shows **"Live DB"** (green) — NOT "Live API"
+3. Verify Total Pipeline count is **0** (unless user has explicitly approved opportunities)
+4. Verify message: "No approved opportunities in the pipeline yet. Approve opportunities from the Approvals queue to see them here."
+5. The Pipeline endpoint reads only from Postgres with `WHERE approved_at IS NOT NULL`. n8n webhook was removed because it returned all opportunities as "Qualified" regardless of user approval.
+
+### Ops Tracker Stage Verification
+
+1. Navigate to `/ops-tracker`
+2. For each visible row, verify the status dropdown shows **"Interest"** (selectedindex=0)
+3. Specifically check IDs 666 (C2 Digital) and 696 (Cyber Training) — these were previously auto-changed
+4. No opportunity should show "Qualify", "Lost", or any other non-Interest status unless the user explicitly changed it
+
+### KPI Info Button ("?") Testing
+
+1. Navigate to any page with the KPI strip header (e.g., `/ops-tracker`)
+2. Note the current URL
+3. Click the "?" button next to any KPI label (e.g., "Orders")
+4. Verify:
+   - URL does NOT change (should NOT navigate to `/financial-bible/...`)
+   - A tooltip popover appears with sections: "What it is", "What it means", "How it's calculated"
+   - The button is 20px (not 12px) — large enough to click without hitting the parent div
+5. KPI cards are `<div>` elements, not `<a>` links — clicking them should never navigate
 
 ## Ops Tracker Testing (n8n Integration)
 
 ### Pagination
 - Default: 25 per page, `page=1&pageSize=25` query params
-- Expected: ~12 pages for 291 opportunities (ceil(291/25) = 12)
+- Expected: ~13 pages for 302 opportunities (ceil(302/25) = 13)
 - Pagination controls: Prev/Next buttons + "Page X of Y — showing Z of N opportunities"
-- **Summary strip must show full-dataset aggregates** (Count=291, Total Value≈$2.3B), NOT page-slice values
+- **Summary strip must show full-dataset aggregates** (Count=302, Total Value≈$23B), NOT page-slice values
 - **Summary stats must NOT change when paginating** — only the table data changes
 
 ### API Verification
@@ -164,24 +197,27 @@ TOKEN=$(curl -s https://gda.csr-llc.tech/api/auth/login \
 curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
   -H "Authorization: Bearer $TOKEN" \
   | jq '{source: .meta.source, count: .meta.totalFiltered, totalPages: .meta.totalPages, totalValue: .meta.totalValue}'
-# Expected: {source: "gateway", count: 291, totalPages: 12, totalValue: ~2303223583}
+# Expected: {source: "gateway", count: ~302, totalPages: ~13}
 ```
 
 ### Production Deploy
 - VPS: `ssh root@187.77.206.105`
-- Deploy compose file: `docker-compose.deploy.yml` (NOT `docker-compose.yml` which is dev-only postgres)
-- Services: `gda-v2-frontend`, `gda-v2-backend`, `gda-v2-postgres`
-- Rebuild: `docker compose -f docker-compose.deploy.yml build --no-cache gda-backend gda-frontend`
-- Restart: `docker compose -f docker-compose.deploy.yml up -d gda-backend gda-frontend`
-- Verify: `docker ps --format 'table {{.Names}}\t{{.Status}}' | grep gda-v2`
+- Deploy compose file: `docker-compose.prod.yml` (NOT `docker-compose.yml` which is dev-only postgres)
+- Services: frontend, backend, postgres
+- Rebuild: `docker compose -f docker-compose.prod.yml up -d --build backend frontend`
+- Verify: `docker ps --format 'table {{.Names}}\t{{.Status}}' | grep gda`
 - Site: https://gda.csr-llc.tech
 - Login: `shawn.seffernick@envision-is.com` / `admin123`
+- **Traefik**: Uses `mytlschallenge` cert resolver (NOT `letsencrypt`). Frontend needs `traefik.docker.network` label.
 
 ### Browser Testing Tips
+- **Browser cache warning**: After deploying code changes, the browser may serve stale cached JavaScript. Always do a hard refresh (Ctrl+Shift+R) or use a fresh login/incognito window after production deploys.
 - Pagination buttons may be below the fold — scroll down to expose them
 - Use `document.querySelectorAll('button')` with text matching to reliably click pagination buttons
 - When verifying summary stats across pages, compare Count + Total Value on page 1 vs page 2 — they must be identical
-- n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection failed
+- n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection might have failed
+- Pipeline source badge: always "Live DB" (green) — this is correct; Pipeline reads only from Postgres
+- When using Playwright for fresh login testing, intercept API responses to verify backend returns correct data shape independently of browser rendering
 
 ## Devin Secrets Needed
 
