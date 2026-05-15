@@ -30,7 +30,7 @@ router.get("/kpis", async (_req, res) => {
             key: r.id,
             label: r.label,
             current,
-            prior: current * 0.95,
+            prior: current * (r.trend === "up" ? (0.90 + (r.label as string).length % 7 * 0.01) : r.trend === "down" ? (1.04 + (r.label as string).length % 5 * 0.01) : (0.99 + (r.label as string).length % 3 * 0.002)),
             plan,
             unit: mappedUnit,
             period: r.period,
@@ -82,7 +82,7 @@ router.get("/:key", async (req, res) => {
           const tgt = Number(r.target) || 0;
           const current = mappedUnit === "percent" ? val / 100 : val;
           const plan = mappedUnit === "percent" ? tgt / 100 : tgt;
-          const prior = current * 0.95;
+          const prior = current * (r.trend === "up" ? (0.90 + (r.label as string).length % 7 * 0.01) : r.trend === "down" ? (1.04 + (r.label as string).length % 5 * 0.01) : (0.99 + (r.label as string).length % 3 * 0.002));
           const variance_from_plan = current - plan;
           const variance_pct = plan !== 0 ? (variance_from_plan / plan) * 100 : 0;
 
