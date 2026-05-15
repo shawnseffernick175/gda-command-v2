@@ -14,8 +14,8 @@ interface RiskEntry {
   category: string;
   if_statement: string;
   then_statement: string;
-  likelihood: "high" | "medium" | "low";
-  impact: "high" | "medium" | "low";
+  likelihood: "critical" | "high" | "medium" | "low";
+  impact: "critical" | "high" | "medium" | "low";
   risk_score: number;
   status: string;
   mitigation_plan: string;
@@ -66,9 +66,11 @@ interface EvalResult {
 // ---------------------------------------------------------------------------
 
 function riskColor(level: string): string {
+  if (level === "critical") return "#991b1b";
   if (level === "high") return "#ef4444";
   if (level === "medium") return "#f59e0b";
-  return "#10b981";
+  if (level === "low") return "#10b981";
+  return "#6b7280";
 }
 
 function scoreColor(score: number): string {
@@ -583,19 +585,19 @@ function RiskCard({ risk, expanded, onToggle }: { risk: RiskEntry; expanded: boo
 // ---------------------------------------------------------------------------
 
 function RiskMatrix({ risks }: { risks: RiskEntry[] }) {
-  const levels = ["high", "medium", "low"] as const;
+  const levels = ["critical", "high", "medium", "low"] as const;
   const activeRisks = risks.filter((r) => r.status !== "closed");
 
   // Build matrix cells: rows = likelihood (high→low), cols = impact (low→high)
-  const impactLevels = ["low", "medium", "high"] as const;
+  const impactLevels = ["low", "medium", "high", "critical"] as const;
 
   function cellRisks(likelihood: string, impact: string) {
     return activeRisks.filter((r) => r.likelihood === likelihood && r.impact === impact);
   }
 
   function cellColor(likelihood: string, impact: string): string {
-    const lMap: Record<string, number> = { high: 5, medium: 3, low: 1 };
-    const iMap: Record<string, number> = { high: 5, medium: 3, low: 1 };
+    const lMap: Record<string, number> = { critical: 7, high: 5, medium: 3, low: 1 };
+    const iMap: Record<string, number> = { critical: 7, high: 5, medium: 3, low: 1 };
     const score = (lMap[likelihood] ?? 1) * (iMap[impact] ?? 1);
     if (score >= 15) return "rgba(239,68,68,0.25)";
     if (score >= 9) return "rgba(245,158,11,0.25)";
@@ -609,7 +611,7 @@ function RiskMatrix({ risks }: { risks: RiskEntry[] }) {
         Risk Heat Map — {activeRisks.length} Active Risks
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 1fr", gap: 2 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 1fr 1fr", gap: 2 }}>
         {/* Header row */}
         <div />
         {impactLevels.map((imp) => (

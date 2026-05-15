@@ -535,6 +535,11 @@ function AskAnythingFAB() {
   const [loading, setLoading] = useState(false);
   const { pathname } = useLocation();
 
+  // Clear answer when navigating to a new page
+  useEffect(() => {
+    setAnswer("");
+  }, [pathname]);
+
   const handleAsk = async () => {
     if (!question.trim() || loading) return;
     setLoading(true);

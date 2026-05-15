@@ -1264,7 +1264,7 @@ function UploadReviewForm({ onSubmit, result, reviewing }: {
           {file ? (
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#22c55e" }}>{file.name}</div>
-              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>{(file.size / 1024).toFixed(0)} KB — Click to change</div>
+              <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>{file.size >= 1_000_000 ? `${(file.size / 1_000_000).toFixed(1)} MB` : file.size >= 1_000 ? `${Math.round(file.size / 1_000)} KB` : `${file.size} B`} — Click to change</div>
             </div>
           ) : (
             <div>
