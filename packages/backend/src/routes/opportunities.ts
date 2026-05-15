@@ -184,7 +184,55 @@ router.get("/", async (req, res) => {
     try {
       const n8nResult = await fetchOpsTrackerFromN8n();
       if (n8nResult.ok && n8nResult.opportunities.length > 0) {
-        const allRows = filterAndSort(n8nResult.opportunities);
+        let combined = n8nResult.opportunities;
+
+        // Stage enforcement: default all n8n opportunities to "discovery" (Interest),
+        // then apply any user-approved overrides from the local DB.
+        // Also merge locally-created opportunities (QuickEntry) into results.
+        const dbPool = getPool();
+        if (dbPool) {
+          try {
+            // Fetch user-approved stage overrides (opportunities the user explicitly changed)
+            const overrides = await dbPool.query(
+              `SELECT id, status, capture_stage FROM opportunities WHERE status != 'discovery' AND id NOT LIKE 'opp-%'`
+            );
+            const overrideMap = new Map<string, string>();
+            for (const row of overrides.rows) {
+              overrideMap.set(String(row.id), row.status as string);
+            }
+
+            // Apply stage enforcement: default to "discovery" unless user overrode
+            combined = combined.map((o) => ({
+              ...o,
+              status: (overrideMap.get(String(o.id)) ?? "discovery") as typeof o.status,
+            }));
+
+            // Merge locally-created opportunities (QuickEntry) that only exist in the DB
+            const localOpps = await dbPool.query(
+              `SELECT id, title, agency, department, status, score, value_estimated,
+                      probability_of_win, naics, due_date, solicitation_number,
+                      set_aside, place_of_performance, data_source, created_at, updated_at
+               FROM opportunities WHERE id LIKE 'opp-%'`
+            );
+            if (localOpps.rows.length > 0) {
+              combined = [...combined, ...localOpps.rows.map((r) => ({
+                ...r,
+                id: String(r.id),
+                naics_size: classifyNaicsSize(r.naics),
+                tags: [],
+              } as Opportunity))];
+            }
+          } catch (dbErr) {
+            process.stderr.write(`[opportunities] DB merge: ${(dbErr as Error).message}\n`);
+            // Fallback: still enforce Interest on all n8n results even without DB
+            combined = combined.map((o) => ({ ...o, status: "discovery" as typeof o.status }));
+          }
+        } else {
+          // No DB: enforce Interest on all n8n results
+          combined = combined.map((o) => ({ ...o, status: "discovery" as typeof o.status }));
+        }
+
+        const allRows = filterAndSort(combined);
         const totalFiltered = allRows.length;
         const totalPages = Math.ceil(totalFiltered / pageSize);
         const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
@@ -204,7 +252,7 @@ router.get("/", async (req, res) => {
             {
               count: rows.length,
               totalFiltered,
-              totalAvailable: n8nResult.meta.total,
+              totalAvailable: n8nResult.meta.total + (combined.length - n8nResult.opportunities.length),
               page,
               pageSize,
               totalPages,

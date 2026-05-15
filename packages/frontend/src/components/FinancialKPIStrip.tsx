@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { fetchFinancialKPIs, type FinancialKPI } from "../api/client";
 import InfoBadge from "./InfoBadge";
 
@@ -66,6 +66,7 @@ function planIndicator(kpi: FinancialKPI): { label: string; color: string } {
 }
 
 export default function FinancialKPIStrip() {
+  const navigate = useNavigate();
   const [kpis, setKpis] = useState<FinancialKPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
@@ -168,9 +169,17 @@ export default function FinancialKPIStrip() {
             const plan = planIndicator(kpi);
 
             return (
-              <Link
+              <div
                 key={kpi.key}
-                to={`/financial-bible/${kpi.key}`}
+                role="link"
+                tabIndex={0}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest('button[title="More info"]')) return;
+                  navigate(`/financial-bible/${kpi.key}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") navigate(`/financial-bible/${kpi.key}`);
+                }}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -225,7 +234,7 @@ export default function FinancialKPIStrip() {
                     {change.arrow} {change.label}
                   </span>
                 )}
-              </Link>
+              </div>
             );
           })}
         </div>
