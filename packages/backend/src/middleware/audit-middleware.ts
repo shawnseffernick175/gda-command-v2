@@ -60,8 +60,8 @@ export function auditMiddleware(req: Request, res: Response, next: NextFunction)
     }
 
     pool.query(
-      `INSERT INTO audit_log (user_id, user_email, action, resource_type, resource_id, details, ip_address)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+      `INSERT INTO audit_log (user_id, user_email, action, entity_type, entity_id, resource_type, resource_id, details, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $4, $5, $6::jsonb, $7)`,
       [userId, userEmail, action, resourceType, resourceId ?? null, JSON.stringify(details), ip]
     ).catch((err) => {
       log.error("audit_middleware_error", { error: (err as Error).message });

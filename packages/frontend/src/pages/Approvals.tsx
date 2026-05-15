@@ -639,16 +639,17 @@ function AgentActionsTab() {
     const params: { type?: string; agent?: string } = {};
     if (agentFilter) params.agent = agentFilter;
     if (typeFilter) params.type = typeFilter;
-    Promise.all([
-      fetchAgentApprovalsPending(params),
-      fetchAgentApprovalsStats(),
-    ])
-      .then(([pendingEnv, statsEnv]) => {
-        if (pendingEnv.success && pendingEnv.data) setItems(pendingEnv.data.items);
-        if (statsEnv.success && statsEnv.data) setStats(statsEnv.data);
+    fetchAgentApprovalsPending(params)
+      .then((env) => {
+        if (env.success && env.data) setItems(env.data.items);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
+    fetchAgentApprovalsStats()
+      .then((env) => {
+        if (env.success && env.data) setStats(env.data);
+      })
+      .catch(() => {});
   };
 
   useEffect(() => { loadData(); }, [agentFilter, typeFilter]);
