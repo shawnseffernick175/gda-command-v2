@@ -68,8 +68,9 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.gda-app.rule=Host(`app.csr-llc.tech`) || Host(`gda.csr-llc.tech`)"
       - "traefik.http.routers.gda-app.tls=true"
-      - "traefik.http.routers.gda-app.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.gda-app.tls.certresolver=mytlschallenge"
       - "traefik.http.services.gda-app.loadbalancer.server.port=80"
+      - "traefik.docker.network=n8n_default"
     networks:
       - gda
       - traefik
