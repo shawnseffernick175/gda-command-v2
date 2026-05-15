@@ -101,11 +101,75 @@ When doing a comprehensive audit, navigate every page and verify:
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
+- **Predictive Analytics crash**: `/predictive` might crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend might not handle undefined response after mock data removal.
+- **FPDS Monitor calculation errors**: `/fpds-monitor` might show "$NaN" for Total Value and "null%" for Avg Relevance — data parsing issue in aggregate calculations.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
+- **"+ Shred New RFP" button may appear offscreen**: The button in RFP Shredder might show `offscreen` in the DOM. Use `document.querySelector('button[devinid="61"]').click()` via browser console to open the modal if clicking doesn't work.
+- **"undefined" text in shred success message**: After submitting a shred job, the modal may show "undefined" below the "Job queued" message. This is cosmetic — the extraction result message is undefined when no LLM API key is configured.
+
+## RFP Shredder Testing
+
+### Shred Job Submission & Persistence Test
+
+1. Navigate to `/rfp-shredder`
+2. Note initial job count in "Shred Jobs (N)" tab header
+3. Click "+ Shred New RFP" button (if offscreen, use browser console: `document.querySelector('button').click()` targeting the correct button)
+4. Fill in the modal:
+   - **Solicitation Title**: e.g., "E2E Test Persistence Check"
+   - **Or Paste Document Text**: Any text (e.g., "The contractor shall provide cybersecurity services...")
+   - **Agency**: e.g., "Test Agency"
+5. Click "Shred RFP" button (becomes enabled once title + text/file are provided)
+6. Observe success message: "Job queued: GDA-SHRED-..."
+7. **Hard refresh** the page (Ctrl+Shift+R)
+8. Verify: New job appears in Jobs tab, total count incremented by 1
+
+### Seed Data Verification
+
+After `db:seed`, the Jobs tab should show these seed jobs:
+- Army PEO IEW&S SETA Support Services IDIQ (completed, 24 requirements)
+- DEVCOM C5ISR Cyber IA Services (completed, 18 requirements)
+- Hanscom AFB IT Modernization Support (processing)
+- DHS CISA CDM DEFEND Phase 4 (failed)
+- Test Solicitation ABC (queued)
+
+## Audit Log Testing
+
+### Verify Audit Log Records Write Operations
+
+1. Navigate to `/admin/audit`
+2. Note initial state (may be empty or have existing entries)
+3. Perform a write action (e.g., submit a shred job via `/rfp-shredder`)
+4. Return to `/admin/audit`
+5. Verify: New entry appears with:
+   - Action: "POST/shred" (or relevant endpoint)
+   - User: "admin@gda-command.local"
+   - Resource type visible
+   - Recent timestamp
+   - Status: 200
+
+**Key fix (PR #156):** Audit log was previously empty because INSERT failed silently on `entity_type` NOT NULL constraint. The fix populates both `entity_type` and `resource_type` columns.
+
+## Approvals Resilience Testing
+
+### Test Agent Actions Tab Survives Stats Failure
+
+1. Navigate to `/approvals` — verify "Agent Command Center" loads with stats cards
+2. Open browser console and inject fetch override:
+   ```js
+   const origFetch = window.fetch;
+   window.fetch = function(url, opts) {
+     if (typeof url === 'string' && url.includes('/agents/approvals/stats')) {
+       return Promise.reject(new Error('Simulated stats failure'));
+     }
+     return origFetch.apply(this, arguments);
+   };
+   ```
+3. Switch to "Agent Runs" tab, then back to "Agent Actions"
+4. Verify: Tab renders without crash — shows empty state or pending items normally
+
+**Key fix (PR #156):** `loadData()` was using `Promise.all` for pending items + stats. Now stats fetch is independent and non-blocking.
 
 ## POST Write Persistence Testing
 
@@ -121,7 +185,7 @@ For testing endpoints that write to PostgreSQL:
 ### POST Endpoints with Real DB Writes
 
 | Route | Endpoint | DB Operation |
-|-------|----------|-------------|
+|-------|----------|--------------|
 | approvals | `POST /:id/resolve` | UPDATE approvals status/resolved_by/at/notes |
 | anomaly | `POST /anomalies/:id/acknowledge` | UPDATE status + acknowledged_at |
 | anomaly | `POST /anomalies/:id/resolve` | UPDATE status + resolved_at |
@@ -132,6 +196,8 @@ For testing endpoints that write to PostgreSQL:
 | reports | `POST /generate` | INSERT generated_reports |
 | reports | `POST /export` | INSERT export_jobs |
 | capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+| rfp-shredder | `POST /shred` | INSERT into shred_jobs + extracted_requirements |
+| audit-middleware | All POST/PUT/PATCH/DELETE | INSERT into audit_log (entity_type + resource_type) |
 
 ## Testing Strategy
 
@@ -142,6 +208,7 @@ For testing endpoints that write to PostgreSQL:
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **For persistence tests** — submit data → hard refresh (Ctrl+Shift+R) → verify data survives
 
 ## Ops Tracker Testing (n8n Integration)
 
@@ -182,6 +249,7 @@ curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
 - Use `document.querySelectorAll('button')` with text matching to reliably click pagination buttons
 - When verifying summary stats across pages, compare Count + Total Value on page 1 vs page 2 — they must be identical
 - n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection failed
+- Some buttons might be marked `offscreen` in the DOM — use browser console `document.querySelector('button[devinid="N"]').click()` to interact with them
 
 ## Devin Secrets Needed
 
