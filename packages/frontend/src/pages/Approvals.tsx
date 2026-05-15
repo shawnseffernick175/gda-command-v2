@@ -73,17 +73,18 @@ export default function Approvals() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      fetchApprovals(),
-      fetchAgentApprovalsStats(),
-    ])
-      .then(([appEnv, statsEnv]) => {
-        if (appEnv.success && appEnv.data) setData(appEnv.data);
-        else setError(appEnv.error?.message ?? "Failed to load approvals");
-        if (statsEnv.success && statsEnv.data) setAgentPending(statsEnv.data.total_pending);
+    fetchApprovals()
+      .then((env) => {
+        if (env.success && env.data) setData(env.data);
+        else setError(env.error?.message ?? "Failed to load approvals");
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
+    fetchAgentApprovalsStats()
+      .then((env) => {
+        if (env.success && env.data) setAgentPending(env.data.total_pending);
+      })
+      .catch(() => {});
   }, []);
 
   if (loading) return <p style={{ color: "var(--color-text-muted)" }}>Loading approvals...</p>;
