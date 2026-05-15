@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, notConfiguredEnvelope, errorEnvelope } from "../middleware/envelope";
-import { callWebhook, webhookConfig, listFailedExecutions, apiConfig } from "../lib/n8n-client";
+import { callWebhook, webhookConfig, listFailedExecutions, fetchWorkflows, apiConfig } from "../lib/n8n-client";
 import {
   READONLY_CHECKS,
   DRYRUN_CHECKS,
@@ -206,7 +206,10 @@ router.get("/latest-failures", async (req, res) => {
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 && limitRaw <= 250 ? limitRaw : 25;
 
   try {
-    const out = await listFailedExecutions(limit);
+    const [out, wfResult] = await Promise.all([
+      listFailedExecutions(limit),
+      fetchWorkflows(250),
+    ]);
     if (!out.configured) {
       return res.json(
         notConfiguredEnvelope("GDA.gateway.failures-latest", "list", out.missing ?? cfg.missing)
@@ -221,9 +224,21 @@ router.get("/latest-failures", async (req, res) => {
         })
       );
     }
-    const rows = (out.executions || []).map((e) =>
-      plainEnglish(e as Record<string, unknown>)
-    );
+    const wfNameMap = new Map<string, string>();
+    for (const wf of wfResult.workflows) {
+      const w = wf as Record<string, unknown>;
+      if (w.id && w.name) wfNameMap.set(String(w.id), String(w.name));
+    }
+    const rows = (out.executions || []).map((e) => {
+      const row = plainEnglish(e as Record<string, unknown>);
+      if (row.workflowId && wfNameMap.has(String(row.workflowId))) {
+        const resolvedName = wfNameMap.get(String(row.workflowId))!;
+        if (row.workflowName === row.workflowId || row.workflowName === "unknown workflow") {
+          row.workflowName = resolvedName;
+        }
+      }
+      return row;
+    });
     return res.json(
       successEnvelope(
         "GDA.gateway.failures-latest",

@@ -23,7 +23,7 @@ export default function InfoBadge({ whatItIs, whatItMeans, howCalculated, size =
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setOpen((o) => !o); }}
         title="More info"
         style={{
           width: size,
@@ -35,7 +35,8 @@ export default function InfoBadge({ whatItIs, whatItMeans, howCalculated, size =
           alignItems: "center",
           justifyContent: "center",
           cursor: "pointer",
-          padding: 0,
+          padding: 2,
+          marginLeft: 4,
           fontSize: size * 0.6,
           fontWeight: 800,
           color: "#facc15",

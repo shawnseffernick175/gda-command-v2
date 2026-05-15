@@ -46,12 +46,12 @@ RUN chmod +x /docker-entrypoint.sh
 # pg_dump for in-app backup API
 RUN apk add --no-cache postgresql16-client
 
-# Backup directory
-RUN mkdir -p /var/backups/gda/daily /var/backups/gda/weekly
+# Backup and upload directories
+RUN mkdir -p /var/backups/gda/daily /var/backups/gda/weekly /var/uploads/gda
 
 # Non-root user
 RUN addgroup -g 1001 -S gda && adduser -u 1001 -S gda -G gda
-RUN chown -R gda:gda /var/backups/gda
+RUN chown -R gda:gda /var/backups/gda /var/uploads/gda
 USER gda
 
 ENV NODE_ENV=production

@@ -183,7 +183,55 @@ router.get("/", async (req, res) => {
     try {
       const n8nResult = await fetchOpsTrackerFromN8n();
       if (n8nResult.ok && n8nResult.opportunities.length > 0) {
-        const allRows = filterAndSort(n8nResult.opportunities);
+        let combined = n8nResult.opportunities;
+
+        // Stage enforcement: default all n8n opportunities to "discovery" (Interest),
+        // then apply any user-approved overrides from the local DB.
+        // Also merge locally-created opportunities (QuickEntry) into results.
+        const dbPool = getPool();
+        if (dbPool) {
+          try {
+            // Fetch user-approved stage overrides (opportunities the user explicitly changed)
+            const overrides = await dbPool.query(
+              `SELECT id, status, capture_stage FROM opportunities WHERE status != 'discovery' AND id NOT LIKE 'opp-%'`
+            );
+            const overrideMap = new Map<string, string>();
+            for (const row of overrides.rows) {
+              overrideMap.set(String(row.id), row.status as string);
+            }
+
+            // Apply stage enforcement: default to "discovery" unless user overrode
+            combined = combined.map((o) => ({
+              ...o,
+              status: (overrideMap.get(String(o.id)) ?? "discovery") as typeof o.status,
+            }));
+
+            // Merge locally-created opportunities (QuickEntry) that only exist in the DB
+            const localOpps = await dbPool.query(
+              `SELECT id, title, agency, department, status, score, value_estimated,
+                      probability_of_win, naics, due_date, solicitation_number,
+                      set_aside, place_of_performance, data_source, created_at, updated_at
+               FROM opportunities WHERE id LIKE 'opp-%'`
+            );
+            if (localOpps.rows.length > 0) {
+              combined = [...combined, ...localOpps.rows.map((r) => ({
+                ...r,
+                id: String(r.id),
+                naics_size: classifyNaicsSize(r.naics),
+                tags: [],
+              } as Opportunity))];
+            }
+          } catch (dbErr) {
+            process.stderr.write(`[opportunities] DB merge: ${(dbErr as Error).message}\n`);
+            // Fallback: still enforce Interest on all n8n results even without DB
+            combined = combined.map((o) => ({ ...o, status: "discovery" as typeof o.status }));
+          }
+        } else {
+          // No DB: enforce Interest on all n8n results
+          combined = combined.map((o) => ({ ...o, status: "discovery" as typeof o.status }));
+        }
+
+        const allRows = filterAndSort(combined);
         const totalFiltered = allRows.length;
         const totalPages = Math.ceil(totalFiltered / pageSize);
         const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
@@ -203,7 +251,7 @@ router.get("/", async (req, res) => {
             {
               count: rows.length,
               totalFiltered,
-              totalAvailable: n8nResult.meta.total,
+              totalAvailable: n8nResult.meta.total + (combined.length - n8nResult.opportunities.length),
               page,
               pageSize,
               totalPages,
@@ -353,37 +401,12 @@ router.get("/pipeline", async (req, res) => {
   const sortBy = (req.query.sortBy as string) ?? "qualified_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
 
-  // --- Helper: apply pipeline filters & sort ---
-  function pipelineFilterAndSort(rows: Opportunity[]): Opportunity[] {
-    let filtered = [...rows];
-    if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (o) =>
-          o.id.toLowerCase().includes(q) || o.title.toLowerCase().includes(q)
-      );
-    }
-    if (deptFilter) {
-      filtered = filtered.filter((o) => o.department === deptFilter);
-    }
-    if (minPwin !== undefined && !isNaN(minPwin)) {
-      filtered = filtered.filter(
-        (o) => o.probability_of_win !== null && o.probability_of_win >= minPwin
-      );
-    }
-    const col = sortBy as keyof Opportunity;
-    filtered.sort((a, b) => {
-      const av = a[col] ?? "";
-      const bv = b[col] ?? "";
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-    return filtered;
-  }
+  // --- Source: Postgres only (n8n webhook bypasses approval gate) ---
+  // Pipeline must ONLY show opportunities the user explicitly approved
+  // (approved_at IS NOT NULL). n8n returns all opportunities with
+  // "Qualified" status regardless of user approval, so we skip it.
 
-  // Pipeline uses DB only — n8n data bypasses the qualification gate.
-  // Only user-approved opportunities (approved_at IS NOT NULL) belong here.
+  // Try Postgres
   const pool = getPool();
 
   if (!pool) {
@@ -616,11 +639,10 @@ router.get("/:id/detail", async (req, res) => {
 // POST /api/opportunities/quick-create — create a new opportunity (Quick Entry)
 // ---------------------------------------------------------------------------
 router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
-  const { title, agency, department, status, value_estimated } = req.body as {
+  const { title, agency, department, value_estimated } = req.body as {
     title?: string;
     agency?: string;
     department?: string;
-    status?: string;
     value_estimated?: number;
   };
 
@@ -643,7 +665,7 @@ router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"),
     await pool.query(
       `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $7)`,
-      [id, title, agency ?? null, department ?? null, status ?? "discovery", value_estimated ?? null, now],
+      [id, title, agency ?? null, department ?? null, "discovery", value_estimated ?? null, now],
     );
     // Auto-trigger Capture Coach for newly created opportunity (fire-and-forget)
     queueCaptureCoachIfNeeded(id);
@@ -894,7 +916,7 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
           `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
            ON CONFLICT (id) DO NOTHING`,
-          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, n8nOpp.status, n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now]
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now]
         );
         current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
       }

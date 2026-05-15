@@ -3085,7 +3085,6 @@ export function quickCreateOpportunity(data: {
   title: string;
   agency?: string;
   department?: string;
-  status?: string;
   value_estimated?: number;
 }) {
   return request<{ id: string; title: string }>("/opportunities/quick-create", {

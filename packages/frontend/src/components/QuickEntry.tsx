@@ -34,7 +34,6 @@ interface OpportunityForm {
   title: string;
   agency: string;
   department: string;
-  status: string;
   value_estimated: string;
 }
 
@@ -73,7 +72,7 @@ export default function QuickEntry() {
 
   // Opportunity form state
   const [oppForm, setOppForm] = useState<OpportunityForm>({
-    title: "", agency: "", department: "", status: "discovery", value_estimated: "",
+    title: "", agency: "", department: "", value_estimated: "",
   });
 
   // Contact form state
@@ -116,7 +115,7 @@ export default function QuickEntry() {
   }, [activeForm]);
 
   const resetForms = useCallback(() => {
-    setOppForm({ title: "", agency: "", department: "", status: "discovery", value_estimated: "" });
+    setOppForm({ title: "", agency: "", department: "", value_estimated: "" });
     setContactForm({ first_name: "", last_name: "", title: "", agency: "", email: "", phone: "" });
     setDiscForm({ title: "", entity_type: "general", tags: "" });
     setNoteForm({ title: "", content: "", tags: "" });
@@ -135,7 +134,6 @@ export default function QuickEntry() {
         title: oppForm.title.trim(),
         agency: oppForm.agency.trim() || undefined,
         department: oppForm.department.trim() || undefined,
-        status: oppForm.status,
         value_estimated: oppForm.value_estimated ? Number(oppForm.value_estimated) : undefined,
       });
       if (env.success) {
@@ -281,12 +279,10 @@ export default function QuickEntry() {
                 <FormField label="Title *" value={oppForm.title} onChange={v => setOppForm(p => ({ ...p, title: v }))} placeholder="e.g. DoD IT Modernization" autoFocus />
                 <FormField label="Agency" value={oppForm.agency} onChange={v => setOppForm(p => ({ ...p, agency: v }))} placeholder="e.g. Department of Defense" />
                 <FormField label="Department" value={oppForm.department} onChange={v => setOppForm(p => ({ ...p, department: v }))} placeholder="e.g. Army" />
-                <FormSelect label="Status" value={oppForm.status} onChange={v => setOppForm(p => ({ ...p, status: v }))}
-                  options={[
-                    { value: "discovery", label: "Discovery" },
-                    { value: "qualified", label: "Qualified" },
-                    { value: "pipeline", label: "Pipeline" },
-                  ]} />
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", marginBottom: 4, display: "block" }}>Status</label>
+                  <div style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "rgba(255,255,255,0.03)", color: "var(--color-text-muted)", fontSize: 14 }}>Interest (all new opportunities start here)</div>
+                </div>
                 <FormField label="Estimated Value ($)" value={oppForm.value_estimated} onChange={v => setOppForm(p => ({ ...p, value_estimated: v }))} placeholder="e.g. 5000000" type="number" />
                 <FormActions onCancel={() => { setActiveForm(null); resetForms(); }} onSubmit={handleSubmitOpportunity} submitting={submitting} />
               </div>

@@ -286,40 +286,11 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-// Auto-No Bid: move unqualified opps with due_date <= 30 days to no_bid
-let autoNoBidTimer: ReturnType<typeof setInterval> | null = null;
-
-async function runAutoNoBidCheck() {
-  const pool = getPool();
-  if (!pool) return;
-  try {
-    const result = await pool.query(
-      `UPDATE opportunities
-       SET status = 'lost', capture_stage = 'no_bid', updated_at = NOW()
-       WHERE status = 'discovery'
-         AND capture_stage IN ('interest', 'discovery')
-         AND due_date IS NOT NULL
-         AND due_date <= NOW() + INTERVAL '30 days'
-         AND due_date > NOW()
-       RETURNING id, title`
-    );
-    if (result.rows.length > 0) {
-      log.info("auto_no_bid", { count: result.rows.length, ids: result.rows.map((r: { id: string }) => r.id) });
-    }
-  } catch (err: unknown) {
-    log.error("auto_no_bid_error", { error: (err as Error).message });
-  }
-}
-
-function startAutoNoBidCheck() {
-  runAutoNoBidCheck();
-  // Check every 6 hours
-  autoNoBidTimer = setInterval(runAutoNoBidCheck, 6 * 60 * 60 * 1000);
-}
-
-function stopAutoNoBidCheck() {
-  if (autoNoBidTimer) clearInterval(autoNoBidTimer);
-}
+// Auto-No Bid DISABLED — only the user can change opportunity stages.
+// Previously this timer auto-archived unqualified opps due within 30 days,
+// which violates the rule that all stage changes require explicit user action.
+function startAutoNoBidCheck() { /* disabled */ }
+function stopAutoNoBidCheck() { /* disabled */ }
 
 const server = app.listen(PORT, () => {
   log.info("server_started", { port: Number(PORT), env: process.env.NODE_ENV ?? "development" });

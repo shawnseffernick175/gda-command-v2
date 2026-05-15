@@ -39,13 +39,46 @@ router.get("/kpis", async (_req, res) => {
         const avgScore = launchpad.kpis.avgScore;
         const topByScore = launchpad.topOpportunities.slice(0, 10);
 
-        const n8nFunnel = funnel.oppStages.map((s) => ({
+        // Stage enforcement: recompute funnel with all n8n opps defaulting to Identified,
+        // then overlay any user-approved stage overrides from the local DB.
+        let n8nFunnel = funnel.oppStages.map((s) => ({
           stage: s.stage,
           count: s.count,
           totalValue: s.valueM * 1_000_000,
           avgPwin: 0,
           avgScore: 0,
         }));
+
+        const pool = getPool();
+        if (pool) {
+          try {
+            const overrides = await pool.query(
+              `SELECT status, COUNT(*) as cnt FROM opportunities WHERE status != 'discovery' AND id NOT LIKE 'opp-%' GROUP BY status`
+            );
+            const overrideCounts = new Map<string, number>();
+            let totalOverridden = 0;
+            for (const row of overrides.rows) {
+              overrideCounts.set(row.status as string, parseInt(row.cnt as string, 10));
+              totalOverridden += parseInt(row.cnt as string, 10);
+            }
+
+            // Rebuild funnel: all opps start as Identified, then add user overrides
+            const identifiedCount = totalOpportunities - totalOverridden;
+            const funnelMap = new Map<string, { count: number; totalValue: number }>();
+            funnelMap.set("Identified", { count: Math.max(0, identifiedCount), totalValue: 0 });
+            for (const [status, cnt] of overrideCounts) {
+              const label = status === "qualified" ? "Qualified" : status === "pipeline" ? "Pipeline" : status.charAt(0).toUpperCase() + status.slice(1);
+              funnelMap.set(label, { count: cnt, totalValue: 0 });
+            }
+            n8nFunnel = Array.from(funnelMap.entries()).map(([stage, data]) => ({
+              stage,
+              count: data.count,
+              totalValue: data.totalValue,
+              avgPwin: 0,
+              avgScore: 0,
+            }));
+          } catch { /* fallback to n8n funnel */ }
+        }
 
         return res.json(
           successEnvelope(
