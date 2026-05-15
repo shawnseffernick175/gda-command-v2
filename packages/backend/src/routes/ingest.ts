@@ -66,7 +66,6 @@ router.post("/opportunities", async (req, res) => {
           title = EXCLUDED.title,
           agency = EXCLUDED.agency,
           department = EXCLUDED.department,
-          status = EXCLUDED.status,
           score = EXCLUDED.score,
           value_estimated = EXCLUDED.value_estimated,
           naics = EXCLUDED.naics,
@@ -81,7 +80,7 @@ router.post("/opportunities", async (req, res) => {
           updated_at = NOW()
       `, [
         opp.id, opp.title, opp.agency ?? null, opp.department ?? null,
-        opp.status ?? "discovery", opp.score ?? 0, opp.value_estimated ?? null,
+        "discovery", opp.score ?? 0, opp.value_estimated ?? null,
         opp.naics ?? null, opp.psc ?? null, opp.due_date ?? null,
         opp.solicitation_number ?? null, opp.set_aside ?? null,
         opp.place_of_performance ?? null, opp.incumbent ?? null,

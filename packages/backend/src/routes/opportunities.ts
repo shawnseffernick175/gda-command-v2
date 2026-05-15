@@ -672,7 +672,7 @@ router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"),
     await pool.query(
       `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $7)`,
-      [id, title, agency ?? null, department ?? null, status ?? "discovery", value_estimated ?? null, now],
+      [id, title, agency ?? null, department ?? null, "discovery", value_estimated ?? null, now],
     );
     // Auto-trigger Capture Coach for newly created opportunity (fire-and-forget)
     queueCaptureCoachIfNeeded(id);
@@ -923,7 +923,7 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
           `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
            ON CONFLICT (id) DO NOTHING`,
-          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, n8nOpp.status, n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now]
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now]
         );
         current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
       }
