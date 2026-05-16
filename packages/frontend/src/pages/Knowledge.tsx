@@ -123,6 +123,7 @@ function DocumentsTab() {
   const [typeFilter, setTypeFilter] = useState("");
   const [sortBy, setSortBy] = useState("recent");
   const [showUpload, setShowUpload] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     Promise.all([
@@ -135,7 +136,7 @@ function DocumentsTab() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [search, collectionFilter, typeFilter, sortBy]);
+  }, [search, collectionFilter, typeFilter, sortBy, refreshKey]);
 
   useEffect(() => {
     if (!selectedDocId) return;
@@ -295,7 +296,7 @@ function DocumentsTab() {
       </div>
 
       {/* Upload Modal */}
-      {showUpload && <UploadModal collections={collections} onClose={() => setShowUpload(false)} />}
+      {showUpload && <UploadModal collections={collections} onClose={() => setShowUpload(false)} onUploadComplete={() => setRefreshKey((k) => k + 1)} />}
     </div>
   );
 }
@@ -385,7 +386,7 @@ function formatFileSize(bytes: number): string {
   return `${bytes} B`;
 }
 
-function UploadModal({ collections, onClose }: { collections: KnowledgeCollection[]; onClose: () => void }) {
+function UploadModal({ collections, onClose, onUploadComplete }: { collections: KnowledgeCollection[]; onClose: () => void; onUploadComplete?: () => void }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("memo");
   const [collection, setCollection] = useState("col-contracts");
@@ -406,9 +407,10 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
       .then((env) => {
         if (env.success && env.data) {
           setResult(`Uploaded: ${env.data.message}${env.data.download_url ? `\nDownload: ${env.data.download_url}` : ""}`);
+          onUploadComplete?.();
         }
       })
-      .catch(() => setResult("Upload failed"))
+      .catch((err: Error) => setResult(`Upload failed: ${err.message || "unknown error"}`))
       .finally(() => setUploading(false));
   };
 
