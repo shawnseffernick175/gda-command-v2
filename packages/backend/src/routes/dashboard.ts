@@ -37,7 +37,7 @@ router.get("/kpis", async (_req, res) => {
         const totalPipelineValue = launchpad.kpis.weightedPipelineRaw;
 
         const avgScore = launchpad.kpis.avgScore;
-        const topByScore = launchpad.topOpportunities.slice(0, 10);
+        let topByScore = launchpad.topOpportunities.slice(0, 10);
 
         // Stage enforcement: recompute funnel with all n8n opps defaulting to Identified,
         // then overlay any user-approved stage overrides from the local DB.
@@ -78,11 +78,11 @@ router.get("/kpis", async (_req, res) => {
             const discoveryData = statusMap.get("discovery") ?? { count: 0, totalValue: 0, avgPwin: 0, avgScore: 0 };
             const discoveryCount = discoveryData.count + unsyncedCount;
 
-            // Distribute n8n total pipeline value to Identified if DB values are low
-            const dbTotalValue = Array.from(statusMap.values()).reduce((s, d) => s + d.totalValue, 0);
-            const identifiedValue = dbTotalValue > 0
-              ? discoveryData.totalValue
-              : totalPipelineValue;
+            // Subtract non-discovery DB values from n8n total to avoid double-counting
+            const nonDiscoveryValue = Array.from(statusMap.entries())
+              .filter(([status]) => status !== "discovery")
+              .reduce((s, [, d]) => s + d.totalValue, 0);
+            const identifiedValue = Math.max(discoveryData.totalValue, totalPipelineValue - nonDiscoveryValue);
 
             const funnelMap = new Map<string, { count: number; totalValue: number; avgPwin: number; avgScore: number }>();
             funnelMap.set("Identified", { count: discoveryCount, totalValue: identifiedValue, avgPwin: discoveryData.avgPwin, avgScore: discoveryData.avgScore });
@@ -98,7 +98,83 @@ router.get("/kpis", async (_req, res) => {
               avgPwin: data.avgPwin,
               avgScore: data.avgScore,
             }));
+            // Augment top opps with DB data (dept, value, score, pwin)
+            if (topByScore.length > 0) {
+              const topIds = topByScore.map((o) => o.id);
+              const dbTopResult = await pool.query(
+                `SELECT id, department, value_estimated, score, probability_of_win
+                 FROM opportunities WHERE id = ANY($1)`,
+                [topIds]
+              );
+              const dbMap = new Map(
+                dbTopResult.rows.map((r) => [
+                  String(r.id),
+                  {
+                    department: r.department as string | null,
+                    value_estimated: r.value_estimated ? parseFloat(r.value_estimated as string) : null,
+                    score: parseFloat(r.score as string) || 0,
+                    probability_of_win: r.probability_of_win ? parseFloat(r.probability_of_win as string) : null,
+                  },
+                ])
+              );
+              topByScore = topByScore.map((opp) => {
+                const db = dbMap.get(opp.id);
+                if (!db) return opp;
+                return {
+                  ...opp,
+                  department: opp.department ?? db.department,
+                  value_estimated: opp.value_estimated ?? db.value_estimated,
+                  score: opp.score || db.score,
+                  probability_of_win: opp.probability_of_win ?? db.probability_of_win,
+                };
+              });
+              // Re-sort by score descending after augmentation
+              topByScore.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+            }
+
           } catch { /* fallback to n8n funnel */ }
+        }
+
+        // If n8n topByScore is still empty/sparse, fall back to top DB opps
+        if (topByScore.every((o) => !o.score)) {
+          const pool2 = getPool();
+          if (pool2) {
+            try {
+              const dbTop = await pool2.query(
+                `SELECT id, title, agency, department, status, score, value_estimated,
+                        probability_of_win, naics, psc, due_date, solicitation_number,
+                        set_aside, place_of_performance, data_source, created_at, updated_at
+                 FROM opportunities WHERE id NOT LIKE 'opp-%'
+                 ORDER BY score DESC NULLS LAST LIMIT 10`
+              );
+              if (dbTop.rows.length > 0) {
+                topByScore = dbTop.rows.map((r) => ({
+                  id: String(r.id),
+                  title: (r.title as string) ?? "Untitled",
+                  agency: r.agency as string | null,
+                  department: r.department as string | null,
+                  status: ((r.status as string) ?? "discovery") as OpportunityStatus,
+                  score: parseFloat(r.score as string) || 0,
+                  value_estimated: r.value_estimated ? parseFloat(r.value_estimated as string) : null,
+                  probability_of_win: r.probability_of_win ? parseFloat(r.probability_of_win as string) : null,
+                  naics: r.naics as string | null,
+                  psc: r.psc as string | null,
+                  due_date: r.due_date as string | null,
+                  solicitation_number: r.solicitation_number as string | null,
+                  set_aside: r.set_aside as string | null,
+                  place_of_performance: r.place_of_performance as string | null,
+                  incumbent: null,
+                  qualified_at: null,
+                  qualified_by: null,
+                  tags: [r.data_source as string].filter(Boolean),
+                  raw_source_url: null,
+                  data_source: r.data_source as string | null,
+                  created_at: (r.created_at as string) ?? new Date().toISOString(),
+                  updated_at: (r.updated_at as string) ?? new Date().toISOString(),
+                }));
+              }
+            } catch { /* ignore fallback error */ }
+          }
         }
 
         return res.json(

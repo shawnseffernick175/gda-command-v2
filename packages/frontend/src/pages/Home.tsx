@@ -590,10 +590,11 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
       {/* Upcoming Decisions */}
       <SignalCard title="Decisions Pending" icon="🎯" count={signals.upcomingDecisions.length} accentColor="#8b5cf6"
         info={{ whatItIs: "Opportunities awaiting your bid/no-bid decision.", whatItMeans: "These need your go/no-go call. Delays risk missing submission windows.", howCalculated: "Capture plans with bid_decision = 'pending' status." }}>
-        {signals.upcomingDecisions.slice(0, 4).map((dec, i) => (
+        <div style={{ maxHeight: 260, overflowY: signals.upcomingDecisions.length > 4 ? "auto" : "visible" }}>
+        {signals.upcomingDecisions.map((dec, i) => (
           <div
             key={i}
-            style={{ ...clickableRow("decision"), borderBottom: i < Math.min(signals.upcomingDecisions.length, 4) - 1 ? "1px solid var(--color-border)" : "none" }}
+            style={{ ...clickableRow("decision"), borderBottom: i < signals.upcomingDecisions.length - 1 ? "1px solid var(--color-border)" : "none" }}
             onClick={() => navigate("/capture")}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
@@ -613,6 +614,7 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
             )}
           </div>
         ))}
+        </div>
       </SignalCard>
 
       {/* Due-Soon Items + Approvals */}
