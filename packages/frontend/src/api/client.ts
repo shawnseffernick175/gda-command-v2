@@ -18,7 +18,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<GDAEnvelope
     // Try to parse the error envelope for a useful message
     try {
       const body = await res.json() as GDAEnvelope<T>;
-      if (body.error?.message) {
+      if (body?.error?.message) {
         throw new Error(body.error.message);
       }
     } catch (parseErr) {
