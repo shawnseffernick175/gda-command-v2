@@ -448,7 +448,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
   return (
     <div className="kpi-grid" style={{
       display: "grid",
-      gridTemplateColumns: kpis.n8nKpis ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
+      gridTemplateColumns: "repeat(4, 1fr)",
       gap: 16,
     }}>
       <KPICard
@@ -472,18 +472,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             whatItIs: "Average opportunity quality score across all tracked opportunities.",
             whatItMeans: "Overall pipeline quality. Above 70 is strong, 50-70 moderate, below 50 needs review.",
           }} />
-          <KPICard
-            label="Pipeline Value"
-            value={formatCurrency(kpis.totalPipelineValue)}
-            accent="#8b5cf6"
-            onClick={() => navigate("/pipeline")}
-            info={{
-              whatItIs: "Total estimated value of approved pipeline opportunities.",
-              whatItMeans: "The dollar amount of contracts you are actively pursuing (Qualified + Pipeline status only).",
-              howCalculated: "Sum of estimated values for opportunities in Qualify and Pursue stages.",
-            }}
-          />
-          <KPICard label="Avg Pwin" value={formatPwin(kpis.avgPwin)} accent="#22c55e" onClick={() => navigate("/ops-tracker")} info={{
+          <KPICard label="Avg Pwin" value={kpis.avgPwin > 0 ? formatPwin(kpis.avgPwin) : "—"} accent="#22c55e" onClick={() => navigate("/ops-tracker")} info={{
             whatItIs: "Average probability of win across active opportunities.",
             whatItMeans: "Higher Pwin = stronger competitive position. Industry benchmark: 30-50%.",
           }} />
