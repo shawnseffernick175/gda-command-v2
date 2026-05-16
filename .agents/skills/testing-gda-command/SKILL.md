@@ -33,7 +33,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
   - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, CPARS Builder, GovWin IQ
   - REPORTING: Financials, Reports, Charts, Discussions
   - ADMIN: Settings, Health, Workflows, Users, Audit Log, Doctrine, Book of Truths, Prompts, User Manual
-- Financial KPI strip: persistent header showing "Financial KPIs unavailable" with Retry button when no data seeded
+- Financial KPI strip: **sticky header** (position: sticky, top: 0, zIndex: 40) showing **16 KPIs** with "?" info badges on every card. KPIs use both legacy keys (e.g., `orders`, `sales`) and fin-XXX keys (e.g., `fin-001`, `fin-006`). The KPI_INFO map must have entries for both key formats.
 - Hidden routes (no sidebar link): Opportunity Detail (`/opportunities/:id`), SAM Monitor (`/sam-monitor`), FPDS Monitor (`/fpds-monitor`)
 
 ## Auth System
@@ -43,6 +43,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - **Auth endpoints**: POST `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh`, `/api/auth/logout`, GET `/api/auth/me`
 - **Token storage**: localStorage keys `gda_access_token`, `gda_refresh_token`, `gda_user`
 - **Default admin user**: `admin@gda-command.local` — **WARNING**: The seed data uses a placeholder password hash (`$2b$10$placeholder_hash_for_dev`), so login with `admin123` may fail after a fresh `db:reset`. Workaround: register a new user via `POST /api/auth/register` with `{"email":"tester@gda.local","password":"tester123","display_name":"Test User"}`.
+- **Production test user**: `tester@gda.local` / `tester123` (registered via API, display name "Devin Tester")
 - **Frontend auth gate**: `App.tsx` — `authed` state: `null` = loading spinner, `false` = Login component, `true` = main app
 - **Logout**: Sidebar shows username + "Logout" button at bottom
 
@@ -66,7 +67,7 @@ When doing a comprehensive audit, navigate every page and verify:
 
 ### Data Sources
 
-- **n8n integration** (primary): Backend calls n8n webhook at `https://n8n.csr-llc.tech/webhook/gda-opp-tracker` with header `x-gda-key: gda-webhook-secret-2026`. Returns ~291 real opportunities from GovTribe, SAM.gov, GDA Tracker.
+- **n8n integration** (primary): Backend calls n8n webhook at `https://n8n.csr-llc.tech/webhook/gda-opp-tracker` with header `x-gda-key: gda-webhook-secret-2026`. Returns ~301 real opportunities from GovTribe, SAM.gov, GDA Tracker.
 - **Postgres fallback**: If n8n is unreachable, backend falls back to local DB (7 seeded opportunities). Source badge shows "Live DB" instead of "Live API".
 - Envision Innovative Solutions company profile: $382M revenue (Large Business), 41 employees (Small Business by SBA headcount)
 - NAICS Size classification: ~4 Small Business (employee-based NAICS like 541715), ~55 Large Business (revenue-based NAICS), rest Unclassified
@@ -96,16 +97,30 @@ When doing a comprehensive audit, navigate every page and verify:
 |---------|-------------|
 | Sidebar collapse | Click ◀ button, verify icon-only rail, click ▶ to expand back |
 | Notifications | Click bell icon at bottom of sidebar, verify panel renders |
-| Financial KPI strip | Observe top header — shows 10 KPIs with real values when data is seeded |
+| Financial KPI strip | Observe top header — shows 16 KPIs with real values, sticky at top when scrolling, "?" info badge on every card |
 | 404 page | Navigate to `/nonexistent-page`, verify "Page not found" with Back to Launchpad link |
+
+## Launchpad Testing
+
+### KPI Strip Verification
+- **Sticky behavior**: Scroll down the page — KPI strip must remain fixed at viewport top (position: sticky, top: 0, zIndex: 40)
+- **All 16 KPIs must have "?" buttons**: Orders, Sales, EBIT, Gross Profit, ROS, Funded Backlog, Contract Backlog, Active Contracts, Annual Revenue, Avg Contract Value, Avg P(Win), Employee Count, Pipeline Value, Proposals Submitted, Revenue Per Employee, Win Rate
+- **"Contract Backlog" label** (not "Backlog"): 7th KPI card, backed by `fin-006` in `financial_kpis` table
+- **KPI_INFO map**: Must contain entries for both legacy keys (e.g., `backlog`) AND fin-XXX keys (e.g., `fin-006`) since DB returns fin-XXX keys
+
+### Summary Cards Verification
+- Cards should show: **Total Opportunities**, **Weighted Op Value**, **Avg Score**, **Avg Pwin**
+- NO cards labeled "Pursue", "Evaluate", or "Monitor" (these were removed — they showed misleading n8n classification counts)
+- **Avg Pwin** should show "—" (dash) when no pwin data exists, NOT "0%"
+- Grid layout: `repeat(4, 1fr)` — 4 cards in a row
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
+- **Predictive Analytics crash**: `/predictive` might crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend might not handle undefined response.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
+- **n8n values arrive as strings**: All numeric fields from n8n (value_estimated, score, probability_of_win) must be coerced with `Number()` or `parseFloat()` before arithmetic. Without coercion, `reduce()` concatenates strings instead of summing (e.g., "5000000" + "3000000" = "050000003000000").
 
 ## POST Write Persistence Testing
 
@@ -138,7 +153,7 @@ For testing endpoints that write to PostgreSQL:
 1. **Navigate systematically** through all sidebar groups
 2. **Verify source badges** — "Live API" means n8n data (preferred), "Live DB" means postgres fallback
 3. **Check empty states** — pages with no DB data should show 0 counts + empty message (NOT mock data)
-4. **Test NAICS Size filter** on Ops Tracker: All=291, Small≈4, Large≈55, Unclassified≈41
+4. **Test NAICS Size filter** on Ops Tracker: All≈302, Small≈varies, Large≈varies
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
@@ -147,42 +162,53 @@ For testing endpoints that write to PostgreSQL:
 
 ### Pagination
 - Default: 25 per page, `page=1&pageSize=25` query params
-- Expected: ~12 pages for 291 opportunities (ceil(291/25) = 12)
+- Expected: ~13 pages for ~302 opportunities
 - Pagination controls: Prev/Next buttons + "Page X of Y — showing Z of N opportunities"
-- **Summary strip must show full-dataset aggregates** (Count=291, Total Value≈$2.3B), NOT page-slice values
+- **Summary strip must show full-dataset aggregates** (Count≈302, Total Value≈$2.3B), NOT page-slice values
 - **Summary stats must NOT change when paginating** — only the table data changes
+- **Total Value formatting**: Must show clean abbreviations like "$2.3B" or "$6.0M", NOT raw numbers like "$23032235831.0M" or scientific notation
 
 ### API Verification
 ```bash
-# Login
+# Login (production)
 TOKEN=$(curl -s https://gda.csr-llc.tech/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"shawn.seffernick@envision-is.com","password":"admin123"}' \
+  -d '{"email":"tester@gda.local","password":"tester123"}' \
   | jq -r '.data.accessToken')
 
 # Test pagination
 curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
   -H "Authorization: Bearer $TOKEN" \
   | jq '{source: .meta.source, count: .meta.totalFiltered, totalPages: .meta.totalPages, totalValue: .meta.totalValue}'
-# Expected: {source: "gateway", count: 291, totalPages: 12, totalValue: ~2303223583}
+# Expected: {source: "gateway", count: ~302, totalPages: 13, totalValue: ~2303223583}
 ```
 
 ### Production Deploy
-- VPS: `ssh root@187.77.206.105`
-- Deploy compose file: `docker-compose.deploy.yml` (NOT `docker-compose.yml` which is dev-only postgres)
-- Services: `gda-v2-frontend`, `gda-v2-backend`, `gda-v2-postgres`
-- Rebuild: `docker compose -f docker-compose.deploy.yml build --no-cache gda-backend gda-frontend`
-- Restart: `docker compose -f docker-compose.deploy.yml up -d gda-backend gda-frontend`
-- Verify: `docker ps --format 'table {{.Names}}\t{{.Status}}' | grep gda-v2`
+- VPS: `sshpass -p "${HOSTINGER_VPS_PASSWORD}" ssh root@${HOSTINGER_VPS_IP}` (or `ssh root@187.77.206.105`)
+- Deploy compose file: **`docker-compose.prod.yml`** (NOT `docker-compose.yml` which is dev-only postgres, NOT `docker-compose.deploy.yml`)
+- Container names: **`gda-backend`**, **`gda-frontend`**, **`gda-postgres`** (NOT `gda-v2-*` prefixed)
+- Pull latest: `cd /root/gda-command-v2 && git pull origin main`
+- Rebuild: `docker compose -f docker-compose.prod.yml build --no-cache backend frontend`
+- Restart: `docker compose -f docker-compose.prod.yml up -d backend frontend`
+- Run migrations: `docker exec gda-backend node -e "require('./dist/db/migrate').migrate()"`
+- Verify: `docker ps --format 'table {{.Names}}\t{{.Status}}' | grep gda`
 - Site: https://gda.csr-llc.tech
-- Login: `shawn.seffernick@envision-is.com` / `admin123`
+- **Production login**: `tester@gda.local` / `tester123` (display: "Devin Tester")
+
+### Migration Testing
+- **Column names matter**: The `financial_kpis` table uses `id` column (NOT `key`). Migration 023 was initially wrong with `WHERE key = 'backlog'` — fixed to `WHERE id = 'fin-006'`.
+- **Always verify migrations on production**: After deploy, run migration command and check for errors. Then verify the data change in the UI.
+- **Test migration idempotency**: Running the same migration twice should not error (use `IF NOT EXISTS`, `ON CONFLICT`, or conditional updates).
 
 ### Browser Testing Tips
 - Pagination buttons may be below the fold — scroll down to expose them
 - Use `document.querySelectorAll('button')` with text matching to reliably click pagination buttons
 - When verifying summary stats across pages, compare Count + Total Value on page 1 vs page 2 — they must be identical
 - n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection failed
+- **KPI strip scrolls horizontally** — not all 16 KPIs are visible at once. Use DOM inspection to verify offscreen KPIs have "?" buttons.
 
 ## Devin Secrets Needed
 
-None — all live DB data, no external services required for testing. Auth uses local JWT with dev secret.
+- `HOSTINGER_VPS_PASSWORD` — for SSH access to production VPS (used in deploy commands)
+- `HOSTINGER_VPS_IP` — production VPS IP address
+- No other secrets needed for testing. Auth uses local JWT with dev secret.
