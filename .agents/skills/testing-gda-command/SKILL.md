@@ -96,16 +96,55 @@ When doing a comprehensive audit, navigate every page and verify:
 |---------|-------------|
 | Sidebar collapse | Click ◀ button, verify icon-only rail, click ▶ to expand back |
 | Notifications | Click bell icon at bottom of sidebar, verify panel renders |
-| Financial KPI strip | Observe top header — shows 10 KPIs with real values when data is seeded |
+| Financial KPI strip | Observe top header — shows 10+ KPIs with real values when data is seeded |
 | 404 page | Navigate to `/nonexistent-page`, verify "Page not found" with Back to Launchpad link |
 
 ## Known Issues
 
-- **Predictive Analytics crash**: `/predictive` crashes with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend doesn't handle undefined response after mock data removal.
-- **FPDS Monitor calculation errors**: `/fpds-monitor` loads 500 awards but Total Value shows "$NaN" and Avg Relevance shows "null%" — data parsing issue in aggregate calculations.
+- **Predictive Analytics crash**: `/predictive` might crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend might not handle undefined response after mock data removal.
+- **FPDS Monitor calculation errors**: `/fpds-monitor` might show "$NaN" for Total Value and "null%" for Avg Relevance — data parsing issue in aggregate calculations.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
+
+## Launchpad Testing
+
+### KPI Trend Variance
+KPI trends should show varied percentages, not all identical. If all KPIs show the same trend (e.g., all +5.3%), the backend `financials.ts` route might be using a hardcoded multiplier for the `prior` value. Verify at least 3 distinct trend percentages across the KPI strip. Use the DOM `title` attribute on each KPI card to read the exact value.
+
+### Opportunity Funnel Per-Stage Values
+The Opportunity Funnel on Launchpad should show per-stage aggregations (count, dollar value, avg pwin, avg score). Check the "Interest/Identified/Discovery" row for non-zero dollar value and pwin. The backend `dashboard.ts` queries `SUM(value_estimated)` and `AVG(probability_of_win)` per status group. If values show $0 and 0%, the aggregation query might not be running.
+
+## Charts Testing
+
+### Full Dataset Verification
+The Charts page (`/charts`) should load ALL opportunities, not just the first page. The `fetchPipeline()` function should loop through all pages with `pageSize=100`. Verify by checking the "X opportunities loaded" label — it should match the total DB count (e.g., 46 local opps, or 291+ with n8n). If it shows only 25, the pagination loop might be missing.
+
+## Color Review Testing
+
+### Score Display Validation
+Color Review scores should display as clean percentages (e.g., "71%", "42%"). Watch for scientific notation (e.g., "5.1e+27%") or absurdly large numbers — this indicates a `Number()` coercion bug in the frontend. The backend stores scores as numeric strings that need proper parsing. Submit a test review (paste any text, select a phase like "Pink Team") and verify the returned score renders correctly. If no OpenAI key is configured, reviews will queue but not return a real score — verify the display shows "—" or "0%" instead of garbage.
+
+## RFP Shredder Testing
+
+### Job Persistence
+RFP Shredder jobs should persist to the database and survive page refresh. After submitting a shred job:
+1. Note the job name in the success modal
+2. Refresh the page (F5 or navigate away and back)
+3. Verify the job still appears in the Jobs tab
+If jobs disappear on refresh, the POST endpoint might not be inserting into `shred_jobs` table.
+
+### Success Modal — No "undefined" Text
+The shred success modal should show a clean message without any stray "undefined" text. The `data.message` field from the API response might be undefined — the frontend should use conditional rendering (`data.message && ...`) to avoid displaying the literal string "undefined".
+
+## Navigation Regression Testing
+
+### Previously Crashing Pages
+Approvals (`/approvals`) and Proposal Center (`/proposal-center`) previously crashed on client-side navigation with `SyntaxError: "undefined" is not valid JSON`. The fix made agent stats fetch non-blocking (`Promise.allSettled` instead of `Promise.all` or a guarded try/catch). When testing navigation:
+1. Navigate to at least 5-6 pages using sidebar links (not address bar)
+2. **Must include** Approvals and Proposal Center transitions
+3. Check for blank screens, crashes, or console errors at each transition
+4. Hard refresh should NOT be required — client-side nav should work cleanly
 
 ## POST Write Persistence Testing
 
@@ -132,6 +171,9 @@ For testing endpoints that write to PostgreSQL:
 | reports | `POST /generate` | INSERT generated_reports |
 | reports | `POST /export` | INSERT export_jobs |
 | capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+| rfp-shredder | `POST /shred` | INSERT shred_jobs + shred_requirements |
+| color-review | `POST /reviews` | INSERT color_reviews |
+| audit-log | (automatic middleware) | INSERT audit_events on POST/PUT/PATCH/DELETE |
 
 ## Testing Strategy
 
@@ -142,6 +184,11 @@ For testing endpoints that write to PostgreSQL:
 5. **Test filters and tabs** — click each, verify content renders
 6. **Record browser interactions** with annotate_recording tool
 7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+8. **Verify KPI trends** — at least 3 different trend percentages across KPI strip
+9. **Verify Charts total** — should match full opportunity count, not just first page
+10. **Verify funnel values** — Interest/Discovery row should show non-zero dollar value and pwin
+11. **Verify Color Review scores** — clean percentages, no scientific notation
+12. **Test navigation regression** — include Approvals and Proposal Center in multi-page nav test
 
 ## Ops Tracker Testing (n8n Integration)
 
