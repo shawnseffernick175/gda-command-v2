@@ -87,7 +87,7 @@ function mapStage(stage: string | undefined): OpportunityStatus {
 
 function mapOpportunity(raw: N8nOpportunity): Opportunity {
   const value = raw.estimated_value != null ? Number(raw.estimated_value) : null;
-  const score = raw.gda_score ?? raw.eis_fit_score ?? 0;
+  const score = Number(raw.gda_score ?? raw.eis_fit_score ?? 0) || 0;
 
   return {
     id: String(raw.id),

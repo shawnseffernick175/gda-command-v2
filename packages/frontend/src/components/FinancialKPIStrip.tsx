@@ -34,6 +34,11 @@ const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalcu
     whatItMeans: "Long-term revenue pipeline. Higher contract backlog = more future revenue security.",
     howCalculated: "Sum of total contract ceiling minus revenue recognized across all active contracts.",
   },
+  contract_backlog: {
+    whatItIs: "Contract Backlog — total remaining value on all active contracts (funded + unfunded).",
+    whatItMeans: "Long-term revenue pipeline. Higher contract backlog = more future revenue security.",
+    howCalculated: "Sum of total contract ceiling minus revenue recognized across all active contracts.",
+  },
   gross_profit: {
     whatItIs: "Revenue minus direct costs (labor, materials, subcontractors).",
     whatItMeans: "Measures contract-level profitability before overhead and SG&A.",
@@ -78,6 +83,52 @@ const KPI_INFO: Record<string, { whatItIs: string; whatItMeans: string; howCalcu
     whatItIs: "Percentage of proposals that result in contract awards.",
     whatItMeans: "Overall capture effectiveness. Industry benchmark: 30-50% for GovCon.",
     howCalculated: "Contracts Won ÷ Total Proposals Submitted × 100%.",
+  },
+  // DB key aliases (fin-XXX format)
+  "fin-001": {
+    whatItIs: "Total revenue recognized in the current fiscal year.",
+    whatItMeans: "Top-line revenue indicator for the organization.",
+  },
+  "fin-002": {
+    whatItIs: "Total estimated value of all opportunities in the pipeline.",
+    whatItMeans: "Future revenue potential if all opportunities are won.",
+  },
+  "fin-003": {
+    whatItIs: "Percentage of proposals that result in contract awards.",
+    whatItMeans: "Overall capture effectiveness. Industry benchmark: 30-50% for GovCon.",
+    howCalculated: "Contracts Won ÷ Total Proposals Submitted × 100%.",
+  },
+  "fin-004": {
+    whatItIs: "Average dollar value per active contract.",
+    whatItMeans: "Higher values indicate larger, more complex contract wins.",
+    howCalculated: "Total Contract Value ÷ Number of Active Contracts.",
+  },
+  "fin-005": {
+    whatItIs: "Number of active contracts currently being executed.",
+    whatItMeans: "Indicates current workload and revenue-generating capacity.",
+  },
+  "fin-006": {
+    whatItIs: "Contract Backlog — total remaining value on all active contracts (funded + unfunded).",
+    whatItMeans: "Long-term revenue pipeline. Higher contract backlog = more future revenue security.",
+    howCalculated: "Sum of total contract ceiling minus revenue recognized across all active contracts.",
+  },
+  "fin-007": {
+    whatItIs: "Average Probability of Win across all active opportunities.",
+    whatItMeans: "Overall competitiveness of the current pipeline.",
+    howCalculated: "Sum of all opportunity P(Win) scores ÷ Number of opportunities.",
+  },
+  "fin-008": {
+    whatItIs: "Number of proposals submitted in the current period.",
+    whatItMeans: "Measures business development activity and pursuit volume.",
+  },
+  "fin-009": {
+    whatItIs: "Total number of employees in the organization.",
+    whatItMeans: "Workforce capacity for contract execution and growth.",
+  },
+  "fin-010": {
+    whatItIs: "Annual revenue divided by employee count.",
+    whatItMeans: "Efficiency metric — higher values indicate better utilization.",
+    howCalculated: "Annual Revenue ÷ Employee Count.",
   },
 };
 
@@ -191,6 +242,9 @@ export default function FinancialKPIStrip() {
       borderBottom: "1px solid var(--color-border)",
       padding: collapsed ? "4px 24px" : "8px 24px",
       transition: "padding 0.2s",
+      position: "sticky",
+      top: 0,
+      zIndex: 40,
     }}>
       <div style={{
         display: "flex",
