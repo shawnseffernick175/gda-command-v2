@@ -78,8 +78,11 @@ router.get("/kpis", async (_req, res) => {
             const discoveryData = statusMap.get("discovery") ?? { count: 0, totalValue: 0, avgPwin: 0, avgScore: 0 };
             const discoveryCount = discoveryData.count + unsyncedCount;
 
-            // Use the larger of DB total or n8n pipeline value for Identified stage
-            const identifiedValue = Math.max(discoveryData.totalValue, totalPipelineValue);
+            // Subtract non-discovery DB values from n8n total to avoid double-counting
+            const nonDiscoveryValue = Array.from(statusMap.entries())
+              .filter(([status]) => status !== "discovery")
+              .reduce((s, [, d]) => s + d.totalValue, 0);
+            const identifiedValue = Math.max(discoveryData.totalValue, totalPipelineValue - nonDiscoveryValue);
 
             const funnelMap = new Map<string, { count: number; totalValue: number; avgPwin: number; avgScore: number }>();
             funnelMap.set("Identified", { count: discoveryCount, totalValue: identifiedValue, avgPwin: discoveryData.avgPwin, avgScore: discoveryData.avgScore });
