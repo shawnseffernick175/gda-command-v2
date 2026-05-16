@@ -22,7 +22,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<GDAEnvelope
         throw new Error(body.error.message);
       }
     } catch (parseErr) {
-      if (parseErr instanceof Error && parseErr.message !== `HTTP ${res.status}: ${res.statusText}`) {
+      // Re-throw only if this was our intentionally thrown error (with the server message),
+      // not a JSON parse SyntaxError from non-JSON responses
+      if (parseErr instanceof Error && !(parseErr instanceof SyntaxError)) {
         throw parseErr;
       }
     }
