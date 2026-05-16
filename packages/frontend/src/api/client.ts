@@ -15,6 +15,17 @@ interface GDAEnvelope<T> {
 async function request<T>(path: string, init?: RequestInit): Promise<GDAEnvelope<T>> {
   const res = await authenticatedFetch(`${API_BASE}${path}`, init);
   if (!res.ok) {
+    // Try to parse the error envelope for a useful message
+    try {
+      const body = await res.json() as GDAEnvelope<T>;
+      if (body.error?.message) {
+        throw new Error(body.error.message);
+      }
+    } catch (parseErr) {
+      if (parseErr instanceof Error && parseErr.message !== `HTTP ${res.status}: ${res.statusText}`) {
+        throw parseErr;
+      }
+    }
     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }
   return res.json() as Promise<GDAEnvelope<T>>;

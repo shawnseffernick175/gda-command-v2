@@ -476,6 +476,14 @@ router.post(
         try {
           await client.query("BEGIN");
 
+          // Ensure the target collection exists (auto-create if missing)
+          await client.query(
+            `INSERT INTO knowledge_collections (id, name, description, document_count, total_chunks, created_at)
+             VALUES ($1, $2, $3, 0, 0, NOW())
+             ON CONFLICT (id) DO NOTHING`,
+            [collectionId, collectionId.replace(/^col-/, "").replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()), "Auto-created collection"],
+          );
+
           // Insert uploaded_files record
           await client.query(
             `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
