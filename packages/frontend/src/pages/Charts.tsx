@@ -19,9 +19,18 @@ interface GDAEnvelope<T> {
 
 async function fetchPipeline(): Promise<PipelineRow[]> {
   try {
-    const r = await authenticatedFetch("/api/opportunities");
-    const env: GDAEnvelope<{ opportunities: PipelineRow[] }> = await r.json();
-    return env.data?.opportunities ?? [];
+    const all: PipelineRow[] = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const r = await authenticatedFetch(`/api/opportunities?pageSize=100&page=${page}`);
+      const env = await r.json() as { success: boolean; data: { opportunities: PipelineRow[] } | null; meta?: Record<string, unknown> };
+      const rows = env.data?.opportunities ?? [];
+      all.push(...rows);
+      totalPages = (env.meta?.totalPages as number) ?? 1;
+      page++;
+    } while (page <= totalPages);
+    return all;
   } catch {
     return [];
   }

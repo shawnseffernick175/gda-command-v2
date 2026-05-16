@@ -52,34 +52,51 @@ router.get("/kpis", async (_req, res) => {
         const pool = getPool();
         if (pool) {
           try {
-            // Query all statuses directly from DB (not just overrides)
-            const statusCounts = await pool.query(
-              `SELECT status, COUNT(*) as cnt FROM opportunities WHERE id NOT LIKE 'opp-%' GROUP BY status`
+            // Query per-stage aggregates from DB
+            const statusAgg = await pool.query(
+              `SELECT status, COUNT(*) as cnt,
+                      COALESCE(SUM(value_estimated), 0) as total_value,
+                      AVG(CASE WHEN probability_of_win IS NOT NULL THEN probability_of_win END) as avg_pwin,
+                      AVG(score) as avg_score
+               FROM opportunities WHERE id NOT LIKE 'opp-%' GROUP BY status`
             );
-            const statusMap = new Map<string, number>();
+            const statusMap = new Map<string, { count: number; totalValue: number; avgPwin: number; avgScore: number }>();
             let dbTotal = 0;
-            for (const row of statusCounts.rows) {
-              statusMap.set(row.status as string, parseInt(row.cnt as string, 10));
-              dbTotal += parseInt(row.cnt as string, 10);
+            for (const row of statusAgg.rows) {
+              const cnt = parseInt(row.cnt as string, 10);
+              statusMap.set(row.status as string, {
+                count: cnt,
+                totalValue: parseFloat(row.total_value as string) || 0,
+                avgPwin: parseFloat(row.avg_pwin as string) || 0,
+                avgScore: parseFloat(row.avg_score as string) || 0,
+              });
+              dbTotal += cnt;
             }
 
             // Opps in n8n but not yet in DB are also in Identified
             const unsyncedCount = Math.max(0, totalOpportunities - dbTotal);
-            const discoveryCount = (statusMap.get("discovery") ?? 0) + unsyncedCount;
+            const discoveryData = statusMap.get("discovery") ?? { count: 0, totalValue: 0, avgPwin: 0, avgScore: 0 };
+            const discoveryCount = discoveryData.count + unsyncedCount;
 
-            const funnelMap = new Map<string, { count: number; totalValue: number }>();
-            funnelMap.set("Identified", { count: discoveryCount, totalValue: 0 });
-            for (const [status, cnt] of statusMap) {
+            // Distribute n8n total pipeline value to Identified if DB values are low
+            const dbTotalValue = Array.from(statusMap.values()).reduce((s, d) => s + d.totalValue, 0);
+            const identifiedValue = dbTotalValue > 0
+              ? discoveryData.totalValue
+              : totalPipelineValue;
+
+            const funnelMap = new Map<string, { count: number; totalValue: number; avgPwin: number; avgScore: number }>();
+            funnelMap.set("Identified", { count: discoveryCount, totalValue: identifiedValue, avgPwin: discoveryData.avgPwin, avgScore: discoveryData.avgScore });
+            for (const [status, data] of statusMap) {
               if (status === "discovery") continue;
               const label = status === "qualified" ? "Qualified" : status === "pipeline" ? "Pipeline" : status.charAt(0).toUpperCase() + status.slice(1);
-              funnelMap.set(label, { count: cnt, totalValue: 0 });
+              funnelMap.set(label, data);
             }
             n8nFunnel = Array.from(funnelMap.entries()).map(([stage, data]) => ({
               stage,
               count: data.count,
               totalValue: data.totalValue,
-              avgPwin: 0,
-              avgScore: 0,
+              avgPwin: data.avgPwin,
+              avgScore: data.avgScore,
             }));
           } catch { /* fallback to n8n funnel */ }
         }
