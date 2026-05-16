@@ -448,7 +448,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
   return (
     <div className="kpi-grid" style={{
       display: "grid",
-      gridTemplateColumns: kpis.n8nKpis ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
+      gridTemplateColumns: "repeat(4, 1fr)",
       gap: 16,
     }}>
       <KPICard
@@ -463,14 +463,19 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
       />
       {kpis.n8nKpis ? (
         <>
-          <KPICard label="Weighted Op Value" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" onClick={() => navigate("/pipeline")} info={{
+          <KPICard label="Weighted Op Value" value={kpis.n8nKpis.weightedPipeline} accent="#8b5cf6" onClick={() => navigate("/ops-tracker")} info={{
             whatItIs: "Total opportunity value weighted by probability of win.",
             whatItMeans: "Risk-adjusted forecast based on contract values and win probability.",
             howCalculated: "Sum of (contract value × Pwin) for all tracked opportunities.",
           }} />
-          <KPICard label="Pursue" value={String(kpis.n8nKpis.pursueCount)} accent="#22c55e" onClick={() => navigate("/ops-tracker?status=pipeline")} />
-          <KPICard label="Evaluate" value={String(kpis.n8nKpis.evaluateCount)} accent="#f59e0b" onClick={() => navigate("/ops-tracker")} />
-          <KPICard label="Monitor" value={String(kpis.n8nKpis.monitorCount)} accent="#6b7280" onClick={() => navigate("/ops-tracker")} />
+          <KPICard label="Avg Score" value={kpis.avgScore ? kpis.avgScore.toFixed(0) : "—"} accent="#3b82f6" onClick={() => navigate("/ops-tracker")} info={{
+            whatItIs: "Average opportunity quality score across all tracked opportunities.",
+            whatItMeans: "Overall pipeline quality. Above 70 is strong, 50-70 moderate, below 50 needs review.",
+          }} />
+          <KPICard label="Avg Pwin" value={kpis.avgPwin > 0 ? formatPwin(kpis.avgPwin) : "—"} accent="#22c55e" onClick={() => navigate("/ops-tracker")} info={{
+            whatItIs: "Average probability of win across active opportunities.",
+            whatItMeans: "Higher Pwin = stronger competitive position. Industry benchmark: 30-50%.",
+          }} />
         </>
       ) : (
         <>

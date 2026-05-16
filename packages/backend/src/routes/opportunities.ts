@@ -217,6 +217,9 @@ router.get("/", async (req, res) => {
               combined = [...combined, ...localOpps.rows.map((r) => ({
                 ...r,
                 id: String(r.id),
+                score: parseFloat(r.score) || 0,
+                value_estimated: r.value_estimated ? parseFloat(r.value_estimated) : null,
+                probability_of_win: r.probability_of_win ? parseFloat(r.probability_of_win) : null,
                 naics_size: classifyNaicsSize(r.naics),
                 tags: [],
               } as Opportunity))];
@@ -237,10 +240,11 @@ router.get("/", async (req, res) => {
         const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
 
         // Compute aggregate stats across ALL filtered rows (not just page slice)
-        const aggTotalValue = allRows.reduce((s, o) => s + (o.value_estimated ?? 0), 0);
+        // Ensure numeric coercion to prevent string concatenation from DB/n8n values
+        const aggTotalValue = allRows.reduce((s, o) => s + (Number(o.value_estimated) || 0), 0);
         const withPwin = allRows.filter((o) => o.probability_of_win !== null);
-        const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length : 0;
-        const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (o.score ?? 0), 0) / allRows.length : 0;
+        const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (Number(o.probability_of_win) || 0), 0) / withPwin.length : 0;
+        const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (Number(o.score) || 0), 0) / allRows.length : 0;
         const aggDepartments = [...new Set(allRows.map((o) => o.department).filter(Boolean))].sort();
 
         return res.json(
@@ -349,10 +353,10 @@ router.get("/", async (req, res) => {
     const rows = allRows.slice((page - 1) * pageSize, page * pageSize);
 
     // Compute aggregate stats across ALL filtered rows (not just page slice)
-    const aggTotalValue = allRows.reduce((s, o) => s + (o.value_estimated ?? 0), 0);
+    const aggTotalValue = allRows.reduce((s, o) => s + (Number(o.value_estimated) || 0), 0);
     const withPwin = allRows.filter((o) => o.probability_of_win !== null);
-    const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (o.probability_of_win ?? 0), 0) / withPwin.length : 0;
-    const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (o.score ?? 0), 0) / allRows.length : 0;
+    const aggAvgPwin = withPwin.length > 0 ? withPwin.reduce((s, o) => s + (Number(o.probability_of_win) || 0), 0) / withPwin.length : 0;
+    const aggAvgScore = allRows.length > 0 ? allRows.reduce((s, o) => s + (Number(o.score) || 0), 0) / allRows.length : 0;
     const aggDepartments = [...new Set(allRows.map((o) => o.department).filter(Boolean))].sort();
 
     return res.json(
