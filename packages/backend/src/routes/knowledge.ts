@@ -331,15 +331,15 @@ router.post("/chat", requireRole("admin", "bd_manager", "capture_lead", "analyst
 
     /* No mock fallback for search results */
 
-    if (isLLMAvailable() && sourceDocs.length > 0) {
-      // Real LLM call with RAG context
+    if (isLLMAvailable()) {
+      // Real LLM call — with RAG context if available, or general knowledge
+      const userContent = sourceDocs.length > 0
+        ? `Here are the relevant documents from the GDA knowledge base:\n\n${ragContext}\n\n---\n\nUser question: ${message.trim()}`
+        : message.trim();
       const llmResponse = await chatCompletion(
         [
           { role: "system", content: SYSTEM_PROMPTS.ragChat },
-          {
-            role: "user",
-            content: `Here are the relevant documents from the GDA knowledge base:\n\n${ragContext}\n\n---\n\nUser question: ${message.trim()}`,
-          },
+          { role: "user", content: userContent },
         ],
         { temperature: 0.3, max_tokens: 1500 },
       );
@@ -521,6 +521,33 @@ router.post(
         });
       }
 
+      // Auto-vectorize: extract text and embed in background (non-blocking)
+      let vectorizationStarted = false;
+      if (isEmbeddingAvailable() && pool) {
+        const textMimes = ["text/plain", "text/markdown", "text/csv", "application/json"];
+        const isText = textMimes.includes(file.mimetype) || file.originalname.match(/\.(txt|md|csv|json|log)$/i);
+        if (isText) {
+          const rawText = file.buffer.toString("utf-8");
+          if (rawText.trim().length > 0) {
+            vectorizationStarted = true;
+            // Fire and forget — update status as it processes
+            embedDocument(docId, rawText).then((result) => {
+              pool.query(
+                `UPDATE knowledge_documents SET status = 'indexed', chunk_count = $2, updated_at = NOW() WHERE id = $1`,
+                [docId, result.chunksCreated],
+              ).catch(() => {});
+              log.info("knowledge_auto_vectorized", { docId, chunks: result.chunksCreated, tokens: result.tokensUsed, ms: result.durationMs });
+            }).catch((embErr) => {
+              pool.query(
+                `UPDATE knowledge_documents SET status = 'error', updated_at = NOW() WHERE id = $1`,
+                [docId],
+              ).catch(() => {});
+              log.error("knowledge_vectorize_error", { docId, error: (embErr as Error).message });
+            });
+          }
+        }
+      }
+
       res.json(
         successEnvelope("gda-knowledge", "upload", {
           id: docId,
@@ -531,9 +558,11 @@ router.post(
           tags: parsedTags,
           size_bytes: file.size,
           mime_type: file.mimetype,
-          status: "pending",
+          status: vectorizationStarted ? "processing" : "pending",
           download_url: `/api/files/${fileId}/download`,
-          message: "Document uploaded and queued for processing.",
+          message: vectorizationStarted
+            ? "Document uploaded and vectorization started."
+            : "Document uploaded and queued for processing.",
         }),
       );
     } catch (err) {

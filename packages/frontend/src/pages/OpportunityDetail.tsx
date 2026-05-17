@@ -142,6 +142,10 @@ export default function OpportunityDetail() {
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachResult, setCoachResult] = useState<{ message: string; isError: boolean } | null>(null);
 
+  // AI Analysis state
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeResult, setAnalyzeResult] = useState<{ message: string; isError: boolean } | null>(null);
+
   const backPath = location.state?.from ?? "/ops-tracker";
   const backLabel = backPath === "/pipeline" ? "Pipeline" : backPath === "/" ? "Launchpad" : "Ops Tracker";
 
@@ -222,6 +226,30 @@ export default function OpportunityDetail() {
     act: rawOoda?.act ?? { summary: null, next_steps: [] },
   };
 
+  const handleRunAnalysis = async () => {
+    if (!id) return;
+    setAnalyzing(true);
+    setAnalyzeResult(null);
+    try {
+      const res = await authenticatedFetch(`/api/opportunities/${id}/analyze`, {
+        method: "POST",
+      });
+      const env = await res.json();
+      if (env.success) {
+        setAnalyzeResult({ message: "AI analysis complete — refreshing...", isError: false });
+        // Re-fetch the detail data to show updated OODA/Pwin
+        const detail = await fetchOpportunityDetail(id);
+        if (detail.success && detail.data) setData(detail.data);
+      } else {
+        setAnalyzeResult({ message: env.error?.message ?? "Analysis failed", isError: true });
+      }
+    } catch (err) {
+      setAnalyzeResult({ message: (err as Error).message, isError: true });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleCaptureCoach = async () => {
     if (!id) return;
     setCoachLoading(true);
@@ -295,7 +323,7 @@ export default function OpportunityDetail() {
           <Field label="NAICS" value={opp.naics} />
           <Field label="PSC" value={opp.psc} />
           <Field label="Estimated Value" value={formatCurrency(opp.value_estimated)} />
-          <Field label="Probability of Win" value={opp.probability_of_win != null ? `${Math.round(opp.probability_of_win * 100)}%` : "—"} />
+          <Field label="Probability of Win" value={opp.probability_of_win != null && opp.probability_of_win > 0 ? `${Math.round(opp.probability_of_win * 100)}%` : "—"} />
           <Field label="Due Date" value={formatDate(opp.due_date)} />
           <Field label="Set-Aside" value={opp.set_aside} />
           <Field label="Place of Performance" value={opp.place_of_performance} />
@@ -329,7 +357,7 @@ export default function OpportunityDetail() {
             <p style={{ margin: "0 0 8px" }}>
               Current stage: <strong>{({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}</strong>.
               {opp.score > 0 ? ` Fit score: ${opp.score}/100.` : ""}
-              {opp.probability_of_win ? ` Estimated Pwin: ${(opp.probability_of_win * 100).toFixed(0)}%.` : ""}
+              {opp.probability_of_win ? ` Estimated Pwin: ${Math.round(opp.probability_of_win * 100)}%.` : ""}
             </p>
             {opp.incumbent && <p style={{ margin: 0 }}>Incumbent: {opp.incumbent}.</p>}
           </div>
@@ -338,6 +366,30 @@ export default function OpportunityDetail() {
 
       {/* Section 3: OODA Analysis */}
       <Section title="OODA Analysis">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <button
+            onClick={handleRunAnalysis}
+            disabled={analyzing}
+            style={{
+              padding: "8px 18px",
+              background: analyzing ? "#444" : "linear-gradient(135deg, #3b82f6, #06b6d4)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: analyzing ? "not-allowed" : "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {analyzing ? "Analyzing..." : ooda.observe.items.length > 0 ? "Re-analyze" : "Run AI Analysis"}
+          </button>
+          {analyzeResult && (
+            <span style={{ fontSize: 13, color: analyzeResult.isError ? "#ef4444" : "#22c55e" }}>
+              {analyzeResult.message}
+            </span>
+          )}
+        </div>
         {/* Observe */}
         <OodaSubSection title="Observe — What We Know" summary={ooda.observe.summary}>
           {ooda.observe.items.length === 0 ? (
