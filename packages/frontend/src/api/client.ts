@@ -297,6 +297,7 @@ export interface OodaActStep {
   owner: string | null;
   due_date: string | null;
   priority: string;
+  resource_url?: string | null;
 }
 
 export interface OodaBlock {
