@@ -610,6 +610,60 @@ export interface Proposal {
   win_themes: string[];
   created_at: string;
   updated_at: string;
+  // Builder extensions
+  win_theme_details?: WinThemeDetail[];
+  storyboard?: StoryboardEntry[];
+  outline?: OutlineEntry[];
+  linked_opportunity_id?: string | null;
+  linked_shred_job_id?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Proposal Builder types
+// ---------------------------------------------------------------------------
+
+export type ProposalSectionStatus = "outline" | "draft" | "in_review" | "final";
+
+export interface ProposalSection {
+  id: string;
+  proposal_id: string;
+  volume_type: ProposalVolumeType;
+  title: string;
+  sort_order: number;
+  content: string;
+  ai_generated: boolean;
+  status: ProposalSectionStatus;
+  word_count: number;
+  notes: string | null;
+  assigned_to: string | null;
+  compliance_req_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WinThemeDetail {
+  id: string;
+  theme: string;
+  description: string;
+  evidence: string;
+}
+
+export interface StoryboardEntry {
+  id: string;
+  section_id: string;
+  section_title: string;
+  volume_type: ProposalVolumeType;
+  win_themes: string[];
+  key_points: string[];
+  compliance_reqs: string[];
+  status: ProposalSectionStatus;
+}
+
+export interface OutlineEntry {
+  id: string;
+  volume_type: ProposalVolumeType;
+  title: string;
+  sections: { id: string; title: string; description: string }[];
 }
 
 // ---------------------------------------------------------------------------

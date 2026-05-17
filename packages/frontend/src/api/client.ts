@@ -881,6 +881,53 @@ export interface ProposalRow {
   win_themes: string[];
   created_at: string;
   updated_at: string;
+  win_theme_details?: WinThemeDetailRow[];
+  storyboard?: StoryboardEntryRow[];
+  outline?: OutlineEntryRow[];
+  linked_opportunity_id?: string | null;
+  linked_shred_job_id?: string | null;
+}
+
+export interface WinThemeDetailRow {
+  id: string;
+  theme: string;
+  description: string;
+  evidence: string;
+}
+
+export interface StoryboardEntryRow {
+  id: string;
+  section_id: string;
+  section_title: string;
+  volume_type: string;
+  win_themes: string[];
+  key_points: string[];
+  compliance_reqs: string[];
+  status: string;
+}
+
+export interface OutlineEntryRow {
+  id: string;
+  volume_type: string;
+  title: string;
+  sections: { id: string; title: string; description: string }[];
+}
+
+export interface ProposalSectionRow {
+  id: string;
+  proposal_id: string;
+  volume_type: string;
+  title: string;
+  sort_order: number;
+  content: string;
+  ai_generated: boolean;
+  status: string;
+  word_count: number;
+  notes: string | null;
+  assigned_to: string | null;
+  compliance_req_ids: string[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProposalsData {
@@ -899,6 +946,7 @@ export interface ProposalsData {
 
 export interface ProposalDetailData {
   proposal: ProposalRow;
+  sections: ProposalSectionRow[];
   source: "db" | "n8n";
 }
 
@@ -909,6 +957,59 @@ export function fetchProposals(params?: Record<string, string>) {
 
 export function fetchProposalDetail(id: string) {
   return request<ProposalDetailData>(`/proposals/${id}`);
+}
+
+export function createProposal(data: {
+  title: string;
+  agency: string;
+  solicitation_id?: string;
+  solicitation_title?: string;
+  value_estimated?: number;
+  due_date?: string;
+  capture_manager?: string;
+  proposal_manager?: string;
+  win_themes?: string[];
+  win_theme_details?: WinThemeDetailRow[];
+  linked_opportunity_id?: string;
+  linked_shred_job_id?: string;
+}) {
+  return request<{ proposal: ProposalRow }>("/proposals", { method: "POST", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } });
+}
+
+export function updateProposal(id: string, data: Partial<ProposalRow>) {
+  return request<{ proposal: ProposalRow }>(`/proposals/${id}`, { method: "PUT", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } });
+}
+
+export function deleteProposal(id: string) {
+  return request<{ deleted: string }>(`/proposals/${id}`, { method: "DELETE" });
+}
+
+export function createProposalSection(proposalId: string, data: { volume_type?: string; title: string; content?: string; sort_order?: number; assigned_to?: string; compliance_req_ids?: string[]; status?: string }) {
+  return request<{ section: ProposalSectionRow }>(`/proposals/${proposalId}/sections`, { method: "POST", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } });
+}
+
+export function updateProposalSection(proposalId: string, sectionId: string, data: Partial<ProposalSectionRow>) {
+  return request<{ section: ProposalSectionRow }>(`/proposals/${proposalId}/sections/${sectionId}`, { method: "PUT", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } });
+}
+
+export function deleteProposalSection(proposalId: string, sectionId: string) {
+  return request<{ deleted: string }>(`/proposals/${proposalId}/sections/${sectionId}`, { method: "DELETE" });
+}
+
+export function generateProposalOutline(proposalId: string) {
+  return request<{ outline: OutlineEntryRow[]; model: string; tier: string }>(`/proposals/${proposalId}/generate-outline`, { method: "POST", headers: { "Content-Type": "application/json" } });
+}
+
+export function generateSectionContent(proposalId: string, sectionId: string, instructions?: string) {
+  return request<{ content: string; wordCount: number; model: string }>(`/proposals/${proposalId}/sections/${sectionId}/generate`, { method: "POST", body: JSON.stringify({ instructions }), headers: { "Content-Type": "application/json" } });
+}
+
+export function transformSectionContent(proposalId: string, sectionId: string, action: string, customPrompt?: string) {
+  return request<{ content: string; wordCount: number; action: string; model: string }>(`/proposals/${proposalId}/sections/${sectionId}/transform`, { method: "POST", body: JSON.stringify({ action, custom_prompt: customPrompt }), headers: { "Content-Type": "application/json" } });
+}
+
+export function generateStoryboard(proposalId: string) {
+  return request<{ storyboard: StoryboardEntryRow[]; model: string }>(`/proposals/${proposalId}/generate-storyboard`, { method: "POST", headers: { "Content-Type": "application/json" } });
 }
 
 // ---------------------------------------------------------------------------
