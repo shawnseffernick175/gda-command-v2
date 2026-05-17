@@ -51,9 +51,9 @@ interface RawOpportunity {
 }
 
 interface OodaAnalysis {
-  observe: { summary: string; items: Array<{ label: string; detail: string; source: string }> };
-  orient: { summary: string; items: Array<{ factor: string; assessment: string; impact: string }> };
-  decide: { summary: string; options: Array<{ option: string; pros: string[]; cons: string[]; recommended: boolean }> };
+  observe: { summary: string; items: Array<{ label: string; value: string; source_ids: string[] }> };
+  orient: { summary: string; items: Array<{ label: string; value: string; source_ids: string[]; type: string }> };
+  decide: { summary: string; options: Array<{ label: string; rationale: string; recommended: boolean }> };
   act: { summary: string; next_steps: Array<{ action: string; owner: string | null; due_date: string | null; priority: string }> };
 }
 
@@ -205,15 +205,15 @@ Respond ONLY with valid JSON (no markdown, no code fences):
   "ooda": {
     "observe": {
       "summary": "<key observations about this opportunity>",
-      "items": [{"label": "<label>", "detail": "<detail>", "source": "SAM.gov"}]
+      "items": [{"label": "<label>", "value": "<detail about this observation>", "source_ids": ["SAM.gov"]}]
     },
     "orient": {
       "summary": "<how this aligns with company capabilities>",
-      "items": [{"factor": "<factor>", "assessment": "<assessment>", "impact": "<high|medium|low>"}]
+      "items": [{"label": "<factor>", "value": "<assessment>", "source_ids": [], "type": "<high|medium|low>"}]
     },
     "decide": {
       "summary": "<decision recommendation>",
-      "options": [{"option": "<option>", "pros": ["<pro>"], "cons": ["<con>"], "recommended": true}]
+      "options": [{"label": "<option>", "rationale": "<reasoning for/against>", "recommended": true}]
     },
     "act": {
       "summary": "<immediate actions>",

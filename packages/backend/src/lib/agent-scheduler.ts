@@ -47,10 +47,19 @@ function shouldRunNow(cronExpr: string, lastRunAt: Date | null): boolean {
   const now = new Date();
   const [cronMin, cronHour, cronDom, cronMon, cronDow] = parts;
 
-  // Check if we already ran within the last 55 minutes (prevent double-fire)
+  // Dynamic cooldown based on cron frequency to prevent double-fire
+  // For sub-hourly schedules (*/N), cooldown = N - 1 minutes
+  // For hourly or longer schedules, cooldown = 55 minutes
   if (lastRunAt) {
     const minutesSinceLastRun = (now.getTime() - lastRunAt.getTime()) / 60_000;
-    if (minutesSinceLastRun < 55) return false;
+    let cooldownMinutes = 55;
+    if (cronMin.startsWith("*/")) {
+      const interval = parseInt(cronMin.slice(2));
+      if (!isNaN(interval) && interval > 0 && interval < 55) {
+        cooldownMinutes = Math.max(interval - 1, 1);
+      }
+    }
+    if (minutesSinceLastRun < cooldownMinutes) return false;
   }
 
   const matchField = (field: string, value: number, divisorField?: boolean): boolean => {
