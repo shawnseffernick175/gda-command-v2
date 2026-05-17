@@ -996,6 +996,10 @@ export function deleteProposalSection(proposalId: string, sectionId: string) {
   return request<{ deleted: string }>(`/proposals/${proposalId}/sections/${sectionId}`, { method: "DELETE" });
 }
 
+export function deleteAllProposalSections(proposalId: string) {
+  return request<{ deleted: number }>(`/proposals/${proposalId}/sections`, { method: "DELETE" });
+}
+
 export function generateProposalOutline(proposalId: string) {
   return request<{ outline: OutlineEntryRow[]; model: string; tier: string }>(`/proposals/${proposalId}/generate-outline`, { method: "POST", headers: { "Content-Type": "application/json" } });
 }

@@ -8,6 +8,7 @@ import {
   createProposalSection,
   updateProposalSection,
   deleteProposalSection,
+  deleteAllProposalSections,
   generateProposalOutline,
   generateSectionContent,
   transformSectionContent,
@@ -428,6 +429,8 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
       const env = await generateProposalOutline(proposalId);
       if (env.success && env.data) {
         const outline = env.data.outline;
+        // Delete existing sections before creating new ones
+        await deleteAllProposalSections(proposalId);
         // Create sections from outline
         for (const vol of outline) {
           for (let i = 0; i < vol.sections.length; i++) {

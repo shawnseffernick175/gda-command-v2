@@ -350,6 +350,23 @@ router.delete("/:id/sections/:sectionId", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// DELETE /api/proposals/:id/sections — bulk-delete all sections for a proposal
+// ---------------------------------------------------------------------------
+router.delete("/:id/sections", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "delete-all-sections", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const result = await pool.query(`DELETE FROM proposal_sections WHERE proposal_id = $1`, [req.params.id]);
+    res.json(successEnvelope("GDA.proposals", "delete-all-sections", { deleted: result.rowCount }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "delete-all-sections", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/proposals/:id/generate-outline — AI generates outline
 // ---------------------------------------------------------------------------
 router.post("/:id/generate-outline", async (req, res) => {
