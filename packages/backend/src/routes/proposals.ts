@@ -150,7 +150,7 @@ router.post("/", async (req, res) => {
       return res.status(400).json(errorEnvelope("GDA.proposals", "create", { code: "VALIDATION", message: "Title and agency are required", detail: null }));
     }
 
-    const id = `PROP-${Date.now()}`;
+    const id = `PROP-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     await pool.query(
       `INSERT INTO proposals (id, title, solicitation_id, solicitation_title, agency, status, value_estimated, due_date, capture_manager, proposal_manager, win_themes, win_theme_details, linked_opportunity_id, linked_shred_job_id, volumes, red_team_findings, scorecard, timeline, compliance_score, overall_score)
        VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11, $12, $13, '[]', '[]', '[]', '[]', 0, 0)`,
@@ -313,8 +313,9 @@ router.put("/:id/sections/:sectionId", async (req, res) => {
 
     fields.push(`updated_at = NOW()`);
     params.push(req.params.sectionId);
+    params.push(req.params.id);
 
-    await pool.query(`UPDATE proposal_sections SET ${fields.join(", ")} WHERE id = $${idx}`, params);
+    await pool.query(`UPDATE proposal_sections SET ${fields.join(", ")} WHERE id = $${idx} AND proposal_id = $${idx + 1}`, params);
 
     const result = await pool.query(`SELECT * FROM proposal_sections WHERE id = $1`, [req.params.sectionId]);
     if (result.rows.length === 0) {
@@ -441,7 +442,7 @@ router.post("/:id/sections/:sectionId/generate", async (req, res) => {
       return res.status(404).json(errorEnvelope("GDA.proposals", "generate-section", { code: "NOT_FOUND", message: "Proposal not found", detail: null }));
     }
 
-    const sectionResult = await pool.query(`SELECT * FROM proposal_sections WHERE id = $1`, [req.params.sectionId]);
+    const sectionResult = await pool.query(`SELECT * FROM proposal_sections WHERE id = $1 AND proposal_id = $2`, [req.params.sectionId, req.params.id]);
     if (sectionResult.rows.length === 0) {
       return res.status(404).json(errorEnvelope("GDA.proposals", "generate-section", { code: "NOT_FOUND", message: "Section not found", detail: null }));
     }
@@ -495,7 +496,7 @@ router.post("/:id/sections/:sectionId/transform", async (req, res) => {
       return res.status(500).json(errorEnvelope("GDA.proposals", "transform-section", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
     }
 
-    const sectionResult = await pool.query(`SELECT * FROM proposal_sections WHERE id = $1`, [req.params.sectionId]);
+    const sectionResult = await pool.query(`SELECT * FROM proposal_sections WHERE id = $1 AND proposal_id = $2`, [req.params.sectionId, req.params.id]);
     if (sectionResult.rows.length === 0) {
       return res.status(404).json(errorEnvelope("GDA.proposals", "transform-section", { code: "NOT_FOUND", message: "Section not found", detail: null }));
     }
