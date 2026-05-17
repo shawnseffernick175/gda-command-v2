@@ -225,6 +225,8 @@ export default function OpportunityDetail() {
     decide: rawOoda?.decide ?? { summary: null, options: [] },
     act: rawOoda?.act ?? { summary: null, next_steps: [] },
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const naicsMatch = (rawOoda as any)?.naics_match as { level: string; score: number; companyCode: string | null; oppCode: string; explanation: string; canBidAsPrime: boolean } | null;
 
   const handleRunAnalysis = async () => {
     if (!id) return;
@@ -390,6 +392,40 @@ export default function OpportunityDetail() {
             </span>
           )}
         </div>
+
+        {/* NAICS Match Banner */}
+        {naicsMatch && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: 8,
+              marginBottom: 16,
+              background: naicsMatch.canBidAsPrime ? "#22c55e15" : naicsMatch.level === "none" ? "#ef444415" : "#f59e0b15",
+              border: `1px solid ${naicsMatch.canBidAsPrime ? "#22c55e44" : naicsMatch.level === "none" ? "#ef444444" : "#f59e0b44"}`,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 16 }}>{naicsMatch.canBidAsPrime ? "\u2705" : naicsMatch.level === "none" ? "\u274c" : "\u26a0\ufe0f"}</span>
+              <strong style={{ fontSize: 14, color: naicsMatch.canBidAsPrime ? "#22c55e" : naicsMatch.level === "none" ? "#ef4444" : "#f59e0b" }}>
+                NAICS {naicsMatch.canBidAsPrime ? "Match" : "Mismatch"} — {naicsMatch.oppCode}
+              </strong>
+              <span
+                style={{
+                  fontSize: 11,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: naicsMatch.canBidAsPrime ? "#22c55e22" : "#ef444422",
+                  color: naicsMatch.canBidAsPrime ? "#22c55e" : "#ef4444",
+                  fontWeight: 600,
+                }}
+              >
+                {naicsMatch.score}/20 pts
+              </span>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: "#d1d5db", lineHeight: 1.5 }}>{naicsMatch.explanation}</p>
+          </div>
+        )}
+
         {/* Observe */}
         <OodaSubSection title="Observe — What We Know" summary={ooda.observe.summary}>
           {ooda.observe.items.length === 0 ? (

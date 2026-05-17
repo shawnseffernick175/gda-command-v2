@@ -31,6 +31,82 @@ interface CompanyProfile {
   core_competencies: string[];
 }
 
+// ---------------------------------------------------------------------------
+// NAICS match scoring (deterministic — not left to LLM)
+// ---------------------------------------------------------------------------
+
+export interface NaicsMatchResult {
+  level: "exact" | "prefix_5" | "prefix_4" | "sector" | "none";
+  score: number;          // 0-20 points for the NAICS component
+  companyCode: string | null;  // closest matching company code, if any
+  oppCode: string;        // the opportunity's NAICS code
+  explanation: string;    // human-readable explanation
+  canBidAsPrime: boolean; // whether the company can bid as prime
+}
+
+export function scoreNaicsMatch(oppNaics: string | undefined, companyNaics: string[]): NaicsMatchResult {
+  const oppCode = (oppNaics ?? "").trim();
+  if (!oppCode || companyNaics.length === 0) {
+    return {
+      level: "none", score: 0, companyCode: null, oppCode: oppCode || "N/A",
+      explanation: oppCode
+        ? `Opportunity NAICS ${oppCode} cannot be evaluated — company has no registered NAICS codes.`
+        : "Opportunity does not specify a NAICS code.",
+      canBidAsPrime: !oppCode, // if no NAICS required, assume yes
+    };
+  }
+
+  // 1. Exact match → 20 points
+  const exactMatch = companyNaics.find((c) => c === oppCode);
+  if (exactMatch) {
+    return {
+      level: "exact", score: 20, companyCode: exactMatch, oppCode,
+      explanation: `Exact NAICS match: company is registered under ${oppCode}.`,
+      canBidAsPrime: true,
+    };
+  }
+
+  // 2. Same 5-digit prefix (first 5 of 6 digits) → 12 points
+  const opp5 = oppCode.slice(0, 5);
+  const prefix5Match = companyNaics.find((c) => c.slice(0, 5) === opp5);
+  if (prefix5Match) {
+    return {
+      level: "prefix_5", score: 12, companyCode: prefix5Match, oppCode,
+      explanation: `Close NAICS match: company code ${prefix5Match} shares 5-digit prefix ${opp5}xx with opportunity ${oppCode}. Related work, but not an exact registration — verify eligibility or add ${oppCode} to SAM.gov profile.`,
+      canBidAsPrime: false,
+    };
+  }
+
+  // 3. Same 4-digit prefix → 8 points
+  const opp4 = oppCode.slice(0, 4);
+  const prefix4Match = companyNaics.find((c) => c.slice(0, 4) === opp4);
+  if (prefix4Match) {
+    return {
+      level: "prefix_4", score: 8, companyCode: prefix4Match, oppCode,
+      explanation: `Partial NAICS match: company code ${prefix4Match} is in the same 4-digit industry group ${opp4}xx as opportunity ${oppCode}. Adjacent capability — consider adding ${oppCode} to SAM.gov registrations or teaming with a firm registered under it.`,
+      canBidAsPrime: false,
+    };
+  }
+
+  // 4. Same 2-digit sector → 3 points
+  const opp2 = oppCode.slice(0, 2);
+  const sectorMatch = companyNaics.find((c) => c.slice(0, 2) === opp2);
+  if (sectorMatch) {
+    return {
+      level: "sector", score: 3, companyCode: sectorMatch, oppCode,
+      explanation: `Weak NAICS match: company code ${sectorMatch} is in the same sector (${opp2}) as opportunity ${oppCode}, but different industry groups. Would need to add ${oppCode} to SAM.gov or partner with a registered firm. Not a natural fit for prime bidding.`,
+      canBidAsPrime: false,
+    };
+  }
+
+  // 5. No match at all → 0 points
+  return {
+    level: "none", score: 0, companyCode: null, oppCode,
+    explanation: `No NAICS match: opportunity requires ${oppCode}, which is outside the company's registered codes (${companyNaics.join(", ")}). Cannot bid as prime without adding this NAICS to SAM.gov registration or subcontracting to a firm with this code.`,
+    canBidAsPrime: false,
+  };
+}
+
 interface RawOpportunity {
   id: string;
   title: string;
@@ -76,6 +152,7 @@ interface ScoredOpportunity {
   risks: string[];
   next_actions: string[];
   source: "sam" | "pipeline";
+  naics_match?: NaicsMatchResult;
   ooda?: OodaAnalysis;
   analysis?: AnalysisBlock;
 }
@@ -167,6 +244,7 @@ async function getUnscoredOpportunities(limit = 20): Promise<RawOpportunity[]> {
 function buildScoringPrompt(opp: RawOpportunity, profile: CompanyProfile): ChatMessage[] {
   const value = opp.value_estimate ?? opp.value_estimated;
   const deadline = opp.response_deadline ?? opp.due_date;
+  const naicsResult = scoreNaicsMatch(opp.naics, profile.naics_codes);
 
   const system = `You are an expert government contracting business development analyst for ${profile.name} (CAGE: ${profile.cage_code}).
 
@@ -179,12 +257,21 @@ COMPANY PROFILE:
 - Certifications: ${profile.certifications.join(", ")}
 - Core competencies: ${profile.core_competencies.join(", ")}
 
+NAICS MATCH ANALYSIS (pre-computed — use these facts, do NOT override):
+- Opportunity NAICS: ${naicsResult.oppCode}
+- Match level: ${naicsResult.level}
+- NAICS score: ${naicsResult.score}/20
+- Can bid as prime: ${naicsResult.canBidAsPrime ? "YES" : "NO"}
+- Detail: ${naicsResult.explanation}
+
 Score this opportunity 0-100 based on:
-1. NAICS Match (0-20): Do the company's NAICS codes match the opportunity's NAICS?
+1. NAICS Match (0-20): USE THE PRE-COMPUTED SCORE OF ${naicsResult.score} ABOVE. Do NOT re-evaluate this.
 2. Set-Aside Eligibility (0-15): Does the company qualify for the set-aside type?
 3. Technical Fit (0-25): Do capabilities and past performance align with the requirement?
 4. Competitive Position (0-20): Would incumbent, contract vehicles, and certifications give an advantage?
 5. Value/Risk Balance (0-20): Is the contract value appropriate and the risk manageable?
+
+IMPORTANT: The naics_match score in your response MUST be exactly ${naicsResult.score}. If the company cannot bid as prime (canBidAsPrime=NO), you MUST include a risk about NAICS mismatch and recommend either adding the NAICS code to SAM.gov registration or teaming/subcontracting.
 
 Also perform an OODA analysis (Observe, Orient, Decide, Act) for the opportunity.
 
@@ -209,7 +296,10 @@ Respond ONLY with valid JSON (no markdown, no code fences):
     },
     "orient": {
       "summary": "<how this aligns with company capabilities>",
-      "items": [{"label": "<factor>", "value": "<assessment>", "source_ids": [], "type": "<strength|risk|inference>"}]
+      "items": [
+        {"label": "NAICS Alignment", "value": "${naicsResult.explanation}", "source_ids": ["SAM.gov"], "type": "${naicsResult.canBidAsPrime ? "strength" : "risk"}"},
+        {"label": "<other factor>", "value": "<assessment>", "source_ids": [], "type": "<strength|risk|inference>"}
+      ]
     },
     "decide": {
       "summary": "<decision recommendation>",
@@ -235,6 +325,7 @@ Classification rules: pursue = score > 80, evaluate = 60-80, pass = score < 60.`
 Title: ${opp.title}
 Agency: ${opp.agency}${opp.sub_agency ? ` / ${opp.sub_agency}` : ""}
 NAICS: ${opp.naics ?? "Not specified"}${opp.naics_description ? ` (${opp.naics_description})` : ""}
+NAICS Match Assessment: ${naicsResult.explanation}
 PSC: ${opp.psc ?? "Not specified"}
 Set-Aside: ${opp.set_aside ?? "Full and open"}
 Estimated Value: ${value ? `$${value.toLocaleString()}` : "Not specified"}
@@ -341,14 +432,18 @@ async function storeResults(scored: ScoredOpportunity[]): Promise<void> {
         ],
       );
     } else {
+      // Embed naics_match into the stored OODA JSON for frontend display
+      const oodaWithNaics = opp.ooda ? { ...opp.ooda, naics_match: opp.naics_match ?? null } : null;
+      const analysisWithNaics = opp.analysis ? { ...opp.analysis, naics_match: opp.naics_match ?? null } : null;
+
       await pool.query(
         `UPDATE opportunities SET score = $2, probability_of_win = $3,
          ooda = $4, analysis = $5, ai_analyzed_at = NOW(), updated_at = NOW()
          WHERE id = $1`,
         [
           opp.id, opp.score, opp.score / 100,
-          opp.ooda ? JSON.stringify(opp.ooda) : null,
-          opp.analysis ? JSON.stringify(opp.analysis) : null,
+          oodaWithNaics ? JSON.stringify(oodaWithNaics) : null,
+          analysisWithNaics ? JSON.stringify(analysisWithNaics) : null,
         ],
       );
     }
@@ -412,6 +507,7 @@ export async function scoreSingleOpportunity(oppId: string): Promise<ScoredOppor
     source: "pipeline",
   };
 
+  const naicsMatch = scoreNaicsMatch(opp.naics, profile.naics_codes);
   const messages = buildScoringPrompt(opp, profile);
   const llmResult = await chatCompletion(messages, { tier: "fast" });
   const parsed = parseScoreResponse(llmResult.content);
@@ -430,6 +526,7 @@ export async function scoreSingleOpportunity(oppId: string): Promise<ScoredOppor
     source: opp.source,
     ooda: parsed.ooda,
     analysis: parsed.analysis,
+    naics_match: naicsMatch,
   };
 
   await storeResults([scored]);
@@ -468,6 +565,7 @@ export async function runOpportunityWatch(trigger: "cron" | "manual" | "webhook"
     const scored: ScoredOpportunity[] = [];
     for (const opp of opps) {
       try {
+        const naicsMatch = scoreNaicsMatch(opp.naics, profile.naics_codes);
         const messages = buildScoringPrompt(opp, profile);
         const result = await chatCompletion(messages, { tier: "fast" });
         const parsed = parseScoreResponse(result.content);
@@ -485,6 +583,7 @@ export async function runOpportunityWatch(trigger: "cron" | "manual" | "webhook"
             source: opp.source,
             ooda: parsed.ooda,
             analysis: parsed.analysis,
+            naics_match: naicsMatch,
           });
         } else {
           log.warn("opportunity_watch_parse_error", { oppId: opp.id, raw: result.content.slice(0, 200) });
