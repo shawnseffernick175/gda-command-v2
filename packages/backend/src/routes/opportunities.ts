@@ -610,14 +610,31 @@ router.get("/:id/detail", async (req, res) => {
 
   const respondedAt = new Date().toISOString();
 
+  // Extract stored OODA and analysis from DB columns (populated by Opportunity Watch agent)
+  const oppRecord = opp as unknown as Record<string, unknown>;
+  const storedOoda = oppRecord.ooda as Record<string, unknown> | null;
+  const storedAnalysis = oppRecord.analysis as Record<string, unknown> | null;
+  const aiAnalyzedAt = oppRecord.ai_analyzed_at as string | null;
+
+  const emptyOoda = { observe: { summary: "", items: [] }, orient: { summary: "", items: [] }, decide: { summary: "", options: [] }, act: { summary: "", next_steps: [] } };
+  const emptyAnalysis = { executive_summary: "", strengths: [], risks: [], competitive_landscape: null, relevance_rationale: null, recommended_action: null, confidence: null, last_analyzed_at: null, analyst_feedback: null, analysis_version: "1.0" };
+
+  const oodaData = storedOoda ?? emptyOoda;
+  const analysisData = storedAnalysis
+    ? { ...emptyAnalysis, ...storedAnalysis, last_analyzed_at: aiAnalyzedAt }
+    : emptyAnalysis;
+
+  const hasAnalysis = !!storedAnalysis;
+  const hasOoda = !!storedOoda;
+
   return res.json(
     successEnvelope(
       "gda-opportunity-detail",
       "read",
       {
         opportunity: opp,
-        analysis: { executive_summary: "", strengths: [], risks: [], competitive_landscape: null, relevance_rationale: null, recommended_action: null, confidence: null, last_analyzed_at: null, analyst_feedback: null, analysis_version: "1.0" },
-        ooda: { observe: { summary: "", items: [] }, orient: { summary: "", items: [] }, decide: { summary: "", options: [] }, act: { summary: "", next_steps: [] } },
+        analysis: analysisData,
+        ooda: oodaData,
         sources: [],
         learning: { learning_notes: null, feedback_submitted: false, feedback_at: null, source_count: 0, coverage_gaps: [], next_review_at: null },
         source,
@@ -627,16 +644,56 @@ router.get("/:id/detail", async (req, res) => {
         respondedAt,
         opportunityId: id,
         sourceCount: 0,
-        analysisGeneratedAt: null,
+        analysisGeneratedAt: aiAnalyzedAt,
         coverageFlags: {
-          hasAnalysis: false,
-          hasOoda: false,
+          hasAnalysis,
+          hasOoda,
           hasSources: false,
           hasLearning: false,
         },
       }
     )
   );
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/opportunities/:id/analyze — trigger AI OODA analysis on demand
+// ---------------------------------------------------------------------------
+router.post("/:id/analyze", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(503).json(
+        errorEnvelope("gda-opportunities", "analyze", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+      );
+    }
+
+    const { isLLMAvailable } = await import("../lib/llm");
+    if (!isLLMAvailable()) {
+      return res.status(503).json(
+        errorEnvelope("gda-opportunities", "analyze", { code: "LLM_UNAVAILABLE", message: "No AI model configured", detail: null }),
+      );
+    }
+
+    // Reset score to 0 so opportunity-watch picks it up
+    await pool.query(
+      `UPDATE opportunities SET score = 0, updated_at = NOW() WHERE id = $1`,
+      [req.params.id],
+    );
+
+    // Fire opportunity watch for just this one
+    const { runOpportunityWatch } = await import("../agents/opportunity-watch");
+    const result = await runOpportunityWatch("manual");
+
+    res.json(successEnvelope("gda-opportunities", "analyze", {
+      message: "AI analysis triggered",
+      result,
+    }));
+  } catch (e) {
+    res.status(500).json(
+      errorEnvelope("gda-opportunities", "analyze", { code: "ANALYSIS_ERROR", message: (e as Error).message, detail: null }),
+    );
+  }
 });
 
 // ---------------------------------------------------------------------------

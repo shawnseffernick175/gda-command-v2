@@ -57,6 +57,7 @@ import { isLLMAvailable, getAvailableModels } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
 import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
+import { startAgentScheduler, stopAgentScheduler } from "./lib/agent-scheduler";
 import { getPool } from "./lib/db";
 import { auditMiddleware } from "./middleware/audit-middleware";
 import { authLimiter, sessionLimiter, apiLimiter, ingestLimiter } from "./middleware/rate-limit";
@@ -299,6 +300,9 @@ const server = app.listen(PORT, () => {
     startScheduledSync(syncInterval);
   }
 
+  // Start the agent cron scheduler (checks every 60s which agents are due)
+  startAgentScheduler();
+
   startAutoNoBidCheck();
 });
 
@@ -306,6 +310,7 @@ const server = app.listen(PORT, () => {
 function shutdown(signal: string) {
   log.info("shutdown_initiated", { signal });
   stopScheduledSync();
+  stopAgentScheduler();
   stopAutoNoBidCheck();
   server.close(() => {
     log.info("server_closed");

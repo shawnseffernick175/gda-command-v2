@@ -102,8 +102,9 @@ askRouter.post("/", async (req, res) => {
     return res.status(400).json(errorEnvelope("gda-ai", "ask", { code: "MISSING_QUESTION", message: "Question is required", detail: null }));
   }
 
-  // Gather broad system context
+  // Gather broad system context + RAG from knowledge base
   let systemContext = "";
+  let ragContext = "";
   const pool = getPool();
   if (pool) {
     try {
@@ -114,6 +115,38 @@ askRouter.post("/", async (req, res) => {
       ]);
       systemContext = `Envision has ${opps.rows[0].cnt} opportunities worth $${(opps.rows[0].total / 1e6).toFixed(1)}M, ${risks.rows[0].cnt} risks, and ${contacts.rows[0].cnt} contacts in the system.`;
     } catch { /* ignore */ }
+
+    // Also pull relevant data from DB based on question keywords
+    try {
+      const q = question.trim().toLowerCase();
+      if (q.includes("highest") || q.includes("value") || q.includes("biggest") || q.includes("largest") || q.includes("top")) {
+        const top5 = await pool.query(
+          `SELECT title, agency, value_estimated, score, probability_of_win, status FROM opportunities ORDER BY value_estimated DESC NULLS LAST LIMIT 5`,
+        );
+        if (top5.rows.length > 0) {
+          ragContext += "\n\nTop opportunities by value:\n" + top5.rows.map((r: Record<string, unknown>, i: number) => `${i + 1}. ${r.title} (${r.agency}) — $${((r.value_estimated as number) / 1e6).toFixed(1)}M, Score: ${r.score}, Pwin: ${r.probability_of_win ?? "N/A"}`).join("\n");
+        }
+      }
+      if (q.includes("pipeline") || q.includes("stage") || q.includes("status") || q.includes("funnel")) {
+        const stages = await pool.query(
+          `SELECT status, COUNT(*)::int as cnt, COALESCE(SUM(value_estimated),0) as total FROM opportunities GROUP BY status ORDER BY cnt DESC`,
+        );
+        if (stages.rows.length > 0) {
+          ragContext += "\n\nPipeline breakdown:\n" + stages.rows.map((r: Record<string, unknown>) => `- ${r.status}: ${r.cnt} opps ($${((r.total as number) / 1e6).toFixed(1)}M)`).join("\n");
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Vector search from knowledge base
+    try {
+      const { isEmbeddingAvailable, vectorSearch } = await import("../lib/embeddings");
+      if (isEmbeddingAvailable()) {
+        const vectorResults = await vectorSearch(question.trim(), 3);
+        if (vectorResults.length > 0) {
+          ragContext += "\n\nRelevant knowledge base documents:\n" + vectorResults.map((vr, i) => `[${i + 1}. "${vr.document_title}" (${Math.round(vr.similarity * 100)}% match)]\n${vr.chunk_text}`).join("\n---\n");
+        }
+      }
+    } catch { /* ignore */ }
   }
 
   if (!isLLMAvailable()) {
@@ -123,9 +156,12 @@ askRouter.post("/", async (req, res) => {
   }
 
   try {
+    const userContent = ragContext
+      ? `${question}\n\n--- Supporting Data ---${ragContext}`
+      : question;
     const messages: ChatMessage[] = [
-      { role: "system", content: `You are GDA Command's AI assistant for Envision Innovative Solutions, a SDVOSB specializing in defense IT, cybersecurity, and Army SETA. Answer the user's question concisely. Current page: ${pageContext}. ${systemContext}` },
-      { role: "user", content: question },
+      { role: "system", content: `You are GDA Command's AI assistant for Envision Innovative Solutions, a SDVOSB specializing in defense IT, cybersecurity, and Army SETA. Answer the user's question concisely using the supporting data when provided. Always cite specific opportunity names, values, and scores. Current page: ${pageContext}. ${systemContext}` },
+      { role: "user", content: userContent },
     ];
     const result = await chatCompletion(messages);
     return res.json(successEnvelope("gda-ai", "ask", { answer: result.content }));

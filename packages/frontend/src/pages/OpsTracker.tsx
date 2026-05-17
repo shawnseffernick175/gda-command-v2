@@ -40,8 +40,9 @@ function formatCurrency(v: number | null): string {
 }
 
 function formatPwin(v: number | null): string {
-  if (v === null || v === undefined) return "—";
-  return `${(v * 100).toFixed(0)}%`;
+  if (v === null || v === undefined || v === 0) return "—";
+  // Pwin may be stored as 0-100 (from AI scoring) or 0-1 (legacy)
+  return `${v > 1 ? Math.round(v) : Math.round(v * 100)}%`;
 }
 
 function formatDate(d: string | null): string {
