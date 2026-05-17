@@ -209,7 +209,7 @@ Respond ONLY with valid JSON (no markdown, no code fences):
     },
     "orient": {
       "summary": "<how this aligns with company capabilities>",
-      "items": [{"label": "<factor>", "value": "<assessment>", "source_ids": [], "type": "<high|medium|low>"}]
+      "items": [{"label": "<factor>", "value": "<assessment>", "source_ids": [], "type": "<strength|risk|inference>"}]
     },
     "decide": {
       "summary": "<decision recommendation>",
