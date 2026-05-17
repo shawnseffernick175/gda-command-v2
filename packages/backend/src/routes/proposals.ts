@@ -373,19 +373,18 @@ router.post("/:id/generate-outline", async (req, res) => {
     // Gather context: opportunity data, shredded requirements, win themes
     let opportunityContext = "";
     if (proposal.linked_opportunity_id) {
-      const oppResult = await pool.query(`SELECT title, agency, description, naics, set_aside_type FROM opportunities WHERE id = $1`, [proposal.linked_opportunity_id]);
+      const oppResult = await pool.query(`SELECT title, agency, naics, set_aside FROM opportunities WHERE id = $1`, [proposal.linked_opportunity_id]);
       if (oppResult.rows.length > 0) {
         const opp = oppResult.rows[0];
-        opportunityContext = `\nOpportunity: ${opp.title}\nAgency: ${opp.agency}\nDescription: ${opp.description ?? "N/A"}\nNAICS: ${opp.naics ?? "N/A"}\nSet-Aside: ${opp.set_aside_type ?? "Full and Open"}`;
+        opportunityContext = `\nOpportunity: ${opp.title}\nAgency: ${opp.agency}\nNAICS: ${opp.naics ?? "N/A"}\nSet-Aside: ${opp.set_aside ?? "Full and Open"}`;
       }
     }
 
     let requirementsContext = "";
     if (proposal.linked_shred_job_id) {
-      const reqResult = await pool.query(`SELECT requirements FROM shred_jobs WHERE id = $1`, [proposal.linked_shred_job_id]);
-      if (reqResult.rows.length > 0 && reqResult.rows[0].requirements) {
-        const reqs = reqResult.rows[0].requirements;
-        const reqList = Array.isArray(reqs) ? reqs.slice(0, 30) : [];
+      const reqResult = await pool.query(`SELECT requirement_text AS text, requirement_type AS type FROM extracted_requirements WHERE shred_job_id = $1 LIMIT 30`, [proposal.linked_shred_job_id]);
+      if (reqResult.rows.length > 0) {
+        const reqList = reqResult.rows;
         requirementsContext = `\nExtracted Requirements (${reqList.length}):\n` + reqList.map((r: { text?: string; type?: string }, i: number) => `${i + 1}. [${r.type ?? "SHALL"}] ${r.text ?? ""}`).join("\n");
       }
     }
