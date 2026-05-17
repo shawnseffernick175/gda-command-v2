@@ -367,6 +367,55 @@ router.delete("/:id/sections", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/proposals/:id/apply-outline — atomically replace sections
+// ---------------------------------------------------------------------------
+router.post("/:id/apply-outline", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "apply-outline", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const { sections: newSections } = req.body;
+    if (!Array.isArray(newSections) || newSections.length === 0) {
+      return res.status(400).json(errorEnvelope("GDA.proposals", "apply-outline", { code: "VALIDATION", message: "Sections array is required and must be non-empty", detail: null }));
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Delete all existing sections within the transaction
+      await client.query(`DELETE FROM proposal_sections WHERE proposal_id = $1`, [req.params.id]);
+
+      // Insert all new sections within the same transaction
+      const created: ReturnType<typeof rowToSection>[] = [];
+      for (const sec of newSections) {
+        const id = `SEC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const wordCount = (sec.content ?? "").split(/\s+/).filter(Boolean).length;
+        await client.query(
+          `INSERT INTO proposal_sections (id, proposal_id, volume_type, title, sort_order, content, status, word_count)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, req.params.id, sec.volume_type ?? "technical", sec.title, sec.sort_order ?? 0, sec.content ?? "", sec.status ?? "outline", wordCount],
+        );
+        const result = await client.query(`SELECT * FROM proposal_sections WHERE id = $1`, [id]);
+        created.push(rowToSection(result.rows[0]));
+      }
+
+      await client.query("COMMIT");
+      res.json(successEnvelope("GDA.proposals", "apply-outline", { sections: created, count: created.length }));
+    } catch (txErr) {
+      await client.query("ROLLBACK");
+      throw txErr;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "apply-outline", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/proposals/:id/generate-outline — AI generates outline
 // ---------------------------------------------------------------------------
 router.post("/:id/generate-outline", async (req, res) => {
@@ -430,8 +479,10 @@ router.post("/:id/generate-outline", async (req, res) => {
       outline = [];
     }
 
-    // Save outline to proposal
-    await pool.query(`UPDATE proposals SET outline = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(outline), req.params.id]);
+    // Only save outline if we got a valid non-empty result
+    if (Array.isArray(outline) && outline.length > 0) {
+      await pool.query(`UPDATE proposals SET outline = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(outline), req.params.id]);
+    }
 
     res.json(successEnvelope("GDA.proposals", "generate-outline", { outline, model: llmResponse.model, tier: llmResponse.tier }));
   } catch (err) {
@@ -605,7 +656,10 @@ router.post("/:id/generate-storyboard", async (req, res) => {
       storyboard = [];
     }
 
-    await pool.query(`UPDATE proposals SET storyboard = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(storyboard), req.params.id]);
+    // Only save storyboard if we got a valid non-empty result
+    if (Array.isArray(storyboard) && storyboard.length > 0) {
+      await pool.query(`UPDATE proposals SET storyboard = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(storyboard), req.params.id]);
+    }
 
     res.json(successEnvelope("GDA.proposals", "generate-storyboard", { storyboard, model: llmResponse.model }));
   } catch (err) {

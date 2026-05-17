@@ -9,6 +9,7 @@ import {
   updateProposalSection,
   deleteProposalSection,
   deleteAllProposalSections,
+  applyProposalOutline,
   generateProposalOutline,
   generateSectionContent,
   transformSectionContent,
@@ -432,11 +433,12 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
         if (!Array.isArray(outline) || outline.length === 0) {
           setAiStatus("AI returned an empty outline — sections were not modified.");
         } else {
-          await deleteAllProposalSections(proposalId);
+          // Build flat sections array for atomic apply
+          const newSections: Array<{ volume_type: string; title: string; content?: string; sort_order?: number; status?: string }> = [];
           for (const vol of outline) {
             for (let i = 0; i < vol.sections.length; i++) {
               const sec = vol.sections[i];
-              await createProposalSection(proposalId, {
+              newSections.push({
                 volume_type: vol.volume_type,
                 title: sec.title,
                 content: sec.description,
@@ -445,6 +447,8 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
               });
             }
           }
+          // Atomic replace: delete old + insert new in a single DB transaction
+          await applyProposalOutline(proposalId, newSections);
           setAiStatus("Outline generated — sections created!");
         }
         await load();

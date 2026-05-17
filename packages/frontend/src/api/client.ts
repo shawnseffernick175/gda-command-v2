@@ -1000,6 +1000,10 @@ export function deleteAllProposalSections(proposalId: string) {
   return request<{ deleted: number }>(`/proposals/${proposalId}/sections`, { method: "DELETE" });
 }
 
+export function applyProposalOutline(proposalId: string, sections: Array<{ volume_type: string; title: string; content?: string; sort_order?: number; status?: string }>) {
+  return request<{ sections: ProposalSectionRow[]; count: number }>(`/proposals/${proposalId}/apply-outline`, { method: "POST", body: JSON.stringify({ sections }), headers: { "Content-Type": "application/json" } });
+}
+
 export function generateProposalOutline(proposalId: string) {
   return request<{ outline: OutlineEntryRow[]; model: string; tier: string }>(`/proposals/${proposalId}/generate-outline`, { method: "POST", headers: { "Content-Type": "application/json" } });
 }
