@@ -328,7 +328,7 @@ async function getUnscoredOpportunities(limit = 20): Promise<RawOpportunity[]> {
 // AI scoring
 // ---------------------------------------------------------------------------
 
-async function buildScoringPrompt(opp: RawOpportunity, profile: CompanyProfile): Promise<ChatMessage[]> {
+async function buildScoringPrompt(opp: RawOpportunity, profile: CompanyProfile): Promise<{ messages: ChatMessage[]; actionCtx: ActionableContext }> {
   const value = opp.value_estimate ?? opp.value_estimated;
   const deadline = opp.response_deadline ?? opp.due_date;
   const naicsResult = scoreNaicsMatch(opp.naics, profile.naics_codes);
@@ -462,10 +462,76 @@ Response Deadline: ${deadline ?? "Not specified"}
 Place of Performance: ${opp.place_of_performance ?? "Not specified"}
 Incumbent: ${opp.incumbent ?? "Unknown"}`;
 
-  return [
-    { role: "system", content: system },
-    { role: "user", content: user },
-  ];
+  return {
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    actionCtx,
+  };
+}
+
+/**
+ * Post-process LLM output to inject resource URLs deterministically.
+ * The LLM often omits resource_url despite prompt instructions, so we
+ * match action text against known patterns and inject the correct URLs.
+ */
+function injectResourceUrls(
+  parsed: NonNullable<ReturnType<typeof parseScoreResponse>>,
+  actionCtx: ActionableContext,
+): void {
+  const samRegistrationUrl = "https://sam.gov/content/entity-registration";
+
+  if (parsed.ooda?.act?.next_steps) {
+    for (const step of parsed.ooda.act.next_steps) {
+      if (step.resource_url) continue; // already set by LLM
+
+      const lower = (step.action || "").toLowerCase();
+
+      if (
+        (lower.includes("team") || lower.includes("partner") || lower.includes("subcontract") || lower.includes("entity search")) &&
+        actionCtx.samEntitySearchUrl
+      ) {
+        step.resource_url = actionCtx.samEntitySearchUrl;
+      } else if (
+        (lower.includes("registration") || lower.includes("adding naics") || lower.includes("add naics") || lower.includes("sam.gov registration")) &&
+        !lower.includes("search")
+      ) {
+        step.resource_url = samRegistrationUrl;
+      } else if (
+        (lower.includes("past award") || lower.includes("competitor") || lower.includes("incumbent") || lower.includes("usaspending")) &&
+        actionCtx.usaSpendingUrl
+      ) {
+        step.resource_url = actionCtx.usaSpendingUrl;
+      }
+    }
+  }
+
+  // Inject URLs into recommended_action text if it mentions SAM.gov without a link
+  if (parsed.analysis?.recommended_action) {
+    let text = parsed.analysis.recommended_action;
+    if (
+      (text.toLowerCase().includes("sam.gov") || text.toLowerCase().includes("teaming partner")) &&
+      !text.includes("https://")
+    ) {
+      if (actionCtx.samEntitySearchUrl) {
+        text += ` ${actionCtx.samEntitySearchUrl}`;
+      }
+    }
+    parsed.analysis.recommended_action = text;
+  }
+
+  // Inject URLs into competitive_landscape text if it lacks links
+  if (parsed.analysis?.competitive_landscape) {
+    let text = parsed.analysis.competitive_landscape;
+    if (
+      !text.includes("https://") &&
+      actionCtx.usaSpendingUrl
+    ) {
+      text += ` Review past awards: ${actionCtx.usaSpendingUrl}`;
+    }
+    parsed.analysis.competitive_landscape = text;
+  }
 }
 
 function parseScoreResponse(raw: string): {
@@ -637,11 +703,13 @@ export async function scoreSingleOpportunity(oppId: string): Promise<ScoredOppor
   };
 
   const naicsMatch = scoreNaicsMatch(opp.naics, profile.naics_codes);
-  const messages = await buildScoringPrompt(opp, profile);
+  const { messages, actionCtx } = await buildScoringPrompt(opp, profile);
   const llmResult = await chatCompletion(messages, { tier: "fast" });
   const parsed = parseScoreResponse(llmResult.content);
 
   if (!parsed) return null;
+
+  injectResourceUrls(parsed, actionCtx);
 
   const scored: ScoredOpportunity = {
     id: opp.id,
@@ -695,11 +763,12 @@ export async function runOpportunityWatch(trigger: "cron" | "manual" | "webhook"
     for (const opp of opps) {
       try {
         const naicsMatch = scoreNaicsMatch(opp.naics, profile.naics_codes);
-        const messages = await buildScoringPrompt(opp, profile);
+        const { messages, actionCtx } = await buildScoringPrompt(opp, profile);
         const result = await chatCompletion(messages, { tier: "fast" });
         const parsed = parseScoreResponse(result.content);
 
         if (parsed) {
+          injectResourceUrls(parsed, actionCtx);
           scored.push({
             id: opp.id,
             title: opp.title,
