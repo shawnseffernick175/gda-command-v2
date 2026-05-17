@@ -522,12 +522,14 @@ router.post(
       }
 
       // Auto-vectorize: extract text and embed in background (non-blocking)
+      let vectorizationStarted = false;
       if (isEmbeddingAvailable() && pool) {
         const textMimes = ["text/plain", "text/markdown", "text/csv", "application/json"];
         const isText = textMimes.includes(file.mimetype) || file.originalname.match(/\.(txt|md|csv|json|log)$/i);
         if (isText) {
           const rawText = file.buffer.toString("utf-8");
           if (rawText.trim().length > 0) {
+            vectorizationStarted = true;
             // Fire and forget — update status as it processes
             embedDocument(docId, rawText).then((result) => {
               pool.query(
@@ -545,11 +547,6 @@ router.post(
           }
         }
       }
-
-      // Determine if vectorization was actually started (only for text files)
-      const textMimesForStatus = ["text/plain", "text/markdown", "text/csv", "application/json"];
-      const isTextFile = textMimesForStatus.includes(file.mimetype) || !!file.originalname.match(/\.(txt|md|csv|json|log)$/i);
-      const vectorizationStarted = isEmbeddingAvailable() && isTextFile;
 
       res.json(
         successEnvelope("gda-knowledge", "upload", {
