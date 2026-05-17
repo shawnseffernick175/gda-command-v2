@@ -124,7 +124,7 @@ askRouter.post("/", async (req, res) => {
           `SELECT title, agency, value_estimated, score, probability_of_win, status FROM opportunities ORDER BY value_estimated DESC NULLS LAST LIMIT 5`,
         );
         if (top5.rows.length > 0) {
-          ragContext += "\n\nTop opportunities by value:\n" + top5.rows.map((r: Record<string, unknown>, i: number) => `${i + 1}. ${r.title} (${r.agency}) — $${((r.value_estimated as number) / 1e6).toFixed(1)}M, Score: ${r.score}, Pwin: ${r.probability_of_win ?? "N/A"}`).join("\n");
+          ragContext += "\n\nTop opportunities by value:\n" + top5.rows.map((r: Record<string, unknown>, i: number) => `${i + 1}. ${r.title} (${r.agency}) — ${r.value_estimated != null ? `$${(Number(r.value_estimated) / 1e6).toFixed(1)}M` : "Value TBD"}, Score: ${r.score}, Pwin: ${r.probability_of_win ?? "N/A"}`).join("\n");
         }
       }
       if (q.includes("pipeline") || q.includes("stage") || q.includes("status") || q.includes("funnel")) {
