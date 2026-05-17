@@ -109,17 +109,39 @@ export async function listFailedExecutions(limit = 25): Promise<FailedExecutions
     return { configured: false, missing, executions: [] };
   }
   const url = `${base}/executions?status=error&limit=${encodeURIComponent(limit)}`;
+  const headers = { "X-N8N-API-KEY": key, Accept: "application/json" };
   try {
-    const r = await fetchWithTimeout(url, {
-      headers: { "X-N8N-API-KEY": key, Accept: "application/json" },
-    });
+    const r = await fetchWithTimeout(url, { headers });
     if (!r.ok) {
       const text = await r.text().catch(() => "");
       return { configured: true, http: r.status, error: text.slice(0, 500), executions: [] };
     }
     const json = (await r.json().catch(() => null)) as Record<string, unknown> | null;
-    const data = (json && ((json.data as unknown[]) || (json.executions as unknown[]))) || [];
-    return { configured: true, http: r.status, executions: data };
+    const summaries = (json && ((json.data as unknown[]) || (json.executions as unknown[]))) || [];
+
+    // The list endpoint returns only basic metadata (no error messages).
+    // Fetch each execution individually with includeData=true to get
+    // the actual error messages for the Health tab.
+    const detailed = await Promise.all(
+      (summaries as Record<string, unknown>[]).map(async (s) => {
+        const execId = s.id;
+        if (!execId) return s;
+        try {
+          const dr = await fetchWithTimeout(
+            `${base}/executions/${encodeURIComponent(String(execId))}?includeData=true`,
+            { headers },
+            15_000,
+          );
+          if (!dr.ok) return s;
+          const detail = (await dr.json().catch(() => null)) as Record<string, unknown> | null;
+          return detail ?? s;
+        } catch {
+          return s;
+        }
+      }),
+    );
+
+    return { configured: true, http: r.status, executions: detailed };
   } catch (e: unknown) {
     const err = e as Error;
     return { configured: true, error: err.message, executions: [] };

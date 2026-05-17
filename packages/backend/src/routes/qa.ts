@@ -161,18 +161,38 @@ function plainEnglish(exec: Record<string, unknown>): Record<string, unknown> {
   const rd = (exec.data as Record<string, unknown>)?.resultData as Record<string, unknown> | undefined;
   const errObj = rd?.error as Record<string, unknown> | undefined;
   const execErr = exec.error as Record<string, unknown> | undefined;
+
+  // Extract error message from multiple possible locations in the execution data
   const errMsg =
     errObj?.message ??
     execErr?.message ??
     exec.message ??
     "No message returned by n8n";
+
+  // Extract description for additional context (e.g. "Authorization data is wrong!")
+  const errDesc = errObj?.description ?? execErr?.description ?? null;
+
+  // Extract the node that failed from the error object or resultData
+  const errNode = errObj?.node as Record<string, unknown> | undefined;
+  const failedNode =
+    errNode?.name ?? rd?.lastNodeExecuted ?? exec.lastNodeExecuted ?? null;
+
+  // Build a combined message: if we have a description that differs from the
+  // main message, append it for context
+  let message = typeof errMsg === "string" ? errMsg.slice(0, 300) : "See execution detail";
+  if (errDesc && typeof errDesc === "string") {
+    const cleanDesc = errDesc.replace(/<[^>]+>/g, "").slice(0, 200);
+    if (cleanDesc && !message.includes(cleanDesc)) {
+      message = `${message} — ${cleanDesc}`;
+    }
+  }
+
   return {
     id: exec.id ?? null,
     workflowName: wfName,
     workflowId: exec.workflowId ?? wd?.id ?? null,
-    failedNode: rd?.lastNodeExecuted ?? exec.lastNodeExecuted ?? null,
-    message:
-      typeof errMsg === "string" ? errMsg.slice(0, 500) : "See execution detail",
+    failedNode,
+    message: message.slice(0, 500),
     startedAt: exec.startedAt ?? exec.createdAt ?? null,
     stoppedAt: exec.stoppedAt ?? exec.finishedAt ?? null,
   };
