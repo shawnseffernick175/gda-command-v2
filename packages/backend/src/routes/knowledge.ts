@@ -546,6 +546,11 @@ router.post(
         }
       }
 
+      // Determine if vectorization was actually started (only for text files)
+      const textMimesForStatus = ["text/plain", "text/markdown", "text/csv", "application/json"];
+      const isTextFile = textMimesForStatus.includes(file.mimetype) || !!file.originalname.match(/\.(txt|md|csv|json|log)$/i);
+      const vectorizationStarted = isEmbeddingAvailable() && isTextFile;
+
       res.json(
         successEnvelope("gda-knowledge", "upload", {
           id: docId,
@@ -556,9 +561,9 @@ router.post(
           tags: parsedTags,
           size_bytes: file.size,
           mime_type: file.mimetype,
-          status: isEmbeddingAvailable() ? "processing" : "pending",
+          status: vectorizationStarted ? "processing" : "pending",
           download_url: `/api/files/${fileId}/download`,
-          message: isEmbeddingAvailable()
+          message: vectorizationStarted
             ? "Document uploaded and vectorization started."
             : "Document uploaded and queued for processing.",
         }),
