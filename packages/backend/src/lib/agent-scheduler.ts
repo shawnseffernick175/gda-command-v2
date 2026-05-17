@@ -13,6 +13,9 @@ import { isLLMAvailable } from "./llm";
 // Agent execution imports (lazy to avoid circular deps)
 type AgentRunner = (trigger: "cron" | "manual" | "webhook") => Promise<unknown>;
 
+// In-memory guard to prevent concurrent runs of the same agent
+const runningAgents = new Set<string>();
+
 const agentRunners: Record<string, () => Promise<AgentRunner>> = {
   "opportunity-watch": async () => {
     const { runOpportunityWatch } = await import("../agents/opportunity-watch");
@@ -112,6 +115,19 @@ async function checkAndRunAgents(): Promise<void> {
         continue;
       }
 
+      // Skip if agent is already running (concurrent-run guard)
+      if (runningAgents.has(agent)) {
+        log.info("agent_scheduler_skipped_running", { agent });
+        continue;
+      }
+
+      // Optimistically update last_run_at to prevent re-fire on next tick
+      await pool.query(
+        `UPDATE agent_config SET last_run_at = NOW() WHERE agent = $1`,
+        [agent],
+      );
+
+      runningAgents.add(agent);
       log.info("agent_scheduler_firing", { agent, schedule });
 
       // Fire and forget — agent-runner handles lifecycle
@@ -122,6 +138,8 @@ async function checkAndRunAgents(): Promise<void> {
           log.info("agent_scheduler_completed", { agent });
         } catch (e) {
           log.error("agent_scheduler_error", { agent, error: (e as Error).message });
+        } finally {
+          runningAgents.delete(agent);
         }
       })();
     }

@@ -323,7 +323,7 @@ export default function OpportunityDetail() {
           <Field label="NAICS" value={opp.naics} />
           <Field label="PSC" value={opp.psc} />
           <Field label="Estimated Value" value={formatCurrency(opp.value_estimated)} />
-          <Field label="Probability of Win" value={opp.probability_of_win != null && opp.probability_of_win > 0 ? `${opp.probability_of_win > 1 ? Math.round(opp.probability_of_win) : Math.round(opp.probability_of_win * 100)}%` : "—"} />
+          <Field label="Probability of Win" value={opp.probability_of_win != null && opp.probability_of_win > 0 ? `${Math.round(opp.probability_of_win * 100)}%` : "—"} />
           <Field label="Due Date" value={formatDate(opp.due_date)} />
           <Field label="Set-Aside" value={opp.set_aside} />
           <Field label="Place of Performance" value={opp.place_of_performance} />
@@ -357,7 +357,7 @@ export default function OpportunityDetail() {
             <p style={{ margin: "0 0 8px" }}>
               Current stage: <strong>{({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}</strong>.
               {opp.score > 0 ? ` Fit score: ${opp.score}/100.` : ""}
-              {opp.probability_of_win ? ` Estimated Pwin: ${opp.probability_of_win > 1 ? Math.round(opp.probability_of_win) : Math.round(opp.probability_of_win * 100)}%.` : ""}
+              {opp.probability_of_win ? ` Estimated Pwin: ${Math.round(opp.probability_of_win * 100)}%.` : ""}
             </p>
             {opp.incumbent && <p style={{ margin: 0 }}>Incumbent: {opp.incumbent}.</p>}
           </div>

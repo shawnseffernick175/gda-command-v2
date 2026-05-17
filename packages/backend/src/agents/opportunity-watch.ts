@@ -346,7 +346,7 @@ async function storeResults(scored: ScoredOpportunity[]): Promise<void> {
          ooda = $4, analysis = $5, ai_analyzed_at = NOW(), updated_at = NOW()
          WHERE id = $1`,
         [
-          opp.id, opp.score, opp.score,
+          opp.id, opp.score, opp.score / 100,
           opp.ooda ? JSON.stringify(opp.ooda) : null,
           opp.analysis ? JSON.stringify(opp.analysis) : null,
         ],
@@ -370,6 +370,70 @@ async function storeResults(scored: ScoredOpportunity[]): Promise<void> {
       );
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Single-opportunity scoring (used by on-demand analyze endpoint)
+// ---------------------------------------------------------------------------
+
+export async function scoreSingleOpportunity(oppId: string): Promise<ScoredOpportunity | null> {
+  const pool = getPool();
+  if (!pool) throw new Error("Database not available");
+
+  if (!isLLMAvailable()) {
+    throw new Error("No LLM available — OPENAI_API_KEY or ANTHROPIC_API_KEY required");
+  }
+
+  const profile = await getCompanyProfile();
+  if (!profile) throw new Error("Company profile not found in database");
+
+  // Fetch the specific opportunity regardless of status or score
+  const result = await pool.query(
+    `SELECT id, title, agency, naics, psc, set_aside, value_estimated,
+            due_date, place_of_performance, incumbent
+     FROM opportunities WHERE id = $1`,
+    [oppId],
+  );
+
+  if (result.rows.length === 0) throw new Error(`Opportunity ${oppId} not found`);
+
+  const r = result.rows[0];
+  const opp: RawOpportunity = {
+    id: r.id as string,
+    title: r.title as string,
+    agency: r.agency as string,
+    naics: r.naics as string | undefined,
+    psc: r.psc as string | undefined,
+    set_aside: r.set_aside as string | undefined,
+    value_estimated: r.value_estimated != null ? Number(r.value_estimated) : undefined,
+    due_date: r.due_date as string | undefined,
+    place_of_performance: r.place_of_performance as string | undefined,
+    incumbent: r.incumbent as string | undefined,
+    source: "pipeline",
+  };
+
+  const messages = buildScoringPrompt(opp, profile);
+  const llmResult = await chatCompletion(messages, { tier: "fast" });
+  const parsed = parseScoreResponse(llmResult.content);
+
+  if (!parsed) return null;
+
+  const scored: ScoredOpportunity = {
+    id: opp.id,
+    title: opp.title,
+    agency: opp.agency,
+    score: parsed.score,
+    classification: parsed.classification,
+    rationale: parsed.rationale,
+    risks: parsed.risks,
+    next_actions: parsed.next_actions,
+    source: opp.source,
+    ooda: parsed.ooda,
+    analysis: parsed.analysis,
+  };
+
+  await storeResults([scored]);
+  return scored;
 }
 
 // ---------------------------------------------------------------------------

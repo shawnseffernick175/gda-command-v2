@@ -668,26 +668,21 @@ router.post("/:id/analyze", requireRole("admin", "bd_manager", "capture_lead"), 
       );
     }
 
-    const { isLLMAvailable } = await import("../lib/llm");
-    if (!isLLMAvailable()) {
-      return res.status(503).json(
-        errorEnvelope("gda-opportunities", "analyze", { code: "LLM_UNAVAILABLE", message: "No AI model configured", detail: null }),
+    // Score this specific opportunity via dedicated single-opp scorer
+    const { scoreSingleOpportunity } = await import("../agents/opportunity-watch");
+    const scored = await scoreSingleOpportunity(req.params.id);
+
+    if (!scored) {
+      return res.status(500).json(
+        errorEnvelope("gda-opportunities", "analyze", { code: "ANALYSIS_FAILED", message: "AI could not parse analysis results", detail: null }),
       );
     }
 
-    // Reset score to 0 so opportunity-watch picks it up
-    await pool.query(
-      `UPDATE opportunities SET score = 0, updated_at = NOW() WHERE id = $1`,
-      [req.params.id],
-    );
-
-    // Fire opportunity watch for just this one
-    const { runOpportunityWatch } = await import("../agents/opportunity-watch");
-    const result = await runOpportunityWatch("manual");
-
     res.json(successEnvelope("gda-opportunities", "analyze", {
-      message: "AI analysis triggered",
-      result,
+      message: "AI analysis complete",
+      score: scored.score,
+      classification: scored.classification,
+      pwin: scored.score / 100,
     }));
   } catch (e) {
     res.status(500).json(
