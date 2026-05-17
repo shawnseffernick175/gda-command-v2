@@ -16,6 +16,7 @@ import FinancialBible from "./pages/FinancialBible";
 import Approvals from "./pages/Approvals";
 import Compliance from "./pages/Compliance";
 import ProposalReview from "./pages/ProposalReview";
+import ProposalBuilder from "./pages/ProposalBuilder";
 import Contacts from "./pages/Contacts";
 import Reports from "./pages/Reports";
 import PromptArchitect from "./pages/PromptArchitect";
@@ -64,7 +65,7 @@ const NAV_GROUPS = [
       { path: "/proposal-center", label: "Proposal Center", icon: "📝" },
       { path: "/rfp-shredder", label: "RFP Shredder", icon: "✂" },
       { path: "/compliance", label: "Compliance", icon: "📋" },
-      { path: "/proposals", label: "Proposals", icon: "📄" },
+      { path: "/proposals", label: "Proposal Builder", icon: "📄" },
       { path: "/color-review", label: "Color Review", icon: "🎨" },
       { path: "/capture", label: "Capture Plans", icon: "🎯" },
     ],
@@ -494,7 +495,7 @@ export default function App() {
             <Route path="/financial-bible/:key" element={<FinancialBible />} />
             <Route path="/approvals" element={<Approvals />} />
             <Route path="/compliance" element={<Compliance />} />
-            <Route path="/proposals" element={<ProposalReview />} />
+            <Route path="/proposals" element={<ProposalBuilder />} />
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/prompts" element={<PromptArchitect />} />
