@@ -315,13 +315,13 @@ router.put("/:id/sections/:sectionId", async (req, res) => {
     params.push(req.params.sectionId);
     params.push(req.params.id);
 
-    await pool.query(`UPDATE proposal_sections SET ${fields.join(", ")} WHERE id = $${idx} AND proposal_id = $${idx + 1}`, params);
+    const updateResult = await pool.query(`UPDATE proposal_sections SET ${fields.join(", ")} WHERE id = $${idx} AND proposal_id = $${idx + 1}`, params);
 
-    const result = await pool.query(`SELECT * FROM proposal_sections WHERE id = $1`, [req.params.sectionId]);
-    if (result.rows.length === 0) {
+    if (updateResult.rowCount === 0) {
       return res.status(404).json(errorEnvelope("GDA.proposals", "update-section", { code: "NOT_FOUND", message: "Section not found", detail: null }));
     }
 
+    const result = await pool.query(`SELECT * FROM proposal_sections WHERE id = $1 AND proposal_id = $2`, [req.params.sectionId, req.params.id]);
     res.json(successEnvelope("GDA.proposals", "update-section", { section: rowToSection(result.rows[0]) }));
   } catch (err) {
     res.status(500).json(errorEnvelope("GDA.proposals", "update-section", { code: "INTERNAL", message: String(err), detail: null }));
