@@ -126,11 +126,98 @@ interface RawOpportunity {
   source: "sam" | "pipeline";
 }
 
+// ---------------------------------------------------------------------------
+// Actionable context: teaming partners, contacts, resource links
+// ---------------------------------------------------------------------------
+
+interface ActionableContext {
+  potentialPartners: Array<{ name: string; naics: string[]; threatScore: number }>;
+  agencyContacts: Array<{ name: string; title: string; agency: string; email: string | null }>;
+  samEntitySearchUrl: string | null;
+  usaSpendingUrl: string | null;
+  incumbentInfo: string | null;
+  relatedAwardees: string[];
+}
+
+async function gatherActionableContext(
+  opp: RawOpportunity,
+  naicsResult: NaicsMatchResult,
+): Promise<ActionableContext> {
+  const pool = getPool();
+  const ctx: ActionableContext = {
+    potentialPartners: [],
+    agencyContacts: [],
+    samEntitySearchUrl: null,
+    usaSpendingUrl: null,
+    incumbentInfo: opp.incumbent ?? null,
+    relatedAwardees: [],
+  };
+
+  if (!pool) return ctx;
+
+  // Generate resource URLs for the opportunity's NAICS code
+  if (naicsResult.oppCode && naicsResult.oppCode !== "N/A") {
+    ctx.samEntitySearchUrl =
+      `https://sam.gov/search/?index=ei&page=1&pageSize=25&sort=-relevance&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BnaicsCode%5D%5B0%5D=${encodeURIComponent(naicsResult.oppCode)}`;
+    ctx.usaSpendingUrl =
+      `https://www.usaspending.gov/search/?hash=&filters=%7B%22naicsCodes%22%3A%5B%22${encodeURIComponent(naicsResult.oppCode)}%22%5D%7D`;
+  }
+
+  try {
+    // Find competitors registered under the opportunity's NAICS code
+    const partners = await pool.query(
+      `SELECT name, primary_naics, threat_score
+       FROM competitor_profiles
+       WHERE $1 = ANY(primary_naics) AND watch_status = 'active'
+       ORDER BY threat_score DESC LIMIT 5`,
+      [naicsResult.oppCode],
+    );
+    ctx.potentialPartners = partners.rows.map((r) => ({
+      name: r.name as string,
+      naics: r.primary_naics as string[],
+      threatScore: Number(r.threat_score),
+    }));
+  } catch { /* table may not exist yet */ }
+
+  try {
+    // Find contacts at the opportunity's agency
+    const contacts = await pool.query(
+      `SELECT first_name, last_name, title, agency, email
+       FROM contacts
+       WHERE LOWER(agency) = LOWER($1) AND status = 'active'
+       ORDER BY relationship_strength DESC LIMIT 5`,
+      [opp.agency],
+    );
+    ctx.agencyContacts = contacts.rows.map((r) => ({
+      name: `${r.first_name} ${r.last_name}`,
+      title: r.title as string,
+      agency: r.agency as string,
+      email: r.email as string | null,
+    }));
+  } catch { /* table may not exist yet */ }
+
+  try {
+    // Find known awardees in the same NAICS from SAM opportunities
+    const awardees = await pool.query(
+      `SELECT DISTINCT agency, sub_agency
+       FROM sam_opportunities
+       WHERE naics = $1 AND scan_status IN ('tracked', 'qualified')
+       LIMIT 10`,
+      [naicsResult.oppCode],
+    );
+    ctx.relatedAwardees = awardees.rows.map((r) =>
+      r.sub_agency ? `${r.agency} / ${r.sub_agency}` : (r.agency as string),
+    );
+  } catch { /* ignore */ }
+
+  return ctx;
+}
+
 interface OodaAnalysis {
   observe: { summary: string; items: Array<{ label: string; value: string; source_ids: string[] }> };
   orient: { summary: string; items: Array<{ label: string; value: string; source_ids: string[]; type: string }> };
   decide: { summary: string; options: Array<{ label: string; rationale: string; recommended: boolean }> };
-  act: { summary: string; next_steps: Array<{ action: string; owner: string | null; due_date: string | null; priority: string }> };
+  act: { summary: string; next_steps: Array<{ action: string; owner: string | null; due_date: string | null; priority: string; resource_url?: string | null }> };
 }
 
 interface AnalysisBlock {
@@ -241,10 +328,43 @@ async function getUnscoredOpportunities(limit = 20): Promise<RawOpportunity[]> {
 // AI scoring
 // ---------------------------------------------------------------------------
 
-function buildScoringPrompt(opp: RawOpportunity, profile: CompanyProfile): ChatMessage[] {
+async function buildScoringPrompt(opp: RawOpportunity, profile: CompanyProfile): Promise<ChatMessage[]> {
   const value = opp.value_estimate ?? opp.value_estimated;
   const deadline = opp.response_deadline ?? opp.due_date;
   const naicsResult = scoreNaicsMatch(opp.naics, profile.naics_codes);
+  const actionCtx = await gatherActionableContext(opp, naicsResult);
+
+  // Build actionable context block for the prompt
+  let actionableBlock = "\nACTIONABLE RESOURCES (include these links/names in your recommendations):";
+
+  if (actionCtx.incumbentInfo) {
+    actionableBlock += `\n- Known incumbent: ${actionCtx.incumbentInfo}`;
+  }
+
+  if (actionCtx.potentialPartners.length > 0) {
+    actionableBlock += "\n- Known companies registered under this NAICS (potential teaming partners):";
+    for (const p of actionCtx.potentialPartners) {
+      actionableBlock += `\n  * ${p.name} (NAICS: ${p.naics.join(", ")})`;
+    }
+  }
+
+  if (actionCtx.agencyContacts.length > 0) {
+    actionableBlock += `\n- Known contacts at ${opp.agency}:`;
+    for (const c of actionCtx.agencyContacts) {
+      actionableBlock += `\n  * ${c.name}, ${c.title}${c.email ? ` (${c.email})` : ""}`;
+    }
+  }
+
+  if (actionCtx.samEntitySearchUrl) {
+    actionableBlock += `\n- SAM.gov entity search for NAICS ${naicsResult.oppCode}: ${actionCtx.samEntitySearchUrl}`;
+  }
+  if (actionCtx.usaSpendingUrl) {
+    actionableBlock += `\n- USAspending.gov past awards for NAICS ${naicsResult.oppCode}: ${actionCtx.usaSpendingUrl}`;
+  }
+
+  if (actionCtx.relatedAwardees.length > 0) {
+    actionableBlock += `\n- Agencies with tracked opportunities in NAICS ${naicsResult.oppCode}: ${actionCtx.relatedAwardees.join(", ")}`;
+  }
 
   const system = `You are an expert government contracting business development analyst for ${profile.name} (CAGE: ${profile.cage_code}).
 
@@ -263,6 +383,7 @@ NAICS MATCH ANALYSIS (pre-computed — use these facts, do NOT override):
 - NAICS score: ${naicsResult.score}/20
 - Can bid as prime: ${naicsResult.canBidAsPrime ? "YES" : "NO"}
 - Detail: ${naicsResult.explanation}
+${actionableBlock}
 
 Score this opportunity 0-100 based on:
 1. NAICS Match (0-20): USE THE PRE-COMPUTED SCORE OF ${naicsResult.score} ABOVE. Do NOT re-evaluate this.
@@ -272,6 +393,14 @@ Score this opportunity 0-100 based on:
 5. Value/Risk Balance (0-20): Is the contract value appropriate and the risk manageable?
 
 IMPORTANT: The naics_match score in your response MUST be exactly ${naicsResult.score}. If the company cannot bid as prime (canBidAsPrime=NO), you MUST include a risk about NAICS mismatch and recommend either adding the NAICS code to SAM.gov registration or teaming/subcontracting.
+
+CRITICAL — ACTIONABLE RECOMMENDATIONS REQUIRED:
+Every recommendation and next_step MUST be specific and actionable. Never give vague advice.
+- If you recommend teaming/partnering: name specific companies from the "Known companies" list above, or provide the SAM.gov entity search URL so the user can find partners registered under this NAICS.
+- If you recommend contacting the agency: name specific contacts from the "Known contacts" list above, or tell the user exactly where to find the contracting officer (e.g., "Check the solicitation document for the Contracting Officer name and contact info").
+- If you recommend researching competitors: provide the USAspending.gov URL to review past awards.
+- If you recommend adding a NAICS code: link to SAM.gov registration update page (https://sam.gov/content/entity-registration).
+- Every action item in the "act.next_steps" array must include a "resource_url" field with a relevant link (SAM.gov search, USAspending.gov, agency forecast page, etc.) when applicable. Set to null only if no URL is relevant.
 
 Also perform an OODA analysis (Observe, Orient, Decide, Act) for the opportunity.
 
@@ -307,15 +436,15 @@ Respond ONLY with valid JSON (no markdown, no code fences):
     },
     "act": {
       "summary": "<immediate actions>",
-      "next_steps": [{"action": "<action>", "owner": null, "due_date": null, "priority": "<high|medium|low>"}]
+      "next_steps": [{"action": "<specific actionable step with names/links>", "owner": null, "due_date": null, "priority": "<high|medium|low>", "resource_url": "<relevant URL or null>"}]
     }
   },
   "analysis": {
     "executive_summary": "<1-2 sentence summary>",
     "strengths": ["<strength1>", "<strength2>"],
     "risks": ["<risk1>", "<risk2>"],
-    "competitive_landscape": "<assessment of competition>",
-    "recommended_action": "<specific next step>"
+    "competitive_landscape": "<assessment of competition — name specific competitors if known>",
+    "recommended_action": "<specific next step with names/contacts/links>"
   }
 }
 
@@ -508,7 +637,7 @@ export async function scoreSingleOpportunity(oppId: string): Promise<ScoredOppor
   };
 
   const naicsMatch = scoreNaicsMatch(opp.naics, profile.naics_codes);
-  const messages = buildScoringPrompt(opp, profile);
+  const messages = await buildScoringPrompt(opp, profile);
   const llmResult = await chatCompletion(messages, { tier: "fast" });
   const parsed = parseScoreResponse(llmResult.content);
 
@@ -566,7 +695,7 @@ export async function runOpportunityWatch(trigger: "cron" | "manual" | "webhook"
     for (const opp of opps) {
       try {
         const naicsMatch = scoreNaicsMatch(opp.naics, profile.naics_codes);
-        const messages = buildScoringPrompt(opp, profile);
+        const messages = await buildScoringPrompt(opp, profile);
         const result = await chatCompletion(messages, { tier: "fast" });
         const parsed = parseScoreResponse(result.content);
 

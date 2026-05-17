@@ -342,7 +342,7 @@ export default function OpportunityDetail() {
             {analysis.recommended_action && (
               <div style={styles.recommendBox}>
                 <strong style={{ fontSize: 13, color: "#22c55e" }}>Recommended Action</strong>
-                <p style={{ margin: "4px 0 0" }}>{analysis.recommended_action}</p>
+                <p style={{ margin: "4px 0 0" }}><Linkify text={analysis.recommended_action} /></p>
               </div>
             )}
           </>
@@ -713,7 +713,7 @@ export default function OpportunityDetail() {
       {/* Section 10: Competitive Landscape (Text) */}
       <Section title="Competitive Landscape Summary">
         {analysis.competitive_landscape ? (
-          <p style={{ margin: 0, lineHeight: 1.6 }}>{analysis.competitive_landscape}</p>
+          <p style={{ margin: 0, lineHeight: 1.6 }}><Linkify text={analysis.competitive_landscape} /></p>
         ) : (
           <EmptyState text="No competitive intelligence available for this opportunity." />
         )}
@@ -982,6 +982,24 @@ export default function OpportunityDetail() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
+function Linkify({ text }: { text: string }) {
+  const urlRegex = /(https?:\/\/[^\s),]+)/g;
+  const parts = text.split(urlRegex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        urlRegex.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", textDecoration: "none" }}>
+            {part.length > 60 ? part.slice(0, 57) + "..." : part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={styles.section}>
@@ -1106,7 +1124,19 @@ function DecideCard({ option }: { option: OodaDecideOption }) {
 function ActRow({ step }: { step: OodaActStep }) {
   return (
     <tr>
-      <td style={styles.actTd}>{step.action}</td>
+      <td style={styles.actTd}>
+        <div><Linkify text={step.action} /></div>
+        {step.resource_url && (
+          <a
+            href={step.resource_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4 }}
+          >
+            View Resource →
+          </a>
+        )}
+      </td>
       <td style={styles.actTd}>{step.owner ?? "—"}</td>
       <td style={styles.actTd}>{formatDate(step.due_date)}</td>
       <td style={styles.actTd}>
