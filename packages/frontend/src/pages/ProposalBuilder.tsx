@@ -429,22 +429,24 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
       const env = await generateProposalOutline(proposalId);
       if (env.success && env.data) {
         const outline = env.data.outline;
-        // Delete existing sections before creating new ones
-        await deleteAllProposalSections(proposalId);
-        // Create sections from outline
-        for (const vol of outline) {
-          for (let i = 0; i < vol.sections.length; i++) {
-            const sec = vol.sections[i];
-            await createProposalSection(proposalId, {
-              volume_type: vol.volume_type,
-              title: sec.title,
-              content: sec.description,
-              sort_order: i,
-              status: "outline",
-            });
+        if (!Array.isArray(outline) || outline.length === 0) {
+          setAiStatus("AI returned an empty outline — sections were not modified.");
+        } else {
+          await deleteAllProposalSections(proposalId);
+          for (const vol of outline) {
+            for (let i = 0; i < vol.sections.length; i++) {
+              const sec = vol.sections[i];
+              await createProposalSection(proposalId, {
+                volume_type: vol.volume_type,
+                title: sec.title,
+                content: sec.description,
+                sort_order: i,
+                status: "outline",
+              });
+            }
           }
+          setAiStatus("Outline generated — sections created!");
         }
-        setAiStatus("Outline generated — sections created!");
         await load();
         setTab("sections");
       } else {
