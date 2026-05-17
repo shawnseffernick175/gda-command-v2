@@ -120,63 +120,63 @@ When doing a comprehensive audit, navigate every page and verify:
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
-- **n8n values arrive as strings**: All numeric fields from n8n (value_estimated, score, probability_of_win) must be coerced with `Number()` or `parseFloat()` before arithmetic. Without coercion, `reduce()` concatenates strings instead of summing (e.g., "5000000" + "3000000" = "050000003000000").
 
-## POST Write Persistence Testing
+## OODA Analysis & NAICS Scoring Testing
 
-For testing endpoints that write to PostgreSQL:
+### Overview
+The OODA Analysis feature runs AI analysis on opportunities. As of PR #169, NAICS scoring is **deterministic** — the `scoreNaicsMatch()` function compares the opportunity's NAICS code against the company's registered codes before the LLM runs, and injects the pre-computed score into the prompt.
 
-1. **Reset DB to clean state**: `cd packages/backend && npm run db:reset`
-2. **Record initial state**: `docker exec gda-postgres psql -U gda -d gda_command -c "SELECT id, status FROM <table> WHERE id='<id>'"`
-3. **Call POST endpoint**: `curl -s -X POST http://localhost:3001/api/<endpoint> -H 'Content-Type: application/json' -d '{...}'`
-4. **Verify API response**: Check `success: true`, `dryRun: false` (not `true`), and returned data matches expected
-5. **Verify DB persistence**: `docker exec gda-postgres psql -U gda -d gda_command -c "SELECT ... FROM <table> WHERE ..."`
-6. **Verify UI renders updated data**: Navigate to the page in browser and confirm the change is visible
+### Company's Registered NAICS Codes
+`541512, 541519, 541611, 541715, 541330, 541990, 518210, 561611`
 
-### POST Endpoints with Real DB Writes
+These are hardcoded in `packages/backend/src/agents/opportunity-watch.ts` in the `COMPANY_NAICS` array.
 
-| Route | Endpoint | DB Operation |
-|-------|----------|-------------|
-| approvals | `POST /:id/resolve` | UPDATE approvals status/resolved_by/at/notes |
-| anomaly | `POST /anomalies/:id/acknowledge` | UPDATE status + acknowledged_at |
-| anomaly | `POST /anomalies/:id/resolve` | UPDATE status + resolved_at |
-| discussions | `POST /threads` | INSERT discussion_threads |
-| discussions | `POST /threads/:id/messages` | INSERT message + UPDATE thread count |
-| doctrine | `POST /finalize` | UPDATE drafts + INSERT publish run |
-| sam-monitor | `POST /opportunities/:id/qualify` | UPDATE scan_status |
-| reports | `POST /generate` | INSERT generated_reports |
-| reports | `POST /export` | INSERT export_jobs |
-| capture | `POST /gate-review` | UPDATE gate_reviews JSONB |
+### NAICS Scoring Tiers
+| Match Level | Score | Banner Color | canBidAsPrime |
+|-------------|-------|-------------|---------------|
+| exact | 20/20 | Green | Yes |
+| prefix_5 (first 5 digits match) | 12/20 | Yellow | Yes |
+| prefix_4 (first 4 digits match) | 8/20 | Yellow | Yes |
+| sector (first 2 digits match) | 3/20 | Yellow | No |
+| none | 0/20 | Red | No |
 
-## Testing Strategy
+### How to Test NAICS Scoring
 
-1. **Navigate systematically** through all sidebar groups
-2. **Verify source badges** — "Live API" means n8n data (preferred), "Live DB" means postgres fallback
-3. **Check empty states** — pages with no DB data should show 0 counts + empty message (NOT mock data)
-4. **Test NAICS Size filter** on Ops Tracker: All≈302, Small≈varies, Large≈varies
-5. **Test filters and tabs** — click each, verify content renders
-6. **Record browser interactions** with annotate_recording tool
-7. **For POST writes** — curl POST → psql verify → GET verify → UI verify (4-step pattern)
+1. **Find or create test data**: You need at least two opportunities — one with a NAICS code in the company's list (e.g., 541512) and one with a non-matching NAICS (e.g., 611430).
+   - To update an opportunity's NAICS in the DB: `UPDATE opportunities SET naics = '541512' WHERE id = '666';`
+   - Use `docker exec gda-postgres psql -U gda -d gda_command -c "..."` for local, or SSH into VPS for production.
 
-## Ops Tracker Testing (n8n Integration)
+2. **Navigate to Opportunity Detail**: `/opportunities/<id>`
 
-### Pagination
-- Default: 25 per page, `page=1&pageSize=25` query params
-- Expected: ~13 pages for ~302 opportunities
-- Pagination controls: Prev/Next buttons + "Page X of Y — showing Z of N opportunities"
-- **Summary strip must show full-dataset aggregates** (Count≈302, Total Value≈$2.3B), NOT page-slice values
-- **Summary stats must NOT change when paginating** — only the table data changes
-- **Total Value formatting**: Must show clean abbreviations like "$2.3B" or "$6.0M", NOT raw numbers like "$23032235831.0M" or scientific notation
+3. **Click "Run AI Analysis" or "Re-analyze"**: This triggers the backend OODA analysis which includes deterministic NAICS scoring. The button shows "Analyzing..." while running (~15-30 seconds for LLM call).
 
-### API Verification
+4. **Verify NAICS Match Banner**: After analysis completes, a banner appears above the Observe section:
+   - **Matching NAICS**: Green background, checkmark emoji, "NAICS Match — <code>", "20/20 pts", explanation like "Exact NAICS match: company is registered under <code>"
+   - **Non-matching NAICS**: Red background, X emoji, "NAICS Mismatch — <code>", "0/20 pts", explanation listing all registered codes and "Cannot bid as prime"
+
+5. **Verify Orient Section**: Scroll to "Orient — What It Means" section:
+   - Matching: "NAICS Alignment" with green "strength" badge
+   - Non-matching: "NAICS Alignment" with red "risk" badge
+
+6. **Verify Score Impact**: The overall Pwin score should be higher for matching NAICS than non-matching. In testing, a matching NAICS opp scored 75 vs 45 for non-matching (30-point difference from NAICS component alone).
+
+### NAICS Testing Gotchas
+- **Analysis takes 15-30 seconds**: The LLM call is not instant. Wait for the "Analyzing..." button to change back to "Re-analyze" and the page to refresh.
+- **Existing analysis may cache**: If an opportunity already has OODA data from before the NAICS feature, click "Re-analyze" to trigger a fresh analysis with the new deterministic scoring.
+- **LLM may not always perfectly follow NAICS score injection**: The prompt instructs the LLM to use the pre-computed NAICS score exactly, but verify the banner (which uses the deterministic result directly) rather than relying on the LLM's text description alone.
+- **Banner data comes from `naics_match` field in OODA JSON**: The frontend reads `rawOoda.naics_match` to render the banner. If no `naics_match` key exists in the stored OODA data, no banner shows.
+
+## Production Testing
+
+### Production Verification Workflow
 ```bash
-# Login (production)
-TOKEN=$(curl -s https://gda.csr-llc.tech/api/auth/login \
-  -H 'Content-Type: application/json' \
+# Login and get token
+export TOKEN=$(curl -s -X POST "https://gda.csr-llc.tech/api/auth/login" \
+  -H "Content-Type: application/json" \
   -d '{"email":"tester@gda.local","password":"tester123"}' \
   | jq -r '.data.accessToken')
 
-# Test pagination
+# Get opportunities
 curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
   -H "Authorization: Bearer $TOKEN" \
   | jq '{source: .meta.source, count: .meta.totalFiltered, totalPages: .meta.totalPages, totalValue: .meta.totalValue}'
