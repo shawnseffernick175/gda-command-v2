@@ -32,6 +32,18 @@ const COLOR_TEAM_ORDER: ColorTeamColor[] = ["blue", "pink", "red", "green", "gol
 
 const TERMINAL_PHASES: ShipleyPhase[] = ["awarded", "lost", "no_bid"];
 
+// Map ShipleyPhase → DB status and capture_stage to keep all columns in sync
+const PHASE_TO_STATUS: Record<ShipleyPhase, string> = {
+  identify: "discovery", qualify: "qualified", pursue: "pipeline",
+  capture: "pipeline", proposal: "pipeline", submit: "pipeline",
+  awarded: "won", lost: "lost", no_bid: "no_bid",
+};
+const PHASE_TO_CAPTURE_STAGE: Record<ShipleyPhase, string> = {
+  identify: "interest", qualify: "qualify", pursue: "pursue",
+  capture: "pursue", proposal: "solicitation", submit: "post_submittal",
+  awarded: "won", lost: "lost", no_bid: "no_bid",
+};
+
 function isForwardTransition(current: ShipleyPhase, target: ShipleyPhase): boolean {
   // Terminal states are always reachable from active phases
   if (TERMINAL_PHASES.includes(target)) return true;
@@ -402,11 +414,13 @@ router.patch("/advance/:id", requireRole("admin", "bd_manager"), async (req: Req
       return;
     }
 
-    // Advance phase
+    // Advance phase — sync status and capture_stage to keep all surfaces consistent
+    const newStatus = PHASE_TO_STATUS[target_phase] ?? "discovery";
+    const newCaptureStage = PHASE_TO_CAPTURE_STAGE[target_phase] ?? "interest";
     const { rows: updated } = await pool.query(
-      `UPDATE opportunities SET shipley_phase = $2, updated_at = NOW()
+      `UPDATE opportunities SET shipley_phase = $2, status = $3, capture_stage = $4, updated_at = NOW()
        WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
-      [id, target_phase]
+      [id, target_phase, newStatus, newCaptureStage]
     );
 
     const userId = req.user?.userId ?? "system";
@@ -466,10 +480,10 @@ router.post("/color-reviews/:opportunityId", requireRole("admin", "bd_manager"),
       `INSERT INTO color_team_review (opportunity_id, team_color, scheduled_date, completed_date, score, notes)
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (opportunity_id, team_color) DO UPDATE SET
-         scheduled_date = COALESCE(EXCLUDED.scheduled_date, color_team_review.scheduled_date),
-         completed_date = COALESCE(EXCLUDED.completed_date, color_team_review.completed_date),
-         score = COALESCE(EXCLUDED.score, color_team_review.score),
-         notes = COALESCE(EXCLUDED.notes, color_team_review.notes),
+         scheduled_date = EXCLUDED.scheduled_date,
+         completed_date = EXCLUDED.completed_date,
+         score = EXCLUDED.score,
+         notes = EXCLUDED.notes,
          updated_at = NOW()
        RETURNING *`,
       [opportunityId, team_color, scheduled_date ?? null, completed_date ?? null, score ?? null, notes ?? null]
