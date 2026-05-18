@@ -11,6 +11,7 @@ import {
   fetchCompetitorField,
   fetchBlackHatAnalysis,
   fetchWargameAnalysis,
+  fetchOpportunityTimeline,
   changeOpportunityStage,
   SHIPLEY_STAGES,
   type OpportunityDetailData,
@@ -24,6 +25,7 @@ import {
   type CompetitorFieldData,
   type BlackHatAnalysisData,
   type WargameAnalysisData,
+  type TimelineEvent,
 } from "../api/client";
 
 // ---------------------------------------------------------------------------
@@ -150,6 +152,9 @@ export default function OpportunityDetail() {
   const [blackHat, setBlackHat] = useState<BlackHatAnalysisData | null>(null);
   const [wargame, setWargame] = useState<WargameAnalysisData | null>(null);
 
+  // Activity timeline state
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+
   // Capture Coach state
   const [coachAnalysis, setCoachAnalysis] = useState<CaptureCoachAnalysis | null>(null);
   const [coachLoading, setCoachLoading] = useState(false);
@@ -158,6 +163,8 @@ export default function OpportunityDetail() {
   // AI Analysis state
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState<{ message: string; isError: boolean } | null>(null);
+
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Entity eligibility state (W4)
   const [entityResults, setEntityResults] = useState<Array<{
@@ -195,6 +202,7 @@ export default function OpportunityDetail() {
     setWargame(null);
     setCoachAnalysis(null);
     setCoachResult(null);
+    setTimeline([]);
 
     // Fetch enrichments in parallel (non-blocking) — validate data shape before setting state
     fetchPwinBreakdown(id).then((e) => { if (e.success && e.data && typeof e.data.overall_pwin === "number" && Array.isArray(e.data.factors)) setPwin(e.data); }).catch(() => {});
@@ -202,6 +210,7 @@ export default function OpportunityDetail() {
     fetchCompetitorField(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.competitors)) setCompetitors(e.data); }).catch(() => {});
     fetchBlackHatAnalysis(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.scenarios)) setBlackHat(e.data); }).catch(() => {});
     fetchWargameAnalysis(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.scenarios)) setWargame(e.data); }).catch(() => {});
+    fetchOpportunityTimeline(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.events)) setTimeline(e.data.events); }).catch(() => {});
     // Fetch entity eligibility (W4)
     authenticatedFetch(`/api/admin/companies/check-all/${id}`)
       .then((r) => r.json())
@@ -390,6 +399,61 @@ export default function OpportunityDetail() {
         )}
       </div>
 
+      {/* Tab Bar */}
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: 20 }}>
+        {[
+          { key: "overview", label: "Overview" },
+          { key: "analysis", label: "Analysis" },
+          { key: "intelligence", label: "Intelligence" },
+          { key: "strategy", label: "Strategy" },
+          { key: "history", label: "History" },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              padding: "10px 20px",
+              border: "none",
+              borderBottom: activeTab === tab.key ? "2px solid #3b82f6" : "2px solid transparent",
+              background: "none",
+              color: activeTab === tab.key ? "#f1f5f9" : "#64748b",
+              fontWeight: activeTab === tab.key ? 700 : 400,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ======================== OVERVIEW TAB ======================== */}
+      {activeTab === "overview" && <>
+
+      {/* Analytics Strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 20 }}>
+        <div style={styles.analyticsCard}>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>Fit Score</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: scoreColor(opp.score ?? 0) }}>{opp.score ?? 0}</div>
+        </div>
+        <div style={styles.analyticsCard}>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>Pwin</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: pwin ? scoreColor(Math.round(pwin.overall_pwin * 100)) : "#64748b" }}>{pwin ? `${Math.round(pwin.overall_pwin * 100)}%` : "—"}</div>
+        </div>
+        <div style={styles.analyticsCard}>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>Est. Value</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#e2e8f0" }}>{formatCurrency(opp.value_estimated)}</div>
+        </div>
+        <div style={styles.analyticsCard}>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>Stage</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: STATUS_COLORS[opp.status] ?? "#6b7280", textTransform: "capitalize" }}>{opp.capture_stage ?? opp.status}</div>
+        </div>
+        <div style={styles.analyticsCard}>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 2 }}>Due</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" }}>{formatDate(opp.due_date)}</div>
+        </div>
+      </div>
+
       {/* Section 1: Core Fields */}
       <Section title="Core Fields">
         <div style={styles.fieldGrid}>
@@ -513,6 +577,10 @@ export default function OpportunityDetail() {
           </div>
         </div>
       </Section>
+      </>}
+
+      {/* ======================== ANALYSIS TAB ======================== */}
+      {activeTab === "analysis" && <>
 
       {/* Section 2: Executive Summary */}
       <Section title="Executive Summary">
@@ -698,6 +766,10 @@ export default function OpportunityDetail() {
           </div>
         </div>
       </Section>
+      </>}
+
+      {/* ======================== INTELLIGENCE TAB ======================== */}
+      {activeTab === "intelligence" && <>
 
       {/* Section 5: Pwin Breakdown */}
       {pwin && (
@@ -898,8 +970,12 @@ export default function OpportunityDetail() {
           <EmptyState text="No competitive intelligence available for this opportunity." />
         )}
       </Section>
+      </>}
 
-      {/* Section 11: Sources */}
+      {/* ======================== STRATEGY TAB ======================== */}
+      {activeTab === "strategy" && <>
+
+      {/* Section 11: Sources (strategy context) */}
       <Section title="Sources">
         {(sources ?? []).length === 0 ? (
           <EmptyState text="No external sources are associated with this analysis." />
@@ -1149,6 +1225,30 @@ export default function OpportunityDetail() {
           </div>
         )}
       </Section>
+      </>}
+
+      {/* ======================== HISTORY TAB ======================== */}
+      {activeTab === "history" && <>
+
+      {/* Activity Timeline */}
+      <Section title="Activity Timeline">
+        {timeline.length === 0 ? (
+          <EmptyState text="No activity recorded for this opportunity." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {timeline.map((ev) => (
+              <div key={ev.id} style={{ display: "flex", gap: 12, padding: "10px 14px", borderRadius: 6, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 6, flexShrink: 0, background: ev.type === "create" ? "#22c55e" : "#3b82f6" }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.summary}</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{formatDate(ev.timestamp)} · {ev.actor}</div>
+                </div>
+                <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase" as const }}>{ev.type}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
       {/* Section: Version History */}
       <Section title="Version History">
@@ -1156,15 +1256,15 @@ export default function OpportunityDetail() {
           table="opportunities"
           recordId={id ?? ""}
           onRestore={() => {
-            // Re-fetch data after restore
             if (id) {
               fetchOpportunityDetail(id).then((env) => { if (env.success && env.data) setData(env.data); });
             }
           }}
         />
       </Section>
+      </>}
 
-      {/* Section: Ask AI */}
+      {/* Section: Ask AI (always visible) */}
       <div style={{ marginTop: 24 }}>
         <AskAIChat opportunityId={id ?? ""} opportunityTitle={opp.title} />
       </div>
@@ -1240,11 +1340,7 @@ function SourceChip({ sourceId, sources }: { sourceId: string; sources: Opportun
   return (
     <span
       style={styles.sourceChip}
-      title={src.title}
-      onClick={() => {
-        const el = document.getElementById(`source-${sourceId}`);
-        el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }}
+      title={`${src.title} — see Strategy tab for details`}
     >
       {src.type.replace(/_/g, " ")}
     </span>
@@ -1496,5 +1592,12 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "8px 10px",
     borderBottom: "1px solid rgba(255,255,255,0.04)",
     verticalAlign: "top" as const,
+  },
+  analyticsCard: {
+    padding: "14px 16px",
+    borderRadius: 8,
+    background: "rgba(255,255,255,0.03)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    textAlign: "center" as const,
   },
 };
