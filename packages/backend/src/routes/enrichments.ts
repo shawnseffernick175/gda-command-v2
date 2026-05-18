@@ -13,11 +13,37 @@ router.get("/pwin/:oppId", async (req, res) => {
   // Try n8n first
   if (n8nWebhookConfigured()) {
     try {
-      const result = await callWebhook("gda-pwin-calculator", { opp_id: oppId }, { timeoutMs: 15_000 });
+      const result = await callWebhook(
+        "gda-pwin-calculator",
+        { body: { action: "calculate", opp_id: oppId } },
+        { timeoutMs: 15_000 },
+      );
       if (result.ok && result.body) {
-        return res.json(successEnvelope("gda-enrichments", "pwin", { ...result.body, source: "n8n" }));
+        const raw = result.body as Record<string, unknown>;
+        const breakdown = Array.isArray(raw.breakdown) ? raw.breakdown : [];
+        const factors = breakdown.map((b: Record<string, unknown>) => ({
+          name: String(b.factor ?? ""),
+          weight: parseFloat(String(b.weight ?? "0").replace("%", "")) || 0,
+          score: Number(b.score ?? 0),
+          weighted_score: Number(b.weighted_contribution ?? 0),
+          rationale: "",
+        }));
+        const mapped = {
+          opp_id: oppId,
+          overall_pwin: Number(raw.pwin ?? 0),
+          factors,
+          historical_win_rate: 0,
+          confidence: (Number(raw.pwin ?? 0) >= 60 ? "high" : Number(raw.pwin ?? 0) >= 30 ? "medium" : "low") as "high" | "medium" | "low",
+          last_calculated: String(raw.assessed_at ?? new Date().toISOString()),
+          methodology: "GDA Command weighted scoring",
+          recommendation: raw.recommendation ?? null,
+          recommendation_color: raw.recommendation_color ?? null,
+          gates: raw.gates ?? null,
+          source: "n8n" as const,
+        };
+        return res.json(successEnvelope("gda-enrichments", "pwin", mapped));
       }
-    } catch { /* fall through to mock */ }
+    } catch { /* fall through to 404 */ }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "pwin", {
