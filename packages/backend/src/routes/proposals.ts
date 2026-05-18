@@ -824,25 +824,29 @@ router.post("/:id/sections/:sectionId/import", sectionUpload.single("file"), asy
     // Save version before overwriting
     const section = rowToSection(sectionResult.rows[0]);
     if (section.content && section.content.trim().length > 0) {
-      const versionCount = await pool.query(
-        `SELECT COUNT(*) FROM proposal_section_versions WHERE section_id = $1`,
-        [req.params.sectionId],
-      );
-      const nextVersion = Number(versionCount.rows[0].count) + 1;
-      await pool.query(
-        `INSERT INTO proposal_section_versions (id, section_id, proposal_id, version_number, content, word_count, change_summary, changed_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          `sv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          req.params.sectionId,
-          req.params.id,
-          nextVersion,
-          section.content,
-          section.word_count,
-          `Saved before import of ${file.originalname}`,
-          "system",
-        ],
-      );
+      try {
+        const versionCount = await pool.query(
+          `SELECT COUNT(*) FROM proposal_section_versions WHERE section_id = $1`,
+          [req.params.sectionId],
+        );
+        const nextVersion = Number(versionCount.rows[0].count) + 1;
+        await pool.query(
+          `INSERT INTO proposal_section_versions (id, section_id, proposal_id, version_number, content, word_count, change_summary, changed_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            `sv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            req.params.sectionId,
+            req.params.id,
+            nextVersion,
+            section.content,
+            section.word_count,
+            `Saved before import of ${file.originalname}`,
+            "system",
+          ],
+        );
+      } catch {
+        // Non-fatal: version table might not exist yet
+      }
     }
 
     // Decide: append or replace
