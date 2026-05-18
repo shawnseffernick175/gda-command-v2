@@ -20,6 +20,7 @@ const VALID_STATUSES: OpportunityStatus[] = [
   "lost",
   "won",
   "no_bid",
+  "gov_cancelled",
 ];
 
 // Shipley stages — superset of existing statuses for the capture pipeline
@@ -126,6 +127,7 @@ router.get("/", async (req, res) => {
   const minPwin = req.query.minPwin ? parseFloat(req.query.minPwin as string) : undefined;
   const minScore = req.query.minScore ? parseFloat(req.query.minScore as string) : undefined;
   const includeLowFit = req.query.includeLowFit === "true";
+  const includeAllStatuses = req.query.includeAllStatuses === "true";
   const sortBy = (req.query.sortBy as string) ?? "updated_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
@@ -157,8 +159,8 @@ router.get("/", async (req, res) => {
     }
     if (statusFilter) {
       filtered = filtered.filter((o) => o.status === statusFilter);
-    } else {
-      filtered = filtered.filter((o) => o.status !== "no_bid");
+    } else if (!includeAllStatuses) {
+      filtered = filtered.filter((o) => !["won", "lost", "no_bid", "gov_cancelled"].includes(o.status));
     }
     if (deptFilter) {
       filtered = filtered.filter((o) => o.department === deptFilter);
@@ -310,6 +312,7 @@ router.get("/", async (req, res) => {
               avgScore: aggAvgScore,
               departments: aggDepartments,
               filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
+              viewLabel: includeAllStatuses ? "v_opportunity_all_tracked" : "v_opportunity_active",
               lastSync: n8nResult.meta.lastSync,
               dataSources: n8nResult.meta.dataSources,
             }
@@ -353,8 +356,8 @@ router.get("/", async (req, res) => {
       conditions.push(`status = $${paramIdx}`);
       params.push(statusFilter);
       paramIdx++;
-    } else {
-      conditions.push(`status <> 'no_bid'`);
+    } else if (!includeAllStatuses) {
+      conditions.push(`status NOT IN ('won', 'lost', 'no_bid', 'gov_cancelled')`);
     }
     if (deptFilter) {
       conditions.push(`department = $${paramIdx}`);
@@ -383,7 +386,7 @@ router.get("/", async (req, res) => {
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
              qualified_by, description, capture_stage, tags, raw_source_url, created_at, updated_at
-      FROM opportunities
+      FROM v_opportunity_all_tracked
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
     `;
@@ -441,6 +444,7 @@ router.get("/", async (req, res) => {
           avgScore: aggAvgScore,
           departments: aggDepartments,
           filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
+          viewLabel: includeAllStatuses ? "v_opportunity_all_tracked" : statusFilter ? "v_opportunity_all_tracked (filtered)" : "v_opportunity_active",
         }
       )
     );

@@ -48,7 +48,8 @@ export type OpportunityStatus =
   | "pipeline"
   | "lost"
   | "won"
-  | "no_bid";
+  | "no_bid"
+  | "gov_cancelled";
 
 /** SBA size standard classification for a given NAICS code. */
 export type NaicsSize = "small" | "large" | null;
