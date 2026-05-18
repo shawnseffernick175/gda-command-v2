@@ -202,13 +202,14 @@ router.post("/auto-capture", requireRole("admin", "bd_manager"), async (_req, re
   try {
     // Extract POC data from SAM opportunities that have contact info
     const { rows: samOpps } = await pool.query(
-      `SELECT id, title, agency, poc_name, poc_email, poc_phone, poc_title
+      `SELECT DISTINCT ON (poc_email) id, title, agency, poc_name, poc_email, poc_phone, poc_title
        FROM sam_opportunities
        WHERE poc_name IS NOT NULL AND poc_name != ''
        AND poc_email IS NOT NULL AND poc_email != ''
        AND NOT EXISTS (
          SELECT 1 FROM contacts c WHERE c.email = sam_opportunities.poc_email AND c.email IS NOT NULL AND sam_opportunities.poc_email IS NOT NULL
        )
+       ORDER BY poc_email, created_at DESC
        LIMIT 100`
     );
 

@@ -292,7 +292,7 @@ router.post("/scan", requireRole("admin", "bd_manager"), async (_req, res) => {
             "buyer",
             score,
             naicsMatch,
-            opp.sam_url ? [opp.sam_url] : [],
+            JSON.stringify(opp.sam_url ? [opp.sam_url] : []),
             `SAM.gov ${opp.type ?? "pre-solicitation"} → potential RFP`,
             naicsMatch ? "Review and promote to pipeline" : "Monitor for updates",
           ]
