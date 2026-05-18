@@ -29,10 +29,11 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - All API responses use `successEnvelope(workflow, action, data, meta, dryRun)` wrapper
 - Navigation: 5-group collapsible sidebar (220px expanded / 52px collapsed)
   - OPERATIONS: Launchpad, Fast Track, Ops Tracker, Pipeline, Approvals, Risk Register
-  - CAPTURE: Capture Plans, Proposals, RFP Shredder, Compliance, Color Review
-  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, CPARS Builder, GovWin IQ
-  - REPORTING: Financials, Reports, Charts, Discussions
-  - ADMIN: Settings, Health, Workflows, Users, Audit Log, Doctrine, Book of Truths, Prompts, User Manual
+  - CAPTURE: Proposal Center, RFP Shredder, Compliance, Proposal Builder, Color Review, Capture Plans
+  - INTELLIGENCE: Intel Hub, Predictive, Anomaly Detection, Contacts, Knowledge Base, GovWin IQ
+  - REPORTING: Financial Bible (renamed from "Financials" in PR #173), Reports, Charts
+  - ADMIN: Settings, Health, Workflows, Doctrine, Book of Truths, Prompts, User Manual
+- **Removed features**: Discussions page was removed in PR #173 — no `/discussions` route exists. Do NOT test for it or reference it.
 - Financial KPI strip: **sticky header** (position: sticky, top: 0, zIndex: 40) showing **16 KPIs** with "?" info badges on every card. KPIs use both legacy keys (e.g., `orders`, `sales`) and fin-XXX keys (e.g., `fin-001`, `fin-006`). The KPI_INFO map must have entries for both key formats.
 - Hidden routes (no sidebar link): Opportunity Detail (`/opportunities/:id`), SAM Monitor (`/sam-monitor`), FPDS Monitor (`/fpds-monitor`)
 
@@ -40,6 +41,8 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 
 - **Dev mode** (`AUTH_REQUIRED=false` in `.env`): Auth middleware injects admin user for all requests. Frontend probes `/api/auth/me` on mount, gets 200, renders main app without login.
 - **Production mode** (`AUTH_REQUIRED=true`): JWT-based auth enforced on all `/api/*` routes except `/api/auth/*`. Frontend probes `/api/auth/me`, gets 401 if no token, shows Login page.
+- **JWT TTL**: Access token expires in **8 hours** (extended from 15m in PR #173). Refresh token: 7 days.
+- **Auto-refresh**: Frontend uses coalesced token refresh — multiple concurrent 401s trigger only one refresh call. If refresh fails, user is redirected to `/` (NOT `/login` — the `/login` route does not exist).
 - **Auth endpoints**: POST `/api/auth/login`, `/api/auth/register`, `/api/auth/refresh`, `/api/auth/logout`, GET `/api/auth/me`
 - **Token storage**: localStorage keys `gda_access_token`, `gda_refresh_token`, `gda_user`
 - **Default admin user**: `admin@gda-command.local` — **WARNING**: The seed data uses a placeholder password hash (`$2b$10$placeholder_hash_for_dev`), so login with `admin123` may fail after a fresh `db:reset`. Workaround: register a new user via `POST /api/auth/register` with `{"email":"tester@gda.local","password":"tester123","display_name":"Test User"}`.
@@ -55,6 +58,7 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 4. **Logout**: Click "Logout" button in sidebar. Verify return to Login page.
 5. **Login**: Enter registered credentials, click "Sign In". Verify redirect to Launchpad with username.
 6. **Invalid login**: Enter wrong credentials. Verify red error banner "Invalid email or password".
+7. **401 sweep**: After logging in, navigate to Settings, Health, Reports, Knowledge Base, Workflows. Verify NO HTTP 401 errors in console (`performance.getEntriesByType('resource').filter(r => r.responseStatus === 401)` should return empty array).
 
 ## Full E2E Audit Pattern (38 items)
 
@@ -80,18 +84,18 @@ When doing a comprehensive audit, navigate every page and verify:
   `window.history.pushState({}, '', '/route'); window.dispatchEvent(new PopStateEvent('popstate'));`
 - Sidebar collapse toggle: click ◀ to collapse to icon-only rail (~52px), click ▶ to expand back
 
-### Complete Page Inventory (34 pages)
+### Complete Page Inventory (33 pages)
 
 | Group | Pages |
 |-------|-------|
 | Operations (6) | Launchpad `/`, Fast Track `/fast-track`, Ops Tracker `/ops-tracker`, Pipeline `/pipeline`, Approvals `/approvals`, Risk Register `/risk-register` |
-| Capture (5) | Capture Plans `/capture`, Proposals `/proposals`, RFP Shredder `/rfp-shredder`, Compliance `/compliance`, Color Review `/color-review` |
-| Intelligence (7) | Intel Hub `/intel`, Predictive `/predictive`, Anomaly Detection `/anomaly`, Contacts `/contacts`, Knowledge Base `/knowledge`, CPARS Builder `/cpars`, GovWin IQ `/govwin` |
-| Reporting (4) | Financials `/financial-bible`, Reports `/reports`, Charts `/charts`, Discussions `/discussions` |
-| Admin (9) | Settings `/settings`, Health `/qa-center`, Workflows `/workflows`, Users `/admin/users`, Audit Log `/admin/audit`, Doctrine `/doctrine`, Book of Truths `/book-of-truths`, Prompts `/prompts`, User Manual `/help` |
+| Capture (6) | Proposal Center `/proposal-center`, RFP Shredder `/rfp-shredder`, Compliance `/compliance`, Proposal Builder `/proposals`, Color Review `/color-review`, Capture Plans `/capture` |
+| Intelligence (6) | Intel Hub `/intel`, Predictive `/predictive`, Anomaly Detection `/anomaly`, Contacts `/contacts`, Knowledge Base `/knowledge`, GovWin IQ `/govwin` |
+| Reporting (3) | Financial Bible `/financial-bible`, Reports `/reports`, Charts `/charts` |
+| Admin (9) | Settings `/settings`, Health `/qa-center`, Workflows `/workflows`, Doctrine `/doctrine`, Book of Truths `/book-of-truths`, Prompts `/prompts`, User Manual `/help`, Notifications `/notifications` |
 | Hidden (3) | Opportunity Detail `/opportunities/:id`, SAM Monitor `/sam-monitor`, FPDS Monitor `/fpds-monitor` |
 
-### Global Features (4 items)
+### Global Features (5 items)
 
 | Feature | How to test |
 |---------|-------------|
@@ -99,6 +103,7 @@ When doing a comprehensive audit, navigate every page and verify:
 | Notifications | Click bell icon at bottom of sidebar, verify panel renders |
 | Financial KPI strip | Observe top header — shows 16 KPIs with real values, sticky at top when scrolling, "?" info badge on every card |
 | 404 page | Navigate to `/nonexistent-page`, verify "Page not found" with Back to Launchpad link |
+| QuickEntry FAB | Click floating "+" button (bottom-right). Verify exactly 3 actions: New Opportunity (📡), New Contact (👤), Quick Note (📝). NO Discussion option. Note: the "?" help button may overlap the FAB — use `document.querySelector('button[aria-label="Quick Entry"]').click()` if click doesn't work. |
 
 ## Launchpad Testing
 
@@ -114,12 +119,47 @@ When doing a comprehensive audit, navigate every page and verify:
 - **Avg Pwin** should show "—" (dash) when no pwin data exists, NOT "0%"
 - Grid layout: `repeat(4, 1fr)` — 4 cards in a row
 
+## Ops Tracker Testing
+
+### Expired Due Date Badges
+- Opportunities with past `due_date` AND active status (discovery, interest, pipeline/pursue) should show:
+  - Red text (#ef4444) with font-weight 600
+  - "EXPIRED" badge (small red background pill)
+- **Won/lost opportunities**: Should NOT show EXPIRED badge even if due_date is in the past (terminal statuses are semantically correct)
+- `isExpired()` function at OpsTracker.tsx:47-50 checks `new Date(d).getTime() < Date.now()`
+- Guards at lines 645-654 exclude `opp.status !== "won" && opp.status !== "lost"`
+
 ## Known Issues
 
 - **Predictive Analytics crash**: `/predictive` might crash with `Cannot read properties of undefined (reading 'overall_win_rate')` when DB returns empty data. Frontend might not handle undefined response.
 - **System DATABASE_URL override**: The VM might have a system-level `DATABASE_URL` env var (e.g., pointing to n8n's postgres). Always start backend with explicit `DATABASE_URL=...`.
 - **Admin login may fail after db:reset**: Seed data uses placeholder password hash. Register a new user via API as workaround.
 - **Financial KPI strip**: Shows "unavailable" when no financial data is seeded — this is expected behavior, not a bug.
+- **QuickEntry FAB overlap**: The "?" (Ask a Question) button may visually overlap the QuickEntry "+" FAB at bottom-right. Use JavaScript click as workaround: `document.querySelector('button[aria-label="Quick Entry"]').click()`
+- **Workflows page**: Shows "Workflow Engine Unavailable" when n8n is not running — this is expected in dev, not a bug.
+
+## Mock Data & Migration Gotchas
+
+### Migration ID Patterns
+When writing migrations to delete seeded/mock data, always verify the actual ID patterns in the database first. Previous migration (027) failed because it used wrong patterns:
+
+| Table | Wrong Pattern | Correct Pattern |
+|-------|--------------|----------------|
+| morning_briefings | `briefing-%` | `brief-%` |
+| doctrine_drafts | `doctrine-%` | `dd-%` |
+| contacts | `contact-%` | `CON-%` |
+| approvals | `approval-%` | `APR-%` |
+| capture_plans | `capture-%` | `cap-%` |
+| generated_reports | `report-%` | `RPT-%` |
+| report_templates | `template-%` | `TPL-%` |
+| scheduled_reports | `schedule-%` | `SCH-%` |
+| compliance_requirements | `compliance-%` | `CR-%` |
+
+**Always query the DB first**: `SELECT id FROM <table> LIMIT 5;` to see actual ID patterns before writing DELETE statements.
+
+### FK Constraints
+- `generated_reports` has a FK to `report_templates` — must delete generated_reports FIRST
+- Track applied migrations in `schema_migrations` table (id, name, applied_at)
 
 ## OODA Analysis & NAICS Scoring Testing
 
@@ -190,6 +230,7 @@ curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
 - Pull latest: `cd /root/gda-command-v2 && git pull origin main`
 - Rebuild: `docker compose -f docker-compose.prod.yml build --no-cache backend frontend`
 - Restart: `docker compose -f docker-compose.prod.yml up -d backend frontend`
+- **NEVER use `-v` flag** with `docker compose down` — this deletes the postgres volume and wipes all user data
 - Run migrations: `docker exec gda-backend node -e "require('./dist/db/migrate').migrate()"`
 - Verify: `docker ps --format 'table {{.Names}}\t{{.Status}}' | grep gda`
 - Site: https://gda.csr-llc.tech
@@ -199,6 +240,7 @@ curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
 - **Column names matter**: The `financial_kpis` table uses `id` column (NOT `key`). Migration 023 was initially wrong with `WHERE key = 'backlog'` — fixed to `WHERE id = 'fin-006'`.
 - **Always verify migrations on production**: After deploy, run migration command and check for errors. Then verify the data change in the UI.
 - **Test migration idempotency**: Running the same migration twice should not error (use `IF NOT EXISTS`, `ON CONFLICT`, or conditional updates).
+- **Verify ID patterns before writing DELETEs**: Query the actual table to see real IDs. Don't guess patterns from table/column names.
 
 ### Browser Testing Tips
 - Pagination buttons may be below the fold — scroll down to expose them
@@ -206,6 +248,7 @@ curl -s "https://gda.csr-llc.tech/api/opportunities?page=1&pageSize=25" \
 - When verifying summary stats across pages, compare Count + Total Value on page 1 vs page 2 — they must be identical
 - n8n source badge text: "Live API" (green chip) — if you see "Live DB", n8n connection failed
 - **KPI strip scrolls horizontally** — not all 16 KPIs are visible at once. Use DOM inspection to verify offscreen KPIs have "?" buttons.
+- **Console 401 check**: Use `performance.getEntriesByType('resource').filter(r => r.responseStatus === 401)` to programmatically verify no 401 errors on any page.
 
 ## Devin Secrets Needed
 
