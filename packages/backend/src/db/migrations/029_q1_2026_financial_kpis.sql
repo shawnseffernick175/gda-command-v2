@@ -29,9 +29,8 @@ UPDATE financial_kpis SET value = 16599957, target = 25000000, period = 'FY2026-
 -- Revenue Per Employee → annualized Q1 revenue / 41 employees ($961,491)
 UPDATE financial_kpis SET value = 961491, target = 1000000, period = 'FY2026-Q1', trend = 'up' WHERE id = 'fin-010';
 
--- Avg Contract Value → Q1 YTD revenue / 10 active projects ($351,975)
--- Note: the "prior" value was $12.4M which was clearly placeholder data
-UPDATE financial_kpis SET value = 351975, target = 500000, period = 'FY2026-Q1', trend = 'up' WHERE id = 'fin-004';
+-- Avg Contract Value → Q1 YTD revenue / 10 active projects ($985,529)
+UPDATE financial_kpis SET value = 985529, target = 1500000, period = 'FY2026-Q1', trend = 'up' WHERE id = 'fin-004';
 
 -- Active Contracts → from L1-ACTUAL Revenue Summary (10 active projects)
 UPDATE financial_kpis SET value = 10, target = 15, period = 'FY2026-Q1', trend = 'up' WHERE id = 'fin-005';
