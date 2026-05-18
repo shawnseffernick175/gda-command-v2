@@ -1,7 +1,9 @@
 import { Router } from "express";
+import multer from "multer";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { chatCompletion, isLLMAvailable, SYSTEM_PROMPTS } from "../lib/llm";
+import { isAllowedMimeType, getMaxFileSize } from "../lib/storage";
 import type { Proposal, ProposalStatus, ProposalSection } from "@gda/shared";
 
 const router = Router();
@@ -314,6 +316,35 @@ router.put("/:id/sections/:sectionId", async (req, res) => {
     fields.push(`updated_at = NOW()`);
     params.push(req.params.sectionId);
     params.push(req.params.id);
+
+    // Auto-save version before overwriting content
+    if (req.body.content !== undefined) {
+      try {
+        const prevResult = await pool.query(
+          `SELECT content, word_count FROM proposal_sections WHERE id = $1 AND proposal_id = $2`,
+          [req.params.sectionId, req.params.id],
+        );
+        if (prevResult.rows.length > 0 && prevResult.rows[0].content && String(prevResult.rows[0].content).trim().length > 0) {
+          const versionCount = await pool.query(
+            `SELECT COUNT(*) FROM proposal_section_versions WHERE section_id = $1`,
+            [req.params.sectionId],
+          );
+          const nextVer = Number(versionCount.rows[0].count) + 1;
+          await pool.query(
+            `INSERT INTO proposal_section_versions (id, section_id, proposal_id, version_number, content, word_count, change_summary, changed_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+              `sv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              req.params.sectionId, req.params.id, nextVer,
+              prevResult.rows[0].content, Number(prevResult.rows[0].word_count ?? 0),
+              `Auto-saved v${nextVer}`, "system",
+            ],
+          );
+        }
+      } catch {
+        // Non-fatal: version table might not exist yet
+      }
+    }
 
     const updateResult = await pool.query(`UPDATE proposal_sections SET ${fields.join(", ")} WHERE id = $${idx} AND proposal_id = $${idx + 1}`, params);
 
@@ -727,5 +758,548 @@ function parseJsonb<T>(val: unknown, fallback: T): T {
   }
   return val as T;
 }
+
+// ---------------------------------------------------------------------------
+// POST /api/proposals/:id/sections/:sectionId/import — import document content into section
+// ---------------------------------------------------------------------------
+const sectionUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: getMaxFileSize() },
+  fileFilter: (_req, file, cb) => {
+    if (!isAllowedMimeType(file.mimetype, file.originalname)) {
+      cb(new Error(`File type ${file.mimetype} is not allowed`));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+router.post("/:id/sections/:sectionId/import", sectionUpload.single("file"), async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "import-section", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const sectionResult = await pool.query(
+      `SELECT * FROM proposal_sections WHERE id = $1 AND proposal_id = $2`,
+      [req.params.sectionId, req.params.id],
+    );
+    if (sectionResult.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.proposals", "import-section", { code: "NOT_FOUND", message: "Section not found", detail: null }));
+    }
+
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json(errorEnvelope("GDA.proposals", "import-section", { code: "BAD_REQUEST", message: "No file provided", detail: null }));
+    }
+
+    // Extract text content from the uploaded file
+    let textContent = "";
+    const mime = file.mimetype;
+    if (mime === "text/plain" || mime === "text/csv" || mime === "text/markdown") {
+      textContent = file.buffer.toString("utf-8");
+    } else if (mime === "application/pdf") {
+      // Basic PDF text extraction — read raw buffer for text segments
+      const raw = file.buffer.toString("latin1");
+      const textMatches = raw.match(/\(([^)]+)\)/g) ?? [];
+      textContent = textMatches.map((m) => m.slice(1, -1)).join(" ");
+      if (textContent.length < 50) {
+        textContent = `[Imported from ${file.originalname} — PDF content may need AI processing. File size: ${(file.size / 1024).toFixed(1)} KB]`;
+      }
+    } else {
+      // For DOCX/XLSX, store a reference and let AI process
+      textContent = `[Imported from ${file.originalname} — ${(file.size / 1024).toFixed(1)} KB, type: ${mime}]`;
+    }
+
+    // Save version before overwriting
+    const section = rowToSection(sectionResult.rows[0]);
+    if (section.content && section.content.trim().length > 0) {
+      const versionCount = await pool.query(
+        `SELECT COUNT(*) FROM proposal_section_versions WHERE section_id = $1`,
+        [req.params.sectionId],
+      );
+      const nextVersion = Number(versionCount.rows[0].count) + 1;
+      await pool.query(
+        `INSERT INTO proposal_section_versions (id, section_id, proposal_id, version_number, content, word_count, change_summary, changed_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          `sv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          req.params.sectionId,
+          req.params.id,
+          nextVersion,
+          section.content,
+          section.word_count,
+          `Saved before import of ${file.originalname}`,
+          "system",
+        ],
+      );
+    }
+
+    // Decide: append or replace
+    const mode = (req.body as Record<string, string>).mode ?? "replace";
+    const finalContent = mode === "append" ? `${section.content}\n\n---\n\n${textContent}` : textContent;
+    const wordCount = finalContent.split(/\s+/).filter(Boolean).length;
+
+    await pool.query(
+      `UPDATE proposal_sections SET content = $1, word_count = $2, status = 'draft', updated_at = NOW() WHERE id = $3`,
+      [finalContent, wordCount, req.params.sectionId],
+    );
+
+    res.json(successEnvelope("GDA.proposals", "import-section", {
+      content: finalContent,
+      wordCount,
+      fileName: file.originalname,
+      fileSize: file.size,
+      mode,
+    }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "import-section", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/proposals/:id/sections/:sectionId/versions — version history
+// ---------------------------------------------------------------------------
+router.get("/:id/sections/:sectionId/versions", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.json(successEnvelope("GDA.proposals", "section-versions", { versions: [] }));
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM proposal_section_versions WHERE section_id = $1 AND proposal_id = $2 ORDER BY version_number DESC`,
+      [req.params.sectionId, req.params.id],
+    );
+
+    const versions = result.rows.map((row) => ({
+      id: String(row.id),
+      section_id: String(row.section_id),
+      version_number: Number(row.version_number),
+      content: String(row.content ?? ""),
+      word_count: Number(row.word_count ?? 0),
+      change_summary: row.change_summary ? String(row.change_summary) : null,
+      changed_by: String(row.changed_by ?? "user"),
+      created_at: String(row.created_at),
+    }));
+
+    res.json(successEnvelope("GDA.proposals", "section-versions", { versions }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "section-versions", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/proposals/:id/sections/:sectionId/versions — save a version snapshot
+// ---------------------------------------------------------------------------
+router.post("/:id/sections/:sectionId/versions", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "save-version", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const sectionResult = await pool.query(
+      `SELECT * FROM proposal_sections WHERE id = $1 AND proposal_id = $2`,
+      [req.params.sectionId, req.params.id],
+    );
+    if (sectionResult.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.proposals", "save-version", { code: "NOT_FOUND", message: "Section not found", detail: null }));
+    }
+
+    const section = rowToSection(sectionResult.rows[0]);
+    const { change_summary } = req.body as { change_summary?: string };
+
+    const versionCount = await pool.query(
+      `SELECT COUNT(*) FROM proposal_section_versions WHERE section_id = $1`,
+      [req.params.sectionId],
+    );
+    const nextVersion = Number(versionCount.rows[0].count) + 1;
+
+    const id = `sv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    await pool.query(
+      `INSERT INTO proposal_section_versions (id, section_id, proposal_id, version_number, content, word_count, change_summary, changed_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, req.params.sectionId, req.params.id, nextVersion, section.content, section.word_count, change_summary ?? `Manual snapshot v${nextVersion}`, "user"],
+    );
+
+    res.status(201).json(successEnvelope("GDA.proposals", "save-version", {
+      id, version_number: nextVersion, word_count: section.word_count,
+    }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "save-version", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/proposals/:id/sections/:sectionId/restore — restore a version
+// ---------------------------------------------------------------------------
+router.post("/:id/sections/:sectionId/restore", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "restore-version", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const { version_id } = req.body as { version_id: string };
+    if (!version_id) {
+      return res.status(400).json(errorEnvelope("GDA.proposals", "restore-version", { code: "BAD_REQUEST", message: "version_id required", detail: null }));
+    }
+
+    // Save current content as a version before restoring
+    const currentResult = await pool.query(
+      `SELECT * FROM proposal_sections WHERE id = $1 AND proposal_id = $2`,
+      [req.params.sectionId, req.params.id],
+    );
+    if (currentResult.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.proposals", "restore-version", { code: "NOT_FOUND", message: "Section not found", detail: null }));
+    }
+
+    const current = rowToSection(currentResult.rows[0]);
+    const versionCount = await pool.query(
+      `SELECT COUNT(*) FROM proposal_section_versions WHERE section_id = $1`,
+      [req.params.sectionId],
+    );
+    const nextVersion = Number(versionCount.rows[0].count) + 1;
+
+    // Save current state before restore
+    await pool.query(
+      `INSERT INTO proposal_section_versions (id, section_id, proposal_id, version_number, content, word_count, change_summary, changed_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        `sv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        req.params.sectionId, req.params.id, nextVersion,
+        current.content, current.word_count, "Auto-saved before version restore", "system",
+      ],
+    );
+
+    // Restore the requested version
+    const versionResult = await pool.query(
+      `SELECT * FROM proposal_section_versions WHERE id = $1 AND section_id = $2`,
+      [version_id, req.params.sectionId],
+    );
+    if (versionResult.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.proposals", "restore-version", { code: "NOT_FOUND", message: "Version not found", detail: null }));
+    }
+
+    const version = versionResult.rows[0];
+    await pool.query(
+      `UPDATE proposal_sections SET content = $1, word_count = $2, updated_at = NOW() WHERE id = $3`,
+      [version.content, version.word_count, req.params.sectionId],
+    );
+
+    res.json(successEnvelope("GDA.proposals", "restore-version", {
+      restored_version: Number(version.version_number),
+      content: String(version.content),
+      word_count: Number(version.word_count),
+    }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "restore-version", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/proposals/:id/compliance-map — RFP requirements vs response mapping
+// ---------------------------------------------------------------------------
+router.get("/:id/compliance-map", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.json(successEnvelope("GDA.proposals", "compliance-map", { requirements: [], stats: { total: 0, addressed: 0, partial: 0, not_addressed: 0, non_compliant: 0 } }));
+    }
+
+    const result = await pool.query(
+      `SELECT * FROM proposal_compliance_map WHERE proposal_id = $1 ORDER BY sort_order, created_at`,
+      [req.params.id],
+    );
+
+    const requirements = result.rows.map((row) => ({
+      id: String(row.id),
+      proposal_id: String(row.proposal_id),
+      requirement_id: row.requirement_id ? String(row.requirement_id) : null,
+      requirement_text: String(row.requirement_text ?? ""),
+      requirement_type: String(row.requirement_type ?? "SHALL"),
+      section_id: row.section_id ? String(row.section_id) : null,
+      section_title: row.section_title ? String(row.section_title) : null,
+      response_status: String(row.response_status ?? "not_addressed"),
+      response_summary: row.response_summary ? String(row.response_summary) : null,
+      sort_order: Number(row.sort_order ?? 0),
+    }));
+
+    const stats = {
+      total: requirements.length,
+      addressed: requirements.filter((r) => r.response_status === "fully_addressed").length,
+      partial: requirements.filter((r) => r.response_status === "partial").length,
+      not_addressed: requirements.filter((r) => r.response_status === "not_addressed").length,
+      non_compliant: requirements.filter((r) => r.response_status === "non_compliant").length,
+    };
+
+    res.json(successEnvelope("GDA.proposals", "compliance-map", { requirements, stats }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "compliance-map", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/proposals/:id/compliance-map — add/import requirements
+// ---------------------------------------------------------------------------
+router.post("/:id/compliance-map", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "add-compliance", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const { requirements } = req.body as {
+      requirements: Array<{
+        requirement_text: string;
+        requirement_type?: string;
+        requirement_id?: string;
+        section_id?: string;
+        section_title?: string;
+      }>;
+    };
+
+    if (!requirements || !Array.isArray(requirements)) {
+      return res.status(400).json(errorEnvelope("GDA.proposals", "add-compliance", { code: "BAD_REQUEST", message: "requirements array required", detail: null }));
+    }
+
+    const created = [];
+    for (let i = 0; i < requirements.length; i++) {
+      const r = requirements[i];
+      const id = `cr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      await pool.query(
+        `INSERT INTO proposal_compliance_map (id, proposal_id, requirement_id, requirement_text, requirement_type, section_id, section_title, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [id, req.params.id, r.requirement_id ?? null, r.requirement_text, r.requirement_type ?? "SHALL", r.section_id ?? null, r.section_title ?? null, i],
+      );
+      created.push({ id, requirement_text: r.requirement_text });
+    }
+
+    res.status(201).json(successEnvelope("GDA.proposals", "add-compliance", { created, count: created.length }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "add-compliance", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/proposals/:id/compliance-map/:reqId — update requirement mapping
+// ---------------------------------------------------------------------------
+router.put("/:id/compliance-map/:reqId", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "update-compliance", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const { section_id, section_title, response_status, response_summary } = req.body as {
+      section_id?: string;
+      section_title?: string;
+      response_status?: string;
+      response_summary?: string;
+    };
+
+    const fields: string[] = [];
+    const params: unknown[] = [];
+    let idx = 1;
+
+    if (section_id !== undefined) { fields.push(`section_id = $${idx++}`); params.push(section_id); }
+    if (section_title !== undefined) { fields.push(`section_title = $${idx++}`); params.push(section_title); }
+    if (response_status !== undefined) { fields.push(`response_status = $${idx++}`); params.push(response_status); }
+    if (response_summary !== undefined) { fields.push(`response_summary = $${idx++}`); params.push(response_summary); }
+
+    if (fields.length === 0) {
+      return res.status(400).json(errorEnvelope("GDA.proposals", "update-compliance", { code: "BAD_REQUEST", message: "No fields to update", detail: null }));
+    }
+
+    fields.push(`updated_at = NOW()`);
+    params.push(req.params.reqId);
+    params.push(req.params.id);
+
+    await pool.query(
+      `UPDATE proposal_compliance_map SET ${fields.join(", ")} WHERE id = $${idx} AND proposal_id = $${idx + 1}`,
+      params,
+    );
+
+    res.json(successEnvelope("GDA.proposals", "update-compliance", { updated: req.params.reqId }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "update-compliance", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/proposals/:id/compliance-map/import-from-shred — import from RFP Shredder
+// ---------------------------------------------------------------------------
+router.post("/:id/compliance-map/import-from-shred", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "import-compliance", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const { shred_job_id } = req.body as { shred_job_id: string };
+    if (!shred_job_id) {
+      return res.status(400).json(errorEnvelope("GDA.proposals", "import-compliance", { code: "BAD_REQUEST", message: "shred_job_id required", detail: null }));
+    }
+
+    // Fetch extracted requirements from RFP Shredder
+    const reqResult = await pool.query(
+      `SELECT id, requirement_text, requirement_type FROM extracted_requirements WHERE shred_job_id = $1 ORDER BY id`,
+      [shred_job_id],
+    );
+
+    if (reqResult.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.proposals", "import-compliance", { code: "NOT_FOUND", message: "No requirements found for this shred job", detail: null }));
+    }
+
+    const created = [];
+    for (let i = 0; i < reqResult.rows.length; i++) {
+      const r = reqResult.rows[i];
+      const id = `cr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      await pool.query(
+        `INSERT INTO proposal_compliance_map (id, proposal_id, requirement_id, requirement_text, requirement_type, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT DO NOTHING`,
+        [id, req.params.id, r.id, r.requirement_text, r.requirement_type ?? "SHALL", i],
+      );
+      created.push({ id, requirement_text: r.requirement_text });
+    }
+
+    res.status(201).json(successEnvelope("GDA.proposals", "import-compliance", {
+      imported: created.length,
+      shred_job_id,
+    }));
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "import-compliance", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/proposals/:id/export — export proposal to downloadable format
+// ---------------------------------------------------------------------------
+router.get("/:id/export", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(500).json(errorEnvelope("GDA.proposals", "export", { code: "DB_UNAVAILABLE", message: "Database unavailable", detail: null }));
+    }
+
+    const proposalResult = await pool.query(`SELECT * FROM proposals WHERE id = $1`, [req.params.id]);
+    if (proposalResult.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.proposals", "export", { code: "NOT_FOUND", message: "Proposal not found", detail: null }));
+    }
+
+    const proposal = rowToProposal(proposalResult.rows[0]);
+    const sectionsResult = await pool.query(
+      `SELECT * FROM proposal_sections WHERE proposal_id = $1 ORDER BY volume_type, sort_order`,
+      [req.params.id],
+    );
+    const sections = sectionsResult.rows.map(rowToSection);
+
+    const format = (req.query.format as string) ?? "markdown";
+
+    if (format === "markdown" || format === "md") {
+      // Generate Markdown document
+      let md = `# ${proposal.title}\n\n`;
+      md += `**Agency:** ${proposal.agency}\n`;
+      md += `**Solicitation:** ${proposal.solicitation_title || "N/A"}\n`;
+      md += `**Estimated Value:** $${proposal.value_estimated.toLocaleString()}\n`;
+      md += `**Due Date:** ${proposal.due_date || "TBD"}\n`;
+      md += `**Status:** ${proposal.status}\n`;
+      if (proposal.win_themes.length > 0) {
+        md += `**Win Themes:** ${proposal.win_themes.join(", ")}\n`;
+      }
+      md += `\n---\n\n`;
+
+      // Group sections by volume
+      const volumeOrder = ["executive_summary", "technical", "management", "past_performance", "cost_price", "cover_letter", "other"];
+      const volumeLabels: Record<string, string> = {
+        executive_summary: "Executive Summary",
+        technical: "Technical Approach",
+        management: "Management Plan",
+        past_performance: "Past Performance",
+        cost_price: "Cost/Price Volume",
+        cover_letter: "Cover Letter",
+        other: "Other",
+      };
+
+      for (const vol of volumeOrder) {
+        const volSections = sections.filter((s) => s.volume_type === vol);
+        if (volSections.length === 0) continue;
+
+        md += `## ${volumeLabels[vol] ?? vol}\n\n`;
+        for (const section of volSections) {
+          md += `### ${section.title}\n\n`;
+          md += `${section.content || "*[No content yet]*"}\n\n`;
+        }
+      }
+
+      const fileName = `${proposal.title.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_")}.md`;
+      res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.send(md);
+    } else if (format === "docx" || format === "word") {
+      // Generate a simple HTML doc that Word can open
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${proposal.title}</title>
+<style>body{font-family:'Calibri',sans-serif;margin:1in;line-height:1.6;color:#222;}
+h1{font-size:24pt;color:#1a365d;border-bottom:2px solid #1a365d;padding-bottom:8px;}
+h2{font-size:18pt;color:#2d4a7a;margin-top:24pt;border-bottom:1px solid #ccc;padding-bottom:4px;}
+h3{font-size:14pt;color:#333;margin-top:16pt;}
+p{font-size:11pt;margin:6pt 0;}
+table{border-collapse:collapse;width:100%;margin:12pt 0;}
+th,td{border:1px solid #ccc;padding:6pt 8pt;font-size:10pt;text-align:left;}
+th{background:#f0f4f8;font-weight:bold;}
+.meta{color:#666;font-size:10pt;margin:4pt 0;}
+</style></head><body>\n`;
+
+      html += `<h1>${proposal.title}</h1>\n`;
+      html += `<p class="meta"><strong>Agency:</strong> ${proposal.agency} | `;
+      html += `<strong>Solicitation:</strong> ${proposal.solicitation_title || "N/A"} | `;
+      html += `<strong>Value:</strong> $${proposal.value_estimated.toLocaleString()} | `;
+      html += `<strong>Due:</strong> ${proposal.due_date || "TBD"}</p>\n`;
+      if (proposal.win_themes.length > 0) {
+        html += `<p class="meta"><strong>Win Themes:</strong> ${proposal.win_themes.join(", ")}</p>\n`;
+      }
+      html += `<hr>\n`;
+
+      const volumeOrder2 = ["executive_summary", "technical", "management", "past_performance", "cost_price", "cover_letter", "other"];
+      const volumeLabels2: Record<string, string> = {
+        executive_summary: "Executive Summary",
+        technical: "Technical Approach",
+        management: "Management Plan",
+        past_performance: "Past Performance",
+        cost_price: "Cost/Price Volume",
+        cover_letter: "Cover Letter",
+        other: "Other",
+      };
+
+      for (const vol of volumeOrder2) {
+        const volSections = sections.filter((s) => s.volume_type === vol);
+        if (volSections.length === 0) continue;
+
+        html += `<h2>${volumeLabels2[vol] ?? vol}</h2>\n`;
+        for (const section of volSections) {
+          html += `<h3>${section.title}</h3>\n`;
+          const paragraphs = (section.content || "<em>[No content yet]</em>").split("\n\n");
+          for (const p of paragraphs) {
+            html += `<p>${p.replace(/\n/g, "<br>")}</p>\n`;
+          }
+        }
+      }
+
+      html += `</body></html>`;
+
+      const fileName = `${proposal.title.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_")}.doc`;
+      res.setHeader("Content-Type", "application/msword");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.send(html);
+    } else {
+      return res.status(400).json(errorEnvelope("GDA.proposals", "export", { code: "BAD_REQUEST", message: `Unsupported format: ${format}. Use 'markdown' or 'docx'.`, detail: null }));
+    }
+  } catch (err) {
+    res.status(500).json(errorEnvelope("GDA.proposals", "export", { code: "INTERNAL", message: String(err), detail: null }));
+  }
+});
 
 export default router;
