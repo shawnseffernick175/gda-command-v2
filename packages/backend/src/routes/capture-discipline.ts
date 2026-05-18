@@ -234,8 +234,12 @@ router.post("/check-guardrails/:opportunityId", requireRole("admin", "bd_manager
   const pool = getPool();
 
   if (!pool) {
-    return res.json(
-      successEnvelope("gda-capture-discipline", "check-guardrails", { alerts: [], checked: 0 })
+    return res.status(503).json(
+      errorEnvelope("gda-capture-discipline", "check-guardrails", {
+        code: "DB_UNAVAILABLE",
+        message: "Database not available.",
+        detail: null,
+      })
     );
   }
 
