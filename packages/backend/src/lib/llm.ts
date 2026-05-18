@@ -25,6 +25,12 @@ const OPENAI_MODEL = "gpt-4o";
 const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 
 // ---------------------------------------------------------------------------
+// Timeouts — prevent hung requests from making the UI non-responsive
+// ---------------------------------------------------------------------------
+
+const LLM_TIMEOUT_MS = 60_000; // 60 s per request
+
+// ---------------------------------------------------------------------------
 // Client singletons
 // ---------------------------------------------------------------------------
 
@@ -35,7 +41,7 @@ function getOpenAIClient(): OpenAI | null {
   if (_openaiClient) return _openaiClient;
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
-  _openaiClient = new OpenAI({ apiKey: key });
+  _openaiClient = new OpenAI({ apiKey: key, timeout: LLM_TIMEOUT_MS });
   return _openaiClient;
 }
 
@@ -43,7 +49,7 @@ function getAnthropicClient(): Anthropic | null {
   if (_anthropicClient) return _anthropicClient;
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
-  _anthropicClient = new Anthropic({ apiKey: key });
+  _anthropicClient = new Anthropic({ apiKey: key, timeout: LLM_TIMEOUT_MS });
   return _anthropicClient;
 }
 
@@ -97,16 +103,19 @@ async function anthropicCompletion(
   const systemMsg = messages.find((m) => m.role === "system");
   const nonSystemMsgs = messages.filter((m) => m.role !== "system");
 
-  const response = await client.messages.create({
-    model: ANTHROPIC_MODEL,
-    max_tokens: opts?.max_tokens ?? 4096,
-    temperature: opts?.temperature ?? 0.7,
-    ...(systemMsg ? { system: systemMsg.content } : {}),
-    messages: nonSystemMsgs.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })),
-  });
+  const response = await client.messages.create(
+    {
+      model: ANTHROPIC_MODEL,
+      max_tokens: opts?.max_tokens ?? 4096,
+      temperature: opts?.temperature ?? 0.7,
+      ...(systemMsg ? { system: systemMsg.content } : {}),
+      messages: nonSystemMsgs.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    },
+    { timeout: LLM_TIMEOUT_MS },
+  );
 
   const textBlock = response.content.find((b) => b.type === "text");
   return {
@@ -139,13 +148,16 @@ async function openaiCompletion(
     throw new Error("OPENAI_API_KEY not configured — fast model unavailable");
   }
 
-  const response = await client.chat.completions.create({
-    model: opts?.model ?? OPENAI_MODEL,
-    messages,
-    temperature: opts?.temperature ?? 0.7,
-    max_tokens: opts?.max_tokens ?? 2048,
-    ...(opts?.response_format ? { response_format: opts.response_format } : {}),
-  });
+  const response = await client.chat.completions.create(
+    {
+      model: opts?.model ?? OPENAI_MODEL,
+      messages,
+      temperature: opts?.temperature ?? 0.7,
+      max_tokens: opts?.max_tokens ?? 2048,
+      ...(opts?.response_format ? { response_format: opts.response_format } : {}),
+    },
+    { timeout: LLM_TIMEOUT_MS },
+  );
 
   const choice = response.choices[0];
   return {
@@ -216,13 +228,16 @@ export async function* chatCompletionStream(
     throw new Error("OPENAI_API_KEY not configured — streaming unavailable");
   }
 
-  const stream = await client.chat.completions.create({
-    model: opts?.model ?? OPENAI_MODEL,
-    messages,
-    temperature: opts?.temperature ?? 0.7,
-    max_tokens: opts?.max_tokens ?? 2048,
-    stream: true,
-  });
+  const stream = await client.chat.completions.create(
+    {
+      model: opts?.model ?? OPENAI_MODEL,
+      messages,
+      temperature: opts?.temperature ?? 0.7,
+      max_tokens: opts?.max_tokens ?? 2048,
+      stream: true,
+    },
+    { timeout: LLM_TIMEOUT_MS },
+  );
 
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta?.content;
