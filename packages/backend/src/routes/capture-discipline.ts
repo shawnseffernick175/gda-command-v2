@@ -204,7 +204,8 @@ router.post("/gates", requireRole("admin", "bd_manager", "capture_lead"), async 
     const row = upsertRes.rows[0];
     if (row) {
       const changeType = row.is_insert ? "create" : "update";
-      await recordVersion("capture_gate_reviews", row.id, row, userId, changeType);
+      const { is_insert: _, ...snapshot } = row;
+      await recordVersion("capture_gate_reviews", row.id, snapshot, userId, changeType);
     }
 
     res.json(
