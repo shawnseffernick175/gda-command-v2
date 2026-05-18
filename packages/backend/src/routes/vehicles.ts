@@ -190,15 +190,15 @@ router.post("/classify", async (req, res) => {
 
     const { opportunity_ids } = req.body as { opportunity_ids?: string[] };
 
-    let query = `SELECT id, set_aside, description, tags, vehicle_type FROM opportunities WHERE deleted_at IS NULL AND vehicle_type IS NULL`;
-    const params: string[] = [];
+    let query = `SELECT id, set_aside, description, tags, vehicle_type FROM opportunities WHERE deleted_at IS NULL`;
 
     if (opportunity_ids && opportunity_ids.length > 0) {
       query += ` AND id = ANY($1)`;
-      params.push(opportunity_ids as unknown as string);
+    } else {
+      query += ` AND vehicle_type IS NULL`;
     }
 
-    const opps = await pool.query(query, params.length > 0 ? [opportunity_ids] : []);
+    const opps = await pool.query(query, opportunity_ids?.length ? [opportunity_ids] : []);
     let classified = 0;
 
     for (const opp of opps.rows) {
