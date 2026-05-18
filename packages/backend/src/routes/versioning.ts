@@ -6,6 +6,14 @@ import { getPool } from "../lib/db";
 
 const router = Router();
 
+const PK_COLUMNS: Record<string, string> = {
+  company_entity: "entity_id",
+};
+
+function pkFor(table: string): string {
+  return PK_COLUMNS[table] ?? "id";
+}
+
 const TABLE_VALIDATION_ERROR = {
   code: "INVALID_TABLE",
   message: "Table name not in allowlist",
@@ -57,7 +65,7 @@ router.delete(
       return;
     }
     const userId = req.user?.userId ?? "unknown";
-    const ok = await softDelete(table, recordId, userId);
+    const ok = await softDelete(table, recordId, userId, pkFor(table));
     if (!ok) {
       res.status(404).json(
         errorEnvelope("versioning", "soft-delete", {
@@ -119,7 +127,7 @@ router.post(
       return;
     }
     const userId = req.user?.userId ?? "unknown";
-    const restored = await restoreVersion(table, recordId, version_number, userId);
+    const restored = await restoreVersion(table, recordId, version_number, userId, pkFor(table));
     if (!restored) {
       res.status(404).json(
         errorEnvelope("versioning", "restore", {

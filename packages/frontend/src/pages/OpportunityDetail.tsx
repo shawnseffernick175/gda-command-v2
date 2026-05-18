@@ -221,6 +221,15 @@ export default function OpportunityDetail() {
       .catch(() => {});
   }, [id]);
 
+  // Sync pursuing entity from loaded data (W4)
+  useEffect(() => {
+    if (data?.opportunity?.pursuing_entity_id) {
+      setPursuingEntity(data.opportunity.pursuing_entity_id);
+    } else {
+      setPursuingEntity(null);
+    }
+  }, [data]);
+
   if (loading) {
     return (
       <div style={{ padding: "2rem" }}>
@@ -252,10 +261,7 @@ export default function OpportunityDetail() {
   const { opportunity: opp, analysis: rawAnalysis, ooda: rawOoda, sources, learning } = data;
   const analysis = rawAnalysis ?? { executive_summary: null, recommended_action: null, strengths: [], risks: [], competitive_landscape: null };
 
-  // Initialize pursuing entity from loaded data
-  if (pursuingEntity === null && opp.pursuing_entity_id) {
-    setPursuingEntity(opp.pursuing_entity_id);
-  }
+
   const emptyOodaPhase = { summary: null, items: [] };
   const ooda = {
     observe: rawOoda?.observe ?? emptyOodaPhase,
