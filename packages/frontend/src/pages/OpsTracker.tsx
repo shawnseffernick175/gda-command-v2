@@ -31,6 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
   pipeline: "#8b5cf6",
   won: "#22c55e",
   lost: "#ef4444",
+  no_bid: "#9ca3af",
 };
 
 function formatCurrency(v: number | null): string {
@@ -63,6 +64,7 @@ function statusToShipley(status: string): string {
     pipeline: "pursue",
     won: "won",
     lost: "lost",
+    no_bid: "no_bid",
   };
   return map[status] ?? "interest";
 }
@@ -74,6 +76,7 @@ function statusLabel(status: string): string {
     pipeline: "Pursue",
     won: "Won",
     lost: "Lost",
+    no_bid: "No Bid",
   };
   return labels[status] ?? status;
 }
@@ -91,6 +94,7 @@ export default function OpsTracker() {
   const [deptFilter, setDeptFilter] = useState("");
   const [naicsSizeFilter, setNaicsSizeFilter] = useState("");
   const [minPwin, setMinPwin] = useState("");
+  const [includeLowFit, setIncludeLowFit] = useState(false);
 
   // Sort
   const [sortBy, setSortBy] = useState<SortKey>("score");
@@ -121,6 +125,7 @@ export default function OpsTracker() {
         department: deptFilter || undefined,
         naics_size: naicsSizeFilter || undefined,
         minPwin: minPwin ? parseFloat(minPwin) : undefined,
+        includeLowFit: includeLowFit || undefined,
         sortBy,
         sortDir,
         page,
@@ -148,7 +153,7 @@ export default function OpsTracker() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, deptFilter, naicsSizeFilter, minPwin, sortBy, sortDir, page]);
+  }, [search, statusFilter, deptFilter, naicsSizeFilter, minPwin, includeLowFit, sortBy, sortDir, page]);
 
   useEffect(() => {
     load();
@@ -370,6 +375,7 @@ export default function OpsTracker() {
           <option value="pipeline">Pursue</option>
           <option value="won">Won</option>
           <option value="lost">Lost</option>
+          <option value="no_bid">No Bid</option>
         </select>
         <select
           value={deptFilter}
@@ -424,7 +430,25 @@ export default function OpsTracker() {
             width: 130,
           }}
         />
-        {(search || statusFilter || deptFilter || naicsSizeFilter || minPwin) && (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 13,
+            color: "var(--color-text-muted)",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={includeLowFit}
+            onChange={(e) => { setIncludeLowFit(e.target.checked); setPage(1); }}
+          />
+          Show Low Fit
+        </label>
+        {(search || statusFilter || deptFilter || naicsSizeFilter || minPwin || includeLowFit) && (
           <button
             onClick={() => {
               setSearch("");
@@ -432,6 +456,7 @@ export default function OpsTracker() {
               setDeptFilter("");
               setNaicsSizeFilter("");
               setMinPwin("");
+              setIncludeLowFit(false);
               setPage(1);
             }}
             style={{
@@ -526,7 +551,7 @@ export default function OpsTracker() {
                       padding: "40px 12px",
                     }}
                   >
-                    {search || statusFilter || deptFilter || naicsSizeFilter || minPwin
+                    {search || statusFilter || deptFilter || naicsSizeFilter || minPwin || includeLowFit
                       ? "No opportunities match your filters."
                       : "No opportunities found."}
                   </td>
@@ -648,12 +673,12 @@ export default function OpsTracker() {
                       ...tdStyle,
                       whiteSpace: "nowrap",
                       fontSize: 13,
-                      color: isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" ? "#ef4444" : "var(--color-text-muted)",
-                      fontWeight: isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" ? 600 : 400,
+                      color: isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" && opp.status !== "no_bid" ? "#ef4444" : "var(--color-text-muted)",
+                      fontWeight: isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" && opp.status !== "no_bid" ? 600 : 400,
                     }}
                   >
                     {formatDate(opp.due_date)}
-                    {isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" && (
+                    {isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" && opp.status !== "no_bid" && (
                       <span style={{ marginLeft: 6, fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(239,68,68,0.15)", color: "#ef4444", fontWeight: 700 }}>
                         EXPIRED
                       </span>

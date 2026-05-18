@@ -61,6 +61,7 @@ interface N8nOpportunity {
   financials_score?: number | null;
   ooda_score?: number | null;
   eis_fit_score?: number | null;
+  description?: string;
 }
 
 const STAGE_MAP: Record<string, OpportunityStatus> = {
@@ -107,6 +108,7 @@ function mapOpportunity(raw: N8nOpportunity): Opportunity {
     incumbent: raw.incumbent_analysis ?? null,
     qualified_at: null,
     qualified_by: null,
+    description: raw.description ?? null,
     tags: [
       raw.gda_label,
       raw.data_source,

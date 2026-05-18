@@ -19,6 +19,7 @@ const VALID_STATUSES: OpportunityStatus[] = [
   "pipeline",
   "lost",
   "won",
+  "no_bid",
 ];
 
 // Shipley stages — superset of existing statuses for the capture pipeline
@@ -43,7 +44,7 @@ const SHIPLEY_TO_STATUS: Record<string, OpportunityStatus> = {
   post_submittal: "pipeline",
   won: "won",
   lost: "lost",
-  no_bid: "lost",
+  no_bid: "no_bid",
   gov_cancelled: "lost",
 };
 
@@ -123,6 +124,8 @@ router.get("/", async (req, res) => {
   const deptFilter = req.query.department as string | undefined;
   const naicsSizeFilter = req.query.naics_size as string | undefined;
   const minPwin = req.query.minPwin ? parseFloat(req.query.minPwin as string) : undefined;
+  const minScore = req.query.minScore ? parseFloat(req.query.minScore as string) : undefined;
+  const includeLowFit = req.query.includeLowFit === "true";
   const sortBy = (req.query.sortBy as string) ?? "updated_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
@@ -154,6 +157,8 @@ router.get("/", async (req, res) => {
     }
     if (statusFilter) {
       filtered = filtered.filter((o) => o.status === statusFilter);
+    } else {
+      filtered = filtered.filter((o) => o.status !== "no_bid");
     }
     if (deptFilter) {
       filtered = filtered.filter((o) => o.department === deptFilter);
@@ -165,6 +170,11 @@ router.get("/", async (req, res) => {
       filtered = filtered.filter(
         (o) => o.probability_of_win !== null && o.probability_of_win >= minPwin
       );
+    }
+    if (minScore !== undefined && !isNaN(minScore)) {
+      filtered = filtered.filter((o) => o.score >= minScore);
+    } else if (!includeLowFit && !search) {
+      filtered = filtered.filter((o) => o.score >= 30 || o.score === 0);
     }
     const col = sortBy as keyof Opportunity;
     filtered.sort((a, b) => {
@@ -214,7 +224,7 @@ router.get("/", async (req, res) => {
               if (o.due_date) {
                 const due = new Date(o.due_date);
                 if (!isNaN(due.getTime()) && due <= thirtyDaysFromNow) {
-                  return { ...o, status: "lost" as typeof o.status };
+                  return { ...o, status: "no_bid" as typeof o.status };
                 }
               }
               return { ...o, status: "discovery" as typeof o.status };
@@ -248,7 +258,7 @@ router.get("/", async (req, res) => {
               if (o.due_date) {
                 const due = new Date(o.due_date);
                 if (!isNaN(due.getTime()) && due <= fbCutoff) {
-                  return { ...o, status: "lost" as typeof o.status };
+                  return { ...o, status: "no_bid" as typeof o.status };
                 }
               }
               return { ...o, status: "discovery" as typeof o.status };
@@ -263,7 +273,7 @@ router.get("/", async (req, res) => {
             if (o.due_date) {
               const due = new Date(o.due_date);
               if (!isNaN(due.getTime()) && due <= noDbCutoff) {
-                return { ...o, status: "lost" as typeof o.status };
+                return { ...o, status: "no_bid" as typeof o.status };
               }
             }
             return { ...o, status: "discovery" as typeof o.status };
@@ -343,6 +353,8 @@ router.get("/", async (req, res) => {
       conditions.push(`status = $${paramIdx}`);
       params.push(statusFilter);
       paramIdx++;
+    } else {
+      conditions.push(`status <> 'no_bid'`);
     }
     if (deptFilter) {
       conditions.push(`department = $${paramIdx}`);
@@ -354,6 +366,13 @@ router.get("/", async (req, res) => {
       params.push(minPwin);
       paramIdx++;
     }
+    if (minScore !== undefined && !isNaN(minScore)) {
+      conditions.push(`score >= $${paramIdx}`);
+      params.push(minScore);
+      paramIdx++;
+    } else if (!includeLowFit && !search) {
+      conditions.push(`(score >= 30 OR score = 0)`);
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const sortColumn = SORTABLE_COLUMNS[sortBy] ?? "updated_at";
@@ -363,7 +382,7 @@ router.get("/", async (req, res) => {
       SELECT id, title, agency, department, status, score, value_estimated,
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
-             qualified_by, tags, raw_source_url, created_at, updated_at
+             qualified_by, description, capture_stage, tags, raw_source_url, created_at, updated_at
       FROM opportunities
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
@@ -725,10 +744,10 @@ router.post("/:id/analyze", requireRole("admin", "bd_manager", "capture_lead"), 
       if (n8nOpp) {
         const now = new Date().toISOString();
         await pool.query(
-          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
+          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, description, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)
            ON CONFLICT (id) DO NOTHING`,
-          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now],
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, n8nOpp.description ?? null, now],
         );
       } else {
         return res.status(404).json(
@@ -1042,10 +1061,10 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
       const n8nOpp = await fetchOpportunityDetailFromN8n(id);
       if (n8nOpp) {
         await pool.query(
-          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
+          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, description, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)
            ON CONFLICT (id) DO NOTHING`,
-          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now]
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, n8nOpp.description ?? null, now]
         );
         current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
       }

@@ -47,7 +47,8 @@ export type OpportunityStatus =
   | "qualified"
   | "pipeline"
   | "lost"
-  | "won";
+  | "won"
+  | "no_bid";
 
 /** SBA size standard classification for a given NAICS code. */
 export type NaicsSize = "small" | "large" | null;
@@ -72,6 +73,8 @@ export interface Opportunity {
   incumbent: string | null;
   qualified_at: string | null;
   qualified_by: string | null;
+  description?: string | null;
+  capture_stage?: string | null;
   tags: string[];
   raw_source_url: string | null;
   data_source: string | null;

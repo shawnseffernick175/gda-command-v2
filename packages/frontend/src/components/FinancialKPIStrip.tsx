@@ -169,16 +169,11 @@ export default function FinancialKPIStrip() {
     fetchFinancialKPIs()
       .then((env) => {
         if (!cancelled && env.success && env.data) {
-          const priorityOrder = ["orders", "sales", "ebit", "gross_profit", "ros", "funded_backlog", "fin-006"];
-          const sorted = [...env.data.kpis].sort((a, b) => {
-            const ai = priorityOrder.indexOf(a.key);
-            const bi = priorityOrder.indexOf(b.key);
-            if (ai >= 0 && bi >= 0) return ai - bi;
-            if (ai >= 0) return -1;
-            if (bi >= 0) return 1;
-            return 0;
-          });
-          setKpis(sorted);
+          const headerKeys = ["orders", "sales", "ebit", "gross_profit", "ros"];
+          const filtered = headerKeys
+            .map((key) => env.data!.kpis.find((k) => k.key === key))
+            .filter((k): k is FinancialKPI => k != null);
+          setKpis(filtered);
         }
       })
       .catch(() => {
