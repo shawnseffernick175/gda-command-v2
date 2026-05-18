@@ -409,7 +409,7 @@ export async function resolveFixProposal(
   const proposal = result.rows[0];
 
   // On approval, attempt to apply the fix automatically
-  if (action === "approve" && proposal.auto_fixable && proposal.safety_lane === "read_only") {
+  if (action === "approve" && proposal.auto_fixable && proposal.safety_lane === "read-only") {
     try {
       await applyApprovedFix(pool, proposal);
     } catch (e) {
