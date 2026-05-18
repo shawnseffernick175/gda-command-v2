@@ -101,6 +101,7 @@ function classifyNaicsSize(naicsCode: string | null): "small" | "large" | null {
 }
 
 const SORTABLE_COLUMNS: Record<string, string> = {
+  id: "id",
   title: "title",
   department: "department",
   status: "status",
@@ -380,6 +381,16 @@ router.get("/", async (req, res) => {
     let allRows = enrichWithNaicsSize(rawRows);
     if (naicsSizeFilter === "small" || naicsSizeFilter === "large") {
       allRows = allRows.filter((o) => o.naics_size === naicsSizeFilter);
+    }
+
+    // naics_size is computed, not a DB column — re-sort in memory when requested
+    if (sortBy === "naics_size") {
+      const dir = sortDir === "asc" ? 1 : -1;
+      allRows.sort((a, b) => {
+        const av = a.naics_size ?? "";
+        const bv = b.naics_size ?? "";
+        return av < bv ? -dir : av > bv ? dir : 0;
+      });
     }
 
     // Paginate DB results (same as n8n path)
