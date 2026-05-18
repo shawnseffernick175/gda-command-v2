@@ -642,12 +642,12 @@ export default function OpsTracker() {
                       ...tdStyle,
                       whiteSpace: "nowrap",
                       fontSize: 13,
-                      color: isExpired(opp.due_date) ? "#ef4444" : "var(--color-text-muted)",
-                      fontWeight: isExpired(opp.due_date) ? 600 : 400,
+                      color: isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" ? "#ef4444" : "var(--color-text-muted)",
+                      fontWeight: isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" ? 600 : 400,
                     }}
                   >
                     {formatDate(opp.due_date)}
-                    {isExpired(opp.due_date) && (
+                    {isExpired(opp.due_date) && opp.status !== "won" && opp.status !== "lost" && (
                       <span style={{ marginLeft: 6, fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(239,68,68,0.15)", color: "#ef4444", fontWeight: 700 }}>
                         EXPIRED
                       </span>
