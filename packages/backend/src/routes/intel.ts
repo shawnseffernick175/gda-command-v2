@@ -247,14 +247,14 @@ router.get("/research", async (_req: Request, res: Response) => {
           Array.isArray(r.weaknesses) && r.weaknesses.length > 0 ? `Weaknesses: ${r.weaknesses.join(", ")}.` : "",
           Array.isArray(r.focus_areas) && r.focus_areas.length > 0 ? `Focus: ${r.focus_areas.join(", ")}.` : "",
         ].filter(Boolean).join(" "),
-        findings: {
+        findings: JSON.stringify({
           strengths: r.strengths ?? [],
           weaknesses: r.weaknesses ?? [],
           recent_wins: r.recent_wins ?? [],
           key_contracts: r.key_contracts ?? [],
           focus_areas: r.focus_areas ?? [],
           threat_score: r.threat_score,
-        },
+        }, null, 2),
         sources_count: 5,
         requested_at: r.created_at,
         completed_at: r.created_at,
