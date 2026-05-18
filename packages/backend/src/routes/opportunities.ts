@@ -353,6 +353,8 @@ router.get("/", async (req, res) => {
       conditions.push(`status = $${paramIdx}`);
       params.push(statusFilter);
       paramIdx++;
+    } else {
+      conditions.push(`status <> 'no_bid'`);
     }
     if (deptFilter) {
       conditions.push(`department = $${paramIdx}`);
@@ -363,6 +365,13 @@ router.get("/", async (req, res) => {
       conditions.push(`probability_of_win >= $${paramIdx}`);
       params.push(minPwin);
       paramIdx++;
+    }
+    if (minScore !== undefined && !isNaN(minScore)) {
+      conditions.push(`score >= $${paramIdx}`);
+      params.push(minScore);
+      paramIdx++;
+    } else if (!includeLowFit && !search) {
+      conditions.push(`(score >= 30 OR score = 0)`);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

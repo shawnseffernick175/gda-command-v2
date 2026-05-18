@@ -73,6 +73,7 @@ export interface Opportunity {
   incumbent: string | null;
   qualified_at: string | null;
   qualified_by: string | null;
+  description?: string | null;
   tags: string[];
   raw_source_url: string | null;
   data_source: string | null;

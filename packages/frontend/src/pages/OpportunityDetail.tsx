@@ -10,6 +10,8 @@ import {
   fetchCompetitorField,
   fetchBlackHatAnalysis,
   fetchWargameAnalysis,
+  changeOpportunityStage,
+  SHIPLEY_STAGES,
   type OpportunityDetailData,
   type OodaObserveItem,
   type OodaOrientItem,
@@ -85,6 +87,16 @@ const STATUS_COLORS: Record<string, string> = {
   pipeline: "#22c55e",
   lost: "#ef4444",
   won: "#eab308",
+  no_bid: "#9ca3af",
+};
+
+const STATUS_TO_SHIPLEY: Record<string, string> = {
+  discovery: "interest",
+  qualified: "qualify",
+  pipeline: "pursue",
+  won: "won",
+  lost: "lost",
+  no_bid: "no_bid",
 };
 
 function formatCurrency(n: number | null | undefined): string {
@@ -297,16 +309,40 @@ export default function OpportunityDetail() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>{opp.title} <SourceBadge source={opp.data_source} size="md" /></h1>
-        <span
+        <select
+          value={STATUS_TO_SHIPLEY[opp.status] ?? "interest"}
+          onChange={async (e) => {
+            const newStage = e.target.value;
+            try {
+              const env = await changeOpportunityStage(opp.id, newStage);
+              if (env.success) {
+                const detail = await fetchOpportunityDetail(opp.id);
+                if (detail.success && detail.data) setData(detail.data);
+              }
+            } catch { /* empty */ }
+          }}
           style={{
-            ...styles.badge,
+            padding: "4px 8px",
+            borderRadius: 8,
+            border: "none",
             background: STATUS_COLORS[opp.status] ?? "#6b7280",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: "pointer",
+            outline: "none",
           }}
         >
-          {({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}
-        </span>
-        <span style={{ fontSize: 18, fontWeight: 700, color: scoreColor(opp.score ?? 0) }}>
+          {SHIPLEY_STAGES.map((s) => (
+            <option key={s.value} value={s.value} style={{ color: "#000" }}>{s.label}</option>
+          ))}
+        </select>
+        <span
+          title="GDA Fit Score — how well this opportunity matches your company's NAICS codes, capabilities, and past performance"
+          style={{ fontSize: 18, fontWeight: 700, color: scoreColor(opp.score ?? 0), cursor: "help" }}
+        >
           {opp.score ?? 0}
+          <span style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af", marginLeft: 2 }}>/ 100 fit</span>
         </span>
       </div>
       <div style={{ fontSize: 13, color: "#9ca3af", marginBottom: 20 }}>
@@ -314,6 +350,12 @@ export default function OpportunityDetail() {
           {data.source === "n8n" ? "Live API" : "Live DB"}
         </span>
         {opp.id}
+        {opp.raw_source_url && (
+          <>
+            {" · "}
+            <a href={opp.raw_source_url} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa" }}>View on SAM.gov</a>
+          </>
+        )}
       </div>
 
       {/* Section 1: Core Fields */}
@@ -331,6 +373,47 @@ export default function OpportunityDetail() {
           <Field label="Place of Performance" value={opp.place_of_performance} />
           <Field label="Incumbent" value={opp.incumbent} />
           <Field label="Tags" value={(opp.tags ?? []).length > 0 ? (opp.tags ?? []).join(", ") : "—"} />
+        </div>
+      </Section>
+
+      {/* Section 1.5: Description / Scope of Work */}
+      {opp.description && (
+        <Section title="Description / Scope of Work">
+          <p style={{ margin: 0, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{opp.description}</p>
+        </Section>
+      )}
+
+      {/* Score Explanation */}
+      <Section title="Score Breakdown">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+          <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-border)" }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>GDA Fit Score</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: scoreColor(opp.score ?? 0) }}>{opp.score ?? 0}<span style={{ fontSize: 12, color: "#6b7280" }}>/100</span></div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Based on NAICS alignment, set-aside match, agency history, and value fit</div>
+          </div>
+          {opp.probability_of_win != null && opp.probability_of_win > 0 && (
+            <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-border)" }}>
+              <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>P(Win)</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: (opp.probability_of_win ?? 0) >= 0.6 ? "#22c55e" : (opp.probability_of_win ?? 0) >= 0.3 ? "#f59e0b" : "#ef4444" }}>{Math.round((opp.probability_of_win ?? 0) * 100)}%</div>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Estimated probability of winning this contract</div>
+            </div>
+          )}
+          {naicsMatch && (
+            <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-border)" }}>
+              <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>NAICS Match</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: naicsMatch.level === "exact" ? "#22c55e" : naicsMatch.level === "partial" ? "#f59e0b" : "#ef4444" }}>{naicsMatch.level.toUpperCase()}</div>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{naicsMatch.explanation}</div>
+            </div>
+          )}
+          <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-border)" }}>
+            <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>Data Source</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#60a5fa" }}>{opp.data_source ?? "Unknown"}</div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+              {opp.raw_source_url ? (
+                <a href={opp.raw_source_url} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa" }}>View original source</a>
+              ) : "No direct source link available"}
+            </div>
+          </div>
         </div>
       </Section>
 
@@ -357,7 +440,7 @@ export default function OpportunityDetail() {
               {opp.due_date ? ` Response deadline: ${new Date(opp.due_date).toLocaleDateString()}.` : ""}
             </p>
             <p style={{ margin: "0 0 8px" }}>
-              Current stage: <strong>{({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost" } as Record<string, string>)[opp.status] ?? opp.status}</strong>.
+              Current stage: <strong>{({ discovery: "Interest", qualified: "Qualify", pipeline: "Pursue", won: "Won", lost: "Lost", no_bid: "No Bid" } as Record<string, string>)[opp.status] ?? opp.status}</strong>.
               {opp.score > 0 ? ` Fit score: ${opp.score}/100.` : ""}
               {opp.probability_of_win ? ` Estimated Pwin: ${Math.round(opp.probability_of_win * 100)}%.` : ""}
             </p>
