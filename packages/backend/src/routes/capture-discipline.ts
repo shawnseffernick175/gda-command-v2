@@ -208,9 +208,10 @@ router.post("/gates", requireRole("admin", "bd_manager", "capture_lead"), async 
       await recordVersion("capture_gate_reviews", row.id, snapshot, userId, changeType);
     }
 
+    const { is_insert: _flag, ...cleanRow } = row ?? ({} as Record<string, unknown>);
     res.json(
       successEnvelope("gda-capture-discipline", "create-gate", {
-        gate_review: row ?? { id, opportunity_id, gate, status },
+        gate_review: Object.keys(cleanRow).length > 0 ? cleanRow : { id, opportunity_id, gate, status },
       })
     );
   } catch (err) {
