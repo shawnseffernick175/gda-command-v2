@@ -686,7 +686,7 @@ export default function OpsTracker() {
                   </td>
                   <td style={tdStyle}>
                     <select
-                      value={statusToShipley(opp.status)}
+                      value={opp.capture_stage ?? statusToShipley(opp.status)}
                       onClick={(e) => e.stopPropagation()}
                       onChange={async (e) => {
                         e.stopPropagation();
