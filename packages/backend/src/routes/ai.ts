@@ -279,10 +279,10 @@ router.post("/recommend/:id", async (req, res) => {
     // Pull entity data for context
     let entityContext = "No entity data available.";
     try {
-      const { rows: entities } = await pool.query("SELECT name, entity_type, naics_codes, set_aside_eligible FROM company_entity WHERE deleted_at IS NULL");
+      const { rows: entities } = await pool.query("SELECT legal_name, status, naics_codes, set_aside_status FROM company_entity WHERE deleted_at IS NULL");
       if (entities.length > 0) {
         entityContext = entities.map((e) =>
-          `${e.name} (${e.entity_type}): NAICS [${e.naics_codes?.join(", ") ?? ""}], Set-aside: ${e.set_aside_eligible ? "Yes" : "No"}`
+          `${e.legal_name} (${e.status}): NAICS [${e.naics_codes?.join(", ") ?? ""}], Set-aside: ${e.set_aside_status?.length ? e.set_aside_status.join(", ") : "None"}`
         ).join("\n");
       }
     } catch { /* entity table may not exist */ }

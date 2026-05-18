@@ -52,16 +52,16 @@ async function getOrganizationsContext(): Promise<string> {
 
   try {
     const { rows } = await pool.query(
-      `SELECT entity_id, name, legal_name, entity_type, cage_code, uei, naics_codes, set_aside_eligible
+      `SELECT entity_id, legal_name, status, cage_code, uei, naics_codes, set_aside_status
        FROM company_entity
        WHERE deleted_at IS NULL
-       ORDER BY name`
+       ORDER BY legal_name`
     );
 
     if (rows.length === 0) return "";
 
     const lines = rows.map((r) =>
-      `- ${r.name} (${r.entity_type}): CAGE ${r.cage_code ?? "N/A"}, UEI ${r.uei ?? "N/A"}, NAICS [${r.naics_codes?.join(", ") ?? ""}], Set-aside eligible: ${r.set_aside_eligible ? "Yes" : "No"}`
+      `- ${r.legal_name} (${r.status}): CAGE ${r.cage_code ?? "N/A"}, UEI ${r.uei ?? "N/A"}, NAICS [${r.naics_codes?.join(", ") ?? ""}], Set-aside: ${r.set_aside_status?.length ? r.set_aside_status.join(", ") : "None"}`
     );
 
     return `\n\n--- Organizations Context (NewCo Merger) ---\nThe user's organization is a merger of multiple entities. All analysis should consider entity-specific capabilities:\n${lines.join("\n")}\n---\n`;
@@ -108,7 +108,7 @@ export async function gatewayCall(opts: GatewayCallOptions): Promise<GatewayResu
 
   // Classification gate: always block CUI/ITAR/SECRET — no restricted provider implemented yet
   const provider = process.env.LLM_PROVIDER ?? "public";
-  if (PUBLIC_BLOCKED_CLASSIFICATIONS.includes(classification as DataClassification)) {
+  if (PUBLIC_BLOCKED_CLASSIFICATIONS.includes(classification.toLowerCase() as DataClassification)) {
     const callId = await logCall({
       purpose: opts.purpose,
       provider,
