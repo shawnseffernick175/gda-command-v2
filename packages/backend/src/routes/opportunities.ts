@@ -443,7 +443,7 @@ router.get("/", async (req, res) => {
           avgScore: aggAvgScore,
           departments: aggDepartments,
           filters_applied: { search, status: statusFilter, department: deptFilter, naics_size: naicsSizeFilter, minPwin },
-          viewLabel: statusFilter ? "v_opportunity_all_tracked (filtered)" : "v_opportunity_active",
+          viewLabel: includeAllStatuses ? "v_opportunity_all_tracked" : statusFilter ? "v_opportunity_all_tracked (filtered)" : "v_opportunity_active",
         }
       )
     );

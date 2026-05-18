@@ -318,7 +318,7 @@ router.get("/kpis", async (_req, res) => {
   const topByScore = [...realOpps].sort((a, b) => b.score - a.score).slice(0, 10);
 
   // Compute activePipeline from realOpps (active statuses only)
-  const activeOpps = realOpps.filter((o) => o.status !== "won" && o.status !== "lost" && o.status !== "no_bid");
+  const activeOpps = realOpps.filter((o) => o.status !== "won" && o.status !== "lost" && o.status !== "no_bid" && o.status !== "gov_cancelled");
 
   return res.json(
     successEnvelope(
