@@ -55,6 +55,7 @@ import companyEntitiesRouter from "./routes/company-entities";
 import vehiclesRouter from "./routes/vehicles";
 import sourcesRouter from "./routes/sources";
 import mergersRouter from "./routes/mergers";
+import aiGatewayRouter from "./routes/ai-gateway";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -190,6 +191,7 @@ app.use("/api/admin/companies", companyEntitiesRouter);
 app.use("/api/vehicles", vehiclesRouter);
 app.use("/api/sources", sourcesRouter);
 app.use("/api/mergers", mergersRouter);
+app.use("/api/ai-gateway", aiGatewayRouter);
 
 // --- n8n webhook proxy (generic pass-through to any n8n workflow) ---
 app.use("/api/n8n", n8nProxyRouter);
