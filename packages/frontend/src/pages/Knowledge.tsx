@@ -451,7 +451,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
-    uploadDocument(selectedFile, docType, collection, tags)
+    uploadDocument(selectedFile, docType, collection, tags, action)
       .then((env) => {
         if (env.success && env.data) {
           setResult(`Uploaded: ${env.data.message}${env.data.download_url ? `\nDownload: ${env.data.download_url}` : ""}`);
