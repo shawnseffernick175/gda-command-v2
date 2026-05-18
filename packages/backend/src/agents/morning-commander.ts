@@ -88,7 +88,7 @@ async function gatherBriefingData(): Promise<BriefingData> {
     pool.query("SELECT COUNT(*) as count FROM approval_queue WHERE status = 'pending'"),
     // Recent competitor movements (last 48 hours)
     pool.query(
-      `SELECT id, competitor_name, movement_type, summary, significance
+      `SELECT id, competitor_name, movement_type, description AS summary, threat_level AS significance
        FROM competitor_movements
        WHERE detected_at > NOW() - INTERVAL '48 hours'
        ORDER BY detected_at DESC LIMIT 5`,
