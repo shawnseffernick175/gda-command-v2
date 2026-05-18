@@ -228,7 +228,7 @@ router.post("/gates", requireRole("admin", "bd_manager", "capture_lead"), async 
 // POST /api/capture-discipline/check-guardrails/:opportunityId
 // Run guardrail checks for an opportunity
 // ---------------------------------------------------------------------------
-router.post("/check-guardrails/:opportunityId", async (req, res) => {
+router.post("/check-guardrails/:opportunityId", requireRole("admin", "bd_manager", "capture_lead"), async (req, res) => {
   const { opportunityId } = req.params;
   const pool = getPool();
 
@@ -361,10 +361,20 @@ router.post("/alerts/:id/resolve", requireRole("admin", "bd_manager", "capture_l
 
   try {
     const userId = req.user?.userId ?? "system";
-    await pool.query(
-      "UPDATE capture_guardrail_alerts SET resolved = true, resolved_by = $1, resolved_at = NOW() WHERE id = $2",
+    const result = await pool.query(
+      "UPDATE capture_guardrail_alerts SET resolved = true, resolved_by = $1, resolved_at = NOW() WHERE id = $2 AND resolved = false RETURNING id",
       [userId, id]
     );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(
+        errorEnvelope("gda-capture-discipline", "resolve-alert", {
+          code: "NOT_FOUND",
+          message: "Alert not found or already resolved.",
+          detail: null,
+        })
+      );
+    }
 
     res.json(
       successEnvelope("gda-capture-discipline", "resolve-alert", { id, resolved: true })
