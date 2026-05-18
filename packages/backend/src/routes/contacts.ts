@@ -221,7 +221,7 @@ router.post("/auto-capture", requireRole("admin", "bd_manager"), async (_req, re
       const id = `contact-sam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
       try {
-        await pool.query(
+        const insertResult = await pool.query(
           `INSERT INTO contacts (id, first_name, last_name, title, agency, email, phone, status, relationship_strength, relationship_history, data_source, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'new', $8, 'sam.gov', NOW(), NOW())
            ON CONFLICT DO NOTHING`,
@@ -234,7 +234,7 @@ router.post("/auto-capture", requireRole("admin", "bd_manager"), async (_req, re
             `Auto-captured from SAM.gov opportunity: ${opp.title}`,
           ]
         );
-        created++;
+        if (insertResult.rowCount && insertResult.rowCount > 0) created++;
       } catch { /* skip duplicates */ }
     }
 
