@@ -3826,3 +3826,74 @@ export function resolveFixProposal(id: string, action: "approve" | "reject", not
     body: JSON.stringify({ action, note }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Source Registry (W2)
+// ---------------------------------------------------------------------------
+
+export interface SourceEntry {
+  id: string;
+  name: string;
+  source_type: string;
+  category: string;
+  base_url: string | null;
+  auth_type: string;
+  enabled: boolean;
+  search_params: Record<string, unknown>;
+  sync_frequency: string;
+  last_sync_at: string | null;
+  last_sync_status: string;
+  last_sync_count: number;
+  total_synced: number;
+  error_count: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SourcesListData {
+  sources: SourceEntry[];
+  total: number;
+  enabled: number;
+  total_records_synced: number;
+}
+
+export interface SyncRunEntry {
+  id: string;
+  source_id: string;
+  source_name?: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  records_fetched: number;
+  records_upserted: number;
+  records_errored: number;
+  duration_ms: number | null;
+  error: string | null;
+}
+
+export function fetchSources() {
+  return request<SourcesListData>("/sources");
+}
+
+export function fetchSourceDetail(id: string) {
+  return request<{ source: SourceEntry; recent_runs: SyncRunEntry[] }>(`/sources/${id}`);
+}
+
+export function updateSource(id: string, updates: { enabled?: boolean; sync_frequency?: string; search_params?: Record<string, unknown> }) {
+  return request<SourceEntry>(`/sources/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+}
+
+export function triggerSourceSync(id: string) {
+  return request<{ run_id: string; source_id: string; status: string; message: string }>(`/sources/${id}/sync`, {
+    method: "POST",
+  });
+}
+
+export function fetchSyncHistory() {
+  return request<{ runs: SyncRunEntry[]; total: number }>("/sources/sync/history");
+}

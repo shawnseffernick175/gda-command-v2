@@ -251,6 +251,7 @@ export async function restoreVersion(
     const { version_id, ...restoreData } = snapshot as Record<string, unknown> & { version_id?: unknown };
     delete restoreData.created_at;
     delete restoreData.deleted_at;
+    delete restoreData.updated_at;
 
     // Build UPDATE SET clause from snapshot fields (quote identifiers to prevent injection)
     const quoteIdent = (s: string) => '"' + s.replace(/"/g, '""') + '"';

@@ -48,7 +48,7 @@ const SHIPLEY_TO_STATUS: Record<string, OpportunityStatus> = {
   won: "won",
   lost: "lost",
   no_bid: "no_bid",
-  gov_cancelled: "lost",
+  gov_cancelled: "gov_cancelled",
 };
 
 // ---------------------------------------------------------------------------
