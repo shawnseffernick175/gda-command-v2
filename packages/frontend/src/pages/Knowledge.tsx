@@ -47,6 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
+  financials: "Financials",
   past_performance: "Past Performance",
   proposal: "Proposal",
   compliance: "Compliance",
@@ -54,10 +55,39 @@ const TYPE_LABELS: Record<string, string> = {
   capability_statement: "Capability Statement",
   doctrine: "Doctrine",
   contract: "Contract",
-  memo: "Memo",
+  sow: "Statement of Work (SOW)",
+  pws: "Performance Work Statement (PWS)",
+  rfp: "RFP / Solicitation",
+  rfi: "RFI / Sources Sought",
+  teaming_agreement: "Teaming Agreement",
+  org_chart: "Org Chart",
+  resume: "Resume / Key Personnel",
+  cost_volume: "Cost / Price Volume",
+  tech_volume: "Technical Volume",
+  management_volume: "Management Volume",
+  cpars: "CPARS / Past Performance Eval",
+  dd254: "DD-254 / Security",
+  subcontracting_plan: "Subcontracting Plan",
+  quality_plan: "Quality Control Plan",
+  transition_plan: "Transition Plan",
+  white_paper: "White Paper",
+  intel_report: "Intel / Market Research",
+  meeting_notes: "Meeting Notes",
+  memo: "Memo / General",
+};
+
+const ACTION_LABELS: Record<string, { label: string; description: string }> = {
+  store: { label: "Store & Index", description: "Save to Knowledge Base for AI reference" },
+  ingest_financials: { label: "Ingest into Financial Bible", description: "Parse financial data and update KPIs" },
+  ingest_past_perf: { label: "Ingest Past Performance", description: "Extract contract history for proposals" },
+  ingest_contacts: { label: "Extract Contacts", description: "Pull names, emails, roles into Contacts" },
+  analyze: { label: "AI Analysis", description: "Run deep analysis and generate recommendations" },
+  shred_rfp: { label: "Shred as RFP", description: "Extract requirements, compliance matrix, deadlines" },
+  update_company: { label: "Update Company Profile", description: "Parse and update company capabilities" },
 };
 
 const TYPE_COLORS: Record<string, string> = {
+  financials: "#10b981",
   past_performance: "#8b5cf6",
   proposal: "#3b82f6",
   compliance: "#f59e0b",
@@ -65,6 +95,24 @@ const TYPE_COLORS: Record<string, string> = {
   capability_statement: "#06b6d4",
   doctrine: "#ec4899",
   contract: "#6366f1",
+  sow: "#a855f7",
+  pws: "#a855f7",
+  rfp: "#ef4444",
+  rfi: "#f97316",
+  teaming_agreement: "#14b8a6",
+  org_chart: "#64748b",
+  resume: "#0ea5e9",
+  cost_volume: "#10b981",
+  tech_volume: "#3b82f6",
+  management_volume: "#8b5cf6",
+  cpars: "#f59e0b",
+  dd254: "#ef4444",
+  subcontracting_plan: "#22c55e",
+  quality_plan: "#06b6d4",
+  transition_plan: "#a855f7",
+  white_paper: "#64748b",
+  intel_report: "#f97316",
+  meeting_notes: "#6b7280",
   memo: "#6b7280",
 };
 
@@ -336,20 +384,20 @@ function DocumentDetail({ doc }: { doc: KnowledgeDocument }) {
         <MetaField label="Uploaded" value={new Date(doc.uploaded_at).toLocaleDateString()} />
         <MetaField label="Last Accessed" value={doc.last_accessed ? timeAgo(doc.last_accessed) : "Never"} />
         <MetaField label="Lookups" value={String(doc.access_count)} />
-        {doc.metadata.agency && <MetaField label="Agency" value={doc.metadata.agency} />}
-        {doc.metadata.contract_number && <MetaField label="Contract #" value={doc.metadata.contract_number} />}
-        {doc.metadata.naics && <MetaField label="NAICS" value={doc.metadata.naics} />}
-        {doc.metadata.period_of_performance && <MetaField label="PoP" value={doc.metadata.period_of_performance} />}
-        {doc.metadata.solicitation_number && <MetaField label="Solicitation" value={doc.metadata.solicitation_number} />}
-        {doc.metadata.author && <MetaField label="Author" value={doc.metadata.author} />}
+        {doc.metadata?.agency && <MetaField label="Agency" value={doc.metadata.agency} />}
+        {doc.metadata?.contract_number && <MetaField label="Contract #" value={doc.metadata.contract_number} />}
+        {doc.metadata?.naics && <MetaField label="NAICS" value={doc.metadata.naics} />}
+        {doc.metadata?.period_of_performance && <MetaField label="PoP" value={doc.metadata.period_of_performance} />}
+        {doc.metadata?.solicitation_number && <MetaField label="Solicitation" value={doc.metadata.solicitation_number} />}
+        {doc.metadata?.author && <MetaField label="Author" value={doc.metadata.author} />}
       </div>
 
       {/* Tags */}
-      {doc.tags.length > 0 && (
+      {doc.tags?.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Tags</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {doc.tags.map((tag) => (
+            {doc.tags?.map((tag) => (
               <span
                 key={tag}
                 style={{
@@ -388,6 +436,7 @@ function formatFileSize(bytes: number): string {
 function UploadModal({ collections, onClose }: { collections: KnowledgeCollection[]; onClose: () => void }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("memo");
+  const [action, setAction] = useState("store");
   const [collection, setCollection] = useState("col-contracts");
   const [tagsInput, setTagsInput] = useState("");
   const [result, setResult] = useState<string | null>(null);
@@ -490,7 +539,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
             <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Type</label>
-                <select value={docType} onChange={(e) => setDocType(e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }}>
+                <select value={docType} onChange={(e) => { setDocType(e.target.value); if (e.target.value === "financials") setAction("ingest_financials"); else if (e.target.value === "rfp") setAction("shred_rfp"); else if (e.target.value === "past_performance" || e.target.value === "cpars") setAction("ingest_past_perf"); }} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }}>
                   {Object.entries(TYPE_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
                   ))}
@@ -503,6 +552,17 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
                     <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>What should GDA do with this file?</label>
+              <select value={action} onChange={(e) => setAction(e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }}>
+                {Object.entries(ACTION_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4, fontStyle: "italic" }}>
+                {ACTION_LABELS[action]?.description}
               </div>
             </div>
             <div style={{ marginBottom: 16 }}>
@@ -522,7 +582,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
                 disabled={!selectedFile || uploading}
                 style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: !selectedFile || uploading ? 0.5 : 1 }}
               >
-                {uploading ? "Uploading..." : "Upload"}
+                {uploading ? "Uploading..." : ACTION_LABELS[action]?.label ?? "Upload"}
               </button>
             </div>
           </>
