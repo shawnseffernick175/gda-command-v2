@@ -3906,3 +3906,20 @@ export function triggerSourceSync(id: string) {
 export function fetchSyncHistory() {
   return request<{ runs: SyncRunEntry[]; total: number }>("/sources/sync/history");
 }
+
+// ---------------------------------------------------------------------------
+// Opportunity Timeline (W5)
+// ---------------------------------------------------------------------------
+
+export interface TimelineEvent {
+  id: string;
+  type: string;
+  actor: string;
+  timestamp: string;
+  summary: string;
+  snapshot_keys: string[];
+}
+
+export function fetchOpportunityTimeline(oppId: string) {
+  return request<{ events: TimelineEvent[] }>(`/opportunities/${oppId}/timeline`);
+}

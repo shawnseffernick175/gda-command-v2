@@ -1140,4 +1140,52 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/opportunities/:id/timeline — activity timeline for an opportunity
+// ---------------------------------------------------------------------------
+router.get("/:id/timeline", async (req, res) => {
+  const { id } = req.params;
+  const pool = getPool();
+
+  if (!pool) {
+    return res.json(
+      successEnvelope("gda-opportunities", "timeline", { events: [] })
+    );
+  }
+
+  try {
+    const versionRows = await pool.query(
+      `SELECT id, change_type, changed_by, created_at, snapshot
+       FROM record_versions
+       WHERE table_name = 'opportunities' AND record_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [id]
+    );
+
+    const events = versionRows.rows.map((r: { id: string; change_type: string; changed_by: string; created_at: string; snapshot: Record<string, unknown> }) => ({
+      id: r.id,
+      type: r.change_type,
+      actor: r.changed_by,
+      timestamp: r.created_at,
+      summary: r.change_type === "create"
+        ? "Opportunity created"
+        : `Updated by ${r.changed_by}`,
+      snapshot_keys: Object.keys(r.snapshot ?? {}),
+    }));
+
+    res.json(
+      successEnvelope("gda-opportunities", "timeline", { events })
+    );
+  } catch (err) {
+    res.status(500).json(
+      errorEnvelope("gda-opportunities", "timeline", {
+        code: "INTERNAL",
+        message: String(err),
+        detail: null,
+      })
+    );
+  }
+});
+
 export default router;
