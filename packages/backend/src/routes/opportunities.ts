@@ -1234,4 +1234,81 @@ router.get("/:id/timeline", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/opportunities/analytics — aggregate analytics for the index page
+// ---------------------------------------------------------------------------
+router.get("/analytics", async (_req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    res.status(503).json(errorEnvelope("gda-opportunities", "analytics", { code: "DB_UNAVAILABLE", message: "Database not configured", detail: null }));
+    return;
+  }
+
+  try {
+    // 1. Pipeline value by vehicle type
+    const byVehicle = await pool.query(
+      `SELECT COALESCE(vehicle_type::text, 'unclassified') AS vehicle_type,
+              COUNT(*)::int AS count,
+              COALESCE(SUM(value_estimated), 0) AS total_value
+       FROM opportunities
+       WHERE deleted_at IS NULL AND status NOT IN ('lost', 'no_bid', 'gov_cancelled')
+       GROUP BY vehicle_type ORDER BY total_value DESC`
+    );
+
+    // 2. Capture phase funnel (Shipley)
+    const funnel = await pool.query(
+      `SELECT COALESCE(shipley_phase::text, capture_stage, 'identify') AS phase,
+              COUNT(*)::int AS count,
+              COALESCE(SUM(value_estimated), 0) AS total_value
+       FROM opportunities
+       WHERE deleted_at IS NULL
+       GROUP BY phase ORDER BY count DESC`
+    );
+
+    // 3. Top agencies by count and ceiling
+    const topAgencies = await pool.query(
+      `SELECT COALESCE(agency, 'Unknown') AS agency,
+              COUNT(*)::int AS count,
+              COALESCE(SUM(value_estimated), 0) AS total_value
+       FROM opportunities
+       WHERE deleted_at IS NULL AND status NOT IN ('lost', 'no_bid', 'gov_cancelled')
+       GROUP BY agency ORDER BY total_value DESC LIMIT 10`
+    );
+
+    // 4. Aging report (no activity in 14+ days)
+    const aging = await pool.query(
+      `SELECT id, title, EXTRACT(DAY FROM NOW() - updated_at)::int AS days_stale
+       FROM opportunities
+       WHERE deleted_at IS NULL
+         AND status NOT IN ('won', 'lost', 'no_bid', 'gov_cancelled')
+         AND updated_at < NOW() - INTERVAL '14 days'
+       ORDER BY updated_at ASC LIMIT 20`
+    );
+
+    // 5. Win-probability-weighted pipeline
+    const weighted = await pool.query(
+      `SELECT COALESCE(SUM(value_estimated * COALESCE(probability_of_win, 0)), 0) AS weighted_value,
+              COALESCE(SUM(value_estimated), 0) AS total_value,
+              COUNT(*)::int AS count
+       FROM opportunities
+       WHERE deleted_at IS NULL AND status NOT IN ('lost', 'no_bid', 'gov_cancelled')`
+    );
+
+    res.json(successEnvelope("gda-opportunities", "analytics", {
+      by_vehicle: byVehicle.rows.map((r) => ({ vehicle_type: r.vehicle_type, count: Number(r.count), total_value: Number(r.total_value) })),
+      funnel: funnel.rows.map((r) => ({ phase: r.phase, count: Number(r.count), total_value: Number(r.total_value) })),
+      top_agencies: topAgencies.rows.map((r) => ({ agency: r.agency, count: Number(r.count), total_value: Number(r.total_value) })),
+      aging: aging.rows.map((r) => ({ id: r.id, title: r.title, days_stale: Number(r.days_stale) })),
+      weighted_pipeline: {
+        weighted_value: Number(weighted.rows[0].weighted_value),
+        total_value: Number(weighted.rows[0].total_value),
+        count: Number(weighted.rows[0].count),
+      },
+    }));
+  } catch (err) {
+    log.error("analytics_error", { error: (err as Error).message });
+    res.status(500).json(errorEnvelope("gda-opportunities", "analytics", { code: "QUERY_ERROR", message: "Failed to load analytics", detail: null }));
+  }
+});
+
 export default router;

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ExportButton from "../components/ExportButton";
 import InfoBadge from "../components/InfoBadge";
 import SourceBadge from "../components/SourceBadge";
+import { authenticatedFetch } from "../api/auth";
 import {
   fetchOpportunities,
   qualifyOpportunity,
@@ -13,6 +14,14 @@ import {
   type OpportunitiesData,
   type SmartRecommendation,
 } from "../api/client";
+
+interface AnalyticsData {
+  by_vehicle: Array<{ vehicle_type: string; count: number; total_value: number }>;
+  funnel: Array<{ phase: string; count: number; total_value: number }>;
+  top_agencies: Array<{ agency: string; count: number; total_value: number }>;
+  aging: Array<{ id: string; title: string; days_stale: number }>;
+  weighted_pipeline: { weighted_value: number; total_value: number; count: number };
+}
 
 type SortKey =
   | "id"
@@ -115,6 +124,11 @@ export default function OpsTracker() {
   // Smart recommendations
   const [recommendations, setRecommendations] = useState<SmartRecommendation[]>([]);
 
+  // Analytics panel
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
   // Pagination
   const [page, setPage] = useState(1);
   const pageSize = 25;
@@ -169,6 +183,18 @@ export default function OpsTracker() {
       if (e.success && e.data) setRecommendations(e.data.recommendations);
     }).catch(() => {});
   }, [load]);
+
+  useEffect(() => {
+    if (!showAnalytics || analytics) return;
+    setAnalyticsLoading(true);
+    authenticatedFetch("/api/opportunities/analytics")
+      .then((r) => r.json())
+      .then((env) => {
+        if (env.success && env.data) setAnalytics(env.data);
+      })
+      .catch(() => {})
+      .finally(() => setAnalyticsLoading(false));
+  }, [showAnalytics, analytics]);
 
   const opportunities = data?.opportunities ?? [];
   const source = data?.source ?? "db";
@@ -537,6 +563,101 @@ export default function OpsTracker() {
         </div>
       )}
 
+      {/* Analytics Toggle */}
+      <div style={{ marginBottom: 12 }}>
+        <button
+          onClick={() => setShowAnalytics(!showAnalytics)}
+          style={{
+            background: showAnalytics ? "#1e3a5f" : "var(--color-surface, #1e293b)",
+            color: showAnalytics ? "#60a5fa" : "var(--color-text-muted, #94a3b8)",
+            border: "1px solid var(--color-border, #334155)",
+            borderRadius: 4,
+            padding: "4px 14px",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+        >
+          {showAnalytics ? "Hide Analytics" : "Show Analytics"}
+        </button>
+      </div>
+
+      {/* Analytics Panel */}
+      {showAnalytics && (
+        <div style={{ marginBottom: 16 }}>
+          {analyticsLoading ? (
+            <div style={{ padding: 16, color: "var(--color-text-muted, #94a3b8)", fontSize: 13 }}>Loading analytics...</div>
+          ) : analytics ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12 }}>
+              {/* Widget 1: Pipeline by Vehicle Type */}
+              <div style={{ background: "var(--color-surface, #1e293b)", border: "1px solid var(--color-border, #334155)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted, #94a3b8)", marginBottom: 8 }}>By Vehicle</div>
+                {analytics.by_vehicle.slice(0, 5).map((v) => (
+                  <div key={v.vehicle_type} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "2px 0", color: "var(--color-text, #e2e8f0)" }}>
+                    <span>{v.vehicle_type}</span>
+                    <span style={{ color: "var(--color-text-muted, #94a3b8)" }}>
+                      {v.count} / ${v.total_value >= 1e6 ? `${(v.total_value / 1e6).toFixed(1)}M` : `${(v.total_value / 1e3).toFixed(0)}K`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Widget 2: Funnel */}
+              <div style={{ background: "var(--color-surface, #1e293b)", border: "1px solid var(--color-border, #334155)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted, #94a3b8)", marginBottom: 8 }}>Capture Funnel</div>
+                {analytics.funnel.slice(0, 6).map((f) => (
+                  <div key={f.phase} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "2px 0", color: "var(--color-text, #e2e8f0)" }}>
+                    <span>{f.phase}</span>
+                    <span style={{ color: "var(--color-text-muted, #94a3b8)" }}>{f.count}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Widget 3: Top Agencies */}
+              <div style={{ background: "var(--color-surface, #1e293b)", border: "1px solid var(--color-border, #334155)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted, #94a3b8)", marginBottom: 8 }}>Top Agencies</div>
+                {analytics.top_agencies.slice(0, 5).map((a) => (
+                  <div key={a.agency} style={{ fontSize: 11, padding: "2px 0", color: "var(--color-text, #e2e8f0)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.agency}>
+                    {a.agency} ({a.count})
+                  </div>
+                ))}
+              </div>
+
+              {/* Widget 4: Aging */}
+              <div style={{ background: "var(--color-surface, #1e293b)", border: "1px solid var(--color-border, #334155)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted, #94a3b8)", marginBottom: 8 }}>Aging (14d+)</div>
+                {analytics.aging.length === 0 ? (
+                  <div style={{ fontSize: 11, color: "#22c55e" }}>All current</div>
+                ) : analytics.aging.slice(0, 5).map((a) => (
+                  <div key={a.id} style={{ fontSize: 11, padding: "2px 0", color: a.days_stale > 30 ? "#ef4444" : "#f59e0b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.title}>
+                    {a.days_stale}d — {a.title}
+                  </div>
+                ))}
+              </div>
+
+              {/* Widget 5: Weighted Pipeline */}
+              <div style={{ background: "var(--color-surface, #1e293b)", border: "1px solid var(--color-border, #334155)", borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted, #94a3b8)", marginBottom: 8 }}>Weighted Pipeline</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#22c55e" }}>
+                  ${analytics.weighted_pipeline.weighted_value >= 1e9
+                    ? `${(analytics.weighted_pipeline.weighted_value / 1e9).toFixed(1)}B`
+                    : analytics.weighted_pipeline.weighted_value >= 1e6
+                      ? `${(analytics.weighted_pipeline.weighted_value / 1e6).toFixed(1)}M`
+                      : `${(analytics.weighted_pipeline.weighted_value / 1e3).toFixed(0)}K`}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--color-text-muted, #94a3b8)", marginTop: 4 }}>
+                  $ x P(win) across {analytics.weighted_pipeline.count} opps
+                </div>
+                <div style={{ fontSize: 11, color: "var(--color-text-muted, #94a3b8)" }}>
+                  Total: ${analytics.weighted_pipeline.total_value >= 1e9
+                    ? `${(analytics.weighted_pipeline.total_value / 1e9).toFixed(1)}B`
+                    : `${(analytics.weighted_pipeline.total_value / 1e6).toFixed(1)}M`}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* Table */}
       {!loading && (
         <div style={{ overflowX: "auto" }}>
@@ -570,6 +691,7 @@ export default function OpsTracker() {
                 <th style={thStyle} onClick={() => handleSort("due_date")}>
                   Due{sortArrow("due_date")}
                 </th>
+                <th style={thStyle}>Source</th>
                 <th style={thStyle}>Actions</th>
               </tr>
             </thead>
@@ -716,6 +838,22 @@ export default function OpsTracker() {
                       <span style={{ marginLeft: 6, fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "rgba(239,68,68,0.15)", color: "#ef4444", fontWeight: 700 }}>
                         EXPIRED
                       </span>
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>
+                    {opp.raw_source_url ? (
+                      <a
+                        href={opp.raw_source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ color: "#60a5fa", fontSize: 12, textDecoration: "none" }}
+                        title={opp.raw_source_url}
+                      >
+                        Link
+                      </a>
+                    ) : (
+                      <span style={{ color: "#475569", fontSize: 11 }}>—</span>
                     )}
                   </td>
                   <td style={tdStyle}>

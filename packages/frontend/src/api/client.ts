@@ -165,6 +165,14 @@ export interface OpportunityRow {
   raw_source_url: string | null;
   data_source: string | null;
   pursuing_entity_id?: string | null;
+  pwin?: number | null;
+  capture_manager_id?: string | null;
+  proposal_manager_id?: string | null;
+  preferred_vendor_analysis?: string | null;
+  expected_rfp_date?: string | null;
+  expected_award_date?: string | null;
+  shipley_phase?: string | null;
+  vehicle_type?: string | null;
   created_at: string;
   updated_at: string;
 }

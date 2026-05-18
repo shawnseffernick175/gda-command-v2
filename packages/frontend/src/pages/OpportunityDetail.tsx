@@ -403,10 +403,13 @@ export default function OpportunityDetail() {
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: 20 }}>
         {[
           { key: "overview", label: "Overview" },
-          { key: "analysis", label: "Analysis" },
-          { key: "intelligence", label: "Intelligence" },
+          { key: "analysis", label: "Fit Analysis" },
+          { key: "intelligence", label: "Competitive" },
           { key: "strategy", label: "Strategy" },
-          { key: "history", label: "History" },
+          { key: "shipley", label: "Shipley" },
+          { key: "timeline_tab", label: "Timeline" },
+          { key: "documents", label: "Documents" },
+          { key: "history", label: "Activity" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -1223,6 +1226,222 @@ export default function OpportunityDetail() {
               </details>
             )}
           </div>
+        )}
+      </Section>
+      </>}
+
+      {/* ======================== SHIPLEY TAB ======================== */}
+      {activeTab === "shipley" && <>
+      <Section title="Shipley Capture Phase">
+        <div style={{ display: "flex", gap: 4, marginBottom: 16, flexWrap: "wrap" }}>
+          {SHIPLEY_STAGES.map((s) => {
+            const currentStage = opp.capture_stage ?? "interest";
+            const isActive = s.value === currentStage;
+            return (
+              <div
+                key={s.value}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 4,
+                  fontSize: 12,
+                  fontWeight: isActive ? 700 : 400,
+                  background: isActive ? s.color : "rgba(255,255,255,0.04)",
+                  color: isActive ? "#fff" : "#94a3b8",
+                  border: `1px solid ${isActive ? s.color : "rgba(255,255,255,0.08)"}`,
+                }}
+              >
+                {s.label}
+              </div>
+            );
+          })}
+        </div>
+        {opp.pwin !== null && opp.pwin !== undefined && (
+          <div style={{ fontSize: 13, marginBottom: 8 }}>
+            <strong>Pwin:</strong> {Number(opp.pwin).toFixed(0)}%
+            <span style={{ color: "#64748b", marginLeft: 8 }}>
+              (Pursue floor: 25% | Capture: 40% | Bid Decision: 50%)
+            </span>
+          </div>
+        )}
+        {opp.capture_manager_id && (
+          <div style={{ fontSize: 13, marginBottom: 4 }}>
+            <strong>Capture Manager:</strong> {opp.capture_manager_id}
+          </div>
+        )}
+        {opp.proposal_manager_id && (
+          <div style={{ fontSize: 13, marginBottom: 4 }}>
+            <strong>Proposal Manager:</strong> {opp.proposal_manager_id}
+          </div>
+        )}
+        {opp.preferred_vendor_analysis && (
+          <div style={{ fontSize: 13, marginBottom: 4 }}>
+            <strong>Preferred Vendor Analysis:</strong> {opp.preferred_vendor_analysis}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Color Team Gates">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
+          {(["blue", "pink", "red", "green", "gold", "white"] as const).map((color) => {
+            const colorMap: Record<string, string> = {
+              blue: "#3b82f6", pink: "#ec4899", red: "#ef4444",
+              green: "#22c55e", gold: "#f59e0b", white: "#e2e8f0",
+            };
+            const descMap: Record<string, string> = {
+              blue: "Strategy validation (pre-RFP)",
+              pink: "~30% draft review",
+              red: "~60-70% draft review",
+              green: "Pricing alignment",
+              gold: "Executive sign-off",
+              white: "Post-submit lessons learned",
+            };
+            return (
+              <div
+                key={color}
+                style={{
+                  padding: 12,
+                  borderRadius: 6,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{
+                  width: 24, height: 24, borderRadius: "50%",
+                  background: colorMap[color], margin: "0 auto 8px",
+                  opacity: 0.8,
+                }} />
+                <div style={{ fontSize: 12, fontWeight: 600, color: colorMap[color], textTransform: "capitalize" }}>
+                  {color}
+                </div>
+                <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>
+                  {descMap[color]}
+                </div>
+                <div style={{ fontSize: 10, color: "#475569", marginTop: 4 }}>
+                  Not scheduled
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 11, color: "#64748b", marginTop: 12 }}>
+          Color-team gates follow the Shipley standard. Schedule reviews via the Discipline dashboard.
+        </div>
+      </Section>
+      </>}
+
+      {/* ======================== TIMELINE TAB ======================== */}
+      {activeTab === "timeline_tab" && <>
+      <Section title="Key Dates & Countdowns">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[
+            { label: "Expected RFP Date", value: opp.expected_rfp_date },
+            { label: "Due Date (Response)", value: opp.due_date },
+            { label: "Expected Award Date", value: opp.expected_award_date },
+            { label: "Created", value: opp.created_at },
+          ].map(({ label, value }) => {
+            const date = value ? new Date(value) : null;
+            const now = new Date();
+            const daysRemaining = date ? Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+            return (
+              <div
+                key={label}
+                style={{
+                  padding: 12,
+                  borderRadius: 6,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text, #e2e8f0)" }}>
+                  {date ? date.toLocaleDateString() : "Not set"}
+                </div>
+                {daysRemaining !== null && (
+                  <div style={{
+                    fontSize: 12,
+                    color: daysRemaining < 0 ? "#ef4444" : daysRemaining < 14 ? "#f59e0b" : "#22c55e",
+                    marginTop: 2,
+                  }}>
+                    {daysRemaining < 0 ? `${Math.abs(daysRemaining)} days ago` : daysRemaining === 0 ? "Today" : `${daysRemaining} days remaining`}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section title="Milestone Timeline">
+        <div style={{ position: "relative", paddingLeft: 20 }}>
+          {[
+            { label: "Sources Sought / RFI", date: null as string | null, phase: "identify" },
+            { label: "Draft RFP", date: opp.expected_rfp_date, phase: "pursue" },
+            { label: "Final RFP", date: opp.due_date, phase: "proposal" },
+            { label: "Proposal Due", date: opp.due_date, phase: "submit" },
+            { label: "Expected Award", date: opp.expected_award_date, phase: "awarded" },
+          ].map((m, i) => {
+            const currentPhaseIdx = SHIPLEY_STAGES.findIndex((s) => s.value === (opp.capture_stage ?? "interest"));
+            const milestonePhaseIdx = SHIPLEY_STAGES.findIndex((s) => s.value === m.phase);
+            const isPast = milestonePhaseIdx < currentPhaseIdx;
+            const isCurrent = milestonePhaseIdx === currentPhaseIdx;
+            return (
+              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 16, position: "relative" }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: "50%", marginTop: 4, flexShrink: 0,
+                  background: isPast ? "#22c55e" : isCurrent ? "#3b82f6" : "#334155",
+                  border: isCurrent ? "2px solid #60a5fa" : "none",
+                }} />
+                {i < 4 && (
+                  <div style={{
+                    position: "absolute", left: 4, top: 18, width: 2, height: 24,
+                    background: isPast ? "#22c55e" : "#334155",
+                  }} />
+                )}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: isPast ? "#22c55e" : isCurrent ? "#60a5fa" : "#94a3b8" }}>
+                    {m.label}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>
+                    {m.date ? new Date(m.date).toLocaleDateString() : "TBD"}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+      </>}
+
+      {/* ======================== DOCUMENTS TAB ======================== */}
+      {activeTab === "documents" && <>
+      <Section title="Solicitation Documents">
+        <EmptyState text="No documents attached yet. Upload solicitation documents, amendments, and Q&As using the RFP Shredder." />
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={() => navigate("/rfp-shredder")}
+            style={{
+              background: "#3b82f6",
+              color: "#fff",
+              border: "none",
+              borderRadius: 4,
+              padding: "8px 16px",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            Go to RFP Shredder
+          </button>
+        </div>
+      </Section>
+
+      <Section title="Source Links">
+        {opp.raw_source_url ? (
+          <a href={opp.raw_source_url} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa", fontSize: 13 }}>
+            {opp.raw_source_url}
+          </a>
+        ) : (
+          <EmptyState text="No source URL linked to this opportunity." />
         )}
       </Section>
       </>}
