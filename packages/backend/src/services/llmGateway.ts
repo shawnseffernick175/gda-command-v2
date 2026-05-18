@@ -21,6 +21,13 @@ type DataClassification = "unclassified" | "fouo" | "cui" | "itar" | "secret";
 
 const PUBLIC_BLOCKED_CLASSIFICATIONS: DataClassification[] = ["cui", "itar", "secret"];
 
+function resolveProvider(tier?: ModelTier): string {
+  if (tier === "deep") {
+    return process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai";
+  }
+  return process.env.OPENAI_API_KEY ? "openai" : "anthropic";
+}
+
 // ---------------------------------------------------------------------------
 // Cost estimation (approximate per 1K tokens)
 // ---------------------------------------------------------------------------
@@ -181,7 +188,7 @@ export async function gatewayCall(opts: GatewayCallOptions): Promise<GatewayResu
 
     const callId = await logCall({
       purpose: opts.purpose,
-      provider: opts.tier === "deep" ? "anthropic" : "openai",
+      provider: resolveProvider(opts.tier),
       model: "error",
       classification,
       promptHash,

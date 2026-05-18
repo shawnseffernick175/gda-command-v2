@@ -359,7 +359,7 @@ router.get("/call-log", requireRole("admin"), async (req: Request, res: Response
   if (!pool) {
     return res.status(503).json(errorEnvelope("gda-ai", "call-log", { code: "DB_UNAVAILABLE", message: "Database not configured", detail: null }));
   }
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
   const purpose = req.query.purpose as string | undefined;
 
   try {
