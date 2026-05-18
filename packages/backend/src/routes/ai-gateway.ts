@@ -121,7 +121,7 @@ router.post("/summarize", async (req, res) => {
       userId,
       opportunityId: opportunity_id,
       action: "summarize",
-      modelTier: tier,
+      modelTier: result.tier,
       promptTokens: result.usage.prompt_tokens,
       completionTokens: result.usage.completion_tokens,
       latencyMs: latency,
@@ -286,7 +286,7 @@ Consider: competitive landscape, alignment with typical GovCon capabilities, tim
         userId: req.user?.userId,
         opportunityId,
         action: "bid-recommendation",
-        modelTier: tier,
+        modelTier: result.tier,
         latencyMs: latency,
         status: "success",
       });
@@ -296,7 +296,7 @@ Consider: competitive landscape, alignment with typical GovCon capabilities, tim
           id: recId,
           opportunity_id: opportunityId,
           ...parsed,
-          model_tier: tier,
+          model_tier: result.tier,
           latency_ms: latency,
         })
       );
