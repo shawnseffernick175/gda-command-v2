@@ -54,6 +54,37 @@ export type OpportunityStatus =
 /** SBA size standard classification for a given NAICS code. */
 export type NaicsSize = "small" | "large" | null;
 
+/** Entity status for company_entity records (W4 merger context). */
+export type EntityStatus = "legacy" | "merging" | "newco" | "subsidiary" | "partner";
+
+/** Company entity record (W4 — merger context). */
+export interface CompanyEntity {
+  entity_id: string;
+  legal_name: string;
+  dba_names: string[];
+  status: EntityStatus;
+  cage_code: string | null;
+  uei: string | null;
+  duns: string | null;
+  primary_naics: string | null;
+  naics_codes: string[];
+  psc_codes: string[];
+  set_aside_status: string[];
+  certifications: Array<{ name: string; issuer: string; expires: string | null }>;
+  contract_vehicles: Array<{ name: string; number: string; expires: string | null }>;
+  capabilities: string[];
+  bu_codes: unknown[];
+  differentiators: string | null;
+  headquarters: string | null;
+  employee_count: number | null;
+  revenue_band: string | null;
+  primary_customers: string[];
+  description: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Opportunity record matching Postgres schema + S-009 spec. */
 export interface Opportunity {
   id: string;
@@ -80,6 +111,7 @@ export interface Opportunity {
   tags: string[];
   raw_source_url: string | null;
   data_source: string | null;
+  pursuing_entity_id?: string | null;
   created_at: string;
   updated_at: string;
 }

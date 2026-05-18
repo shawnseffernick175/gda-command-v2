@@ -24,6 +24,7 @@ const ALLOWED_TABLES = new Set([
   "approvals",
   "knowledge_documents",
   "cpars_records",
+  "company_entity",
 ]);
 
 export function isAllowedTable(table: string): boolean {

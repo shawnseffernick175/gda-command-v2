@@ -159,6 +159,16 @@ export default function OpportunityDetail() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState<{ message: string; isError: boolean } | null>(null);
 
+  // Entity eligibility state (W4)
+  const [entityResults, setEntityResults] = useState<Array<{
+    entity_id: string; legal_name: string; eligible: boolean;
+    checks: Array<{ check: string; pass: boolean; detail: string }>;
+    score: number; total_checks: number;
+  }> | null>(null);
+  const [recommendedEntity, setRecommendedEntity] = useState<string | null>(null);
+  const [pursuingEntity, setPursuingEntity] = useState<string | null>(null);
+  const [entitySaving, setEntitySaving] = useState(false);
+
   const backPath = location.state?.from ?? "/ops-tracker";
   const backLabel = backPath === "/pipeline" ? "Pipeline" : backPath === "/" ? "Launchpad" : "Ops Tracker";
 
@@ -192,6 +202,16 @@ export default function OpportunityDetail() {
     fetchCompetitorField(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.competitors)) setCompetitors(e.data); }).catch(() => {});
     fetchBlackHatAnalysis(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.scenarios)) setBlackHat(e.data); }).catch(() => {});
     fetchWargameAnalysis(id).then((e) => { if (e.success && e.data && Array.isArray(e.data.scenarios)) setWargame(e.data); }).catch(() => {});
+    // Fetch entity eligibility (W4)
+    authenticatedFetch(`/api/admin/companies/check-all/${id}`)
+      .then((r) => r.json())
+      .then((env: { success: boolean; data: { results: typeof entityResults extends infer T ? T : never; recommended_entity: string | null } | null }) => {
+        if (env.success && env.data) {
+          setEntityResults(env.data.results as typeof entityResults);
+          setRecommendedEntity(env.data.recommended_entity);
+        }
+      })
+      .catch(() => {});
     // Fetch cached Capture Coach analysis
     authenticatedFetch(`/api/agents/capture-coach/analysis/${id}`)
       .then((r) => r.json())
@@ -200,6 +220,15 @@ export default function OpportunityDetail() {
       })
       .catch(() => {});
   }, [id]);
+
+  // Sync pursuing entity from loaded data (W4)
+  useEffect(() => {
+    if (data?.opportunity?.pursuing_entity_id) {
+      setPursuingEntity(data.opportunity.pursuing_entity_id);
+    } else {
+      setPursuingEntity(null);
+    }
+  }, [data]);
 
   if (loading) {
     return (
@@ -231,6 +260,8 @@ export default function OpportunityDetail() {
 
   const { opportunity: opp, analysis: rawAnalysis, ooda: rawOoda, sources, learning } = data;
   const analysis = rawAnalysis ?? { executive_summary: null, recommended_action: null, strengths: [], risks: [], competitive_landscape: null };
+
+
   const emptyOodaPhase = { summary: null, items: [] };
   const ooda = {
     observe: rawOoda?.observe ?? emptyOodaPhase,
@@ -376,6 +407,71 @@ export default function OpportunityDetail() {
           <Field label="Tags" value={(opp.tags ?? []).length > 0 ? (opp.tags ?? []).join(", ") : "—"} />
         </div>
       </Section>
+
+      {/* Section: Pursuing Entity & Eligibility (W4) */}
+      {entityResults && entityResults.length > 0 && (
+        <Section title="Entity Eligibility">
+          <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 12 }}>
+            <label style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>Pursuing Entity:</label>
+            <select
+              value={pursuingEntity ?? ""}
+              onChange={async (e) => {
+                const newVal = e.target.value || null;
+                setPursuingEntity(newVal);
+                setEntitySaving(true);
+                try {
+                  await authenticatedFetch(`/api/opportunities/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ pursuing_entity_id: newVal }),
+                  });
+                } catch { /* best effort */ }
+                setEntitySaving(false);
+              }}
+              style={{ padding: "4px 8px", background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", fontSize: 13, cursor: "pointer" }}
+            >
+              <option value="">— Not assigned —</option>
+              {entityResults.map(er => (
+                <option key={er.entity_id} value={er.entity_id}>{er.legal_name}</option>
+              ))}
+            </select>
+            {entitySaving && <span style={{ fontSize: 12, color: "#94a3b8" }}>Saving...</span>}
+            {recommendedEntity && (
+              <span style={{ fontSize: 12, color: "#22c55e", fontWeight: 600 }}>
+                Recommended: {entityResults.find(er => er.entity_id === recommendedEntity)?.legal_name ?? recommendedEntity}
+              </span>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+            {entityResults.map(er => (
+              <div key={er.entity_id} style={{
+                padding: 12, borderRadius: 8,
+                background: er.eligible ? "#22c55e08" : "#ef444408",
+                border: `1px solid ${er.eligible ? "#22c55e33" : "#ef444433"}`,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <strong style={{ color: "#f1f5f9", fontSize: 14 }}>{er.legal_name}</strong>
+                  <span style={{
+                    fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+                    background: er.eligible ? "#22c55e22" : "#ef444422",
+                    color: er.eligible ? "#22c55e" : "#ef4444",
+                  }}>
+                    {er.eligible ? "ELIGIBLE" : "GAPS"}
+                  </span>
+                </div>
+                {er.checks.map((c, i) => (
+                  <div key={i} style={{ fontSize: 12, color: c.pass ? "#86efac" : "#fca5a5", marginBottom: 2 }}>
+                    {c.pass ? "✓" : "✗"} {c.detail}
+                  </div>
+                ))}
+                {er.total_checks === 0 && (
+                  <div style={{ fontSize: 12, color: "#64748b" }}>No matching criteria to check</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Section 1.5: Description / Scope of Work */}
       {opp.description && (
