@@ -13,7 +13,7 @@ const router = Router();
 const VEHICLE_KEYWORDS: Record<VehicleType, string[]> = {
   idiq: ["idiq", "indefinite delivery", "indefinite quantity", "id/iq"],
   bpa: ["bpa", "blanket purchase", "blanket agreement"],
-  gsa_schedule: ["gsa", "schedule", "mas ", "multiple award schedule", "gsa mas"],
+  gsa_schedule: ["gsa schedule", "gsa mas", "federal supply schedule", "multiple award schedule"],
   gwac: ["gwac", "government-wide", "alliant", "cio-sp", "vets 2", "8a stars"],
   full_and_open: ["full and open", "full & open", "unrestricted"],
   set_aside_sb: ["small business set-aside", "sb set-aside", "total small business"],
@@ -190,7 +190,7 @@ router.post("/classify", async (req, res) => {
 
     const { opportunity_ids } = req.body as { opportunity_ids?: string[] };
 
-    let query = `SELECT id, set_aside, description, tags FROM opportunities WHERE deleted_at IS NULL`;
+    let query = `SELECT id, set_aside, description, tags, vehicle_type FROM opportunities WHERE deleted_at IS NULL`;
     const params: string[] = [];
 
     if (opportunity_ids && opportunity_ids.length > 0) {
