@@ -1911,12 +1911,13 @@ export function sendChatMessage(message: string, sessionId?: string) {
   });
 }
 
-export function uploadDocument(file: File, documentType?: string, collection?: string, tags?: string[]) {
+export function uploadDocument(file: File, documentType?: string, collection?: string, tags?: string[], action?: string) {
   const formData = new FormData();
   formData.append("file", file);
   if (documentType) formData.append("document_type", documentType);
   if (collection) formData.append("collection", collection);
   if (tags && tags.length > 0) formData.append("tags", tags.join(","));
+  if (action) formData.append("action", action);
   return request<UploadResponseData>("/knowledge/upload", {
     method: "POST",
     body: formData,
