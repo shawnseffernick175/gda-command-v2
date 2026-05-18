@@ -655,6 +655,42 @@ export function fetchFinancialDrillDown(key: string) {
   return request<FinancialDrillDownData>(`/financials/${key}`);
 }
 
+export interface MonthlyFinancial {
+  month: number;
+  label: string;
+  revenue: number;
+  directCosts: number;
+  indirectCosts: number;
+  grossProfit: number;
+  ebit: number;
+  orders: number;
+  fundedBacklog: number;
+  headcount: number;
+  revenueTarget: number;
+  grossProfitTarget: number;
+  ebitTarget: number;
+  ordersTarget: number;
+}
+
+export interface MonthlyFinancialsData {
+  months: MonthlyFinancial[];
+  year: number;
+  ytd: {
+    revenue: number;
+    directCosts: number;
+    indirectCosts: number;
+    grossProfit: number;
+    ebit: number;
+    orders: number;
+  };
+  annualTargets: Record<string, number>;
+}
+
+export function fetchMonthlyFinancials(year?: number) {
+  const qs = year ? `?year=${year}` : "";
+  return request<MonthlyFinancialsData>(`/financials/monthly${qs}`);
+}
+
 // ---------------------------------------------------------------------------
 // Approvals Queue
 // ---------------------------------------------------------------------------

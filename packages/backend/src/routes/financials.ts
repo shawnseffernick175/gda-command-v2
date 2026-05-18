@@ -60,6 +60,94 @@ router.get("/kpis", async (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/financials/monthly — Monthly breakdown for charts & tables
+// ---------------------------------------------------------------------------
+router.get("/monthly", async (req, res) => {
+  const year = Number(req.query.year) || new Date().getFullYear();
+
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.json(
+        successEnvelope("GDA.financials", "monthly", { months: [], year })
+      );
+    }
+
+    try {
+      const { rows } = await pool.query(
+        `SELECT month, month_label, revenue, direct_costs, indirect_costs,
+                gross_profit, ebit, orders, funded_backlog, headcount,
+                revenue_target, gross_profit_target, ebit_target, orders_target
+         FROM monthly_financials
+         WHERE fiscal_year = $1
+         ORDER BY month`,
+        [year]
+      );
+
+      const months = rows.map((r: Record<string, unknown>) => ({
+        month: Number(r.month),
+        label: r.month_label as string,
+        revenue: Number(r.revenue),
+        directCosts: Number(r.direct_costs),
+        indirectCosts: Number(r.indirect_costs),
+        grossProfit: Number(r.gross_profit),
+        ebit: Number(r.ebit),
+        orders: Number(r.orders),
+        fundedBacklog: Number(r.funded_backlog),
+        headcount: Number(r.headcount),
+        revenueTarget: Number(r.revenue_target),
+        grossProfitTarget: Number(r.gross_profit_target),
+        ebitTarget: Number(r.ebit_target),
+        ordersTarget: Number(r.orders_target),
+      }));
+
+      // Compute YTD totals
+      const ytd = {
+        revenue: months.reduce((s, m) => s + m.revenue, 0),
+        directCosts: months.reduce((s, m) => s + m.directCosts, 0),
+        indirectCosts: months.reduce((s, m) => s + m.indirectCosts, 0),
+        grossProfit: months.reduce((s, m) => s + m.grossProfit, 0),
+        ebit: months.reduce((s, m) => s + m.ebit, 0),
+        orders: months.reduce((s, m) => s + m.orders, 0),
+      };
+
+      // Annual targets from the financial_kpis table
+      let annualTargets: Record<string, number> = {};
+      try {
+        const { rows: kpiRows } = await pool.query(
+          "SELECT id, target, unit FROM financial_kpis"
+        );
+        for (const kr of kpiRows) {
+          const r = kr as Record<string, unknown>;
+          annualTargets[r.id as string] = Number(r.target);
+        }
+      } catch { /* ignore */ }
+
+      return res.json(
+        successEnvelope("GDA.financials", "monthly", {
+          months,
+          year,
+          ytd,
+          annualTargets,
+        })
+      );
+    } catch {
+      return res.json(
+        successEnvelope("GDA.financials", "monthly", { months: [], year })
+      );
+    }
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("GDA.financials", "monthly", {
+        code: "INTERNAL",
+        message: (err as Error).message,
+        detail: null,
+      })
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/financials/:key — Drill-down for a single KPI
 // ---------------------------------------------------------------------------
 router.get("/:key", async (req, res) => {
