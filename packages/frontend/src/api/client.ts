@@ -1061,6 +1061,81 @@ export function generateStoryboard(proposalId: string) {
   return request<{ storyboard: StoryboardEntryRow[]; model: string }>(`/proposals/${proposalId}/generate-storyboard`, { method: "POST", headers: { "Content-Type": "application/json" } });
 }
 
+// Document import into section
+export function importDocumentToSection(proposalId: string, sectionId: string, file: File, mode: "replace" | "append" = "replace") {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("mode", mode);
+  return request<{ content: string; wordCount: number; fileName: string; fileSize: number; mode: string }>(`/proposals/${proposalId}/sections/${sectionId}/import`, { method: "POST", body: formData });
+}
+
+// Version history
+export interface SectionVersionRow {
+  id: string;
+  section_id: string;
+  version_number: number;
+  content: string;
+  word_count: number;
+  change_summary: string | null;
+  changed_by: string;
+  created_at: string;
+}
+
+export function fetchSectionVersions(proposalId: string, sectionId: string) {
+  return request<{ versions: SectionVersionRow[] }>(`/proposals/${proposalId}/sections/${sectionId}/versions`);
+}
+
+export function saveSectionVersion(proposalId: string, sectionId: string, changeSummary?: string) {
+  return request<{ id: string; version_number: number; word_count: number }>(`/proposals/${proposalId}/sections/${sectionId}/versions`, { method: "POST", body: JSON.stringify({ change_summary: changeSummary }), headers: { "Content-Type": "application/json" } });
+}
+
+export function restoreSectionVersion(proposalId: string, sectionId: string, versionId: string) {
+  return request<{ restored_version: number; content: string; word_count: number }>(`/proposals/${proposalId}/sections/${sectionId}/restore`, { method: "POST", body: JSON.stringify({ version_id: versionId }), headers: { "Content-Type": "application/json" } });
+}
+
+// Compliance mapping (RFP requirements vs response)
+export interface ComplianceMapRow {
+  id: string;
+  proposal_id: string;
+  requirement_id: string | null;
+  requirement_text: string;
+  requirement_type: string;
+  section_id: string | null;
+  section_title: string | null;
+  response_status: string;
+  response_summary: string | null;
+  sort_order: number;
+}
+
+export interface ComplianceMapStats {
+  total: number;
+  addressed: number;
+  partial: number;
+  not_addressed: number;
+  non_compliant: number;
+}
+
+export function fetchProposalComplianceMap(proposalId: string) {
+  return request<{ requirements: ComplianceMapRow[]; stats: ComplianceMapStats }>(`/proposals/${proposalId}/compliance-map`);
+}
+
+export function addComplianceRequirements(proposalId: string, requirements: Array<{ requirement_text: string; requirement_type?: string; section_id?: string; section_title?: string }>) {
+  return request<{ created: Array<{ id: string; requirement_text: string }>; count: number }>(`/proposals/${proposalId}/compliance-map`, { method: "POST", body: JSON.stringify({ requirements }), headers: { "Content-Type": "application/json" } });
+}
+
+export function updateComplianceMapping(proposalId: string, reqId: string, data: { section_id?: string; section_title?: string; response_status?: string; response_summary?: string }) {
+  return request<{ updated: string }>(`/proposals/${proposalId}/compliance-map/${reqId}`, { method: "PUT", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } });
+}
+
+export function importComplianceFromShred(proposalId: string, shredJobId: string) {
+  return request<{ imported: number; shred_job_id: string }>(`/proposals/${proposalId}/compliance-map/import-from-shred`, { method: "POST", body: JSON.stringify({ shred_job_id: shredJobId }), headers: { "Content-Type": "application/json" } });
+}
+
+// Export proposal
+export function exportProposal(proposalId: string, format: "markdown" | "docx") {
+  return authenticatedFetch(`${API_BASE}/proposals/${proposalId}/export?format=${format}`);
+}
+
 // ---------------------------------------------------------------------------
 // Contacts & Relationships
 // ---------------------------------------------------------------------------

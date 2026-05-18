@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   fetchProposals,
   fetchProposalDetail,
@@ -14,11 +14,22 @@ import {
   generateSectionContent,
   transformSectionContent,
   generateStoryboard,
+  importDocumentToSection,
+  fetchSectionVersions,
+  restoreSectionVersion,
+  fetchProposalComplianceMap,
+  addComplianceRequirements,
+  updateComplianceMapping,
+  importComplianceFromShred,
+  exportProposal,
   type ProposalRow,
   type ProposalSectionRow,
   type ProposalsData,
   type OutlineEntryRow,
   type StoryboardEntryRow,
+  type SectionVersionRow,
+  type ComplianceMapRow,
+  type ComplianceMapStats,
 } from "../api/client";
 
 // ---------------------------------------------------------------------------
@@ -100,7 +111,7 @@ function daysUntil(dateStr: string): number {
 // ---------------------------------------------------------------------------
 // Tab types
 // ---------------------------------------------------------------------------
-type WorkspaceTab = "outline" | "sections" | "storyboard" | "timeline" | "settings";
+type WorkspaceTab = "outline" | "sections" | "storyboard" | "compliance" | "timeline" | "export" | "settings";
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -548,8 +559,10 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
   const tabs: { key: WorkspaceTab; label: string; icon: string }[] = [
     { key: "outline", label: "Outline", icon: "📑" },
     { key: "sections", label: "Sections", icon: "✏️" },
+    { key: "compliance", label: "RFP Map", icon: "📋" },
     { key: "storyboard", label: "Storyboard", icon: "🎯" },
     { key: "timeline", label: "Timeline", icon: "📅" },
+    { key: "export", label: "Export", icon: "📥" },
     { key: "settings", label: "Settings", icon: "⚙️" },
   ];
 
@@ -650,6 +663,9 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
           aiLoading={aiLoading}
         />
       )}
+      {tab === "compliance" && (
+        <ComplianceMapTab proposal={proposal} sections={sections} />
+      )}
       {tab === "storyboard" && (
         <StoryboardTab
           proposal={proposal}
@@ -659,6 +675,7 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
         />
       )}
       {tab === "timeline" && <TimelineTab proposal={proposal} />}
+      {tab === "export" && <ExportTab proposal={proposal} />}
       {tab === "settings" && <SettingsTab proposal={proposal} onUpdate={load} />}
     </div>
   );
@@ -768,13 +785,70 @@ function SectionsTab({ proposal, sections, volumeGroups, selectedSection, onSele
 }) {
   const [editContent, setEditContent] = useState(selectedSection?.content ?? "");
   const [dirty, setDirty] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<SectionVersionRow[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (selectedSection) {
       setEditContent(selectedSection.content);
       setDirty(false);
+      setShowVersions(false);
     }
   }, [selectedSection]);
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSection) return;
+    setImporting(true);
+    try {
+      const mode = selectedSection.content?.trim() ? "append" : "replace";
+      const env = await importDocumentToSection(proposal.id, selectedSection.id, file, mode);
+      if (env.success && env.data) {
+        setEditContent(env.data.content);
+        setDirty(false);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleLoadVersions = async () => {
+    if (!selectedSection) return;
+    setShowVersions(!showVersions);
+    if (!showVersions) {
+      setVersionsLoading(true);
+      try {
+        const env = await fetchSectionVersions(proposal.id, selectedSection.id);
+        if (env.success && env.data) setVersions(env.data.versions);
+      } catch {
+        setVersions([]);
+      } finally {
+        setVersionsLoading(false);
+      }
+    }
+  };
+
+  const handleRestoreVersion = async (versionId: string) => {
+    if (!selectedSection) return;
+    try {
+      const env = await restoreSectionVersion(proposal.id, selectedSection.id, versionId);
+      if (env.success && env.data) {
+        setEditContent(env.data.content);
+        setDirty(false);
+        // Refresh versions
+        const vEnv = await fetchSectionVersions(proposal.id, selectedSection.id);
+        if (vEnv.success && vEnv.data) setVersions(vEnv.data.versions);
+      }
+    } catch {
+      // silently fail
+    }
+  };
 
   if (sections.length === 0) {
     return (
@@ -855,14 +929,36 @@ function SectionsTab({ proposal, sections, volumeGroups, selectedSection, onSele
               </div>
             </div>
 
-            {/* AI tools bar */}
+            {/* AI tools bar + Import + Version History */}
             <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
               <button
                 onClick={() => onGenerateSection(selectedSection.id)}
                 disabled={aiLoading}
                 style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12, background: "#8b5cf6" }}
               >
-                🤖 {selectedSection.content ? "Rewrite with AI" : "Generate Draft"}
+                {selectedSection.content ? "Rewrite with AI" : "Generate Draft"}
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12 }}
+                title="Import content from a document (PDF, DOCX, TXT)"
+              >
+                {importing ? "Importing..." : "Import Doc"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc,.txt,.md,.csv"
+                onChange={handleImportFile}
+                style={{ display: "none" }}
+              />
+              <button
+                onClick={handleLoadVersions}
+                style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12, color: showVersions ? "#3b82f6" : undefined }}
+                title="View version history"
+              >
+                History {showVersions ? "^" : "v"}
               </button>
               {selectedSection.content && TRANSFORM_ACTIONS.map((t) => (
                 <button
@@ -876,6 +972,63 @@ function SectionsTab({ proposal, sections, volumeGroups, selectedSection, onSele
                 </button>
               ))}
             </div>
+
+            {/* Version History Panel */}
+            {showVersions && (
+              <div style={{
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 12,
+                maxHeight: 250,
+                overflowY: "auto",
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                  Version History
+                </div>
+                {versionsLoading ? (
+                  <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Loading...</p>
+                ) : versions.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "var(--color-text-muted)" }}>No versions saved yet. Versions are created automatically when you save or when AI modifies content.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {versions.map((v) => (
+                      <div key={v.id} style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 10px",
+                        borderRadius: 6,
+                        background: "var(--color-bg)",
+                        fontSize: 12,
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontWeight: 600 }}>v{v.version_number}</span>
+                          <span style={{ color: "var(--color-text-muted)", marginLeft: 8 }}>
+                            {v.word_count}w • {v.changed_by}
+                          </span>
+                          {v.change_summary && (
+                            <span style={{ color: "var(--color-text-muted)", marginLeft: 8, fontStyle: "italic" }}>
+                              {v.change_summary}
+                            </span>
+                          )}
+                          <span style={{ color: "var(--color-text-muted)", marginLeft: 8 }}>
+                            {formatDate(v.created_at)}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleRestoreVersion(v.id)}
+                          style={{ ...btnSecondary, padding: "2px 8px", fontSize: 11 }}
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Content editor */}
             <textarea
@@ -1045,6 +1198,324 @@ function TimelineTab({ proposal }: { proposal: ProposalRow }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Compliance Map Tab — Side-by-side RFP requirements vs response
+// ---------------------------------------------------------------------------
+function ComplianceMapTab({ proposal, sections }: { proposal: ProposalRow; sections: ProposalSectionRow[] }) {
+  const [requirements, setRequirements] = useState<ComplianceMapRow[]>([]);
+  const [stats, setStats] = useState<ComplianceMapStats>({ total: 0, addressed: 0, partial: 0, not_addressed: 0, non_compliant: 0 });
+  const [loading, setLoading] = useState(true);
+  const [addMode, setAddMode] = useState(false);
+  const [newReqText, setNewReqText] = useState("");
+  const [importingShred, setImportingShred] = useState(false);
+
+  const loadMap = useCallback(async () => {
+    setLoading(true);
+    try {
+      const env = await fetchProposalComplianceMap(proposal.id);
+      if (env.success && env.data) {
+        setRequirements(env.data.requirements);
+        setStats(env.data.stats);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, [proposal.id]);
+
+  useEffect(() => { loadMap(); }, [loadMap]);
+
+  const handleAddRequirement = async () => {
+    if (!newReqText.trim()) return;
+    try {
+      await addComplianceRequirements(proposal.id, [{ requirement_text: newReqText.trim() }]);
+      setNewReqText("");
+      setAddMode(false);
+      loadMap();
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleImportFromShred = async () => {
+    if (!proposal.linked_shred_job_id) return;
+    setImportingShred(true);
+    try {
+      await importComplianceFromShred(proposal.id, proposal.linked_shred_job_id);
+      loadMap();
+    } catch {
+      // ignore
+    } finally {
+      setImportingShred(false);
+    }
+  };
+
+  const handleUpdateMapping = async (reqId: string, field: string, value: string) => {
+    try {
+      const data: Record<string, string> = { [field]: value };
+      if (field === "section_id" && value) {
+        const sec = sections.find((s) => s.id === value);
+        if (sec) data.section_title = sec.title;
+      }
+      await updateComplianceMapping(proposal.id, reqId, data);
+      loadMap();
+    } catch {
+      // ignore
+    }
+  };
+
+  const statusColors: Record<string, string> = {
+    fully_addressed: "#22c55e",
+    partial: "#f59e0b",
+    not_addressed: "#6b7280",
+    non_compliant: "#ef4444",
+  };
+  const statusLabels: Record<string, string> = {
+    fully_addressed: "Addressed",
+    partial: "Partial",
+    not_addressed: "Not Addressed",
+    non_compliant: "Non-Compliant",
+  };
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "var(--color-text-muted)" }}>Loading compliance map...</div>;
+
+  return (
+    <div>
+      {/* Stats bar */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        {[
+          { label: "Total Requirements", value: stats.total, color: "#3b82f6" },
+          { label: "Fully Addressed", value: stats.addressed, color: "#22c55e" },
+          { label: "Partial", value: stats.partial, color: "#f59e0b" },
+          { label: "Not Addressed", value: stats.not_addressed, color: "#6b7280" },
+          { label: "Non-Compliant", value: stats.non_compliant, color: "#ef4444" },
+        ].map((s) => (
+          <div key={s.label} style={{ ...summaryCard, textAlign: "center" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{s.label}</div>
+          </div>
+        ))}
+        {stats.total > 0 && (
+          <div style={{ ...summaryCard, textAlign: "center" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#3b82f6" }}>
+              {stats.total > 0 ? Math.round(((stats.addressed + stats.partial) / stats.total) * 100) : 0}%
+            </div>
+            <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Compliance Score</div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button onClick={() => setAddMode(!addMode)} style={btnSecondary}>
+          + Add Requirement
+        </button>
+        {proposal.linked_shred_job_id && (
+          <button onClick={handleImportFromShred} disabled={importingShred} style={btnPrimary}>
+            {importingShred ? "Importing..." : "Import from RFP Shredder"}
+          </button>
+        )}
+      </div>
+
+      {/* Add requirement form */}
+      {addMode && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "flex-start" }}>
+          <textarea
+            value={newReqText}
+            onChange={(e) => setNewReqText(e.target.value)}
+            placeholder="Enter requirement text (e.g., 'The contractor SHALL provide...')"
+            style={{ ...inputStyle, flex: 1, minHeight: 60 }}
+          />
+          <button onClick={handleAddRequirement} style={btnPrimary}>Add</button>
+          <button onClick={() => { setAddMode(false); setNewReqText(""); }} style={btnSecondary}>Cancel</button>
+        </div>
+      )}
+
+      {/* Requirements vs Response mapping */}
+      {requirements.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 20px", color: "var(--color-text-muted)" }}>
+          <p style={{ fontSize: 16, marginBottom: 8 }}>No requirements mapped yet</p>
+          <p style={{ fontSize: 14 }}>
+            {proposal.linked_shred_job_id
+              ? "Click 'Import from RFP Shredder' to pull in extracted requirements, or add them manually."
+              : "Add requirements manually, or link this proposal to an RFP Shredder job first."}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Header */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 200px 180px", gap: 12, padding: "8px 12px", fontWeight: 700, fontSize: 12, textTransform: "uppercase", color: "var(--color-text-muted)" }}>
+            <span>RFP Requirement</span>
+            <span>Mapped Section</span>
+            <span>Status</span>
+          </div>
+
+          {requirements.map((req) => (
+            <div key={req.id} style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 200px 180px",
+              gap: 12,
+              padding: "10px 12px",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              borderLeft: `3px solid ${statusColors[req.response_status] ?? "#6b7280"}`,
+              alignItems: "center",
+            }}>
+              <div>
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "1px 5px",
+                  borderRadius: 3,
+                  background: req.requirement_type === "SHALL" ? "rgba(239,68,68,0.15)" : "rgba(59,130,246,0.15)",
+                  color: req.requirement_type === "SHALL" ? "#ef4444" : "#3b82f6",
+                  marginRight: 6,
+                }}>
+                  {req.requirement_type}
+                </span>
+                <span style={{ fontSize: 13 }}>{req.requirement_text}</span>
+              </div>
+
+              <select
+                value={req.section_id ?? ""}
+                onChange={(e) => handleUpdateMapping(req.id, "section_id", e.target.value)}
+                style={{ ...inputStyle, fontSize: 12, padding: "4px 6px" }}
+              >
+                <option value="">-- None --</option>
+                {sections.map((s) => (
+                  <option key={s.id} value={s.id}>{s.title}</option>
+                ))}
+              </select>
+
+              <select
+                value={req.response_status}
+                onChange={(e) => handleUpdateMapping(req.id, "response_status", e.target.value)}
+                style={{
+                  ...inputStyle,
+                  fontSize: 12,
+                  padding: "4px 6px",
+                  color: statusColors[req.response_status] ?? "#6b7280",
+                  fontWeight: 600,
+                }}
+              >
+                {Object.entries(statusLabels).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Export Tab
+// ---------------------------------------------------------------------------
+function ExportTab({ proposal }: { proposal: ProposalRow }) {
+  const [exporting, setExporting] = useState<string | null>(null);
+
+  const handleExport = async (format: "markdown" | "docx") => {
+    setExporting(format);
+    try {
+      const response = await exportProposal(proposal.id, format);
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const ext = format === "docx" ? "doc" : "md";
+      const fileName = `${proposal.title.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_")}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: 600 }}>
+      <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Export Proposal</h3>
+      <p style={{ color: "var(--color-text-muted)", fontSize: 14, marginBottom: 24 }}>
+        Download your proposal in Word or Markdown format. The export includes cover page metadata,
+        all volumes organized by section, and formatted content ready for submission.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Word Document (.doc)</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+              Formatted HTML document that opens in Microsoft Word. Includes cover page,
+              volume headers, section headings, and styled paragraphs.
+            </div>
+          </div>
+          <button
+            onClick={() => handleExport("docx")}
+            disabled={exporting !== null}
+            style={{ ...btnPrimary, whiteSpace: "nowrap", marginLeft: 16 }}
+          >
+            {exporting === "docx" ? "Exporting..." : "Download .doc"}
+          </button>
+        </div>
+
+        <div style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          padding: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Markdown (.md)</div>
+            <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+              Plain text Markdown format. Useful for version control, collaboration tools,
+              and converting to other formats.
+            </div>
+          </div>
+          <button
+            onClick={() => handleExport("markdown")}
+            disabled={exporting !== null}
+            style={{ ...btnSecondary, whiteSpace: "nowrap", marginLeft: 16 }}
+          >
+            {exporting === "markdown" ? "Exporting..." : "Download .md"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 24, padding: 16, background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#3b82f6", marginBottom: 4 }}>Export Details</div>
+        <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+          <div>Title: {proposal.title}</div>
+          <div>Agency: {proposal.agency}</div>
+          <div>Status: {STATUS_LABELS[proposal.status] ?? proposal.status}</div>
+          <div>Win Themes: {proposal.win_themes.length > 0 ? proposal.win_themes.join(", ") : "None set"}</div>
+        </div>
       </div>
     </div>
   );
