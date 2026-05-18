@@ -37,8 +37,39 @@ export function ensureUploadDir(): void {
   }
 }
 
-export function isAllowedMimeType(mimeType: string): boolean {
-  return ALLOWED_MIME_TYPES.has(mimeType);
+/**
+ * Map file extensions to their correct MIME types.
+ * Used as fallback when clients send application/octet-stream.
+ */
+const EXT_MIME_MAP: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".xls": "application/vnd.ms-excel",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".txt": "text/plain",
+  ".csv": "text/csv",
+  ".md": "text/markdown",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+};
+
+/**
+ * Resolve the correct MIME type for a file. If the reported MIME type is
+ * generic (application/octet-stream), fall back to extension-based lookup.
+ */
+export function resolveMimeType(reportedMime: string, originalName: string): string {
+  if (reportedMime !== "application/octet-stream") return reportedMime;
+  const ext = path.extname(originalName).toLowerCase();
+  return EXT_MIME_MAP[ext] ?? reportedMime;
+}
+
+export function isAllowedMimeType(mimeType: string, originalName?: string): boolean {
+  const resolved = originalName ? resolveMimeType(mimeType, originalName) : mimeType;
+  return ALLOWED_MIME_TYPES.has(resolved);
 }
 
 export function getMaxFileSize(): number {
