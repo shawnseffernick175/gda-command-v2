@@ -38,6 +38,7 @@ import BookOfTruths from "./pages/BookOfTruths";
 import GovWin from "./pages/GovWin";
 import RiskRegister from "./pages/RiskRegister";
 import ProposalCenter from "./pages/ProposalCenter";
+import AdminTrash from "./pages/AdminTrash";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -100,6 +101,7 @@ const NAV_GROUPS = [
       { path: "/workflows", label: "Workflows", icon: "⚙" },
       { path: "/admin/users", label: "Users", icon: "👥" },
       { path: "/admin/audit", label: "Audit Log", icon: "📜" },
+      { path: "/admin/trash", label: "Trash", icon: "🗑" },
       { path: "/doctrine", label: "Doctrine", icon: "📖" },
       { path: "/book-of-truths", label: "Book of Truths", icon: "📓" },
       { path: "/prompts", label: "Prompts", icon: "📝" },
@@ -508,6 +510,7 @@ export default function App() {
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/audit" element={<AuditLog />} />
+            <Route path="/admin/trash" element={<AdminTrash />} />
             <Route path="/charts" element={<Charts />} />
             <Route path="/govwin" element={<GovWin />} />
             <Route path="/book-of-truths" element={<BookOfTruths />} />
