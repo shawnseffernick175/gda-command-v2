@@ -103,7 +103,14 @@ router.post("/analyze-competitors", requireRole("admin", "bd_manager"), async (_
     // Get tracked competitors from intel competitor_watch
     const { rows: competitors } = await pool.query(
       "SELECT id, name FROM competitor_profiles WHERE deleted_at IS NULL"
-    ).catch(() => ({ rows: [] as { id: string; name: string }[] }));
+    );
+
+    if (competitors.length === 0) {
+      return res.json(successEnvelope("gda-fpds", "analyze-competitors", {
+        warning: "No competitors tracked — skipping award analysis",
+        tracked_competitors: 0, matched: 0, recompete: 0, awards_checked: 0,
+      }));
+    }
 
     const competitorNames = competitors.map((c) => c.name.toLowerCase());
 
