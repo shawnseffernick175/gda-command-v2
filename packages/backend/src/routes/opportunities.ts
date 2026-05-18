@@ -1255,9 +1255,9 @@ router.get("/analytics", async (_req, res) => {
        GROUP BY vehicle_type ORDER BY total_value DESC`
     );
 
-    // 2. Capture phase funnel (Shipley)
+    // 2. Capture phase funnel
     const funnel = await pool.query(
-      `SELECT COALESCE(shipley_phase::text, capture_stage, 'identify') AS phase,
+      `SELECT COALESCE(capture_stage, 'interest') AS phase,
               COUNT(*)::int AS count,
               COALESCE(SUM(value_estimated), 0) AS total_value
        FROM opportunities

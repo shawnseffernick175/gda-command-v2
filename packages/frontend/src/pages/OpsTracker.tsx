@@ -699,7 +699,7 @@ export default function OpsTracker() {
               {opportunities.length === 0 && (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={11}
                     style={{
                       ...tdStyle,
                       textAlign: "center",

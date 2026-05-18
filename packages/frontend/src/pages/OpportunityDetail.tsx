@@ -1375,16 +1375,16 @@ export default function OpportunityDetail() {
       <Section title="Milestone Timeline">
         <div style={{ position: "relative", paddingLeft: 20 }}>
           {[
-            { label: "Sources Sought / RFI", date: null as string | null, phase: "identify" },
+            { label: "Sources Sought / RFI", date: null as string | null, phase: "interest" },
             { label: "Draft RFP", date: opp.expected_rfp_date, phase: "pursue" },
-            { label: "Final RFP", date: opp.due_date, phase: "proposal" },
-            { label: "Proposal Due", date: opp.due_date, phase: "submit" },
-            { label: "Expected Award", date: opp.expected_award_date, phase: "awarded" },
+            { label: "Final RFP", date: opp.due_date, phase: "solicitation" },
+            { label: "Proposal Due", date: opp.due_date, phase: "post_submittal" },
+            { label: "Expected Award", date: opp.expected_award_date, phase: "won" },
           ].map((m, i) => {
             const currentPhaseIdx = SHIPLEY_STAGES.findIndex((s) => s.value === (opp.capture_stage ?? "interest"));
             const milestonePhaseIdx = SHIPLEY_STAGES.findIndex((s) => s.value === m.phase);
-            const isPast = milestonePhaseIdx < currentPhaseIdx;
-            const isCurrent = milestonePhaseIdx === currentPhaseIdx;
+            const isPast = milestonePhaseIdx >= 0 && milestonePhaseIdx < currentPhaseIdx;
+            const isCurrent = milestonePhaseIdx >= 0 && milestonePhaseIdx === currentPhaseIdx;
             return (
               <div key={i} style={{ display: "flex", gap: 12, marginBottom: 16, position: "relative" }}>
                 <div style={{
