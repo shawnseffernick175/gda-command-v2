@@ -192,7 +192,7 @@ router.post(
       // Fetch opportunity details
       const oppRes = await pool.query(
         `SELECT id, title, description, agency, status, score, value_estimated,
-                due_date, set_aside, capture_stage, naics_code, tags
+                due_date, set_aside, capture_stage, naics, tags
          FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
         [opportunityId]
       );
@@ -218,7 +218,7 @@ Opportunity:
 - Agency: ${opp.agency ?? "Unknown"}
 - Value: ${opp.value_estimated ? `$${(opp.value_estimated / 1e6).toFixed(1)}M` : "Unknown"}
 - Due Date: ${opp.due_date ?? "Unknown"}
-- NAICS: ${opp.naics_code ?? "Unknown"}
+- NAICS: ${opp.naics ?? "Unknown"}
 - Set-Aside: ${opp.set_aside ?? "None"}
 - Current Score: ${opp.score ?? "Not scored"}
 - Description: ${(opp.description ?? "").slice(0, 3000)}
