@@ -234,12 +234,18 @@ function MonthlyOverview({ data }: { data: MonthlyFinancialsData }) {
         <ChartCard title="Monthly Revenue">
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={months}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={tooltipValueFormatter} />
-              <Legend />
-              <Bar dataKey="revenue" name="Actual" fill={COLORS.revenue} radius={[4, 4, 0, 0]} />
+              <defs>
+                <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS.revenue} stopOpacity={0.9} />
+                  <stop offset="100%" stopColor={COLORS.revenue} stopOpacity={0.5} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <Tooltip formatter={tooltipValueFormatter} contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="revenue" name="Actual" fill="url(#gradRevenue)" radius={[6, 6, 0, 0]} />
               <Line dataKey="revenueTarget" name="Target" stroke={COLORS.target} strokeDasharray="5 5" strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
@@ -248,48 +254,79 @@ function MonthlyOverview({ data }: { data: MonthlyFinancialsData }) {
         <ChartCard title="Monthly Orders">
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={months}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={tooltipValueFormatter} />
-              <Legend />
-              <Bar dataKey="orders" name="Actual" fill={COLORS.orders} radius={[4, 4, 0, 0]} />
+              <defs>
+                <linearGradient id="gradOrders" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS.orders} stopOpacity={0.9} />
+                  <stop offset="100%" stopColor={COLORS.orders} stopOpacity={0.5} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <Tooltip formatter={tooltipValueFormatter} contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="orders" name="Actual" fill="url(#gradOrders)" radius={[6, 6, 0, 0]} />
               <Line dataKey="ordersTarget" name="Target" stroke={COLORS.target} strokeDasharray="5 5" strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
 
-      {/* Profitability Chart */}
-      <ChartCard title="Monthly Profitability">
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={months}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 11 }} />
-            <Tooltip formatter={tooltipValueFormatter} />
-            <Legend />
-            <Bar dataKey="grossProfit" name="Gross Profit" fill={COLORS.grossProfit} radius={[4, 4, 0, 0]} />
-            <Bar dataKey="ebit" name="EBIT" fill={COLORS.ebit} radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
+      {/* Profitability & Cost Breakdown — 2-column grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <ChartCard title="Monthly Profitability">
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={months}>
+              <defs>
+                <linearGradient id="gradGrossProfit" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS.grossProfit} stopOpacity={0.9} />
+                  <stop offset="100%" stopColor={COLORS.grossProfit} stopOpacity={0.5} />
+                </linearGradient>
+                <linearGradient id="gradEbit" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS.ebit} stopOpacity={0.9} />
+                  <stop offset="100%" stopColor={COLORS.ebit} stopOpacity={0.5} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <Tooltip formatter={tooltipValueFormatter} contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="grossProfit" name="Gross Profit" fill="url(#gradGrossProfit)" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="ebit" name="EBIT" fill="url(#gradEbit)" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-      {/* Cost Breakdown Chart */}
-      <ChartCard title="Revenue vs Cost Breakdown">
-        <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={months}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-            <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 11 }} />
-            <Tooltip formatter={tooltipValueFormatter} />
-            <Legend />
-            <Area dataKey="revenue" name="Revenue" fill={`${COLORS.revenue}20`} stroke={COLORS.revenue} strokeWidth={2} />
-            <Bar dataKey="directCosts" name="Direct Costs" fill={COLORS.directCosts} stackId="costs" />
-            <Bar dataKey="indirectCosts" name="Indirect Costs" fill={COLORS.indirectCosts} stackId="costs" />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </ChartCard>
+        <ChartCard title="Revenue vs Cost Breakdown">
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart data={months}>
+              <defs>
+                <linearGradient id="gradRevenueArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS.revenue} stopOpacity={0.3} />
+                  <stop offset="100%" stopColor={COLORS.revenue} stopOpacity={0.05} />
+                </linearGradient>
+                <linearGradient id="gradDirectCosts" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS.directCosts} stopOpacity={0.85} />
+                  <stop offset="100%" stopColor={COLORS.directCosts} stopOpacity={0.5} />
+                </linearGradient>
+                <linearGradient id="gradIndirectCosts" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={COLORS.indirectCosts} stopOpacity={0.85} />
+                  <stop offset="100%" stopColor={COLORS.indirectCosts} stopOpacity={0.5} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={currencyTickFormatter} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+              <Tooltip formatter={tooltipValueFormatter} contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Area dataKey="revenue" name="Revenue" fill="url(#gradRevenueArea)" stroke={COLORS.revenue} strokeWidth={2} />
+              <Bar dataKey="directCosts" name="Direct Costs" fill="url(#gradDirectCosts)" stackId="costs" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="indirectCosts" name="Indirect Costs" fill="url(#gradIndirectCosts)" stackId="costs" radius={[2, 2, 0, 0]} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
 
       {/* Monthly Breakdown Table */}
       <MonthlyTable months={months} ytd={ytd} />

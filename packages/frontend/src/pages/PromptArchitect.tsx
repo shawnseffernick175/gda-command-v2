@@ -8,6 +8,7 @@ import {
   type PromptDetailData,
   type PromptQueryParams,
 } from "../api/client";
+import { authenticatedFetch } from "../api/auth";
 
 const CATEGORY_COLORS: Record<string, string> = {
   capture: "#f59e0b",
@@ -53,6 +54,30 @@ export default function PromptArchitect() {
   const [detail, setDetail] = useState<PromptDetailData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailTab, setDetailTab] = useState<"body" | "versions" | "usage">("body");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState("general");
+  const [newDescription, setNewDescription] = useState("");
+  const [newTemplate, setNewTemplate] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  async function handleCreatePrompt() {
+    if (!newName.trim() || !newTemplate.trim()) return;
+    setCreating(true);
+    try {
+      const resp = await authenticatedFetch("/api/prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName, category: newCategory, description: newDescription, template: newTemplate }),
+      });
+      if (resp.ok) {
+        setShowCreateForm(false);
+        setNewName(""); setNewCategory("general"); setNewDescription(""); setNewTemplate("");
+        loadPrompts();
+      }
+    } catch { /* ignore */ }
+    finally { setCreating(false); }
+  }
 
   const loadPrompts = useCallback((params: PromptQueryParams = {}) => {
     setLoading(true);
@@ -220,10 +245,74 @@ export default function PromptArchitect() {
             Clear filters
           </button>
         )}
-        <span style={{ fontSize: 12, color: "var(--color-text-muted)", marginLeft: "auto" }}>
+        <button
+          onClick={() => setShowCreateForm(true)}
+          style={{
+            padding: "8px 16px", borderRadius: 6, border: "none",
+            background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer",
+            marginLeft: "auto",
+          }}
+        >
+          + New Prompt
+        </button>
+        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
           Showing {prompts.length} of {summary?.total ?? 0}
         </span>
       </div>
+
+      {/* Create Prompt Form */}
+      {showCreateForm && (
+        <div style={{
+          background: "var(--color-surface)", border: "1px solid var(--color-border)",
+          borderRadius: 10, padding: 20, marginBottom: 20,
+        }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>New Prompt</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Name *</label>
+              <input value={newName} onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g., Opportunity Summarizer"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Category</label>
+              <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }}>
+                <option value="general">General</option>
+                <option value="capture">Capture</option>
+                <option value="compliance">Compliance</option>
+                <option value="proposal">Proposal</option>
+                <option value="research">Research</option>
+                <option value="analysis">Analysis</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Description</label>
+            <input value={newDescription} onChange={(e) => setNewDescription(e.target.value)}
+              placeholder="Brief description of this prompt's purpose"
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Template *</label>
+            <textarea value={newTemplate} onChange={(e) => setNewTemplate(e.target.value)}
+              placeholder="Enter prompt template text. Use {{variable}} for placeholders."
+              rows={6}
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13, fontFamily: "monospace", resize: "vertical" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleCreatePrompt} disabled={creating || !newName.trim() || !newTemplate.trim()}
+              style={{ padding: "8px 20px", borderRadius: 6, border: "none", background: "#22c55e", color: "#fff", fontWeight: 600, fontSize: 13, cursor: creating ? "not-allowed" : "pointer" }}>
+              {creating ? "Creating..." : "Create Prompt"}
+            </button>
+            <button onClick={() => setShowCreateForm(false)}
+              style={{ padding: "8px 20px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text-muted)", fontSize: 13, cursor: "pointer" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div style={{ color: "var(--color-text-muted)", padding: 24 }}>Loading prompts...</div>

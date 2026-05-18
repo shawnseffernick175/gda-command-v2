@@ -351,10 +351,17 @@ export default function OpportunityDetail() {
           {data.source === "n8n" ? "Live API" : "Live DB"}
         </span>
         {opp.id}
-        {opp.raw_source_url && (
+        {(opp.raw_source_url || opp.solicitation_number) && (
           <>
             {" · "}
-            <a href={opp.raw_source_url} target="_blank" rel="noopener noreferrer" style={{ color: "#60a5fa" }}>View on SAM.gov</a>
+            <a
+              href={opp.raw_source_url || `https://sam.gov/search/?keywords=${encodeURIComponent(opp.solicitation_number ?? "")}&sort=-relevance&index=opp`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#60a5fa" }}
+            >
+              {opp.raw_source_url ? "View on SAM.gov" : "Search SAM.gov"}
+            </a>
           </>
         )}
       </div>

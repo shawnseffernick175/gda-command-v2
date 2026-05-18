@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
 
 interface FPDSAward { id: string; award_amount?: number; is_competitor?: boolean; competitor_name?: string; is_recompete_candidate?: boolean; relevance_score?: number; [key: string]: unknown }
@@ -87,6 +88,74 @@ router.get("/awards/:id", async (req, res) => {
     );
   }
   return res.json(successEnvelope("gda-fpds", "detail", item));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/fpds/analyze-competitors — cross-reference awards against tracked competitors
+// ---------------------------------------------------------------------------
+router.post("/analyze-competitors", requireRole("admin", "bd_manager"), async (_req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-fpds", "analyze-competitors", { code: "NO_DB", message: "Database unavailable", detail: null }));
+  }
+
+  try {
+    // Get tracked competitors from intel competitor_watch
+    const { rows: competitors } = await pool.query(
+      "SELECT id, name FROM competitors WHERE deleted_at IS NULL"
+    ).catch(() => ({ rows: [] as { id: string; name: string }[] }));
+
+    const competitorNames = competitors.map((c) => c.name.toLowerCase());
+
+    // Update FPDS awards with competitor match data
+    const { rows: awards } = await pool.query(
+      "SELECT id, vendor, naics, award_date, period_end FROM fpds_awards WHERE is_competitor IS NULL OR is_competitor = false"
+    );
+
+    let matched = 0;
+    let recompete = 0;
+
+    for (const award of awards) {
+      const vendorLower = (award.vendor ?? "").toLowerCase();
+      const competitorIdx = competitorNames.findIndex((c) => vendorLower.includes(c) || c.includes(vendorLower));
+      const isCompetitor = competitorIdx >= 0;
+
+      // Check if contract is ending soon (within 12 months) → recompete candidate
+      const periodEnd = award.period_end ? new Date(award.period_end) : null;
+      const twelveMonths = new Date();
+      twelveMonths.setMonth(twelveMonths.getMonth() + 12);
+      const isRecompete = periodEnd !== null && periodEnd <= twelveMonths && periodEnd > new Date();
+
+      await pool.query(
+        `UPDATE fpds_awards SET
+          is_competitor = $2,
+          competitor_name = $3,
+          is_recompete_candidate = $4
+         WHERE id = $1`,
+        [
+          award.id,
+          isCompetitor,
+          isCompetitor ? competitors[competitorIdx].name : null,
+          isRecompete,
+        ]
+      );
+
+      if (isCompetitor) matched++;
+      if (isRecompete) recompete++;
+    }
+
+    return res.json(successEnvelope("gda-fpds", "analyze-competitors", {
+      analyzed: awards.length,
+      competitor_matches: matched,
+      recompete_candidates: recompete,
+      tracked_competitors: competitors.length,
+      message: `Analyzed ${awards.length} awards: ${matched} competitor matches, ${recompete} recompete candidates`,
+    }));
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-fpds", "analyze-competitors", { code: "INTERNAL", message: (err as Error).message, detail: null }),
+    );
+  }
 });
 
 export default router;

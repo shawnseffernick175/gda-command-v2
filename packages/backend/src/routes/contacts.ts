@@ -188,4 +188,64 @@ router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"),
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/contacts/auto-capture — extract POCs from SAM data and create contacts
+// ---------------------------------------------------------------------------
+router.post("/auto-capture", requireRole("admin", "bd_manager"), async (_req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("GDA.contacts", "auto-capture", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+    );
+  }
+
+  try {
+    // Extract POC data from SAM opportunities that have contact info
+    const { rows: samOpps } = await pool.query(
+      `SELECT id, title, agency, poc_name, poc_email, poc_phone, poc_title
+       FROM sam_opportunities
+       WHERE poc_name IS NOT NULL AND poc_name != ''
+       AND NOT EXISTS (
+         SELECT 1 FROM contacts c WHERE c.email = sam_opportunities.poc_email AND c.email IS NOT NULL
+       )
+       LIMIT 100`
+    );
+
+    let created = 0;
+    for (const opp of samOpps) {
+      const names = (opp.poc_name ?? "").split(/\s+/);
+      const firstName = names[0] || "Unknown";
+      const lastName = names.slice(1).join(" ") || "Unknown";
+      const id = `contact-sam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+      try {
+        await pool.query(
+          `INSERT INTO contacts (id, first_name, last_name, title, agency, email, phone, status, relationship_strength, notes, data_source, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'new', $8, 'sam.gov', NOW(), NOW())
+           ON CONFLICT DO NOTHING`,
+          [
+            id, firstName, lastName,
+            opp.poc_title ?? null,
+            opp.agency ?? null,
+            opp.poc_email ?? null,
+            opp.poc_phone ?? null,
+            `Auto-captured from SAM.gov opportunity: ${opp.title}`,
+          ]
+        );
+        created++;
+      } catch { /* skip duplicates */ }
+    }
+
+    return res.json(successEnvelope("GDA.contacts", "auto-capture", {
+      scanned: samOpps.length,
+      created,
+      message: `Scanned ${samOpps.length} SAM opportunities, created ${created} new contacts`,
+    }));
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("GDA.contacts", "auto-capture", { code: "INTERNAL", message: (err as Error).message, detail: null }),
+    );
+  }
+});
+
 export default router;
