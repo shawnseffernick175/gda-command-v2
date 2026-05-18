@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
-import { isAuthenticated, logout, getUser } from "./api/auth";
+import { isAuthenticated, logout, getUser, authenticatedFetch } from "./api/auth";
 import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
 import OpsTracker from "./pages/OpsTracker";
@@ -27,7 +27,7 @@ import Predictive from "./pages/Predictive";
 import ColorReview from "./pages/ColorReview";
 import AnomalyDetection from "./pages/AnomalyDetection";
 import SAMMonitor from "./pages/SAMMonitor";
-import Discussions from "./pages/Discussions";
+
 
 import FPDSMonitor from "./pages/FPDSMonitor";
 import UserManagement from "./pages/UserManagement";
@@ -85,10 +85,10 @@ const NAV_GROUPS = [
   {
     label: "Reporting",
     items: [
-      { path: "/financial-bible", label: "Financials", icon: "💰" },
+      { path: "/financial-bible", label: "Financial Bible", icon: "💰" },
       { path: "/reports", label: "Reports", icon: "📑" },
       { path: "/charts", label: "Charts", icon: "📈" },
-      { path: "/discussions", label: "Discussions", icon: "💬" },
+
     ],
   },
   {
@@ -143,16 +143,11 @@ export default function App() {
   }, []);
 
   // On mount, probe /api/auth/me to determine auth state.
-  // In dev mode (AUTH_REQUIRED=false), backend injects admin — no token needed.
-  // Stores user data from response so getUser() returns role for nav filtering.
+  // Uses authenticatedFetch so token auto-refresh works.
   useEffect(() => {
     async function checkAuth() {
       try {
-        const res = await fetch("/api/auth/me", {
-          headers: isAuthenticated()
-            ? { Authorization: `Bearer ${localStorage.getItem("gda_access_token")}` }
-            : {},
-        });
+        const res = await authenticatedFetch("/api/auth/me");
         if (res.ok) {
           const body = await res.json();
           if (body.data) {
@@ -506,7 +501,7 @@ export default function App() {
             <Route path="/color-review" element={<ColorReview />} />
             <Route path="/anomaly" element={<AnomalyDetection />} />
             <Route path="/sam-monitor" element={<SAMMonitor />} />
-            <Route path="/discussions" element={<Discussions />} />
+
 
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
             <Route path="/admin/users" element={<UserManagement />} />
@@ -546,9 +541,9 @@ function AskAnythingFAB() {
     setLoading(true);
     setAnswer("");
     try {
-      const res = await fetch("/api/ask", {
+      const res = await authenticatedFetch("/api/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("gda_access_token") ?? ""}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: question.trim(), context: pathname }),
       });
       const data = await res.json();

@@ -122,8 +122,9 @@ export default function Doctrine() {
   if (error) {
     return (
       <div style={{ padding: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24 }}>Doctrine</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24, color: "var(--color-text)" }}>Doctrine</h1>
         <p style={{ color: "#ef4444" }}>Error: {error}</p>
+        <button onClick={() => { setError(null); loadData(); }} style={{ marginTop: 12, padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Retry</button>
       </div>
     );
   }

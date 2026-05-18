@@ -123,7 +123,7 @@ export function fetchWorkflowRegistry() {
 }
 
 export async function fetchGatewayHealth(): Promise<GDAEnvelope<GatewayHealthData>> {
-  const res = await fetch("/health");
+  const res = await authenticatedFetch("/health");
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   return res.json() as Promise<GDAEnvelope<GatewayHealthData>>;
 }
