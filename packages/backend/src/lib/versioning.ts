@@ -257,6 +257,7 @@ export async function restoreVersion(
     const setClauses = keys.map((k, i) => `${quoteIdent(k)} = $${i + 2}`);
     const values = keys.map(k => {
       const val = restoreData[k];
+      if (Array.isArray(val)) return val; // let pg driver handle TEXT[] conversion
       if (val !== null && typeof val === "object") return JSON.stringify(val);
       return val;
     });
