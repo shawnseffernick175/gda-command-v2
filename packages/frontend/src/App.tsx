@@ -91,6 +91,7 @@ const NAV_GROUPS = [
 
       { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
       { path: "/mergers", label: "M&A Context", icon: "🔗" },
+      { path: "/capture-discipline", label: "Capture Discipline", icon: "🎯" },
     ],
   },
   {
@@ -534,6 +535,7 @@ export default function App() {
             <Route path="/sources" element={<SourceManager />} />
             <Route path="/mergers" element={<MergerContext />} />
             <Route path="/discipline" element={<CaptureDiscipline />} />
+            <Route path="/capture-discipline" element={<CaptureDiscipline />} />
             <Route path="/admin/discipline-config" element={<AdminDisciplineConfig />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
