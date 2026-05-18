@@ -213,7 +213,8 @@ router.post("/classify", async (req, res) => {
           "UPDATE opportunities SET vehicle_type = $1, updated_at = NOW() WHERE id = $2",
           [vehicleType, opp.id]
         );
-        await recordVersion("opportunities", opp.id, { vehicle_type: vehicleType }, "system", "update");
+        const { rows: updated } = await pool.query("SELECT * FROM opportunities WHERE id = $1", [opp.id]);
+        if (updated[0]) await recordVersion("opportunities", opp.id, updated[0], "system", "update");
         classified++;
       }
     }
@@ -270,7 +271,8 @@ router.put("/:oppId", async (req, res) => {
     }
 
     const userId = req.user?.userId ?? "unknown";
-    await recordVersion("opportunities", oppId, { vehicle_type }, userId, "update");
+    const { rows: fullRows } = await pool.query("SELECT * FROM opportunities WHERE id = $1", [oppId]);
+    await recordVersion("opportunities", oppId, fullRows[0] ?? { vehicle_type }, userId, "update");
 
     res.json(successEnvelope("vehicles", "set", result.rows[0]));
   } catch (err) {
