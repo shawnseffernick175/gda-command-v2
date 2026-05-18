@@ -382,7 +382,7 @@ router.get("/", async (req, res) => {
       SELECT id, title, agency, department, status, score, value_estimated,
              probability_of_win, naics, psc, due_date, solicitation_number,
              set_aside, place_of_performance, incumbent, qualified_at,
-             qualified_by, tags, raw_source_url, created_at, updated_at
+             qualified_by, description, capture_stage, tags, raw_source_url, created_at, updated_at
       FROM opportunities
       ${where}
       ORDER BY ${sortColumn} ${direction} NULLS LAST, id ASC
@@ -744,10 +744,10 @@ router.post("/:id/analyze", requireRole("admin", "bd_manager", "capture_lead"), 
       if (n8nOpp) {
         const now = new Date().toISOString();
         await pool.query(
-          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
+          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, description, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)
            ON CONFLICT (id) DO NOTHING`,
-          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now],
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, n8nOpp.description ?? null, now],
         );
       } else {
         return res.status(404).json(
@@ -1061,10 +1061,10 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
       const n8nOpp = await fetchOpportunityDetailFromN8n(id);
       if (n8nOpp) {
         await pool.query(
-          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
+          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, description, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)
            ON CONFLICT (id) DO NOTHING`,
-          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now]
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, n8nOpp.description ?? null, now]
         );
         current = await pool.query("SELECT title, status, capture_stage FROM opportunities WHERE id = $1", [id]);
       }

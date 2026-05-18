@@ -310,7 +310,7 @@ export default function OpportunityDetail() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>{opp.title} <SourceBadge source={opp.data_source} size="md" /></h1>
         <select
-          value={STATUS_TO_SHIPLEY[opp.status] ?? "interest"}
+          value={opp.capture_stage ?? STATUS_TO_SHIPLEY[opp.status] ?? "interest"}
           onChange={async (e) => {
             const newStage = e.target.value;
             try {
