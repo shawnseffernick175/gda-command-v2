@@ -40,6 +40,7 @@ import RiskRegister from "./pages/RiskRegister";
 import ProposalCenter from "./pages/ProposalCenter";
 import AdminTrash from "./pages/AdminTrash";
 import SourceManager from "./pages/SourceManager";
+import MergerContext from "./pages/MergerContext";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -83,6 +84,7 @@ const NAV_GROUPS = [
       { path: "/knowledge", label: "Knowledge Base", icon: "📚" },
 
       { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
+      { path: "/mergers", label: "M&A Context", icon: "🔗" },
     ],
   },
   {
@@ -520,6 +522,7 @@ export default function App() {
             <Route path="/risk-register" element={<RiskRegister />} />
             <Route path="/proposal-center" element={<ProposalCenter />} />
             <Route path="/sources" element={<SourceManager />} />
+            <Route path="/mergers" element={<MergerContext />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>

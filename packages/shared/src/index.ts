@@ -1655,3 +1655,46 @@ export interface SourceSyncRun {
   error: string | null;
   metadata: Record<string, unknown>;
 }
+
+// ---------------------------------------------------------------------------
+// W4: Merger Context types
+// ---------------------------------------------------------------------------
+
+export type DealType = "acquisition" | "merger" | "divestiture" | "joint_venture" | "strategic_alliance";
+export type DealStatus = "announced" | "pending" | "completed" | "blocked" | "withdrawn";
+export type OurImpact = "positive" | "negative" | "neutral" | "monitor";
+export type OppImpactType = "competitor_strengthened" | "competitor_weakened" | "new_teaming" | "lost_teaming" | "incumbent_change" | "neutral";
+
+export interface MergerAcquisition {
+  id: string;
+  acquirer_name: string;
+  target_name: string;
+  deal_type: DealType;
+  status: DealStatus;
+  announced_date: string | null;
+  closed_date: string | null;
+  deal_value: number | null;
+  rationale: string | null;
+  impact_summary: string | null;
+  affected_naics: string[];
+  affected_agencies: string[];
+  our_impact: OurImpact;
+  score_adjustment: number;
+  source_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MergerOppImpact {
+  id: string;
+  merger_id: string;
+  opportunity_id: string;
+  impact_type: OppImpactType;
+  description: string | null;
+  score_delta: number;
+  created_at: string;
+  opp_title?: string;
+  opp_agency?: string;
+  opp_value?: number;
+}
