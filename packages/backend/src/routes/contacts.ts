@@ -205,8 +205,9 @@ router.post("/auto-capture", requireRole("admin", "bd_manager"), async (_req, re
       `SELECT id, title, agency, poc_name, poc_email, poc_phone, poc_title
        FROM sam_opportunities
        WHERE poc_name IS NOT NULL AND poc_name != ''
+       AND poc_email IS NOT NULL AND poc_email != ''
        AND NOT EXISTS (
-         SELECT 1 FROM contacts c WHERE c.email = sam_opportunities.poc_email AND c.email IS NOT NULL
+         SELECT 1 FROM contacts c WHERE c.email = sam_opportunities.poc_email AND c.email IS NOT NULL AND sam_opportunities.poc_email IS NOT NULL
        )
        LIMIT 100`
     );

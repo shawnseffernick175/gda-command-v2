@@ -232,7 +232,7 @@ router.get("/research", async (_req: Request, res: Response) => {
         `SELECT id, name, threat_score, market_position, strengths, weaknesses,
                 recent_wins, revenue_estimate, employee_count, headquarters,
                 focus_areas, key_contracts, created_at
-         FROM competitors WHERE deleted_at IS NULL ORDER BY threat_score DESC NULLS LAST`
+         FROM competitor_profiles WHERE deleted_at IS NULL ORDER BY threat_score DESC NULLS LAST`
       );
       const reports = rows.map((r) => ({
         id: `research-db-${r.id}`,

@@ -346,7 +346,7 @@ router.get("/", async (req, res) => {
 
   // Real DB query
   try {
-    const conditions: string[] = ["deleted_at IS NULL"];
+    const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIdx = 1;
 

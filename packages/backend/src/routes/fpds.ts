@@ -102,7 +102,7 @@ router.post("/analyze-competitors", requireRole("admin", "bd_manager"), async (_
   try {
     // Get tracked competitors from intel competitor_watch
     const { rows: competitors } = await pool.query(
-      "SELECT id, name FROM competitors WHERE deleted_at IS NULL"
+      "SELECT id, name FROM competitor_profiles WHERE deleted_at IS NULL"
     ).catch(() => ({ rows: [] as { id: string; name: string }[] }));
 
     const competitorNames = competitors.map((c) => c.name.toLowerCase());
