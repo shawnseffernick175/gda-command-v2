@@ -3964,3 +3964,59 @@ export function triggerSourceSync(id: string) {
 export function fetchSyncHistory() {
   return request<{ runs: SyncRunEntry[]; total: number }>("/sources/sync/history");
 }
+
+// ---------------------------------------------------------------------------
+// Merger Context (W4)
+// ---------------------------------------------------------------------------
+
+export interface MergerEntry {
+  id: string;
+  acquirer_name: string;
+  target_name: string;
+  deal_type: string;
+  status: string;
+  announced_date: string | null;
+  closed_date: string | null;
+  deal_value: number | null;
+  rationale: string | null;
+  impact_summary: string | null;
+  affected_naics: string[];
+  affected_agencies: string[];
+  our_impact: string;
+  score_adjustment: number;
+  source_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MergerImpactEntry {
+  id: string;
+  merger_id: string;
+  opportunity_id: string;
+  impact_type: string;
+  description: string | null;
+  score_delta: number;
+  created_at: string;
+  opp_title?: string;
+  opp_agency?: string;
+  opp_value?: number;
+}
+
+export interface MergersListData {
+  mergers: MergerEntry[];
+  total: number;
+  impact_summary: Record<string, number>;
+}
+
+export function fetchMergers(filters?: { status?: string; impact?: string }) {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.impact) params.set("impact", filters.impact);
+  const qs = params.toString();
+  return request<MergersListData>(`/mergers${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchMergerDetail(id: string) {
+  return request<{ merger: MergerEntry; impacts: MergerImpactEntry[] }>(`/mergers/${id}`);
+}
