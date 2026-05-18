@@ -46,6 +46,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Breadcrumb from "./components/Breadcrumb";
 import { ToastProvider } from "./components/Toast";
 import QuickEntry from "./components/QuickEntry";
+import StagingBanner from "./components/StagingBanner";
 
 const NAV_GROUPS = [
   {
@@ -204,6 +205,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <ToastProvider>
+    <StagingBanner />
     <div style={{ minHeight: "100vh", display: "flex" }}>
       {/* Mobile sidebar backdrop */}
       {isMobile && sidebarOpen && (
