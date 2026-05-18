@@ -106,9 +106,9 @@ export async function gatewayCall(opts: GatewayCallOptions): Promise<GatewayResu
     .digest("hex")
     .slice(0, 16);
 
-  // Classification gate: block CUI/ITAR from public providers
+  // Classification gate: always block CUI/ITAR/SECRET — no restricted provider implemented yet
   const provider = process.env.LLM_PROVIDER ?? "public";
-  if (PUBLIC_BLOCKED_CLASSIFICATIONS.includes(classification as DataClassification) && provider !== "restricted") {
+  if (PUBLIC_BLOCKED_CLASSIFICATIONS.includes(classification as DataClassification)) {
     const callId = await logCall({
       purpose: opts.purpose,
       provider,
