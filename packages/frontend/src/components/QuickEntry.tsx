@@ -4,7 +4,6 @@ import { useToast } from "./Toast";
 import {
   quickCreateOpportunity,
   quickCreateContact,
-  quickCreateDiscussionThread,
   quickCreateNote,
 } from "../api/client";
 
@@ -22,7 +21,6 @@ interface QuickAction {
 const ACTIONS: QuickAction[] = [
   { id: "opportunity", icon: "📡", label: "New Opportunity", color: "#3b82f6" },
   { id: "contact", icon: "👤", label: "New Contact", color: "#8b5cf6" },
-  { id: "discussion", icon: "💬", label: "New Discussion", color: "#f59e0b" },
   { id: "note", icon: "📝", label: "Quick Note", color: "#22c55e" },
 ];
 
@@ -44,12 +42,6 @@ interface ContactForm {
   agency: string;
   email: string;
   phone: string;
-}
-
-interface DiscussionForm {
-  title: string;
-  entity_type: string;
-  tags: string;
 }
 
 interface NoteForm {
@@ -78,11 +70,6 @@ export default function QuickEntry() {
   // Contact form state
   const [contactForm, setContactForm] = useState<ContactForm>({
     first_name: "", last_name: "", title: "", agency: "", email: "", phone: "",
-  });
-
-  // Discussion form state
-  const [discForm, setDiscForm] = useState<DiscussionForm>({
-    title: "", entity_type: "general", tags: "",
   });
 
   // Note form state
@@ -117,7 +104,7 @@ export default function QuickEntry() {
   const resetForms = useCallback(() => {
     setOppForm({ title: "", agency: "", department: "", value_estimated: "" });
     setContactForm({ first_name: "", last_name: "", title: "", agency: "", email: "", phone: "" });
-    setDiscForm({ title: "", entity_type: "general", tags: "" });
+
     setNoteForm({ title: "", content: "", tags: "" });
   }, []);
 
@@ -172,31 +159,6 @@ export default function QuickEntry() {
         navigate("/contacts");
       } else {
         toast.error(env.error?.message ?? "Failed to create contact");
-      }
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  async function handleSubmitDiscussion() {
-    if (!discForm.title.trim()) { toast.error("Title is required"); return; }
-    setSubmitting(true);
-    try {
-      const tags = discForm.tags.split(",").map(t => t.trim()).filter(Boolean);
-      const env = await quickCreateDiscussionThread({
-        title: discForm.title.trim(),
-        entity_type: discForm.entity_type,
-        tags,
-      });
-      if (env.success) {
-        toast.success("Discussion thread created");
-        setActiveForm(null);
-        resetForms();
-        navigate("/discussions");
-      } else {
-        toast.error(env.error?.message ?? "Failed to create discussion");
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -300,23 +262,6 @@ export default function QuickEntry() {
                 <FormField label="Email" value={contactForm.email} onChange={v => setContactForm(p => ({ ...p, email: v }))} placeholder="john.smith@agency.gov" type="email" />
                 <FormField label="Phone" value={contactForm.phone} onChange={v => setContactForm(p => ({ ...p, phone: v }))} placeholder="(555) 123-4567" />
                 <FormActions onCancel={() => { setActiveForm(null); resetForms(); }} onSubmit={handleSubmitContact} submitting={submitting} />
-              </div>
-            )}
-
-            {/* Discussion form */}
-            {activeForm === "discussion" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <FormField label="Thread Title *" value={discForm.title} onChange={v => setDiscForm(p => ({ ...p, title: v }))} placeholder="e.g. Strategy for DoD contract" autoFocus />
-                <FormSelect label="Category" value={discForm.entity_type} onChange={v => setDiscForm(p => ({ ...p, entity_type: v }))}
-                  options={[
-                    { value: "general", label: "General" },
-                    { value: "opportunity", label: "Opportunity" },
-                    { value: "capture", label: "Capture Plan" },
-                    { value: "proposal", label: "Proposal" },
-                    { value: "intel", label: "Intel" },
-                  ]} />
-                <FormField label="Tags" value={discForm.tags} onChange={v => setDiscForm(p => ({ ...p, tags: v }))} placeholder="strategy, review (comma-separated)" />
-                <FormActions onCancel={() => { setActiveForm(null); resetForms(); }} onSubmit={handleSubmitDiscussion} submitting={submitting} />
               </div>
             )}
 

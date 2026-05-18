@@ -163,7 +163,7 @@ export async function authenticatedFetch(
       // Refresh failed — session expired, redirect to login
       clearAuth();
       if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+        window.location.href = "/";
       }
       return res;
     }
