@@ -105,7 +105,7 @@ router.post("/", requireRole("admin"), async (req: Request, res: Response) => {
       ]
     );
 
-    const userId = (req as unknown as { user?: { id?: string } }).user?.id ?? "system";
+    const userId = req.user?.userId ?? "system";
     await recordVersion("company_entity", entity_id, rows[0], userId, "create");
 
     res.status(201).json(successEnvelope("company-entities", "create", rows[0]));
@@ -207,7 +207,7 @@ router.put("/:entityId", requireRole("admin"), async (req: Request, res: Respons
       return;
     }
 
-    const userId = (req as unknown as { user?: { id?: string } }).user?.id ?? "system";
+    const userId = req.user?.userId ?? "system";
     await recordVersion("company_entity", entityId, rows[0], userId, "update", current[0]);
 
     res.json(successEnvelope("company-entities", "update", rows[0]));
