@@ -57,12 +57,14 @@ CREATE INDEX IF NOT EXISTS idx_opp_capture_mgr ON opportunities (capture_manager
 CREATE INDEX IF NOT EXISTS idx_opp_proposal_mgr ON opportunities (proposal_manager_id);
 CREATE INDEX IF NOT EXISTS idx_color_review_opp ON color_team_review (opportunity_id);
 
--- 6. Backfill: map existing capture_stage values to shipley_phase
-UPDATE opportunities SET shipley_phase = 'identify'  WHERE capture_stage = 'interest'        AND shipley_phase IS NULL;
-UPDATE opportunities SET shipley_phase = 'qualify'    WHERE capture_stage = 'qualify'         AND shipley_phase IS NULL;
-UPDATE opportunities SET shipley_phase = 'pursue'     WHERE capture_stage = 'pursue'          AND shipley_phase IS NULL;
-UPDATE opportunities SET shipley_phase = 'proposal'   WHERE capture_stage = 'solicitation'    AND shipley_phase IS NULL;
-UPDATE opportunities SET shipley_phase = 'submit'     WHERE capture_stage = 'post_submittal'  AND shipley_phase IS NULL;
-UPDATE opportunities SET shipley_phase = 'awarded'    WHERE capture_stage = 'won'             AND shipley_phase IS NULL;
-UPDATE opportunities SET shipley_phase = 'lost'       WHERE capture_stage = 'lost'            AND shipley_phase IS NULL;
-UPDATE opportunities SET shipley_phase = 'no_bid'     WHERE capture_stage = 'no_bid'          AND shipley_phase IS NULL;
+-- 6. Backfill: map existing capture_stage values to shipley_phase.
+-- The column has DEFAULT 'identify', so existing rows already have that value (not NULL).
+-- Use shipley_phase = 'identify' as the guard to only remap rows that haven't been touched.
+UPDATE opportunities SET shipley_phase = 'identify'  WHERE capture_stage = 'interest'        AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'qualify'    WHERE capture_stage = 'qualify'         AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'pursue'     WHERE capture_stage = 'pursue'          AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'proposal'   WHERE capture_stage = 'solicitation'    AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'submit'     WHERE capture_stage = 'post_submittal'  AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'awarded'    WHERE capture_stage = 'won'             AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'lost'       WHERE capture_stage = 'lost'            AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'no_bid'     WHERE capture_stage = 'no_bid'          AND shipley_phase = 'identify';
