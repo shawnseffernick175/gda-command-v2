@@ -273,6 +273,14 @@ Consider: competitive landscape, alignment with typical GovCon capabilities, tim
       if (!validRecs.includes(parsed.recommendation)) {
         parsed.recommendation = "conditional_bid";
       }
+      if (typeof parsed.confidence !== "number" || !Number.isFinite(parsed.confidence)) {
+        parsed.confidence = 50;
+      } else {
+        parsed.confidence = Math.max(0, Math.min(100, parsed.confidence));
+      }
+      if (!Array.isArray(parsed.factors)) {
+        parsed.factors = [];
+      }
 
       // Store recommendation
       const recId = `br-${crypto.randomUUID().slice(0, 8)}`;
