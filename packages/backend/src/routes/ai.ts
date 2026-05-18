@@ -1,7 +1,10 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
+import { requireRole } from "../lib/auth";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { isLLMAvailable, chatCompletion, type ChatMessage } from "../lib/llm";
+import { gatewayCall } from "../services/llmGateway";
+import { log } from "../lib/logger";
 
 
 const router = Router();
@@ -169,6 +172,234 @@ askRouter.post("/", async (req, res) => {
     return res.json(successEnvelope("gda-ai", "ask", {
       answer: `AI service temporarily unavailable. ${systemContext}\n\nPlease try again or check Settings → AI Configuration.`,
     }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/ai/status — check LLM availability
+// ---------------------------------------------------------------------------
+router.get("/status", (_req, res) => {
+  res.json(successEnvelope("gda-ai", "status", {
+    available: isLLMAvailable(),
+    provider: process.env.LLM_PROVIDER ?? "public",
+    restricted_provider: !!process.env.LLM_PROVIDER_RESTRICTED,
+  }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ai/summarize/:id — generate 3-bullet executive summary (W8)
+// ---------------------------------------------------------------------------
+router.post("/summarize/:id", async (req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ai", "summarize", { code: "DB_UNAVAILABLE", message: "Database not configured", detail: null }));
+  }
+  if (!isLLMAvailable()) {
+    return res.status(503).json(errorEnvelope("gda-ai", "summarize", { code: "LLM_UNAVAILABLE", message: "No AI model configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY.", detail: null }));
+  }
+
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query("SELECT * FROM opportunities WHERE id = $1 AND deleted_at IS NULL", [id]);
+    if (rows.length === 0) {
+      return res.status(404).json(errorEnvelope("gda-ai", "summarize", { code: "NOT_FOUND", message: "Opportunity not found", detail: null }));
+    }
+    const opp = rows[0];
+    const classification = opp.data_classification ?? "unclassified";
+
+    const result = await gatewayCall({
+      purpose: "summarize_opp",
+      classification,
+      recordTable: "opportunities",
+      recordId: id,
+      tier: "fast",
+      temperature: 0.3,
+      max_tokens: 512,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert government contracting analyst. Generate a concise executive summary for the given opportunity. Return EXACTLY this format:
+• [Bullet 1: What the opportunity is]
+• [Bullet 2: Key requirements and fit indicators]
+• [Bullet 3: Strategic relevance]
+
+Why this matters for NewCo: [1 sentence explaining strategic relevance to the merged entity]`,
+        },
+        {
+          role: "user",
+          content: `Opportunity: ${opp.title}\nAgency: ${opp.agency ?? "Unknown"}\nNAICS: ${opp.naics ?? "N/A"}\nSet-aside: ${opp.set_aside ?? "None"}\nValue: ${opp.value_estimated ? `$${(opp.value_estimated / 1e6).toFixed(1)}M` : "Unknown"}\nDue: ${opp.due_date ?? "Not set"}\nDescription: ${(opp.description ?? "No description").slice(0, 2000)}\nIncumbent: ${opp.incumbent ?? "Unknown"}\nStage: ${opp.capture_stage ?? opp.status}\nPwin: ${opp.probability_of_win ? `${Math.round(opp.probability_of_win * 100)}%` : "Not scored"}`,
+        },
+      ],
+    });
+
+    if (!result.success) {
+      const code = result.blocked ? "CLASSIFICATION_BLOCKED" : "LLM_ERROR";
+      const status = result.blocked ? 403 : 500;
+      return res.status(status).json(errorEnvelope("gda-ai", "summarize", { code, message: result.error ?? "Summarization failed", detail: null }));
+    }
+
+    await pool.query(
+      "UPDATE opportunities SET ai_summary = $2, ai_summary_generated_at = NOW(), updated_at = NOW() WHERE id = $1",
+      [id, result.content]
+    );
+
+    return res.json(successEnvelope("gda-ai", "summarize", {
+      summary: result.content,
+      model: result.model,
+      call_id: result.call_id,
+      tokens: result.usage,
+    }));
+  } catch (err) {
+    log.error("ai_summarize_error", { error: (err as Error).message });
+    return res.status(500).json(errorEnvelope("gda-ai", "summarize", { code: "INTERNAL", message: "Summarization failed", detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ai/recommend/:id — bid/no-bid recommendation (W8)
+// ---------------------------------------------------------------------------
+router.post("/recommend/:id", async (req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ai", "recommend", { code: "DB_UNAVAILABLE", message: "Database not configured", detail: null }));
+  }
+  if (!isLLMAvailable()) {
+    return res.status(503).json(errorEnvelope("gda-ai", "recommend", { code: "LLM_UNAVAILABLE", message: "No AI model configured.", detail: null }));
+  }
+
+  const { id } = req.params;
+  try {
+    const { rows: oppRows } = await pool.query("SELECT * FROM opportunities WHERE id = $1 AND deleted_at IS NULL", [id]);
+    if (oppRows.length === 0) {
+      return res.status(404).json(errorEnvelope("gda-ai", "recommend", { code: "NOT_FOUND", message: "Opportunity not found", detail: null }));
+    }
+    const opp = oppRows[0];
+    const classification = opp.data_classification ?? "unclassified";
+
+    // Pull entity data for context
+    let entityContext = "No entity data available.";
+    try {
+      const { rows: entities } = await pool.query("SELECT name, entity_type, naics_codes, set_aside_eligible FROM company_entity WHERE deleted_at IS NULL");
+      if (entities.length > 0) {
+        entityContext = entities.map((e) =>
+          `${e.name} (${e.entity_type}): NAICS [${e.naics_codes?.join(", ") ?? ""}], Set-aside: ${e.set_aside_eligible ? "Yes" : "No"}`
+        ).join("\n");
+      }
+    } catch { /* entity table may not exist */ }
+
+    // Pull discipline config context
+    let disciplineContext = "";
+    try {
+      const { rows: config } = await pool.query("SELECT * FROM capture_discipline_config WHERE id = 1");
+      if (config[0]) {
+        disciplineContext = `Capture manager load max: ${config[0].captures_per_manager_max}. Pipeline coverage target: ${config[0].pipeline_coverage_target}×.`;
+      }
+    } catch { /* discipline config may not exist */ }
+
+    const result = await gatewayCall({
+      purpose: "recommend_bid",
+      classification,
+      recordTable: "opportunities",
+      recordId: id,
+      tier: "fast",
+      temperature: 0.2,
+      max_tokens: 1024,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You are a strategic bid decision advisor for a government contracting company. Analyze the opportunity and return a JSON object with this exact structure:
+{
+  "recommendation": "bid" | "no_bid" | "watch",
+  "confidence": 0.0-1.0,
+  "reasons": ["reason 1", "reason 2", ...],
+  "gaps": ["gap 1", "gap 2", ...],
+  "conditions": ["condition 1", ...]
+}
+Consider: NAICS/set-aside alignment, entity capabilities, incumbent advantage, value size, timeline, Pwin, and strategic fit.`,
+        },
+        {
+          role: "user",
+          content: `Opportunity: ${opp.title}\nAgency: ${opp.agency ?? "Unknown"}\nNAICS: ${opp.naics ?? "N/A"}\nSet-aside: ${opp.set_aside ?? "None"}\nValue: ${opp.value_estimated ? `$${(opp.value_estimated / 1e6).toFixed(1)}M` : "Unknown"}\nDue: ${opp.due_date ?? "Not set"}\nIncumbent: ${opp.incumbent ?? "Unknown"}\nStage: ${opp.capture_stage ?? opp.status}\nPwin: ${opp.probability_of_win ? `${Math.round(opp.probability_of_win * 100)}%` : "Not scored"}\nScore: ${opp.score ?? "Not scored"}\nDescription: ${(opp.description ?? "").slice(0, 1500)}\n\n--- Entity Capabilities ---\n${entityContext}\n\n--- Discipline Context ---\n${disciplineContext}`,
+        },
+      ],
+    });
+
+    if (!result.success) {
+      const code = result.blocked ? "CLASSIFICATION_BLOCKED" : "LLM_ERROR";
+      const status = result.blocked ? 403 : 500;
+      return res.status(status).json(errorEnvelope("gda-ai", "recommend", { code, message: result.error ?? "Recommendation failed", detail: null }));
+    }
+
+    let recommendation;
+    try {
+      recommendation = JSON.parse(result.content);
+    } catch {
+      recommendation = { recommendation: "watch", confidence: 0, reasons: ["AI response could not be parsed"], gaps: [], conditions: [] };
+    }
+
+    const aiRec = { ...recommendation, model: result.model, generated_at: new Date().toISOString() };
+    await pool.query(
+      "UPDATE opportunities SET ai_recommendation = $2, ai_recommendation_generated_at = NOW(), updated_at = NOW() WHERE id = $1",
+      [id, JSON.stringify(aiRec)]
+    );
+
+    return res.json(successEnvelope("gda-ai", "recommend", { recommendation: aiRec, call_id: result.call_id, tokens: result.usage }));
+  } catch (err) {
+    log.error("ai_recommend_error", { error: (err as Error).message });
+    return res.status(500).json(errorEnvelope("gda-ai", "recommend", { code: "INTERNAL", message: "Recommendation failed", detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/ai/call-log — view recent LLM calls (admin only)
+// ---------------------------------------------------------------------------
+router.get("/call-log", requireRole("admin"), async (req: Request, res: Response) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ai", "call-log", { code: "DB_UNAVAILABLE", message: "Database not configured", detail: null }));
+  }
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const purpose = req.query.purpose as string | undefined;
+
+  try {
+    let query = "SELECT * FROM llm_call_log";
+    const params: unknown[] = [];
+    if (purpose) {
+      query += " WHERE purpose = $1";
+      params.push(purpose);
+    }
+    query += " ORDER BY called_at DESC LIMIT $" + (params.length + 1);
+    params.push(limit);
+    const { rows } = await pool.query(query, params);
+    return res.json(successEnvelope("gda-ai", "call-log", { calls: rows, count: rows.length }));
+  } catch (err) {
+    log.error("ai_call_log_error", { error: (err as Error).message });
+    return res.status(500).json(errorEnvelope("gda-ai", "call-log", { code: "QUERY_ERROR", message: "Failed to load call log", detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/ai/summary/:id — get cached AI data for an opportunity
+// ---------------------------------------------------------------------------
+router.get("/summary/:id", async (req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ai", "summary", { code: "DB_UNAVAILABLE", message: "Database not configured", detail: null }));
+  }
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      "SELECT ai_summary, ai_summary_generated_at, ai_recommendation, ai_recommendation_generated_at FROM opportunities WHERE id = $1 AND deleted_at IS NULL",
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json(errorEnvelope("gda-ai", "summary", { code: "NOT_FOUND", message: "Opportunity not found", detail: null }));
+    }
+    return res.json(successEnvelope("gda-ai", "summary", rows[0]));
+  } catch (err) {
+    log.error("ai_summary_get_error", { error: (err as Error).message });
+    return res.status(500).json(errorEnvelope("gda-ai", "summary", { code: "QUERY_ERROR", message: "Failed to load AI data", detail: null }));
   }
 });
 
