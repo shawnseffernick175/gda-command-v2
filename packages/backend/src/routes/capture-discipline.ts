@@ -305,7 +305,7 @@ router.post("/check-guardrails/:opportunityId", requireRole("admin", "bd_manager
         "SELECT status FROM capture_gate_reviews WHERE opportunity_id = $1 AND gate = $2",
         [opportunityId, requiredGate]
       );
-      if (gateRes.rows.length === 0 || gateRes.rows[0].status === "pending") {
+      if (gateRes.rows.length === 0 || !["passed", "waived"].includes(gateRes.rows[0].status)) {
         newAlerts.push({
           rule: "stage_without_gate",
           severity: "warning",
