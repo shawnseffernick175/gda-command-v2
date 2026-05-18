@@ -10,6 +10,7 @@ import {
   fetchOpportunityDetailFromN8n,
 } from "../lib/n8n-data";
 import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
+import { recordVersion } from "../lib/versioning";
 
 const router = Router();
 
@@ -206,7 +207,7 @@ router.get("/", async (req, res) => {
           try {
             // Fetch user-approved stage overrides (opportunities the user explicitly changed)
             const overrides = await dbPool.query(
-              `SELECT id, status, capture_stage FROM opportunities WHERE status != 'discovery' AND id NOT LIKE 'opp-%'`
+              `SELECT id, status, capture_stage FROM opportunities WHERE status != 'discovery' AND id NOT LIKE 'opp-%' AND deleted_at IS NULL`
             );
             const overrideMap = new Map<string, string>();
             for (const row of overrides.rows) {
@@ -237,7 +238,7 @@ router.get("/", async (req, res) => {
               `SELECT id, title, agency, department, status, score, value_estimated,
                       probability_of_win, naics, due_date, solicitation_number,
                       set_aside, place_of_performance, data_source, created_at, updated_at
-               FROM opportunities WHERE id LIKE 'opp-%'`
+               FROM opportunities WHERE id LIKE 'opp-%' AND deleted_at IS NULL`
             );
             if (localOpps.rows.length > 0) {
               combined = [...combined, ...localOpps.rows.map((r) => ({
@@ -343,7 +344,7 @@ router.get("/", async (req, res) => {
 
   // Real DB query
   try {
-    const conditions: string[] = [];
+    const conditions: string[] = ["deleted_at IS NULL"];
     const params: unknown[] = [];
     let paramIdx = 1;
 
@@ -819,6 +820,13 @@ router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead"),
        VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $7)`,
       [id, title, agency ?? null, department ?? null, "discovery", value_estimated ?? null, now],
     );
+    // Record initial version
+    const userId = req.user?.userId ?? "system";
+    const { rows: created } = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
+    if (created[0]) {
+      await recordVersion("opportunities", id, created[0], userId, "create");
+    }
+
     // Auto-trigger Capture Coach for newly created opportunity (fire-and-forget)
     queueCaptureCoachIfNeeded(id);
 
@@ -1099,6 +1107,13 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
     process.stdout.write(
       `[GDA STAGE CHANGE] opportunity_id=${id} | title=${title.replace(/\s+/g, "_")} | prev_status=${prevStatus} | prev_stage=${prevStage} | new_stage=${stage} | new_status=${dbStatus}\n`
     );
+
+    // Record version after stage change
+    const userId = req.user?.userId ?? "system";
+    const { rows: updatedRows } = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
+    if (updatedRows[0]) {
+      await recordVersion("opportunities", id, updatedRows[0], userId, "update");
+    }
 
     // Auto-trigger Capture Coach after stage change (fire-and-forget)
     queueCaptureCoachIfNeeded(id);

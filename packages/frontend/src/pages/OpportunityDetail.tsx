@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import AskAIChat from "../components/AskAIChat";
 import SourceBadge from "../components/SourceBadge";
+import VersionHistory from "../components/VersionHistory";
 import { authenticatedFetch } from "../api/auth";
 import {
   fetchOpportunityDetail,
@@ -1051,6 +1052,20 @@ export default function OpportunityDetail() {
             )}
           </div>
         )}
+      </Section>
+
+      {/* Section: Version History */}
+      <Section title="Version History">
+        <VersionHistory
+          table="opportunities"
+          recordId={id ?? ""}
+          onRestore={() => {
+            // Re-fetch data after restore
+            if (id) {
+              fetchOpportunityDetail(id).then((env) => { if (env.success && env.data) setData(env.data); });
+            }
+          }}
+        />
       </Section>
 
       {/* Section: Ask AI */}
