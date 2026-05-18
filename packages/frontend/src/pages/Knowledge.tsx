@@ -539,7 +539,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
             <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Type</label>
-                <select value={docType} onChange={(e) => { setDocType(e.target.value); if (e.target.value === "financials") setAction("ingest_financials"); else if (e.target.value === "rfp") setAction("shred_rfp"); else if (e.target.value === "past_performance" || e.target.value === "cpars") setAction("ingest_past_perf"); }} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }}>
+                <select value={docType} onChange={(e) => { setDocType(e.target.value); if (e.target.value === "financials") setAction("ingest_financials"); else if (e.target.value === "rfp") setAction("shred_rfp"); else if (e.target.value === "past_performance" || e.target.value === "cpars") setAction("ingest_past_perf"); else setAction("store"); }} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }}>
                   {Object.entries(TYPE_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
                   ))}
