@@ -406,9 +406,11 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
       .then((env) => {
         if (env.success && env.data) {
           setResult(`Uploaded: ${env.data.message}${env.data.download_url ? `\nDownload: ${env.data.download_url}` : ""}`);
+        } else {
+          setResult(`Upload failed: ${env.error?.message ?? "Unknown error"}`);
         }
       })
-      .catch(() => setResult("Upload failed"))
+      .catch((err: Error) => setResult(`Upload failed: ${err.message}`))
       .finally(() => setUploading(false));
   };
 

@@ -200,11 +200,24 @@ router.get("/", async (req, res) => {
               overrideMap.set(String(row.id), row.status as string);
             }
 
-            // Apply stage enforcement: default to "discovery" unless user overrode
-            combined = combined.map((o) => ({
-              ...o,
-              status: (overrideMap.get(String(o.id)) ?? "discovery") as typeof o.status,
-            }));
+            // Apply stage enforcement: default to "discovery" unless user overrode.
+            // Auto no-bid: if due_date is past or within 30 days and user hasn't
+            // explicitly overridden, set status to "lost" (no-bid).
+            const thirtyDaysFromNow = new Date();
+            thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+            combined = combined.map((o) => {
+              const userStatus = overrideMap.get(String(o.id));
+              if (userStatus) return { ...o, status: userStatus as typeof o.status };
+
+              if (o.due_date) {
+                const due = new Date(o.due_date);
+                if (!isNaN(due.getTime()) && due <= thirtyDaysFromNow) {
+                  return { ...o, status: "lost" as typeof o.status };
+                }
+              }
+              return { ...o, status: "discovery" as typeof o.status };
+            });
 
             // Merge locally-created opportunities (QuickEntry) that only exist in the DB
             const localOpps = await dbPool.query(
@@ -226,12 +239,34 @@ router.get("/", async (req, res) => {
             }
           } catch (dbErr) {
             process.stderr.write(`[opportunities] DB merge: ${(dbErr as Error).message}\n`);
-            // Fallback: still enforce Interest on all n8n results even without DB
-            combined = combined.map((o) => ({ ...o, status: "discovery" as typeof o.status }));
+            // Fallback: still enforce Interest on all n8n results even without DB,
+            // but auto no-bid expired / within-30-day opportunities.
+            const fbCutoff = new Date();
+            fbCutoff.setDate(fbCutoff.getDate() + 30);
+            combined = combined.map((o) => {
+              if (o.due_date) {
+                const due = new Date(o.due_date);
+                if (!isNaN(due.getTime()) && due <= fbCutoff) {
+                  return { ...o, status: "lost" as typeof o.status };
+                }
+              }
+              return { ...o, status: "discovery" as typeof o.status };
+            });
           }
         } else {
-          // No DB: enforce Interest on all n8n results
-          combined = combined.map((o) => ({ ...o, status: "discovery" as typeof o.status }));
+          // No DB: enforce Interest on all n8n results,
+          // but auto no-bid expired / within-30-day opportunities.
+          const noDbCutoff = new Date();
+          noDbCutoff.setDate(noDbCutoff.getDate() + 30);
+          combined = combined.map((o) => {
+            if (o.due_date) {
+              const due = new Date(o.due_date);
+              if (!isNaN(due.getTime()) && due <= noDbCutoff) {
+                return { ...o, status: "lost" as typeof o.status };
+              }
+            }
+            return { ...o, status: "discovery" as typeof o.status };
+          });
         }
 
         const allRows = filterAndSort(combined);
@@ -668,9 +703,32 @@ router.post("/:id/analyze", requireRole("admin", "bd_manager", "capture_lead"), 
       );
     }
 
+    const id = req.params.id;
+
+    // Ensure the opportunity exists in the local DB before scoring.
+    // Many opportunities are sourced from n8n/SAM.gov and only exist there
+    // until they're explicitly persisted (e.g., stage change, analysis).
+    const existing = await pool.query("SELECT id FROM opportunities WHERE id = $1", [id]);
+    if (existing.rows.length === 0 && n8nWebhookConfigured()) {
+      const n8nOpp = await fetchOpportunityDetailFromN8n(id);
+      if (n8nOpp) {
+        const now = new Date().toISOString();
+        await pool.query(
+          `INSERT INTO opportunities (id, title, agency, department, status, score, value_estimated, probability_of_win, naics, due_date, solicitation_number, set_aside, place_of_performance, data_source, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)
+           ON CONFLICT (id) DO NOTHING`,
+          [n8nOpp.id, n8nOpp.title, n8nOpp.agency, n8nOpp.department, "discovery", n8nOpp.score, n8nOpp.value_estimated, n8nOpp.probability_of_win, n8nOpp.naics, n8nOpp.due_date, n8nOpp.solicitation_number, n8nOpp.set_aside, n8nOpp.place_of_performance, n8nOpp.data_source, now],
+        );
+      } else {
+        return res.status(404).json(
+          errorEnvelope("gda-opportunities", "analyze", { code: "NOT_FOUND", message: `Opportunity ${id} not found`, detail: null }),
+        );
+      }
+    }
+
     // Score this specific opportunity via dedicated single-opp scorer
     const { scoreSingleOpportunity } = await import("../agents/opportunity-watch");
-    const scored = await scoreSingleOpportunity(req.params.id);
+    const scored = await scoreSingleOpportunity(id);
 
     if (!scored) {
       return res.status(500).json(

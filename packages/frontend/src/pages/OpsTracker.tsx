@@ -15,12 +15,14 @@ import {
 } from "../api/client";
 
 type SortKey =
+  | "id"
   | "title"
   | "department"
   | "value_estimated"
   | "probability_of_win"
   | "score"
   | "status"
+  | "naics_size"
   | "due_date";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -482,7 +484,9 @@ export default function OpsTracker() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={thStyle}>ID</th>
+                <th style={thStyle} onClick={() => handleSort("id")}>
+                  ID{sortArrow("id")}
+                </th>
                 <th style={thStyle} onClick={() => handleSort("title")}>
                   Title{sortArrow("title")}
                 </th>
@@ -501,7 +505,9 @@ export default function OpsTracker() {
                 <th style={thStyle} onClick={() => handleSort("status")}>
                   Status{sortArrow("status")}
                 </th>
-                <th style={thStyle}>NAICS Size</th>
+                <th style={thStyle} onClick={() => handleSort("naics_size")}>
+                  NAICS Size{sortArrow("naics_size")}
+                </th>
                 <th style={thStyle} onClick={() => handleSort("due_date")}>
                   Due{sortArrow("due_date")}
                 </th>
