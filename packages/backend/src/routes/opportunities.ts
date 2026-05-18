@@ -20,6 +20,7 @@ const VALID_STATUSES: OpportunityStatus[] = [
   "lost",
   "won",
   "no_bid",
+  "gov_cancelled",
 ];
 
 // Shipley stages — superset of existing statuses for the capture pipeline
@@ -159,7 +160,7 @@ router.get("/", async (req, res) => {
     if (statusFilter) {
       filtered = filtered.filter((o) => o.status === statusFilter);
     } else if (!includeAllStatuses) {
-      filtered = filtered.filter((o) => o.status !== "no_bid");
+      filtered = filtered.filter((o) => !["won", "lost", "no_bid", "gov_cancelled"].includes(o.status));
     }
     if (deptFilter) {
       filtered = filtered.filter((o) => o.department === deptFilter);
@@ -356,7 +357,7 @@ router.get("/", async (req, res) => {
       params.push(statusFilter);
       paramIdx++;
     } else if (!includeAllStatuses) {
-      conditions.push(`status <> 'no_bid'`);
+      conditions.push(`status NOT IN ('won', 'lost', 'no_bid', 'gov_cancelled')`);
     }
     if (deptFilter) {
       conditions.push(`department = $${paramIdx}`);
