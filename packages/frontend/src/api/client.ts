@@ -3825,3 +3825,60 @@ export function resolveFixProposal(id: string, action: "approve" | "reject", not
     body: JSON.stringify({ action, note }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Vehicle Classification (W1)
+// ---------------------------------------------------------------------------
+
+export interface VehicleData {
+  key: string;
+  label: string;
+  description: string | null;
+  category: string;
+  sort_order: number;
+}
+
+export interface VehicleSummaryRow {
+  vehicle_type: string;
+  label: string;
+  category: string;
+  count: number;
+  total_value: number;
+  avg_score: number;
+}
+
+export interface VehiclesListData {
+  vehicles: VehicleData[];
+  summary: VehicleSummaryRow[];
+  total_opportunities: number;
+}
+
+export interface VehicleOppsData {
+  vehicle_type: string;
+  opportunities: OpportunityRow[];
+  total: number;
+}
+
+export function fetchVehicles() {
+  return request<VehiclesListData>("/vehicles");
+}
+
+export function fetchVehicleOpportunities(vehicleType: string) {
+  return request<VehicleOppsData>(`/vehicles/${vehicleType}/opportunities`);
+}
+
+export function classifyVehicles(opportunityIds?: string[]) {
+  return request<{ processed: number; classified: number }>("/vehicles/classify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ opportunity_ids: opportunityIds }),
+  });
+}
+
+export function setVehicleType(oppId: string, vehicleType: string) {
+  return request<{ id: string; vehicle_type: string }>(`/vehicles/${oppId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ vehicle_type: vehicleType }),
+  });
+}

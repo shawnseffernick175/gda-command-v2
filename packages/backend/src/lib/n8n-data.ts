@@ -4,8 +4,9 @@
  * Falls back gracefully when n8n is unavailable.
  */
 
-import type { Opportunity, OpportunityStatus, DeepResearchReport, CompetitorProfile, ResearchStatus, CapturePlan, CapturePhase, TeamingPartner, CaptureMilestone, CaptureGateReview, CaptureRisk } from "@gda/shared";
+import type { Opportunity, OpportunityStatus, VehicleType, DeepResearchReport, CompetitorProfile, ResearchStatus, CapturePlan, CapturePhase, TeamingPartner, CaptureMilestone, CaptureGateReview, CaptureRisk } from "@gda/shared";
 import { callWebhook, webhookConfig } from "./n8n-client";
+import { classifyVehicle } from "../routes/vehicles";
 
 // Webhook paths (distinct from workflow names)
 const WEBHOOKS = {
@@ -109,6 +110,7 @@ function mapOpportunity(raw: N8nOpportunity): Opportunity {
     qualified_at: null,
     qualified_by: null,
     description: raw.description ?? null,
+    vehicle_type: classifyVehicle(raw.eligible_vehicles, raw.set_aside, null) as VehicleType | null | undefined,
     tags: [
       raw.gda_label,
       raw.data_source,
