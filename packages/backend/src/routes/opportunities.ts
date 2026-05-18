@@ -724,6 +724,10 @@ router.post("/:id/analyze", requireRole("admin", "bd_manager", "capture_lead"), 
           errorEnvelope("gda-opportunities", "analyze", { code: "NOT_FOUND", message: `Opportunity ${id} not found`, detail: null }),
         );
       }
+    } else if (existing.rows.length === 0) {
+      return res.status(404).json(
+        errorEnvelope("gda-opportunities", "analyze", { code: "NOT_FOUND", message: `Opportunity ${id} not found`, detail: null }),
+      );
     }
 
     // Score this specific opportunity via dedicated single-opp scorer
