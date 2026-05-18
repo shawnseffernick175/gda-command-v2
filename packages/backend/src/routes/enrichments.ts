@@ -21,19 +21,20 @@ router.get("/pwin/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         const raw = result.body as Record<string, unknown>;
         const breakdown = Array.isArray(raw.breakdown) ? raw.breakdown : [];
+        const pwinPct = Number(raw.pwin ?? 0);
         const factors = breakdown.map((b: Record<string, unknown>) => ({
           name: String(b.factor ?? ""),
-          weight: parseFloat(String(b.weight ?? "0").replace("%", "")) || 0,
-          score: Number(b.score ?? 0),
-          weighted_score: Number(b.weighted_contribution ?? 0),
+          weight: (parseFloat(String(b.weight ?? "0").replace("%", "")) || 0) / 100,
+          score: Number(b.score ?? 0) / 5,
+          weighted_score: Number(b.weighted_contribution ?? 0) / 5,
           rationale: "",
         }));
         const mapped = {
           opp_id: oppId,
-          overall_pwin: Number(raw.pwin ?? 0),
+          overall_pwin: pwinPct / 100,
           factors,
           historical_win_rate: 0,
-          confidence: (Number(raw.pwin ?? 0) >= 60 ? "high" : Number(raw.pwin ?? 0) >= 30 ? "medium" : "low") as "high" | "medium" | "low",
+          confidence: (pwinPct >= 60 ? "high" : pwinPct >= 30 ? "medium" : "low") as "high" | "medium" | "low",
           last_calculated: String(raw.assessed_at ?? new Date().toISOString()),
           methodology: "GDA Command weighted scoring",
           recommendation: raw.recommendation ?? null,
