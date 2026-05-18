@@ -39,6 +39,7 @@ import GovWin from "./pages/GovWin";
 import RiskRegister from "./pages/RiskRegister";
 import ProposalCenter from "./pages/ProposalCenter";
 import AdminTrash from "./pages/AdminTrash";
+import SourceManager from "./pages/SourceManager";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -106,6 +107,7 @@ const NAV_GROUPS = [
       { path: "/book-of-truths", label: "Book of Truths", icon: "📓" },
       { path: "/prompts", label: "Prompts", icon: "📝" },
       { path: "/help", label: "User Manual", icon: "❓" },
+      { path: "/sources", label: "Data Sources", icon: "🔌" },
     ],
   },
 ] as const;
@@ -517,6 +519,7 @@ export default function App() {
             <Route path="/help" element={<UserManual />} />
             <Route path="/risk-register" element={<RiskRegister />} />
             <Route path="/proposal-center" element={<ProposalCenter />} />
+            <Route path="/sources" element={<SourceManager />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
