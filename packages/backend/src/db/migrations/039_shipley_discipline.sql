@@ -68,3 +68,4 @@ UPDATE opportunities SET shipley_phase = 'submit'     WHERE capture_stage = 'pos
 UPDATE opportunities SET shipley_phase = 'awarded'    WHERE capture_stage = 'won'             AND shipley_phase = 'identify';
 UPDATE opportunities SET shipley_phase = 'lost'       WHERE capture_stage = 'lost'            AND shipley_phase = 'identify';
 UPDATE opportunities SET shipley_phase = 'no_bid'     WHERE capture_stage = 'no_bid'          AND shipley_phase = 'identify';
+UPDATE opportunities SET shipley_phase = 'lost'       WHERE capture_stage = 'gov_cancelled'   AND shipley_phase = 'identify';
