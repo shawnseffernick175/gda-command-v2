@@ -45,10 +45,10 @@ const PHASE_TO_CAPTURE_STAGE: Record<ShipleyPhase, string> = {
 };
 
 function isForwardTransition(current: ShipleyPhase, target: ShipleyPhase): boolean {
-  // Terminal states are always reachable from active phases
-  if (TERMINAL_PHASES.includes(target)) return true;
   // Cannot move out of a terminal state without force
   if (TERMINAL_PHASES.includes(current)) return false;
+  // Terminal states are always reachable from active phases
+  if (TERMINAL_PHASES.includes(target)) return true;
   const currentIdx = PHASE_ORDER.indexOf(current);
   const targetIdx = PHASE_ORDER.indexOf(target);
   return targetIdx > currentIdx;
