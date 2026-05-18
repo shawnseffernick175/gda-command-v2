@@ -431,7 +431,7 @@ async function applyApprovedFix(
   const suggestedFix = proposal.suggested_fix as string;
 
   // Only apply safe, deterministic fixes
-  if (fixType === "config_change" || fixType === "data_fix") {
+  if (fixType === "config_change") {
     // Mark as applied
     await pool.query(
       `UPDATE fix_proposals SET status = 'applied', applied_at = NOW(), updated_at = NOW() WHERE id = $1`,
