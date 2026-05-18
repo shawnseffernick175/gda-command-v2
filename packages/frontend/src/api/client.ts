@@ -154,6 +154,7 @@ export interface OpportunityRow {
   tags: string[];
   raw_source_url: string | null;
   data_source: string | null;
+  pursuing_entity_id?: string | null;
   created_at: string;
   updated_at: string;
 }

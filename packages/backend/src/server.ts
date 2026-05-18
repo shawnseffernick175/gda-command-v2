@@ -51,6 +51,7 @@ import controlledFixRouter from "./routes/controlled-fix";
 import n8nProxyRouter from "./routes/n8n-proxy";
 import featureFlagsRouter from "./routes/feature-flags";
 import versioningRouter from "./routes/versioning";
+import companyEntitiesRouter from "./routes/company-entities";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -182,6 +183,7 @@ app.use("/api/agents/fix-runner", controlledFixRouter);
 app.use("/api/agents", agentsRouter);
 app.use("/api/feature-flags", featureFlagsRouter);
 app.use("/api/versions", versioningRouter);
+app.use("/api/admin/companies", companyEntitiesRouter);
 
 // --- n8n webhook proxy (generic pass-through to any n8n workflow) ---
 app.use("/api/n8n", n8nProxyRouter);

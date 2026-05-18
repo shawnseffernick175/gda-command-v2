@@ -14,6 +14,7 @@ const TABLES = [
   "competitor_profiles",
   "knowledge_documents",
   "cpars_records",
+  "company_entity",
 ];
 
 interface TrashRecord {
