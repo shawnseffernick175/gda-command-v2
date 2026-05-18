@@ -686,7 +686,7 @@ export default function OpsTracker() {
                   </td>
                   <td style={tdStyle}>
                     <select
-                      value={statusToShipley(opp.status)}
+                      value={opp.capture_stage ?? statusToShipley(opp.status)}
                       onClick={(e) => e.stopPropagation()}
                       onChange={async (e) => {
                         e.stopPropagation();
@@ -707,7 +707,7 @@ export default function OpsTracker() {
                         borderRadius: 4,
                         border: "1px solid var(--color-border)",
                         background: "var(--color-surface)",
-                        color: SHIPLEY_STAGES.find(s => s.value === statusToShipley(opp.status))?.color ?? "var(--color-text)",
+                        color: SHIPLEY_STAGES.find(s => s.value === (opp.capture_stage ?? statusToShipley(opp.status)))?.color ?? "var(--color-text)",
                         cursor: "pointer",
                         fontSize: 11,
                         fontWeight: 600,
