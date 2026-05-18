@@ -45,7 +45,7 @@ export function classifyVehicle(
     }
   }
 
-  return combined.length > 0 ? "other" : null;
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ router.post("/classify", async (req, res) => {
 
     const { opportunity_ids } = req.body as { opportunity_ids?: string[] };
 
-    let query = `SELECT id, set_aside, description, tags, vehicle_type FROM opportunities WHERE deleted_at IS NULL`;
+    let query = `SELECT id, set_aside, description, tags, vehicle_type FROM opportunities WHERE deleted_at IS NULL AND vehicle_type IS NULL`;
     const params: string[] = [];
 
     if (opportunity_ids && opportunity_ids.length > 0) {
