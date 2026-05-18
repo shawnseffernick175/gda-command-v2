@@ -38,4 +38,4 @@ DELETE FROM generated_reports WHERE id LIKE 'gen-%';
 DELETE FROM scheduled_reports WHERE id LIKE 'sched-%';
 
 -- Mock prompts
-DELETE FROM prompt_templates WHERE id LIKE 'prompt-%';
+DELETE FROM prompts WHERE id LIKE 'prompt-%';
