@@ -111,7 +111,7 @@ export async function gatewayCall(opts: GatewayCallOptions): Promise<GatewayResu
   if (PUBLIC_BLOCKED_CLASSIFICATIONS.includes(classification.toLowerCase() as DataClassification)) {
     const callId = await logCall({
       purpose: opts.purpose,
-      provider,
+      provider: "blocked",
       model: "blocked",
       classification,
       promptHash,
