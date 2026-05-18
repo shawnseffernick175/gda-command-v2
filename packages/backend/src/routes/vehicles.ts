@@ -17,7 +17,7 @@ const VEHICLE_KEYWORDS: Record<VehicleType, string[]> = {
   gwac: ["gwac", "government-wide", "alliant", "cio-sp", "vets 2", "8a stars"],
   full_and_open: ["full and open", "full & open", "unrestricted"],
   set_aside_sb: ["small business set-aside", "sb set-aside", "total small business"],
-  set_aside_8a: ["8(a)", "8a ", "sba 8"],
+  set_aside_8a: ["8(a)", "8a", "sba 8"],
   set_aside_hubzone: ["hubzone"],
   set_aside_sdvosb: ["sdvosb", "service-disabled veteran"],
   set_aside_wosb: ["wosb", "women-owned", "woman-owned", "edwosb"],
@@ -205,7 +205,7 @@ router.post("/classify", async (req, res) => {
       const vehicleType = classifyVehicle(
         opp.tags?.join(" "),
         opp.set_aside,
-        opp.description
+        null
       );
 
       if (vehicleType && vehicleType !== opp.vehicle_type) {
