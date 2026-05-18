@@ -268,7 +268,7 @@ router.post("/check-guardrails/:opportunityId", requireRole("admin", "bd_manager
     }
 
     // Guardrail 2: Missing score
-    if (opp.score === null || opp.score === undefined || opp.score === 0) {
+    if (opp.score === null || opp.score === undefined || Number(opp.score) === 0) {
       newAlerts.push({
         rule: "missing_score",
         severity: "warning",
@@ -277,7 +277,7 @@ router.post("/check-guardrails/:opportunityId", requireRole("admin", "bd_manager
     }
 
     // Guardrail 3: High value without gate review
-    if (opp.value_estimated && opp.value_estimated > 5000000) {
+    if (opp.value_estimated && Number(opp.value_estimated) > 5000000) {
       const gateRes = await pool.query(
         "SELECT COUNT(*) AS cnt FROM capture_gate_reviews WHERE opportunity_id = $1",
         [opportunityId]
