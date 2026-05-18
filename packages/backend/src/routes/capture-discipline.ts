@@ -183,7 +183,7 @@ router.post("/gates", requireRole("admin", "bd_manager", "capture_lead"), async 
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
 
-    await pool.query(
+    const upsertRes = await pool.query(
       `INSERT INTO capture_gate_reviews
         (id, opportunity_id, gate, status, reviewer, reviewed_at, criteria_met, criteria_total, notes, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
@@ -194,20 +194,22 @@ router.post("/gates", requireRole("admin", "bd_manager", "capture_lead"), async 
         criteria_met = EXCLUDED.criteria_met,
         criteria_total = EXCLUDED.criteria_total,
         notes = EXCLUDED.notes,
-        updated_at = EXCLUDED.updated_at`,
+        updated_at = EXCLUDED.updated_at
+       RETURNING *, (xmax = 0) AS is_insert`,
       [id, opportunity_id, gate, status, reviewer ?? null, status !== "pending" ? now : null, criteria_met ?? 0, criteria_total ?? 0, notes ?? null, now]
     );
 
     // Record version for audit
     const userId = req.user?.userId ?? "system";
-    const { rows } = await pool.query("SELECT * FROM capture_gate_reviews WHERE opportunity_id = $1 AND gate = $2", [opportunity_id, gate]);
-    if (rows[0]) {
-      await recordVersion("capture_gate_reviews", rows[0].id, rows[0], userId, "update");
+    const row = upsertRes.rows[0];
+    if (row) {
+      const changeType = row.is_insert ? "create" : "update";
+      await recordVersion("capture_gate_reviews", row.id, row, userId, changeType);
     }
 
     res.json(
       successEnvelope("gda-capture-discipline", "create-gate", {
-        gate_review: rows[0] ?? { id, opportunity_id, gate, status },
+        gate_review: row ?? { id, opportunity_id, gate, status },
       })
     );
   } catch (err) {
