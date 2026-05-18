@@ -112,6 +112,13 @@ export interface Opportunity {
   raw_source_url: string | null;
   data_source: string | null;
   pursuing_entity_id?: string | null;
+  shipley_phase?: ShipleyPhase | null;
+  pwin?: number | null;
+  capture_manager_id?: string | null;
+  proposal_manager_id?: string | null;
+  preferred_vendor_analysis?: string | null;
+  expected_rfp_date?: string | null;
+  expected_award_date?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1769,4 +1776,69 @@ export interface MergerOppImpact {
   opp_title?: string;
   opp_agency?: string;
   opp_value?: number;
+}
+
+// ---------------------------------------------------------------------------
+// W6 — Shipley Capture Discipline
+// ---------------------------------------------------------------------------
+
+export type ShipleyPhase =
+  | "identify"
+  | "qualify"
+  | "pursue"
+  | "capture"
+  | "proposal"
+  | "submit"
+  | "awarded"
+  | "lost"
+  | "no_bid";
+
+export type ColorTeamColor = "blue" | "pink" | "red" | "green" | "gold" | "white";
+
+export interface ColorTeamReview {
+  review_id: string;
+  opportunity_id: string;
+  team_color: ColorTeamColor;
+  scheduled_date: string | null;
+  completed_date: string | null;
+  score: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CaptureDisciplineConfig {
+  id: number;
+  revenue_target_usd: number;
+  pipeline_coverage_min: number;
+  pipeline_coverage_target: number;
+  pwin_floor_pursue: number;
+  pwin_floor_capture: number;
+  pwin_floor_bid_decision: number;
+  captures_per_manager_max: number;
+  proposals_per_manager_max: number;
+  task_orders_per_manager_max: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DisciplineDashboard {
+  pipeline_coverage: {
+    qualified_value: number;
+    revenue_target: number;
+    coverage_ratio: number;
+    min_ratio: number;
+    target_ratio: number;
+  };
+  funnel: Array<{ phase: ShipleyPhase; count: number; value: number }>;
+  capture_load: Array<{ manager_id: string; active_captures: number; max: number }>;
+  proposal_load: Array<{ manager_id: string; active_proposals: number; max: number }>;
+  aging_captures: Array<{ id: string; title: string; shipley_phase: ShipleyPhase; days_stale: number }>;
+  missing_rfp_date: Array<{ id: string; title: string; shipley_phase: ShipleyPhase }>;
+}
+
+export interface PhaseAdvanceValidation {
+  allowed: boolean;
+  missing_fields: string[];
+  missing_color_teams: ColorTeamColor[];
 }

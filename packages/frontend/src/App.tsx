@@ -43,6 +43,8 @@ import AdminCompanies from "./pages/AdminCompanies";
 import VehicleClassification from "./pages/VehicleClassification";
 import SourceManager from "./pages/SourceManager";
 import MergerContext from "./pages/MergerContext";
+import CaptureDiscipline from "./pages/CaptureDiscipline";
+import AdminDisciplineConfig from "./pages/AdminDisciplineConfig";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -75,6 +77,7 @@ const NAV_GROUPS = [
       { path: "/proposals", label: "Proposal Builder", icon: "📄" },
       { path: "/color-review", label: "Color Review", icon: "🎨" },
       { path: "/capture", label: "Capture Plans", icon: "🎯" },
+      { path: "/discipline", label: "Discipline", icon: "📐" },
     ],
   },
   {
@@ -114,6 +117,7 @@ const NAV_GROUPS = [
       { path: "/prompts", label: "Prompts", icon: "📝" },
       { path: "/help", label: "User Manual", icon: "❓" },
       { path: "/sources", label: "Data Sources", icon: "🔌" },
+      { path: "/admin/discipline-config", label: "Discipline Config", icon: "📐" },
     ],
   },
 ] as const;
@@ -529,6 +533,8 @@ export default function App() {
             <Route path="/proposal-center" element={<ProposalCenter />} />
             <Route path="/sources" element={<SourceManager />} />
             <Route path="/mergers" element={<MergerContext />} />
+            <Route path="/discipline" element={<CaptureDiscipline />} />
+            <Route path="/admin/discipline-config" element={<AdminDisciplineConfig />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
