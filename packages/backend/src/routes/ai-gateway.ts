@@ -188,6 +188,7 @@ router.post(
       );
     }
 
+    const start = Date.now();
     try {
       // Fetch opportunity details
       const oppRes = await pool.query(
@@ -209,7 +210,6 @@ router.post(
 
       const opp = oppRes.rows[0];
       const tier: ModelTier = "fast";
-      const start = Date.now();
 
       const prompt = `Analyze this government contracting opportunity and provide a bid/no-bid recommendation.
 
@@ -295,6 +295,8 @@ Consider: competitive landscape, alignment with typical GovCon capabilities, tim
         opportunityId,
         action: "bid-recommendation",
         modelTier: result.tier,
+        promptTokens: result.usage.prompt_tokens,
+        completionTokens: result.usage.completion_tokens,
         latencyMs: latency,
         status: "success",
       });
@@ -309,7 +311,17 @@ Consider: competitive landscape, alignment with typical GovCon capabilities, tim
         })
       );
     } catch (err) {
+      const latency = Date.now() - start;
       process.stderr.write(`[ai-gateway] bid-recommendation error: ${(err as Error).message}\n`);
+      await logUsage({
+        userId: req.user?.userId,
+        opportunityId,
+        action: "bid-recommendation",
+        modelTier: "fast",
+        latencyMs: latency,
+        status: "error",
+        errorMessage: (err as Error).message,
+      });
       res.status(500).json(
         errorEnvelope("gda-ai-gateway", "bid-recommendation", {
           code: "INTERNAL",
