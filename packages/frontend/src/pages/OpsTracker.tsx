@@ -32,6 +32,7 @@ const STATUS_COLORS: Record<string, string> = {
   won: "#22c55e",
   lost: "#ef4444",
   no_bid: "#9ca3af",
+  gov_cancelled: "#6b7280",
 };
 
 function formatCurrency(v: number | null): string {
@@ -65,6 +66,7 @@ function statusToShipley(status: string): string {
     won: "won",
     lost: "lost",
     no_bid: "no_bid",
+    gov_cancelled: "gov_cancelled",
   };
   return map[status] ?? "interest";
 }
@@ -77,6 +79,7 @@ function statusLabel(status: string): string {
     won: "Won",
     lost: "Lost",
     no_bid: "No Bid",
+    gov_cancelled: "Gov Cancelled",
   };
   return labels[status] ?? status;
 }

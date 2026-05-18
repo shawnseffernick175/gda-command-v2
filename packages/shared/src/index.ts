@@ -1612,6 +1612,7 @@ export interface FastTrackMatch {
   };
 }
 
+
 // ---------------------------------------------------------------------------
 // W1: Vehicle Classification types
 // ---------------------------------------------------------------------------
@@ -1648,4 +1649,49 @@ export interface VehicleSummary {
   count: number;
   total_value: number;
   avg_score: number;
+}
+
+// ---------------------------------------------------------------------------
+// W2: Expanded Sources types
+// ---------------------------------------------------------------------------
+
+export type SourceType = "api" | "webhook" | "file" | "rss" | "manual";
+export type SourceCategory = "government" | "commercial" | "internal";
+export type SourceAuthType = "api_key" | "oauth" | "none" | "webhook_key";
+export type SyncFrequency = "hourly" | "daily" | "weekly" | "manual";
+export type SyncStatus = "success" | "error" | "running" | "never";
+
+export interface SourceRegistryEntry {
+  id: string;
+  name: string;
+  source_type: SourceType;
+  category: SourceCategory;
+  base_url: string | null;
+  auth_type: SourceAuthType;
+  enabled: boolean;
+  search_params: Record<string, unknown>;
+  sync_frequency: SyncFrequency;
+  last_sync_at: string | null;
+  last_sync_status: SyncStatus;
+  last_sync_count: number;
+  total_synced: number;
+  error_count: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SourceSyncRun {
+  id: string;
+  source_id: string;
+  source_name?: string;
+  started_at: string;
+  completed_at: string | null;
+  status: SyncStatus | "running";
+  records_fetched: number;
+  records_upserted: number;
+  records_errored: number;
+  duration_ms: number | null;
+  error: string | null;
+  metadata: Record<string, unknown>;
 }

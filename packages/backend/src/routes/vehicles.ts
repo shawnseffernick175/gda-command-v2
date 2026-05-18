@@ -203,9 +203,9 @@ router.post("/classify", async (req, res) => {
 
     for (const opp of opps.rows) {
       const vehicleType = classifyVehicle(
-        opp.tags?.join(" "),
+        opp.description,
         opp.set_aside,
-        null
+        opp.tags?.join(" ")
       );
 
       if (vehicleType && vehicleType !== opp.vehicle_type) {

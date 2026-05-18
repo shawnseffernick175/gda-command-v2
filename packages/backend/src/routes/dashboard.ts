@@ -187,7 +187,7 @@ router.get("/kpis", async (_req, res) => {
               pool.query(`SELECT COUNT(*)::int AS cnt FROM v_opportunity_all_tracked`),
               pool.query(`SELECT COUNT(*)::int AS cnt FROM v_opportunity_active`),
             ]);
-            totalTracked = Math.max(totalOpportunities, trackedResult.rows[0]?.cnt ?? 0);
+            totalTracked = trackedResult.rows[0]?.cnt ?? totalOpportunities;
             activePipeline = activeResult.rows[0]?.cnt ?? 0;
             totalTrackedSource = "canonical_view";
           } catch { /* keep n8n counts as fallback */ }
