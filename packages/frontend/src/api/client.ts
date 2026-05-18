@@ -20,6 +20,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<GDAEnvelope
   return res.json() as Promise<GDAEnvelope<T>>;
 }
 
+/** Chat/AI requests get an AbortController so a hung LLM call doesn't freeze the UI forever. */
+const CHAT_TIMEOUT_MS = 65_000; // slightly longer than backend LLM timeout
+
+function requestWithTimeout<T>(path: string, init?: RequestInit): Promise<GDAEnvelope<T>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+  const merged: RequestInit = { ...init, signal: controller.signal };
+  return request<T>(path, merged).finally(() => clearTimeout(timer));
+}
+
 // Health check row — supports both mock (name/durationMs) and live (id/label/path/http/ms/bytes/tone) shapes
 export interface QACheckRow {
   // Mock fields
@@ -2024,7 +2034,7 @@ export function fetchChatSession(id: string) {
 }
 
 export function sendChatMessage(message: string, sessionId?: string) {
-  return request<ChatResponseData>("/knowledge/chat", {
+  return requestWithTimeout<ChatResponseData>("/knowledge/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, session_id: sessionId }),
@@ -3427,7 +3437,7 @@ export function fetchAuditStats() {
 // --- AI Chat ---
 
 export function askOpportunityChat(opportunityId: string, question: string, history: { role: string; content: string }[]) {
-  return request<{ answer: string }>("/ai/opportunity-chat", {
+  return requestWithTimeout<{ answer: string }>("/ai/opportunity-chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ opportunityId, question, history }),
@@ -3824,6 +3834,64 @@ export function resolveFixProposal(id: string, action: "approve" | "reject", not
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, note }),
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// Vehicle Classification (W1)
+// ---------------------------------------------------------------------------
+
+export interface VehicleData {
+  key: string;
+  label: string;
+  description: string | null;
+  category: string;
+  sort_order: number;
+}
+
+export interface VehicleSummaryRow {
+  vehicle_type: string;
+  label: string;
+  category: string;
+  count: number;
+  total_value: number;
+  avg_score: number;
+}
+
+export interface VehiclesListData {
+  vehicles: VehicleData[];
+  summary: VehicleSummaryRow[];
+  total_opportunities: number;
+}
+
+export interface VehicleOppsData {
+  vehicle_type: string;
+  opportunities: OpportunityRow[];
+  total: number;
+}
+
+export function fetchVehicles() {
+  return request<VehiclesListData>("/vehicles");
+}
+
+export function fetchVehicleOpportunities(vehicleType: string) {
+  return request<VehicleOppsData>(`/vehicles/${vehicleType}/opportunities`);
+}
+
+export function classifyVehicles(opportunityIds?: string[]) {
+  return request<{ processed: number; classified: number }>("/vehicles/classify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ opportunity_ids: opportunityIds }),
+  });
+}
+
+export function setVehicleType(oppId: string, vehicleType: string) {
+  return request<{ id: string; vehicle_type: string }>(`/vehicles/${oppId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ vehicle_type: vehicleType }),
   });
 }
 

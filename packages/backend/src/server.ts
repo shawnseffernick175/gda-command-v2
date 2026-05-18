@@ -52,6 +52,7 @@ import n8nProxyRouter from "./routes/n8n-proxy";
 import featureFlagsRouter from "./routes/feature-flags";
 import versioningRouter from "./routes/versioning";
 import companyEntitiesRouter from "./routes/company-entities";
+import vehiclesRouter from "./routes/vehicles";
 import sourcesRouter from "./routes/sources";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
@@ -185,6 +186,7 @@ app.use("/api/agents", agentsRouter);
 app.use("/api/feature-flags", featureFlagsRouter);
 app.use("/api/versions", versioningRouter);
 app.use("/api/admin/companies", companyEntitiesRouter);
+app.use("/api/vehicles", vehiclesRouter);
 app.use("/api/sources", sourcesRouter);
 
 // --- n8n webhook proxy (generic pass-through to any n8n workflow) ---

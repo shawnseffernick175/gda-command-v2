@@ -899,13 +899,16 @@ function ChatTab() {
           setMessages((prev) => [...prev, env.data!.message]);
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        const isTimeout = (err as Error).name === "AbortError";
         setMessages((prev) => [
           ...prev,
           {
             id: `msg-err-${Date.now()}`,
             role: "assistant",
-            content: "Sorry, an error occurred. Please try again.",
+            content: isTimeout
+              ? "Request timed out. The AI service may be overloaded \u2014 please try again."
+              : "Sorry, an error occurred. Please try again.",
             timestamp: new Date().toISOString(),
           },
         ]);

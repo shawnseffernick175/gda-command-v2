@@ -40,6 +40,7 @@ import RiskRegister from "./pages/RiskRegister";
 import ProposalCenter from "./pages/ProposalCenter";
 import AdminTrash from "./pages/AdminTrash";
 import AdminCompanies from "./pages/AdminCompanies";
+import VehicleClassification from "./pages/VehicleClassification";
 import SourceManager from "./pages/SourceManager";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
@@ -59,6 +60,7 @@ const NAV_GROUPS = [
       { path: "/fast-track", label: "Fast Track", icon: "🚀" },
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
+      { path: "/vehicles", label: "Vehicles", icon: "🏗" },
       { path: "/approvals", label: "Approvals", icon: "✓" },
       { path: "/risk-register", label: "Risk Register", icon: "⚠" },
     ],
@@ -509,6 +511,7 @@ export default function App() {
             <Route path="/color-review" element={<ColorReview />} />
             <Route path="/anomaly" element={<AnomalyDetection />} />
             <Route path="/sam-monitor" element={<SAMMonitor />} />
+            <Route path="/vehicles" element={<VehicleClassification />} />
 
 
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
@@ -547,8 +550,14 @@ function AskAnythingFAB() {
     setAnswer("");
   }, [pathname]);
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const handleAsk = async () => {
     if (!question.trim() || loading) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), 65_000);
     setLoading(true);
     setAnswer("");
     try {
@@ -556,13 +565,20 @@ function AskAnythingFAB() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: question.trim(), context: pathname }),
+        signal: controller.signal,
       });
       const data = await res.json();
       setAnswer(data?.data?.answer ?? data?.error?.message ?? "Could not get an answer. The AI service may be unavailable.");
-    } catch {
-      setAnswer("Error connecting to AI service. Check that OpenAI API key is configured in Settings.");
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        setAnswer("Request timed out. The AI service may be overloaded — please try again.");
+      } else {
+        setAnswer("Error connecting to AI service. Check that OpenAI API key is configured in Settings.");
+      }
+    } finally {
+      clearTimeout(timer);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!open) {
