@@ -1116,8 +1116,8 @@ router.put("/:id/compliance-map/:reqId", async (req, res) => {
     const params: unknown[] = [];
     let idx = 1;
 
-    if (section_id !== undefined) { fields.push(`section_id = $${idx++}`); params.push(section_id); }
-    if (section_title !== undefined) { fields.push(`section_title = $${idx++}`); params.push(section_title); }
+    if (section_id !== undefined) { fields.push(`section_id = $${idx++}`); params.push(section_id || null); }
+    if (section_title !== undefined) { fields.push(`section_title = $${idx++}`); params.push(section_title || null); }
     if (response_status !== undefined) { fields.push(`response_status = $${idx++}`); params.push(response_status); }
     if (response_summary !== undefined) { fields.push(`response_summary = $${idx++}`); params.push(response_summary); }
 
@@ -1165,14 +1165,19 @@ router.post("/:id/compliance-map/import-from-shred", async (req, res) => {
       return res.status(404).json(errorEnvelope("GDA.proposals", "import-compliance", { code: "NOT_FOUND", message: "No requirements found for this shred job", detail: null }));
     }
 
+    // Remove existing entries from this shred job to prevent duplicates on re-import
+    await pool.query(
+      `DELETE FROM proposal_compliance_map WHERE proposal_id = $1 AND requirement_id IN (SELECT id FROM extracted_requirements WHERE shred_job_id = $2)`,
+      [req.params.id, shred_job_id],
+    );
+
     const created = [];
     for (let i = 0; i < reqResult.rows.length; i++) {
       const r = reqResult.rows[i];
       const id = `cr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       await pool.query(
         `INSERT INTO proposal_compliance_map (id, proposal_id, requirement_id, requirement_text, requirement_type, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT DO NOTHING`,
+         VALUES ($1, $2, $3, $4, $5, $6)`,
         [id, req.params.id, r.id, r.requirement_text, r.requirement_type ?? "SHALL", i],
       );
       created.push({ id, requirement_text: r.requirement_text });
