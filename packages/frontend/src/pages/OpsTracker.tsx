@@ -88,13 +88,17 @@ export default function OpsTracker() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // View filter: "active" (default) or "all_tracked" — controls which canonical view
+  const urlFilter = searchParams.get("filter");
+  const [viewFilter, setViewFilter] = useState<"active" | "all_tracked">(urlFilter === "all_tracked" ? "all_tracked" : "active");
+
   // Filters — initialize status from URL query param if present
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
   const [deptFilter, setDeptFilter] = useState("");
   const [naicsSizeFilter, setNaicsSizeFilter] = useState("");
   const [minPwin, setMinPwin] = useState("");
-  const [includeLowFit, setIncludeLowFit] = useState(false);
+  const [includeLowFit, setIncludeLowFit] = useState(viewFilter === "all_tracked");
 
   // Sort
   const [sortBy, setSortBy] = useState<SortKey>("score");
@@ -126,6 +130,7 @@ export default function OpsTracker() {
         naics_size: naicsSizeFilter || undefined,
         minPwin: minPwin ? parseFloat(minPwin) : undefined,
         includeLowFit: includeLowFit || undefined,
+        includeAllStatuses: viewFilter === "all_tracked" || undefined,
         sortBy,
         sortDir,
         page,
@@ -153,7 +158,7 @@ export default function OpsTracker() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, deptFilter, naicsSizeFilter, minPwin, includeLowFit, sortBy, sortDir, page]);
+  }, [search, statusFilter, deptFilter, naicsSizeFilter, minPwin, includeLowFit, viewFilter, sortBy, sortDir, page]);
 
   useEffect(() => {
     load();
@@ -330,6 +335,32 @@ export default function OpsTracker() {
             size={14}
           />
         </div>
+      </div>
+
+      {/* View filter chip — AC-W7-3: label which view is being shown */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+        <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Showing:</span>
+        {(["active", "all_tracked"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => { setViewFilter(v); setIncludeLowFit(v === "all_tracked"); setPage(1); }}
+            style={{
+              padding: "4px 12px",
+              borderRadius: 16,
+              border: viewFilter === v ? "2px solid var(--color-accent, #3b82f6)" : "1px solid var(--color-border)",
+              background: viewFilter === v ? "var(--color-accent, #3b82f6)" : "var(--color-surface)",
+              color: viewFilter === v ? "#fff" : "var(--color-text)",
+              fontSize: 13,
+              fontWeight: viewFilter === v ? 600 : 400,
+              cursor: "pointer",
+            }}
+          >
+            {v === "active" ? "Active" : "All Tracked"}
+          </button>
+        ))}
+        <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic" }}>
+          {viewFilter === "active" ? "v_opportunity_active" : "v_opportunity_all_tracked"}
+        </span>
       </div>
 
       {/* Filters */}

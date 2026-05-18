@@ -52,13 +52,13 @@ router.get("/kpis", async (_req, res) => {
         const pool = getPool();
         if (pool) {
           try {
-            // Query per-stage aggregates from DB
+            // Query per-stage aggregates from DB (canonical: exclude deleted)
             const statusAgg = await pool.query(
               `SELECT status, COUNT(*) as cnt,
                       COALESCE(SUM(value_estimated), 0) as total_value,
                       AVG(CASE WHEN probability_of_win IS NOT NULL THEN probability_of_win END) as avg_pwin,
                       AVG(score) as avg_score
-               FROM opportunities WHERE id NOT LIKE 'opp-%' GROUP BY status`
+               FROM v_opportunity_all_tracked WHERE id NOT LIKE 'opp-%' GROUP BY status`
             );
             const statusMap = new Map<string, { count: number; totalValue: number; avgPwin: number; avgScore: number }>();
             let dbTotal = 0;
@@ -177,18 +177,36 @@ router.get("/kpis", async (_req, res) => {
           }
         }
 
+        // Reconciled counts: query canonical views so Launchpad matches Opps Tracker
+        let totalTracked = totalOpportunities;
+        let activePipeline = totalOpportunities;
+        let totalTrackedSource = "n8n" as string;
+        if (pool) {
+          try {
+            const [trackedResult, activeResult] = await Promise.all([
+              pool.query(`SELECT COUNT(*)::int AS cnt FROM v_opportunity_all_tracked`),
+              pool.query(`SELECT COUNT(*)::int AS cnt FROM v_opportunity_active`),
+            ]);
+            totalTracked = Math.max(totalOpportunities, trackedResult.rows[0]?.cnt ?? 0);
+            activePipeline = activeResult.rows[0]?.cnt ?? 0;
+            totalTrackedSource = "canonical_view";
+          } catch { /* keep n8n counts as fallback */ }
+        }
+
         return res.json(
           successEnvelope(
             "gda-dashboard",
             "kpis",
             {
-              totalOpportunities,
+              totalOpportunities: totalTracked,
+              activePipeline,
               totalPipelineValue,
               avgPwin: 0,
               avgScore,
               funnel: n8nFunnel,
               topByScore,
               source: "n8n" as const,
+              countSource: totalTrackedSource,
               n8nKpis: {
                 pursueCount: launchpad.kpis.pursueCount,
                 evaluateCount: launchpad.kpis.evaluateCount,
@@ -201,8 +219,9 @@ router.get("/kpis", async (_req, res) => {
             },
             {
               generatedAt: launchpad.generatedAt || new Date().toISOString(),
-              opportunityCount: totalOpportunities,
+              opportunityCount: totalTracked,
               pipelineCount: launchpad.kpis.pursueCount,
+              viewLabel: "v_opportunity_all_tracked",
             }
           )
         );
@@ -225,7 +244,7 @@ router.get("/kpis", async (_req, res) => {
                 probability_of_win, naics, psc, due_date, solicitation_number,
                 set_aside, place_of_performance, incumbent, qualified_at,
                 qualified_by, tags, raw_source_url, data_source, created_at, updated_at
-         FROM opportunities ORDER BY score DESC`
+         FROM v_opportunity_all_tracked ORDER BY score DESC`
       );
       allOpps = result.rows.map((r) => ({
         ...r,
@@ -298,23 +317,29 @@ router.get("/kpis", async (_req, res) => {
 
   const topByScore = [...realOpps].sort((a, b) => b.score - a.score).slice(0, 10);
 
+  // Compute activePipeline from realOpps (active statuses only)
+  const activeOpps = realOpps.filter((o) => o.status !== "won" && o.status !== "lost" && o.status !== "no_bid");
+
   return res.json(
     successEnvelope(
       "gda-dashboard",
       "kpis",
       {
         totalOpportunities,
+        activePipeline: activeOpps.length,
         totalPipelineValue,
         avgPwin,
         avgScore,
         funnel,
         topByScore,
         source,
+        countSource: "canonical_view",
       },
       {
         generatedAt: new Date().toISOString(),
         opportunityCount: totalOpportunities,
         pipelineCount: pipelineOpps.length,
+        viewLabel: "v_opportunity_all_tracked",
       }
     )
   );

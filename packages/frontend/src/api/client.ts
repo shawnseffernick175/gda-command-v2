@@ -181,6 +181,7 @@ export interface OpportunityQueryParams {
   naics_size?: string;
   minPwin?: number;
   includeLowFit?: boolean;
+  includeAllStatuses?: boolean;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   page?: number;
@@ -195,6 +196,7 @@ export function fetchOpportunities(params: OpportunityQueryParams = {}) {
   if (params.naics_size) qs.set("naics_size", params.naics_size);
   if (params.minPwin !== undefined) qs.set("minPwin", String(params.minPwin));
   if (params.includeLowFit) qs.set("includeLowFit", "true");
+  if (params.includeAllStatuses) qs.set("includeAllStatuses", "true");
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
   if (params.page !== undefined) qs.set("page", String(params.page));
@@ -357,12 +359,14 @@ export interface DashboardFunnelStage {
 
 export interface DashboardKPIs {
   totalOpportunities: number;
+  activePipeline?: number;
   totalPipelineValue: number;
   avgPwin: number;
   avgScore: number;
   funnel: DashboardFunnelStage[];
   topByScore: OpportunityRow[];
   source: "db" | "n8n";
+  countSource?: string;
   n8nKpis?: {
     pursueCount: number;
     evaluateCount: number;

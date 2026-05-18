@@ -452,13 +452,24 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
       gap: 16,
     }}>
       <KPICard
-        label="Total Opportunities"
+        label="Total Tracked"
         value={String(kpis.totalOpportunities)}
+        onClick={() => navigate("/ops-tracker?filter=all_tracked")}
+        info={{
+          whatItIs: "Count of all tracked opportunities (v_opportunity_all_tracked).",
+          whatItMeans: "Every opportunity ever ingested, excluding soft-deleted records. All statuses included.",
+          howCalculated: "SELECT COUNT(*) FROM v_opportunity_all_tracked — canonical view, same query used by Opps Tracker 'All Tracked' filter.",
+        }}
+      />
+      <KPICard
+        label="Active Pipeline"
+        value={String(kpis.activePipeline ?? "—")}
+        accent="#22c55e"
         onClick={() => navigate("/ops-tracker")}
         info={{
-          whatItIs: "Count of all tracked opportunities (Interest + Qualify status).",
-          whatItMeans: "Total number of potential contracts being evaluated or actively pursued.",
-          howCalculated: "Count of opportunities in Interest and Qualify stages. Does not include Fast Track R&D signals.",
+          whatItIs: "Count of active pipeline opportunities (v_opportunity_active).",
+          whatItMeans: "Opportunities currently in play — excludes Won, Lost, No-Bid, and Gov Cancelled.",
+          howCalculated: "SELECT COUNT(*) FROM v_opportunity_active — canonical view, same query used by Opps Tracker default 'Active' filter.",
         }}
       />
       {kpis.n8nKpis ? (
@@ -472,10 +483,6 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             whatItIs: "Average opportunity quality score across all tracked opportunities.",
             whatItMeans: "Overall pipeline quality. Above 70 is strong, 50-70 moderate, below 50 needs review.",
           }} />
-          <KPICard label="Avg Pwin" value={kpis.avgPwin > 0 ? formatPwin(kpis.avgPwin) : "—"} accent="#22c55e" onClick={() => navigate("/ops-tracker")} info={{
-            whatItIs: "Average probability of win across active opportunities.",
-            whatItMeans: "Higher Pwin = stronger competitive position. Industry benchmark: 30-50%.",
-          }} />
         </>
       ) : (
         <>
@@ -488,16 +495,6 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
               whatItIs: "Total estimated value of approved pipeline opportunities.",
               whatItMeans: "The dollar amount of contracts you are actively pursuing (Qualified + Pipeline status only).",
               howCalculated: "Sum of estimated values for opportunities in Qualify and Pursue stages. Interest items are excluded — they are prospects, not pipeline.",
-            }}
-          />
-          <KPICard
-            label="Avg Pwin"
-            value={formatPwin(kpis.avgPwin)}
-            onClick={() => navigate("/predictive")}
-            info={{
-              whatItIs: "Average probability of win across all tracked opportunities.",
-              whatItMeans: "Higher Pwin means stronger competitive position. Below 40% suggests heavy competition or weak positioning.",
-              howCalculated: "Composite score based on: Technical Fit (30%), Past Performance (25%), Competition (20%), Customer Relationship (15%), Price Competitiveness (10%). Each factor scored 0-100, then weighted and averaged across all opportunities.",
             }}
           />
           <KPICard
