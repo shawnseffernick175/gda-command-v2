@@ -300,7 +300,7 @@ router.post("/check-guardrails/:opportunityId", requireRole("admin", "bd_manager
     const stageOrder = ["interest", "qualify", "pursue", "solicitation", "post_submittal"];
     const currentStageIdx = stageOrder.indexOf(opp.capture_stage ?? opp.status);
     if (currentStageIdx >= 2) {
-      const requiredGate = stageOrder[currentStageIdx];
+      const requiredGate = stageOrder[currentStageIdx - 1];
       const gateRes = await pool.query(
         "SELECT status FROM capture_gate_reviews WHERE opportunity_id = $1 AND gate = $2",
         [opportunityId, requiredGate]
