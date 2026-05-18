@@ -13,6 +13,7 @@ import {
   getStorageUsage,
   isAllowedMimeType,
   getMaxFileSize,
+  resolveMimeType,
 } from "../lib/storage";
 
 const router = Router();
@@ -24,7 +25,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: getMaxFileSize() },
   fileFilter: (_req, file, cb) => {
-    if (!isAllowedMimeType(file.mimetype)) {
+    if (!isAllowedMimeType(file.mimetype, file.originalname)) {
       cb(new Error(`File type ${file.mimetype} is not allowed`));
       return;
     }
@@ -53,6 +54,7 @@ router.post(
         return;
       }
 
+      const resolvedMime = resolveMimeType(file.mimetype, file.originalname);
       const storageKey = generateStorageKey(file.originalname);
       saveFile(storageKey, file.buffer);
 
@@ -64,7 +66,7 @@ router.post(
           `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
            VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING id, original_name, storage_key, mime_type, size_bytes, uploaded_by, created_at`,
-          [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
+          [fileId, file.originalname, storageKey, resolvedMime, file.size, req.user?.userId ?? null],
         );
         if (rows.length > 0) {
           fileId = rows[0].id;
@@ -74,7 +76,7 @@ router.post(
       log.info("file_uploaded", {
         fileId,
         originalName: file.originalname,
-        mimeType: file.mimetype,
+        mimeType: resolvedMime,
         sizeBytes: file.size,
         uploadedBy: req.user?.userId,
       });
@@ -84,7 +86,7 @@ router.post(
           id: fileId,
           original_name: file.originalname,
           storage_key: storageKey,
-          mime_type: file.mimetype,
+          mime_type: resolvedMime,
           size_bytes: file.size,
           download_url: `/api/files/${fileId}/download`,
         }),

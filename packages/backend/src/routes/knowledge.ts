@@ -9,7 +9,7 @@ interface ChatMessage { role: string; content: string; [key: string]: unknown }
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
-import { generateStorageKey, saveFile, deleteFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
+import { generateStorageKey, saveFile, deleteFile, isAllowedMimeType, getMaxFileSize, resolveMimeType } from "../lib/storage";
 import {
   isEmbeddingAvailable,
   vectorSearch,
@@ -403,7 +403,7 @@ const knowledgeUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: getMaxFileSize() },
   fileFilter: (_req, file, cb) => {
-    if (!isAllowedMimeType(file.mimetype)) {
+    if (!isAllowedMimeType(file.mimetype, file.originalname)) {
       cb(new Error(`File type ${file.mimetype} is not allowed`));
       return;
     }
@@ -458,7 +458,8 @@ router.post(
         return;
       }
 
-      // Real file upload
+      // Real file upload — resolve MIME in case client sent octet-stream
+      const resolvedMime = resolveMimeType(file.mimetype, file.originalname);
       storageKey = generateStorageKey(file.originalname);
       saveFile(storageKey, file.buffer);
 
@@ -480,7 +481,7 @@ router.post(
           await client.query(
             `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
+            [fileId, file.originalname, storageKey, resolvedMime, file.size, req.user?.userId ?? null],
           );
 
           // Insert knowledge_documents record linked to file
@@ -496,7 +497,7 @@ router.post(
               file.originalname,
               file.size,
               parsedTags,
-              JSON.stringify({ mime_type: file.mimetype, storage_key: storageKey }),
+              JSON.stringify({ mime_type: resolvedMime, storage_key: storageKey }),
               fileId,
             ],
           );
@@ -525,7 +526,7 @@ router.post(
       let vectorizationStarted = false;
       if (isEmbeddingAvailable() && pool) {
         const textMimes = ["text/plain", "text/markdown", "text/csv", "application/json"];
-        const isText = textMimes.includes(file.mimetype) || file.originalname.match(/\.(txt|md|csv|json|log)$/i);
+        const isText = textMimes.includes(resolvedMime) || file.originalname.match(/\.(txt|md|csv|json|log)$/i);
         if (isText) {
           const rawText = file.buffer.toString("utf-8");
           if (rawText.trim().length > 0) {
@@ -557,7 +558,7 @@ router.post(
           collection: collectionId,
           tags: parsedTags,
           size_bytes: file.size,
-          mime_type: file.mimetype,
+          mime_type: resolvedMime,
           status: vectorizationStarted ? "processing" : "pending",
           download_url: `/api/files/${fileId}/download`,
           message: vectorizationStarted
