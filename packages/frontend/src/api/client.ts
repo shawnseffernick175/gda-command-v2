@@ -178,6 +178,7 @@ export interface OpportunityQueryParams {
   department?: string;
   naics_size?: string;
   minPwin?: number;
+  includeLowFit?: boolean;
   sortBy?: string;
   sortDir?: "asc" | "desc";
   page?: number;
@@ -191,6 +192,7 @@ export function fetchOpportunities(params: OpportunityQueryParams = {}) {
   if (params.department) qs.set("department", params.department);
   if (params.naics_size) qs.set("naics_size", params.naics_size);
   if (params.minPwin !== undefined) qs.set("minPwin", String(params.minPwin));
+  if (params.includeLowFit) qs.set("includeLowFit", "true");
   if (params.sortBy) qs.set("sortBy", params.sortBy);
   if (params.sortDir) qs.set("sortDir", params.sortDir);
   if (params.page !== undefined) qs.set("page", String(params.page));

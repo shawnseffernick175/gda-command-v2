@@ -19,6 +19,7 @@ const VALID_STATUSES: OpportunityStatus[] = [
   "pipeline",
   "lost",
   "won",
+  "no_bid",
 ];
 
 // Shipley stages — superset of existing statuses for the capture pipeline
@@ -43,7 +44,7 @@ const SHIPLEY_TO_STATUS: Record<string, OpportunityStatus> = {
   post_submittal: "pipeline",
   won: "won",
   lost: "lost",
-  no_bid: "lost",
+  no_bid: "no_bid",
   gov_cancelled: "lost",
 };
 
@@ -123,6 +124,8 @@ router.get("/", async (req, res) => {
   const deptFilter = req.query.department as string | undefined;
   const naicsSizeFilter = req.query.naics_size as string | undefined;
   const minPwin = req.query.minPwin ? parseFloat(req.query.minPwin as string) : undefined;
+  const minScore = req.query.minScore ? parseFloat(req.query.minScore as string) : undefined;
+  const includeLowFit = req.query.includeLowFit === "true";
   const sortBy = (req.query.sortBy as string) ?? "updated_at";
   const sortDir = (req.query.sortDir as string) === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
@@ -154,6 +157,8 @@ router.get("/", async (req, res) => {
     }
     if (statusFilter) {
       filtered = filtered.filter((o) => o.status === statusFilter);
+    } else {
+      filtered = filtered.filter((o) => o.status !== "no_bid");
     }
     if (deptFilter) {
       filtered = filtered.filter((o) => o.department === deptFilter);
@@ -165,6 +170,11 @@ router.get("/", async (req, res) => {
       filtered = filtered.filter(
         (o) => o.probability_of_win !== null && o.probability_of_win >= minPwin
       );
+    }
+    if (minScore !== undefined && !isNaN(minScore)) {
+      filtered = filtered.filter((o) => o.score >= minScore);
+    } else if (!includeLowFit && !search) {
+      filtered = filtered.filter((o) => o.score >= 30 || o.score === 0);
     }
     const col = sortBy as keyof Opportunity;
     filtered.sort((a, b) => {
@@ -214,7 +224,7 @@ router.get("/", async (req, res) => {
               if (o.due_date) {
                 const due = new Date(o.due_date);
                 if (!isNaN(due.getTime()) && due <= thirtyDaysFromNow) {
-                  return { ...o, status: "lost" as typeof o.status };
+                  return { ...o, status: "no_bid" as typeof o.status };
                 }
               }
               return { ...o, status: "discovery" as typeof o.status };
@@ -248,7 +258,7 @@ router.get("/", async (req, res) => {
               if (o.due_date) {
                 const due = new Date(o.due_date);
                 if (!isNaN(due.getTime()) && due <= fbCutoff) {
-                  return { ...o, status: "lost" as typeof o.status };
+                  return { ...o, status: "no_bid" as typeof o.status };
                 }
               }
               return { ...o, status: "discovery" as typeof o.status };
@@ -263,7 +273,7 @@ router.get("/", async (req, res) => {
             if (o.due_date) {
               const due = new Date(o.due_date);
               if (!isNaN(due.getTime()) && due <= noDbCutoff) {
-                return { ...o, status: "lost" as typeof o.status };
+                return { ...o, status: "no_bid" as typeof o.status };
               }
             }
             return { ...o, status: "discovery" as typeof o.status };
