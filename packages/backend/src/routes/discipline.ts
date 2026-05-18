@@ -30,6 +30,18 @@ const QUALIFIED_PHASES: ShipleyPhase[] = ["capture", "proposal", "submit"];
 
 const COLOR_TEAM_ORDER: ColorTeamColor[] = ["blue", "pink", "red", "green", "gold", "white"];
 
+const TERMINAL_PHASES: ShipleyPhase[] = ["awarded", "lost", "no_bid"];
+
+function isForwardTransition(current: ShipleyPhase, target: ShipleyPhase): boolean {
+  // Terminal states are always reachable from active phases
+  if (TERMINAL_PHASES.includes(target)) return true;
+  // Cannot move out of a terminal state without force
+  if (TERMINAL_PHASES.includes(current)) return false;
+  const currentIdx = PHASE_ORDER.indexOf(current);
+  const targetIdx = PHASE_ORDER.indexOf(target);
+  return targetIdx > currentIdx;
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/discipline/dashboard — aggregate dashboard data
 // ---------------------------------------------------------------------------
@@ -250,8 +262,14 @@ router.post("/validate-advance/:id", async (req: Request, res: Response) => {
     }
 
     const opp = oppRows[0];
+    const currentPhase = (opp.shipley_phase ?? "identify") as ShipleyPhase;
     const missing_fields: string[] = [];
     const missing_color_teams: ColorTeamColor[] = [];
+
+    // Phase ordering: only forward transitions allowed (terminal states always reachable)
+    if (!isForwardTransition(currentPhase, target_phase)) {
+      missing_fields.push(`Cannot move from '${currentPhase}' to '${target_phase}' — only forward transitions allowed`);
+    }
 
     // Qualify → Pursue: need pwin, incumbent, preferred_vendor_analysis
     if (target_phase === "pursue") {
@@ -313,7 +331,7 @@ router.patch("/advance/:id", requireRole("admin", "bd_manager"), async (req: Req
   }
 
   const { id } = req.params;
-  const { target_phase } = req.body as { target_phase: ShipleyPhase };
+  const { target_phase, force } = req.body as { target_phase: ShipleyPhase; force?: boolean };
 
   if (!target_phase || !PHASE_ORDER.includes(target_phase)) {
     res.status(400).json(errorEnvelope("discipline", "advance", { code: "VALIDATION", message: "Invalid target_phase", detail: null }));
@@ -333,8 +351,14 @@ router.patch("/advance/:id", requireRole("admin", "bd_manager"), async (req: Req
 
     // Validate
     const opp = oppRows[0];
+    const currentPhase = (opp.shipley_phase ?? "identify") as ShipleyPhase;
     const missing_fields: string[] = [];
     const missing_color_teams: ColorTeamColor[] = [];
+
+    // Phase ordering: only forward transitions unless force=true
+    if (!force && !isForwardTransition(currentPhase, target_phase)) {
+      missing_fields.push(`Cannot move from '${currentPhase}' to '${target_phase}' — only forward transitions allowed (pass force: true to override)`);
+    }
 
     if (target_phase === "pursue") {
       if (!opp.pwin && opp.pwin !== 0) missing_fields.push("pwin");
