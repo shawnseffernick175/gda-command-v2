@@ -54,6 +54,37 @@ export type OpportunityStatus =
 /** SBA size standard classification for a given NAICS code. */
 export type NaicsSize = "small" | "large" | null;
 
+/** Entity status for company_entity records (W4 merger context). */
+export type EntityStatus = "legacy" | "merging" | "newco" | "subsidiary" | "partner";
+
+/** Company entity record (W4 — merger context). */
+export interface CompanyEntity {
+  entity_id: string;
+  legal_name: string;
+  dba_names: string[];
+  status: EntityStatus;
+  cage_code: string | null;
+  uei: string | null;
+  duns: string | null;
+  primary_naics: string | null;
+  naics_codes: string[];
+  psc_codes: string[];
+  set_aside_status: string[];
+  certifications: Array<{ name: string; issuer: string; expires: string | null }>;
+  contract_vehicles: Array<{ name: string; number: string; expires: string | null }>;
+  capabilities: string[];
+  bu_codes: unknown[];
+  differentiators: string | null;
+  headquarters: string | null;
+  employee_count: number | null;
+  revenue_band: string | null;
+  primary_customers: string[];
+  description: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Opportunity record matching Postgres schema + S-009 spec. */
 export interface Opportunity {
   id: string;
@@ -76,9 +107,11 @@ export interface Opportunity {
   qualified_by: string | null;
   description?: string | null;
   capture_stage?: string | null;
+  vehicle_type?: VehicleType | null;
   tags: string[];
   raw_source_url: string | null;
   data_source: string | null;
+  pursuing_entity_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1611,6 +1644,45 @@ export interface FastTrackMatch {
   };
 }
 
+
+// ---------------------------------------------------------------------------
+// W1: Vehicle Classification types
+// ---------------------------------------------------------------------------
+
+export type VehicleType =
+  | "idiq"
+  | "bpa"
+  | "gsa_schedule"
+  | "gwac"
+  | "full_and_open"
+  | "set_aside_sb"
+  | "set_aside_8a"
+  | "set_aside_hubzone"
+  | "set_aside_sdvosb"
+  | "set_aside_wosb"
+  | "sole_source"
+  | "task_order"
+  | "other";
+
+export type VehicleCategory = "contract" | "agreement" | "schedule" | "competition" | "set_aside" | "order" | "other";
+
+export interface ProcurementVehicle {
+  key: VehicleType;
+  label: string;
+  description: string | null;
+  category: VehicleCategory;
+  sort_order: number;
+}
+
+export interface VehicleSummary {
+  vehicle_type: VehicleType;
+  label: string;
+  category: VehicleCategory;
+  count: number;
+  total_value: number;
+  avg_score: number;
+}
+
 // ---------------------------------------------------------------------------
 // W2: Expanded Sources types
 // ---------------------------------------------------------------------------
@@ -1654,4 +1726,47 @@ export interface SourceSyncRun {
   duration_ms: number | null;
   error: string | null;
   metadata: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// W4: Merger Context types
+// ---------------------------------------------------------------------------
+
+export type DealType = "acquisition" | "merger" | "divestiture" | "joint_venture" | "strategic_alliance";
+export type DealStatus = "announced" | "pending" | "completed" | "blocked" | "withdrawn";
+export type OurImpact = "positive" | "negative" | "neutral" | "monitor";
+export type OppImpactType = "competitor_strengthened" | "competitor_weakened" | "new_teaming" | "lost_teaming" | "incumbent_change" | "neutral";
+
+export interface MergerAcquisition {
+  id: string;
+  acquirer_name: string;
+  target_name: string;
+  deal_type: DealType;
+  status: DealStatus;
+  announced_date: string | null;
+  closed_date: string | null;
+  deal_value: number | null;
+  rationale: string | null;
+  impact_summary: string | null;
+  affected_naics: string[];
+  affected_agencies: string[];
+  our_impact: OurImpact;
+  score_adjustment: number;
+  source_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MergerOppImpact {
+  id: string;
+  merger_id: string;
+  opportunity_id: string;
+  impact_type: OppImpactType;
+  description: string | null;
+  score_delta: number;
+  created_at: string;
+  opp_title?: string;
+  opp_agency?: string;
+  opp_value?: number;
 }

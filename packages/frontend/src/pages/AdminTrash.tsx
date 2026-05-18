@@ -14,12 +14,18 @@ const TABLES = [
   "competitor_profiles",
   "knowledge_documents",
   "cpars_records",
+  "company_entity",
 ];
 
+const TABLE_CONFIG: Record<string, { pk: string; displayField: string }> = {
+  company_entity: { pk: "entity_id", displayField: "legal_name" },
+};
+
+function getConfig(table: string) {
+  return TABLE_CONFIG[table] ?? { pk: "id", displayField: "title" };
+}
+
 interface TrashRecord {
-  id: string;
-  title?: string;
-  name?: string;
   deleted_at: string;
   [key: string]: unknown;
 }
@@ -46,6 +52,8 @@ export default function AdminTrash() {
     fetchTrash();
   }, [selectedTable]);
 
+  const cfg = getConfig(selectedTable);
+
   const handleUndelete = async (recordId: string) => {
     if (!confirm("Restore this record from trash?")) return;
     try {
@@ -62,7 +70,7 @@ export default function AdminTrash() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ version_number: restoreVer.version_number }),
           });
-          setRecords((prev) => prev.filter((r) => r.id !== recordId));
+          setRecords((prev) => prev.filter((r) => String(r[cfg.pk]) !== recordId));
         }
       }
     } catch {
@@ -116,20 +124,23 @@ export default function AdminTrash() {
             </tr>
           </thead>
           <tbody>
-            {records.map((r) => (
-              <tr key={r.id} style={{ borderBottom: "1px solid var(--color-border, #334155)" }}>
+            {records.map((r) => {
+              const rid = String(r[cfg.pk] ?? r.id ?? "");
+              const display = String(r[cfg.displayField] ?? r.title ?? r.name ?? "—");
+              return (
+              <tr key={rid} style={{ borderBottom: "1px solid var(--color-border, #334155)" }}>
                 <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)", fontFamily: "monospace" }}>
-                  {String(r.id).slice(0, 16)}
+                  {rid.slice(0, 16)}
                 </td>
                 <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)" }}>
-                  {r.title ?? r.name ?? "—"}
+                  {display}
                 </td>
                 <td style={{ padding: "8px 12px", color: "var(--color-text-muted, #94a3b8)" }}>
                   {r.deleted_at ? new Date(r.deleted_at).toLocaleString() : "—"}
                 </td>
                 <td style={{ padding: "8px 12px", textAlign: "right" }}>
                   <button
-                    onClick={() => handleUndelete(r.id)}
+                    onClick={() => handleUndelete(rid)}
                     style={{
                       background: "#22c55e",
                       color: "#fff",
@@ -144,7 +155,8 @@ export default function AdminTrash() {
                   </button>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       )}

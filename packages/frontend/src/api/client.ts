@@ -164,6 +164,7 @@ export interface OpportunityRow {
   tags: string[];
   raw_source_url: string | null;
   data_source: string | null;
+  pursuing_entity_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -3836,6 +3837,64 @@ export function resolveFixProposal(id: string, action: "approve" | "reject", not
   });
 }
 
+
+// ---------------------------------------------------------------------------
+// Vehicle Classification (W1)
+// ---------------------------------------------------------------------------
+
+export interface VehicleData {
+  key: string;
+  label: string;
+  description: string | null;
+  category: string;
+  sort_order: number;
+}
+
+export interface VehicleSummaryRow {
+  vehicle_type: string;
+  label: string;
+  category: string;
+  count: number;
+  total_value: number;
+  avg_score: number;
+}
+
+export interface VehiclesListData {
+  vehicles: VehicleData[];
+  summary: VehicleSummaryRow[];
+  total_opportunities: number;
+}
+
+export interface VehicleOppsData {
+  vehicle_type: string;
+  opportunities: OpportunityRow[];
+  total: number;
+}
+
+export function fetchVehicles() {
+  return request<VehiclesListData>("/vehicles");
+}
+
+export function fetchVehicleOpportunities(vehicleType: string) {
+  return request<VehicleOppsData>(`/vehicles/${vehicleType}/opportunities`);
+}
+
+export function classifyVehicles(opportunityIds?: string[]) {
+  return request<{ processed: number; classified: number }>("/vehicles/classify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ opportunity_ids: opportunityIds }),
+  });
+}
+
+export function setVehicleType(oppId: string, vehicleType: string) {
+  return request<{ id: string; vehicle_type: string }>(`/vehicles/${oppId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ vehicle_type: vehicleType }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Source Registry (W2)
 // ---------------------------------------------------------------------------
@@ -3907,6 +3966,7 @@ export function fetchSyncHistory() {
   return request<{ runs: SyncRunEntry[]; total: number }>("/sources/sync/history");
 }
 
+
 // ---------------------------------------------------------------------------
 // Opportunity Timeline (W5)
 // ---------------------------------------------------------------------------
@@ -3922,4 +3982,60 @@ export interface TimelineEvent {
 
 export function fetchOpportunityTimeline(oppId: string) {
   return request<{ events: TimelineEvent[] }>(`/opportunities/${oppId}/timeline`);
+}
+
+// ---------------------------------------------------------------------------
+// Merger Context (W4)
+// ---------------------------------------------------------------------------
+
+export interface MergerEntry {
+  id: string;
+  acquirer_name: string;
+  target_name: string;
+  deal_type: string;
+  status: string;
+  announced_date: string | null;
+  closed_date: string | null;
+  deal_value: number | null;
+  rationale: string | null;
+  impact_summary: string | null;
+  affected_naics: string[];
+  affected_agencies: string[];
+  our_impact: string;
+  score_adjustment: number;
+  source_url: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MergerImpactEntry {
+  id: string;
+  merger_id: string;
+  opportunity_id: string;
+  impact_type: string;
+  description: string | null;
+  score_delta: number;
+  created_at: string;
+  opp_title?: string;
+  opp_agency?: string;
+  opp_value?: number;
+}
+
+export interface MergersListData {
+  mergers: MergerEntry[];
+  total: number;
+  impact_summary: Record<string, number>;
+}
+
+export function fetchMergers(filters?: { status?: string; impact?: string }) {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.impact) params.set("impact", filters.impact);
+  const qs = params.toString();
+  return request<MergersListData>(`/mergers${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchMergerDetail(id: string) {
+  return request<{ merger: MergerEntry; impacts: MergerImpactEntry[] }>(`/mergers/${id}`);
 }

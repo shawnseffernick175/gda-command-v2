@@ -11,6 +11,7 @@ import {
 } from "../lib/n8n-data";
 import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
 import { recordVersion } from "../lib/versioning";
+import { log } from "../lib/logger";
 
 const router = Router();
 
@@ -1035,6 +1036,51 @@ router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res)
 });
 
 // ---------------------------------------------------------------------------
+// PUT /api/opportunities/:id — update opportunity fields (e.g. pursuing_entity_id)
+// ---------------------------------------------------------------------------
+router.put("/:id", requireRole("admin", "bd_manager"), async (req, res) => {
+  const { id } = req.params;
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-opportunities", "update", { code: "DB_UNAVAILABLE", message: "Database not configured", detail: null }));
+  }
+
+  const { pursuing_entity_id } = req.body;
+
+  try {
+    const setClauses: string[] = [];
+    const values: unknown[] = [id];
+    let idx = 2;
+
+    if (pursuing_entity_id !== undefined) {
+      setClauses.push(`pursuing_entity_id = $${idx}`);
+      values.push(pursuing_entity_id);
+      idx++;
+    }
+
+    if (setClauses.length === 0) {
+      return res.status(400).json(errorEnvelope("gda-opportunities", "update", { code: "NO_FIELDS", message: "No updatable fields provided", detail: null }));
+    }
+
+    setClauses.push(`updated_at = NOW()`);
+
+    const { rows } = await pool.query(
+      `UPDATE opportunities SET ${setClauses.join(", ")} WHERE id = $1 RETURNING *`,
+      values
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json(errorEnvelope("gda-opportunities", "update", { code: "NOT_FOUND", message: "Opportunity not found", detail: null }));
+    }
+
+    return res.json(successEnvelope("gda-opportunities", "update", rows[0]));
+  } catch (err) {
+    log.error("opportunity_update_error", { id, error: (err as Error).message });
+    return res.status(500).json(errorEnvelope("gda-opportunities", "update", { code: "QUERY_ERROR", message: "Failed to update opportunity", detail: null }));
+  }
+});
+
+// ---------------------------------------------------------------------------
 // PATCH /api/opportunities/:id/stage — change Shipley capture stage
 // ---------------------------------------------------------------------------
 router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) => {
@@ -1181,7 +1227,7 @@ router.get("/:id/timeline", async (req, res) => {
     res.status(500).json(
       errorEnvelope("gda-opportunities", "timeline", {
         code: "INTERNAL",
-        message: String(err),
+        message: "Failed to load timeline.",
         detail: null,
       })
     );

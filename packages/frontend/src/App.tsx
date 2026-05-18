@@ -39,7 +39,10 @@ import GovWin from "./pages/GovWin";
 import RiskRegister from "./pages/RiskRegister";
 import ProposalCenter from "./pages/ProposalCenter";
 import AdminTrash from "./pages/AdminTrash";
+import AdminCompanies from "./pages/AdminCompanies";
+import VehicleClassification from "./pages/VehicleClassification";
 import SourceManager from "./pages/SourceManager";
+import MergerContext from "./pages/MergerContext";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
@@ -58,6 +61,7 @@ const NAV_GROUPS = [
       { path: "/fast-track", label: "Fast Track", icon: "🚀" },
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
+      { path: "/vehicles", label: "Vehicles", icon: "🏗" },
       { path: "/approvals", label: "Approvals", icon: "✓" },
       { path: "/risk-register", label: "Risk Register", icon: "⚠" },
     ],
@@ -83,6 +87,7 @@ const NAV_GROUPS = [
       { path: "/knowledge", label: "Knowledge Base", icon: "📚" },
 
       { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
+      { path: "/mergers", label: "M&A Context", icon: "🔗" },
     ],
   },
   {
@@ -102,6 +107,7 @@ const NAV_GROUPS = [
       { path: "/workflows", label: "Workflows", icon: "⚙" },
       { path: "/admin/users", label: "Users", icon: "👥" },
       { path: "/admin/audit", label: "Audit Log", icon: "📜" },
+      { path: "/admin/companies", label: "Companies", icon: "🏢" },
       { path: "/admin/trash", label: "Trash", icon: "🗑" },
       { path: "/doctrine", label: "Doctrine", icon: "📖" },
       { path: "/book-of-truths", label: "Book of Truths", icon: "📓" },
@@ -507,11 +513,13 @@ export default function App() {
             <Route path="/color-review" element={<ColorReview />} />
             <Route path="/anomaly" element={<AnomalyDetection />} />
             <Route path="/sam-monitor" element={<SAMMonitor />} />
+            <Route path="/vehicles" element={<VehicleClassification />} />
 
 
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/audit" element={<AuditLog />} />
+            <Route path="/admin/companies" element={<AdminCompanies />} />
             <Route path="/admin/trash" element={<AdminTrash />} />
             <Route path="/charts" element={<Charts />} />
             <Route path="/govwin" element={<GovWin />} />
@@ -520,6 +528,7 @@ export default function App() {
             <Route path="/risk-register" element={<RiskRegister />} />
             <Route path="/proposal-center" element={<ProposalCenter />} />
             <Route path="/sources" element={<SourceManager />} />
+            <Route path="/mergers" element={<MergerContext />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
