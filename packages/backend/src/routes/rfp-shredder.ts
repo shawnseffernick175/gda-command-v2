@@ -13,7 +13,7 @@ import type {
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
-import { generateStorageKey, saveFile, isAllowedMimeType, getMaxFileSize } from "../lib/storage";
+import { generateStorageKey, saveFile, isAllowedMimeType, getMaxFileSize, resolveMimeType } from "../lib/storage";
 import { extractText, EXTRACTABLE_MIME_TYPES } from "../lib/extract-text";
 
 const router = Router();
@@ -131,7 +131,8 @@ const rfpUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: getMaxFileSize() },
   fileFilter: (_req, file, cb) => {
-    if (!EXTRACTABLE_MIME_TYPES.has(file.mimetype)) {
+    const resolved = resolveMimeType(file.mimetype, file.originalname);
+    if (!EXTRACTABLE_MIME_TYPES.has(resolved)) {
       cb(new Error(`File type ${file.mimetype} is not allowed for RFP shredding. Use PDF, DOC, DOCX, XLSX, XLS, PPTX, TXT, or CSV.`));
       return;
     }
@@ -170,6 +171,7 @@ router.post(
     // If file uploaded, store it and link to shred job
     let fileId: string | null = null;
     if (file) {
+      const resolvedMime = resolveMimeType(file.mimetype, file.originalname);
       const storageKey = generateStorageKey(file.originalname);
       saveFile(storageKey, file.buffer);
       fileId = `file-${Date.now()}`;
@@ -179,7 +181,7 @@ router.post(
         await pool.query(
           `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
+          [fileId, file.originalname, storageKey, resolvedMime, file.size, req.user?.userId ?? null],
         );
         log.info("rfp_file_uploaded", { fileId, fileName: file.originalname, sizeBytes: file.size });
       }
@@ -188,7 +190,7 @@ router.post(
     // Extract text from uploaded file
     let effectiveText = document_text ?? "";
     if (file && !document_text) {
-      effectiveText = await extractText(file.buffer, file.mimetype);
+      effectiveText = await extractText(file.buffer, resolveMimeType(file.mimetype, file.originalname));
     }
 
     const persistJob = async (status: ShredJobStatus, reqsFound: number, pageCount: number, errorMsg?: string) => {

@@ -5,7 +5,7 @@ import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
 import type { ColorReviewPhase, ColorReviewStatus } from "@gda/shared";
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
-import { generateStorageKey, saveFile, getMaxFileSize } from "../lib/storage";
+import { generateStorageKey, saveFile, getMaxFileSize, resolveMimeType } from "../lib/storage";
 import { log } from "../lib/logger";
 import { extractText } from "../lib/extract-text";
 
@@ -274,7 +274,8 @@ const proposalUpload = multer({
       "text/markdown",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ]);
-    if (!allowed.has(file.mimetype)) {
+    const resolved = resolveMimeType(file.mimetype, file.originalname);
+    if (!allowed.has(resolved)) {
       cb(new Error(`File type ${file.mimetype} not allowed. Upload PDF, DOCX, or TXT.`));
       return;
     }
@@ -322,7 +323,7 @@ router.post(
     // Extract text from uploaded file or use provided text
     let documentText = proposal_text ?? "";
     if (file && !proposal_text) {
-      documentText = await extractText(file.buffer, file.mimetype);
+      documentText = await extractText(file.buffer, resolveMimeType(file.mimetype, file.originalname));
     }
 
     if (!documentText) {
@@ -350,7 +351,7 @@ router.post(
           await pool.query(
             `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [fileId, file.originalname, storageKey, file.mimetype, file.size, req.user?.userId ?? null],
+            [fileId, file.originalname, storageKey, resolveMimeType(file.mimetype, file.originalname), file.size, req.user?.userId ?? null],
           );
         } catch (err) {
           log.error("color_review_file_save_error", { error: String(err) });
