@@ -732,6 +732,15 @@ function rowToProposal(row: Record<string, unknown>): Proposal {
   };
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function rowToSection(row: Record<string, unknown>): ProposalSection {
   return {
     id: String(row.id),
@@ -947,7 +956,6 @@ router.post("/:id/sections/:sectionId/restore", async (req, res) => {
       return res.status(400).json(errorEnvelope("GDA.proposals", "restore-version", { code: "BAD_REQUEST", message: "version_id required", detail: null }));
     }
 
-    // Save current content as a version before restoring
     const currentResult = await pool.query(
       `SELECT * FROM proposal_sections WHERE id = $1 AND proposal_id = $2`,
       [req.params.sectionId, req.params.id],
@@ -956,6 +964,16 @@ router.post("/:id/sections/:sectionId/restore", async (req, res) => {
       return res.status(404).json(errorEnvelope("GDA.proposals", "restore-version", { code: "NOT_FOUND", message: "Section not found", detail: null }));
     }
 
+    // Validate version_id exists BEFORE creating the auto-save snapshot
+    const versionResult = await pool.query(
+      `SELECT * FROM proposal_section_versions WHERE id = $1 AND section_id = $2`,
+      [version_id, req.params.sectionId],
+    );
+    if (versionResult.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.proposals", "restore-version", { code: "NOT_FOUND", message: "Version not found", detail: null }));
+    }
+
+    // Save current state before restore
     const current = rowToSection(currentResult.rows[0]);
     const versionCount = await pool.query(
       `SELECT COUNT(*) FROM proposal_section_versions WHERE section_id = $1`,
@@ -963,7 +981,6 @@ router.post("/:id/sections/:sectionId/restore", async (req, res) => {
     );
     const nextVersion = Number(versionCount.rows[0].count) + 1;
 
-    // Save current state before restore
     await pool.query(
       `INSERT INTO proposal_section_versions (id, section_id, proposal_id, version_number, content, word_count, change_summary, changed_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -973,15 +990,6 @@ router.post("/:id/sections/:sectionId/restore", async (req, res) => {
         current.content, current.word_count, "Auto-saved before version restore", "system",
       ],
     );
-
-    // Restore the requested version
-    const versionResult = await pool.query(
-      `SELECT * FROM proposal_section_versions WHERE id = $1 AND section_id = $2`,
-      [version_id, req.params.sectionId],
-    );
-    if (versionResult.rows.length === 0) {
-      return res.status(404).json(errorEnvelope("GDA.proposals", "restore-version", { code: "NOT_FOUND", message: "Version not found", detail: null }));
-    }
 
     const version = versionResult.rows[0];
     await pool.query(
@@ -1241,7 +1249,7 @@ router.get("/:id/export", async (req, res) => {
       res.send(md);
     } else if (format === "docx" || format === "word") {
       // Generate a simple HTML doc that Word can open
-      let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${proposal.title}</title>
+      let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(proposal.title)}</title>
 <style>body{font-family:'Calibri',sans-serif;margin:1in;line-height:1.6;color:#222;}
 h1{font-size:24pt;color:#1a365d;border-bottom:2px solid #1a365d;padding-bottom:8px;}
 h2{font-size:18pt;color:#2d4a7a;margin-top:24pt;border-bottom:1px solid #ccc;padding-bottom:4px;}
@@ -1253,13 +1261,13 @@ th{background:#f0f4f8;font-weight:bold;}
 .meta{color:#666;font-size:10pt;margin:4pt 0;}
 </style></head><body>\n`;
 
-      html += `<h1>${proposal.title}</h1>\n`;
-      html += `<p class="meta"><strong>Agency:</strong> ${proposal.agency} | `;
-      html += `<strong>Solicitation:</strong> ${proposal.solicitation_title || "N/A"} | `;
+      html += `<h1>${escapeHtml(proposal.title)}</h1>\n`;
+      html += `<p class="meta"><strong>Agency:</strong> ${escapeHtml(proposal.agency)} | `;
+      html += `<strong>Solicitation:</strong> ${escapeHtml(proposal.solicitation_title || "N/A")} | `;
       html += `<strong>Value:</strong> $${proposal.value_estimated.toLocaleString()} | `;
-      html += `<strong>Due:</strong> ${proposal.due_date || "TBD"}</p>\n`;
+      html += `<strong>Due:</strong> ${escapeHtml(proposal.due_date || "TBD")}</p>\n`;
       if (proposal.win_themes.length > 0) {
-        html += `<p class="meta"><strong>Win Themes:</strong> ${proposal.win_themes.join(", ")}</p>\n`;
+        html += `<p class="meta"><strong>Win Themes:</strong> ${escapeHtml(proposal.win_themes.join(", "))}</p>\n`;
       }
       html += `<hr>\n`;
 
@@ -1280,10 +1288,11 @@ th{background:#f0f4f8;font-weight:bold;}
 
         html += `<h2>${volumeLabels2[vol] ?? vol}</h2>\n`;
         for (const section of volSections) {
-          html += `<h3>${section.title}</h3>\n`;
-          const paragraphs = (section.content || "<em>[No content yet]</em>").split("\n\n");
+          html += `<h3>${escapeHtml(section.title)}</h3>\n`;
+          const rawContent = section.content || "[No content yet]";
+          const paragraphs = rawContent.split("\n\n");
           for (const p of paragraphs) {
-            html += `<p>${p.replace(/\n/g, "<br>")}</p>\n`;
+            html += `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>\n`;
           }
         }
       }
