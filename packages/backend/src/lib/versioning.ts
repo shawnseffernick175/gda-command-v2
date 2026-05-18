@@ -251,9 +251,10 @@ export async function restoreVersion(
     delete restoreData.created_at;
     delete restoreData.deleted_at;
 
-    // Build UPDATE SET clause from snapshot fields
+    // Build UPDATE SET clause from snapshot fields (quote identifiers to prevent injection)
+    const quoteIdent = (s: string) => '"' + s.replace(/"/g, '""') + '"';
     const keys = Object.keys(restoreData).filter(k => k !== pkColumn);
-    const setClauses = keys.map((k, i) => `${k} = $${i + 2}`);
+    const setClauses = keys.map((k, i) => `${quoteIdent(k)} = $${i + 2}`);
     const values = keys.map(k => {
       const val = restoreData[k];
       if (val !== null && typeof val === "object") return JSON.stringify(val);
