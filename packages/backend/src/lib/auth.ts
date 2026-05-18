@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 import { getPool } from "./db";
 
 const JWT_SECRET = process.env.JWT_SECRET ?? "gda-dev-secret-change-in-production";
-const ACCESS_TOKEN_TTL = "15m";
+const ACCESS_TOKEN_TTL = "8h";
 const REFRESH_TOKEN_TTL = "7d";
 
 export interface JWTPayload {

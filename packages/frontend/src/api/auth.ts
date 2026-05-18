@@ -130,7 +130,10 @@ export async function logout(): Promise<void> {
 
 /**
  * Fetch wrapper that adds Authorization header and handles token refresh.
+ * If refresh fails, redirects to login — never returns a raw 401 to the UI.
  */
+let _refreshPromise: Promise<boolean> | null = null;
+
 export async function authenticatedFetch(
   input: RequestInfo | URL,
   init?: RequestInit
@@ -145,15 +148,55 @@ export async function authenticatedFetch(
 
   // Auto-refresh on 401
   if (res.status === 401 && token) {
-    const refreshed = await refreshTokens();
+    // Coalesce concurrent refresh attempts
+    if (!_refreshPromise) {
+      _refreshPromise = refreshTokens().finally(() => { _refreshPromise = null; });
+    }
+    const refreshed = await _refreshPromise;
     if (refreshed) {
       const newToken = getAccessToken();
       if (newToken) {
         headers.set("Authorization", `Bearer ${newToken}`);
         res = await fetch(input, { ...init, headers });
       }
+    } else {
+      // Refresh failed — session expired, redirect to login
+      clearAuth();
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      return res;
     }
   }
 
   return res;
+}
+
+/**
+ * Start a background timer that proactively refreshes the access token
+ * before it expires. Call once after login.
+ */
+let _refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+export function startTokenRefreshTimer(): void {
+  stopTokenRefreshTimer();
+  // Refresh every 7 hours (token lasts 8h, refresh 1h before expiry)
+  _refreshTimer = setInterval(async () => {
+    if (!getAccessToken()) {
+      stopTokenRefreshTimer();
+      return;
+    }
+    const ok = await refreshTokens();
+    if (!ok) {
+      clearAuth();
+      window.location.href = "/login";
+    }
+  }, 7 * 60 * 60 * 1000);
+}
+
+export function stopTokenRefreshTimer(): void {
+  if (_refreshTimer) {
+    clearInterval(_refreshTimer);
+    _refreshTimer = null;
+  }
 }

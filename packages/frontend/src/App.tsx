@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
-import { isAuthenticated, logout, getUser } from "./api/auth";
+import { isAuthenticated, logout, getUser, startTokenRefreshTimer, stopTokenRefreshTimer } from "./api/auth";
 import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
 import OpsTracker from "./pages/OpsTracker";
@@ -138,6 +138,7 @@ export default function App() {
   }, [sidebarOpen]);
 
   const handleLogout = useCallback(async () => {
+    stopTokenRefreshTimer();
     await logout();
     setAuthed(false);
   }, []);
@@ -160,6 +161,7 @@ export default function App() {
           }
         }
         setAuthed(res.ok);
+        if (res.ok) startTokenRefreshTimer();
       } catch {
         setAuthed(false);
       }
@@ -203,7 +205,7 @@ export default function App() {
 
   // Gate: show login when not authenticated
   if (!authed) {
-    return <Login onAuth={() => setAuthed(true)} />;
+    return <Login onAuth={() => { setAuthed(true); startTokenRefreshTimer(); }} />;
   }
 
   return (
