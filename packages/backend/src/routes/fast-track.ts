@@ -278,9 +278,9 @@ router.post("/scan", requireRole("admin", "bd_manager"), async (_req, res) => {
 
       try {
         await pool.query(
-          `INSERT INTO fast_track_matches (id, signal_type, signal_title, signal_summary, technology_tags, company_name, company_role,
-            candidate_agency, score, status, needs_attention, sources, contract_path, recommended_action, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10, $11, $12, $13, NOW(), NOW())
+          `INSERT INTO fast_track_matches (id, signal_type, signal_title, executive_summary, technology_tags, company_name, company_role,
+            score, status, needs_attention, sources, contract_path, recommended_action, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11, $12, NOW(), NOW())
            ON CONFLICT (id) DO NOTHING`,
           [
             id,
@@ -290,7 +290,6 @@ router.post("/scan", requireRole("admin", "bd_manager"), async (_req, res) => {
             opp.naics ? [opp.naics] : [],
             opp.agency ?? "Unknown",
             "buyer",
-            opp.agency ?? null,
             score,
             naicsMatch,
             opp.sam_url ? [opp.sam_url] : [],

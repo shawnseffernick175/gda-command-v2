@@ -109,7 +109,7 @@ router.post("/analyze-competitors", requireRole("admin", "bd_manager"), async (_
 
     // Update FPDS awards with competitor match data
     const { rows: awards } = await pool.query(
-      "SELECT id, vendor, naics, award_date, period_end FROM fpds_awards WHERE is_competitor IS NULL OR is_competitor = false"
+      "SELECT id, vendor, naics, award_date, period_of_performance_end FROM fpds_awards WHERE is_competitor IS NULL OR is_competitor = false"
     );
 
     let matched = 0;
@@ -123,7 +123,7 @@ router.post("/analyze-competitors", requireRole("admin", "bd_manager"), async (_
       const isCompetitor = competitorIdx >= 0;
 
       // Check if contract is ending soon (within 12 months) → recompete candidate
-      const periodEnd = award.period_end ? new Date(award.period_end) : null;
+      const periodEnd = award.period_of_performance_end ? new Date(award.period_of_performance_end) : null;
       const twelveMonths = new Date();
       twelveMonths.setMonth(twelveMonths.getMonth() + 12);
       const isRecompete = periodEnd !== null && periodEnd <= twelveMonths && periodEnd > new Date();
