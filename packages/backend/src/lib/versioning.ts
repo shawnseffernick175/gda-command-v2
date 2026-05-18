@@ -207,7 +207,7 @@ export async function softDelete(
 
     // Set deleted_at
     await pool.query(
-      `UPDATE ${table} SET deleted_at = NOW() WHERE ${pkColumn} = $1`,
+      `UPDATE ${table} SET deleted_at = NOW() WHERE ${pkColumn} = $1 AND deleted_at IS NULL`,
       [recordId]
     );
 

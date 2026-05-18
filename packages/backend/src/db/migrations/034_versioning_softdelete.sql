@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS record_version (
   changed_by     TEXT NOT NULL,
   changed_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   change_type    TEXT NOT NULL CHECK (change_type IN ('create', 'update', 'delete', 'restore')),
-  change_summary JSONB
+  change_summary JSONB,
+  UNIQUE (table_name, record_id, version_number)
 );
 
 CREATE INDEX IF NOT EXISTS idx_rv_table_record ON record_version (table_name, record_id, version_number DESC);
