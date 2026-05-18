@@ -1201,19 +1201,19 @@ router.get("/:id/timeline", async (req, res) => {
 
   try {
     const versionRows = await pool.query(
-      `SELECT id, change_type, changed_by, created_at, snapshot
-       FROM record_versions
+      `SELECT version_id, change_type, changed_by, changed_at, snapshot
+       FROM record_version
        WHERE table_name = 'opportunities' AND record_id = $1
-       ORDER BY created_at DESC
+       ORDER BY changed_at DESC
        LIMIT 50`,
       [id]
     );
 
-    const events = versionRows.rows.map((r: { id: string; change_type: string; changed_by: string; created_at: string; snapshot: Record<string, unknown> }) => ({
-      id: r.id,
+    const events = versionRows.rows.map((r: { version_id: string; change_type: string; changed_by: string; changed_at: string; snapshot: Record<string, unknown> }) => ({
+      id: r.version_id,
       type: r.change_type,
       actor: r.changed_by,
-      timestamp: r.created_at,
+      timestamp: r.changed_at,
       summary: r.change_type === "create"
         ? "Opportunity created"
         : `Updated by ${r.changed_by}`,
