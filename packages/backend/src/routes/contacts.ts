@@ -220,7 +220,7 @@ router.post("/auto-capture", requireRole("admin", "bd_manager"), async (_req, re
 
       try {
         await pool.query(
-          `INSERT INTO contacts (id, first_name, last_name, title, agency, email, phone, status, relationship_strength, notes, data_source, created_at, updated_at)
+          `INSERT INTO contacts (id, first_name, last_name, title, agency, email, phone, status, relationship_strength, relationship_history, data_source, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', 'new', $8, 'sam.gov', NOW(), NOW())
            ON CONFLICT DO NOTHING`,
           [

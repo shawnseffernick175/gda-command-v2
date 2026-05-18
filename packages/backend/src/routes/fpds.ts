@@ -117,7 +117,9 @@ router.post("/analyze-competitors", requireRole("admin", "bd_manager"), async (_
 
     for (const award of awards) {
       const vendorLower = (award.vendor ?? "").toLowerCase();
-      const competitorIdx = competitorNames.findIndex((c) => vendorLower.includes(c) || c.includes(vendorLower));
+      const competitorIdx = vendorLower.length > 0
+        ? competitorNames.findIndex((c) => vendorLower.includes(c) || c.includes(vendorLower))
+        : -1;
       const isCompetitor = competitorIdx >= 0;
 
       // Check if contract is ending soon (within 12 months) → recompete candidate

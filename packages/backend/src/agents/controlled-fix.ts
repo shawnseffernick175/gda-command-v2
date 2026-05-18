@@ -417,7 +417,9 @@ export async function resolveFixProposal(
     }
   }
 
-  return proposal;
+  // Re-fetch proposal to reflect any status changes from applyApprovedFix
+  const fresh = await pool.query(`SELECT * FROM fix_proposals WHERE id = $1`, [id]);
+  return fresh.rows[0] ?? proposal;
 }
 
 async function applyApprovedFix(
