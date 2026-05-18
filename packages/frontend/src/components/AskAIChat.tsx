@@ -33,8 +33,14 @@ export default function AskAIChat({ opportunityId, opportunityTitle }: AskAIChat
       const data = await askOpportunityChat(opportunityId, userMsg.content, messages.slice(-6));
       const answer = data?.data?.answer ?? "I couldn't generate an answer. Please try again.";
       setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
-    } catch {
-      setMessages((prev) => [...prev, { role: "assistant", content: "Error connecting to AI service. Please try again." }]);
+    } catch (err) {
+      const isTimeout = (err as Error).name === "AbortError";
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: isTimeout
+          ? "Request timed out. The AI service may be overloaded \u2014 please try again."
+          : "Error connecting to AI service. Please try again.",
+      }]);
     } finally {
       setLoading(false);
     }

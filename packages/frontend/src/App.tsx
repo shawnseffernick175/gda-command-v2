@@ -544,8 +544,14 @@ function AskAnythingFAB() {
     setAnswer("");
   }, [pathname]);
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const handleAsk = async () => {
     if (!question.trim() || loading) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), 65_000);
     setLoading(true);
     setAnswer("");
     try {
@@ -553,13 +559,20 @@ function AskAnythingFAB() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: question.trim(), context: pathname }),
+        signal: controller.signal,
       });
       const data = await res.json();
       setAnswer(data?.data?.answer ?? data?.error?.message ?? "Could not get an answer. The AI service may be unavailable.");
-    } catch {
-      setAnswer("Error connecting to AI service. Check that OpenAI API key is configured in Settings.");
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        setAnswer("Request timed out. The AI service may be overloaded — please try again.");
+      } else {
+        setAnswer("Error connecting to AI service. Check that OpenAI API key is configured in Settings.");
+      }
+    } finally {
+      clearTimeout(timer);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!open) {
