@@ -98,7 +98,7 @@ export default function FinancialBible() {
       fetchMonthlyFinancials().then((env) => {
         if (env.success && env.data) setMonthly(env.data);
       }),
-    ]).finally(() => setLoading(false));
+    ]).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
