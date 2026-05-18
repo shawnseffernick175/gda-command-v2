@@ -1,10 +1,76 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
-import { getVersionHistory, getVersion, restoreVersion, softDelete } from "../lib/versioning";
+import { getVersionHistory, getVersion, restoreVersion, softDelete, isAllowedTable } from "../lib/versioning";
 import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
 
 const router = Router();
+
+const TABLE_VALIDATION_ERROR = {
+  code: "INVALID_TABLE",
+  message: "Table name not in allowlist",
+  detail: null,
+};
+
+/** GET /api/versions/trash/:table — list soft-deleted records for a table (admin only) */
+router.get(
+  "/trash/:table",
+  requireRole("admin"),
+  async (req, res) => {
+    const { table } = req.params;
+    if (!isAllowedTable(table)) {
+      res.status(400).json(errorEnvelope("versioning", "trash", TABLE_VALIDATION_ERROR));
+      return;
+    }
+    const pool = getPool();
+    if (!pool) {
+      res.json(successEnvelope("versioning", "trash", { records: [] }));
+      return;
+    }
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    try {
+      const { rows } = await pool.query(
+        `SELECT * FROM ${table} WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT $1`,
+        [limit]
+      );
+      res.json(successEnvelope("versioning", "trash", { records: rows, total: rows.length }));
+    } catch (err) {
+      res.status(500).json(
+        errorEnvelope("versioning", "trash", {
+          code: "DB_ERROR",
+          message: (err as Error).message,
+          detail: null,
+        })
+      );
+    }
+  }
+);
+
+/** DELETE /api/versions/soft-delete/:table/:recordId — soft-delete a record (admin only) */
+router.delete(
+  "/soft-delete/:table/:recordId",
+  requireRole("admin"),
+  async (req, res) => {
+    const { table, recordId } = req.params;
+    if (!isAllowedTable(table)) {
+      res.status(400).json(errorEnvelope("versioning", "soft-delete", TABLE_VALIDATION_ERROR));
+      return;
+    }
+    const userId = req.user?.userId ?? "unknown";
+    const ok = await softDelete(table, recordId, userId);
+    if (!ok) {
+      res.status(404).json(
+        errorEnvelope("versioning", "soft-delete", {
+          code: "NOT_FOUND",
+          message: "Record not found or already deleted",
+          detail: null,
+        })
+      );
+      return;
+    }
+    res.json(successEnvelope("versioning", "soft-delete", { deleted: true }));
+  }
+);
 
 /** GET /api/versions/:table/:recordId — version history for a record */
 router.get("/:table/:recordId", async (req, res) => {
@@ -37,6 +103,10 @@ router.post(
   requireRole("admin"),
   async (req, res) => {
     const { table, recordId } = req.params;
+    if (!isAllowedTable(table)) {
+      res.status(400).json(errorEnvelope("versioning", "restore", TABLE_VALIDATION_ERROR));
+      return;
+    }
     const { version_number } = req.body;
     if (!version_number || typeof version_number !== "number") {
       res.status(400).json(
@@ -61,58 +131,6 @@ router.post(
       return;
     }
     res.json(successEnvelope("versioning", "restore", restored));
-  }
-);
-
-/** DELETE /api/versions/soft-delete/:table/:recordId — soft-delete a record (admin only) */
-router.delete(
-  "/soft-delete/:table/:recordId",
-  requireRole("admin"),
-  async (req, res) => {
-    const { table, recordId } = req.params;
-    const userId = req.user?.userId ?? "unknown";
-    const ok = await softDelete(table, recordId, userId);
-    if (!ok) {
-      res.status(404).json(
-        errorEnvelope("versioning", "soft-delete", {
-          code: "NOT_FOUND",
-          message: "Record not found or already deleted",
-          detail: null,
-        })
-      );
-      return;
-    }
-    res.json(successEnvelope("versioning", "soft-delete", { deleted: true }));
-  }
-);
-
-/** GET /api/versions/trash/:table — list soft-deleted records for a table (admin only) */
-router.get(
-  "/trash/:table",
-  requireRole("admin"),
-  async (req, res) => {
-    const pool = getPool();
-    if (!pool) {
-      res.json(successEnvelope("versioning", "trash", { records: [] }));
-      return;
-    }
-    const { table } = req.params;
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
-    try {
-      const { rows } = await pool.query(
-        `SELECT * FROM ${table} WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT $1`,
-        [limit]
-      );
-      res.json(successEnvelope("versioning", "trash", { records: rows, total: rows.length }));
-    } catch (err) {
-      res.status(500).json(
-        errorEnvelope("versioning", "trash", {
-          code: "DB_ERROR",
-          message: (err as Error).message,
-          detail: null,
-        })
-      );
-    }
   }
 );
 

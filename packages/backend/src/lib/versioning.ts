@@ -8,6 +8,28 @@
 import { getPool } from "./db";
 import { log } from "./logger";
 
+const ALLOWED_TABLES = new Set([
+  "opportunities",
+  "capture_plans",
+  "capture_activities",
+  "proposals",
+  "proposal_sections",
+  "compliance_requirements",
+  "contacts",
+  "intel_items",
+  "doctrine_drafts",
+  "risk_register",
+  "color_reviews",
+  "competitor_profiles",
+  "approvals",
+  "knowledge_documents",
+  "cpars_records",
+]);
+
+export function isAllowedTable(table: string): boolean {
+  return ALLOWED_TABLES.has(table);
+}
+
 export interface VersionEntry {
   version_id: string;
   table_name: string;
@@ -171,6 +193,7 @@ export async function softDelete(
   userId: string,
   pkColumn = "id"
 ): Promise<boolean> {
+  if (!isAllowedTable(table)) return false;
   const pool = getPool();
   if (!pool) return false;
 
@@ -213,6 +236,7 @@ export async function restoreVersion(
   userId: string,
   pkColumn = "id"
 ): Promise<Record<string, unknown> | null> {
+  if (!isAllowedTable(table)) return null;
   const pool = getPool();
   if (!pool) return null;
 
