@@ -76,6 +76,7 @@ export interface Opportunity {
   qualified_by: string | null;
   description?: string | null;
   capture_stage?: string | null;
+  vehicle_type?: VehicleType | null;
   tags: string[];
   raw_source_url: string | null;
   data_source: string | null;
@@ -1609,6 +1610,45 @@ export interface FastTrackMatch {
     notes: string[];
     reserved: boolean;
   };
+}
+
+
+// ---------------------------------------------------------------------------
+// W1: Vehicle Classification types
+// ---------------------------------------------------------------------------
+
+export type VehicleType =
+  | "idiq"
+  | "bpa"
+  | "gsa_schedule"
+  | "gwac"
+  | "full_and_open"
+  | "set_aside_sb"
+  | "set_aside_8a"
+  | "set_aside_hubzone"
+  | "set_aside_sdvosb"
+  | "set_aside_wosb"
+  | "sole_source"
+  | "task_order"
+  | "other";
+
+export type VehicleCategory = "contract" | "agreement" | "schedule" | "competition" | "set_aside" | "order" | "other";
+
+export interface ProcurementVehicle {
+  key: VehicleType;
+  label: string;
+  description: string | null;
+  category: VehicleCategory;
+  sort_order: number;
+}
+
+export interface VehicleSummary {
+  vehicle_type: VehicleType;
+  label: string;
+  category: VehicleCategory;
+  count: number;
+  total_value: number;
+  avg_score: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -39,6 +39,7 @@ import GovWin from "./pages/GovWin";
 import RiskRegister from "./pages/RiskRegister";
 import ProposalCenter from "./pages/ProposalCenter";
 import AdminTrash from "./pages/AdminTrash";
+import VehicleClassification from "./pages/VehicleClassification";
 import SourceManager from "./pages/SourceManager";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
@@ -58,6 +59,7 @@ const NAV_GROUPS = [
       { path: "/fast-track", label: "Fast Track", icon: "🚀" },
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
+      { path: "/vehicles", label: "Vehicles", icon: "🏗" },
       { path: "/approvals", label: "Approvals", icon: "✓" },
       { path: "/risk-register", label: "Risk Register", icon: "⚠" },
     ],
@@ -507,6 +509,7 @@ export default function App() {
             <Route path="/color-review" element={<ColorReview />} />
             <Route path="/anomaly" element={<AnomalyDetection />} />
             <Route path="/sam-monitor" element={<SAMMonitor />} />
+            <Route path="/vehicles" element={<VehicleClassification />} />
 
 
             <Route path="/fpds-monitor" element={<FPDSMonitor />} />
