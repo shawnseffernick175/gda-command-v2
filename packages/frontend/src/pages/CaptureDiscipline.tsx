@@ -100,9 +100,10 @@ export default function CaptureDiscipline() {
 
   const resolveAlert = async (alertId: string) => {
     try {
-      await authenticatedFetch(`/api/capture-discipline/alerts/${alertId}/resolve`, {
+      const res = await authenticatedFetch(`/api/capture-discipline/alerts/${alertId}/resolve`, {
         method: "POST",
       });
+      if (!res.ok) return;
       setData((prev) =>
         prev
           ? { ...prev, alerts: prev.alerts.filter((a) => a.id !== alertId) }
