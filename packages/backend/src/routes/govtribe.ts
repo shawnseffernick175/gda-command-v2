@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireRole } from "../lib/auth";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import {
   searchGovTribeAwards,
@@ -71,7 +72,7 @@ router.get("/credits", (_req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/govtribe/credits/reset — reset credit cycle counter
 // ---------------------------------------------------------------------------
-router.post("/credits/reset", (_req, res) => {
+router.post("/credits/reset", requireRole("admin"), (_req, res) => {
   resetGovTribeCreditCycle();
   res.json(
     successEnvelope("GDA.govtribe.credits", "reset", { reset: true }, {
