@@ -51,7 +51,7 @@ async function countDB(from: Date, to: Date): Promise<number> {
   const toStr = toDBDate(to);
   const { rows: [{ count }] } = await pool.query(
     `SELECT COUNT(*)::int AS count FROM sam_opportunities
-     WHERE posted_date >= $1::date AND posted_date <= $2::date + INTERVAL '1 day'`,
+     WHERE posted_date >= $1::date AND posted_date < $2::date + INTERVAL '1 day'`,
     [fromStr, toStr],
   );
   return count;
