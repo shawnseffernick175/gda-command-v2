@@ -34,13 +34,14 @@ Sources examined:
 | F-008 | On user action | P1 | LLM calls hang forever — no timeout, chat freezes | **Fixed** (PR #194) |
 | F-009 | On every write | P1 | Versioning triggers fire 3× per write (dedup masks it) | **Fixed in audit** (PR #208) |
 | F-010 | On fresh deploy | P1 | Duplicate migration numbers (036, 038, 039, 040) — undefined ordering | **Fixed** (PR #224) |
-| F-011 | On fresh deploy | P1 | Missing migration 024 — file not in repo, schema_migrations references it | Open |
+| F-011 | On fresh deploy | P1 | Missing migration 024 — file not in repo, schema_migrations references it | **Fixed** (PR #227) |
 | F-012 | Always | P2 | 42 catch blocks swallow errors silently — failures invisible | **Fixed in audit** (PR #208) |
 | F-013 | On startup | P2 | Background tasks start before DB is ready | **Fixed** (PR #213 — waitForDB) |
 | F-014 | Preventive | P2 | No cross-file type-safety validation in migrations | Open (tracked separately) |
 | F-015 | Every 6h | P2 | Ingest mappers (SAM, GovTribe, GovWin, FPDS) lack consistent input sanitization | Open (tracked separately) |
 | F-016 | Always | P2 | Schema-mapper drift — mappers write fields the DB silently drops, no detection | Open (tracked separately) |
 | F-017 | On deploy | P1 | Migration system tests fresh-deploy only, not production-state-dependent migrations — already produced one incident (PR #224 / migration 045 UNIQUE violation) | Open (active gap) |
+| F-018 | Unknown | P2 | Existing migrations may have unmarked state-dependent operations without corresponding regression tests | Open (audit needed) |
 
 ---
 
@@ -209,6 +210,16 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 **Proposed fix:** For any future state-dependent migration, require a corresponding regression test that pre-populates the relevant prior state and asserts the migration completes without error. Document this as a convention in the migrations README. Options for systematic enforcement: (a) CI script that detects UPDATE/DELETE in new migrations and requires a matching test file, (b) comment-based metadata (e.g., `-- state-dependent: true`) that triggers the test requirement.
 
 **Proposed regression test:** Per-migration tests for state-dependent migrations (like `test-migration-045.ts`). The existing smoke test remains valuable for fresh-deploy ordering but is insufficient for production-state bugs.
+
+### F-018 — Audit Existing Migrations for Unmarked State-Dependent Operations
+
+**Root cause:** The state-dependent migration convention (F-017) applies going forward, but migrations that already shipped may contain UPDATE, DELETE, or INSERT ... ON CONFLICT operations that depend on prior database state — and none of those have corresponding regression tests.
+
+**Evidence:** Migration 045 (F-010 fix) was the first identified case of a state-dependent migration without a test. The convention was established after the incident, but no retroactive audit has been done on migrations 001–046.
+
+**Proposed fix:** One-time pass: scan all existing migrations for state-modifying operations (UPDATE, DELETE, INSERT with ON CONFLICT that has side effects beyond DO NOTHING). For each, assess whether a regression test is needed and add one if so.
+
+**Proposed regression test:** Per-migration tests for any identified state-dependent migrations, following the `test-migration-045.ts` pattern.
 
 ---
 
