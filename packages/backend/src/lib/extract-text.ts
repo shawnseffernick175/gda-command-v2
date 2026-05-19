@@ -73,7 +73,7 @@ async function extractXlsx(buffer: Buffer): Promise<string> {
       lines.push(`--- Sheet: ${sheet.name} ---`);
       sheet.eachRow((row) => {
         const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
-        const text = vals.map(String).filter(Boolean).join(" | ");
+        const text = vals.map((v) => (v == null ? "" : typeof v === "object" ? ("text" in v ? String(v.text) : "result" in v ? String(v.result) : "") : String(v))).filter(Boolean).join(" | ");
         if (text.trim()) lines.push(text);
       });
     });

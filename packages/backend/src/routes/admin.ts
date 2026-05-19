@@ -330,4 +330,108 @@ router.get("/invitations", requireRole("admin"), async (_req: Request, res: Resp
   }
 });
 
+// GET /api/admin/health — comprehensive health dashboard (Phase 6)
+router.get("/health", requireRole("admin"), async (_req: Request, res: Response) => {
+  const pool = getPool();
+  if (!pool) {
+    res.status(503).json({ success: false, error: "Database not configured" });
+    return;
+  }
+
+  const checks: Array<{ name: string; status: string; detail?: string; latencyMs?: number }> = [];
+
+  // 1. Database connectivity
+  const dbStart = Date.now();
+  try {
+    await pool.query("SELECT 1");
+    checks.push({ name: "postgresql", status: "healthy", latencyMs: Date.now() - dbStart });
+  } catch (err) {
+    checks.push({ name: "postgresql", status: "unhealthy", detail: (err as Error).message, latencyMs: Date.now() - dbStart });
+  }
+
+  // 2. Table row counts for key tables
+  try {
+    const { rows } = await pool.query(`
+      SELECT relname AS table_name, n_live_tup AS row_count
+      FROM pg_stat_user_tables
+      WHERE schemaname = 'public'
+      ORDER BY n_live_tup DESC
+      LIMIT 20
+    `);
+    checks.push({ name: "table_counts", status: "healthy", detail: JSON.stringify(rows) });
+  } catch (err) {
+    checks.push({ name: "table_counts", status: "error", detail: (err as Error).message });
+  }
+
+  // 3. Versioning trigger health
+  try {
+    const { rows } = await pool.query(`
+      SELECT trigger_name, event_object_table
+      FROM information_schema.triggers
+      WHERE trigger_name LIKE 'trg_version_%'
+      ORDER BY event_object_table
+    `);
+    const tableGroups: Record<string, number> = {};
+    for (const r of rows) {
+      const t = r.event_object_table as string;
+      tableGroups[t] = (tableGroups[t] ?? 0) + 1;
+    }
+    const duplicates = Object.entries(tableGroups).filter(([, c]) => c > 1);
+    checks.push({
+      name: "versioning_triggers",
+      status: duplicates.length > 0 ? "warning" : "healthy",
+      detail: duplicates.length > 0
+        ? `Duplicate triggers on: ${duplicates.map(([t, c]) => `${t}(${c})`).join(", ")}`
+        : `${rows.length} triggers active`,
+    });
+  } catch (err) {
+    checks.push({ name: "versioning_triggers", status: "error", detail: (err as Error).message });
+  }
+
+  // 4. Record version coverage
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*) AS cnt FROM record_version");
+    checks.push({
+      name: "version_history",
+      status: parseInt(rows[0].cnt) > 0 ? "healthy" : "warning",
+      detail: `${rows[0].cnt} version records`,
+    });
+  } catch (err) {
+    checks.push({ name: "version_history", status: "error", detail: (err as Error).message });
+  }
+
+  // 5. Empty tables count
+  try {
+    const { rows } = await pool.query(`
+      SELECT COUNT(*) AS cnt
+      FROM pg_stat_user_tables
+      WHERE schemaname = 'public' AND n_live_tup = 0
+    `);
+    checks.push({
+      name: "empty_tables",
+      status: parseInt(rows[0].cnt) > 20 ? "warning" : "healthy",
+      detail: `${rows[0].cnt} empty tables`,
+    });
+  } catch (err) {
+    checks.push({ name: "empty_tables", status: "error", detail: (err as Error).message });
+  }
+
+  // 6. Migration count
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*) AS cnt FROM schema_migrations");
+    checks.push({ name: "migrations", status: "healthy", detail: `${rows[0].cnt} migrations applied` });
+  } catch (err) {
+    checks.push({ name: "migrations", status: "error", detail: (err as Error).message });
+  }
+
+  const allHealthy = checks.every((c) => c.status !== "unhealthy" && c.status !== "error");
+
+  res.json(successEnvelope("admin", "health-dashboard", {
+    status: allHealthy ? "healthy" : "degraded",
+    timestamp: new Date().toISOString(),
+    uptimeSec: Math.round(process.uptime()),
+    checks,
+  }));
+});
+
 export default router;
