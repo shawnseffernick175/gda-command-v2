@@ -14,6 +14,16 @@ import {
 
 const router = Router();
 
+function parsePageParam(raw: unknown, fallback: number): number {
+  const n = parseInt(String(raw ?? fallback), 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function parsePerPage(raw: unknown, fallback = 25, max = 100): number {
+  const n = parseInt(String(raw ?? fallback), 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, max) : fallback;
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/govtribe/health — automated MCP endpoint + API key validation
 // Same pattern as SAM verify — no manual curl needed.
@@ -76,8 +86,8 @@ router.post("/credits/reset", (_req, res) => {
 router.get("/awards", async (req, res) => {
   try {
     const query = String(req.query.q ?? req.query.query ?? "");
-    const per_page = req.query.per_page ? Number(req.query.per_page) : 25;
-    const page = req.query.page ? Number(req.query.page) : 1;
+    const per_page = parsePerPage(req.query.per_page);
+    const page = parsePageParam(req.query.page, 1);
     const date_range = req.query.date_range ? String(req.query.date_range) : undefined;
 
     const result = await searchGovTribeAwards(query, { per_page, page, date_range });
@@ -104,8 +114,8 @@ router.get("/awards", async (req, res) => {
 router.get("/forecasts", async (req, res) => {
   try {
     const query = String(req.query.q ?? req.query.query ?? "");
-    const per_page = req.query.per_page ? Number(req.query.per_page) : 25;
-    const page = req.query.page ? Number(req.query.page) : 1;
+    const per_page = parsePerPage(req.query.per_page);
+    const page = parsePageParam(req.query.page, 1);
 
     const result = await searchGovTribeForecasts(query, { per_page, page });
     res.json(
@@ -131,8 +141,8 @@ router.get("/forecasts", async (req, res) => {
 router.get("/contacts", async (req, res) => {
   try {
     const query = String(req.query.q ?? req.query.query ?? "");
-    const per_page = req.query.per_page ? Number(req.query.per_page) : 25;
-    const page = req.query.page ? Number(req.query.page) : 1;
+    const per_page = parsePerPage(req.query.per_page);
+    const page = parsePageParam(req.query.page, 1);
     const agency_ids = req.query.agency_ids
       ? String(req.query.agency_ids).split(",")
       : undefined;
@@ -161,8 +171,8 @@ router.get("/contacts", async (req, res) => {
 router.get("/vendors", async (req, res) => {
   try {
     const query = String(req.query.q ?? req.query.query ?? "");
-    const per_page = req.query.per_page ? Number(req.query.per_page) : 25;
-    const page = req.query.page ? Number(req.query.page) : 1;
+    const per_page = parsePerPage(req.query.per_page);
+    const page = parsePageParam(req.query.page, 1);
 
     const result = await searchGovTribeVendors(query, { per_page, page });
     res.json(
@@ -188,8 +198,8 @@ router.get("/vendors", async (req, res) => {
 router.get("/vehicles", async (req, res) => {
   try {
     const query = String(req.query.q ?? req.query.query ?? "");
-    const per_page = req.query.per_page ? Number(req.query.per_page) : 25;
-    const page = req.query.page ? Number(req.query.page) : 1;
+    const per_page = parsePerPage(req.query.per_page);
+    const page = parsePageParam(req.query.page, 1);
 
     const result = await searchGovTribeVehicles(query, { per_page, page });
     res.json(
