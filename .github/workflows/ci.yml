@@ -61,6 +61,10 @@ jobs:
         env:
           DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
         run: npx tsx packages/backend/src/db/migrate.ts
+      - name: Regression test — migration 044 non-UUID IDs
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+        run: npx tsx packages/backend/src/db/test-migration-044.ts
 
   audit:
     name: Dependency Audit
