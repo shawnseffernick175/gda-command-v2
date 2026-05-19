@@ -43,6 +43,7 @@ import AdminCompanies from "./pages/AdminCompanies";
 import VehicleClassification from "./pages/VehicleClassification";
 import SourceManager from "./pages/SourceManager";
 import MergerContext from "./pages/MergerContext";
+import AIGateway from "./pages/AIGateway";
 import CaptureDiscipline from "./pages/CaptureDiscipline";
 import NotFound from "./pages/NotFound";
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
@@ -89,6 +90,7 @@ const NAV_GROUPS = [
 
       { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
       { path: "/mergers", label: "M&A Context", icon: "🔗" },
+      { path: "/ai-gateway", label: "AI Gateway", icon: "🤖" },
       { path: "/capture-discipline", label: "Capture Discipline", icon: "🎯" },
     ],
   },
@@ -531,6 +533,7 @@ export default function App() {
             <Route path="/proposal-center" element={<ProposalCenter />} />
             <Route path="/sources" element={<SourceManager />} />
             <Route path="/mergers" element={<MergerContext />} />
+            <Route path="/ai-gateway" element={<AIGateway />} />
             <Route path="/capture-discipline" element={<CaptureDiscipline />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
