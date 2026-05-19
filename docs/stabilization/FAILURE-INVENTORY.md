@@ -38,6 +38,7 @@ Sources examined:
 | F-012 | Always | P2 | 42 catch blocks swallow errors silently — failures invisible | **Fixed in audit** (PR #208) |
 | F-013 | On startup | P2 | Background tasks start before DB is ready | **Fixed** (PR #213 — waitForDB) |
 | F-014 | Preventive | P2 | No cross-file type-safety validation in migrations | Open (tracked separately) |
+| F-015 | Every 6h | P2 | Ingest mappers (SAM, GovTribe, GovWin, FPDS) lack consistent input sanitization | Open (tracked separately) |
 
 ---
 
@@ -168,6 +169,18 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 **Proposed fix:** A CI check that parses all migration SQL files and validates that column types referenced in INSERT/UPDATE/CAST operations match the CREATE TABLE definitions from earlier migrations. This is a preventive measure — tracked as separate work, not blocking current stabilization fixes.
 
 **Proposed regression test:** CI script that scans migration files for `::uuid`, `::integer`, `::boolean` casts and cross-references them against the column types from CREATE TABLE statements.
+
+---
+
+### F-015 — Ingest Mappers Lack Consistent Input Sanitization
+
+**Root cause:** The empty-string-to-null bug fixed in F-004 (SAM mapper `responseDeadLine`) is a symptom of a broader pattern: all four ingest mappers (SAM, GovTribe, GovWin, FPDS) use `??` for nullish coalescing, which does not catch empty strings. Any TIMESTAMPTZ, NUMERIC, or BOOLEAN column receiving an empty string from an API response will cause an upsert failure — the same silent data loss seen in F-004.
+
+**Evidence:** F-004 confirmed the pattern in the SAM mapper. The same `raw.field ?? null` pattern appears in `govtribe-api.ts`, `govwin-api.ts`, and `fpds-api.ts` for date and numeric fields.
+
+**Proposed fix:** Audit all four mapper files. Apply the `tsOrNull()` pattern to every TIMESTAMPTZ field and add equivalent `numOrNull()` for NUMERIC fields. This is a systematic sweep — tracked as separate work, not blocking current stabilization fixes.
+
+**Proposed regression test:** Extend `sam-api-mapper.test.ts` pattern to all four mappers. Each test seeds empty-string inputs for every date/numeric field and asserts null output.
 
 ---
 

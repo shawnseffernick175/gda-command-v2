@@ -9,19 +9,30 @@
  * Fixed in PR #213. This test verifies the handlers remain installed.
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { installCrashHandlers } from "../lib/crash-handlers";
 
 describe("crash handler registration (F-002)", () => {
-  beforeAll(async () => {
-    // Import app to trigger handler registration (side effect of server.ts)
-    await import("../server");
+  let rejectionCountBefore: number;
+  let exceptionCountBefore: number;
+
+  beforeAll(() => {
+    rejectionCountBefore = process.listenerCount("unhandledRejection");
+    exceptionCountBefore = process.listenerCount("uncaughtException");
+    installCrashHandlers();
   });
 
-  it("has at least one unhandledRejection listener", () => {
-    expect(process.listenerCount("unhandledRejection")).toBeGreaterThan(0);
+  it("registers an unhandledRejection listener", () => {
+    expect(process.listenerCount("unhandledRejection")).toBeGreaterThan(rejectionCountBefore);
   });
 
-  it("has at least one uncaughtException listener", () => {
-    expect(process.listenerCount("uncaughtException")).toBeGreaterThan(0);
+  it("registers an uncaughtException listener", () => {
+    expect(process.listenerCount("uncaughtException")).toBeGreaterThan(exceptionCountBefore);
+  });
+
+  it("is idempotent — calling twice does not double-register", () => {
+    const before = process.listenerCount("unhandledRejection");
+    installCrashHandlers();
+    expect(process.listenerCount("unhandledRejection")).toBe(before);
   });
 });

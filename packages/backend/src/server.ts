@@ -63,6 +63,7 @@ import { dbConfig, healthCheck as dbHealthCheck, waitForDB } from "./lib/db";
 import { WEBHOOK_REGISTRY, getRegistrySummary } from "./lib/webhook-registry";
 import { isLLMAvailable, getAvailableModels } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
+import { installCrashHandlers } from "./lib/crash-handlers";
 import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
 import { startAgentScheduler, stopAgentScheduler } from "./lib/agent-scheduler";
@@ -343,21 +344,6 @@ function shutdown(signal: string) {
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
-// Crash safety net — log and survive unhandled errors instead of silently dying
-process.on("unhandledRejection", (reason) => {
-  log.error("unhandled_rejection", {
-    error: reason instanceof Error ? reason.message : String(reason),
-    stack: reason instanceof Error ? reason.stack?.slice(0, 2000) : undefined,
-  });
-});
-
-process.on("uncaughtException", (err) => {
-  log.error("uncaught_exception", {
-    error: err.message,
-    stack: err.stack?.slice(0, 2000),
-  });
-  // Give the logger time to flush, then exit (container will restart)
-  setTimeout(() => process.exit(1), 1000);
-});
+installCrashHandlers();
 
 export default app;

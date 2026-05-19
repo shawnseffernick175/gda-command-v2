@@ -201,7 +201,6 @@ export function mapToDBRecord(raw: SAMOpportunityRaw): Record<string, unknown> {
     value_estimate: raw.award?.amount ? parseFloat(raw.award.amount) : null,
     response_deadline: tsOrNull(raw.responseDeadLine),
     posted_date: tsOrNull(raw.postedDate),
-    archive_date: tsOrNull(raw.archiveDate),
     place_of_performance: placeOfPerf || null,
     relevance_score: 50, // default; overridden by AI scoring later
     relevance_reasons: [],
