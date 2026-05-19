@@ -128,6 +128,35 @@ export function fetchQALatestFailures() {
   return request<QAFailuresData>("/qa/latest-failures");
 }
 
+export interface SAMVerifyRun {
+  id: string;
+  ran_at: string;
+  days_checked: number;
+  sam_count: number;
+  db_count_before: number;
+  db_count_after: number | null;
+  gap_before_pct: number;
+  gap_after_pct: number | null;
+  backfill_ran: boolean;
+  backfill_fetched: number | null;
+  backfill_upserted: number | null;
+  backfill_errors: number | null;
+  status: "pass" | "fail" | "error";
+  error_message: string | null;
+  duration_ms: number;
+}
+
+export interface SAMVerifyData {
+  overall: "operational" | "degraded" | "error" | "unknown";
+  latest: SAMVerifyRun | null;
+  history: SAMVerifyRun[];
+  source: string;
+}
+
+export function fetchSAMVerify() {
+  return request<SAMVerifyData>("/qa/sam-verify");
+}
+
 export function fetchWorkflowRegistry() {
   return request<WorkflowRegistryData>("/workflows/registry");
 }

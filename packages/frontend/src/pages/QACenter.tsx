@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   fetchQAHealth,
   fetchQALatestFailures,
+  fetchSAMVerify,
   triggerControlledFix,
   fetchPendingFixes,
   resolveFixProposal as resolveFixProposalApi,
@@ -10,6 +11,8 @@ import {
   type QACheckRow,
   type FixProposalItem,
   type ControlledFixResult,
+  type SAMVerifyData,
+  type SAMVerifyRun,
 } from "../api/client";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -39,6 +42,7 @@ export default function QACenter() {
   const [fixesLoading, setFixesLoading] = useState(false);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [expandedFix, setExpandedFix] = useState<string | null>(null);
+  const [samVerify, setSamVerify] = useState<SAMVerifyData | null>(null);
 
   async function load() {
     setLoading(true);
@@ -54,6 +58,11 @@ export default function QACenter() {
       }
       if (failuresRes.success && failuresRes.data)
         setFailures(failuresRes.data.rows);
+
+      try {
+        const samRes = await fetchSAMVerify();
+        if (samRes.success && samRes.data) setSamVerify(samRes.data);
+      } catch { /* sam-verify table may not exist yet */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -134,6 +143,8 @@ export default function QACenter() {
       </div>
 
       {health && <HealthPanel health={health} />}
+
+      {samVerify && <SAMVerifyPanel data={samVerify} />}
 
       <div style={{ marginTop: 32 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
@@ -622,6 +633,158 @@ function CheckIcon({ status, tone }: { status: string; tone?: string }) {
     }}>
       {letter}
     </span>
+  );
+}
+
+function SAMVerifyPanel({ data }: { data: SAMVerifyData }) {
+  const statusColors: Record<string, { bg: string; color: string; label: string }> = {
+    operational: { bg: "rgba(34,197,94,0.15)", color: "var(--color-success)", label: "Operational" },
+    degraded: { bg: "rgba(245,158,11,0.15)", color: "#f59e0b", label: "Degraded" },
+    error: { bg: "rgba(239,68,68,0.15)", color: "var(--color-danger)", label: "Error" },
+    unknown: { bg: "rgba(107,114,128,0.15)", color: "var(--color-text-muted)", label: "No Data" },
+  };
+  const s = statusColors[data.overall] ?? statusColors.unknown;
+
+  return (
+    <div style={{
+      background: "var(--color-surface)",
+      border: "1px solid var(--color-border)",
+      borderRadius: 8,
+      padding: 20,
+      marginTop: 24,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <span style={{ width: 12, height: 12, borderRadius: "50%", background: s.color }} />
+        <span style={{ fontSize: 16, fontWeight: 600 }}>SAM Sync Verification</span>
+        <span style={{
+          fontSize: 11,
+          padding: "2px 8px",
+          borderRadius: 4,
+          background: s.bg,
+          color: s.color,
+          fontWeight: 500,
+        }}>
+          {s.label}
+        </span>
+      </div>
+
+      {data.latest ? (
+        <SAMVerifyRunCard run={data.latest} />
+      ) : (
+        <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>
+          No verification runs recorded yet. First run triggers 30s after server startup.
+        </p>
+      )}
+
+      {data.history.length > 1 && (
+        <details style={{ marginTop: 16 }}>
+          <summary style={{ fontSize: 13, fontWeight: 500, cursor: "pointer", color: "var(--color-text-muted)" }}>
+            Previous runs ({data.history.length - 1})
+          </summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+            {data.history.slice(1).map((run) => (
+              <SAMVerifyRunCard key={run.id} run={run} compact />
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function SAMVerifyRunCard({ run, compact }: { run: SAMVerifyRun; compact?: boolean }) {
+  const statusStyle: Record<string, { bg: string; color: string }> = {
+    pass: { bg: "rgba(34,197,94,0.15)", color: "var(--color-success)" },
+    fail: { bg: "rgba(239,68,68,0.15)", color: "var(--color-danger)" },
+    error: { bg: "rgba(245,158,11,0.15)", color: "#f59e0b" },
+  };
+  const st = statusStyle[run.status] ?? statusStyle.error;
+
+  return (
+    <div style={{
+      padding: compact ? "8px 12px" : "12px 16px",
+      borderRadius: 6,
+      background: "var(--color-bg)",
+      border: "1px solid var(--color-border)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: compact ? 4 : 8 }}>
+        <span style={{
+          padding: "2px 8px",
+          borderRadius: 4,
+          fontSize: 11,
+          fontWeight: 600,
+          background: st.bg,
+          color: st.color,
+          textTransform: "uppercase",
+        }}>
+          {run.status}
+        </span>
+        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+          {new Date(run.ran_at).toLocaleString()}
+        </span>
+        <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+          {run.duration_ms}ms
+        </span>
+      </div>
+
+      {run.status === "error" ? (
+        <p style={{ fontSize: 13, color: "var(--color-danger)" }}>
+          {run.error_message ?? "Unknown error"}
+        </p>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: compact ? "repeat(auto-fill, minmax(140px, 1fr))" : "repeat(auto-fill, minmax(160px, 1fr))",
+          gap: 8,
+          fontSize: 13,
+        }}>
+          <div>
+            <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>SAM Count</div>
+            <div style={{ fontWeight: 500 }}>{run.sam_count.toLocaleString()}</div>
+          </div>
+          <div>
+            <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>DB Before</div>
+            <div style={{ fontWeight: 500 }}>{run.db_count_before.toLocaleString()}</div>
+          </div>
+          {run.db_count_after !== null && (
+            <div>
+              <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>DB After</div>
+              <div style={{ fontWeight: 500 }}>{run.db_count_after.toLocaleString()}</div>
+            </div>
+          )}
+          <div>
+            <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>Gap Before</div>
+            <div style={{ fontWeight: 500, color: run.gap_before_pct > 1 ? "var(--color-danger)" : "var(--color-success)" }}>
+              {run.gap_before_pct.toFixed(1)}%
+            </div>
+          </div>
+          {run.gap_after_pct !== null && (
+            <div>
+              <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>Gap After</div>
+              <div style={{ fontWeight: 500, color: run.gap_after_pct > 1 ? "var(--color-danger)" : "var(--color-success)" }}>
+                {run.gap_after_pct.toFixed(1)}%
+              </div>
+            </div>
+          )}
+          {run.backfill_ran && (
+            <>
+              <div>
+                <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>Backfill Fetched</div>
+                <div style={{ fontWeight: 500 }}>{(run.backfill_fetched ?? 0).toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>Backfill Upserted</div>
+                <div style={{ fontWeight: 500 }}>{(run.backfill_upserted ?? 0).toLocaleString()}</div>
+              </div>
+            </>
+          )}
+          <div>
+            <div style={{ color: "var(--color-text-muted)", fontSize: 11 }}>Days Checked</div>
+            <div style={{ fontWeight: 500 }}>{run.days_checked}</div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -177,6 +177,13 @@ export async function runVerifyAndBackfill(): Promise<void> {
 
 // ---------------------------------------------------------------------------
 // Scheduler (setInterval-based, started from server.ts)
+//
+// Recovery behavior: setInterval fires every 24h regardless of previous run
+// outcome. If runVerifyAndBackfill() throws, the error is caught and logged
+// but the timer is NOT cancelled — the next cycle runs normally. The only
+// way the timer stops is an explicit stopVerifyScheduler() call (graceful
+// shutdown). This means a transient SAM API outage or DB error self-heals
+// on the next cycle without container restart.
 // ---------------------------------------------------------------------------
 
 let verifyTimer: ReturnType<typeof setInterval> | null = null;
