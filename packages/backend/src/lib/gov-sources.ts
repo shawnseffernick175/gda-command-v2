@@ -364,6 +364,7 @@ async function callGovTribeMCP(
       method: "tools/call",
       params: { name: toolName, arguments: args },
     }),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!resp.ok) {
@@ -840,6 +841,7 @@ export async function checkGovTribeHealth(): Promise<{
         method: "tools/list",
         params: {},
       }),
+      signal: AbortSignal.timeout(30_000),
     });
 
     const latencyMs = Date.now() - start;
