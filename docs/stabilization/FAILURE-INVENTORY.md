@@ -42,6 +42,7 @@ Sources examined:
 | F-016 | Always | P2 | Schema-mapper drift — mappers write fields the DB silently drops, no detection | Open (tracked separately) |
 | F-017 | On deploy | P1 | Migration system tests fresh-deploy only, not production-state-dependent migrations — already produced one incident (PR #224 / migration 045 UNIQUE violation) | Open (active gap) |
 | F-018 | Unknown | P2 | Existing migrations may have unmarked state-dependent operations without corresponding regression tests | Open (audit needed) |
+| F-019 | On every deploy | P1 | Production state modified outside canonical deploy path — sessions applied migrations from unmerged branches | Open |
 
 ---
 
@@ -223,6 +224,23 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 **Proposed fix:** One-time pass: scan all existing migrations for state-modifying operations (UPDATE, DELETE, INSERT with ON CONFLICT that has side effects beyond DO NOTHING). For each, assess whether a regression test is needed and add one if so.
 
 **Proposed regression test:** Per-migration tests for any identified state-dependent migrations, following the `test-migration-045.ts` pattern.
+
+### F-019 — Production State Modified Outside Canonical Deploy Path
+
+**Status:** Open — P1 process violation.
+
+**Root cause:** Devin sessions can apply migrations to production directly from feature branches without the PR being merged. This bypasses the canonical deploy path (merge to main → deploy → migrations run). When the PR is subsequently abandoned, the migration file never lands on main, but production's `schema_migrations` table references it. Every subsequent fresh deploy is inconsistent with production — the migration completeness check (PR #227) catches the *symptom* (missing file) but nothing prevents the *cause* (applying migrations from unmerged branches).
+
+**Evidence:** Migration 024 (`024_seed_knowledge_collections.sql`) was created in commit `a397cef` on branch `devin/1778910320-fix-knowledge-upload`. That branch was pushed to the remote and the migration was applied to production, but the PR was never merged to main. The branch was abandoned, leaving production's `schema_migrations` referencing a file that doesn't exist on main. PR #227 restored the file retroactively.
+
+**Impact:** If sessions can bypass the deploy process, every other protection in the rebuild — CI gates, regression tests, migration smoke tests, completeness checks — is theater. The guards only work if all changes flow through the canonical path. Any migration applied outside that path is invisible to CI and can silently diverge production from the codebase.
+
+**Proposed fix:**
+1. **Deploy-time guard:** Before running migrations, compare the set of migrations on disk with the set in `schema_migrations`. If production references a migration that is not present on disk *and* was not applied from the current branch, fail closed with a clear error message. Do not silently skip.
+2. **Audit production schema:** One-time check — query production's `schema_migrations` for entries that don't correspond to files on main. Identify any other migrations that were applied from unmerged branches.
+3. **Process documentation:** Document that migrations must only be applied via the canonical deploy path (merge to main first). No direct application from feature branches.
+
+**Proposed regression test:** CI check that compares migration files on disk with a known-good list. The existing completeness check (PR #227) partially covers this — extend it to flag any migration in `schema_migrations` that doesn't exist on disk as a hard failure, not just a warning.
 
 ---
 
