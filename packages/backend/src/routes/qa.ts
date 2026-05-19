@@ -278,4 +278,59 @@ router.get("/latest-failures", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/qa/sam-verify
+ * Returns the latest SAM verification run results.
+ */
+router.get("/sam-verify", async (req, res) => {
+  const { getPool } = await import("../lib/db");
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("GDA.qa.sam-verify", "list", {
+        code: "NO_DB",
+        message: "Database not available",
+        detail: null,
+      })
+    );
+  }
+
+  const limitRaw = parseInt((req.query.limit as string) ?? "10", 10);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 && limitRaw <= 100 ? limitRaw : 10;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM sam_verification_runs ORDER BY ran_at DESC LIMIT $1`,
+      [limit],
+    );
+
+    const latest = rows[0] ?? null;
+    const overall = latest
+      ? latest.status === "pass" ? "operational" : latest.status === "fail" ? "degraded" : "error"
+      : "unknown";
+
+    res.json(
+      successEnvelope(
+        "GDA.qa.sam-verify",
+        "list",
+        {
+          overall,
+          latest,
+          history: rows,
+          source: "db",
+        },
+        { count: rows.length, limit }
+      )
+    );
+  } catch (e: unknown) {
+    res.status(500).json(
+      errorEnvelope("GDA.qa.sam-verify", "list", {
+        code: "INTERNAL",
+        message: (e as Error).message ?? "Failed to fetch verification runs",
+        detail: null,
+      })
+    );
+  }
+});
+
 export default router;

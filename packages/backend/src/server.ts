@@ -67,6 +67,7 @@ import { installCrashHandlers } from "./lib/crash-handlers";
 import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
 import { startAgentScheduler, stopAgentScheduler } from "./lib/agent-scheduler";
+import { startVerifyScheduler, stopVerifyScheduler } from "./lib/sam-verify-scheduler";
 import { getPool } from "./lib/db";
 import { auditMiddleware } from "./middleware/audit-middleware";
 import { authLimiter, sessionLimiter, apiLimiter, ingestLimiter } from "./middleware/rate-limit";
@@ -321,6 +322,9 @@ const server = app.listen(PORT, async () => {
   // Start the agent cron scheduler (checks every 60s which agents are due)
   startAgentScheduler();
 
+  // Start daily SAM verification + auto-backfill (F-004 guard rail)
+  startVerifyScheduler(24);
+
   startAutoNoBidCheck();
 });
 
@@ -329,6 +333,7 @@ function shutdown(signal: string) {
   log.info("shutdown_initiated", { signal });
   stopScheduledSync();
   stopAgentScheduler();
+  stopVerifyScheduler();
   stopAutoNoBidCheck();
   server.close(() => {
     log.info("server_closed");
