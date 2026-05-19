@@ -59,7 +59,7 @@ import aiGatewayRouter from "./routes/ai-gateway";
 import captureDisciplineRouter from "./routes/capture-discipline";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
-import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
+import { dbConfig, healthCheck as dbHealthCheck, waitForDB } from "./lib/db";
 import { WEBHOOK_REGISTRY, getRegistrySummary } from "./lib/webhook-registry";
 import { isLLMAvailable, getAvailableModels } from "./lib/llm";
 import { requestLogger, log } from "./lib/logger";
@@ -300,8 +300,16 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 function startAutoNoBidCheck() { /* no-op */ }
 function stopAutoNoBidCheck() { /* no-op */ }
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   log.info("server_started", { port: Number(PORT), env: process.env.NODE_ENV ?? "development" });
+
+  // Wait for DB before starting background tasks that depend on it
+  const dbReady = await waitForDB(10, 2000);
+  if (!dbReady) {
+    log.error("db_not_reachable", { message: "Postgres unreachable after retries — background tasks disabled" });
+    return;
+  }
+  log.info("db_ready");
 
   // Start scheduled feed sync if configured
   const syncInterval = parseInt(process.env.FEED_SYNC_INTERVAL_HOURS ?? "6", 10);
@@ -334,5 +342,22 @@ function shutdown(signal: string) {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Crash safety net — log and survive unhandled errors instead of silently dying
+process.on("unhandledRejection", (reason) => {
+  log.error("unhandled_rejection", {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack?.slice(0, 2000) : undefined,
+  });
+});
+
+process.on("uncaughtException", (err) => {
+  log.error("uncaught_exception", {
+    error: err.message,
+    stack: err.stack?.slice(0, 2000),
+  });
+  // Give the logger time to flush, then exit (container will restart)
+  setTimeout(() => process.exit(1), 1000);
+});
 
 export default app;

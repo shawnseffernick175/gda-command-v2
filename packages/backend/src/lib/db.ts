@@ -17,10 +17,37 @@ export function getPool(): pg.Pool | null {
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
   });
+  // Pool-level errors (e.g. idle client disconnect) must be caught here
+  // to prevent an unhandled 'error' event from crashing the process.
   pool.on("error", (err) => {
-    process.stderr.write(`[db] pool error: ${err.message}\n`);
+    process.stderr.write(`[db] pool error (non-fatal): ${err.message}\n`);
   });
   return pool;
+}
+
+/**
+ * Wait for Postgres to become reachable. Useful at startup when the DB
+ * container may still be booting. Returns true once a connection succeeds,
+ * or false after all retries are exhausted.
+ */
+export async function waitForDB(
+  retries = 10,
+  delayMs = 2000,
+): Promise<boolean> {
+  for (let i = 1; i <= retries; i++) {
+    try {
+      const p = getPool();
+      if (!p) return false;
+      await p.query("SELECT 1");
+      return true;
+    } catch {
+      process.stderr.write(
+        `[db] waiting for postgres (${i}/${retries})...\n`,
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return false;
 }
 
 export function dbConfig(): { configured: boolean; missing: string[] } {
