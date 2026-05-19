@@ -174,8 +174,11 @@ router.get("/vendors", async (req, res) => {
     const query = String(req.query.q ?? req.query.query ?? "");
     const per_page = parsePerPage(req.query.per_page);
     const page = parsePageParam(req.query.page, 1);
+    const sba_certs = req.query.sba_certs
+      ? String(req.query.sba_certs).split(",")
+      : undefined;
 
-    const result = await searchGovTribeVendors(query, { per_page, page });
+    const result = await searchGovTribeVendors(query, { per_page, page, sba_certs });
     res.json(
       successEnvelope("GDA.govtribe.vendors", "search", result, {
         count: result.data.length,
