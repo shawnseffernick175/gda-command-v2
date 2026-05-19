@@ -36,11 +36,19 @@ async function countSAMApi(from: Date, to: Date): Promise<number> {
   return result.totalRecords;
 }
 
+/** Format date as YYYY-MM-DD using local timezone (matches toSAMDate). */
+function toDBDate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 async function countDB(from: Date, to: Date): Promise<number> {
   const pool = getPool();
   if (!pool) return 0;
-  const fromStr = from.toISOString().slice(0, 10);
-  const toStr = to.toISOString().slice(0, 10);
+  const fromStr = toDBDate(from);
+  const toStr = toDBDate(to);
   const { rows: [{ count }] } = await pool.query(
     `SELECT COUNT(*)::int AS count FROM sam_opportunities
      WHERE posted_date >= $1::date AND posted_date <= $2::date + INTERVAL '1 day'`,
