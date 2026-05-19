@@ -418,7 +418,9 @@ router.patch("/advance/:id", requireRole("admin", "bd_manager"), async (req: Req
     const newStatus = PHASE_TO_STATUS[target_phase] ?? "discovery";
     const newCaptureStage = PHASE_TO_CAPTURE_STAGE[target_phase] ?? "interest";
     const { rows: updated } = await pool.query(
-      `UPDATE opportunities SET shipley_phase = $2, status = $3, capture_stage = $4, updated_at = NOW()
+      `UPDATE opportunities SET shipley_phase = $2, status = $3, capture_stage = $4, updated_at = NOW(),
+             qualified_at = CASE WHEN $4 IN ('qualify','pursue','solicitation','post_submittal') AND qualified_at IS NULL THEN NOW() ELSE qualified_at END,
+             qualified_by = CASE WHEN $4 IN ('qualify','pursue','solicitation','post_submittal') AND qualified_by IS NULL THEN 'GDA_PHASE_ADVANCE' ELSE qualified_by END
        WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
       [id, target_phase, newStatus, newCaptureStage]
     );
