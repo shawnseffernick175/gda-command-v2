@@ -1,0 +1,59 @@
+name: Weekly Drift Report
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Every Monday at 06:00 UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  drift-check:
+    name: Codebase Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Typecheck
+        run: |
+          npm run build -w packages/shared
+          npx tsc --noEmit -p packages/backend/tsconfig.json 2>&1 | tee /tmp/typecheck.txt
+          npx tsc --noEmit -p packages/frontend/tsconfig.json 2>&1 | tee -a /tmp/typecheck.txt
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high 2>&1 | tee /tmp/audit.txt || true
+
+      - name: Inventory counts
+        run: |
+          echo "## Source File Counts" > /tmp/drift.md
+          echo "Backend routes: $(ls packages/backend/src/routes/*.ts 2>/dev/null | wc -l)" >> /tmp/drift.md
+          echo "Frontend pages: $(ls packages/frontend/src/pages/*.tsx 2>/dev/null | wc -l)" >> /tmp/drift.md
+          echo "Migrations: $(ls packages/backend/src/db/migrations/*.sql 2>/dev/null | wc -l)" >> /tmp/drift.md
+          echo "" >> /tmp/drift.md
+
+          echo "## Typecheck Results" >> /tmp/drift.md
+          if [ -s /tmp/typecheck.txt ]; then
+            echo '```' >> /tmp/drift.md
+            cat /tmp/typecheck.txt >> /tmp/drift.md
+            echo '```' >> /tmp/drift.md
+          else
+            echo "Clean - no type errors" >> /tmp/drift.md
+          fi
+          echo "" >> /tmp/drift.md
+
+          echo "## Dependency Audit" >> /tmp/drift.md
+          echo '```' >> /tmp/drift.md
+          head -50 /tmp/audit.txt >> /tmp/drift.md
+          echo '```' >> /tmp/drift.md
+
+      - name: Create issue if drift detected
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="Weekly Drift Report — $(date +%Y-%m-%d)"
+          BODY=$(cat /tmp/drift.md)
+          gh issue create --title "$TITLE" --body "$BODY" --label "drift-report" || echo "Issue creation skipped"
