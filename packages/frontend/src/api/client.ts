@@ -157,6 +157,33 @@ export function fetchSAMVerify() {
   return request<SAMVerifyData>("/qa/sam-verify");
 }
 
+export interface SourceHealthItem {
+  id: string;
+  source: string;
+  name: string;
+  enabled: boolean;
+  status: "healthy" | "degraded" | "error" | "deprecated" | "disabled" | "missing_key";
+  last_sync_at: string | null;
+  last_sync_count: number;
+  error_count: number;
+  deprecated_at: string | null;
+  deprecation_reason: string | null;
+  api_key_configured: boolean | null;
+}
+
+export interface SourceHealthData {
+  overall: "operational" | "degraded" | "error";
+  total: number;
+  active: number;
+  deprecated: number;
+  erroring: number;
+  sources: SourceHealthItem[];
+}
+
+export function fetchSourceHealth() {
+  return request<SourceHealthData>("/qa/source-health");
+}
+
 export function fetchWorkflowRegistry() {
   return request<WorkflowRegistryData>("/workflows/registry");
 }

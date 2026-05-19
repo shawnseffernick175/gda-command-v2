@@ -28,7 +28,7 @@ Sources examined:
 | F-002 | Daily | P0 | No unhandledRejection handler — any async error kills server | **Fixed** (PR #213) |
 | F-003 | Every deploy | P1 | Migration 028 FK delete ordering | **Fixed** (PR #211) |
 | F-004 | Every 6h | P1 | SAM sync upserts fail on empty timestamps — 13-17 records lost per cycle | **Fixed** (PRs #218, #220, #222, #223 — mapper fix + backfill + automated verify + QA Center) |
-| F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails for every keyword | Open |
+| F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails for every keyword — GovTribe deprecated 2023, DIBBS has no API | **Fixed** (PR #228) |
 | F-006 | Every 6h | P1 | GovWin API returns HTML instead of JSON | Open |
 | F-007 | On user action | P1 | Sidebar search crashes on undefined `.type` field | **Fixed** (PR #206) |
 | F-008 | On user action | P1 | LLM calls hang forever — no timeout, chat freezes | **Fixed** (PR #194) |
