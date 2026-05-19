@@ -28,6 +28,10 @@ interface IntelItem {
   related_competitor: string | null;
   tags: string[];
   data_source: string | null;
+  solicitation_number: string | null;
+  notice_id: string | null;
+  value_estimated: number | null;
+  due_date: string | null;
   created_at: string;
   read: boolean;
 }
@@ -659,6 +663,31 @@ function FeedTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                 borderTop: "1px solid var(--color-border)",
                 paddingTop: 12,
               }}>
+                {/* Solicitation details row */}
+                {(item.solicitation_number || item.value_estimated != null || item.due_date) && (
+                  <div style={{ display: "flex", gap: 16, marginBottom: 10, flexWrap: "wrap" }}>
+                    {item.solicitation_number && (
+                      <div style={{ fontSize: 12 }}>
+                        <span style={{ color: "var(--color-text-muted)" }}>Sol #: </span>
+                        <span style={{ fontWeight: 600 }}>{item.solicitation_number}</span>
+                      </div>
+                    )}
+                    {item.value_estimated != null && (
+                      <div style={{ fontSize: 12 }}>
+                        <span style={{ color: "var(--color-text-muted)" }}>Value: </span>
+                        <span style={{ fontWeight: 600, color: "#22c55e" }}>
+                          {item.value_estimated >= 1_000_000 ? `$${(item.value_estimated / 1_000_000).toFixed(1)}M` : `$${item.value_estimated.toLocaleString()}`}
+                        </span>
+                      </div>
+                    )}
+                    {item.due_date && (
+                      <div style={{ fontSize: 12 }}>
+                        <span style={{ color: "var(--color-text-muted)" }}>Due: </span>
+                        <span style={{ fontWeight: 600 }}>{new Date(item.due_date).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--color-text-muted)", margin: "0 0 10px" }}>
                   {item.summary}
                 </p>
@@ -675,8 +704,8 @@ function FeedTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                     </span>
                   ))}
                 </div>
-                {item.source_url && (
-                  <div style={{ marginTop: 8 }}>
+                <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                  {item.source_url && (
                     <a
                       href={item.source_url}
                       target="_blank"
@@ -685,8 +714,28 @@ function FeedTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                     >
                       View source \u2192
                     </a>
-                  </div>
-                )}
+                  )}
+                  {item.notice_id && (
+                    <a
+                      href={`https://sam.gov/opp/${item.notice_id}/view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12, color: "#f59e0b" }}
+                    >
+                      SAM.gov \u2192
+                    </a>
+                  )}
+                  {!item.source_url && !item.notice_id && item.solicitation_number && (
+                    <a
+                      href={`https://sam.gov/search/?keywords=${encodeURIComponent(item.solicitation_number)}&sort=-relevance&index=opp`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12, color: "#f59e0b" }}
+                    >
+                      Search SAM.gov \u2192
+                    </a>
+                  )}
+                </div>
               </div>
             )}
           </div>

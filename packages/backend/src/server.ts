@@ -56,6 +56,7 @@ import vehiclesRouter from "./routes/vehicles";
 import sourcesRouter from "./routes/sources";
 import mergersRouter from "./routes/mergers";
 import disciplineRouter from "./routes/discipline";
+import aiGatewayRouter from "./routes/ai-gateway";
 import captureDisciplineRouter from "./routes/capture-discipline";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
@@ -193,6 +194,7 @@ app.use("/api/vehicles", vehiclesRouter);
 app.use("/api/sources", sourcesRouter);
 app.use("/api/mergers", mergersRouter);
 app.use("/api/discipline", disciplineRouter);
+app.use("/api/ai-gateway", aiGatewayRouter);
 app.use("/api/capture-discipline", captureDisciplineRouter);
 
 // --- n8n webhook proxy (generic pass-through to any n8n workflow) ---

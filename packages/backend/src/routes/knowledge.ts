@@ -703,6 +703,76 @@ router.post("/embeddings/document/:id", requireRole("admin"), async (req, res) =
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/knowledge/reprocess-pending — reprocess all pending documents
+// When embeddings are available: embed. Otherwise: mark as indexed (text-only search).
+// ---------------------------------------------------------------------------
+router.post("/reprocess-pending", requireRole("admin"), async (_req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("gda-knowledge", "reprocess", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+    );
+  }
+
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, title, doc_type, tags, metadata, file_id FROM knowledge_documents WHERE status = 'pending'"
+    );
+
+    let processed = 0;
+    let embedded = 0;
+    const useEmbeddings = isEmbeddingAvailable();
+
+    for (const doc of rows) {
+      try {
+        if (useEmbeddings) {
+          const textParts: string[] = [doc.title];
+          if (doc.doc_type) textParts.push(`Document type: ${doc.doc_type}`);
+          if (doc.tags?.length) textParts.push(`Tags: ${doc.tags.join(", ")}`);
+          const meta = doc.metadata ?? {};
+          if (meta.summary) textParts.push(meta.summary);
+          if (meta.description) textParts.push(meta.description);
+          if (meta.content) textParts.push(meta.content);
+
+          const fullText = textParts.join("\n\n");
+          if (fullText.trim().length > 0) {
+            const result = await embedDocument(doc.id, fullText);
+            await pool.query(
+              "UPDATE knowledge_documents SET status = 'indexed', chunk_count = $2, updated_at = NOW() WHERE id = $1",
+              [doc.id, result.chunksCreated],
+            );
+            embedded++;
+          }
+        } else {
+          // Without embeddings, mark as indexed so they show up in text search
+          await pool.query(
+            "UPDATE knowledge_documents SET status = 'indexed', chunk_count = 1, updated_at = NOW() WHERE id = $1",
+            [doc.id],
+          );
+        }
+        processed++;
+      } catch {
+        // Skip individual failures
+      }
+    }
+
+    return res.json(successEnvelope("gda-knowledge", "reprocess", {
+      total_pending: rows.length,
+      processed,
+      embedded,
+      embeddings_available: useEmbeddings,
+      message: useEmbeddings
+        ? `Processed ${processed} documents (${embedded} embedded)`
+        : `Processed ${processed} documents (text-only indexing — pgvector not available)`,
+    }));
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-knowledge", "reprocess", { code: "INTERNAL", message: (err as Error).message, detail: null }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/knowledge/quick-create — create a knowledge document (Quick Entry)
 // ---------------------------------------------------------------------------
 router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead", "analyst"), async (req: Request, res: Response) => {

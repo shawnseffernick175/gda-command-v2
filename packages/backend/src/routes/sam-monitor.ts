@@ -218,4 +218,57 @@ router.post("/opportunities/:id/qualify", requireRole("admin", "bd_manager"), as
   );
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/sam-monitor/score-all — batch-score all 'new' SAM opps by NAICS match
+// ---------------------------------------------------------------------------
+router.post("/score-all", requireRole("admin", "bd_manager"), async (_req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-sam-monitor", "score-all", { code: "NO_DB", message: "Database unavailable", detail: null }));
+  }
+
+  try {
+    const envisionNaics = ["541512", "541519", "541611", "541330", "541715", "518210", "541690", "611430"];
+    const envisionKeywords = ["cyber", "c5isr", "seta", "it support", "information technology", "software", "network", "cloud", "zero trust", "rmf"];
+
+    const { rows } = await pool.query(
+      "SELECT id, title, naics, type, set_aside FROM sam_opportunities WHERE scan_status = 'new'"
+    );
+
+    let scored = 0;
+    for (const opp of rows) {
+      const naicsMatch = envisionNaics.some((n) => (opp.naics ?? "").includes(n));
+      const titleLower = (opp.title ?? "").toLowerCase();
+      const matchedKeywords = envisionKeywords.filter((k) => titleLower.includes(k));
+      const setAsideBonus = (opp.set_aside ?? "").toLowerCase().includes("sdvosb") || (opp.set_aside ?? "").toLowerCase().includes("small") ? 15 : 0;
+
+      let relevanceScore = 20; // baseline
+      if (naicsMatch) relevanceScore += 40;
+      if (matchedKeywords.length > 0) relevanceScore += Math.min(matchedKeywords.length * 10, 30);
+      relevanceScore += setAsideBonus;
+      relevanceScore = Math.min(relevanceScore, 100);
+
+      await pool.query(
+        `UPDATE sam_opportunities SET
+          relevance_score = $2,
+          matched_naics = $3,
+          matched_keywords = $4,
+          scan_status = CASE WHEN $2 >= 60 THEN 'tracked' ELSE 'new' END
+         WHERE id = $1`,
+        [opp.id, relevanceScore, naicsMatch, matchedKeywords]
+      );
+      scored++;
+    }
+
+    return res.json(successEnvelope("gda-sam-monitor", "score-all", {
+      scored,
+      message: `Scored ${scored} opportunities based on NAICS/keyword matching`,
+    }));
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-sam-monitor", "score-all", { code: "INTERNAL", message: (err as Error).message, detail: null }),
+    );
+  }
+});
+
 export default router;

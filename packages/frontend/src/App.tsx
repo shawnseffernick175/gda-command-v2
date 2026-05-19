@@ -43,6 +43,7 @@ import AdminCompanies from "./pages/AdminCompanies";
 import VehicleClassification from "./pages/VehicleClassification";
 import SourceManager from "./pages/SourceManager";
 import MergerContext from "./pages/MergerContext";
+import AIGateway from "./pages/AIGateway";
 import CaptureDiscipline from "./pages/CaptureDiscipline";
 import AdminDisciplineConfig from "./pages/AdminDisciplineConfig";
 import NotFound from "./pages/NotFound";
@@ -91,6 +92,7 @@ const NAV_GROUPS = [
 
       { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
       { path: "/mergers", label: "M&A Context", icon: "🔗" },
+      { path: "/ai-gateway", label: "AI Gateway", icon: "🤖" },
       { path: "/capture-discipline", label: "Capture Discipline", icon: "🎯" },
     ],
   },
@@ -535,6 +537,7 @@ export default function App() {
             <Route path="/sources" element={<SourceManager />} />
             <Route path="/mergers" element={<MergerContext />} />
             <Route path="/discipline" element={<CaptureDiscipline />} />
+            <Route path="/ai-gateway" element={<AIGateway />} />
             <Route path="/capture-discipline" element={<CaptureDiscipline />} />
             <Route path="/admin/discipline-config" element={<AdminDisciplineConfig />} />
             <Route path="*" element={<NotFound />} />
@@ -598,9 +601,9 @@ function AskAnythingFAB() {
         onClick={() => setOpen(true)}
         title="Ask a question about anything in GDA Command"
         style={{
-          position: "fixed", bottom: 24, right: 24, width: 52, height: 52, borderRadius: "50%",
-          background: "#3b82f6", color: "#fff", border: "none", cursor: "pointer", fontSize: 22,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.3)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+          position: "fixed", bottom: 80, right: 16, width: 40, height: 40, borderRadius: "50%",
+          background: "#3b82f6", color: "#fff", border: "none", cursor: "pointer", fontSize: 18,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.25)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85,
         }}
       >?</button>
     );
@@ -608,7 +611,7 @@ function AskAnythingFAB() {
 
   return (
     <div style={{
-      position: "fixed", bottom: 24, right: 24, width: 380, maxHeight: 420,
+      position: "fixed", bottom: 80, right: 16, width: 380, maxHeight: 420,
       background: "var(--color-surface)", border: "1px solid var(--color-border)",
       borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.3)", zIndex: 10000, display: "flex", flexDirection: "column",
     }}>

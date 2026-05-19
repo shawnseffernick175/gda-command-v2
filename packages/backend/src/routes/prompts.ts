@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
+import { randomUUID } from "crypto";
 
 const router = Router();
 
@@ -117,6 +119,123 @@ router.get("/:id", async (req, res) => {
   return res.status(404).json(
     errorEnvelope("GDA.prompts", "get", { code: "NOT_FOUND", message: `Prompt not found: ${id}`, detail: null })
   );
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/prompts — Create a new prompt
+// ---------------------------------------------------------------------------
+router.post("/", requireRole("admin", "bd_manager"), async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json(errorEnvelope("GDA.prompts", "create", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }));
+
+  const { name, category, description, template, variables, tags } = req.body as {
+    name?: string; category?: string; description?: string;
+    template?: string; variables?: string[]; tags?: string[];
+  };
+
+  if (!name || !template) {
+    return res.status(400).json(errorEnvelope("GDA.prompts", "create", {
+      code: "VALIDATION", message: "name and template are required", detail: null,
+    }));
+  }
+
+  const id = `prompt-${randomUUID().slice(0, 8)}`;
+  try {
+    const user = (req as unknown as Record<string, unknown>).user as { email?: string } | undefined;
+    await pool.query(
+      `INSERT INTO prompts (id, name, category, description, template, variables, tags, is_active, version, usage_count, created_by, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, 1, 0, $8, NOW(), NOW())`,
+      [id, name, category ?? "general", description ?? "", template, variables ?? [], tags ?? [], user?.email ?? "admin"],
+    );
+    const { rows } = await pool.query("SELECT * FROM prompts WHERE id = $1", [id]);
+    const r = rows[0];
+    const prompt = {
+      id: r.id, title: r.name, name: r.name,
+      category: r.category, description: r.description ?? "",
+      template: r.template, variables: r.variables ?? [],
+      tags: r.tags ?? [], version: r.version ?? 1,
+      status: r.is_active ? "active" : "archived",
+      starred: false, usageCount: 0,
+      createdBy: r.created_by ?? "", createdAt: r.created_at, updatedAt: r.updated_at,
+    };
+    return res.status(201).json(successEnvelope("GDA.prompts", "create", { prompt }));
+  } catch (e) {
+    return res.status(500).json(errorEnvelope("GDA.prompts", "create", {
+      code: "INTERNAL", message: (e as Error).message, detail: null,
+    }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/prompts/:id — Update an existing prompt
+// ---------------------------------------------------------------------------
+router.put("/:id", requireRole("admin", "bd_manager"), async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json(errorEnvelope("GDA.prompts", "update", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }));
+
+  const { id } = req.params;
+  const { name, category, description, template, variables, tags } = req.body as {
+    name?: string; category?: string; description?: string;
+    template?: string; variables?: string[]; tags?: string[];
+  };
+
+  try {
+    const result = await pool.query(
+      `UPDATE prompts SET
+        name = COALESCE($2, name),
+        category = COALESCE($3, category),
+        description = COALESCE($4, description),
+        template = COALESCE($5, template),
+        variables = COALESCE($6, variables),
+        tags = COALESCE($7, tags),
+        version = version + 1,
+        updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [id, name, category, description, template, variables, tags],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.prompts", "update", { code: "NOT_FOUND", message: `Prompt ${id} not found`, detail: null }));
+    }
+    const r = result.rows[0];
+    const prompt = {
+      id: r.id, title: r.name, name: r.name,
+      category: r.category, description: r.description ?? "",
+      template: r.template, variables: r.variables ?? [],
+      tags: r.tags ?? [], version: r.version ?? 1,
+      status: r.is_active ? "active" : "archived",
+      starred: false, usageCount: r.usage_count ?? 0,
+      createdBy: r.created_by ?? "", createdAt: r.created_at, updatedAt: r.updated_at,
+    };
+    return res.json(successEnvelope("GDA.prompts", "update", { prompt }));
+  } catch (e) {
+    return res.status(500).json(errorEnvelope("GDA.prompts", "update", {
+      code: "INTERNAL", message: (e as Error).message, detail: null,
+    }));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/prompts/:id — Soft-delete a prompt
+// ---------------------------------------------------------------------------
+router.delete("/:id", requireRole("admin"), async (req, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json(errorEnvelope("GDA.prompts", "delete", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }));
+
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      "UPDATE prompts SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING id",
+      [id],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json(errorEnvelope("GDA.prompts", "delete", { code: "NOT_FOUND", message: `Prompt ${id} not found`, detail: null }));
+    }
+    return res.json(successEnvelope("GDA.prompts", "delete", { id, deleted: true }));
+  } catch (e) {
+    return res.status(500).json(errorEnvelope("GDA.prompts", "delete", {
+      code: "INTERNAL", message: (e as Error).message, detail: null,
+    }));
+  }
 });
 
 export default router;
