@@ -33,7 +33,7 @@ Sources examined:
 | F-007 | On user action | P1 | Sidebar search crashes on undefined `.type` field | **Fixed** (PR #206) |
 | F-008 | On user action | P1 | LLM calls hang forever — no timeout, chat freezes | **Fixed** (PR #194) |
 | F-009 | On every write | P1 | Versioning triggers fire 3× per write (dedup masks it) | **Fixed in audit** (PR #208) |
-| F-010 | On fresh deploy | P1 | Duplicate migration numbers (036, 038, 039, 040) — undefined ordering | Open |
+| F-010 | On fresh deploy | P1 | Duplicate migration numbers (036, 038, 039, 040) — undefined ordering | **Fixed** (PR #224) |
 | F-011 | On fresh deploy | P1 | Missing migration 024 — file not in repo, schema_migrations references it | Open |
 | F-012 | Always | P2 | 42 catch blocks swallow errors silently — failures invisible | **Fixed in audit** (PR #208) |
 | F-013 | On startup | P2 | Background tasks start before DB is ready | **Fixed** (PR #213 — waitForDB) |
