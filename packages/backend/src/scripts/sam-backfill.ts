@@ -21,9 +21,10 @@
 import { syncSAMOpportunities } from "../lib/feed-sync";
 import { getPool } from "../lib/db";
 
-const DAYS_BACK = parseInt(process.argv.find(a => a.startsWith("--days="))?.split("=")[1]
-  ?? process.argv[process.argv.indexOf("--days") + 1]
-  ?? "90", 10);
+const daysArg = process.argv.find(a => a.startsWith("--days="))?.split("=")[1]
+  ?? (process.argv.indexOf("--days") !== -1 ? process.argv[process.argv.indexOf("--days") + 1] : undefined)
+  ?? "90";
+const DAYS_BACK = parseInt(daysArg, 10);
 
 async function main() {
   const pool = getPool();

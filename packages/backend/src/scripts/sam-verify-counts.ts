@@ -17,9 +17,10 @@
 import { getPool } from "../lib/db";
 import { searchOpportunities, toSAMDate } from "../lib/sam-api";
 
-const DAYS_BACK = parseInt(process.argv.find(a => a.startsWith("--days="))?.split("=")[1]
-  ?? process.argv[process.argv.indexOf("--days") + 1]
-  ?? "7", 10);
+const daysArg = process.argv.find(a => a.startsWith("--days="))?.split("=")[1]
+  ?? (process.argv.indexOf("--days") !== -1 ? process.argv[process.argv.indexOf("--days") + 1] : undefined)
+  ?? "7";
+const DAYS_BACK = parseInt(daysArg, 10);
 
 const TOLERANCE_PERCENT = 5;
 
