@@ -3,8 +3,9 @@
  *
  * Compares the number of SAM records in our database for a given date
  * window against the count the SAM.gov API reports for the same window.
- * They should match within tolerance (~1-2% for timing/pagination edge
- * cases). If they don't, the ingest pipeline has a gap.
+ * They should match within 1% tolerance. If they don't, the ingest
+ * pipeline has a gap. (Raised from 5% per Shawn's request — F-004 was
+ * ~0.3% loss. If 1% causes false positives, raise to 2% with reasoning.)
  *
  * Usage:
  *   DATABASE_URL=... SAM_API_KEY=... npx tsx src/scripts/sam-verify-counts.ts
