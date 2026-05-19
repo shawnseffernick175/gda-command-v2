@@ -428,9 +428,12 @@ router.patch("/advance/:id", requireRole("admin", "bd_manager"), async (req: Req
     const userId = req.user?.userId ?? "system";
     if (updated[0]) {
       await recordVersion("opportunities", id, updated[0], userId, "update", opp);
+    } else {
+      res.status(404).json(errorEnvelope("discipline", "advance", { code: "NOT_FOUND", message: "Opportunity not found or was deleted", detail: null }));
+      return;
     }
 
-    res.json(successEnvelope("discipline", "advance", { opportunity: updated[0] ?? null, new_phase: target_phase }));
+    res.json(successEnvelope("discipline", "advance", { opportunity: updated[0], new_phase: target_phase }));
   } catch (err) {
     log.error("discipline_advance_error", { error: (err as Error).message });
     res.status(500).json(errorEnvelope("discipline", "advance", { code: "QUERY_ERROR", message: "Phase advance failed", detail: null }));
