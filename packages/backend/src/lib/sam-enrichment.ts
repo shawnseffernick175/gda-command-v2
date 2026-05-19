@@ -267,7 +267,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     return {
       incumbent: recipientName,
       incumbent_confidence: confidence,
-      incumbent_source: confidence === "low" ? "usaspending_fuzzy" : "usaspending_exact",
+      incumbent_source: "usaspending_fuzzy",
     };
   } catch (e) {
     log.warn("usaspending_incumbent_error", { error: (e as Error).message });
