@@ -120,7 +120,6 @@ export interface GovTribeVehicle {
   name: string;
   description?: string;
   agency?: string;
-  vehicle_type?: string;
   govtribe_url?: string;
 }
 
@@ -132,8 +131,6 @@ export interface GovTribeLaborRate {
   current_price?: number;
   worksite?: string;
   business_size?: string;
-  education_level?: string;
-  security_clearance?: string;
 }
 
 export interface GovTribeSearchResult<T> {
@@ -168,6 +165,81 @@ function validateJsonResponse(resp: Response, source: string): boolean {
 // ---------------------------------------------------------------------------
 const GOVTRIBE_API_KEY = process.env.GOVTRIBE_API_KEY;
 const GOVTRIBE_MCP_URL = "https://govtribe.com/mcp";
+
+// ---------------------------------------------------------------------------
+// Credit tracking — metered usage per GovTribe pricing table
+// Credits are charged per 10 results returned. The cost varies by tool.
+// This tracker runs in-process; resets on server restart.
+// ---------------------------------------------------------------------------
+
+const CREDIT_COSTS_PER_10: Record<string, number> = {
+  Search_Federal_Contract_Opportunities: 3,
+  Search_Federal_Contract_Awards: 4,
+  Search_Federal_Forecasts: 3,
+  Search_Contacts: 4,
+  Search_Vendors: 4,
+  Search_Federal_Contract_Vehicles: 3,
+  Labor_Ceiling_Rate_Benchmarks: 4,
+};
+
+interface CreditUsage {
+  totalCredits: number;
+  callCount: number;
+  byTool: Record<string, { credits: number; calls: number }>;
+  cycleStartedAt: string;
+  budgetLimit: number | null;
+  budgetExceeded: boolean;
+}
+
+const GOVTRIBE_CREDIT_BUDGET_ENV = process.env.GOVTRIBE_CREDIT_BUDGET;
+
+const creditUsage: CreditUsage = {
+  totalCredits: 0,
+  callCount: 0,
+  byTool: {},
+  cycleStartedAt: new Date().toISOString(),
+  budgetLimit: GOVTRIBE_CREDIT_BUDGET_ENV ? Number(GOVTRIBE_CREDIT_BUDGET_ENV) : null,
+  budgetExceeded: false,
+};
+
+function estimateCredits(toolName: string, resultsReturned: number): number {
+  const costPer10 = CREDIT_COSTS_PER_10[toolName] ?? 3;
+  return Math.ceil(resultsReturned / 10) * costPer10;
+}
+
+function trackCredits(toolName: string, resultsReturned: number): { credits: number; budgetExceeded: boolean } {
+  const credits = estimateCredits(toolName, resultsReturned);
+  creditUsage.totalCredits += credits;
+  creditUsage.callCount += 1;
+  if (!creditUsage.byTool[toolName]) {
+    creditUsage.byTool[toolName] = { credits: 0, calls: 0 };
+  }
+  creditUsage.byTool[toolName].credits += credits;
+  creditUsage.byTool[toolName].calls += 1;
+
+  if (creditUsage.budgetLimit != null && creditUsage.totalCredits >= creditUsage.budgetLimit) {
+    creditUsage.budgetExceeded = true;
+    log.warn("govtribe_budget_exceeded", {
+      totalCredits: creditUsage.totalCredits,
+      budgetLimit: creditUsage.budgetLimit,
+      tool: toolName,
+    });
+  }
+
+  return { credits, budgetExceeded: creditUsage.budgetExceeded };
+}
+
+export function getGovTribeCreditUsage(): CreditUsage {
+  return { ...creditUsage, byTool: { ...creditUsage.byTool } };
+}
+
+export function resetGovTribeCreditCycle(): void {
+  creditUsage.totalCredits = 0;
+  creditUsage.callCount = 0;
+  creditUsage.byTool = {};
+  creditUsage.cycleStartedAt = new Date().toISOString();
+  creditUsage.budgetExceeded = false;
+}
 
 interface GovTribeMCPResponse {
   jsonrpc: string;
@@ -267,6 +339,13 @@ async function callGovTribeMCP(
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<string> {
+  if (creditUsage.budgetExceeded) {
+    throw new Error(
+      `GovTribe credit budget exceeded (${creditUsage.totalCredits}/${creditUsage.budgetLimit} credits). ` +
+      `Reset via /api/govtribe/credits/reset or increase GOVTRIBE_CREDIT_BUDGET.`
+    );
+  }
+
   const resp = await fetch(GOVTRIBE_MCP_URL, {
     method: "POST",
     headers: {
@@ -369,10 +448,12 @@ async function fetchGovTribeOpportunities(
         total?: number;
       };
 
+      const returned = result.data?.length ?? 0;
+      trackCredits("Search_Federal_Contract_Opportunities", returned);
       log.info("govtribe_mcp_search", {
         query: query || "(all recent)",
         total: result.total ?? 0,
-        returned: result.data?.length ?? 0,
+        returned,
       });
 
       for (const row of result.data ?? []) {
@@ -447,6 +528,7 @@ export async function searchGovTribeAwards(
     current_page?: number; last_page?: number; per_page?: number;
   };
 
+  trackCredits("Search_Federal_Contract_Awards", result.data?.length ?? 0);
   log.info("govtribe_awards_search", { query: query || "(all)", total: result.total ?? 0 });
 
   return {
@@ -502,6 +584,7 @@ export async function searchGovTribeForecasts(
     current_page?: number; last_page?: number; per_page?: number;
   };
 
+  trackCredits("Search_Federal_Forecasts", result.data?.length ?? 0);
   log.info("govtribe_forecasts_search", { query: query || "(all)", total: result.total ?? 0 });
 
   return {
@@ -555,6 +638,7 @@ export async function searchGovTribeContacts(
     current_page?: number; last_page?: number; per_page?: number;
   };
 
+  trackCredits("Search_Contacts", result.data?.length ?? 0);
   log.info("govtribe_contacts_search", { query: query || "(all)", total: result.total ?? 0 });
 
   return {
@@ -614,6 +698,7 @@ export async function searchGovTribeVendors(
     current_page?: number; last_page?: number; per_page?: number;
   };
 
+  trackCredits("Search_Vendors", result.data?.length ?? 0);
   log.info("govtribe_vendors_search", { query: query || "(all)", total: result.total ?? 0 });
 
   return {
@@ -662,6 +747,7 @@ export async function searchGovTribeVehicles(
     current_page?: number; last_page?: number; per_page?: number;
   };
 
+  trackCredits("Search_Federal_Contract_Vehicles", result.data?.length ?? 0);
   log.info("govtribe_vehicles_search", { query: query || "(all)", total: result.total ?? 0 });
 
   return {
@@ -703,6 +789,7 @@ export async function searchGovTribeLaborRates(
     summary?: Record<string, unknown>;
   };
 
+  trackCredits("Labor_Ceiling_Rate_Benchmarks", result.items?.length ?? 0);
   log.info("govtribe_labor_rates_search", { keyword, count: result.items?.length ?? 0 });
 
   return {

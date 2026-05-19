@@ -8,6 +8,8 @@ import {
   searchGovTribeVehicles,
   searchGovTribeLaborRates,
   checkGovTribeHealth,
+  getGovTribeCreditUsage,
+  resetGovTribeCreditCycle,
 } from "../lib/gov-sources";
 
 const router = Router();
@@ -19,13 +21,14 @@ const router = Router();
 router.get("/health", async (_req, res) => {
   try {
     const result = await checkGovTribeHealth();
+    const credits = getGovTribeCreditUsage();
     res.json(
-      successEnvelope("GDA.govtribe", "health", result, {
+      successEnvelope("GDA.govtribe", "health", { ...result, credits }, {
         hint: result.status === "no_key"
           ? "Set GOVTRIBE_API_KEY environment variable"
           : result.status === "error"
             ? "MCP endpoint unreachable or API key invalid"
-            : `MCP endpoint healthy — ${result.toolCount} tools available`,
+            : `MCP endpoint healthy — ${result.toolCount} tools available, ${credits.totalCredits} credits used this cycle`,
       })
     );
   } catch (e: unknown) {
@@ -37,6 +40,34 @@ router.get("/health", async (_req, res) => {
       })
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/govtribe/credits — credit usage this cycle
+// ---------------------------------------------------------------------------
+router.get("/credits", (_req, res) => {
+  const usage = getGovTribeCreditUsage();
+  res.json(
+    successEnvelope("GDA.govtribe.credits", "usage", usage, {
+      hint: usage.budgetExceeded
+        ? `Budget exceeded: ${usage.totalCredits}/${usage.budgetLimit} credits`
+        : usage.budgetLimit != null
+          ? `${usage.totalCredits}/${usage.budgetLimit} credits used (${Math.round((usage.totalCredits / usage.budgetLimit) * 100)}%)`
+          : `${usage.totalCredits} credits used (no budget limit set — set GOVTRIBE_CREDIT_BUDGET)`,
+    })
+  );
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/govtribe/credits/reset — reset credit cycle counter
+// ---------------------------------------------------------------------------
+router.post("/credits/reset", (_req, res) => {
+  resetGovTribeCreditCycle();
+  res.json(
+    successEnvelope("GDA.govtribe.credits", "reset", { reset: true }, {
+      hint: "Credit cycle counter reset to zero",
+    })
+  );
 });
 
 // ---------------------------------------------------------------------------
