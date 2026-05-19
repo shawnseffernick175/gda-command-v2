@@ -51,6 +51,19 @@ const SHIPLEY_TO_STATUS: Record<string, OpportunityStatus> = {
   gov_cancelled: "gov_cancelled",
 };
 
+// Reverse map: capture_stage → shipley_phase (keeps discipline dashboard in sync)
+const STAGE_TO_SHIPLEY_PHASE: Record<string, string> = {
+  interest: "identify",
+  qualify: "qualify",
+  pursue: "pursue",
+  solicitation: "proposal",
+  post_submittal: "submit",
+  won: "awarded",
+  lost: "lost",
+  no_bid: "no_bid",
+  gov_cancelled: "lost",
+};
+
 // ---------------------------------------------------------------------------
 // NAICS size classification — SBA size standard lookup
 // Revenue-based NAICS codes (threshold in $M): if company revenue exceeds
@@ -1141,13 +1154,14 @@ router.patch("/:id/stage", requireRole("admin", "bd_manager"), async (req, res) 
     const prevStage = current.rows[0].capture_stage;
     const title = current.rows[0].title;
 
+    const shipleyPhase = STAGE_TO_SHIPLEY_PHASE[stage] ?? "identify";
     await pool.query(
       `UPDATE opportunities
-       SET status = $2, capture_stage = $3, updated_at = $4,
+       SET status = $2, capture_stage = $3, updated_at = $4, shipley_phase = $5::shipley_phase,
            qualified_at = CASE WHEN $3 IN ('qualify','pursue','solicitation','post_submittal') AND qualified_at IS NULL THEN $4 ELSE qualified_at END,
            qualified_by = CASE WHEN $3 IN ('qualify','pursue','solicitation','post_submittal') AND qualified_by IS NULL THEN 'GDA_STAGE_CHANGE' ELSE qualified_by END
        WHERE id = $1`,
-      [id, dbStatus, stage, now]
+      [id, dbStatus, stage, now, shipleyPhase]
     );
 
     process.stdout.write(
