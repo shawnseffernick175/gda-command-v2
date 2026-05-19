@@ -111,6 +111,9 @@ async function run() {
     // --- Test 3: Fresh deploy (no GovTribe feed row) ---
     process.stdout.write("\n  Test 3: Safe on fresh deploy\n");
 
+    // Delete the GovTribe row to simulate a fresh DB with no feed entry
+    await pool.query(`DELETE FROM gov_source_feeds WHERE id = 'feed-govtribe'`);
+
     // Migration should be a no-op if there's no matching row
     let freshError: string | null = null;
     try {
@@ -122,19 +125,19 @@ async function run() {
     assert(
       freshError === null,
       freshError
-        ? `Migration 049 failed on re-run: ${freshError}`
-        : "Migration 049 is idempotent (safe to re-run)",
+        ? `Migration 049 failed on fresh deploy: ${freshError}`
+        : "Migration 049 is safe on fresh deploy (UPDATE is a no-op)",
     );
 
     // --- Summary ---
     process.stdout.write(`\n[test-049] ${passed} passed, ${failed} failed\n`);
-    process.exit(failed > 0 ? 1 : 0);
-  } catch (e) {
-    process.stderr.write(`[test-049] FATAL: ${(e as Error).message}\n`);
-    process.exit(1);
+    if (failed > 0) process.exit(1);
   } finally {
     await pool.end();
   }
 }
 
-run();
+run().catch((e) => {
+  process.stderr.write(`[test-049] fatal: ${(e as Error).message}\n`);
+  process.exit(1);
+});
