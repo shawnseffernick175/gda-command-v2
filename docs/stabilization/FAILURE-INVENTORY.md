@@ -40,7 +40,7 @@ Sources examined:
 | F-014 | Preventive | P2 | No cross-file type-safety validation in migrations | Open (tracked separately) |
 | F-015 | Every 6h | P2 | Ingest mappers (SAM, GovTribe, GovWin, FPDS) lack consistent input sanitization | Open (tracked separately) |
 | F-016 | Always | P2 | Schema-mapper drift — mappers write fields the DB silently drops, no detection | Open (tracked separately) |
-| F-017 | On fresh deploy | P2 | Migration ordering by number, not by dependency — implicit ordering can break if a migration depends on a table/column another migration creates | Open (tracked separately) |
+| F-017 | On deploy | P1 | Migration system tests fresh-deploy only, not production-state-dependent migrations — already produced one incident (PR #224 / migration 045 UNIQUE violation) | Open (active gap) |
 
 ---
 
@@ -196,15 +196,19 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 
 **Proposed regression test:** CI script that extracts field names from each mapper’s return object and cross-references them against the column list in the corresponding INSERT statement. Any mismatch fails the build.
 
-### F-017 — Migration Ordering by Number, Not by Dependency
+### F-017 — Migration System Tests Fresh-Deploy Only, Not Production State
 
-**Root cause:** The migration runner sorts files alphabetically by filename and applies them in that order. There is no mechanism to declare that one migration depends on a table or column created by another. If two migrations have adjacent numbers but one depends on schema created by the other, the system relies on implicit filename ordering — which is fragile and undocumented.
+**Status:** Active gap — already produced one incident.
 
-**Evidence:** The CI check added for F-010 catches duplicate number prefixes but not the harder case: a migration that references a table or column created by a migration that happens to sort after it. The migration smoke test (running all migrations from scratch) catches this at CI time, but only for the current set of migrations — it doesn't prevent future PRs from introducing ordering bugs.
+**Root cause:** The CI migration smoke test runs all migrations from scratch against an empty database. Production runs migrations against a database with prior state. Any migration that depends on or modifies pre-existing `schema_migrations` entries, existing rows, or existing column values has no test coverage for the production case. The gap is structural: the test infrastructure assumes migrations are only applied to empty databases, but state-dependent migrations are a normal part of maintenance.
 
-**Proposed fix:** Track as preventive work. Options: (a) add a comment-based dependency declaration (e.g., `-- depends: 036`) and validate the DAG in CI, (b) document the constraint and rely on the existing smoke test to catch violations, or (c) adopt a migration tool that handles dependency ordering natively.
+**Evidence:** PR #224 introduced migration 045 with UPDATE statements that caused a UNIQUE constraint violation on production-like databases. The CI smoke test passed because it runs from scratch (the old-name entries never exist). Devin Review caught the bug; CI did not. The fix (PR #225) changed UPDATEs to DELETEs, and a regression test (`test-migration-045.ts`) was added to simulate the production state and catch this class of bug.
 
-**Proposed regression test:** The existing migration smoke test partially covers this (applying all migrations from scratch catches ordering errors). A more robust check would parse `CREATE TABLE` / `ALTER TABLE` / `INSERT INTO` references and verify they sort after the migration that creates the referenced object.
+**First incident:** Migration 045 (F-010 fix) used `UPDATE schema_migrations SET name = '036b_...' WHERE name = '036_...'`. The migration runner re-applies renamed files before 045 runs, creating both old and new entries. The UPDATE then violates the UNIQUE constraint on the `name` column, causing `process.exit(1)`.
+
+**Proposed fix:** For any future state-dependent migration, require a corresponding regression test that pre-populates the relevant prior state and asserts the migration completes without error. Document this as a convention in the migrations README. Options for systematic enforcement: (a) CI script that detects UPDATE/DELETE in new migrations and requires a matching test file, (b) comment-based metadata (e.g., `-- state-dependent: true`) that triggers the test requirement.
+
+**Proposed regression test:** Per-migration tests for state-dependent migrations (like `test-migration-045.ts`). The existing smoke test remains valuable for fresh-deploy ordering but is insufficient for production-state bugs.
 
 ---
 
