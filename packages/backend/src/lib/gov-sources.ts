@@ -606,6 +606,7 @@ export async function searchGovTribeVendors(
     page: options.page ?? 1,
   };
   if (query) args.query = query;
+  if (options.sba_certs?.length) args.sba_certifications = options.sba_certs;
 
   const text = await callGovTribeMCP("Search_Vendors", args);
   const result = JSON.parse(text) as {
@@ -709,8 +710,8 @@ export async function searchGovTribeLaborRates(
       labor_category: String(item.labor_category ?? ""),
       vendor_name: item.vendor_name ? String(item.vendor_name) : undefined,
       contract_number: item.idv_piid ? String(item.idv_piid) : undefined,
-      benchmark_price: item.benchmark_price ? Number(item.benchmark_price) : undefined,
-      current_price: item.current_price ? Number(item.current_price) : undefined,
+      benchmark_price: item.benchmark_price != null ? Number(item.benchmark_price) : undefined,
+      current_price: item.current_price != null ? Number(item.current_price) : undefined,
       worksite: item.worksite ? String(item.worksite) : undefined,
       business_size: item.business_size ? String(item.business_size) : undefined,
     })),
