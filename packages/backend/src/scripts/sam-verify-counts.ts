@@ -22,7 +22,7 @@ const daysArg = process.argv.find(a => a.startsWith("--days="))?.split("=")[1]
   ?? "7";
 const DAYS_BACK = parseInt(daysArg, 10);
 
-const TOLERANCE_PERCENT = 5;
+const TOLERANCE_PERCENT = 1;
 
 async function main() {
   const pool = getPool();
@@ -57,7 +57,7 @@ async function main() {
   // Query our database for the same window
   const { rows: [{ count: dbCount }] } = await pool.query(
     `SELECT COUNT(*)::int AS count FROM sam_opportunities
-     WHERE created_at >= $1::date AND created_at <= $2::date + INTERVAL '1 day'`,
+     WHERE posted_date >= $1::date AND posted_date <= $2::date + INTERVAL '1 day'`,
     [fromStr, toStr]
   );
 
@@ -72,7 +72,7 @@ async function main() {
     process.stdout.write(`[verify] PASS — within ${TOLERANCE_PERCENT}% tolerance\n`);
   } else {
     process.stdout.write(`[verify] FAIL — gap exceeds ${TOLERANCE_PERCENT}% tolerance\n`);
-    process.stdout.write(`[verify] Missing ~${samCount - dbCount} records from database\n`);
+    process.stdout.write(`[verify] ${dbCount < samCount ? `Missing ~${diff} records from database` : `Database has ~${diff} more records than SAM reports`}\n`);
     process.exit(1);
   }
 
