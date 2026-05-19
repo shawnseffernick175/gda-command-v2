@@ -14,6 +14,24 @@ const DATABASE_URL =
   process.env.DATABASE_URL ??
   "postgresql://gda:gda_dev_password@localhost:5432/gda_command";
 
+/** Return true only if every statement in the SQL is DELETE or TRUNCATE. */
+function isDataCleanupMigration(sql: string): boolean {
+  // Strip SQL comments (-- line comments and /* block comments */)
+  const stripped = sql
+    .replace(/--[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .trim();
+  if (!stripped) return false;
+  // Split on semicolons and check each non-empty statement
+  const statements = stripped
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return statements.every((s) =>
+    /^\s*(DELETE\s+FROM|TRUNCATE)\s/i.test(s),
+  );
+}
+
 async function run() {
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
 
@@ -61,11 +79,13 @@ async function run() {
       await client.query("ROLLBACK");
       const msg = (e as Error).message;
       process.stderr.write(`[migrate] FAILED on ${file}: ${msg}\n`);
-      // If the migration is purely a data-cleanup (DELETE/TRUNCATE) and the
-      // target table doesn't exist yet, treat it as a warning and continue.
+      // Only skip if the migration is a pure data-cleanup (DELETE/TRUNCATE)
+      // AND the failure is a missing table. Structural migrations (CREATE,
+      // ALTER, INSERT seeds) must still hard-fail so they get retried.
       const isTableMissing = /relation ".*" does not exist/i.test(msg);
-      if (isTableMissing) {
-        process.stderr.write(`[migrate] WARNING: skipping ${file} (table not found — safe to ignore)\n`);
+      const isCleanupOnly = isDataCleanupMigration(sql);
+      if (isTableMissing && isCleanupOnly) {
+        process.stderr.write(`[migrate] WARNING: skipping cleanup migration ${file} (table not found)\n`);
         // Record it so we don't retry every restart
         const skipClient = await pool.connect();
         try {
