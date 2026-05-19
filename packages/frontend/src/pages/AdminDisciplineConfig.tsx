@@ -96,7 +96,7 @@ export default function AdminDisciplineConfig() {
               step={type === "currency" ? "1000" : type === "ratio" ? "0.1" : type === "percent" ? "1" : "1"}
               value={config[key] ?? ""}
               onChange={(e) => {
-                const val = e.target.value === "" ? 0 : Number(e.target.value);
+                const val = e.target.value === "" ? null : Number(e.target.value);
                 setConfig({ ...config, [key]: val });
               }}
               style={{

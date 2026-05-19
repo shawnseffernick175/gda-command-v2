@@ -22,7 +22,7 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS expected_award_date DATE;
 -- 3. Color team review table (Shipley Blue/Pink/Red/Green/Gold/White gates)
 CREATE TABLE IF NOT EXISTS color_team_review (
   review_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  opportunity_id TEXT NOT NULL,
+  opportunity_id TEXT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
   team_color     TEXT NOT NULL CHECK (team_color IN ('blue','pink','red','green','gold','white')),
   scheduled_date DATE,
   completed_date DATE,
