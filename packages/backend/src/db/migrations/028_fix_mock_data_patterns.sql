@@ -17,14 +17,14 @@ DELETE FROM approvals WHERE id LIKE 'APR-%';
 -- Capture plans: actual IDs are cap-001, cap-002, etc.
 DELETE FROM capture_plans WHERE id LIKE 'cap-%';
 
+-- Scheduled reports before templates (FK constraint: scheduled_reports -> report_templates)
+DELETE FROM scheduled_reports WHERE id LIKE 'SCH-%';
+
 -- Generated reports before templates (FK constraint)
 DELETE FROM generated_reports WHERE id LIKE 'RPT-%';
 
 -- Report templates: actual IDs are TPL-001, TPL-002, etc.
 DELETE FROM report_templates WHERE id LIKE 'TPL-%';
-
--- Scheduled reports: actual IDs are SCH-001, SCH-002, etc.
-DELETE FROM scheduled_reports WHERE id LIKE 'SCH-%';
 
 -- Compliance requirements: actual IDs are CR-001, CR-002, etc.
 DELETE FROM compliance_requirements WHERE id LIKE 'CR-%';
