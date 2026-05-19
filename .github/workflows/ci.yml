@@ -65,6 +65,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
         run: npx tsx packages/backend/src/db/test-migration-044.ts
+      - name: Regression test — no duplicate migration numbers (F-010)
+        run: npx tsx packages/backend/src/db/test-unique-migration-numbers.ts
 
   audit:
     name: Dependency Audit
