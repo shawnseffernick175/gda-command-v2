@@ -3,8 +3,9 @@
  *
  * Compares the number of SAM records in our database for a given date
  * window against the count the SAM.gov API reports for the same window.
- * They should match within tolerance (~1-2% for timing/pagination edge
- * cases). If they don't, the ingest pipeline has a gap.
+ * They should match within 1% tolerance. If they don't, the ingest
+ * pipeline has a gap. (Raised from 5% per Shawn's request — F-004 was
+ * ~0.3% loss. If 1% causes false positives, raise to 2% with reasoning.)
  *
  * Usage:
  *   DATABASE_URL=... SAM_API_KEY=... npx tsx src/scripts/sam-verify-counts.ts
@@ -22,7 +23,7 @@ const daysArg = process.argv.find(a => a.startsWith("--days="))?.split("=")[1]
   ?? "7";
 const DAYS_BACK = parseInt(daysArg, 10);
 
-const TOLERANCE_PERCENT = 5;
+const TOLERANCE_PERCENT = 1;
 
 async function main() {
   const pool = getPool();
@@ -57,7 +58,7 @@ async function main() {
   // Query our database for the same window
   const { rows: [{ count: dbCount }] } = await pool.query(
     `SELECT COUNT(*)::int AS count FROM sam_opportunities
-     WHERE created_at >= $1::date AND created_at <= $2::date + INTERVAL '1 day'`,
+     WHERE posted_date >= $1::date AND posted_date <= $2::date + INTERVAL '1 day'`,
     [fromStr, toStr]
   );
 
@@ -72,7 +73,7 @@ async function main() {
     process.stdout.write(`[verify] PASS — within ${TOLERANCE_PERCENT}% tolerance\n`);
   } else {
     process.stdout.write(`[verify] FAIL — gap exceeds ${TOLERANCE_PERCENT}% tolerance\n`);
-    process.stdout.write(`[verify] Missing ~${samCount - dbCount} records from database\n`);
+    process.stdout.write(`[verify] ${dbCount < samCount ? `Missing ~${diff} records from database` : `Database has ~${diff} more records than SAM reports`}\n`);
     process.exit(1);
   }
 

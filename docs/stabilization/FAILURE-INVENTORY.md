@@ -39,6 +39,7 @@ Sources examined:
 | F-013 | On startup | P2 | Background tasks start before DB is ready | **Fixed** (PR #213 — waitForDB) |
 | F-014 | Preventive | P2 | No cross-file type-safety validation in migrations | Open (tracked separately) |
 | F-015 | Every 6h | P2 | Ingest mappers (SAM, GovTribe, GovWin, FPDS) lack consistent input sanitization | Open (tracked separately) |
+| F-016 | Always | P2 | Schema-mapper drift — mappers write fields the DB silently drops, no detection | Open (tracked separately) |
 
 ---
 
@@ -181,6 +182,18 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 **Proposed fix:** Audit all four mapper files. Apply the `tsOrNull()` pattern to every TIMESTAMPTZ field and add equivalent `numOrNull()` for NUMERIC fields. This is a systematic sweep — tracked as separate work, not blocking current stabilization fixes.
 
 **Proposed regression test:** Extend `sam-api-mapper.test.ts` pattern to all four mappers. Each test seeds empty-string inputs for every date/numeric field and asserts null output.
+
+---
+
+### F-016 — Schema-Mapper Drift (No Detection of Orphaned Fields)
+
+**Root cause:** Ingest mappers return plain objects. The INSERT statements reference specific columns by positional `$N` parameters. If a mapper produces a field that doesn't exist in the target table, the field is silently discarded — no error, no warning. Conversely, if the schema adds a column the mapper doesn't populate, there's no compile-time or CI-time detection.
+
+**Evidence:** PR #218 added `archive_date: tsOrNull(raw.archiveDate)` to the SAM mapper. The `sam_opportunities` table has no `archive_date` column. The field was produced by the mapper and silently dropped by the INSERT. Devin Review caught it; nothing else did.
+
+**Proposed fix:** Audit all four ingest mappers against their target table schemas. Add a CI check that fails when a mapper writes a field that doesn’t exist in the target table. Options: (a) a static analysis script that parses mapper return keys and compares to CREATE TABLE columns, or (b) typed interfaces for each table’s insertable row shape, replacing untyped objects with compile-time checked types.
+
+**Proposed regression test:** CI script that extracts field names from each mapper’s return object and cross-references them against the column list in the corresponding INSERT statement. Any mismatch fails the build.
 
 ---
 
