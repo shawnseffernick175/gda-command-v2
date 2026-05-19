@@ -37,6 +37,7 @@ Sources examined:
 | F-011 | On fresh deploy | P1 | Missing migration 024 — file not in repo, schema_migrations references it | Open |
 | F-012 | Always | P2 | 42 catch blocks swallow errors silently — failures invisible | **Fixed in audit** (PR #208) |
 | F-013 | On startup | P2 | Background tasks start before DB is ready | **Fixed** (PR #213 — waitForDB) |
+| F-014 | Preventive | P2 | No cross-file type-safety validation in migrations | Open (tracked separately) |
 
 ---
 
@@ -155,6 +156,18 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 **Proposed fix:** Reconstruct migration 024 from the production database state (inspect `knowledge_collections` table) and commit the file.
 
 **Proposed regression test:** CI check that every `.sql` file in migrations directory has a corresponding entry in a expected-files list.
+
+---
+
+### F-014 — No Cross-File Type-Safety Validation in Migration System
+
+**Root cause:** The migration runner executes raw SQL files sequentially with no validation that column types referenced in later migrations match the types declared in earlier ones. Migration 044 assumed `record_version.record_id` was UUID (used `::uuid` cast) when it was actually TEXT. Nothing in CI caught this mismatch before it reached production.
+
+**Evidence:** F-001 (migration 044 daily crash) was caused by exactly this class of bug — a column-type mismatch across migration files that only surfaced at runtime.
+
+**Proposed fix:** A CI check that parses all migration SQL files and validates that column types referenced in INSERT/UPDATE/CAST operations match the CREATE TABLE definitions from earlier migrations. This is a preventive measure — tracked as separate work, not blocking current stabilization fixes.
+
+**Proposed regression test:** CI script that scans migration files for `::uuid`, `::integer`, `::boolean` casts and cross-references them against the column types from CREATE TABLE statements.
 
 ---
 
