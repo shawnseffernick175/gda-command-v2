@@ -406,6 +406,15 @@ router.get("/source-health", async (_req, res) => {
       };
     });
 
+    // Low-confidence incumbent enrichment counter for review queue
+    let low_confidence_incumbents = 0;
+    try {
+      const lcResult = await pool.query(
+        `SELECT COUNT(*) AS count FROM opportunities WHERE incumbent_confidence = 'low'`,
+      );
+      low_confidence_incumbents = parseInt(lcResult.rows[0]?.count ?? "0", 10);
+    } catch { /* column may not exist yet */ }
+
     const overall = erroring.length > 0
       ? "degraded"
       : active.length === 0
@@ -423,8 +432,14 @@ router.get("/source-health", async (_req, res) => {
           deprecated: deprecated.length,
           erroring: erroring.length,
           sources,
+          low_confidence_incumbents,
         },
-        { count: rows.length }
+        {
+          count: rows.length,
+          hint: low_confidence_incumbents > 0
+            ? `${low_confidence_incumbents} opportunities with low-confidence incumbent matches awaiting review`
+            : undefined,
+        }
       )
     );
   } catch (e: unknown) {
