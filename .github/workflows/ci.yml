@@ -33,6 +33,35 @@ jobs:
       - run: npm run build -w packages/shared
       - run: npm test
 
+  migrations:
+    name: Migration Smoke Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda
+          POSTGRES_PASSWORD: gda_ci_password
+          POSTGRES_DB: gda_command
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gda -d gda_command"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run all migrations from scratch
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+        run: npx tsx packages/backend/src/db/migrate.ts
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
