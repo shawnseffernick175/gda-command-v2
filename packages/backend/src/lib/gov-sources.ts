@@ -193,12 +193,18 @@ interface CreditUsage {
 
 const GOVTRIBE_CREDIT_BUDGET_ENV = process.env.GOVTRIBE_CREDIT_BUDGET;
 
+function parseBudgetLimit(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 const creditUsage: CreditUsage = {
   totalCredits: 0,
   callCount: 0,
   byTool: {},
   cycleStartedAt: new Date().toISOString(),
-  budgetLimit: GOVTRIBE_CREDIT_BUDGET_ENV ? Number(GOVTRIBE_CREDIT_BUDGET_ENV) : null,
+  budgetLimit: parseBudgetLimit(GOVTRIBE_CREDIT_BUDGET_ENV),
   budgetExceeded: false,
 };
 
