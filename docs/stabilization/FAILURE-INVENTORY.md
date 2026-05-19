@@ -124,7 +124,7 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 
 **Regression tests:** 13 vitest assertions covering MCP client structure, JSON-RPC protocol, content-type validation, response mapping, deduplication, error handling, and sourceHandler registration. Migration 049 has 7 CI assertions.
 
-**Process lesson:** A vendor deprecating one access method doesn't mean the data product is dead. Always confirm with the user before deprecating a paid data source.
+**Process lesson:** Never deprecate a data source the user is paying for without explicit user confirmation.
 
 ---
 
