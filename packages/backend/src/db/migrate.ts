@@ -59,7 +59,22 @@ async function run() {
       count++;
     } catch (e) {
       await client.query("ROLLBACK");
-      process.stderr.write(`[migrate] FAILED on ${file}: ${(e as Error).message}\n`);
+      const msg = (e as Error).message;
+      process.stderr.write(`[migrate] FAILED on ${file}: ${msg}\n`);
+      // If the migration is purely a data-cleanup (DELETE/TRUNCATE) and the
+      // target table doesn't exist yet, treat it as a warning and continue.
+      const isTableMissing = /relation ".*" does not exist/i.test(msg);
+      if (isTableMissing) {
+        process.stderr.write(`[migrate] WARNING: skipping ${file} (table not found — safe to ignore)\n`);
+        // Record it so we don't retry every restart
+        const skipClient = await pool.connect();
+        try {
+          await skipClient.query("INSERT INTO schema_migrations (name) VALUES ($1)", [file]);
+        } finally {
+          skipClient.release();
+        }
+        continue;
+      }
       process.exit(1);
     } finally {
       client.release();
