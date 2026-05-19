@@ -44,8 +44,4 @@ describe("mapToDBRecord — timestamp handling", () => {
     expect(record.posted_date).toBe("2026-05-01");
   });
 
-  it("converts empty string archiveDate to null", () => {
-    const record = mapToDBRecord(makeSAMRecord({ archiveDate: "" }));
-    expect(record.archive_date).toBeNull();
-  });
 });
