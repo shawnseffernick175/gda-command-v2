@@ -1,49 +1,50 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
 import { isAuthenticated, logout, getUser, authenticatedFetch } from "./api/auth";
-import QACenter from "./pages/QACenter";
 import Home from "./pages/Home";
-import OpsTracker from "./pages/OpsTracker";
-import Pipeline from "./pages/Pipeline";
-import OpportunityDetail from "./pages/OpportunityDetail";
-import Doctrine from "./pages/Doctrine";
-import Intel from "./pages/Intel";
-import Capture from "./pages/Capture";
-import Workflows from "./pages/Workflows";
-import Settings from "./pages/Settings";
-import FinancialBible from "./pages/FinancialBible";
-import Approvals from "./pages/Approvals";
-import Compliance from "./pages/Compliance";
-import ProposalReview from "./pages/ProposalReview";
-import ProposalBuilder from "./pages/ProposalBuilder";
-import Contacts from "./pages/Contacts";
-import Reports from "./pages/Reports";
-import PromptArchitect from "./pages/PromptArchitect";
-import FastTrack from "./pages/FastTrack";
-import Knowledge from "./pages/Knowledge";
-import RFPShredder from "./pages/RFPShredder";
-import Predictive from "./pages/Predictive";
-import ColorReview from "./pages/ColorReview";
-import AnomalyDetection from "./pages/AnomalyDetection";
-import SAMMonitor from "./pages/SAMMonitor";
-
-
-import FPDSMonitor from "./pages/FPDSMonitor";
-import UserManagement from "./pages/UserManagement";
-import AuditLog from "./pages/AuditLog";
-import UserManual from "./pages/UserManual";
-import Charts from "./pages/Charts";
-import BookOfTruths from "./pages/BookOfTruths";
-import GovWin from "./pages/GovWin";
-import RiskRegister from "./pages/RiskRegister";
-import ProposalCenter from "./pages/ProposalCenter";
-import AdminTrash from "./pages/AdminTrash";
-import AdminCompanies from "./pages/AdminCompanies";
-import VehicleClassification from "./pages/VehicleClassification";
-import SourceManager from "./pages/SourceManager";
-import MergerContext from "./pages/MergerContext";
 import NotFound from "./pages/NotFound";
+
+const QACenter = lazy(() => import("./pages/QACenter"));
+const OpsTracker = lazy(() => import("./pages/OpsTracker"));
+const Pipeline = lazy(() => import("./pages/Pipeline"));
+const OpportunityDetail = lazy(() => import("./pages/OpportunityDetail"));
+const Doctrine = lazy(() => import("./pages/Doctrine"));
+const Intel = lazy(() => import("./pages/Intel"));
+const Capture = lazy(() => import("./pages/Capture"));
+const Workflows = lazy(() => import("./pages/Workflows"));
+const Settings = lazy(() => import("./pages/Settings"));
+const FinancialBible = lazy(() => import("./pages/FinancialBible"));
+const Approvals = lazy(() => import("./pages/Approvals"));
+const Compliance = lazy(() => import("./pages/Compliance"));
+const ProposalReview = lazy(() => import("./pages/ProposalReview"));
+const ProposalBuilder = lazy(() => import("./pages/ProposalBuilder"));
+const Contacts = lazy(() => import("./pages/Contacts"));
+const Reports = lazy(() => import("./pages/Reports"));
+const PromptArchitect = lazy(() => import("./pages/PromptArchitect"));
+const FastTrack = lazy(() => import("./pages/FastTrack"));
+const Knowledge = lazy(() => import("./pages/Knowledge"));
+const RFPShredder = lazy(() => import("./pages/RFPShredder"));
+const Predictive = lazy(() => import("./pages/Predictive"));
+const ColorReview = lazy(() => import("./pages/ColorReview"));
+const AnomalyDetection = lazy(() => import("./pages/AnomalyDetection"));
+const SAMMonitor = lazy(() => import("./pages/SAMMonitor"));
+const FPDSMonitor = lazy(() => import("./pages/FPDSMonitor"));
+const UserManagement = lazy(() => import("./pages/UserManagement"));
+const AuditLog = lazy(() => import("./pages/AuditLog"));
+const UserManual = lazy(() => import("./pages/UserManual"));
+const Charts = lazy(() => import("./pages/Charts"));
+const BookOfTruths = lazy(() => import("./pages/BookOfTruths"));
+const GovWin = lazy(() => import("./pages/GovWin"));
+const RiskRegister = lazy(() => import("./pages/RiskRegister"));
+const ProposalCenter = lazy(() => import("./pages/ProposalCenter"));
+const AdminTrash = lazy(() => import("./pages/AdminTrash"));
+const AdminCompanies = lazy(() => import("./pages/AdminCompanies"));
+const VehicleClassification = lazy(() => import("./pages/VehicleClassification"));
+const SourceManager = lazy(() => import("./pages/SourceManager"));
+const MergerContext = lazy(() => import("./pages/MergerContext"));
+const AIGateway = lazy(() => import("./pages/AIGateway"));
+const CaptureDiscipline = lazy(() => import("./pages/CaptureDiscipline"));
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -88,6 +89,8 @@ const NAV_GROUPS = [
 
       { path: "/govwin", label: "GovWin IQ", icon: "🌐" },
       { path: "/mergers", label: "M&A Context", icon: "🔗" },
+      { path: "/ai-gateway", label: "AI Gateway", icon: "🤖" },
+      { path: "/capture-discipline", label: "Capture Discipline", icon: "🎯" },
     ],
   },
   {
@@ -487,6 +490,7 @@ export default function App() {
 
         <main style={{ flex: 1, padding: isMobile ? 12 : 24 }}>
           <Breadcrumb />
+          <Suspense fallback={<div style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>Loading…</div>}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/qa-center" element={<QACenter />} />
@@ -529,8 +533,11 @@ export default function App() {
             <Route path="/proposal-center" element={<ProposalCenter />} />
             <Route path="/sources" element={<SourceManager />} />
             <Route path="/mergers" element={<MergerContext />} />
+            <Route path="/ai-gateway" element={<AIGateway />} />
+            <Route path="/capture-discipline" element={<CaptureDiscipline />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </main>
       </div>
     </div>
@@ -590,9 +597,9 @@ function AskAnythingFAB() {
         onClick={() => setOpen(true)}
         title="Ask a question about anything in GDA Command"
         style={{
-          position: "fixed", bottom: 24, right: 24, width: 52, height: 52, borderRadius: "50%",
-          background: "#3b82f6", color: "#fff", border: "none", cursor: "pointer", fontSize: 22,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.3)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center",
+          position: "fixed", bottom: 80, right: 16, width: 40, height: 40, borderRadius: "50%",
+          background: "#3b82f6", color: "#fff", border: "none", cursor: "pointer", fontSize: 18,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.25)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85,
         }}
       >?</button>
     );
@@ -600,7 +607,7 @@ function AskAnythingFAB() {
 
   return (
     <div style={{
-      position: "fixed", bottom: 24, right: 24, width: 380, maxHeight: 420,
+      position: "fixed", bottom: 80, right: 16, width: 380, maxHeight: 420,
       background: "var(--color-surface)", border: "1px solid var(--color-border)",
       borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.3)", zIndex: 10000, display: "flex", flexDirection: "column",
     }}>

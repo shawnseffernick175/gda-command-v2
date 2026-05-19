@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 
 import { callWebhook, webhookConfig } from "../lib/n8n-client";
@@ -44,7 +45,7 @@ router.get("/pwin/:oppId", async (req, res) => {
         };
         return res.json(successEnvelope("gda-enrichments", "pwin", mapped));
       }
-    } catch { /* fall through to 404 */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "pwin", {
@@ -63,7 +64,7 @@ router.get("/recommendations", async (_req, res) => {
         const recs = Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).recommendations ?? [];
         return res.json(successEnvelope("gda-enrichments", "recommendations", { recommendations: recs, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-enrichments", "recommendations", {
@@ -83,7 +84,7 @@ router.get("/incumbent/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-enrichments", "incumbent", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "incumbent", {
@@ -101,7 +102,7 @@ router.get("/competitors/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-enrichments", "competitors", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "competitors", {
@@ -119,7 +120,7 @@ router.get("/blackhat/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-enrichments", "blackhat", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "blackhat", {
@@ -137,7 +138,7 @@ router.get("/wargame/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-enrichments", "wargame", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "wargame", {
@@ -156,7 +157,7 @@ router.get("/intel-modules", async (req, res) => {
         const modules = Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).modules ?? [];
         return res.json(successEnvelope("gda-enrichments", "intel-modules", { modules, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-enrichments", "intel-modules", {
@@ -176,7 +177,7 @@ router.get("/teaming/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-enrichments", "teaming", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-enrichments", "teaming", {
@@ -197,9 +198,24 @@ router.post("/search", async (req, res) => {
     try {
       const result = await callWebhook("gda-semantic-search", { query }, { timeoutMs: 20_000 });
       if (result.ok && result.body) {
-        return res.json(successEnvelope("gda-enrichments", "search", { ...result.body, source: "n8n" }));
+        const body = result.body as Record<string, unknown>;
+        const rawResults = Array.isArray(body.results) ? body.results : [];
+        const sanitized = rawResults.map((r: Record<string, unknown>) => ({
+          type: typeof r.type === "string" ? r.type : "unknown",
+          id: String(r.id ?? ""),
+          title: typeof r.title === "string" ? r.title : "",
+          score: typeof r.score === "number" ? r.score : 0,
+          snippet: typeof r.snippet === "string" ? r.snippet : "",
+          path: typeof r.path === "string" ? r.path : "#",
+        }));
+        return res.json(successEnvelope("gda-enrichments", "search", {
+          query,
+          results: sanitized,
+          total: sanitized.length,
+          source: "n8n",
+        }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("enrichments_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-enrichments", "search", {

@@ -25,7 +25,7 @@ export async function extractText(buffer: Buffer, mimeType: string): Promise<str
     mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
     mimeType === "application/vnd.ms-excel"
   ) {
-    return extractXlsx(buffer);
+    return await extractXlsx(buffer);
   }
 
   if (mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
@@ -61,22 +61,22 @@ async function extractDocx(buffer: Buffer): Promise<string> {
   }
 }
 
-function extractXlsx(buffer: Buffer): string {
+async function extractXlsx(buffer: Buffer): Promise<string> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const XLSX = require("xlsx") as typeof import("xlsx");
-    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const ExcelJS = require("exceljs") as typeof import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as never);
     const lines: string[] = [];
 
-    for (const sheetName of workbook.SheetNames) {
-      lines.push(`--- Sheet: ${sheetName} ---`);
-      const sheet = workbook.Sheets[sheetName];
-      const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-      for (const row of rows) {
-        const text = row.map(String).filter(Boolean).join(" | ");
+    workbook.eachSheet((sheet) => {
+      lines.push(`--- Sheet: ${sheet.name} ---`);
+      sheet.eachRow((row) => {
+        const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
+        const text = vals.map(String).filter(Boolean).join(" | ");
         if (text.trim()) lines.push(text);
-      }
-    }
+      });
+    });
 
     return lines.join("\n");
   } catch (err) {

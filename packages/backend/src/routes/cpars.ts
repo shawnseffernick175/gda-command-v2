@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
@@ -14,7 +15,7 @@ async function loadRecords(): Promise<{ items: CPARSRecord[]; source: "db" }> {
     try {
       const { rows } = await pool.query("SELECT * FROM cpars_records ORDER BY updated_at DESC");
       if (rows.length > 0) return { items: rows as CPARSRecord[], source: "db" };
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("cpars_fallback", { error: String(err) }); }
   }
   return { items: [], source: "db" };
 }
@@ -81,7 +82,7 @@ router.get("/records/:id", async (req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM cpars_records WHERE id = $1", [req.params.id]);
       if (rows.length > 0) return res.json(successEnvelope("gda-cpars", "detail", rows[0]));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("cpars_fallback", { error: String(err) }); }
   }
   const item: CPARSRecord | undefined = undefined;
   if (!item) {
@@ -100,7 +101,7 @@ router.post("/records/:id/generate-narrative", requireRole("admin", "bd_manager"
       try {
         const { rows } = await pool.query("SELECT * FROM cpars_records WHERE id = $1", [req.params.id]);
         if (rows.length > 0) item = rows[0] as CPARSRecord;
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("cpars_fallback", { error: String(err) }); }
     }
     if (!item) { /* no data available */ }
 

@@ -3,6 +3,7 @@
  */
 
 import { Router, Request, Response } from "express";
+import { log } from "../lib/logger";
 import { sendEmail } from "../lib/email";
 import crypto from "crypto";
 import {
@@ -204,7 +205,8 @@ router.post("/refresh", async (req: Request, res: Response) => {
     );
 
     res.json(envelope({ accessToken: newAccess, refreshToken: newRefresh }, "refresh"));
-  } catch {
+  } catch (err) {
+    log.warn("auth_fallback", { error: String(err) });
     res.status(401).json(errorEnvelope("INVALID_TOKEN", "Invalid refresh token", "refresh", 401));
   }
 });

@@ -206,32 +206,36 @@ router.get("/", async (req, res) => {
         const dbPool = getPool();
         if (dbPool) {
           try {
-            // Fetch user-approved stage overrides (opportunities the user explicitly changed)
+            // Fetch user-approved stage overrides and pwin scores from DB
             const overrides = await dbPool.query(
-              `SELECT id, status, capture_stage FROM opportunities WHERE status != 'discovery' AND id NOT LIKE 'opp-%' AND deleted_at IS NULL`
+              `SELECT id, status, capture_stage, probability_of_win FROM opportunities WHERE id NOT LIKE 'opp-%' AND deleted_at IS NULL`
             );
-            const overrideMap = new Map<string, string>();
+            const overrideMap = new Map<string, { status: string; pwin: number | null }>();
             for (const row of overrides.rows) {
-              overrideMap.set(String(row.id), row.status as string);
+              overrideMap.set(String(row.id), {
+                status: row.status as string,
+                pwin: row.probability_of_win ? parseFloat(row.probability_of_win) : null,
+              });
             }
 
             // Apply stage enforcement: default to "discovery" unless user overrode.
-            // Auto no-bid: if due_date is past or within 30 days and user hasn't
-            // explicitly overridden, set status to "lost" (no-bid).
-            const thirtyDaysFromNow = new Date();
-            thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+            // Auto no-bid: only if due_date has already passed.
+            // Also merge pwin scores from DB into n8n results.
+            const now = new Date();
 
             combined = combined.map((o) => {
-              const userStatus = overrideMap.get(String(o.id));
-              if (userStatus) return { ...o, status: userStatus as typeof o.status };
+              const dbData = overrideMap.get(String(o.id));
+              const pwin = dbData?.pwin ?? o.probability_of_win;
+              const userStatus = dbData && dbData.status !== "discovery" ? dbData.status : null;
+              if (userStatus) return { ...o, status: userStatus as typeof o.status, probability_of_win: pwin };
 
               if (o.due_date) {
                 const due = new Date(o.due_date);
-                if (!isNaN(due.getTime()) && due <= thirtyDaysFromNow) {
-                  return { ...o, status: "no_bid" as typeof o.status };
+                if (!isNaN(due.getTime()) && due < now) {
+                  return { ...o, status: "no_bid" as typeof o.status, probability_of_win: pwin };
                 }
               }
-              return { ...o, status: "discovery" as typeof o.status };
+              return { ...o, status: "discovery" as typeof o.status, probability_of_win: pwin };
             });
 
             // Merge locally-created opportunities (QuickEntry) that only exist in the DB
@@ -255,13 +259,12 @@ router.get("/", async (req, res) => {
           } catch (dbErr) {
             process.stderr.write(`[opportunities] DB merge: ${(dbErr as Error).message}\n`);
             // Fallback: still enforce Interest on all n8n results even without DB,
-            // but auto no-bid expired / within-30-day opportunities.
-            const fbCutoff = new Date();
-            fbCutoff.setDate(fbCutoff.getDate() + 30);
+            // but auto no-bid only if due date has already passed.
+            const fbNow = new Date();
             combined = combined.map((o) => {
               if (o.due_date) {
                 const due = new Date(o.due_date);
-                if (!isNaN(due.getTime()) && due <= fbCutoff) {
+                if (!isNaN(due.getTime()) && due < fbNow) {
                   return { ...o, status: "no_bid" as typeof o.status };
                 }
               }
@@ -270,13 +273,12 @@ router.get("/", async (req, res) => {
           }
         } else {
           // No DB: enforce Interest on all n8n results,
-          // but auto no-bid expired / within-30-day opportunities.
-          const noDbCutoff = new Date();
-          noDbCutoff.setDate(noDbCutoff.getDate() + 30);
+          // but auto no-bid only if due date has already passed.
+          const noDbNow = new Date();
           combined = combined.map((o) => {
             if (o.due_date) {
               const due = new Date(o.due_date);
-              if (!isNaN(due.getTime()) && due <= noDbCutoff) {
+              if (!isNaN(due.getTime()) && due < noDbNow) {
                 return { ...o, status: "no_bid" as typeof o.status };
               }
             }
@@ -345,7 +347,7 @@ router.get("/", async (req, res) => {
 
   // Real DB query
   try {
-    const conditions: string[] = ["deleted_at IS NULL"];
+    const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIdx = 1;
 
@@ -655,7 +657,7 @@ router.get("/:id/detail", async (req, res) => {
     try {
       const result = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
       if (result.rows.length > 0) opp = result.rows[0] as Opportunity;
-    } catch { /* empty */ }
+    } catch (err) { log.warn("opportunities_fallback", { error: String(err) }); }
   }
 
   // Fall back to n8n if not in DB
@@ -666,7 +668,7 @@ router.get("/:id/detail", async (req, res) => {
         opp = n8nOpp;
         source = "n8n";
       }
-    } catch { /* empty */ }
+    } catch (err) { log.warn("opportunities_fallback", { error: String(err) }); }
   }
 
   if (!opp) {
@@ -866,7 +868,8 @@ router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res)
         if (result.rows.length > 0) {
           opp = result.rows[0] as Opportunity;
         }
-      } catch {
+      } catch (err) {
+        log.warn("opportunities_fallback", { error: String(err) });
         // Fall through to mock
       }
     }
@@ -1201,19 +1204,19 @@ router.get("/:id/timeline", async (req, res) => {
 
   try {
     const versionRows = await pool.query(
-      `SELECT id, change_type, changed_by, created_at, snapshot
-       FROM record_versions
+      `SELECT version_id, change_type, changed_by, changed_at, snapshot
+       FROM record_version
        WHERE table_name = 'opportunities' AND record_id = $1
-       ORDER BY created_at DESC
+       ORDER BY changed_at DESC
        LIMIT 50`,
       [id]
     );
 
-    const events = versionRows.rows.map((r: { id: string; change_type: string; changed_by: string; created_at: string; snapshot: Record<string, unknown> }) => ({
-      id: r.id,
+    const events = versionRows.rows.map((r: { version_id: string; change_type: string; changed_by: string; changed_at: string; snapshot: Record<string, unknown> }) => ({
+      id: r.version_id,
       type: r.change_type,
       actor: r.changed_by,
-      timestamp: r.created_at,
+      timestamp: r.changed_at,
       summary: r.change_type === "create"
         ? "Opportunity created"
         : `Updated by ${r.changed_by}`,

@@ -1,6 +1,9 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
+import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
+import { randomUUID } from "crypto";
 
 const router = Router();
 
@@ -30,7 +33,7 @@ router.get("/summary", async (_req, res) => {
         }
         counts.total = total;
         counts.needs_attention_count = attention;
-      } catch { /* fall through to zeros */ }
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
     }
 
     return res.json(
@@ -82,7 +85,7 @@ router.get("/matches", async (req, res) => {
       try {
         const { rows } = await pool.query("SELECT * FROM fast_track_matches ORDER BY score DESC");
         dbRows = rows;
-      } catch { /* empty */ }
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
     }
 
     let items = dbRows.map(mapDbRow);
@@ -151,7 +154,7 @@ router.get("/:id", async (req, res) => {
       try {
         const { rows } = await pool.query("SELECT * FROM fast_track_matches WHERE id = $1", [req.params.id]);
         if (rows.length > 0) rawRow = rows[0] as Record<string, unknown>;
-      } catch { /* empty */ }
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
     }
     if (!rawRow) {
       return res.status(404).json(
@@ -228,7 +231,8 @@ router.post("/promote", async (req, res) => {
       if (result.rows.length > 0) {
         opportunityId = result.rows[0].id;
       }
-    } catch {
+    } catch (err) {
+      log.warn("fast-track_fallback", { error: String(err) });
       // DB insert failed — match exists but promotion insert failed
     }
 
@@ -243,6 +247,70 @@ router.post("/promote", async (req, res) => {
   } catch (err) {
     return res.status(500).json(
       errorEnvelope("gda-fast-track", "promote", { code: "INTERNAL", message: (err as Error).message, detail: null }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/fast-track/scan — generate fast-track signals from SAM pre-solicitation data
+// ---------------------------------------------------------------------------
+router.post("/scan", requireRole("admin", "bd_manager"), async (_req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.status(503).json(errorEnvelope("gda-fast-track", "scan", { code: "NO_DB", message: "Database unavailable", detail: null }));
+    }
+
+    // Pull pre-solicitation opportunities from SAM monitor that match Envision NAICS codes
+    const envisionNaics = ["541512", "541519", "541611", "541330", "541715", "518210", "541690", "611430"];
+    const { rows: samOpps } = await pool.query(
+      `SELECT id, notice_id, title, agency, sub_agency, type, naics, value_estimate, response_deadline, sam_url, ai_summary
+       FROM sam_opportunities
+       WHERE (type ILIKE '%pre%solicitation%' OR type ILIKE '%sources%sought%' OR type ILIKE '%special%notice%')
+         AND scan_status = 'new'
+         AND NOT EXISTS (SELECT 1 FROM fast_track_matches WHERE fast_track_matches.id = 'ft-' || sam_opportunities.id)
+       ORDER BY created_at DESC LIMIT 50`
+    );
+
+    let inserted = 0;
+    for (const opp of samOpps) {
+      const naicsMatch = envisionNaics.some((n) => (opp.naics ?? "").includes(n));
+      const score = naicsMatch ? 75 : 40;
+      const id = `ft-${opp.id}`;
+
+      try {
+        const result = await pool.query(
+          `INSERT INTO fast_track_matches (id, signal_type, signal_title, executive_summary, technology_tags, company_name, company_role,
+            score, status, needs_attention, sources, contract_path, recommended_action, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11, $12, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            id,
+            opp.type ?? "pre-solicitation",
+            opp.title,
+            opp.ai_summary ?? `${opp.type} from ${opp.agency ?? "Unknown Agency"}`,
+            opp.naics ? [opp.naics] : [],
+            opp.agency ?? "Unknown",
+            "buyer",
+            score,
+            naicsMatch,
+            JSON.stringify(opp.sam_url ? [opp.sam_url] : []),
+            `SAM.gov ${opp.type ?? "pre-solicitation"} → potential RFP`,
+            naicsMatch ? "Review and promote to pipeline" : "Monitor for updates",
+          ]
+        );
+        if (result.rowCount && result.rowCount > 0) inserted++;
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
+    }
+
+    return res.json(successEnvelope("gda-fast-track", "scan", {
+      scanned: samOpps.length,
+      inserted,
+      message: `Scanned ${samOpps.length} SAM opportunities, added ${inserted} new signals`,
+    }));
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-fast-track", "scan", { code: "INTERNAL", message: (err as Error).message, detail: null }),
     );
   }
 });

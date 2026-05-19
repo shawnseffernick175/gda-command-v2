@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -35,7 +36,8 @@ router.get("/summary", async (_req, res) => {
       try {
         const result = await pool.query("SELECT * FROM discussion_threads");
         all = result.rows.map(rowToThread);
-      } catch {
+      } catch (err) {
+        log.warn("discussions_fallback", { error: String(err) });
         all = [];
       }
     } else {
@@ -76,7 +78,8 @@ router.get("/threads", async (req, res) => {
       try {
         const result = await pool.query("SELECT * FROM discussion_threads ORDER BY last_message_at DESC NULLS LAST");
         items = result.rows.map(rowToThread);
-      } catch {
+      } catch (err) {
+        log.warn("discussions_fallback", { error: String(err) });
         items = [];
       }
     } else {
@@ -117,7 +120,7 @@ router.get("/threads/:id", async (req, res) => {
       if (result.rows.length > 0) {
         return res.json(successEnvelope("gda-discussions", "thread-detail", rowToThread(result.rows[0])));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("discussions_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(
@@ -144,7 +147,7 @@ router.get("/threads/:id/messages", async (req, res) => {
           successEnvelope("gda-discussions", "messages", messages, { total: messages.length }),
         );
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("discussions_fallback", { error: String(err) }); }
   }
 
   return res.json(

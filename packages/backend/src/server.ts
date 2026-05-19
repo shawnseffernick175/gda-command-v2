@@ -55,6 +55,8 @@ import companyEntitiesRouter from "./routes/company-entities";
 import vehiclesRouter from "./routes/vehicles";
 import sourcesRouter from "./routes/sources";
 import mergersRouter from "./routes/mergers";
+import aiGatewayRouter from "./routes/ai-gateway";
+import captureDisciplineRouter from "./routes/capture-discipline";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck } from "./lib/db";
@@ -72,7 +74,12 @@ const app = express();
 const PORT = process.env.PORT ?? 3001;
 
 app.disable("x-powered-by");
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === "production"
+    ? ["https://gda.csr-llc.tech"]
+    : [/localhost/],
+  credentials: true,
+}));
 app.use(express.json({ limit: "256kb" }));
 
 // Ensure upload directory exists
@@ -83,28 +90,16 @@ app.use(requestLogger);
 
 // --- Gateway health ---
 app.get("/health", async (_req, res) => {
-  const wh = webhookConfig();
-  const api = apiConfig();
   const db = dbConfig();
-  let dbStatus: { ok: boolean; latencyMs: number; error?: string } | null = null;
+  let dbOk = false;
   if (db.configured) {
-    dbStatus = await dbHealthCheck();
+    const status = await dbHealthCheck();
+    dbOk = status?.ok ?? false;
   }
   res.json(
     successEnvelope("GDA.gateway", "health", {
-      status: "ok",
+      status: dbOk ? "ok" : "degraded",
       uptimeSec: Math.round(process.uptime()),
-      pid: process.pid,
-      nodeVersion: process.version,
-      config: {
-        webhookConfigured: wh.missing.length === 0,
-        apiConfigured: api.missing.length === 0,
-        dbConfigured: db.configured,
-        missingForWebhook: wh.missing,
-        missingForApi: api.missing,
-        missingForDb: db.missing,
-      },
-      db: dbStatus,
     })
   );
 });
@@ -122,8 +117,8 @@ app.use("/api/auth", (req, _res, next) => {
 // --- Ingest routes (key-based auth, no JWT, rate-limited) ---
 app.use("/api/ingest", ingestLimiter, ingestRouter);
 
-// --- Webhook registry (public, read-only) ---
-app.get("/api/webhooks/registry", (_req, res) => {
+// --- Webhook registry (auth-protected) ---
+app.get("/api/webhooks/registry", apiLimiter, authMiddleware, (_req, res) => {
   res.json(successEnvelope("gda-webhooks", "registry", {
     ...getRegistrySummary(),
     webhooks: WEBHOOK_REGISTRY,
@@ -190,6 +185,8 @@ app.use("/api/admin/companies", companyEntitiesRouter);
 app.use("/api/vehicles", vehiclesRouter);
 app.use("/api/sources", sourcesRouter);
 app.use("/api/mergers", mergersRouter);
+app.use("/api/ai-gateway", aiGatewayRouter);
+app.use("/api/capture-discipline", captureDisciplineRouter);
 
 // --- n8n webhook proxy (generic pass-through to any n8n workflow) ---
 app.use("/api/n8n", n8nProxyRouter);
@@ -208,8 +205,8 @@ app.post("/api/errors", (req, res) => {
   res.json({ received: true });
 });
 
-// --- Detailed health endpoint ---
-app.get("/health/detailed", async (_req, res) => {
+// --- Detailed health endpoint (auth-protected) ---
+app.get("/health/detailed", authMiddleware, async (_req, res) => {
   const wh = webhookConfig();
   const api = apiConfig();
   const db = dbConfig();

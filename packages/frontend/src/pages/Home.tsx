@@ -535,7 +535,7 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
           <div
             key={i}
             style={{ ...clickableRow("search"), borderBottom: i < signals.accelerators.length - 1 ? "1px solid var(--color-border)" : "none" }}
-            onClick={() => navigate(`/ops-tracker?search=${encodeURIComponent(ft.opportunity_title.replace(/^\[(PDF|XLS|DOC)\]\s*/i, "").slice(0, 40))}`)}
+            onClick={() => navigate(`/ops-tracker?search=${encodeURIComponent((ft.opportunity_title ?? "").replace(/^\[(PDF|XLS|DOC)\]\s*/i, "").slice(0, 40))}`)}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)"; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
           >

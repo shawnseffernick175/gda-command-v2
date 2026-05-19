@@ -45,7 +45,7 @@ router.get("/summary", async (_req, res) => {
           collection_count: collRes.rows[0].cnt,
           top_documents: topRes.rows,
         };
-      } catch { /* tables may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.json(successEnvelope("gda-knowledge", "summary", summary));
   } catch (err) {
@@ -70,7 +70,7 @@ router.get("/collections", async (_req, res) => {
       try {
         const { rows } = await pool.query(`SELECT id, name, description, document_count, total_chunks, created_at FROM knowledge_collections ORDER BY name`);
         collections = rows;
-      } catch { /* table may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.json(successEnvelope("gda-knowledge", "collections", collections));
   } catch (err) {
@@ -110,7 +110,7 @@ router.get("/documents", async (req, res) => {
           created_at: r.uploaded_at as string, tags: (r.tags as string[]) ?? [],
           file_size_bytes: r.file_size_bytes as number, uploaded_at: r.uploaded_at as string,
         })) as KnowledgeDocument[];
-      } catch { /* table may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.json(
       successEnvelope("gda-knowledge", "documents", results, { total: results.length }),
@@ -141,7 +141,7 @@ router.get("/documents/:id", async (req, res) => {
         if (rows.length > 0) {
           return res.json(successEnvelope("gda-knowledge", "document-detail", rows[0]));
         }
-      } catch { /* table may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.status(404).json(
       errorEnvelope("gda-knowledge", "document-detail", {
@@ -506,7 +506,7 @@ router.post(
         } catch (txErr) {
           await client.query("ROLLBACK");
           // Clean up orphaned file on disk
-          try { deleteFile(storageKey); } catch { /* best effort */ }
+          try { deleteFile(storageKey); } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
           throw txErr;
         } finally {
           client.release();
@@ -569,7 +569,7 @@ router.post(
     } catch (err) {
       // Clean up orphaned file if it was saved to disk before the error
       if (storageKey) {
-        try { deleteFile(storageKey); } catch { /* best effort */ }
+        try { deleteFile(storageKey); } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
       }
       log.error("knowledge_upload_error", { error: (err as Error).message });
       res.status(500).json(
@@ -698,6 +698,77 @@ router.post("/embeddings/document/:id", requireRole("admin"), async (req, res) =
         message: err instanceof Error ? err.message : "Unknown error",
         detail: null,
       }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/knowledge/reprocess-pending — reprocess all pending documents
+// When embeddings are available: embed. Otherwise: mark as indexed (text-only search).
+// ---------------------------------------------------------------------------
+router.post("/reprocess-pending", requireRole("admin"), async (_req, res) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("gda-knowledge", "reprocess", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+    );
+  }
+
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, title, doc_type, tags, metadata, file_id FROM knowledge_documents WHERE status = 'pending'"
+    );
+
+    let processed = 0;
+    let embedded = 0;
+    const useEmbeddings = isEmbeddingAvailable();
+
+    for (const doc of rows) {
+      try {
+        if (useEmbeddings) {
+          const textParts: string[] = [doc.title];
+          if (doc.doc_type) textParts.push(`Document type: ${doc.doc_type}`);
+          if (doc.tags?.length) textParts.push(`Tags: ${doc.tags.join(", ")}`);
+          const meta = doc.metadata ?? {};
+          if (meta.summary) textParts.push(meta.summary);
+          if (meta.description) textParts.push(meta.description);
+          if (meta.content) textParts.push(meta.content);
+
+          const fullText = textParts.join("\n\n");
+          if (fullText.trim().length > 0) {
+            const result = await embedDocument(doc.id, fullText);
+            await pool.query(
+              "UPDATE knowledge_documents SET status = 'indexed', chunk_count = $2, updated_at = NOW() WHERE id = $1",
+              [doc.id, result.chunksCreated],
+            );
+            embedded++;
+          }
+        } else {
+          // Without embeddings, mark as indexed so they show up in text search
+          await pool.query(
+            "UPDATE knowledge_documents SET status = 'indexed', chunk_count = 1, updated_at = NOW() WHERE id = $1",
+            [doc.id],
+          );
+        }
+        processed++;
+      } catch (err) {
+        log.warn("knowledge_fallback", { error: String(err) });
+        // Skip individual failures
+      }
+    }
+
+    return res.json(successEnvelope("gda-knowledge", "reprocess", {
+      total_pending: rows.length,
+      processed,
+      embedded,
+      embeddings_available: useEmbeddings,
+      message: useEmbeddings
+        ? `Processed ${processed} documents (${embedded} embedded)`
+        : `Processed ${processed} documents (text-only indexing — pgvector not available)`,
+    }));
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-knowledge", "reprocess", { code: "INTERNAL", message: (err as Error).message, detail: null }),
     );
   }
 });
