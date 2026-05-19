@@ -307,6 +307,7 @@ router.post("/recommend/:id", async (req, res) => {
       temperature: 0.2,
       max_tokens: 1024,
       response_format: { type: "json_object" },
+      includeOrgContext: false,
       messages: [
         {
           role: "system",
