@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import type { Opportunity, OpportunityStatus, CapturePlan } from "@gda/shared";
 import { successEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
@@ -132,7 +133,7 @@ router.get("/kpis", async (_req, res) => {
               topByScore.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
             }
 
-          } catch { /* fallback to n8n funnel */ }
+          } catch (err) { log.warn("dashboard_fallback", { error: String(err) }); }
         }
 
         // If n8n topByScore is still empty/sparse, fall back to top DB opps
@@ -173,7 +174,7 @@ router.get("/kpis", async (_req, res) => {
                   updated_at: (r.updated_at as string) ?? new Date().toISOString(),
                 }));
               }
-            } catch { /* ignore fallback error */ }
+            } catch (err) { log.warn("dashboard_fallback", { error: String(err) }); }
           }
         }
 
@@ -190,7 +191,7 @@ router.get("/kpis", async (_req, res) => {
             totalTracked = trackedResult.rows[0]?.cnt ?? totalOpportunities;
             activePipeline = activeResult.rows[0]?.cnt ?? 0;
             totalTrackedSource = "canonical_view";
-          } catch { /* keep n8n counts as fallback */ }
+          } catch (err) { log.warn("dashboard_fallback", { error: String(err) }); }
         }
 
         return res.json(
@@ -255,7 +256,8 @@ router.get("/kpis", async (_req, res) => {
           : null,
       }));
       source = "db";
-    } catch {
+    } catch (err) {
+      log.warn("dashboard_fallback", { error: String(err) });
       allOpps = [];
     }
   } else {
@@ -363,7 +365,8 @@ router.get("/command-signals", async (_req, res) => {
       } else {
         plans = [];
       }
-    } catch {
+    } catch (err) {
+      log.warn("dashboard_fallback", { error: String(err) });
       plans = [];
     }
   } else {
@@ -392,7 +395,7 @@ router.get("/command-signals", async (_req, res) => {
         mitigation: r.mitigation_plan,
         status: r.status,
       }));
-    } catch { /* fall through to capture plan risks */ }
+    } catch (err) { log.warn("dashboard_fallback", { error: String(err) }); }
   }
   if (activeRisks.length === 0) {
     activeRisks = plans
@@ -477,7 +480,8 @@ router.get("/command-signals", async (_req, res) => {
           urgency: (s.urgency ?? "medium") as "high" | "medium" | "low",
         }));
       }
-    } catch {
+    } catch (err) {
+      log.warn("dashboard_fallback", { error: String(err) });
       // fall through to mock
     }
   }
@@ -556,7 +560,7 @@ router.get("/mega", async (_req, res) => {
         "SELECT COALESCE(SUM(value_estimated), 0) as v FROM opportunities WHERE status = 'pipeline'"
       );
       pipelineValue = parseFloat(valRow[0].v) || 0;
-    } catch { /* fallback */ }
+    } catch (err) { log.warn("dashboard_fallback", { error: String(err) }); }
   }
 
   res.json(
@@ -593,7 +597,7 @@ router.get("/trends", async (_req, res) => {
           })
         );
       }
-    } catch { /* fallback */ }
+    } catch (err) { log.warn("dashboard_fallback", { error: String(err) }); }
   }
 
   res.json(
@@ -621,7 +625,7 @@ router.get("/actions", async (_req, res) => {
           })
         );
       }
-    } catch { /* fallback */ }
+    } catch (err) { log.warn("dashboard_fallback", { error: String(err) }); }
   }
 
   res.json(

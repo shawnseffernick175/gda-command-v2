@@ -65,7 +65,7 @@ router.get("/status", async (_req: Request, res: Response) => {
         const fpdsFeedObj = feeds.find((f) => f.id === "fpds-awards");
         if (samFeedObj) Object.assign(samFeedObj, { record_count: parseInt(samCount.rows[0].count) });
         if (fpdsFeedObj) Object.assign(fpdsFeedObj, { record_count: parseInt(fpdsCount.rows[0].count) });
-      } catch { /* fall through with defaults */ }
+      } catch (err) { log.warn("feeds_fallback", { error: String(err) }); }
     }
 
     res.json(successEnvelope("gda-feeds", "status", { feeds }));
@@ -202,7 +202,7 @@ router.get("/config", async (_req: Request, res: Response) => {
           res.json(successEnvelope("gda-feeds", "config", rows[0]));
           return;
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("feeds_fallback", { error: String(err) }); }
     }
 
     res.json(successEnvelope("gda-feeds", "config", {

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 const router = Router();
@@ -21,7 +22,7 @@ router.get("/", async (_req, res) => {
           }),
         );
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("company-profile_fallback", { error: String(err) }); }
   }
 
   res.json(
@@ -52,7 +53,7 @@ router.get("/:id", async (req, res) => {
           }),
         );
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("company-profile_fallback", { error: String(err) }); }
   }
   return res
     .status(404)

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 
 import { callWebhook } from "../lib/n8n-client";
@@ -19,7 +20,7 @@ router.get("/pwin-models", async (_req, res) => {
         const models = Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).models ?? [];
         return res.json(successEnvelope("gda-predictive", "pwin-models", { models, source: "n8n" }));
       }
-    } catch { /* fall through to mock */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   // DB fallback: aggregate pwin from opportunities
@@ -47,7 +48,7 @@ router.get("/pwin-models", async (_req, res) => {
         data_source: "db",
       }));
       return res.json(successEnvelope("gda-predictive", "pwin-models", { models, total: models.length, source: "db" }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-predictive", "pwin-models", {
@@ -66,7 +67,7 @@ router.get("/pwin-models/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-predictive", "pwin-model", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-predictive", "pwin-model", {
@@ -87,7 +88,7 @@ router.get("/forecast", async (_req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-predictive", "forecast", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   // DB fallback: compute forecast from opportunities
@@ -142,7 +143,7 @@ router.get("/forecast", async (_req, res) => {
         top_contributors: topContributors,
         source: "db",
       }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-predictive", "forecast", {
@@ -179,7 +180,7 @@ router.get("/bid-assessments", async (_req, res) => {
         const assessments = Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).assessments ?? [];
         return res.json(successEnvelope("gda-predictive", "bid-assessments", { assessments, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   // DB fallback: generate bid assessments from opportunities
@@ -212,7 +213,7 @@ router.get("/bid-assessments", async (_req, res) => {
       return res.json(successEnvelope("gda-predictive", "bid-assessments", {
         assessments, total: assessments.length, bid, no_bid: noBid, watch, source: "db",
       }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-predictive", "bid-assessments", {
@@ -234,7 +235,7 @@ router.get("/bid-assessments/:oppId", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-predictive", "bid-assessment", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-predictive", "bid-assessment", {
@@ -255,7 +256,7 @@ router.get("/win-loss", async (_req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-predictive", "win-loss", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   // DB fallback: aggregate win/loss from opportunities
@@ -296,7 +297,7 @@ router.get("/win-loss", async (_req, res) => {
         quarterly_trends: [],
         source: "db",
       }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("predictive_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-predictive", "win-loss", {

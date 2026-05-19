@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -24,7 +25,7 @@ router.get("/templates", async (req, res) => {
             created_at: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
           }));
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("reports_fallback", { error: String(err) }); }
     }
 
     let items = [...allTemplates];
@@ -79,7 +80,7 @@ router.get("/templates/:id", async (req, res) => {
             template: { ...r, created_at: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at },
           }));
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("reports_fallback", { error: String(err) }); }
     }
 
     return res.status(404).json(
@@ -108,7 +109,7 @@ router.get("/generated", async (req, res) => {
             expires_at: r.expires_at instanceof Date ? r.expires_at.toISOString() : r.expires_at,
           }));
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("reports_fallback", { error: String(err) }); }
     }
 
     let items = [...allReports];
@@ -171,7 +172,7 @@ router.post("/generate", requireRole("admin", "bd_manager", "capture_lead", "ana
       try {
         const result = await pool.query("SELECT * FROM report_templates WHERE id = $1", [template_id]);
         if (result.rows.length > 0) template = result.rows[0];
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("reports_fallback", { error: String(err) }); }
     }
 
     if (!template) {
@@ -260,7 +261,7 @@ router.get("/scheduled", async (_req, res) => {
             schedules: items, total: items.length, summary: { enabled, disabled },
           }));
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("reports_fallback", { error: String(err) }); }
     }
 
     res.json(successEnvelope("GDA.reports", "list-scheduled", {
@@ -289,7 +290,7 @@ router.get("/exports", async (_req, res) => {
           }));
           return res.json(successEnvelope("GDA.reports", "list-exports", { exports: items, total: items.length }));
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("reports_fallback", { error: String(err) }); }
     }
 
     res.json(successEnvelope("GDA.reports", "list-exports", { exports: [], total: 0 }));

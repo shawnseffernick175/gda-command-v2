@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -43,7 +44,8 @@ async function logUsage(opts: {
         opts.errorMessage ?? null,
       ]
     );
-  } catch {
+  } catch (err) {
+    log.warn("ai-gateway_fallback", { error: String(err) });
     // Non-critical — don't block the response
   }
 }
@@ -259,7 +261,8 @@ Consider: competitive landscape, alignment with typical GovCon capabilities, tim
       try {
         const cleaned = result.content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         parsed = JSON.parse(cleaned);
-      } catch {
+      } catch (err) {
+        log.warn("ai-gateway_fallback", { error: String(err) });
         parsed = {
           recommendation: "conditional_bid",
           confidence: 50,

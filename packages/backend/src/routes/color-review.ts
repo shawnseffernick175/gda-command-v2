@@ -32,7 +32,7 @@ async function loadReviews(): Promise<{ items: ReviewItem[]; source: "db" }> {
           risk_factors: r.risk_factors ?? [],
         })) as ReviewItem[], source: "db" };
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("color-review_fallback", { error: String(err) }); }
   }
   return { items: [], source: "db" };
 }
@@ -251,7 +251,7 @@ router.get("/:id", async (req, res) => {
           };
           return res.json(successEnvelope("GDA.color-review", "get-detail", { review, source: "db" }));
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("color-review_fallback", { error: String(err) }); }
     }
     return res.status(404).json(
       errorEnvelope("GDA.color-review", "get-detail", { code: "NOT_FOUND", message: `Color review ${req.params.id} not found`, detail: null }),
@@ -387,7 +387,8 @@ router.post(
     let reviewResult: Record<string, unknown> = {};
     try {
       reviewResult = JSON.parse(llmResponse.content);
-    } catch {
+    } catch (err) {
+      log.warn("color-review_fallback", { error: String(err) });
       reviewResult = { summary: llmResponse.content, overall_score: 0 };
     }
 

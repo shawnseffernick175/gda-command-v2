@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -95,7 +96,8 @@ router.get("/plans", async (_req, res) => {
       } else {
         allPlans = [];
       }
-    } catch {
+    } catch (err) {
+      log.warn("capture_fallback", { error: String(err) });
       allPlans = [];
     }
   } else {
@@ -110,7 +112,8 @@ router.get("/plans", async (_req, res) => {
         } else {
           allPlans = [];
         }
-      } catch {
+      } catch (err) {
+        log.warn("capture_fallback", { error: String(err) });
         allPlans = [];
       }
     } else {
@@ -162,7 +165,7 @@ router.get("/plans/:id", async (req, res) => {
         plan = result.plans.find((p) => p.id === req.params.id);
         if (plan) source = "n8n";
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("capture_fallback", { error: String(err) }); }
   }
 
   if (!plan) {
@@ -174,7 +177,7 @@ router.get("/plans/:id", async (req, res) => {
           plan = rowToCapturePlan(result.rows[0]);
           source = "db";
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("capture_fallback", { error: String(err) }); }
     }
   }
 
@@ -201,7 +204,8 @@ router.get("/plans/:id", async (req, res) => {
         ...r,
         performed_at: r.performed_at instanceof Date ? r.performed_at.toISOString() : r.performed_at,
       }));
-    } catch {
+    } catch (err) {
+      log.warn("capture_fallback", { error: String(err) });
       activities = [];
     }
   } else {
@@ -231,7 +235,7 @@ router.get("/activities", async (_req, res) => {
           performed_at: r.performed_at instanceof Date ? r.performed_at.toISOString() : r.performed_at,
         }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("capture_fallback", { error: String(err) }); }
   }
 
   let activities = [...allActivities];
@@ -286,7 +290,7 @@ router.post("/gate-review", requireRole("admin", "bd_manager", "capture_lead"), 
     try {
       const result = await pool.query("SELECT * FROM capture_plans WHERE id = $1", [capture_plan_id]);
       if (result.rows.length > 0) plan = rowToCapturePlan(result.rows[0]);
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("capture_fallback", { error: String(err) }); }
   }
 
   if (!plan) {

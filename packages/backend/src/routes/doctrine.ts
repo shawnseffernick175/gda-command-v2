@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -33,7 +34,8 @@ router.get("/drafts", async (req, res) => {
       const result = await pool.query("SELECT * FROM doctrine_drafts ORDER BY updated_at DESC");
       allDrafts = result.rows.map(rowToDraft);
       source = "db";
-    } catch {
+    } catch (err) {
+      log.warn("doctrine_fallback", { error: String(err) });
       allDrafts = [];
     }
   } else {
@@ -89,7 +91,7 @@ router.get("/drafts/:id", async (req, res) => {
       if (result.rows.length > 0) {
         return res.json(successEnvelope("GDA.doctrine", "get-draft", { draft: rowToDraft(result.rows[0]), source: "db" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("doctrine_fallback", { error: String(err) }); }
   }
 
   const draft: DoctrineDraft | undefined = undefined;
@@ -126,7 +128,7 @@ router.get("/publish-runs", async (req, res) => {
       return res.json(successEnvelope("GDA.doctrine", "list-publish-runs", {
         runs, total: runs.length, source: "db",
       }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("doctrine_fallback", { error: String(err) }); }
   }
 
   let runs: Array<Record<string, unknown>> = [];
@@ -163,7 +165,8 @@ router.post("/finalize", requireRole("admin", "bd_manager", "capture_lead"), asy
         [sprintId],
       );
       sprintDrafts = result.rows.map(rowToDraft);
-    } catch {
+    } catch (err) {
+      log.warn("doctrine_fallback", { error: String(err) });
       sprintDrafts = [];
     }
   } else {

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { notify } from "../lib/email";
@@ -45,7 +46,8 @@ router.get("/", async (req, res) => {
         const result = await pool.query("SELECT * FROM approvals ORDER BY created_at DESC");
         allItems = result.rows.map(rowToApproval);
         source = "db";
-      } catch {
+      } catch (err) {
+        log.warn("approvals_fallback", { error: String(err) });
         allItems = [];
       }
     } else {
@@ -122,7 +124,7 @@ router.get("/:id", async (req, res) => {
           item = rowToApproval(result.rows[0]);
           source = "db";
         }
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("approvals_fallback", { error: String(err) }); }
     }
 
     if (!item) {
