@@ -3,7 +3,7 @@ import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
 import { isAuthenticated, logout, getUser, authenticatedFetch } from "./api/auth";
 import Home from "./pages/Home";
-import AdminDisciplineConfig from "./pages/AdminDisciplineConfig";
+const AdminDisciplineConfig = lazy(() => import("./pages/AdminDisciplineConfig"));
 import NotFound from "./pages/NotFound";
 
 const QACenter = lazy(() => import("./pages/QACenter"));
