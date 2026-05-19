@@ -197,7 +197,22 @@ router.post("/search", async (req, res) => {
     try {
       const result = await callWebhook("gda-semantic-search", { query }, { timeoutMs: 20_000 });
       if (result.ok && result.body) {
-        return res.json(successEnvelope("gda-enrichments", "search", { ...result.body, source: "n8n" }));
+        const body = result.body as Record<string, unknown>;
+        const rawResults = Array.isArray(body.results) ? body.results : [];
+        const sanitized = rawResults.map((r: Record<string, unknown>) => ({
+          type: typeof r.type === "string" ? r.type : "unknown",
+          id: String(r.id ?? ""),
+          title: typeof r.title === "string" ? r.title : "",
+          score: typeof r.score === "number" ? r.score : 0,
+          snippet: typeof r.snippet === "string" ? r.snippet : "",
+          path: typeof r.path === "string" ? r.path : "#",
+        }));
+        return res.json(successEnvelope("gda-enrichments", "search", {
+          query,
+          results: sanitized,
+          total: sanitized.length,
+          source: "n8n",
+        }));
       }
     } catch { /* fall through */ }
   }
