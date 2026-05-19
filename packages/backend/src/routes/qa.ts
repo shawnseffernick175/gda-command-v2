@@ -333,4 +333,109 @@ router.get("/sam-verify", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/qa/source-health
+ * Returns the health status of all government data source feeds.
+ * Shows which sources are active, deprecated, erroring, or missing API keys.
+ */
+router.get("/source-health", async (_req, res) => {
+  const { getPool } = await import("../lib/db");
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("GDA.qa.source-health", "list", {
+        code: "NO_DB",
+        message: "Database not available",
+        detail: null,
+      })
+    );
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, source, name, base_url, enabled, last_sync_at, last_sync_count,
+              error_count, deprecated_at, deprecation_reason, updated_at
+       FROM gov_source_feeds ORDER BY source`,
+    );
+
+    // Determine overall health
+    const active = rows.filter((r: Record<string, unknown>) => r.enabled && !r.deprecated_at);
+    const deprecated = rows.filter((r: Record<string, unknown>) => r.deprecated_at);
+    const erroring = active.filter((r: Record<string, unknown>) => (r.error_count as number) > 0);
+
+    // Check for missing API keys
+    const envKeys: Record<string, string | undefined> = {
+      sam_gov: process.env.SAM_API_KEY,
+      govwin: process.env.GOVWIN_API_KEY,
+      govtribe: process.env.GOVTRIBE_API_KEY,
+    };
+
+    const sources = rows.map((r: Record<string, unknown>) => {
+      const apiKeyName = r.source === "sam_gov" ? "SAM_API_KEY"
+        : r.source === "govwin" ? "GOVWIN_API_KEY"
+        : r.source === "govtribe" ? "GOVTRIBE_API_KEY"
+        : null;
+
+      let status: string;
+      if (r.deprecated_at) {
+        status = "deprecated";
+      } else if (!r.enabled) {
+        status = "disabled";
+      } else if (apiKeyName && !envKeys[r.source as string]) {
+        status = "missing_key";
+      } else if ((r.error_count as number) > 3) {
+        status = "error";
+      } else if ((r.error_count as number) > 0) {
+        status = "degraded";
+      } else {
+        status = "healthy";
+      }
+
+      return {
+        id: r.id,
+        source: r.source,
+        name: r.name,
+        enabled: r.enabled,
+        status,
+        last_sync_at: r.last_sync_at,
+        last_sync_count: r.last_sync_count,
+        error_count: r.error_count,
+        deprecated_at: r.deprecated_at,
+        deprecation_reason: r.deprecation_reason,
+        api_key_configured: apiKeyName ? !!envKeys[r.source as string] : null,
+      };
+    });
+
+    const overall = erroring.length > 0
+      ? "degraded"
+      : active.length === 0
+        ? "error"
+        : "operational";
+
+    res.json(
+      successEnvelope(
+        "GDA.qa.source-health",
+        "list",
+        {
+          overall,
+          total: rows.length,
+          active: active.length,
+          deprecated: deprecated.length,
+          erroring: erroring.length,
+          sources,
+        },
+        { count: rows.length }
+      )
+    );
+  } catch (e: unknown) {
+    res.status(500).json(
+      errorEnvelope("GDA.qa.source-health", "list", {
+        code: "INTERNAL",
+        message: (e as Error).message ?? "Failed to fetch source health",
+        detail: null,
+      })
+    );
+  }
+});
+
 export default router;

@@ -3,6 +3,7 @@ import {
   fetchQAHealth,
   fetchQALatestFailures,
   fetchSAMVerify,
+  fetchSourceHealth,
   triggerControlledFix,
   fetchPendingFixes,
   resolveFixProposal as resolveFixProposalApi,
@@ -13,6 +14,8 @@ import {
   type ControlledFixResult,
   type SAMVerifyData,
   type SAMVerifyRun,
+  type SourceHealthData,
+  type SourceHealthItem,
 } from "../api/client";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -43,6 +46,7 @@ export default function QACenter() {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [expandedFix, setExpandedFix] = useState<string | null>(null);
   const [samVerify, setSamVerify] = useState<SAMVerifyData | null>(null);
+  const [sourceHealth, setSourceHealth] = useState<SourceHealthData | null>(null);
 
   async function load() {
     setLoading(true);
@@ -63,6 +67,11 @@ export default function QACenter() {
         const samRes = await fetchSAMVerify();
         if (samRes.success && samRes.data) setSamVerify(samRes.data);
       } catch { /* sam-verify table may not exist yet */ }
+
+      try {
+        const shRes = await fetchSourceHealth();
+        if (shRes.success && shRes.data) setSourceHealth(shRes.data);
+      } catch { /* source-health endpoint may not exist yet */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -145,6 +154,8 @@ export default function QACenter() {
       {health && <HealthPanel health={health} />}
 
       {samVerify && <SAMVerifyPanel data={samVerify} />}
+
+      {sourceHealth && <SourceHealthPanel data={sourceHealth} />}
 
       <div style={{ marginTop: 32 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
@@ -878,3 +889,105 @@ const tdStyle: React.CSSProperties = {
   padding: "10px 12px",
   borderBottom: "1px solid var(--color-border)",
 };
+
+// ---------------------------------------------------------------------------
+// Data Source Health Panel
+// ---------------------------------------------------------------------------
+const SOURCE_STATUS_COLORS: Record<string, string> = {
+  healthy: "#22c55e",
+  degraded: "#f59e0b",
+  error: "#ef4444",
+  deprecated: "#6b7280",
+  disabled: "#9ca3af",
+  missing_key: "#f97316",
+};
+
+const SOURCE_STATUS_LABELS: Record<string, string> = {
+  healthy: "Healthy",
+  degraded: "Degraded",
+  error: "Error",
+  deprecated: "Deprecated",
+  disabled: "Disabled",
+  missing_key: "Missing API Key",
+};
+
+function SourceHealthPanel({ data }: { data: SourceHealthData }) {
+  const overallColor = data.overall === "operational" ? "#22c55e" : data.overall === "degraded" ? "#f59e0b" : "#ef4444";
+
+  return (
+    <div style={{ marginTop: 24, background: "var(--color-surface)", borderRadius: 12, padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Data Source Health</h3>
+        <span style={{
+          display: "inline-block", width: 10, height: 10, borderRadius: "50%",
+          background: overallColor,
+        }} />
+        <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          {data.active} active · {data.deprecated} deprecated · {data.erroring} erroring
+        </span>
+      </div>
+
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Source</th>
+            <th style={thStyle}>Status</th>
+            <th style={thStyle}>Last Sync</th>
+            <th style={thStyle}>Records</th>
+            <th style={thStyle}>Errors</th>
+            <th style={thStyle}>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.sources.map((s: SourceHealthItem) => (
+            <SourceHealthRow key={s.id} source={s} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SourceHealthRow({ source }: { source: SourceHealthItem }) {
+  const color = SOURCE_STATUS_COLORS[source.status] ?? "#6b7280";
+  const label = SOURCE_STATUS_LABELS[source.status] ?? source.status;
+
+  return (
+    <tr style={{ opacity: source.deprecated_at ? 0.6 : 1 }}>
+      <td style={tdStyle}>
+        <span style={{ fontWeight: 500 }}>{source.name}</span>
+        <br />
+        <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{source.source}</span>
+      </td>
+      <td style={tdStyle}>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 500,
+          background: `${color}20`, color,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
+          {label}
+        </span>
+      </td>
+      <td style={{ ...tdStyle, fontSize: 13 }}>
+        {source.last_sync_at
+          ? new Date(source.last_sync_at).toLocaleString()
+          : <span style={{ color: "var(--color-text-muted)" }}>Never</span>}
+      </td>
+      <td style={{ ...tdStyle, fontSize: 13 }}>
+        {source.last_sync_count}
+      </td>
+      <td style={{ ...tdStyle, fontSize: 13 }}>
+        <span style={{ color: source.error_count > 0 ? "#ef4444" : "inherit" }}>
+          {source.error_count}
+        </span>
+      </td>
+      <td style={{ ...tdStyle, fontSize: 12, color: "var(--color-text-muted)", maxWidth: 300 }}>
+        {source.deprecation_reason
+          ?? (source.status === "missing_key" ? "API key not configured in environment" : null)
+          ?? (source.error_count > 3 ? "Consecutive failures — check API connectivity" : null)
+          ?? "\u2014"}
+      </td>
+    </tr>
+  );
+}

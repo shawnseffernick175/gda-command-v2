@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
 // Multi-Source Government Feed Manager
 // Provides a unified interface for pulling opportunities from:
-// - GovTribe, GovWin IQ, DIBBS, Academia Innovation Factories
-// Each source can be enabled/disabled and configured with API keys
+// - GovWin IQ (requires Deltek subscription)
+// - SAM.gov and FPDS are handled by feed-sync.ts
+// Note: GovTribe (deprecated 2023) and DIBBS (no real API) are disabled.
 // ---------------------------------------------------------------------------
 
 import { getPool } from "./db";
@@ -18,6 +19,8 @@ export interface GovSourceConfig {
   last_sync_at: string | null;
   last_sync_count: number;
   error_count: number;
+  deprecated_at: string | null;
+  deprecation_reason: string | null;
 }
 
 export interface GovSourceResult {
@@ -45,53 +48,22 @@ export interface GovOpportunity {
 }
 
 // ---------------------------------------------------------------------------
-// GovTribe API Client
+// Response validation helper
 // ---------------------------------------------------------------------------
-const GOVTRIBE_API_KEY = process.env.GOVTRIBE_API_KEY;
-
-async function fetchGovTribeOpportunities(params: Record<string, unknown>): Promise<GovOpportunity[]> {
-  if (!GOVTRIBE_API_KEY) return [];
-
-  const keywords = (params.keywords ?? []) as string[];
-  const results: GovOpportunity[] = [];
-
-  for (const keyword of keywords.slice(0, 5)) {
-    try {
-      const url = new URL("https://api.govtribe.com/opportunity");
-      url.searchParams.set("q", keyword);
-      url.searchParams.set("status", "active");
-      url.searchParams.set("limit", "50");
-
-      const resp = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${GOVTRIBE_API_KEY}`, Accept: "application/json" },
-      });
-
-      if (!resp.ok) {
-        log.warn("govtribe_fetch_error", { keyword, status: resp.status });
-        continue;
-      }
-
-      const data = await resp.json() as { results?: Array<Record<string, unknown>> };
-      for (const item of data.results ?? []) {
-        results.push({
-          external_id: `govtribe-${String(item._id ?? item.id ?? "")}`,
-          source: "govtribe",
-          title: String(item.title ?? ""),
-          description: String(item.description ?? ""),
-          agency: String(item.agency ?? item.department ?? ""),
-          posted_date: item.postedDate ? String(item.postedDate) : undefined,
-          due_date: item.responseDeadline ? String(item.responseDeadline) : undefined,
-          naics_code: item.naicsCode ? String(item.naicsCode) : undefined,
-          set_aside: item.setAside ? String(item.setAside) : undefined,
-          url: item.url ? String(item.url) : `https://govtribe.com/opportunity/${String(item._id ?? "")}`,
-        });
-      }
-    } catch (e) {
-      log.warn("govtribe_keyword_error", { keyword, error: (e as Error).message });
-    }
+function validateJsonResponse(resp: Response, source: string): boolean {
+  const contentType = resp.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    log.error(`${source}_invalid_content_type`, {
+      status: resp.status,
+      contentType,
+      url: resp.url,
+      hint: contentType.includes("text/html")
+        ? "Received HTML instead of JSON — likely a login page or error page. Check API credentials."
+        : "Response is not JSON. Check API endpoint URL and authentication.",
+    });
+    return false;
   }
-
-  return results;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +93,11 @@ async function fetchGovWinOpportunities(params: Record<string, unknown>): Promis
     });
 
     if (!resp.ok) {
-      log.warn("govwin_fetch_error", { status: resp.status });
+      log.warn("govwin_fetch_error", { status: resp.status, url: resp.url });
+      return [];
+    }
+
+    if (!validateJsonResponse(resp, "govwin")) {
       return [];
     }
 
@@ -149,42 +125,6 @@ async function fetchGovWinOpportunities(params: Record<string, unknown>): Promis
 }
 
 // ---------------------------------------------------------------------------
-// DIBBS (DLA Internet Bid Board System) — public site scraping
-// ---------------------------------------------------------------------------
-async function fetchDIBBSOpportunities(params: Record<string, unknown>): Promise<GovOpportunity[]> {
-  const keywords = (params.keywords ?? []) as string[];
-  const results: GovOpportunity[] = [];
-
-  for (const keyword of keywords.slice(0, 3)) {
-    try {
-      const url = `https://www.dibbs.bsm.dla.mil/rfq/rfqrecs.aspx?category=${encodeURIComponent(keyword)}`;
-      const resp = await fetch(url, { headers: { Accept: "text/html" } });
-
-      if (!resp.ok) {
-        log.warn("dibbs_fetch_error", { keyword, status: resp.status });
-        continue;
-      }
-
-      // DIBBS doesn't have a public JSON API — log that it's checked
-      log.info("dibbs_checked", { keyword, status: resp.status });
-      // Minimal opportunity creation from keyword search
-      results.push({
-        external_id: `dibbs-check-${keyword}-${Date.now()}`,
-        source: "dibbs",
-        title: `DLA DIBBS — ${keyword} requirements check`,
-        description: `Automated check for ${keyword} requirements on DIBBS`,
-        agency: "Defense Logistics Agency",
-        url,
-      });
-    } catch (e) {
-      log.warn("dibbs_keyword_error", { keyword, error: (e as Error).message });
-    }
-  }
-
-  return results;
-}
-
-// ---------------------------------------------------------------------------
 // Unified sync function — pulls from all configured gov sources
 // ---------------------------------------------------------------------------
 export async function syncGovSources(): Promise<GovSourceResult[]> {
@@ -204,12 +144,27 @@ export async function syncGovSources(): Promise<GovSourceResult[]> {
   }
 
   const sourceHandlers: Record<string, (params: Record<string, unknown>) => Promise<GovOpportunity[]>> = {
-    govtribe: fetchGovTribeOpportunities,
     govwin: fetchGovWinOpportunities,
-    dibbs: fetchDIBBSOpportunities,
   };
 
   for (const feed of feeds) {
+    // Skip deprecated sources — they produce noise, not data
+    if (feed.deprecated_at) {
+      log.info("gov_source_skipped_deprecated", {
+        source: feed.source,
+        reason: feed.deprecation_reason ?? "deprecated",
+      });
+      results.push({
+        source: feed.source,
+        status: "skipped",
+        fetched: 0,
+        upserted: 0,
+        durationMs: 0,
+        error: feed.deprecation_reason ?? "Source deprecated",
+      });
+      continue;
+    }
+
     const handler = sourceHandlers[feed.source];
     if (!handler) continue; // SAM and FPDS handled by existing feed-sync.ts
 
