@@ -165,6 +165,11 @@ export function toSAMDate(d: Date): string {
   return `${mm}/${dd}/${yyyy}`;
 }
 
+/** Convert empty strings to null for timestamp columns. */
+function tsOrNull(value: string | undefined): string | null {
+  return value && value.trim() !== "" ? value : null;
+}
+
 /** Map raw SAM API response to our DB schema shape. */
 export function mapToDBRecord(raw: SAMOpportunityRaw): Record<string, unknown> {
   const orgParts = raw.fullParentPathName?.split(".") ?? [];
@@ -194,8 +199,9 @@ export function mapToDBRecord(raw: SAMOpportunityRaw): Record<string, unknown> {
     naics_description: null, // SAM API doesn't return NAICS description inline
     psc: raw.classificationCode ?? null,
     value_estimate: raw.award?.amount ? parseFloat(raw.award.amount) : null,
-    response_deadline: raw.responseDeadLine ?? null,
-    posted_date: raw.postedDate ?? null,
+    response_deadline: tsOrNull(raw.responseDeadLine),
+    posted_date: tsOrNull(raw.postedDate),
+    archive_date: tsOrNull(raw.archiveDate),
     place_of_performance: placeOfPerf || null,
     relevance_score: 50, // default; overridden by AI scoring later
     relevance_reasons: [],
