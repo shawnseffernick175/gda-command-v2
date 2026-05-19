@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { isLLMAvailable, chatCompletion, type ChatMessage } from "../lib/llm";
@@ -43,7 +44,8 @@ router.post("/opportunity-chat", async (req, res) => {
         const opp = result.rows[0];
         oppContext = `Opportunity: ${opp.title}\nAgency: ${opp.agency}\nDepartment: ${opp.department}\nStatus: ${opp.status}\nValue: $${opp.value_estimated}\nPwin: ${opp.probability_of_win}\nScore: ${opp.score}\nNAICS: ${opp.naics}\nPSC: ${opp.psc}\nDue: ${opp.due_date}\nSolicitation: ${opp.solicitation_number}\nSet-aside: ${opp.set_aside}\nLocation: ${opp.place_of_performance}\nIncumbent: ${opp.incumbent}\nTags: ${JSON.stringify(opp.tags)}`;
       }
-    } catch {
+    } catch (err) {
+      log.warn("ai_fallback", { error: String(err) });
       // fall through to mock
     }
   }
@@ -114,7 +116,7 @@ askRouter.post("/", async (req, res) => {
         pool.query("SELECT COUNT(*) AS cnt FROM contacts"),
       ]);
       systemContext = `Envision has ${opps.rows[0].cnt} opportunities worth $${(opps.rows[0].total / 1e6).toFixed(1)}M, ${risks.rows[0].cnt} risks, and ${contacts.rows[0].cnt} contacts in the system.`;
-    } catch { /* ignore */ }
+    } catch (err) { log.warn("ai_fallback", { error: String(err) }); }
 
     // Also pull relevant data from DB based on question keywords
     try {
@@ -135,7 +137,7 @@ askRouter.post("/", async (req, res) => {
           ragContext += "\n\nPipeline breakdown:\n" + stages.rows.map((r: Record<string, unknown>) => `- ${r.status}: ${r.cnt} opps ($${((r.total as number) / 1e6).toFixed(1)}M)`).join("\n");
         }
       }
-    } catch { /* ignore */ }
+    } catch (err) { log.warn("ai_fallback", { error: String(err) }); }
 
     // Vector search from knowledge base
     try {
@@ -146,7 +148,7 @@ askRouter.post("/", async (req, res) => {
           ragContext += "\n\nRelevant knowledge base documents:\n" + vectorResults.map((vr, i) => `[${i + 1}. "${vr.document_title}" (${Math.round(vr.similarity * 100)}% match)]\n${vr.chunk_text}`).join("\n---\n");
         }
       }
-    } catch { /* ignore */ }
+    } catch (err) { log.warn("ai_fallback", { error: String(err) }); }
   }
 
   if (!isLLMAvailable()) {
@@ -165,7 +167,8 @@ askRouter.post("/", async (req, res) => {
     ];
     const result = await chatCompletion(messages);
     return res.json(successEnvelope("gda-ai", "ask", { answer: result.content }));
-  } catch {
+  } catch (err) {
+    log.warn("ai_fallback", { error: String(err) });
     return res.json(successEnvelope("gda-ai", "ask", {
       answer: `AI service temporarily unavailable. ${systemContext}\n\nPlease try again or check Settings → AI Configuration.`,
     }));

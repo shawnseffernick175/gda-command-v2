@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import multer from "multer";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
@@ -341,7 +342,8 @@ router.put("/:id/sections/:sectionId", async (req, res) => {
             ],
           );
         }
-      } catch {
+      } catch (err) {
+        log.warn("proposals_fallback", { error: String(err) });
         // Non-fatal: version table might not exist yet
       }
     }
@@ -506,7 +508,8 @@ router.post("/:id/generate-outline", async (req, res) => {
     try {
       const parsed = JSON.parse(llmResponse.content);
       outline = parsed.outline ?? parsed;
-    } catch {
+    } catch (err) {
+      log.warn("proposals_fallback", { error: String(err) });
       outline = [];
     }
 
@@ -683,7 +686,8 @@ router.post("/:id/generate-storyboard", async (req, res) => {
     try {
       const parsed = JSON.parse(llmResponse.content);
       storyboard = parsed.storyboard ?? parsed;
-    } catch {
+    } catch (err) {
+      log.warn("proposals_fallback", { error: String(err) });
       storyboard = [];
     }
 
@@ -844,7 +848,8 @@ router.post("/:id/sections/:sectionId/import", sectionUpload.single("file"), asy
             "system",
           ],
         );
-      } catch {
+      } catch (err) {
+        log.warn("proposals_fallback", { error: String(err) });
         // Non-fatal: version table might not exist yet
       }
     }

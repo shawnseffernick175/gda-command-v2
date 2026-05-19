@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
@@ -29,7 +30,8 @@ router.get("/", async (req, res) => {
       } else {
         prompts = [];
       }
-    } catch {
+    } catch (err) {
+      log.warn("prompts_fallback", { error: String(err) });
       prompts = [];
     }
   } else {
@@ -113,7 +115,7 @@ router.get("/:id", async (req, res) => {
         };
         return res.json(successEnvelope("GDA.prompts", "get", { prompt, versions: [], usage: [], source: "db" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("prompts_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(

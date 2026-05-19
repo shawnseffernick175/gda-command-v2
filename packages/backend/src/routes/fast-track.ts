@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
@@ -32,7 +33,7 @@ router.get("/summary", async (_req, res) => {
         }
         counts.total = total;
         counts.needs_attention_count = attention;
-      } catch { /* fall through to zeros */ }
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
     }
 
     return res.json(
@@ -84,7 +85,7 @@ router.get("/matches", async (req, res) => {
       try {
         const { rows } = await pool.query("SELECT * FROM fast_track_matches ORDER BY score DESC");
         dbRows = rows;
-      } catch { /* empty */ }
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
     }
 
     let items = dbRows.map(mapDbRow);
@@ -153,7 +154,7 @@ router.get("/:id", async (req, res) => {
       try {
         const { rows } = await pool.query("SELECT * FROM fast_track_matches WHERE id = $1", [req.params.id]);
         if (rows.length > 0) rawRow = rows[0] as Record<string, unknown>;
-      } catch { /* empty */ }
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
     }
     if (!rawRow) {
       return res.status(404).json(
@@ -230,7 +231,8 @@ router.post("/promote", async (req, res) => {
       if (result.rows.length > 0) {
         opportunityId = result.rows[0].id;
       }
-    } catch {
+    } catch (err) {
+      log.warn("fast-track_fallback", { error: String(err) });
       // DB insert failed — match exists but promotion insert failed
     }
 
@@ -298,7 +300,7 @@ router.post("/scan", requireRole("admin", "bd_manager"), async (_req, res) => {
           ]
         );
         if (result.rowCount && result.rowCount > 0) inserted++;
-      } catch { /* skip duplicates */ }
+      } catch (err) { log.warn("fast-track_fallback", { error: String(err) }); }
     }
 
     return res.json(successEnvelope("gda-fast-track", "scan", {

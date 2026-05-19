@@ -101,7 +101,7 @@ router.get("/jobs/:id", async (req, res) => {
       try {
         const { rows } = await pool.query("SELECT * FROM shred_jobs WHERE id = $1", [req.params.id]);
         if (rows.length > 0) job = rows[0] as ShredJob;
-      } catch { /* fall through */ }
+      } catch (err) { log.warn("rfp-shredder_fallback", { error: String(err) }); }
     }
     if (!job) {
       return res.status(404).json(
@@ -267,7 +267,8 @@ router.post(
     try {
       const parsed = JSON.parse(llmResponse.content);
       extractedRequirements = Array.isArray(parsed.requirements) ? parsed.requirements : Array.isArray(parsed) ? parsed : [];
-    } catch {
+    } catch (err) {
+      log.warn("rfp-shredder_fallback", { error: String(err) });
       extractedRequirements = [];
     }
 

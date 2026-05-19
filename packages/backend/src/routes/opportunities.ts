@@ -657,7 +657,7 @@ router.get("/:id/detail", async (req, res) => {
     try {
       const result = await pool.query("SELECT * FROM opportunities WHERE id = $1", [id]);
       if (result.rows.length > 0) opp = result.rows[0] as Opportunity;
-    } catch { /* empty */ }
+    } catch (err) { log.warn("opportunities_fallback", { error: String(err) }); }
   }
 
   // Fall back to n8n if not in DB
@@ -668,7 +668,7 @@ router.get("/:id/detail", async (req, res) => {
         opp = n8nOpp;
         source = "n8n";
       }
-    } catch { /* empty */ }
+    } catch (err) { log.warn("opportunities_fallback", { error: String(err) }); }
   }
 
   if (!opp) {
@@ -868,7 +868,8 @@ router.post("/:id/qualify", requireRole("admin", "bd_manager"), async (req, res)
         if (result.rows.length > 0) {
           opp = result.rows[0] as Opportunity;
         }
-      } catch {
+      } catch (err) {
+        log.warn("opportunities_fallback", { error: String(err) });
         // Fall through to mock
       }
     }

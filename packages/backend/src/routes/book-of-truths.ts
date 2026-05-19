@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 
@@ -26,7 +27,7 @@ router.get("/", async (req, res) => {
       allEntities = eRes.rows as BotEntity[];
       allGlossary = gRes.rows as BotGlossary[];
       allSources = sRes.rows as BotSource[];
-    } catch { /* empty */ }
+    } catch (err) { log.warn("book-of-truths_fallback", { error: String(err) }); }
   }
 
   let entities = [...allEntities];

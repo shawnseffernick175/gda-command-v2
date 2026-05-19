@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import type { GovWinOpportunity } from "@gda/shared";
@@ -13,7 +14,7 @@ router.get("/summary", async (_req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM govwin_opportunities ORDER BY last_updated DESC");
       all = rows as GovWinOpportunity[];
-    } catch { /* empty */ }
+    } catch (err) { log.warn("govwin_fallback", { error: String(err) }); }
   }
 
   const activeOpps = all.filter((o) => o.status !== "dismissed" && o.status !== "archived");
@@ -43,7 +44,7 @@ router.get("/opportunities", async (req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM govwin_opportunities ORDER BY last_updated DESC");
       results = rows as GovWinOpportunity[];
-    } catch { /* empty */ }
+    } catch (err) { log.warn("govwin_fallback", { error: String(err) }); }
   }
 
   if (search && typeof search === "string") {
@@ -84,7 +85,7 @@ router.get("/opportunities/:id", async (req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM govwin_opportunities WHERE id = $1", [req.params.id]);
       if (rows.length > 0) opp = rows[0] as GovWinOpportunity;
-    } catch { /* empty */ }
+    } catch (err) { log.warn("govwin_fallback", { error: String(err) }); }
   }
   if (!opp) {
     res.status(404).json(successEnvelope("GDA.govwin", "opportunity-detail", null));
@@ -101,7 +102,7 @@ router.get("/syncs", async (_req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM govwin_syncs ORDER BY started_at DESC LIMIT 20");
       syncs = rows;
-    } catch { /* empty */ }
+    } catch (err) { log.warn("govwin_fallback", { error: String(err) }); }
   }
   res.json(successEnvelope("GDA.govwin", "syncs", syncs));
 });

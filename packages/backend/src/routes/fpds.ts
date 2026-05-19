@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
 import { getPool } from "../lib/db";
@@ -13,7 +14,7 @@ async function loadAwards(): Promise<{ items: FPDSAward[]; source: "db" }> {
     try {
       const { rows } = await pool.query("SELECT * FROM fpds_awards ORDER BY award_date DESC");
       if (rows.length > 0) return { items: rows as FPDSAward[], source: "db" };
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("fpds_fallback", { error: String(err) }); }
   }
   return { items: [], source: "db" };
 }
@@ -79,7 +80,7 @@ router.get("/awards/:id", async (req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM fpds_awards WHERE id = $1", [req.params.id]);
       if (rows.length > 0) return res.json(successEnvelope("gda-fpds", "detail", rows[0]));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("fpds_fallback", { error: String(err) }); }
   }
   const item: FPDSAward | undefined = undefined;
   if (!item) {

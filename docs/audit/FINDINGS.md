@@ -359,27 +359,27 @@ Shawn: Please review each finding and mark the **Fix decision** column:
 
 | ID | Severity | Summary | Fix Decision |
 |----|----------|---------|--------------|
-| BROKEN-001 | P0 | Versioning triggers duplicated 3× | `___` |
-| STALE-001 | P0 | record_version has 0 rows | `___` |
-| RISK-001 | P0 | CORS allows all origins | `___` |
-| BROKEN-002 | P1 | SAM monitor unpaginated (2.1s) | `___` |
-| STALE-002 | P1 | 41 empty tables with UI pages | `___` |
-| RISK-002 | P1 | xlsx has known HIGH vulnerability | `___` |
-| DATA-001 | P1 | Duplicate migration numbers | `___` |
-| DATA-002 | P1 | Missing migration file (024) | `___` |
-| OBSERVE-001 | P1 | 42 catch blocks swallow errors | `___` |
-| STALE-003 | P2 | Only 1/23 docs embedded | `___` |
-| STALE-004 | P2 | 11 env vars undocumented | `___` |
-| BROKEN-003 | P2 | Two migration tracking tables | `___` |
-| RISK-003 | P2 | Webhook registry publicly accessible | `___` |
-| DATA-003 | P2 | Two migration tracking tables | `___` |
-| PERF-002 | P2 | No code splitting (321 KB bundle) | `___` |
-| OBSERVE-002 | P2 | No n8n failure alerting | `___` |
-| OBSERVE-003 | P2 | Health check doesn't cover n8n | `___` |
-| DOC-001 | P2 | .env.example missing 11 vars | `___` |
-| DEAD-001 | P3 | 27 mock data files unused | `___` |
-| DEAD-002 | P3 | 77 zip files in repo root | `___` |
-| RISK-004 | P3 | Health endpoints expose internals | `___` |
-| PERF-003 | P3 | Recharts (80KB) used in 1 page | `___` |
-| INCON-001 | P3 | Two charting approaches | `___` |
-| DOC-002 | P3 | No API documentation | `___` |
+| BROKEN-001 | P0 | Versioning triggers duplicated 3× | **Fix Now** ✓ |
+| STALE-001 | P0 | record_version has 0 rows | **Fix Now** ✓ |
+| RISK-001 | P0 | CORS allows all origins | **Fix Now** ✓ |
+| BROKEN-002 | P1 | SAM monitor unpaginated (2.1s) | **Fix Now** ✓ |
+| STALE-002 | P1 | 41 empty tables with UI pages | **Document Only** ✓ |
+| RISK-002 | P1 | xlsx has known HIGH vulnerability | **Fix Now** ✓ |
+| DATA-001 | P1 | Duplicate migration numbers | **Document Only** ✓ |
+| DATA-002 | P1 | Missing migration file (024) | **Document Only** ✓ |
+| OBSERVE-001 | P1 | 42 catch blocks swallow errors | **Fix Now** ✓ |
+| STALE-003 | P2 | Only 1/23 docs embedded | **Document Only** ✓ |
+| STALE-004 | P2 | 11 env vars undocumented | **Fix Now** ✓ |
+| BROKEN-003 | P2 | Two migration tracking tables | **Document Only** ✓ |
+| RISK-003 | P2 | Webhook registry publicly accessible | **Fix Now** ✓ |
+| DATA-003 | P2 | Two migration tracking tables | **Document Only** ✓ |
+| PERF-002 | P2 | No code splitting (321 KB bundle) | **Fix Now** ✓ |
+| OBSERVE-002 | P2 | No n8n failure alerting | **Document Only** ✓ |
+| OBSERVE-003 | P2 | Health check doesn't cover n8n | **Document Only** ✓ |
+| DOC-001 | P2 | .env.example missing 11 vars | **Fix Now** ✓ |
+| DEAD-001 | P3 | 27 mock data files unused | **Document Only** ✓ |
+| DEAD-002 | P3 | 77 zip files in repo root | **Document Only** ✓ |
+| RISK-004 | P3 | Health endpoints expose internals | **Fix Now** ✓ |
+| PERF-003 | P3 | Recharts (80KB) used in 1 page | **Fix Now** ✓ |
+| INCON-001 | P3 | Two charting approaches | **Document Only** ✓ |
+| DOC-002 | P3 | No API documentation | **Document Only** ✓ |

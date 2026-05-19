@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 const router = Router();
@@ -38,7 +39,7 @@ router.get("/", async (_req, res) => {
           source: "database",
         }));
       }
-    } catch { /* fall through to mock */ }
+    } catch (err) { log.warn("risk-register_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-risk-register", "list", {
@@ -62,7 +63,7 @@ router.get("/:id", async (req, res) => {
       if (result.rows.length > 0) {
         return res.json(successEnvelope("gda-risk-register", "get", result.rows[0]));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("risk-register_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-risk-register", "get", {
@@ -88,7 +89,7 @@ router.get("/by-opportunity/:oppId", async (req, res) => {
           source: "database",
         }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("risk-register_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-risk-register", "by-opportunity", {
@@ -119,7 +120,7 @@ router.post("/evaluate", async (req, res) => {
         [`%${if_statement.toLowerCase()}%`, if_statement.toLowerCase()],
       );
       matches = result.rows;
-    } catch { /* empty */ }
+    } catch (err) { log.warn("risk-register_fallback", { error: String(err) }); }
   }
 
   const evaluation = {

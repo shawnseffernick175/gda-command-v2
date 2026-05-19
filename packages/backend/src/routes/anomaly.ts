@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -20,7 +21,7 @@ router.get("/anomalies", async (_req, res) => {
         const anomalies = Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).anomalies ?? [];
         return res.json(successEnvelope("gda-anomaly", "list-anomalies", { anomalies, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   const pool = getPool();
@@ -46,7 +47,7 @@ router.get("/anomalies", async (_req, res) => {
       return res.json(successEnvelope("gda-anomaly", "list-anomalies", {
         anomalies, total: anomalies.length, active, acknowledged, resolved, dismissed, critical, high, source: "db",
       }));
-    } catch { /* fall through to mock */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-anomaly", "list-anomalies", {
@@ -63,7 +64,7 @@ router.get("/anomalies/:id", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-anomaly", "get-anomaly", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   const pool = getPool();
@@ -83,7 +84,7 @@ router.get("/anomalies/:id", async (req, res) => {
           source: "db",
         }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-anomaly", "get-anomaly", {
@@ -103,7 +104,7 @@ router.get("/competitor-movements", async (_req, res) => {
         const movements = Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).movements ?? [];
         return res.json(successEnvelope("gda-anomaly", "list-movements", { movements, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   const pool = getPool();
@@ -122,7 +123,7 @@ router.get("/competitor-movements", async (_req, res) => {
         high: movements.filter((m: { threat_level: string }) => m.threat_level === "high").length,
         source: "db",
       }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-anomaly", "list-movements", {
@@ -139,7 +140,7 @@ router.get("/competitor-movements/:id", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-anomaly", "get-movement", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   const pool = getPool();
@@ -154,7 +155,7 @@ router.get("/competitor-movements/:id", async (req, res) => {
           source: "db",
         }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-anomaly", "get-movement", {
@@ -173,7 +174,7 @@ router.get("/escalation-rules", async (_req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-anomaly", "list-rules", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   const pool = getPool();
@@ -183,7 +184,7 @@ router.get("/escalation-rules", async (_req, res) => {
       return res.json(successEnvelope("gda-anomaly", "list-rules", {
         rules: result.rows, total: result.rows.length, source: "db",
       }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-anomaly", "list-rules", { rules: [], total: 0, source: "db" }));
@@ -225,7 +226,7 @@ router.get("/escalations", async (_req, res) => {
         const escalations = Array.isArray(result.body) ? result.body : (result.body as Record<string, unknown>).escalations ?? [];
         return res.json(successEnvelope("gda-anomaly", "list-escalations", { escalations, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   const pool = getPool();
@@ -247,7 +248,7 @@ router.get("/escalations", async (_req, res) => {
       return res.json(successEnvelope("gda-anomaly", "list-escalations", {
         escalations, total: escalations.length, open, in_progress, overdue, resolved, critical, source: "db",
       }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   res.json(successEnvelope("gda-anomaly", "list-escalations", {
@@ -264,7 +265,7 @@ router.get("/escalations/:id", async (req, res) => {
       if (result.ok && result.body) {
         return res.json(successEnvelope("gda-anomaly", "get-escalation", { ...result.body, source: "n8n" }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   const pool = getPool();
@@ -281,7 +282,7 @@ router.get("/escalations/:id", async (req, res) => {
           source: "db",
         }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("anomaly_fallback", { error: String(err) }); }
   }
 
   return res.status(404).json(errorEnvelope("gda-anomaly", "get-escalation", {
