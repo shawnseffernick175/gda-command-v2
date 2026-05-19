@@ -24,13 +24,16 @@ export default function AdminDisciplineConfig() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     authenticatedFetch("/api/discipline/config")
       .then((r) => r.json())
       .then((env) => {
         if (env.success && env.data) setConfig(env.data);
+        else setError("Failed to load discipline config");
       })
+      .catch(() => setError("Network error loading config"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -58,10 +61,18 @@ export default function AdminDisciplineConfig() {
     }
   }, [config]);
 
-  if (loading || !config) {
+  if (loading) {
     return (
       <div style={{ padding: 24, color: "var(--color-text-muted, #94a3b8)" }}>
         Loading...
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div style={{ padding: 24, color: "#ef4444" }}>
+        {error ?? "Failed to load config"}
       </div>
     );
   }
