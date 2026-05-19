@@ -585,109 +585,160 @@ function RiskCard({ risk, expanded, onToggle }: { risk: RiskEntry; expanded: boo
 // ---------------------------------------------------------------------------
 
 function RiskMatrix({ risks }: { risks: RiskEntry[] }) {
-  const levels = ["critical", "high", "medium", "low"] as const;
-  const activeRisks = risks.filter((r) => r.status !== "closed");
-
-  // Build matrix cells: rows = likelihood (high→low), cols = impact (low→high)
+  const likelihoodLevels = ["critical", "high", "medium", "low"] as const;
   const impactLevels = ["low", "medium", "high", "critical"] as const;
+  const activeRisks = risks.filter((r) => r.status !== "closed");
 
   function cellRisks(likelihood: string, impact: string) {
     return activeRisks.filter((r) => r.likelihood === likelihood && r.impact === impact);
   }
 
-  function cellColor(likelihood: string, impact: string): string {
-    const lMap: Record<string, number> = { critical: 7, high: 5, medium: 3, low: 1 };
-    const iMap: Record<string, number> = { critical: 7, high: 5, medium: 3, low: 1 };
-    const score = (lMap[likelihood] ?? 1) * (iMap[impact] ?? 1);
-    if (score >= 15) return "rgba(239,68,68,0.25)";
-    if (score >= 9) return "rgba(245,158,11,0.25)";
-    if (score >= 5) return "rgba(59,130,246,0.15)";
-    return "rgba(16,185,129,0.10)";
+  function riskScore(likelihood: string, impact: string): number {
+    const lMap: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+    const iMap: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+    return (lMap[likelihood] ?? 1) * (iMap[impact] ?? 1);
+  }
+
+  function cellGradient(likelihood: string, impact: string): string {
+    const score = riskScore(likelihood, impact);
+    if (score >= 12) return "linear-gradient(135deg, rgba(239,68,68,0.35), rgba(220,38,38,0.20))";
+    if (score >= 8) return "linear-gradient(135deg, rgba(245,158,11,0.30), rgba(234,88,12,0.18))";
+    if (score >= 4) return "linear-gradient(135deg, rgba(59,130,246,0.22), rgba(99,102,241,0.12))";
+    return "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(5,150,105,0.08))";
+  }
+
+  function cellBorderColor(likelihood: string, impact: string): string {
+    const score = riskScore(likelihood, impact);
+    if (score >= 12) return "rgba(239,68,68,0.4)";
+    if (score >= 8) return "rgba(245,158,11,0.35)";
+    if (score >= 4) return "rgba(59,130,246,0.25)";
+    return "rgba(16,185,129,0.2)";
   }
 
   return (
     <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
-        Risk Heat Map — {activeRisks.length} Active Risks
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20 }}>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>Risk Heat Map</span>
+        <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{activeRisks.length} active risks</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 1fr 1fr", gap: 2 }}>
-        {/* Header row */}
+      <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 1fr 1fr 1fr", gap: 3, position: "relative" }}>
+        {/* Impact header */}
+        <div style={{ gridColumn: "1 / -1", textAlign: "center", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--color-text-muted)", paddingBottom: 4 }}>
+          Impact →
+        </div>
         <div />
         {impactLevels.map((imp) => (
-          <div key={imp} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: riskColor(imp), padding: "8px 0" }}>
-            {imp} Impact
+          <div key={imp} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: riskColor(imp), padding: "6px 0" }}>
+            {imp}
           </div>
         ))}
 
         {/* Matrix rows */}
-        {levels.map((lik) => (
-          <>
-            <div key={`label-${lik}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: riskColor(lik) }}>
+        {likelihoodLevels.map((lik) => (
+          <div key={lik} style={{ display: "contents" }}>
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5,
+              color: riskColor(lik), writingMode: "vertical-lr" as const, transform: "rotate(180deg)",
+            }}>
               {lik}
             </div>
             {impactLevels.map((imp) => {
               const cell = cellRisks(lik, imp);
+              const score = riskScore(lik, imp);
               return (
                 <div
                   key={`${lik}-${imp}`}
                   style={{
-                    background: cellColor(lik, imp),
-                    borderRadius: 6,
-                    padding: 12,
-                    minHeight: 80,
-                    border: "1px solid var(--color-border)",
+                    background: cellGradient(lik, imp),
+                    borderRadius: 8,
+                    padding: 10,
+                    minHeight: 72,
+                    border: `1px solid ${cellBorderColor(lik, imp)}`,
+                    position: "relative",
+                    transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.transform = "scale(1.03)";
+                    (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+                    (e.currentTarget as HTMLElement).style.boxShadow = "none";
                   }}
                 >
+                  {/* Score badge */}
+                  <div style={{
+                    position: "absolute", top: 4, right: 4,
+                    fontSize: 9, fontWeight: 700, color: "var(--color-text-muted)", opacity: 0.5,
+                  }}>
+                    {score}
+                  </div>
                   {cell.length === 0 ? (
-                    <div style={{ fontSize: 11, color: "var(--color-text-muted)", textAlign: "center", marginTop: 20 }}>—</div>
+                    <div style={{ fontSize: 18, color: "var(--color-text-muted)", textAlign: "center", marginTop: 16, opacity: 0.3 }}>-</div>
                   ) : (
-                    cell.map((r) => (
-                      <div
-                        key={r.id}
-                        style={{
-                          fontSize: 11,
-                          padding: "4px 8px",
-                          background: "var(--color-surface)",
-                          borderRadius: 4,
+                    <>
+                      {cell.length > 0 && (
+                        <div style={{
+                          fontSize: 20, fontWeight: 800, textAlign: "center",
+                          color: score >= 12 ? "#ef4444" : score >= 8 ? "#f59e0b" : score >= 4 ? "#3b82f6" : "#10b981",
                           marginBottom: 4,
-                          borderLeft: `3px solid ${statusColor(r.status)}`,
-                        }}
-                        title={`${r.if_statement} → ${r.then_statement}`}
-                      >
-                        <span style={{ fontWeight: 600 }}>{r.id}</span>
-                        <span style={{ marginLeft: 6, color: "var(--color-text-muted)" }}>
-                          {r.if_statement.length > 40 ? r.if_statement.slice(0, 40) + "..." : r.if_statement}
-                        </span>
-                      </div>
-                    ))
+                        }}>
+                          {cell.length}
+                        </div>
+                      )}
+                      {cell.slice(0, 2).map((r) => (
+                        <div
+                          key={r.id}
+                          style={{
+                            fontSize: 10,
+                            padding: "3px 6px",
+                            background: "rgba(0,0,0,0.15)",
+                            borderRadius: 4,
+                            marginBottom: 3,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            backdropFilter: "blur(4px)",
+                          }}
+                          title={`${r.id}: ${r.if_statement} → ${r.then_statement}`}
+                        >
+                          <span style={{ fontWeight: 700 }}>{r.id}</span>
+                        </div>
+                      ))}
+                      {cell.length > 2 && (
+                        <div style={{ fontSize: 9, color: "var(--color-text-muted)", textAlign: "center" }}>
+                          +{cell.length - 2} more
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );
             })}
-          </>
+          </div>
         ))}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: "flex", gap: 16, marginTop: 16, fontSize: 11, color: "var(--color-text-muted)" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(239,68,68,0.25)" }} /> Critical (15+)
-        </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(245,158,11,0.25)" }} /> High (9-14)
-        </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(59,130,246,0.15)" }} /> Medium (5-8)
-        </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(16,185,129,0.10)" }} /> Low (1-3)
-        </span>
+      {/* Likelihood axis label */}
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--color-text-muted)", marginTop: 8, textAlign: "center" }}>
+        ↑ Likelihood
       </div>
 
-      {/* Y-axis label */}
-      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 8 }}>
-        Y-axis: Likelihood | X-axis: Impact
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 20, marginTop: 16, fontSize: 11, color: "var(--color-text-muted)", justifyContent: "center" }}>
+        {[
+          { label: "Critical", bg: "linear-gradient(135deg, rgba(239,68,68,0.35), rgba(220,38,38,0.20))", range: "12-16" },
+          { label: "High", bg: "linear-gradient(135deg, rgba(245,158,11,0.30), rgba(234,88,12,0.18))", range: "8-11" },
+          { label: "Medium", bg: "linear-gradient(135deg, rgba(59,130,246,0.22), rgba(99,102,241,0.12))", range: "4-7" },
+          { label: "Low", bg: "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(5,150,105,0.08))", range: "1-3" },
+        ].map((item) => (
+          <span key={item.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 14, height: 14, borderRadius: 4, background: item.bg, border: "1px solid rgba(255,255,255,0.1)" }} />
+            {item.label} ({item.range})
+          </span>
+        ))}
       </div>
     </div>
   );
