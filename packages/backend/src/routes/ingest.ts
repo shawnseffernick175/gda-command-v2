@@ -13,6 +13,7 @@ import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { notify } from "../lib/email";
 import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
+import { enrichOpportunity } from "../lib/sam-enrichment";
 
 const router = Router();
 
@@ -823,5 +824,174 @@ router.get("/status", async (req, res) => {
     timestamp: new Date().toISOString(),
   }));
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/govtribe — GovTribe Zapier → n8n → GDA ingest pipeline
+// Receives GovTribe opportunity payloads forwarded by n8n from Zapier webhooks.
+// Maps GovTribe field names to GDA opportunity schema, upserts, then
+// auto-enriches via SAM cross-reference (NAICS, agency, PSC, incumbent).
+// ---------------------------------------------------------------------------
+router.post("/govtribe", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "govtribe", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+
+  const rawItems = Array.isArray(req.body) ? req.body : [req.body];
+  let upserted = 0;
+  let enriched_count = 0;
+  let low_confidence_count = 0;
+  let errors = 0;
+
+  for (const raw of rawItems) {
+    try {
+      // Map GovTribe Zapier fields to GDA opportunity schema
+      const id = raw.id ? `govtribe-${raw.id}` : null;
+      if (!id) {
+        errors++;
+        continue;
+      }
+
+      const mapped = {
+        id,
+        title: raw.name ?? raw.title ?? "Untitled",
+        solicitation_number: raw.solicitation_number ?? null,
+        set_aside: raw.set_aside_type ?? raw.set_aside ?? null,
+        due_date: raw.due_date ?? null,
+        description: raw.government_description ?? raw.description ?? null,
+        ai_summary: raw.ai_description ?? raw.ai_summary ?? null,
+        raw_source_url: raw.source_url ?? raw.url ?? null,
+        status: mapOpportunityType(raw.opportunity_type),
+        data_source: "govtribe_zapier",
+        created_at: raw.created_at ?? new Date().toISOString(),
+        updated_at: raw.updated_at ?? new Date().toISOString(),
+      };
+
+      // Upsert the opportunity with core Zapier fields
+      await pool.query(`
+        INSERT INTO opportunities (id, title, status, solicitation_number,
+          set_aside, due_date, description, ai_summary, raw_source_url,
+          data_source, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          solicitation_number = COALESCE(EXCLUDED.solicitation_number, opportunities.solicitation_number),
+          set_aside = COALESCE(EXCLUDED.set_aside, opportunities.set_aside),
+          due_date = COALESCE(EXCLUDED.due_date, opportunities.due_date),
+          description = COALESCE(EXCLUDED.description, opportunities.description),
+          ai_summary = COALESCE(EXCLUDED.ai_summary, opportunities.ai_summary),
+          raw_source_url = COALESCE(EXCLUDED.raw_source_url, opportunities.raw_source_url),
+          data_source = EXCLUDED.data_source,
+          updated_at = NOW()
+      `, [
+        mapped.id, mapped.title, mapped.status, mapped.solicitation_number,
+        mapped.set_aside, mapped.due_date, mapped.description, mapped.ai_summary,
+        mapped.raw_source_url, mapped.data_source, mapped.created_at, mapped.updated_at,
+      ]);
+      upserted++;
+
+      // Auto-enrich via SAM cross-reference (async, fire-and-forget)
+      enrichOpportunity({
+        solicitation_number: mapped.solicitation_number,
+        title: mapped.title,
+        description: mapped.description,
+      }).then(async (result) => {
+        if (!result.enriched) return;
+
+        const updates: string[] = [];
+        const values: unknown[] = [];
+        let paramIdx = 1;
+
+        // SAM-derived fields
+        for (const [key, val] of Object.entries(result.fields)) {
+          if (val != null) {
+            updates.push(`${key} = COALESCE($${paramIdx}, ${key})`);
+            values.push(val);
+            paramIdx++;
+          }
+        }
+
+        // Incumbent fields
+        if (result.incumbent) {
+          updates.push(`incumbent = $${paramIdx}`);
+          values.push(result.incumbent);
+          paramIdx++;
+          updates.push(`incumbent_confidence = $${paramIdx}`);
+          values.push(result.incumbent_confidence);
+          paramIdx++;
+          updates.push(`incumbent_source = $${paramIdx}`);
+          values.push(result.incumbent_source);
+          paramIdx++;
+
+          if (result.incumbent_confidence === "low") {
+            low_confidence_count++;
+          }
+        }
+
+        if (updates.length > 0) {
+          values.push(mapped.id);
+          await pool.query(
+            `UPDATE opportunities SET ${updates.join(", ")}, updated_at = NOW() WHERE id = $${paramIdx}`,
+            values,
+          );
+          enriched_count++;
+
+          log.info("govtribe_enrichment_applied", {
+            id: mapped.id,
+            fields: Object.keys(result.fields),
+            incumbent: result.incumbent ?? null,
+            incumbent_confidence: result.incumbent_confidence ?? null,
+          });
+        }
+      }).catch((e) => {
+        log.warn("govtribe_enrichment_error", { id: mapped.id, error: (e as Error).message });
+      });
+
+      // Auto-trigger Capture Coach
+      queueCaptureCoachIfNeeded(mapped.id);
+    } catch (e) {
+      errors++;
+      log.warn("govtribe_ingest_error", { error: (e as Error).message });
+    }
+  }
+
+  // Update gov_source_feeds tracking
+  try {
+    await pool.query(`
+      UPDATE gov_source_feeds SET
+        last_sync_at = NOW(),
+        last_sync_count = $1,
+        error_count = CASE WHEN $2 > 0 THEN error_count + 1 ELSE 0 END,
+        updated_at = NOW()
+      WHERE id = 'feed-govtribe-zapier'
+    `, [upserted, errors]);
+  } catch (e) {
+    log.warn("govtribe_feed_update_error", { error: (e as Error).message });
+  }
+
+  res.json(successEnvelope("gda-ingest", "govtribe", {
+    upserted,
+    enriched: enriched_count,
+    low_confidence_flagged: low_confidence_count,
+    errors,
+    total: rawItems.length,
+    timestamp: new Date().toISOString(),
+  }));
+});
+
+/** Map GovTribe opportunity_type to GDA status */
+function mapOpportunityType(type?: string): string {
+  if (!type) return "discovery";
+  const lower = type.toLowerCase();
+  if (lower.includes("award")) return "won";
+  if (lower.includes("pre-solicitation") || lower.includes("presolicitation")) return "discovery";
+  if (lower.includes("sources sought") || lower.includes("rfi")) return "discovery";
+  if (lower.includes("solicitation") || lower.includes("rfp") || lower.includes("rfq")) return "qualified";
+  return "discovery";
+}
 
 export default router;
