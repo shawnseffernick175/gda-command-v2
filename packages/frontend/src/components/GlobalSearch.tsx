@@ -53,7 +53,7 @@ const GlobalSearch = forwardRef<GlobalSearchHandle, { collapsed: boolean }>(func
       setLoading(true);
       try {
         const env = await fetchSearchResults(value.trim());
-        if (env.success && env.data) {
+        if (env.success && env.data && Array.isArray(env.data.results)) {
           setResults(env.data.results);
           setOpen(true);
         }
@@ -160,7 +160,7 @@ const GlobalSearch = forwardRef<GlobalSearchHandle, { collapsed: boolean }>(func
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{r.title}</div>
                 <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{r.snippet}</div>
                 <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>
-                  {r.type.replace(/_/g, " ")} · {Math.round(r.score * 100)}% match
+                  {(r.type ?? "item").replace(/_/g, " ")} · {Math.round((r.score ?? 0) * 100)}% match
                 </div>
               </div>
             </button>
