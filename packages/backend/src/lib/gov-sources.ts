@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
 // Multi-Source Government Feed Manager
 // Provides a unified interface for pulling opportunities from:
+// - GovTribe (via MCP server at govtribe.com/mcp — requires API key)
 // - GovWin IQ (requires Deltek subscription)
 // - SAM.gov and FPDS are handled by feed-sync.ts
-// Note: GovTribe (deprecated 2023) and DIBBS (no real API) are disabled.
+// Note: DIBBS (no real API) is disabled.
 // ---------------------------------------------------------------------------
 
 import { getPool } from "./db";

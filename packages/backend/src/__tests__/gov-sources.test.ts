@@ -1,7 +1,8 @@
 /**
  * Regression tests for gov-sources.ts (F-005, F-006)
  *
- * F-005: GovTribe API was deprecated in 2023 — sync must skip deprecated feeds
+ * F-005: DIBBS has no API (deprecated). GovTribe old REST API dead but
+ *        company is active — deprecation reversed, MCP integration pending.
  * F-006: GovWin returns HTML — sync must validate content-type before parsing
  */
 
@@ -31,8 +32,8 @@ describe("F-005: GovTribe/DIBBS deprecated sources", () => {
     expect(migration).toContain("no public JSON API");
   });
 
-  it("GovTribe fetch handler removed from sourceHandlers map", () => {
-    expect(govSources).not.toContain("govtribe: fetchGovTribeOpportunities");
+  it("old GovTribe REST fetch handler removed (MCP integration pending)", () => {
+    expect(govSources).not.toContain("fetchGovTribeOpportunities");
   });
 
   it("DIBBS fetch handler removed from sourceHandlers map", () => {
@@ -42,6 +43,18 @@ describe("F-005: GovTribe/DIBBS deprecated sources", () => {
   it("syncGovSources checks deprecated_at to skip deprecated feeds", () => {
     expect(govSources).toContain("feed.deprecated_at");
     expect(govSources).toContain("gov_source_skipped_deprecated");
+  });
+
+  it("migration 049 reverses GovTribe deprecation", () => {
+    const m049Path = join(__dirname, "../db/migrations/049_reverse_govtribe_deprecation.sql");
+    const m049 = readFileSync(m049Path, "utf8");
+    expect(m049).toContain("feed-govtribe");
+    expect(m049).toContain("enabled = true");
+    expect(m049).toContain("deprecated_at = NULL");
+  });
+
+  it("gov-sources.ts documents GovTribe MCP as the current access path", () => {
+    expect(govSources).toContain("govtribe.com/mcp");
   });
 });
 
