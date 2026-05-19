@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 
@@ -37,7 +38,7 @@ router.get("/kpis", async (_req, res) => {
             updated_at: r.updated_at,
           };
         });
-      } catch { /* table may not exist yet */ }
+      } catch (err) { log.warn("financials_fallback", { error: String(err) }); }
     }
 
     const period = kpis.length > 0 ? (kpis[0].period as string) ?? "N/A" : "N/A";
@@ -121,7 +122,7 @@ router.get("/monthly", async (req, res) => {
           const r = kr as Record<string, unknown>;
           annualTargets[r.id as string] = Number(r.target);
         }
-      } catch { /* ignore */ }
+      } catch (err) { log.warn("financials_fallback", { error: String(err) }); }
 
       return res.json(
         successEnvelope("GDA.financials", "monthly", {
@@ -131,7 +132,8 @@ router.get("/monthly", async (req, res) => {
           annualTargets,
         })
       );
-    } catch {
+    } catch (err) {
+      log.warn("financials_fallback", { error: String(err) });
       return res.json(
         successEnvelope("GDA.financials", "monthly", { months: [], year })
       );
@@ -208,7 +210,7 @@ router.get("/:key", async (req, res) => {
             })
           );
         }
-      } catch { /* table may not exist */ }
+      } catch (err) { log.warn("financials_fallback", { error: String(err) }); }
     }
 
     return res.status(404).json(

@@ -40,7 +40,8 @@ router.get("/status", async (_req, res) => {
           "SELECT pg_size_pretty(pg_database_size(current_database())) AS size"
         );
         dbSize = rows[0]?.size ?? "unknown";
-      } catch {
+      } catch (err) {
+        log.warn("backup_fallback", { error: String(err) });
         // ignore
       }
     }
@@ -55,7 +56,8 @@ router.get("/status", async (_req, res) => {
         );
         tableCount = parseInt(rows[0]?.tables ?? "0");
         totalRows = parseInt(rows[0]?.rows ?? "0");
-      } catch {
+      } catch (err) {
+        log.warn("backup_fallback", { error: String(err) });
         // ignore
       }
     }

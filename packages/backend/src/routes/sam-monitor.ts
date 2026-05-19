@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -48,7 +49,8 @@ router.get("/summary", async (_req, res) => {
           const ca = scanResult.rows[0].completed_at;
           lastScanAt = ca instanceof Date ? ca.toISOString() : ca ? String(ca) : null;
         }
-      } catch {
+      } catch (err) {
+        log.warn("sam-monitor_fallback", { error: String(err) });
         all = [];
         lastScanAt = null;
       }
@@ -87,7 +89,8 @@ router.get("/opportunities", async (req, res) => {
       try {
         const result = await pool.query("SELECT * FROM sam_opportunities ORDER BY relevance_score DESC");
         items = result.rows.map(rowToSamOpp);
-      } catch {
+      } catch (err) {
+        log.warn("sam-monitor_fallback", { error: String(err) });
         items = [];
       }
     } else {
@@ -115,8 +118,16 @@ router.get("/opportunities", async (req, res) => {
 
     items.sort((a, b) => b.relevance_score - a.relevance_score);
 
+    const totalCount = items.length;
+    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
+    const start = (page - 1) * limit;
+    const paged = items.slice(start, start + limit);
+
     return res.json(
-      successEnvelope("gda-sam-monitor", "list", items, { total: items.length }),
+      successEnvelope("gda-sam-monitor", "list", paged, {
+        page, limit, totalCount, totalPages: Math.ceil(totalCount / limit),
+      }),
     );
   } catch (err) {
     return res.status(500).json(
@@ -134,7 +145,7 @@ router.get("/opportunities/:id", async (req, res) => {
       if (result.rows.length > 0) {
         return res.json(successEnvelope("gda-sam-monitor", "detail", rowToSamOpp(result.rows[0])));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("sam-monitor_fallback", { error: String(err) }); }
   }
 
   const item: SAMMonitorOpportunity | undefined = undefined;
@@ -158,7 +169,7 @@ router.get("/scans", async (_req, res) => {
         completed_at: r.completed_at instanceof Date ? r.completed_at.toISOString() : r.completed_at,
       }));
       return res.json(successEnvelope("gda-sam-monitor", "scans", runs, { total: runs.length }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("sam-monitor_fallback", { error: String(err) }); }
   }
 
   return res.json(

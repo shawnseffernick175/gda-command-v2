@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import type { MergerAcquisition, MergerOppImpact, DealType, DealStatus, OurImpact, OppImpactType } from "@gda/shared";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
@@ -59,7 +60,8 @@ router.get("/", async (req, res) => {
             ),
           })
         );
-      } catch {
+      } catch (err) {
+        log.warn("mergers_fallback", { error: String(err) });
         // table may not exist — fall through
       }
     }
@@ -413,7 +415,8 @@ router.get("/impacts/by-opportunity/:oppId", async (req, res) => {
           total_score_delta: totalDelta,
         })
       );
-    } catch {
+    } catch (err) {
+      log.warn("mergers_fallback", { error: String(err) });
       res.json(
         successEnvelope("mergers", "opp-impacts", { impacts: [], total_score_delta: 0 })
       );

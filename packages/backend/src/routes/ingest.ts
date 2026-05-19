@@ -8,6 +8,7 @@
  */
 
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { notify } from "../lib/email";
@@ -808,7 +809,7 @@ router.get("/status", async (req, res) => {
         const { rows } = await pool.query(`SELECT COUNT(*) as count FROM ${table}`);
         dbCounts[table] = parseInt(rows[0].count, 10);
       }
-    } catch { /* table may not exist */ }
+    } catch (err) { log.warn("ingest_fallback", { error: String(err) }); }
   }
 
   const { getRegistrySummary } = await import("../lib/webhook-registry");

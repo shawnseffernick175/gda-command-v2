@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
@@ -30,7 +31,8 @@ router.get("/", async (req, res) => {
         } else {
           items = [];
         }
-      } catch {
+      } catch (err) {
+        log.warn("contacts_fallback", { error: String(err) });
         items = [];
       }
     } else {
@@ -132,7 +134,7 @@ router.get("/:id", async (req, res) => {
           } as Contact;
           source = "db";
         }
-      } catch { /* fall through to mock */ }
+      } catch (err) { log.warn("contacts_fallback", { error: String(err) }); }
     }
 
     if (!contact) {
@@ -235,7 +237,7 @@ router.post("/auto-capture", requireRole("admin", "bd_manager"), async (_req, re
           ]
         );
         if (insertResult.rowCount && insertResult.rowCount > 0) created++;
-      } catch { /* skip duplicates */ }
+      } catch (err) { log.warn("contacts_fallback", { error: String(err) }); }
     }
 
     return res.json(successEnvelope("GDA.contacts", "auto-capture", {

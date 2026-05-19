@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { requireRole } from "../lib/auth";
 
@@ -41,7 +42,8 @@ router.get("/feed", async (_req: Request, res: Response) => {
       } else {
         items = [];
       }
-    } catch {
+    } catch (err) {
+      log.warn("intel_fallback", { error: String(err) });
       items = [];
     }
   } else {
@@ -137,7 +139,7 @@ router.get("/briefings", async (_req: Request, res: Response) => {
           })
         );
       }
-    } catch { /* fall through to empty */ }
+    } catch (err) { log.warn("intel_fallback", { error: String(err) }); }
   }
 
   res.json(
@@ -173,7 +175,7 @@ router.get("/briefings/:id", async (req: Request, res: Response) => {
           })
         );
       }
-    } catch { /* fall through to 404 */ }
+    } catch (err) { log.warn("intel_fallback", { error: String(err) }); }
   }
 
   res.status(404).json({
@@ -219,7 +221,8 @@ router.get("/research", async (_req: Request, res: Response) => {
         );
         return;
       }
-    } catch {
+    } catch (err) {
+      log.warn("intel_fallback", { error: String(err) });
       // fall through to mock
     }
   }
@@ -276,7 +279,7 @@ router.get("/research", async (_req: Request, res: Response) => {
           source: "db" as const,
         })
       );
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("intel_fallback", { error: String(err) }); }
   }
 
   res.json(
@@ -308,7 +311,8 @@ router.get("/research/:id", async (req: Request, res: Response) => {
           return;
         }
       }
-    } catch {
+    } catch (err) {
+      log.warn("intel_fallback", { error: String(err) });
       // fall through to mock
     }
   }
@@ -452,7 +456,8 @@ router.get("/competitors", async (_req: Request, res: Response) => {
         );
         return;
       }
-    } catch {
+    } catch (err) {
+      log.warn("intel_fallback", { error: String(err) });
       // fall through to n8n
     }
   }
@@ -503,7 +508,8 @@ router.get("/competitors", async (_req: Request, res: Response) => {
         );
         return;
       }
-    } catch {
+    } catch (err) {
+      log.warn("intel_fallback", { error: String(err) });
       // fall through to empty
     }
   }
@@ -630,7 +636,8 @@ Respond with ONLY valid JSON:
     try {
       const cleaned = result.content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       analysis = JSON.parse(cleaned);
-    } catch {
+    } catch (err) {
+      log.warn("intel_fallback", { error: String(err) });
       return res.status(500).json(errorEnvelope("GDA.api.competitor-analyze", "run", {
         code: "PARSE_ERROR", message: "Failed to parse AI response", detail: null,
       }));
@@ -672,7 +679,7 @@ router.get("/teaming", async (_req: Request, res: Response) => {
           capabilities: Array.isArray(r.capabilities) ? r.capabilities.join(", ") : (r.capabilities ?? ""),
         });
       }
-    } catch { /* no competitor table */ }
+    } catch (err) { log.warn("intel_fallback", { error: String(err) }); }
   }
 
   // Get opportunities from n8n or DB
@@ -690,7 +697,7 @@ router.get("/teaming", async (_req: Request, res: Response) => {
           set_aside: o.set_aside ?? "",
         }));
       }
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("intel_fallback", { error: String(err) }); }
   }
   if (opportunities.length === 0 && pool) {
     try {
@@ -699,7 +706,7 @@ router.get("/teaming", async (_req: Request, res: Response) => {
         id: r.id, title: r.title, department: r.department ?? "", value: r.value_estimated ?? 0,
         naics: r.naics ?? "", set_aside: r.set_aside ?? "",
       }));
-    } catch { /* ignore */ }
+    } catch (err) { log.warn("intel_fallback", { error: String(err) }); }
   }
 
   // Known defense IT teaming partners from the GovCon ecosystem

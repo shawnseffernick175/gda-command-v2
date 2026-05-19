@@ -45,7 +45,7 @@ router.get("/summary", async (_req, res) => {
           collection_count: collRes.rows[0].cnt,
           top_documents: topRes.rows,
         };
-      } catch { /* tables may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.json(successEnvelope("gda-knowledge", "summary", summary));
   } catch (err) {
@@ -70,7 +70,7 @@ router.get("/collections", async (_req, res) => {
       try {
         const { rows } = await pool.query(`SELECT id, name, description, document_count, total_chunks, created_at FROM knowledge_collections ORDER BY name`);
         collections = rows;
-      } catch { /* table may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.json(successEnvelope("gda-knowledge", "collections", collections));
   } catch (err) {
@@ -110,7 +110,7 @@ router.get("/documents", async (req, res) => {
           created_at: r.uploaded_at as string, tags: (r.tags as string[]) ?? [],
           file_size_bytes: r.file_size_bytes as number, uploaded_at: r.uploaded_at as string,
         })) as KnowledgeDocument[];
-      } catch { /* table may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.json(
       successEnvelope("gda-knowledge", "documents", results, { total: results.length }),
@@ -141,7 +141,7 @@ router.get("/documents/:id", async (req, res) => {
         if (rows.length > 0) {
           return res.json(successEnvelope("gda-knowledge", "document-detail", rows[0]));
         }
-      } catch { /* table may not exist */ }
+      } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
     return res.status(404).json(
       errorEnvelope("gda-knowledge", "document-detail", {
@@ -506,7 +506,7 @@ router.post(
         } catch (txErr) {
           await client.query("ROLLBACK");
           // Clean up orphaned file on disk
-          try { deleteFile(storageKey); } catch { /* best effort */ }
+          try { deleteFile(storageKey); } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
           throw txErr;
         } finally {
           client.release();
@@ -569,7 +569,7 @@ router.post(
     } catch (err) {
       // Clean up orphaned file if it was saved to disk before the error
       if (storageKey) {
-        try { deleteFile(storageKey); } catch { /* best effort */ }
+        try { deleteFile(storageKey); } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
       }
       log.error("knowledge_upload_error", { error: (err as Error).message });
       res.status(500).json(
@@ -751,7 +751,8 @@ router.post("/reprocess-pending", requireRole("admin"), async (_req, res) => {
           );
         }
         processed++;
-      } catch {
+      } catch (err) {
+        log.warn("knowledge_fallback", { error: String(err) });
         // Skip individual failures
       }
     }

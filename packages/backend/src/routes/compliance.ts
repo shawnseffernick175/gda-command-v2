@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import type { ComplianceRequirement, ClauseReference } from "@gda/shared";
@@ -11,7 +12,7 @@ async function loadRequirements(): Promise<{ items: ComplianceRequirement[]; sou
     try {
       const { rows } = await pool.query("SELECT * FROM compliance_requirements ORDER BY solicitation_id, section");
       if (rows.length > 0) return { items: rows as ComplianceRequirement[], source: "db" };
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("compliance_fallback", { error: String(err) }); }
   }
   return { items: [], source: "db" };
 }
@@ -22,7 +23,7 @@ async function loadClauses(): Promise<{ items: ClauseReference[]; source: "db" }
     try {
       const { rows } = await pool.query("SELECT * FROM clause_references ORDER BY clause_number");
       if (rows.length > 0) return { items: rows as ClauseReference[], source: "db" };
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("compliance_fallback", { error: String(err) }); }
   }
   return { items: [], source: "db" };
 }
@@ -134,7 +135,7 @@ router.get("/clauses/:id", async (req, res) => {
     try {
       const { rows } = await pool.query("SELECT * FROM clause_references WHERE id = $1", [req.params.id]);
       if (rows.length > 0) return res.json(successEnvelope("GDA.compliance", "get-clause", { clause: rows[0], source: "db" }));
-    } catch { /* fall through */ }
+    } catch (err) { log.warn("compliance_fallback", { error: String(err) }); }
   }
   return res.status(404).json(errorEnvelope("GDA.compliance", "get-clause", { code: "NOT_FOUND", message: `Clause ${req.params.id} not found`, detail: null }));
 });

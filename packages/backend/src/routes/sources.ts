@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { log } from "../lib/logger";
 import type { SourceRegistryEntry, SourceSyncRun } from "@gda/shared";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
@@ -41,7 +42,8 @@ router.get("/", async (_req, res) => {
             total_records_synced: totalSynced,
           })
         );
-      } catch {
+      } catch (err) {
+        log.warn("sources_fallback", { error: String(err) });
         // table may not exist — fall through
       }
     }
@@ -292,7 +294,8 @@ router.get("/sync/history", async (_req, res) => {
           total: result.rows.length,
         })
       );
-    } catch {
+    } catch (err) {
+      log.warn("sources_fallback", { error: String(err) });
       res.json(
         successEnvelope("sources", "sync-history", {
           runs: [],
