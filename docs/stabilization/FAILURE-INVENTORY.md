@@ -28,7 +28,7 @@ Sources examined:
 | F-002 | Daily | P0 | No unhandledRejection handler — any async error kills server | **Fixed** (PR #213) |
 | F-003 | Every deploy | P1 | Migration 028 FK delete ordering | **Fixed** (PR #211) |
 | F-004 | Every 6h | P1 | SAM sync upserts fail on empty timestamps — 13-17 records lost per cycle | **Fixed** (PRs #218, #220, #222, #223 — mapper fix + backfill + automated verify + QA Center) |
-| F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails — GovTribe old REST API dead (MCP path available), DIBBS has no API | **Partial** (PR #228 deprecated DIBBS; PR #230 reverses GovTribe deprecation; GovTribe MCP integration pending) |
+| F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails — old REST API dead, MCP path rebuilt | **Fixed** (PR #228 DIBBS, PR #230 reversal, PR #231 MCP integration) |
 | F-006 | Every 6h | P1 | GovWin API returns HTML instead of JSON | Open |
 | F-007 | On user action | P1 | Sidebar search crashes on undefined `.type` field | **Fixed** (PR #206) |
 | F-008 | On user action | P1 | LLM calls hang forever — no timeout, chat freezes | **Fixed** (PR #194) |
@@ -110,26 +110,21 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 
 ### F-005 — GovTribe/DIBBS API Fetch Failures
 
-**Status:** Partial fix. DIBBS deprecated (PR #228). GovTribe deprecation reversed (PR #230). GovTribe MCP integration pending.
+**Status: Fixed** (PR #228 DIBBS deprecation, PR #230 GovTribe deprecation reversal, PR #231 MCP integration)
 
-**Root cause (DIBBS):** DIBBS never had a real API. The code fetched an HTML page and created fake placeholder records with titles like "DLA DIBBS — {keyword} requirements check". These are not real opportunities. DIBBS is correctly deprecated.
+**Root cause (DIBBS):** DIBBS never had a real API. The code fetched an HTML page and created fake placeholder records. DIBBS is correctly deprecated (PR #228). Fake records cleaned up (PR #229).
 
-**Root cause (GovTribe):** The old public REST API at `docs.govtribe.com` was deprecated in 2023. However, GovTribe the company is alive with an active paid subscription. GovTribe now provides data access via an MCP server at `https://govtribe.com/mcp` (Streamable HTTP transport, Bearer token auth). The integration needs to be rebuilt against this new access path. PR #228 incorrectly conflated "old REST API deprecated" with "data source is gone" — that conclusion was wrong. The source is active and the subscription is paid.
+**Root cause (GovTribe):** The old public REST API at `docs.govtribe.com` was deprecated in 2023. GovTribe the company is alive with an active paid subscription. PR #228 incorrectly deprecated GovTribe alongside DIBBS — that was reversed in PR #230. GovTribe now provides data access via an MCP server at `https://govtribe.com/mcp` (Streamable HTTP, Bearer token auth). Integration rebuilt in PR #231 using MCP's `Search_Federal_Contract_Opportunities` tool.
 
-**Evidence:** Production logs show `govtribe_keyword_error` for every keyword — the old REST endpoint is dead. The new MCP endpoint at `govtribe.com/mcp` is live and provides access to opportunities, awards, IDVs, contract vehicles, vendors, forecasts, contacts, and more.
+**Fix:**
+- PR #228: Deprecated DIBBS, added `validateJsonResponse`, added Source Health panel
+- PR #229: Cleaned up fake DIBBS records from database
+- PR #230: Reversed GovTribe deprecation (migration 049)
+- PR #231: Built GovTribe MCP client (`callGovTribeMCP` → `fetchGovTribeOpportunities` → `mapGovTribeOpp`), wired into `syncGovSources`, registered in `sourceHandlers`
 
-**Current access paths for GovTribe:**
-1. **MCP server** at `https://govtribe.com/mcp` — Streamable HTTP transport, Bearer token auth, credit-based pricing separate from subscription. Tools include search for opportunities, awards, vendors, etc.
-2. **Data export** — subscription plans include export limits (50/3k/25k records per export depending on plan).
+**Regression tests:** 13 vitest assertions covering MCP client structure, JSON-RPC protocol, content-type validation, response mapping, deduplication, error handling, and sourceHandler registration. Migration 049 has 7 CI assertions.
 
-**Fix plan:**
-1. ~~Deprecate GovTribe~~ → Reversed in PR #230
-2. Rebuild integration using GovTribe MCP tools (search opportunities, extract structured data)
-3. Backfill historical data for the period GovTribe was silent
-
-**Proposed regression test:** Integration test that verifies GovTribe MCP client correctly calls search tools, handles responses, and maps to GovOpportunity format. Source Health panel shows GovTribe status.
-
-**Process lesson:** A vendor deprecating one access method doesn't mean the data product is dead. Always confirm with the user before deprecating a paid data source.
+**Process lesson:** Never deprecate a data source the user is paying for without explicit user confirmation.
 
 ---
 

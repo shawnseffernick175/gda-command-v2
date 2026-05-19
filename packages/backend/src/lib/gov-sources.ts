@@ -1,7 +1,10 @@
 // ---------------------------------------------------------------------------
 // Multi-Source Government Feed Manager
-// Provides a unified interface for pulling opportunities from:
-// - GovTribe (via MCP server at govtribe.com/mcp — requires API key)
+// Provides a unified interface for pulling data from:
+// - GovTribe (via MCP server at govtribe.com/mcp — 57 tools available)
+//   Tier 1: Opportunities, Awards, Forecasts (scheduled + on-demand)
+//   Tier 2: Contacts, Vendors, Contract Vehicles (on-demand)
+//   Tier 3: Labor Rate Benchmarks, BLS Wage Data (on-demand)
 // - GovWin IQ (requires Deltek subscription)
 // - SAM.gov and FPDS are handled by feed-sync.ts
 // Note: DIBBS (no real API) is disabled.
@@ -49,6 +52,96 @@ export interface GovOpportunity {
 }
 
 // ---------------------------------------------------------------------------
+// GovTribe data types for Tier 1+2 integrations
+// ---------------------------------------------------------------------------
+
+export interface GovTribeAward {
+  govtribe_id: string;
+  name: string;
+  contract_number?: string;
+  award_date?: string;
+  completion_date?: string;
+  dollars_obligated?: number;
+  ceiling_value?: number;
+  set_aside_type?: string;
+  extent_competed?: string;
+  pricing_type?: string;
+  contract_type?: string;
+  agency?: string;
+  vendor?: string;
+  vendor_uei?: string;
+  naics_code?: string;
+  psc_code?: string;
+  place_of_performance?: string;
+  govtribe_url?: string;
+}
+
+export interface GovTribeForecast {
+  govtribe_id: string;
+  name: string;
+  description?: string;
+  estimated_value?: number;
+  estimated_award_date?: string;
+  agency?: string;
+  naics_code?: string;
+  place_of_performance?: string;
+  govtribe_url?: string;
+}
+
+export interface GovTribeContact {
+  govtribe_id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  title?: string;
+  organization?: string;
+  types?: string[];
+  govtribe_url?: string;
+}
+
+export interface GovTribeVendor {
+  govtribe_id: string;
+  name: string;
+  uei?: string;
+  dba?: string;
+  location?: string;
+  address?: string;
+  sba_certifications?: string[];
+  business_types?: string[];
+  cage_codes?: string[];
+  activation_date?: string;
+  registration_expiration_date?: string;
+  naics_code?: string;
+  govtribe_url?: string;
+}
+
+export interface GovTribeVehicle {
+  govtribe_id: string;
+  name: string;
+  description?: string;
+  agency?: string;
+  govtribe_url?: string;
+}
+
+export interface GovTribeLaborRate {
+  labor_category: string;
+  vendor_name?: string;
+  contract_number?: string;
+  benchmark_price?: number;
+  current_price?: number;
+  worksite?: string;
+  business_size?: string;
+}
+
+export interface GovTribeSearchResult<T> {
+  data: T[];
+  total: number;
+  current_page: number;
+  last_page: number;
+  per_page: number;
+}
+
+// ---------------------------------------------------------------------------
 // Response validation helper
 // ---------------------------------------------------------------------------
 function validateJsonResponse(resp: Response, source: string): boolean {
@@ -65,6 +158,712 @@ function validateJsonResponse(resp: Response, source: string): boolean {
     return false;
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe MCP Client (govtribe.com/mcp — Streamable HTTP)
+// ---------------------------------------------------------------------------
+const GOVTRIBE_API_KEY = process.env.GOVTRIBE_API_KEY;
+const GOVTRIBE_MCP_URL = "https://govtribe.com/mcp";
+
+// ---------------------------------------------------------------------------
+// Credit tracking — metered usage per GovTribe pricing table
+// Credits are charged per 10 results returned. The cost varies by tool.
+// This tracker runs in-process; resets on server restart.
+// ---------------------------------------------------------------------------
+
+const CREDIT_COSTS_PER_10: Record<string, number> = {
+  Search_Federal_Contract_Opportunities: 3,
+  Search_Federal_Contract_Awards: 4,
+  Search_Federal_Forecasts: 3,
+  Search_Contacts: 4,
+  Search_Vendors: 4,
+  Search_Federal_Contract_Vehicles: 3,
+  Labor_Ceiling_Rate_Benchmarks: 4,
+};
+
+interface CreditUsage {
+  totalCredits: number;
+  callCount: number;
+  byTool: Record<string, { credits: number; calls: number }>;
+  cycleStartedAt: string;
+  budgetLimit: number | null;
+  budgetExceeded: boolean;
+}
+
+const GOVTRIBE_CREDIT_BUDGET_ENV = process.env.GOVTRIBE_CREDIT_BUDGET;
+
+function parseBudgetLimit(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+const creditUsage: CreditUsage = {
+  totalCredits: 0,
+  callCount: 0,
+  byTool: {},
+  cycleStartedAt: new Date().toISOString(),
+  budgetLimit: parseBudgetLimit(GOVTRIBE_CREDIT_BUDGET_ENV),
+  budgetExceeded: false,
+};
+
+function estimateCredits(toolName: string, resultsReturned: number): number {
+  const costPer10 = CREDIT_COSTS_PER_10[toolName] ?? 3;
+  return Math.ceil(resultsReturned / 10) * costPer10;
+}
+
+function trackCredits(toolName: string, resultsReturned: number): { credits: number; budgetExceeded: boolean } {
+  const credits = estimateCredits(toolName, resultsReturned);
+  creditUsage.totalCredits += credits;
+  creditUsage.callCount += 1;
+  if (!creditUsage.byTool[toolName]) {
+    creditUsage.byTool[toolName] = { credits: 0, calls: 0 };
+  }
+  creditUsage.byTool[toolName].credits += credits;
+  creditUsage.byTool[toolName].calls += 1;
+
+  if (creditUsage.budgetLimit != null && creditUsage.totalCredits >= creditUsage.budgetLimit) {
+    creditUsage.budgetExceeded = true;
+    log.warn("govtribe_budget_exceeded", {
+      totalCredits: creditUsage.totalCredits,
+      budgetLimit: creditUsage.budgetLimit,
+      tool: toolName,
+    });
+  }
+
+  return { credits, budgetExceeded: creditUsage.budgetExceeded };
+}
+
+export function getGovTribeCreditUsage(): CreditUsage {
+  return { ...creditUsage, byTool: { ...creditUsage.byTool } };
+}
+
+export function resetGovTribeCreditCycle(): void {
+  creditUsage.totalCredits = 0;
+  creditUsage.callCount = 0;
+  creditUsage.byTool = {};
+  creditUsage.cycleStartedAt = new Date().toISOString();
+  creditUsage.budgetExceeded = false;
+}
+
+interface GovTribeMCPResponse {
+  jsonrpc: string;
+  id: number;
+  result?: {
+    content: Array<{ type: string; text: string }>;
+    isError?: boolean;
+  };
+  error?: { code: number; message: string };
+}
+
+interface GovTribeOppRow {
+  govtribe_id?: string;
+  name?: string;
+  solicitation_number?: string;
+  posted_date?: string;
+  due_date?: string;
+  opportunity_type?: string;
+  set_aside_type?: string;
+  govtribe_url?: string;
+  federal_agency?: { name?: string };
+  naics_category?: { govtribe_id?: string; name?: string };
+  place_of_performance?: { name?: string };
+}
+
+interface GovTribeAwardRow {
+  govtribe_id?: string;
+  name?: string;
+  contract_number?: string;
+  award_date?: string;
+  completion_date?: string;
+  dollars_obligated?: number;
+  ceiling_value?: number;
+  set_aside_type?: string;
+  extent_competed?: string;
+  pricing_type?: string;
+  contract_type?: string;
+  govtribe_url?: string;
+  awardee?: { govtribe_id?: string; name?: string; uei?: string };
+  contracting_federal_agency?: { name?: string };
+  naics_category?: { govtribe_id?: string; name?: string };
+  psc_category?: { govtribe_id?: string; name?: string };
+  place_of_performance?: { name?: string };
+}
+
+interface GovTribeForecastRow {
+  govtribe_id?: string;
+  name?: string;
+  description?: string;
+  estimated_value_low?: number;
+  estimated_value_high?: number;
+  estimated_solicitation_date?: string;
+  estimated_award_date?: string;
+  govtribe_url?: string;
+  federal_agency?: { name?: string };
+  naics_category?: { govtribe_id?: string; name?: string };
+  place_of_performance?: { name?: string };
+}
+
+interface GovTribeContactRow {
+  govtribe_id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  title?: string;
+  types?: string[];
+  organization?: string;
+  govtribe_url?: string;
+  parent_organization_details?: { name?: string };
+}
+
+interface GovTribeVendorRow {
+  govtribe_id?: string;
+  name?: string;
+  uei?: string;
+  dba?: string;
+  location?: { name?: string };
+  address?: string;
+  sba_certifications?: string[];
+  business_types?: string[];
+  cage_codes?: string[];
+  activation_date?: string;
+  registration_expiration_date?: string;
+  govtribe_url?: string;
+  naics_category?: { govtribe_id?: string; name?: string };
+}
+
+interface GovTribeVehicleRow {
+  govtribe_id?: string;
+  name?: string;
+  description?: string;
+  govtribe_url?: string;
+  federal_agency?: { name?: string };
+}
+
+async function callGovTribeMCP(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  if (creditUsage.budgetExceeded) {
+    throw new Error(
+      `GovTribe credit budget exceeded (${creditUsage.totalCredits}/${creditUsage.budgetLimit} credits). ` +
+      `Reset via /api/govtribe/credits/reset or increase GOVTRIBE_CREDIT_BUDGET.`
+    );
+  }
+
+  const resp = await fetch(GOVTRIBE_MCP_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GOVTRIBE_API_KEY}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: toolName, arguments: args },
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`GovTribe MCP HTTP ${resp.status}: ${resp.statusText}`);
+  }
+
+  if (!validateJsonResponse(resp, "govtribe_mcp")) {
+    throw new Error("GovTribe MCP returned non-JSON response");
+  }
+
+  const data = (await resp.json()) as GovTribeMCPResponse;
+
+  if (data.error) {
+    throw new Error(`GovTribe MCP error ${data.error.code}: ${data.error.message}`);
+  }
+
+  if (data.result?.isError) {
+    const errText = data.result.content?.[0]?.text ?? "Unknown MCP error";
+    throw new Error(`GovTribe MCP tool error: ${errText}`);
+  }
+
+  return data.result?.content?.[0]?.text ?? "{}";
+}
+
+function mapGovTribeOpp(row: GovTribeOppRow): GovOpportunity {
+  return {
+    external_id: `govtribe-${row.govtribe_id ?? ""}`,
+    source: "govtribe",
+    title: row.name ?? "",
+    agency: row.federal_agency?.name,
+    posted_date: row.posted_date ?? undefined,
+    due_date: row.due_date ?? undefined,
+    naics_code: row.naics_category?.govtribe_id,
+    set_aside: row.set_aside_type ?? undefined,
+    url: row.govtribe_url,
+    place_of_performance: row.place_of_performance?.name,
+  };
+}
+
+async function fetchGovTribeOpportunities(
+  params: Record<string, unknown>,
+): Promise<GovOpportunity[]> {
+  if (!GOVTRIBE_API_KEY) {
+    log.warn("govtribe_no_api_key", { hint: "Set GOVTRIBE_API_KEY to enable GovTribe MCP integration" });
+    return [];
+  }
+
+  const keywords = (params.keywords ?? params.categories ?? []) as string[];
+  const allOpps: GovOpportunity[] = [];
+  const seenIds = new Set<string>();
+
+  // If keywords are configured, search for each; otherwise do a broad recent search
+  const queries = keywords.length > 0 ? keywords : [""];
+
+  for (const query of queries) {
+    try {
+      const args: Record<string, unknown> = {
+        search_mode: "keyword",
+        fields_to_return: [
+          "govtribe_id",
+          "name",
+          "solicitation_number",
+          "posted_date",
+          "due_date",
+          "opportunity_type",
+          "set_aside_type",
+          "federal_agency",
+          "naics_category",
+          "place_of_performance",
+          "govtribe_url",
+        ],
+        per_page: 50,
+        page: 1,
+        sort: { key: "postedDate", direction: "desc" },
+      };
+
+      if (query) {
+        args.query = query;
+      }
+
+      const text = await callGovTribeMCP(
+        "Search_Federal_Contract_Opportunities",
+        args,
+      );
+
+      const result = JSON.parse(text) as {
+        data?: GovTribeOppRow[];
+        total?: number;
+      };
+
+      const returned = result.data?.length ?? 0;
+      trackCredits("Search_Federal_Contract_Opportunities", returned);
+      log.info("govtribe_mcp_search", {
+        query: query || "(all recent)",
+        total: result.total ?? 0,
+        returned,
+      });
+
+      for (const row of result.data ?? []) {
+        const id = row.govtribe_id;
+        if (!id || seenIds.has(id)) continue;
+        seenIds.add(id);
+        allOpps.push(mapGovTribeOpp(row));
+      }
+    } catch (e) {
+      log.warn("govtribe_mcp_search_error", {
+        query,
+        error: (e as Error).message,
+      });
+    }
+  }
+
+  return allOpps;
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe Awards (Tier 1 — scheduled + on-demand)
+// ---------------------------------------------------------------------------
+
+function mapGovTribeAward(row: GovTribeAwardRow): GovTribeAward {
+  return {
+    govtribe_id: row.govtribe_id ?? "",
+    name: row.name ?? "",
+    contract_number: row.contract_number,
+    award_date: row.award_date,
+    completion_date: row.completion_date,
+    dollars_obligated: row.dollars_obligated,
+    ceiling_value: row.ceiling_value,
+    set_aside_type: row.set_aside_type,
+    extent_competed: row.extent_competed,
+    pricing_type: row.pricing_type,
+    contract_type: row.contract_type,
+    agency: row.contracting_federal_agency?.name,
+    vendor: row.awardee?.name,
+    vendor_uei: row.awardee?.uei,
+    naics_code: row.naics_category?.govtribe_id,
+    psc_code: row.psc_category?.govtribe_id,
+    place_of_performance: row.place_of_performance?.name,
+    govtribe_url: row.govtribe_url,
+  };
+}
+
+export async function searchGovTribeAwards(
+  query: string,
+  options: { per_page?: number; page?: number; date_range?: string } = {},
+): Promise<GovTribeSearchResult<GovTribeAward>> {
+  if (!GOVTRIBE_API_KEY) throw new Error("GOVTRIBE_API_KEY not configured");
+
+  const args: Record<string, unknown> = {
+    search_mode: "keyword",
+    fields_to_return: [
+      "govtribe_id", "name", "contract_number", "award_date",
+      "completion_date", "dollars_obligated", "ceiling_value",
+      "set_aside_type", "extent_competed", "pricing_type", "contract_type",
+      "awardee", "contracting_federal_agency", "naics_category",
+      "psc_category", "place_of_performance", "govtribe_url",
+    ],
+    per_page: options.per_page ?? 25,
+    page: options.page ?? 1,
+    sort: { key: "awardDate", direction: "desc" },
+  };
+  if (query) args.query = query;
+  if (options.date_range) args.award_date_range = options.date_range;
+
+  const text = await callGovTribeMCP("Search_Federal_Contract_Awards", args);
+  const result = JSON.parse(text) as {
+    data?: GovTribeAwardRow[]; total?: number;
+    current_page?: number; last_page?: number; per_page?: number;
+  };
+
+  trackCredits("Search_Federal_Contract_Awards", result.data?.length ?? 0);
+  log.info("govtribe_awards_search", { query: query || "(all)", total: result.total ?? 0 });
+
+  return {
+    data: (result.data ?? []).map(mapGovTribeAward),
+    total: result.total ?? 0,
+    current_page: result.current_page ?? 1,
+    last_page: result.last_page ?? 1,
+    per_page: result.per_page ?? 25,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe Forecasts (Tier 1 — scheduled + on-demand)
+// ---------------------------------------------------------------------------
+
+function mapGovTribeForecast(row: GovTribeForecastRow): GovTribeForecast {
+  return {
+    govtribe_id: row.govtribe_id ?? "",
+    name: row.name ?? "",
+    description: row.description,
+    estimated_value: row.estimated_value_high ?? row.estimated_value_low,
+    estimated_award_date: row.estimated_award_date,
+    agency: row.federal_agency?.name,
+    naics_code: row.naics_category?.govtribe_id,
+    place_of_performance: row.place_of_performance?.name,
+    govtribe_url: row.govtribe_url,
+  };
+}
+
+export async function searchGovTribeForecasts(
+  query: string,
+  options: { per_page?: number; page?: number } = {},
+): Promise<GovTribeSearchResult<GovTribeForecast>> {
+  if (!GOVTRIBE_API_KEY) throw new Error("GOVTRIBE_API_KEY not configured");
+
+  const args: Record<string, unknown> = {
+    search_mode: "keyword",
+    fields_to_return: [
+      "govtribe_id", "name", "description",
+      "estimated_value_low", "estimated_value_high",
+      "estimated_solicitation_date", "estimated_award_date",
+      "federal_agency", "naics_category", "place_of_performance",
+      "govtribe_url",
+    ],
+    per_page: options.per_page ?? 25,
+    page: options.page ?? 1,
+  };
+  if (query) args.query = query;
+
+  const text = await callGovTribeMCP("Search_Federal_Forecasts", args);
+  const result = JSON.parse(text) as {
+    data?: GovTribeForecastRow[]; total?: number;
+    current_page?: number; last_page?: number; per_page?: number;
+  };
+
+  trackCredits("Search_Federal_Forecasts", result.data?.length ?? 0);
+  log.info("govtribe_forecasts_search", { query: query || "(all)", total: result.total ?? 0 });
+
+  return {
+    data: (result.data ?? []).map(mapGovTribeForecast),
+    total: result.total ?? 0,
+    current_page: result.current_page ?? 1,
+    last_page: result.last_page ?? 1,
+    per_page: result.per_page ?? 25,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe Contacts (Tier 2 — on-demand)
+// ---------------------------------------------------------------------------
+
+function mapGovTribeContact(row: GovTribeContactRow): GovTribeContact {
+  return {
+    govtribe_id: row.govtribe_id ?? "",
+    name: row.name ?? "",
+    email: row.email,
+    phone: row.phone,
+    title: row.title,
+    organization: row.parent_organization_details?.name ?? row.organization,
+    types: row.types,
+    govtribe_url: row.govtribe_url,
+  };
+}
+
+export async function searchGovTribeContacts(
+  query: string,
+  options: { per_page?: number; page?: number; agency_ids?: string[] } = {},
+): Promise<GovTribeSearchResult<GovTribeContact>> {
+  if (!GOVTRIBE_API_KEY) throw new Error("GOVTRIBE_API_KEY not configured");
+
+  const args: Record<string, unknown> = {
+    search_mode: "keyword",
+    fields_to_return: [
+      "govtribe_id", "name", "email", "phone", "title",
+      "types", "organization", "parent_organization_details",
+      "govtribe_url",
+    ],
+    per_page: options.per_page ?? 25,
+    page: options.page ?? 1,
+  };
+  if (query) args.query = query;
+  if (options.agency_ids?.length) args.federal_agency_ids = options.agency_ids;
+
+  const text = await callGovTribeMCP("Search_Contacts", args);
+  const result = JSON.parse(text) as {
+    data?: GovTribeContactRow[]; total?: number;
+    current_page?: number; last_page?: number; per_page?: number;
+  };
+
+  trackCredits("Search_Contacts", result.data?.length ?? 0);
+  log.info("govtribe_contacts_search", { query: query || "(all)", total: result.total ?? 0 });
+
+  return {
+    data: (result.data ?? []).map(mapGovTribeContact),
+    total: result.total ?? 0,
+    current_page: result.current_page ?? 1,
+    last_page: result.last_page ?? 1,
+    per_page: result.per_page ?? 25,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe Vendors (Tier 2 — on-demand)
+// ---------------------------------------------------------------------------
+
+function mapGovTribeVendor(row: GovTribeVendorRow): GovTribeVendor {
+  return {
+    govtribe_id: row.govtribe_id ?? "",
+    name: row.name ?? "",
+    uei: row.uei,
+    dba: row.dba,
+    location: row.location?.name,
+    address: row.address,
+    sba_certifications: row.sba_certifications,
+    business_types: row.business_types,
+    cage_codes: row.cage_codes,
+    activation_date: row.activation_date,
+    registration_expiration_date: row.registration_expiration_date,
+    naics_code: row.naics_category?.govtribe_id,
+    govtribe_url: row.govtribe_url,
+  };
+}
+
+export async function searchGovTribeVendors(
+  query: string,
+  options: { per_page?: number; page?: number; sba_certs?: string[] } = {},
+): Promise<GovTribeSearchResult<GovTribeVendor>> {
+  if (!GOVTRIBE_API_KEY) throw new Error("GOVTRIBE_API_KEY not configured");
+
+  const args: Record<string, unknown> = {
+    search_mode: "keyword",
+    fields_to_return: [
+      "govtribe_id", "name", "uei", "dba", "location", "address",
+      "sba_certifications", "business_types", "cage_codes",
+      "activation_date", "registration_expiration_date",
+      "naics_category", "govtribe_url",
+    ],
+    per_page: options.per_page ?? 25,
+    page: options.page ?? 1,
+  };
+  if (query) args.query = query;
+  if (options.sba_certs?.length) args.sba_certifications = options.sba_certs;
+
+  const text = await callGovTribeMCP("Search_Vendors", args);
+  const result = JSON.parse(text) as {
+    data?: GovTribeVendorRow[]; total?: number;
+    current_page?: number; last_page?: number; per_page?: number;
+  };
+
+  trackCredits("Search_Vendors", result.data?.length ?? 0);
+  log.info("govtribe_vendors_search", { query: query || "(all)", total: result.total ?? 0 });
+
+  return {
+    data: (result.data ?? []).map(mapGovTribeVendor),
+    total: result.total ?? 0,
+    current_page: result.current_page ?? 1,
+    last_page: result.last_page ?? 1,
+    per_page: result.per_page ?? 25,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe Contract Vehicles (Tier 2 — on-demand)
+// ---------------------------------------------------------------------------
+
+function mapGovTribeVehicle(row: GovTribeVehicleRow): GovTribeVehicle {
+  return {
+    govtribe_id: row.govtribe_id ?? "",
+    name: row.name ?? "",
+    description: row.description,
+    agency: row.federal_agency?.name,
+    govtribe_url: row.govtribe_url,
+  };
+}
+
+export async function searchGovTribeVehicles(
+  query: string,
+  options: { per_page?: number; page?: number } = {},
+): Promise<GovTribeSearchResult<GovTribeVehicle>> {
+  if (!GOVTRIBE_API_KEY) throw new Error("GOVTRIBE_API_KEY not configured");
+
+  const args: Record<string, unknown> = {
+    search_mode: "keyword",
+    fields_to_return: [
+      "govtribe_id", "name", "description",
+      "federal_agency", "govtribe_url",
+    ],
+    per_page: options.per_page ?? 25,
+    page: options.page ?? 1,
+  };
+  if (query) args.query = query;
+
+  const text = await callGovTribeMCP("Search_Federal_Contract_Vehicles", args);
+  const result = JSON.parse(text) as {
+    data?: GovTribeVehicleRow[]; total?: number;
+    current_page?: number; last_page?: number; per_page?: number;
+  };
+
+  trackCredits("Search_Federal_Contract_Vehicles", result.data?.length ?? 0);
+  log.info("govtribe_vehicles_search", { query: query || "(all)", total: result.total ?? 0 });
+
+  return {
+    data: (result.data ?? []).map(mapGovTribeVehicle),
+    total: result.total ?? 0,
+    current_page: result.current_page ?? 1,
+    last_page: result.last_page ?? 1,
+    per_page: result.per_page ?? 25,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe Labor Rate Benchmarks (Tier 3 — on-demand)
+// ---------------------------------------------------------------------------
+
+export async function searchGovTribeLaborRates(
+  keyword: string,
+  options: { worksite?: string[]; business_size?: string[]; contract_year?: string } = {},
+): Promise<{ items: GovTribeLaborRate[]; summary: Record<string, unknown> }> {
+  if (!GOVTRIBE_API_KEY) throw new Error("GOVTRIBE_API_KEY not configured");
+
+  const args: Record<string, unknown> = {
+    mode: "search",
+    keyword,
+    search_by: "labor_category",
+    contract_year: options.contract_year ?? "current",
+    fields_to_return: ["items", "summary"],
+    item_fields_to_return: [
+      "labor_category", "benchmark_price", "current_price",
+      "vendor_name", "idv_piid", "schedule",
+    ],
+  };
+  if (options.worksite?.length) args.worksite = options.worksite;
+  if (options.business_size?.length) args.business_size = options.business_size;
+
+  const text = await callGovTribeMCP("Labor_Ceiling_Rate_Benchmarks", args);
+  const result = JSON.parse(text) as {
+    items?: Array<Record<string, unknown>>;
+    summary?: Record<string, unknown>;
+  };
+
+  trackCredits("Labor_Ceiling_Rate_Benchmarks", result.items?.length ?? 0);
+  log.info("govtribe_labor_rates_search", { keyword, count: result.items?.length ?? 0 });
+
+  return {
+    items: (result.items ?? []).map((item) => ({
+      labor_category: String(item.labor_category ?? ""),
+      vendor_name: item.vendor_name ? String(item.vendor_name) : undefined,
+      contract_number: item.idv_piid ? String(item.idv_piid) : undefined,
+      benchmark_price: item.benchmark_price != null ? Number(item.benchmark_price) : undefined,
+      current_price: item.current_price != null ? Number(item.current_price) : undefined,
+      worksite: item.worksite ? String(item.worksite) : undefined,
+      business_size: item.business_size ? String(item.business_size) : undefined,
+    })),
+    summary: result.summary ?? {},
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe MCP Health Check (Follow-up 1 — automated API key validation)
+// ---------------------------------------------------------------------------
+
+export async function checkGovTribeHealth(): Promise<{
+  status: "healthy" | "error" | "no_key";
+  latencyMs: number;
+  toolCount?: number;
+  error?: string;
+}> {
+  if (!GOVTRIBE_API_KEY) {
+    return { status: "no_key", latencyMs: 0, error: "GOVTRIBE_API_KEY not set" };
+  }
+
+  const start = Date.now();
+  try {
+    const resp = await fetch(GOVTRIBE_MCP_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GOVTRIBE_API_KEY}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+        params: {},
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    const latencyMs = Date.now() - start;
+
+    if (!resp.ok) {
+      return { status: "error", latencyMs, error: `HTTP ${resp.status}: ${resp.statusText}` };
+    }
+
+    const data = (await resp.json()) as { result?: { tools?: unknown[] }; error?: { message?: string } };
+
+    if (data.error) {
+      return { status: "error", latencyMs, error: data.error.message ?? "MCP error" };
+    }
+
+    return {
+      status: "healthy",
+      latencyMs,
+      toolCount: data.result?.tools?.length ?? 0,
+    };
+  } catch (e) {
+    return { status: "error", latencyMs: Date.now() - start, error: (e as Error).message };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +944,7 @@ export async function syncGovSources(): Promise<GovSourceResult[]> {
   }
 
   const sourceHandlers: Record<string, (params: Record<string, unknown>) => Promise<GovOpportunity[]>> = {
+    govtribe: fetchGovTribeOpportunities,
     govwin: fetchGovWinOpportunities,
   };
 

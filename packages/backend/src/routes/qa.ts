@@ -438,4 +438,30 @@ router.get("/source-health", async (_req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/qa/govtribe-health — automated GovTribe MCP health check
+// Same pattern as SAM verify — no manual curl needed.
+// ---------------------------------------------------------------------------
+router.get("/govtribe-health", async (_req, res) => {
+  try {
+    const { checkGovTribeHealth } = await import("../lib/gov-sources");
+    const result = await checkGovTribeHealth();
+    res.json(
+      successEnvelope("GDA.qa.govtribe-health", "check", result, {
+        hint: result.status === "healthy"
+          ? `GovTribe MCP operational — ${result.toolCount} tools, ${result.latencyMs}ms`
+          : result.error ?? "Check GOVTRIBE_API_KEY",
+      })
+    );
+  } catch (e: unknown) {
+    res.status(500).json(
+      errorEnvelope("GDA.qa.govtribe-health", "check", {
+        code: "INTERNAL",
+        message: (e as Error).message ?? "Failed to check GovTribe health",
+        detail: null,
+      })
+    );
+  }
+});
+
 export default router;
