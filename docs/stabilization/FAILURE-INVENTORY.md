@@ -24,10 +24,10 @@ Sources examined:
 
 | # | Frequency | Severity | Failure | Status |
 |---|-----------|----------|---------|--------|
-| F-001 | Daily | P0 | Migration 044 UUID crash → restart loop | **Mitigated** (PR #213 makes entrypoint non-fatal), root fix pending |
+| F-001 | Daily | P0 | Migration 044 UUID crash → restart loop | **Fixed** (PR #216 — root fix; PR #213 — entrypoint resilience) |
 | F-002 | Daily | P0 | No unhandledRejection handler — any async error kills server | **Fixed** (PR #213) |
 | F-003 | Every deploy | P1 | Migration 028 FK delete ordering | **Fixed** (PR #211) |
-| F-004 | Every 6h | P1 | SAM sync upserts fail on empty timestamps — 13-17 records lost per cycle | Open |
+| F-004 | Every 6h | P1 | SAM sync upserts fail on empty timestamps — 13-17 records lost per cycle | **Fixed** (PRs #218, #220, #222, #223 — mapper fix + backfill + automated verify + QA Center) |
 | F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails for every keyword | Open |
 | F-006 | Every 6h | P1 | GovWin API returns HTML instead of JSON | Open |
 | F-007 | On user action | P1 | Sidebar search crashes on undefined `.type` field | **Fixed** (PR #206) |
@@ -40,6 +40,7 @@ Sources examined:
 | F-014 | Preventive | P2 | No cross-file type-safety validation in migrations | Open (tracked separately) |
 | F-015 | Every 6h | P2 | Ingest mappers (SAM, GovTribe, GovWin, FPDS) lack consistent input sanitization | Open (tracked separately) |
 | F-016 | Always | P2 | Schema-mapper drift — mappers write fields the DB silently drops, no detection | Open (tracked separately) |
+| F-017 | On fresh deploy | P2 | Migration ordering by number, not by dependency — implicit ordering can break if a migration depends on a table/column another migration creates | Open (tracked separately) |
 
 ---
 
@@ -194,6 +195,16 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 **Proposed fix:** Audit all four ingest mappers against their target table schemas. Add a CI check that fails when a mapper writes a field that doesn’t exist in the target table. Options: (a) a static analysis script that parses mapper return keys and compares to CREATE TABLE columns, or (b) typed interfaces for each table’s insertable row shape, replacing untyped objects with compile-time checked types.
 
 **Proposed regression test:** CI script that extracts field names from each mapper’s return object and cross-references them against the column list in the corresponding INSERT statement. Any mismatch fails the build.
+
+### F-017 — Migration Ordering by Number, Not by Dependency
+
+**Root cause:** The migration runner sorts files alphabetically by filename and applies them in that order. There is no mechanism to declare that one migration depends on a table or column created by another. If two migrations have adjacent numbers but one depends on schema created by the other, the system relies on implicit filename ordering — which is fragile and undocumented.
+
+**Evidence:** The CI check added for F-010 catches duplicate number prefixes but not the harder case: a migration that references a table or column created by a migration that happens to sort after it. The migration smoke test (running all migrations from scratch) catches this at CI time, but only for the current set of migrations — it doesn't prevent future PRs from introducing ordering bugs.
+
+**Proposed fix:** Track as preventive work. Options: (a) add a comment-based dependency declaration (e.g., `-- depends: 036`) and validate the DAG in CI, (b) document the constraint and rely on the existing smoke test to catch violations, or (c) adopt a migration tool that handles dependency ordering natively.
+
+**Proposed regression test:** The existing migration smoke test partially covers this (applying all migrations from scratch catches ordering errors). A more robust check would parse `CREATE TABLE` / `ALTER TABLE` / `INSERT INTO` references and verify they sort after the migration that creates the referenced object.
 
 ---
 
