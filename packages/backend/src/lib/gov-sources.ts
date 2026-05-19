@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
 // Multi-Source Government Feed Manager
 // Provides a unified interface for pulling opportunities from:
+// - GovTribe (via MCP server at govtribe.com/mcp — requires API key)
 // - GovWin IQ (requires Deltek subscription)
 // - SAM.gov and FPDS are handled by feed-sync.ts
-// Note: GovTribe (deprecated 2023) and DIBBS (no real API) are disabled.
+// Note: DIBBS (no real API) is disabled.
 // ---------------------------------------------------------------------------
 
 import { getPool } from "./db";
@@ -64,6 +65,165 @@ function validateJsonResponse(resp: Response, source: string): boolean {
     return false;
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe MCP Client (govtribe.com/mcp — Streamable HTTP)
+// ---------------------------------------------------------------------------
+const GOVTRIBE_API_KEY = process.env.GOVTRIBE_API_KEY;
+const GOVTRIBE_MCP_URL = "https://govtribe.com/mcp";
+
+interface GovTribeMCPResponse {
+  jsonrpc: string;
+  id: number;
+  result?: {
+    content: Array<{ type: string; text: string }>;
+    isError?: boolean;
+  };
+  error?: { code: number; message: string };
+}
+
+interface GovTribeOppRow {
+  govtribe_id?: string;
+  name?: string;
+  solicitation_number?: string;
+  posted_date?: string;
+  due_date?: string;
+  opportunity_type?: string;
+  set_aside_type?: string;
+  govtribe_url?: string;
+  federal_agency?: { name?: string };
+  naics_category?: { govtribe_id?: string; name?: string };
+  place_of_performance?: { name?: string };
+}
+
+async function callGovTribeMCP(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const resp = await fetch(GOVTRIBE_MCP_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GOVTRIBE_API_KEY}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: toolName, arguments: args },
+    }),
+  });
+
+  if (!resp.ok) {
+    throw new Error(`GovTribe MCP HTTP ${resp.status}: ${resp.statusText}`);
+  }
+
+  if (!validateJsonResponse(resp, "govtribe_mcp")) {
+    throw new Error("GovTribe MCP returned non-JSON response");
+  }
+
+  const data = (await resp.json()) as GovTribeMCPResponse;
+
+  if (data.error) {
+    throw new Error(`GovTribe MCP error ${data.error.code}: ${data.error.message}`);
+  }
+
+  if (data.result?.isError) {
+    const errText = data.result.content?.[0]?.text ?? "Unknown MCP error";
+    throw new Error(`GovTribe MCP tool error: ${errText}`);
+  }
+
+  return data.result?.content?.[0]?.text ?? "{}";
+}
+
+function mapGovTribeOpp(row: GovTribeOppRow): GovOpportunity {
+  return {
+    external_id: `govtribe-${row.govtribe_id ?? ""}`,
+    source: "govtribe",
+    title: row.name ?? "",
+    agency: row.federal_agency?.name,
+    posted_date: row.posted_date ?? undefined,
+    due_date: row.due_date ?? undefined,
+    naics_code: row.naics_category?.govtribe_id,
+    set_aside: row.set_aside_type ?? undefined,
+    url: row.govtribe_url,
+    place_of_performance: row.place_of_performance?.name,
+  };
+}
+
+async function fetchGovTribeOpportunities(
+  params: Record<string, unknown>,
+): Promise<GovOpportunity[]> {
+  if (!GOVTRIBE_API_KEY) {
+    log.warn("govtribe_no_api_key", { hint: "Set GOVTRIBE_API_KEY to enable GovTribe MCP integration" });
+    return [];
+  }
+
+  const keywords = (params.keywords ?? params.categories ?? []) as string[];
+  const allOpps: GovOpportunity[] = [];
+  const seenIds = new Set<string>();
+
+  // If keywords are configured, search for each; otherwise do a broad recent search
+  const queries = keywords.length > 0 ? keywords : [""];
+
+  for (const query of queries) {
+    try {
+      const args: Record<string, unknown> = {
+        search_mode: "keyword",
+        fields_to_return: [
+          "govtribe_id",
+          "name",
+          "solicitation_number",
+          "posted_date",
+          "due_date",
+          "opportunity_type",
+          "set_aside_type",
+          "federal_agency",
+          "naics_category",
+          "place_of_performance",
+          "govtribe_url",
+        ],
+        per_page: 50,
+        page: 1,
+        sort: { key: "postedDate", direction: "desc" },
+      };
+
+      if (query) {
+        args.query = query;
+      }
+
+      const text = await callGovTribeMCP(
+        "Search_Federal_Contract_Opportunities",
+        args,
+      );
+
+      const result = JSON.parse(text) as {
+        data?: GovTribeOppRow[];
+        total?: number;
+      };
+
+      log.info("govtribe_mcp_search", {
+        query: query || "(all recent)",
+        total: result.total ?? 0,
+        returned: result.data?.length ?? 0,
+      });
+
+      for (const row of result.data ?? []) {
+        const id = row.govtribe_id;
+        if (!id || seenIds.has(id)) continue;
+        seenIds.add(id);
+        allOpps.push(mapGovTribeOpp(row));
+      }
+    } catch (e) {
+      log.warn("govtribe_mcp_search_error", {
+        query,
+        error: (e as Error).message,
+      });
+    }
+  }
+
+  return allOpps;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +304,7 @@ export async function syncGovSources(): Promise<GovSourceResult[]> {
   }
 
   const sourceHandlers: Record<string, (params: Record<string, unknown>) => Promise<GovOpportunity[]>> = {
+    govtribe: fetchGovTribeOpportunities,
     govwin: fetchGovWinOpportunities,
   };
 

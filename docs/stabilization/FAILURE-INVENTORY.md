@@ -28,7 +28,7 @@ Sources examined:
 | F-002 | Daily | P0 | No unhandledRejection handler — any async error kills server | **Fixed** (PR #213) |
 | F-003 | Every deploy | P1 | Migration 028 FK delete ordering | **Fixed** (PR #211) |
 | F-004 | Every 6h | P1 | SAM sync upserts fail on empty timestamps — 13-17 records lost per cycle | **Fixed** (PRs #218, #220, #222, #223 — mapper fix + backfill + automated verify + QA Center) |
-| F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails for every keyword — GovTribe deprecated 2023, DIBBS has no API | **Fixed** (PR #228) |
+| F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails — old REST API dead, MCP path rebuilt | **Fixed** (PR #228 DIBBS, PR #230 reversal, PR #231 MCP integration) |
 | F-006 | Every 6h | P1 | GovWin API returns HTML instead of JSON | Open |
 | F-007 | On user action | P1 | Sidebar search crashes on undefined `.type` field | **Fixed** (PR #206) |
 | F-008 | On user action | P1 | LLM calls hang forever — no timeout, chat freezes | **Fixed** (PR #194) |
@@ -109,18 +109,21 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 
 ### F-005 — GovTribe/DIBBS API Fetch Failures
 
-**Root cause:** The GovTribe and DIBBS API calls fail with `"fetch failed"` for every keyword search. This could be DNS resolution, API key issues, or the APIs being offline/deprecated.
+**Status: Fixed** (PR #228 DIBBS deprecation, PR #230 GovTribe deprecation reversal, PR #231 MCP integration)
 
-**Evidence:** Production logs:
-```json
-{"level":"warn","msg":"govtribe_keyword_error","keyword":"SETA","error":"fetch failed"}
-{"level":"warn","msg":"govtribe_keyword_error","keyword":"cybersecurity","error":"fetch failed"}
-{"level":"warn","msg":"dibbs_keyword_error","keyword":"IT","error":"fetch failed"}
-```
+**Root cause (DIBBS):** DIBBS never had a real API. The code fetched an HTML page and created fake placeholder records. DIBBS is correctly deprecated (PR #228). Fake records cleaned up (PR #229).
 
-**Proposed fix:** Investigate whether GovTribe/DIBBS APIs are reachable at all from the VPS. If the APIs are down or require auth, disable the sync for those sources and log it clearly. Don't silently fail every 6 hours.
+**Root cause (GovTribe):** The old public REST API at `docs.govtribe.com` was deprecated in 2023. GovTribe the company is alive with an active paid subscription. PR #228 incorrectly deprecated GovTribe alongside DIBBS — that was reversed in PR #230. GovTribe now provides data access via an MCP server at `https://govtribe.com/mcp` (Streamable HTTP, Bearer token auth). Integration rebuilt in PR #231 using MCP's `Search_Federal_Contract_Opportunities` tool.
 
-**Proposed regression test:** Health check endpoint that reports which gov data sources are reachable.
+**Fix:**
+- PR #228: Deprecated DIBBS, added `validateJsonResponse`, added Source Health panel
+- PR #229: Cleaned up fake DIBBS records from database
+- PR #230: Reversed GovTribe deprecation (migration 049)
+- PR #231: Built GovTribe MCP client (`callGovTribeMCP` → `fetchGovTribeOpportunities` → `mapGovTribeOpp`), wired into `syncGovSources`, registered in `sourceHandlers`
+
+**Regression tests:** 13 vitest assertions covering MCP client structure, JSON-RPC protocol, content-type validation, response mapping, deduplication, error handling, and sourceHandler registration. Migration 049 has 7 CI assertions.
+
+**Process lesson:** A vendor deprecating one access method doesn't mean the data product is dead. Always confirm with the user before deprecating a paid data source.
 
 ---
 
