@@ -73,6 +73,10 @@ jobs:
         run: npx tsx packages/backend/src/db/test-migration-045.ts
       - name: Regression test — no missing migration numbers (F-011)
         run: npx tsx packages/backend/src/db/test-migration-completeness.ts
+      - name: Regression test — migration 048 DIBBS cleanup (F-005)
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+        run: npx tsx packages/backend/src/db/test-migration-048.ts
       - name: Regression test — migration 049 reverse GovTribe deprecation (F-005)
         env:
           DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
