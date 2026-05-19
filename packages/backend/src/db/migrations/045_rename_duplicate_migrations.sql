@@ -4,16 +4,12 @@
 -- making execution order undefined on fresh deploys. The second file in each pair
 -- was renamed with a 'b' suffix to ensure unique, deterministic ordering.
 --
--- This migration updates schema_migrations so production doesn't re-run them.
+-- On existing databases the migration runner will have already re-applied the
+-- renamed *b_* files (they are idempotent) and recorded them under the new names.
+-- We DELETE the stale old-name entries to clean up. On fresh databases these
+-- DELETEs are harmless no-ops (no rows match).
 
-UPDATE schema_migrations SET name = '036b_vehicle_classification.sql'
-  WHERE name = '036_vehicle_classification.sql';
-
-UPDATE schema_migrations SET name = '038b_merger_context.sql'
-  WHERE name = '038_merger_context.sql';
-
-UPDATE schema_migrations SET name = '039b_pgvector_safe.sql'
-  WHERE name = '039_pgvector_safe.sql';
-
-UPDATE schema_migrations SET name = '040b_seed_anomaly_rules.sql'
-  WHERE name = '040_seed_anomaly_rules.sql';
+DELETE FROM schema_migrations WHERE name = '036_vehicle_classification.sql';
+DELETE FROM schema_migrations WHERE name = '038_merger_context.sql';
+DELETE FROM schema_migrations WHERE name = '039_pgvector_safe.sql';
+DELETE FROM schema_migrations WHERE name = '040_seed_anomaly_rules.sql';
