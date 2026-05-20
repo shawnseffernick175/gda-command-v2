@@ -440,15 +440,15 @@ describe("Webhook registry — govtribe-ingest entry", () => {
     const entry = WEBHOOK_REGISTRY["govtribe-ingest"];
     expect(entry).toBeDefined();
     expect(entry.path).toBe("govtribe-ingest");
-    expect(entry.status).toBe("planned");
+    expect(entry.status).toBe("live");
     expect(entry.n8nWorkflow).toBe("GDA.ingest.govtribe-zapier");
     expect(entry.usedBy).toBe("ingest.ts");
   });
 
-  it("registry summary includes govtribe-ingest in planned count", async () => {
+  it("registry summary includes govtribe-ingest in live count", async () => {
     const { getRegistrySummary } = await import("../lib/webhook-registry");
     const summary = getRegistrySummary();
-    expect(summary.planned).toBeGreaterThan(0);
+    expect(summary.live).toBeGreaterThan(0);
     expect(summary.total).toBeGreaterThan(0);
   });
 });
