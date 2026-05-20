@@ -575,7 +575,8 @@ router.post("/source-health/snapshot", async (req, res) => {
     const { rows: feeds } = await pool.query(
       `SELECT id, source, name, enabled, last_sync_at, last_sync_count,
               error_count, deprecated_at, deprecation_reason,
-              COALESCE(role, 'primary') AS role
+              COALESCE(role, 'primary') AS role,
+              COALESCE(sync_freshness_hours, 36) AS sync_freshness_hours
        FROM gov_source_feeds ORDER BY source`,
     );
 
@@ -643,6 +644,8 @@ router.post("/source-health/snapshot", async (req, res) => {
           errorCount7d = parseInt(errResult.rows[0]?.cnt ?? "0", 10);
         } catch { /* table may not exist */ }
       } else {
+        // feed.error_count is cumulative, not 7-day windowed.
+        // Match GET /source-health threshold logic: >3 = error, >0 = degraded
         errorCount7d = (feed.error_count as number) ?? 0;
       }
 
@@ -651,6 +654,13 @@ router.post("/source-health/snapshot", async (req, res) => {
         sam_gov: process.env.SAM_API_KEY,
         govwin: process.env.GOVWIN_API_KEY,
         govtribe: process.env.GOVTRIBE_API_KEY,
+        govtribe_zapier: process.env.GOVTRIBE_API_KEY,
+      };
+      const envKeyNames: Record<string, string> = {
+        sam_gov: "SAM_API_KEY",
+        govwin: "GOVWIN_API_KEY",
+        govtribe: "GOVTRIBE_API_KEY",
+        govtribe_zapier: "GOVTRIBE_API_KEY",
       };
 
       // Status logic
@@ -665,19 +675,24 @@ router.post("/source-health/snapshot", async (req, res) => {
         statusReason = "Source not yet enabled";
       } else if (src in envKeys && !envKeys[src]) {
         status = "missing_key";
-        statusReason = "API key not configured in environment";
+        statusReason = `API key not configured: set ${envKeyNames[src]} env var`;
       } else if (role === "primary") {
         // Primary source status logic
         const lastSync = feed.last_sync_at ? new Date(feed.last_sync_at as string) : null;
         const hoursSinceSync = lastSync
           ? (Date.now() - lastSync.getTime()) / (1000 * 60 * 60)
           : Infinity;
+        const freshnessThreshold = parseInt(feed.sync_freshness_hours as string, 10) || 36;
 
-        if (errorCount7d > 0 || hoursSinceSync > 36) {
+        if (hoursSinceSync > freshnessThreshold) {
           status = "error";
-          statusReason = hoursSinceSync > 36
-            ? `No sync in ${Math.round(hoursSinceSync)} hours (threshold: 36h)`
-            : `${errorCount7d} errors in last 7 days`;
+          statusReason = `No sync in ${Math.round(hoursSinceSync)} hours (threshold: ${freshnessThreshold}h)`;
+        } else if (errorCount7d > 3) {
+          status = "error";
+          statusReason = `${errorCount7d} cumulative errors (threshold: >3)`;
+        } else if (errorCount7d > 0) {
+          status = "degraded";
+          statusReason = `${errorCount7d} cumulative errors (below error threshold of >3)`;
         } else if (records7d === 0) {
           status = "degraded";
           statusReason = "Sync ran but zero new records in last 7 days — may need investigation";
@@ -708,13 +723,13 @@ router.post("/source-health/snapshot", async (req, res) => {
       if (src === "sam_gov") {
         try {
           const verifyResult = await pool.query(
-            `SELECT status, sam_count, gda_count, gap_pct FROM sam_verification_runs ORDER BY ran_at DESC LIMIT 1`,
+            `SELECT status, sam_count, db_count_before, gap_before_pct FROM sam_verification_runs ORDER BY ran_at DESC LIMIT 1`,
           );
           if (verifyResult.rows[0]) {
-            meta.verify_gap_pct = verifyResult.rows[0].gap_pct;
+            meta.verify_gap_pct = verifyResult.rows[0].gap_before_pct;
             meta.verify_status = verifyResult.rows[0].status;
             meta.verify_sam_count = verifyResult.rows[0].sam_count;
-            meta.verify_gda_count = verifyResult.rows[0].gda_count;
+            meta.verify_gda_count = verifyResult.rows[0].db_count_before;
           }
         } catch { /* sam_verification_runs may not exist */ }
       }

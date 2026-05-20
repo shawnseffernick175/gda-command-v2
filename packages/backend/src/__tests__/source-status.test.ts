@@ -83,6 +83,17 @@ describe("Migration 054: source_health_snapshots + enrichment_call_log", () => {
     expect(migration).toContain("usaspending");
     expect(migration).toContain("fpds");
   });
+
+  it("adds sync_freshness_hours column to gov_source_feeds", () => {
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS sync_freshness_hours");
+    expect(migration).toContain("DEFAULT 36");
+  });
+
+  it("sets GovTribe sync freshness to 96h (twice-weekly cadence)", () => {
+    expect(migration).toContain("SET sync_freshness_hours = 96");
+    expect(migration).toContain("govtribe");
+    expect(migration).toContain("govtribe_zapier");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -132,7 +143,14 @@ describe("POST /api/qa/source-health/snapshot endpoint", () => {
 describe("Primary source status logic", () => {
   it("checks error_count AND sync freshness for primary sources", () => {
     expect(qaRoutes).toContain("hoursSinceSync");
-    expect(qaRoutes).toContain("36");
+    expect(qaRoutes).toContain("freshnessThreshold");
+  });
+
+  it("reads sync_freshness_hours from gov_source_feeds per source", () => {
+    expect(qaRoutes).toContain("sync_freshness_hours");
+    expect(qaRoutes).toContain("freshnessThreshold");
+    // Must read from feed, not use hardcoded 36
+    expect(qaRoutes).toContain("feed.sync_freshness_hours");
   });
 
   it("marks degraded when sync runs but zero records in 7 days", () => {
@@ -140,23 +158,41 @@ describe("Primary source status logic", () => {
     expect(qaRoutes).toContain("zero new records in last 7 days");
   });
 
-  it("marks error when no sync in 36+ hours", () => {
-    expect(qaRoutes).toContain("hoursSinceSync > 36");
-    expect(qaRoutes).toContain("threshold: 36h");
+  it("marks error when sync exceeds per-source threshold", () => {
+    expect(qaRoutes).toContain("hoursSinceSync > freshnessThreshold");
+    expect(qaRoutes).toContain("threshold:");
   });
 
-  it("checks for missing API keys (sam_gov, govwin, govtribe)", () => {
+  it("checks for missing API keys including govtribe_zapier", () => {
     expect(qaRoutes).toContain("SAM_API_KEY");
     expect(qaRoutes).toContain("GOVWIN_API_KEY");
     expect(qaRoutes).toContain("GOVTRIBE_API_KEY");
     expect(qaRoutes).toContain("missing_key");
+    // govtribe_zapier must also be in the envKeys check
+    expect(qaRoutes).toContain("govtribe_zapier: process.env.GOVTRIBE_API_KEY");
   });
 
   it("uses 'in' operator for missing_key check (not !== undefined)", () => {
-    // Devin Review bug: `envKeys[src] !== undefined` fails when env var is unset
-    // because undefined !== undefined is false. Must use `src in envKeys`.
     expect(qaRoutes).toContain("src in envKeys && !envKeys[src]");
     expect(qaRoutes).not.toContain("envKeys[src] !== undefined");
+  });
+
+  it("status reason for missing_key names the specific env var", () => {
+    expect(qaRoutes).toContain("envKeyNames[src]");
+    expect(qaRoutes).toContain("set ${envKeyNames[src]} env var");
+  });
+
+  it("uses graduated error thresholds matching GET endpoint (>3 = error, >0 = degraded)", () => {
+    expect(qaRoutes).toContain("errorCount7d > 3");
+    expect(qaRoutes).toContain("errorCount7d > 0");
+    expect(qaRoutes).toContain("cumulative errors");
+  });
+
+  it("queries sam_verification_runs with correct column names", () => {
+    expect(qaRoutes).toContain("db_count_before");
+    expect(qaRoutes).toContain("gap_before_pct");
+    // Must not query non-existent columns from the table
+    expect(qaRoutes).not.toContain("sam_count, gda_count, gap_pct");
   });
 });
 

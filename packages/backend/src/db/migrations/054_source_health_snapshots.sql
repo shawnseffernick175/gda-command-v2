@@ -36,9 +36,15 @@ CREATE TABLE IF NOT EXISTS enrichment_call_log (
 CREATE INDEX IF NOT EXISTS idx_enrichment_call_log_source_at
   ON enrichment_call_log (source, called_at DESC);
 
--- 3. Add role column to gov_source_feeds
+-- 3. Add role and sync_freshness_hours columns to gov_source_feeds
 ALTER TABLE gov_source_feeds
   ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'primary';
+ALTER TABLE gov_source_feeds
+  ADD COLUMN IF NOT EXISTS sync_freshness_hours INT NOT NULL DEFAULT 36;
 
 -- Set enrichment roles for USAspending and FPDS
 UPDATE gov_source_feeds SET role = 'enrichment' WHERE source IN ('usaspending', 'fpds');
+
+-- Set per-source sync freshness thresholds
+-- GovTribe polls twice weekly (Mon+Thu) → gap up to ~84h, so 96h threshold (25% buffer)
+UPDATE gov_source_feeds SET sync_freshness_hours = 96 WHERE source IN ('govtribe', 'govtribe_zapier');
