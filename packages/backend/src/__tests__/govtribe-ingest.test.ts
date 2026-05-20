@@ -166,81 +166,43 @@ describe("USAspending incumbent fallback — threshold gating", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Mock-based confidence scoring — verifies scoring branch logic
+// Confidence scoring — calls the REAL exported function, not a duplicate
 // ---------------------------------------------------------------------------
 describe("USAspending confidence scoring — branch logic", () => {
-  it("assigns medium confidence when top candidate has >2x score gap", () => {
-    // Simulate the scoring logic from sam-enrichment.ts
-    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
-      if (secondBestScore != null && secondBestScore > 0) {
-        const ratio = bestScore / secondBestScore;
-        if (ratio > 2) return "medium";
-        if (ratio >= 1.2) return "medium";
-        return "low";
-      }
-      return "medium";
-    };
-
-    // >2x gap → medium
+  it("assigns medium confidence when top candidate has >2x score gap", async () => {
+    const { assignConfidence } = await import("../lib/sam-enrichment");
     expect(assignConfidence(10, 4)).toBe("medium");
     expect(assignConfidence(20, 5)).toBe("medium");
   });
 
-  it("assigns medium confidence for 1.2x–2x score gap (distinguishable leader)", () => {
-    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
-      if (secondBestScore != null && secondBestScore > 0) {
-        const ratio = bestScore / secondBestScore;
-        if (ratio > 2) return "medium";
-        if (ratio >= 1.2) return "medium";
-        return "low";
-      }
-      return "medium";
-    };
-
-    // 1.2x–2x gap → medium (this was the missing middle zone)
+  it("assigns medium confidence for 1.2x–2x score gap (distinguishable leader)", async () => {
+    const { assignConfidence } = await import("../lib/sam-enrichment");
     expect(assignConfidence(10, 7)).toBe("medium"); // ratio 1.43
-    expect(assignConfidence(12, 10)).toBe("medium"); // ratio 1.2
+    expect(assignConfidence(12, 10)).toBe("medium"); // ratio 1.2 (boundary)
     expect(assignConfidence(15, 8)).toBe("medium"); // ratio 1.875
   });
 
-  it("assigns low confidence when candidates are within 20% (<1.2x ratio)", () => {
-    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
-      if (secondBestScore != null && secondBestScore > 0) {
-        const ratio = bestScore / secondBestScore;
-        if (ratio > 2) return "medium";
-        if (ratio >= 1.2) return "medium";
-        return "low";
-      }
-      return "medium";
-    };
-
-    // <1.2x gap → low
+  it("assigns low confidence when candidates are within 20% (<1.2x ratio)", async () => {
+    const { assignConfidence } = await import("../lib/sam-enrichment");
     expect(assignConfidence(10, 9)).toBe("low"); // ratio 1.11
     expect(assignConfidence(10, 10)).toBe("low"); // ratio 1.0
     expect(assignConfidence(11, 10)).toBe("low"); // ratio 1.1
   });
 
-  it("assigns medium confidence when only one candidate has a score", () => {
-    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
-      if (secondBestScore != null && secondBestScore > 0) {
-        const ratio = bestScore / secondBestScore;
-        if (ratio > 2) return "medium";
-        if (ratio >= 1.2) return "medium";
-        return "low";
-      }
-      return "medium";
-    };
-
+  it("assigns medium confidence when only one candidate has a score", async () => {
+    const { assignConfidence } = await import("../lib/sam-enrichment");
     expect(assignConfidence(10, null)).toBe("medium");
     expect(assignConfidence(10, 0)).toBe("medium");
   });
 
-  it("uses usaspending_fuzzy_strong for medium and usaspending_fuzzy_weak for low", () => {
-    const assignSource = (confidence: "high" | "medium" | "low") =>
-      confidence === "low" ? "usaspending_fuzzy_weak" : "usaspending_fuzzy_strong";
-
-    expect(assignSource("medium")).toBe("usaspending_fuzzy_strong");
-    expect(assignSource("low")).toBe("usaspending_fuzzy_weak");
+  it("uses usaspending_fuzzy_strong for medium and usaspending_fuzzy_weak for low", async () => {
+    const { assignConfidence } = await import("../lib/sam-enrichment");
+    const medium = assignConfidence(10, 5);
+    const low = assignConfidence(10, 10);
+    const assignSource = (c: "high" | "medium" | "low") =>
+      c === "low" ? "usaspending_fuzzy_weak" : "usaspending_fuzzy_strong";
+    expect(assignSource(medium)).toBe("usaspending_fuzzy_strong");
+    expect(assignSource(low)).toBe("usaspending_fuzzy_weak");
   });
 });
 
@@ -519,5 +481,20 @@ describe("Migration 050+051 — GovTribe Zapier ingest schema", () => {
     expect(content).toContain("usaspending_fuzzy_weak");
     // CHECK constraint should not include usaspending_exact as a valid value
     expect(content).toContain("CHECK (incumbent_source IN ('sam_award', 'usaspending_fuzzy_strong', 'usaspending_fuzzy_weak', 'govtribe_mcp', 'manual'))");
+  });
+
+  it("migration 052 fixes ordering — UPDATEs before ADD CONSTRAINT", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const content = fs.readFileSync(
+      path.join(__dirname, "../db/migrations/052_fix_migration_051_ordering.sql"),
+      "utf8",
+    );
+    // Verify UPDATEs appear BEFORE ADD CONSTRAINT
+    const updateIdx = content.indexOf("UPDATE opportunities SET");
+    const addConstraintIdx = content.indexOf("ALTER TABLE opportunities ADD CONSTRAINT");
+    expect(updateIdx).toBeGreaterThan(-1);
+    expect(addConstraintIdx).toBeGreaterThan(-1);
+    expect(updateIdx).toBeLessThan(addConstraintIdx);
   });
 });
