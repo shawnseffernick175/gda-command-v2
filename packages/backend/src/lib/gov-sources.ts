@@ -1113,14 +1113,20 @@ export async function pollGovTribeMCP(): Promise<GovTribePollResponse> {
             "government_description", "ai_description",
           ];
 
+      const sortForTool = search.tool === "Search_Federal_Contract_Awards"
+        ? { key: "awardDate", direction: "desc" }
+        : search.tool === "Search_Federal_Forecasts"
+        ? undefined
+        : { key: "postedDate", direction: "desc" };
+
       const args: Record<string, unknown> = {
         search_mode: "keyword",
         query,
         fields_to_return: fieldsForTool,
         per_page: 50,
         page: 1,
-        sort: { key: "postedDate", direction: "desc" },
       };
+      if (sortForTool) args.sort = sortForTool;
 
       const text = await callGovTribeMCP(search.tool, args);
       const parsed = JSON.parse(text) as { data?: Record<string, unknown>[]; total?: number };
