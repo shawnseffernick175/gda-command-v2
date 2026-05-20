@@ -84,7 +84,8 @@ jobs:
       - name: Paired migration tests (F-017 harness)
         env:
           DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
-        run: npx vitest run src/db/migrations/__tests__ --config packages/backend/vitest.migration.config.ts
+        working-directory: packages/backend
+        run: npx vitest run --config vitest.migration.config.ts
 
   audit:
     name: Dependency Audit
