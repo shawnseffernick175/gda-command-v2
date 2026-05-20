@@ -250,7 +250,7 @@ export const WEBHOOK_REGISTRY: Record<string, WebhookEntry> = {
     description: "Prompt library management",
   },
 
-  // === LIVE — n8n workflow 5KuF4KZ8uxYcbUN5 (cron every 4h) ===
+  // === LIVE — n8n workflow 5KuF4KZ8uxYcbUN5 (cron Mon + Thu 6am ET) ===
   "govtribe-ingest": {
     path: "govtribe-ingest",
     status: "live",

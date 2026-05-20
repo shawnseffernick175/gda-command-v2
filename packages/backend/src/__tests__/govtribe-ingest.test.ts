@@ -641,9 +641,10 @@ describe("GovTribe credit cap system", () => {
 
   it("credit ledger migration exists", async () => {
     const fs = await import("fs");
-    const path = "src/db/migrations/053_govtribe_credit_ledger.sql";
-    expect(fs.existsSync(path)).toBe(true);
-    const content = fs.readFileSync(path, "utf8");
+    const path = await import("path");
+    const migrationPath = path.join(__dirname, "../db/migrations/053_govtribe_credit_ledger.sql");
+    expect(fs.existsSync(migrationPath)).toBe(true);
+    const content = fs.readFileSync(migrationPath, "utf8");
     expect(content).toContain("govtribe_credit_ledger");
     expect(content).toContain("month_key");
     expect(content).toContain("credits_used");

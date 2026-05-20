@@ -453,7 +453,7 @@ async function callGovTribeMCP(
   if (creditUsage.budgetExceeded) {
     throw new Error(
       `GovTribe credit budget exceeded (${creditUsage.totalCredits}/${creditUsage.budgetLimit} credits). ` +
-      `Reset via /api/govtribe/credits/reset or increase GOVTRIBE_CREDIT_BUDGET.`
+      `Reset via /api/govtribe/credits/reset or increase GOVTRIBE_MONTHLY_CREDIT_CAP.`
     );
   }
 
