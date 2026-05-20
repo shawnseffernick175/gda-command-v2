@@ -6,7 +6,7 @@
  * F-019 additions:
  * - Manifest hash verification (defense in depth)
  * - Provenance recording (commit_sha, applied_by, file_sha256)
- * - MIGRATION_DATABASE_URL support (role separation)
+ * - MIGRATION_DATABASE_URL support (reserved for F-020 role separation)
  * - Break-glass env vars for emergency bypasses
  *
  * Usage: npx tsx src/db/migrate.ts
@@ -18,13 +18,8 @@ import path from "path";
 import crypto from "crypto";
 
 // --- Connection URL resolution ---
-// In production, prefer MIGRATION_DATABASE_URL (gda_migrator role with DDL).
-// Fall back to DATABASE_URL only in dev or when break-glass is active.
-const isProduction = process.env.NODE_ENV === "production";
-const breakGlassAppRole =
-  process.env.MIGRATION_USE_APP_ROLE_FOR_DDL === "true";
-const BREAK_GLASS_FILE = "/etc/gda/break-glass-ddl";
-
+// Prefer MIGRATION_DATABASE_URL when set (reserved for F-020 role separation).
+// Falls back to DATABASE_URL (current default until role separation lands).
 function resolveConnectionUrl(): string {
   const migrationUrl = process.env.MIGRATION_DATABASE_URL?.trim() || null;
   const appUrl =
@@ -32,33 +27,6 @@ function resolveConnectionUrl(): string {
     "postgresql://gda:gda_dev_password@localhost:5432/gda_command";
 
   if (migrationUrl) return migrationUrl;
-
-  if (isProduction && !breakGlassAppRole) {
-    // In production without MIGRATION_DATABASE_URL and without break-glass,
-    // warn but proceed — role separation may not be set up yet (pre-057)
-    process.stderr.write(
-      "[migrate] WARNING: MIGRATION_DATABASE_URL not set in production. " +
-        "Using DATABASE_URL. After migration 057, this will require " +
-        "MIGRATION_USE_APP_ROLE_FOR_DDL=true + break-glass file.\n",
-    );
-    return appUrl;
-  }
-
-  if (breakGlassAppRole) {
-    // Break-glass: env var is set — check for second factor (root-owned file)
-    if (isProduction && !fs.existsSync(BREAK_GLASS_FILE)) {
-      process.stderr.write(
-        `[migrate] FATAL: MIGRATION_USE_APP_ROLE_FOR_DDL=true but ` +
-          `break-glass file ${BREAK_GLASS_FILE} does not exist. ` +
-          `Create it with: sudo touch ${BREAK_GLASS_FILE}\n`,
-      );
-      process.exit(1);
-    }
-    process.stderr.write(
-      `[migrate] ⚠️ BREAK-GLASS ACTIVE: Using app role for DDL. ` +
-        `Env var + file ${BREAK_GLASS_FILE} both present.\n`,
-    );
-  }
 
   return appUrl;
 }

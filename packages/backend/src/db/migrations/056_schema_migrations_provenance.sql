@@ -15,4 +15,4 @@ ALTER TABLE schema_migrations
   ADD COLUMN IF NOT EXISTS file_sha256 TEXT;
 
 -- Backfill existing rows (pre-F-019) with a marker value
-UPDATE schema_migrations SET applied_by = 'unknown (pre-F-019)' WHERE applied_by = current_user AND file_sha256 IS NULL AND name != '056_schema_migrations_provenance.sql';
+UPDATE schema_migrations SET applied_by = 'unknown (pre-F-019)' WHERE file_sha256 IS NULL AND name != '056_schema_migrations_provenance.sql';

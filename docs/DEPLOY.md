@@ -16,43 +16,6 @@ All production deployments follow this path. No exceptions.
 
 Migrations run automatically on container startup via `docker-entrypoint.sh`.
 
-## First Deploy (bootstrapping role separation)
-
-On the **first deploy** of F-019, the `gda_migrator` role does not exist yet.
-Do NOT set `MIGRATION_DATABASE_URL` in `.env` for the first deploy — leave it empty.
-The migration runner will fall back to `DATABASE_URL` (the `gda` role) with a warning.
-Migration 057 creates the roles; after that:
-
-```bash
-# 1. Set passwords for the new roles (as superuser / postgres admin):
-psql "postgresql://gda:PASSWORD@localhost:5432/gda_command"
-ALTER ROLE gda_migrator WITH PASSWORD 'secure_migrator_password';
-ALTER ROLE gda_drift_reader WITH PASSWORD 'secure_reader_password';
-
-# 2. Add MIGRATION_DATABASE_URL to .env:
-MIGRATION_DATABASE_URL=postgresql://gda_migrator:secure_migrator_password@postgres:5432/gda_command
-
-# 3. Restart to verify:
-docker compose -f docker-compose.prod.yml up -d
-docker logs gda-backend --tail 20  # should show "manifest loaded"
-```
-
-All subsequent deploys will use the `gda_migrator` role automatically.
-
-## Role Separation (F-019)
-
-Production Postgres has three roles:
-
-| Role | Purpose | Privileges | Used by |
-|------|---------|------------|---------|
-| `gda` | Application runtime | SELECT, INSERT, UPDATE, DELETE | `DATABASE_URL` |
-| `gda_migrator` | Migration runner | Full DDL + DML | `MIGRATION_DATABASE_URL` |
-| `gda_drift_reader` | Weekly drift check | SELECT on `schema_migrations` only | `DRIFT_DATABASE_URL` (GitHub Actions secret) |
-
-The `gda` role **cannot** CREATE TABLE, ALTER TABLE, or DROP TABLE. This prevents
-any SSH session using application credentials from applying migrations outside the
-canonical deploy path.
-
 ## Manifest Hash Verification
 
 Every migration `.sql` file has a SHA-256 hash recorded in `migration-manifest.json`,
@@ -86,32 +49,13 @@ git push origin main
 # Then redeploy normally (without the skip flag)
 ```
 
-### Role separation bypass
-
-If `MIGRATION_DATABASE_URL` is unavailable or the `gda_migrator` role is locked out:
-
-```bash
-# Requires BOTH factors:
-# 1. Environment variable
-export MIGRATION_USE_APP_ROLE_FOR_DDL=true
-
-# 2. Root-owned file (cannot be created by the app user)
-sudo touch /etc/gda/break-glass-ddl
-
-# Then restart the container
-docker compose -f docker-compose.prod.yml up -d
-
-# After the emergency, remove the break-glass file:
-sudo rm /etc/gda/break-glass-ddl
-```
-
 ### Nuclear option (manual SQL)
 
 If the migration runner itself is broken:
 
 ```bash
-# 1. Connect directly with gda_migrator credentials
-psql "postgresql://gda_migrator:PASSWORD@localhost:5432/gda_command"
+# 1. Connect directly to Postgres
+psql "postgresql://gda:PASSWORD@localhost:5432/gda_command"
 
 # 2. Run the migration SQL manually
 \i /path/to/migration.sql
@@ -124,8 +68,12 @@ VALUES ('NNN_name.sql', 'COMMIT_SHA', current_user, 'FILE_SHA256');
 ## Weekly Drift Check
 
 The `drift-report.yml` GitHub Action runs every Monday at 06:00 UTC. It connects to
-production using the `gda_drift_reader` role (via `DRIFT_DATABASE_URL` GitHub secret)
-and compares `schema_migrations` entries against the migration files on main.
+production using `DRIFT_DATABASE_URL` (a GitHub Actions repository secret) and compares
+`schema_migrations` entries against the migration files on main.
+
+> **Note:** Until F-020 lands (role separation), `DRIFT_DATABASE_URL` uses the `gda`
+> application role credentials. Once F-020 creates `gda_drift_reader` (SELECT-only on
+> `schema_migrations`), the secret should be updated to use that role instead.
 
 **Alerts on:**
 - Migrations in production that don't exist on main (unversioned modification)
@@ -133,15 +81,21 @@ and compares `schema_migrations` entries against the migration files on main.
 
 **Setup:** Add `DRIFT_DATABASE_URL` as a GitHub Actions repository secret:
 ```
-postgresql://gda_drift_reader:PASSWORD@PRODUCTION_HOST:5432/gda_command
+postgresql://gda:PASSWORD@PRODUCTION_HOST:5432/gda_command
 ```
+
+## MIGRATION_DATABASE_URL (reserved for F-020)
+
+The migration runner supports a separate `MIGRATION_DATABASE_URL` env var for role
+separation. This is plumbed but not active until F-020 ships the infrastructure-level
+role demotion. When `MIGRATION_DATABASE_URL` is set, the runner uses it instead of
+`DATABASE_URL`. When unset (current default), it falls back to `DATABASE_URL`.
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | Application Postgres connection (gda role) |
-| `MIGRATION_DATABASE_URL` | After first deploy | Migrator Postgres connection (gda_migrator role). Leave empty on first deploy. |
+| `MIGRATION_DATABASE_URL` | No | Reserved for F-020 role separation. Leave empty until then. |
 | `DEPLOY_COMMIT_SHA` | Auto | Set via Docker build arg from `git rev-parse HEAD` |
 | `MIGRATION_SKIP_MANIFEST_CHECK` | No | Break-glass: bypass manifest hash verification |
-| `MIGRATION_USE_APP_ROLE_FOR_DDL` | No | Break-glass: use app role for DDL (requires file) |

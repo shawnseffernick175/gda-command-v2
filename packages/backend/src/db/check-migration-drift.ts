@@ -2,7 +2,8 @@
  * Migration drift check — compares production schema_migrations against
  * the migration files on main. Reports mismatches.
  *
- * Uses DRIFT_DATABASE_URL (gda_drift_reader role, SELECT-only on schema_migrations).
+ * Uses DRIFT_DATABASE_URL. Currently uses gda app-role credentials;
+ * will switch to gda_drift_reader (SELECT-only) when F-020 lands.
  *
  * Usage: DRIFT_DATABASE_URL=... npx tsx src/db/check-migration-drift.ts
  */

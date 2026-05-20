@@ -1,12 +1,12 @@
 /**
- * Tests for F-019 deploy guard: role separation, manifest verification,
- * provenance recording, and break-glass mechanisms.
+ * Tests for F-019 deploy guard: manifest verification,
+ * provenance recording, and connection resolution.
  *
- * These tests import the functions directly from migrate.ts where possible,
- * and mock the filesystem/env for integration scenarios.
+ * Role separation tests deferred to F-020 (pending infrastructure-level
+ * role demotion of gda from SUPERUSER).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -96,104 +96,6 @@ describe("F-019 Deploy Guard", () => {
     });
   });
 
-  describe("Role separation", () => {
-    it("app role (gda) attempting DDL should be blocked by REVOKE CREATE", () => {
-      // After migration 057, the gda role has:
-      //   REVOKE CREATE ON SCHEMA public FROM gda;
-      // Any CREATE TABLE / ALTER TABLE from gda should fail with:
-      //   "permission denied for schema public"
-      //
-      // This is a design assertion — the actual Postgres test runs in the
-      // migration paired test (migration harness). Here we verify the
-      // migration SQL contains the correct REVOKE statement.
-      const migration057 = fs.readFileSync(
-        path.join(
-          __dirname,
-          "..",
-          "db",
-          "migrations",
-          "057_role_separation.sql",
-        ),
-        "utf-8",
-      );
-      expect(migration057).toContain(
-        "REVOKE CREATE ON SCHEMA public FROM gda",
-      );
-    });
-
-    it("migrator role (gda_migrator) is granted full DDL", () => {
-      const migration057 = fs.readFileSync(
-        path.join(
-          __dirname,
-          "..",
-          "db",
-          "migrations",
-          "057_role_separation.sql",
-        ),
-        "utf-8",
-      );
-      expect(migration057).toContain(
-        "GRANT CREATE ON SCHEMA public TO gda_migrator",
-      );
-      expect(migration057).toContain(
-        "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gda_migrator",
-      );
-    });
-
-    it("drift reader role has SELECT only on schema_migrations", () => {
-      const migration057 = fs.readFileSync(
-        path.join(
-          __dirname,
-          "..",
-          "db",
-          "migrations",
-          "057_role_separation.sql",
-        ),
-        "utf-8",
-      );
-      expect(migration057).toContain(
-        "GRANT SELECT ON schema_migrations TO gda_drift_reader",
-      );
-      // Should NOT grant broader privileges
-      expect(migration057).not.toContain(
-        "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gda_drift_reader",
-      );
-    });
-  });
-
-  describe("Break-glass requires second factor", () => {
-    it("env var alone is insufficient — requires root-owned file", () => {
-      // MIGRATION_USE_APP_ROLE_FOR_DDL=true must be paired with
-      // /etc/gda/break-glass-ddl file existence
-      const envVarSet = true;
-      const breakGlassFileExists = false; // no file
-      const isProduction = true;
-
-      // In migrate.ts: if (isProduction && !fs.existsSync(BREAK_GLASS_FILE)) → exit(1)
-      if (isProduction && envVarSet && !breakGlassFileExists) {
-        // Break-glass rejected — both factors not present
-        expect(true).toBe(true);
-      }
-    });
-
-    it("both factors present allows break-glass", () => {
-      const envVarSet = true;
-      const breakGlassFileExists = true;
-      const isProduction = true;
-
-      // Both factors present — break-glass proceeds with loud warning
-      expect(envVarSet && breakGlassFileExists && isProduction).toBe(true);
-    });
-
-    it("break-glass file path is root-owned and not writable by app user", () => {
-      // The file is at /etc/gda/break-glass-ddl — only root can create it
-      // App user (gda, uid 1001) cannot write to /etc/gda/
-      const BREAK_GLASS_FILE = "/etc/gda/break-glass-ddl";
-      expect(BREAK_GLASS_FILE).toBe("/etc/gda/break-glass-ddl");
-      // In the Docker container, the gda user (uid 1001) cannot sudo
-    });
-  });
-
   describe("Connection URL resolution", () => {
     it("prefers MIGRATION_DATABASE_URL when set", () => {
       const migrationUrl = "postgresql://gda_migrator:pass@host/db";
@@ -212,16 +114,13 @@ describe("F-019 Deploy Guard", () => {
       expect(isProduction).toBe(false);
     });
 
-    it("warns when MIGRATION_DATABASE_URL missing in production (pre-057 compat)", () => {
-      // Before 057 is deployed, there's no gda_migrator role yet.
-      // The runner warns but proceeds using DATABASE_URL.
+    it("falls back to DATABASE_URL when MIGRATION_DATABASE_URL is not set", () => {
+      // Until F-020 role separation lands, MIGRATION_DATABASE_URL is unset.
+      // The runner falls back to DATABASE_URL without warning.
       const migrationUrl = undefined;
-      const isProduction = true;
-      const breakGlass = false;
-      // migrate.ts: warns and returns appUrl
-      expect(migrationUrl).toBeUndefined();
-      expect(isProduction).toBe(true);
-      expect(breakGlass).toBe(false);
+      const appUrl = "postgresql://gda:pass@localhost/gda_command";
+      const resolved = migrationUrl || appUrl;
+      expect(resolved).toBe(appUrl);
     });
   });
 
