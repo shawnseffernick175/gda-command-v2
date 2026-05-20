@@ -10,7 +10,7 @@
     "lint": "eslint src --ext .ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:migrations": "vitest run src/db/migrations/__tests__",
+    "test:migrations": "vitest run --config vitest.migration.config.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/reset.ts",
