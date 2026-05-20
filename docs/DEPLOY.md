@@ -51,6 +51,13 @@ git push origin main
 
 ### Nuclear option (manual SQL)
 
+> **PRECONDITION:** Before using this procedure, confirm the migration file exists
+> on `main` at the commit the production image was built from. If it does not, **STOP**.
+> Merge the file to `main` first, then redeploy. The Nuclear option exists for runner
+> bugs, not for applying unmerged migrations. Use of this procedure is logged via
+> `applied_by = current_user`; the weekly drift check will flag any migration whose
+> hash doesn't match `main` regardless of how it was applied.
+
 If the migration runner itself is broken:
 
 ```bash
