@@ -26,7 +26,7 @@ const breakGlassAppRole =
 const BREAK_GLASS_FILE = "/etc/gda/break-glass-ddl";
 
 function resolveConnectionUrl(): string {
-  const migrationUrl = process.env.MIGRATION_DATABASE_URL;
+  const migrationUrl = process.env.MIGRATION_DATABASE_URL?.trim() || null;
   const appUrl =
     process.env.DATABASE_URL ??
     "postgresql://gda:gda_dev_password@localhost:5432/gda_command";

@@ -19,7 +19,7 @@
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'gda_migrator') THEN
-    CREATE ROLE gda_migrator WITH LOGIN PASSWORD 'CHANGE_ME_ON_DEPLOY';
+    CREATE ROLE gda_migrator WITH LOGIN;
   END IF;
 END
 $$;
@@ -28,7 +28,7 @@ $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'gda_drift_reader') THEN
-    CREATE ROLE gda_drift_reader WITH LOGIN PASSWORD 'CHANGE_ME_ON_DEPLOY';
+    CREATE ROLE gda_drift_reader WITH LOGIN;
   END IF;
 END
 $$;

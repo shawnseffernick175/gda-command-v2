@@ -16,6 +16,29 @@ All production deployments follow this path. No exceptions.
 
 Migrations run automatically on container startup via `docker-entrypoint.sh`.
 
+## First Deploy (bootstrapping role separation)
+
+On the **first deploy** of F-019, the `gda_migrator` role does not exist yet.
+Do NOT set `MIGRATION_DATABASE_URL` in `.env` for the first deploy — leave it empty.
+The migration runner will fall back to `DATABASE_URL` (the `gda` role) with a warning.
+Migration 057 creates the roles; after that:
+
+```bash
+# 1. Set passwords for the new roles (as superuser / postgres admin):
+psql "postgresql://gda:PASSWORD@localhost:5432/gda_command"
+ALTER ROLE gda_migrator WITH PASSWORD 'secure_migrator_password';
+ALTER ROLE gda_drift_reader WITH PASSWORD 'secure_reader_password';
+
+# 2. Add MIGRATION_DATABASE_URL to .env:
+MIGRATION_DATABASE_URL=postgresql://gda_migrator:secure_migrator_password@postgres:5432/gda_command
+
+# 3. Restart to verify:
+docker compose -f docker-compose.prod.yml up -d
+docker logs gda-backend --tail 20  # should show "manifest loaded"
+```
+
+All subsequent deploys will use the `gda_migrator` role automatically.
+
 ## Role Separation (F-019)
 
 Production Postgres has three roles:
@@ -118,8 +141,7 @@ postgresql://gda_drift_reader:PASSWORD@PRODUCTION_HOST:5432/gda_command
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | Application Postgres connection (gda role) |
-| `MIGRATION_DATABASE_URL` | Production | Migrator Postgres connection (gda_migrator role) |
+| `MIGRATION_DATABASE_URL` | After first deploy | Migrator Postgres connection (gda_migrator role). Leave empty on first deploy. |
 | `DEPLOY_COMMIT_SHA` | Auto | Set via Docker build arg from `git rev-parse HEAD` |
 | `MIGRATION_SKIP_MANIFEST_CHECK` | No | Break-glass: bypass manifest hash verification |
 | `MIGRATION_USE_APP_ROLE_FOR_DDL` | No | Break-glass: use app role for DDL (requires file) |
-| `POSTGRES_MIGRATOR_PASSWORD` | Production | Password for gda_migrator role |
