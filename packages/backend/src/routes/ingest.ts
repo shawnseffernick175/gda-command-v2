@@ -917,20 +917,29 @@ router.post("/govtribe", async (req, res) => {
             }
           }
 
-          // Incumbent fields
-          if (result.incumbent) {
-            updates.push(`incumbent = $${paramIdx}`);
-            values.push(result.incumbent);
-            paramIdx++;
-            updates.push(`incumbent_confidence = $${paramIdx}`);
-            values.push(result.incumbent_confidence);
-            paramIdx++;
-            updates.push(`incumbent_source = $${paramIdx}`);
-            values.push(result.incumbent_source);
-            paramIdx++;
-
+          // Incumbent fields — only auto-populate for high/medium confidence.
+          // Low-confidence matches are flagged for manual review, NOT written to incumbent column.
+          if (result.incumbent && result.incumbent_confidence) {
             if (result.incumbent_confidence === "low") {
+              // Flag for review: set confidence/source markers but leave incumbent null
+              updates.push(`incumbent_confidence = $${paramIdx}`);
+              values.push("low");
+              paramIdx++;
+              updates.push(`incumbent_source = $${paramIdx}`);
+              values.push(result.incumbent_source);
+              paramIdx++;
               low_confidence_count++;
+            } else {
+              // High or medium confidence — auto-populate
+              updates.push(`incumbent = $${paramIdx}`);
+              values.push(result.incumbent);
+              paramIdx++;
+              updates.push(`incumbent_confidence = $${paramIdx}`);
+              values.push(result.incumbent_confidence);
+              paramIdx++;
+              updates.push(`incumbent_source = $${paramIdx}`);
+              values.push(result.incumbent_source);
+              paramIdx++;
             }
           }
 
@@ -954,8 +963,10 @@ router.post("/govtribe", async (req, res) => {
         })
       );
 
-      // Auto-trigger Capture Coach
-      queueCaptureCoachIfNeeded(mapped.id);
+      // Auto-trigger Capture Coach (catch to prevent unhandled rejection — F-002 pattern)
+      Promise.resolve(queueCaptureCoachIfNeeded(mapped.id)).catch((e) => {
+        log.warn("govtribe_capture_coach_error", { id: mapped.id, error: (e as Error).message });
+      });
     } catch (e) {
       errors++;
       log.warn("govtribe_ingest_error", { error: (e as Error).message });

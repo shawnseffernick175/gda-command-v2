@@ -51,6 +51,7 @@ export async function enrichFromSAM(opp: {
   agency?: string | null;
   naics?: string | null;
   score?: number;
+  lookbackYears?: number;
 }): Promise<EnrichmentResult> {
   if (!opp.solicitation_number) {
     return { enriched: false, fields: {}, error: "no_solicitation_number" };
@@ -62,14 +63,15 @@ export async function enrichFromSAM(opp: {
 
   try {
     const now = new Date();
-    const fiveYearsAgo = new Date(now);
-    fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+    const lookbackYears = opp.lookbackYears ?? 5;
+    const startDate = new Date(now);
+    startDate.setFullYear(startDate.getFullYear() - lookbackYears);
 
     const toSAMDate = (d: Date) =>
       `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
 
     const result = await searchOpportunities({
-      postedFrom: toSAMDate(fiveYearsAgo),
+      postedFrom: toSAMDate(startDate),
       postedTo: toSAMDate(now),
       solnum: opp.solicitation_number,
       limit: 10,
@@ -177,8 +179,19 @@ export async function enrichIncumbentFromUSAspending(opp: {
   }
 
   try {
-    // Build search parameters from opportunity context
-    const keywords = opp.title.split(/\s+/).slice(0, 5); // First 5 words of title
+    // Build search parameters — extract meaningful keywords, skip stop words
+    const STOP_WORDS = new Set([
+      "the", "for", "and", "of", "to", "in", "a", "an", "is", "at", "by",
+      "on", "with", "from", "this", "that", "are", "was", "will", "be",
+      "contract", "award", "solicitation", "notice", "amendment",
+      "usace", "navsea", "modification", "sources", "sought",
+    ]);
+    const allText = `${opp.title} ${opp.description ?? ""}`;
+    const keywords = allText
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase())
+      .filter((w) => w.length > 3 && !STOP_WORDS.has(w))
+      .slice(0, 8);
     const params: {
       keywords?: string[];
       agencies?: string[];
@@ -240,13 +253,17 @@ export async function enrichIncumbentFromUSAspending(opp: {
     const secondBest = scored.length > 1 ? scored[1] : null;
 
     // Determine confidence based on score gap
+    // Design: >2x gap → medium, 1.2x–2x → medium (distinguishable leader),
+    //         <1.2x → low (ambiguous, flag for review)
     let confidence: "high" | "medium" | "low";
     if (secondBest && secondBest.matchScore > 0) {
       const ratio = best.matchScore / secondBest.matchScore;
       if (ratio > 2) {
         confidence = "medium";
+      } else if (ratio >= 1.2) {
+        confidence = "medium";
       } else {
-        // Multiple candidates score similarly — low confidence, flag for review
+        // Multiple candidates within 20% — low confidence, flag for review
         confidence = "low";
       }
     } else {
@@ -267,7 +284,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     return {
       incumbent: recipientName,
       incumbent_confidence: confidence,
-      incumbent_source: "usaspending_fuzzy",
+      incumbent_source: confidence === "low" ? "usaspending_fuzzy_weak" : "usaspending_fuzzy_strong",
     };
   } catch (e) {
     log.warn("usaspending_incumbent_error", { error: (e as Error).message });
