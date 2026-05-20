@@ -88,14 +88,55 @@ providing seed data that matches the schema at that migration's point in history
 
 ## Reference tests
 
-See the three initial paired tests for examples:
+See paired tests for examples:
 
+- `009_capture_stage.test.ts` — UPDATE opportunities with status→stage mapping
+- `010_opp_data_source.test.ts` — UPDATE opportunities with URL-based classification
+- `027_remove_mock_data.test.ts` — DELETE mock data by ID pattern, preserve real data
+- `028_fix_mock_data_patterns.test.ts` — DELETE mock data by corrected prefixes, adversarial rows
 - `045_rename_duplicate_migrations.test.ts` — DELETE from schema_migrations
+- `047_gov_source_deprecation.test.ts` — UPDATE gov_source_feeds to deprecate feeds
 - `048_cleanup_fake_dibbs_records.test.ts` — DELETE from opportunities + FK tables
 - `049_reverse_govtribe_deprecation.test.ts` — UPDATE gov_source_feeds
+- `052_fix_migration_051_ordering.test.ts` — UPDATE + ADD CONSTRAINT ordering fix
 
 Each test includes a doc comment explaining what break would be induced to
 verify the test catches regressions.
+
+## Migration audit (F-018)
+
+All 55 migrations have been audited. The following are **state-dependent**
+(they modify existing data, not just schema):
+
+| Migration | Operation | Has test? |
+|-----------|-----------|-----------|
+| 009_capture_stage | UPDATE opps status→stage | ✅ |
+| 010_opp_data_source | UPDATE opps URL→data_source | ✅ |
+| 018_fix_bot_glossary_and_sources_columns | UPDATE bot_glossary/bot_sources | ⚠️ low risk — populates columns added in same migration |
+| 023_rename_backlog_kpi | UPDATE single KPI label | ⚠️ low risk — single-row rename |
+| 027_remove_mock_data | DELETE mock rows by ID pattern | ✅ |
+| 028_fix_mock_data_patterns | DELETE mock rows by corrected ID patterns (CON-, APR-, RPT-, CR-) | ✅ |
+| 029_q1_2026_financial_kpis | UPDATE financial KPIs with real data | ⚠️ low risk — seed data override |
+| 045_rename_duplicate_migrations | DELETE from schema_migrations | ✅ |
+| 047_gov_source_deprecation | UPDATE gov_source_feeds | ✅ |
+| 048_cleanup_fake_dibbs_records | DELETE fake DIBBS records | ✅ |
+| 049_reverse_govtribe_deprecation | UPDATE gov_source_feeds | ✅ |
+| 051_fix_incumbent_source_constraint | UPDATE + ADD CONSTRAINT (buggy order) | covered by 052 |
+| 052_fix_migration_051_ordering | UPDATE + ADD CONSTRAINT (fixed) | ✅ |
+| 054_source_health_snapshots | UPDATE gov_source_feeds roles | ⚠️ low risk — config update |
+| 055_govwin_wsapi_integration | UPDATE gov_source_feeds for govwin | ⚠️ low risk — config update |
+
+**Not state-dependent** (excluded from audit):
+- Pure DDL: 001-008, 011-015, 019-022, 025-026, 031-033, 035-036,
+  036b, 037-040, 040b, 041-042, 046, 050, 053
+- Trigger DDL: 034 (versioning), 043 (fix triggers)
+- Idempotent upserts: 030 (monthly financials), 050 (ON CONFLICT DO UPDATE)
+- Extension management: 004, 039b (pgvector)
+- Seed-only: 016, 017, 019, 024, 038b, 044
+
+Migrations marked ⚠️ are low-risk state operations (single-row renames,
+config updates, or same-migration column population) that don't warrant
+paired tests. If any of these become incident-relevant, add a test then.
 
 ## Infrastructure
 
@@ -105,9 +146,3 @@ docker-compose). Each test creates an ephemeral database with a unique name
 
 This avoids Docker-in-Docker complexity and testcontainers overhead while still
 testing against real Postgres behavior (constraints, plpgsql, etc.).
-
-## Future: F-018
-
-F-018 will audit all existing migrations for unmarked state dependencies.
-Once that audit is complete, CI can enforce that every flagged migration has
-a corresponding paired test file.
