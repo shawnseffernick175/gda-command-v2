@@ -17,6 +17,7 @@ import { enrichOpportunity } from "../lib/sam-enrichment";
 import { pollGovTribeMCP } from "../lib/gov-sources";
 import { pollGovWin } from "../lib/govwin-client";
 import type { GovWinOpportunity } from "../lib/govwin-client";
+import { createConcurrencyLimiter, ENRICHMENT_CONCURRENCY } from "../lib/concurrency";
 
 const router = Router();
 
@@ -850,6 +851,7 @@ router.post("/govtribe", async (req, res) => {
   let low_confidence_count = 0;
   let errors = 0;
   const enrichmentPromises: Promise<void>[] = [];
+  const limitEnrichment = createConcurrencyLimiter(ENRICHMENT_CONCURRENCY);
 
   for (const raw of rawItems) {
     try {
@@ -900,11 +902,11 @@ router.post("/govtribe", async (req, res) => {
 
       // Auto-enrich via SAM cross-reference — awaited before response
       enrichmentPromises.push(
-        enrichOpportunity({
+        limitEnrichment(() => enrichOpportunity({
           solicitation_number: mapped.solicitation_number,
           title: mapped.title,
           description: mapped.description,
-        }).then(async (result) => {
+        })).then(async (result) => {
           if (!result.enriched) return;
 
           const updates: string[] = [];
@@ -1061,6 +1063,7 @@ router.post("/govtribe/poll", async (req, res) => {
     let low_confidence_count = 0;
     let errors = 0;
     const enrichmentPromises: Promise<void>[] = [];
+    const limitEnrichment = createConcurrencyLimiter(ENRICHMENT_CONCURRENCY);
 
     for (const raw of pollResult.results) {
       try {
@@ -1108,11 +1111,11 @@ router.post("/govtribe/poll", async (req, res) => {
         upserted++;
 
         enrichmentPromises.push(
-          enrichOpportunity({
+          limitEnrichment(() => enrichOpportunity({
             solicitation_number: mapped.solicitation_number,
             title: mapped.title,
             description: mapped.description,
-          }).then(async (result) => {
+          })).then(async (result) => {
             if (!result.enriched) return;
 
             const updates: string[] = [];
@@ -1296,6 +1299,7 @@ router.post("/govwin/poll", async (req, res) => {
     let low_confidence_count = 0;
     let errors = 0;
     const enrichmentPromises: Promise<void>[] = [];
+    const limitEnrichment = createConcurrencyLimiter(ENRICHMENT_CONCURRENCY);
 
     for (const raw of pollResult.results) {
       try {
@@ -1335,11 +1339,11 @@ router.post("/govwin/poll", async (req, res) => {
 
         // SAM + USAspending enrichment (same pattern as GovTribe)
         enrichmentPromises.push(
-          enrichOpportunity({
+          limitEnrichment(() => enrichOpportunity({
             solicitation_number: mapped.solicitation_number,
             title: mapped.title,
             description: mapped.description,
-          }).then(async (result) => {
+          })).then(async (result) => {
             if (!result.enriched) return;
 
             const updates: string[] = [];

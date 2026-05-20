@@ -706,9 +706,12 @@ router.post("/source-health/snapshot", async (req, res) => {
         }
       } else {
         // Enrichment source status logic
-        if (errorCount7d > 0 && calls7d > 0 && errorCount7d / calls7d > 0.5) {
+        if (errorCount7d > 0 && calls7d > 0 && errorCount7d / calls7d > 0.25) {
           status = "error";
-          statusReason = `${errorCount7d}/${calls7d} calls failed in last 7 days (>${Math.round(50)}% failure rate)`;
+          statusReason = `${errorCount7d}/${calls7d} calls failed in last 7 days (>25% failure rate)`;
+        } else if (errorCount7d > 0 && calls7d > 0 && errorCount7d / calls7d > 0.05) {
+          status = "degraded";
+          statusReason = `${errorCount7d}/${calls7d} calls failed in last 7 days (>5% failure rate)`;
         } else if (errorCount7d > 0) {
           status = "degraded";
           statusReason = `${errorCount7d} failed calls in last 7 days (${calls7d} total)`;

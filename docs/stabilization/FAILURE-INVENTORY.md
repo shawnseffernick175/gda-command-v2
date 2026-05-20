@@ -29,7 +29,7 @@ Sources examined:
 | F-003 | Every deploy | P1 | Migration 028 FK delete ordering | **Fixed** (PR #211) |
 | F-004 | Every 6h | P1 | SAM sync upserts fail on empty timestamps — 13-17 records lost per cycle | **Fixed** (PRs #218, #220, #222, #223 — mapper fix + backfill + automated verify + QA Center) |
 | F-005 | Every 6h | P1 | GovTribe/DIBBS API fetch fails — old REST API dead, MCP path rebuilt | **Fixed** (PR #228 DIBBS, PR #230 reversal, PR #231 MCP integration) |
-| F-006 | Every 6h | P1 | GovWin API returns HTML instead of JSON | Open |
+| F-006 | Every 6h | P1 | GovWin API returns HTML instead of JSON | **Fixed** (PR #240 — WSAPI OAuth2 integration, PR #241 — qa.ts envKeys fix) |
 | F-007 | On user action | P1 | Sidebar search crashes on undefined `.type` field | **Fixed** (PR #206) |
 | F-008 | On user action | P1 | LLM calls hang forever — no timeout, chat freezes | **Fixed** (PR #194) |
 | F-009 | On every write | P1 | Versioning triggers fire 3× per write (dedup masks it) | **Fixed in audit** (PR #208) |
@@ -269,3 +269,14 @@ These were fixed in previous PRs but should be verified on production:
 | F-009 (Triple triggers) | PR #208 | Needs verification |
 | F-012 (Silent catch blocks) | PR #208 | Needs verification |
 | F-013 (DB readiness) | PR #213 | Yes — logs show `db_ready` |
+
+---
+
+## Follow-up Items (Non-blocking)
+
+| Item | Description | Status |
+|------|-------------|--------|
+| Enrichment concurrency cap | GovWin + GovTribe polls fan out unbounded parallel SAM/USAspending lookups. Added `createConcurrencyLimiter(5)` to cap at 5 concurrent enrichment calls. | **Done** |
+| Source Status behavior tests | Mock DB states to assert snapshot status output. 27 behavior tests covering primary, enrichment, and overall status logic. | **Done** |
+| Enrichment error threshold | Tightened from 50% to 25% (error) with new 5% degraded tier. | **Done** |
+| Tier 2 on-demand MCP | GovWin vendor profiles, market intel, agency briefs available via WSAPI but not yet integrated. Track as Tier 2 follow-up once primary opportunity pipeline is validated in production. | Open |
