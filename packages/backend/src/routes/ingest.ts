@@ -15,6 +15,8 @@ import { notify } from "../lib/email";
 import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
 import { enrichOpportunity } from "../lib/sam-enrichment";
 import { pollGovTribeMCP } from "../lib/gov-sources";
+import { pollGovWin } from "../lib/govwin-client";
+import type { GovWinOpportunity } from "../lib/govwin-client";
 
 const router = Router();
 
@@ -1222,6 +1224,289 @@ function mapOpportunityType(type?: string): string {
   if (lower.includes("pre-solicitation") || lower.includes("presolicitation")) return "discovery";
   if (lower.includes("sources sought") || lower.includes("rfi")) return "discovery";
   if (lower.includes("solicitation") || lower.includes("rfp") || lower.includes("rfq")) return "qualified";
+  return "discovery";
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/govwin/poll — GovWin WSAPI poll (F-006)
+// Daily 6am ET via n8n cron or manual trigger. Fetches OPP+TNS opportunities
+// from services.govwin.com/neo-ws, deduplicates via updateDate, upserts to
+// opportunities table with data_source = 'govwin'. SAM + USAspending enrichment.
+// ---------------------------------------------------------------------------
+router.post("/govwin/poll", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "govwin-poll", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+
+  const startTime = Date.now();
+
+  try {
+    const pollResult = await pollGovWin();
+
+    // If poll was blocked by rate limit, return immediately
+    if (pollResult.blocked) {
+      return res.status(429).json(successEnvelope("gda-ingest", "govwin-poll", {
+        upserted: 0,
+        enriched: 0,
+        low_confidence_flagged: 0,
+        errors: 0,
+        total: 0,
+        searchSummary: pollResult.searchSummary,
+        blocked: pollResult.blocked,
+        rateLimit: pollResult.rateLimit,
+        durationMs: Date.now() - startTime,
+        timestamp: pollResult.timestamp,
+      }));
+    }
+
+    if (pollResult.totalFetched === 0) {
+      // Update feed sync timestamp even if nothing new
+      try {
+        await pool.query(`
+          UPDATE gov_source_feeds SET last_sync_at = NOW(), last_sync_count = 0,
+            error_count = 0, updated_at = NOW()
+          WHERE source = 'govwin'
+        `);
+      } catch (e) {
+        log.warn("govwin_poll_feed_update_error", { error: (e as Error).message });
+      }
+
+      return res.json(successEnvelope("gda-ingest", "govwin-poll", {
+        upserted: 0,
+        enriched: 0,
+        low_confidence_flagged: 0,
+        errors: 0,
+        total: 0,
+        skippedUnchanged: pollResult.totalSkippedUnchanged,
+        searchSummary: pollResult.searchSummary,
+        rateLimit: pollResult.rateLimit,
+        durationMs: Date.now() - startTime,
+        timestamp: pollResult.timestamp,
+      }));
+    }
+
+    // Ingest pipeline: upsert + enrichment
+    let upserted = 0;
+    let enriched_count = 0;
+    let low_confidence_count = 0;
+    let errors = 0;
+    const enrichmentPromises: Promise<void>[] = [];
+
+    for (const raw of pollResult.results) {
+      try {
+        const mapped = mapGovWinOpportunity(raw);
+        if (!mapped.id) {
+          errors++;
+          continue;
+        }
+
+        await pool.query(`
+          INSERT INTO opportunities (id, title, status, solicitation_number,
+            set_aside, due_date, description, agency,
+            naics, value_estimated, raw_source_url,
+            data_source, govwin_update_date, created_at, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          ON CONFLICT (id) DO UPDATE SET
+            title = EXCLUDED.title,
+            solicitation_number = COALESCE(EXCLUDED.solicitation_number, opportunities.solicitation_number),
+            set_aside = COALESCE(EXCLUDED.set_aside, opportunities.set_aside),
+            due_date = COALESCE(EXCLUDED.due_date, opportunities.due_date),
+            description = COALESCE(EXCLUDED.description, opportunities.description),
+            agency = COALESCE(EXCLUDED.agency, opportunities.agency),
+            naics = COALESCE(EXCLUDED.naics, opportunities.naics),
+            value_estimated = COALESCE(EXCLUDED.value_estimated, opportunities.value_estimated),
+            raw_source_url = COALESCE(EXCLUDED.raw_source_url, opportunities.raw_source_url),
+            data_source = EXCLUDED.data_source,
+            govwin_update_date = EXCLUDED.govwin_update_date,
+            updated_at = NOW()
+        `, [
+          mapped.id, mapped.title, mapped.status, mapped.solicitation_number,
+          mapped.set_aside, mapped.due_date, mapped.description, mapped.agency,
+          mapped.naics, mapped.value_estimated, mapped.raw_source_url,
+          mapped.data_source, mapped.govwin_update_date,
+          mapped.created_at, mapped.updated_at,
+        ]);
+        upserted++;
+
+        // SAM + USAspending enrichment (same pattern as GovTribe)
+        enrichmentPromises.push(
+          enrichOpportunity({
+            solicitation_number: mapped.solicitation_number,
+            title: mapped.title,
+            description: mapped.description,
+          }).then(async (result) => {
+            if (!result.enriched) return;
+
+            const updates: string[] = [];
+            const values: unknown[] = [];
+            let paramIdx = 1;
+
+            for (const [key, val] of Object.entries(result.fields)) {
+              if (val != null) {
+                updates.push(`${key} = COALESCE($${paramIdx}, ${key})`);
+                values.push(val);
+                paramIdx++;
+              }
+            }
+
+            if (result.incumbent && result.incumbent_confidence) {
+              if (result.incumbent_confidence === "low") {
+                updates.push(`incumbent_confidence = $${paramIdx}`);
+                values.push("low");
+                paramIdx++;
+                updates.push(`incumbent_source = $${paramIdx}`);
+                values.push(result.incumbent_source);
+                paramIdx++;
+                low_confidence_count++;
+              } else {
+                updates.push(`incumbent = $${paramIdx}`);
+                values.push(result.incumbent);
+                paramIdx++;
+                updates.push(`incumbent_confidence = $${paramIdx}`);
+                values.push(result.incumbent_confidence);
+                paramIdx++;
+                updates.push(`incumbent_source = $${paramIdx}`);
+                values.push(result.incumbent_source);
+                paramIdx++;
+              }
+            }
+
+            if (updates.length > 0) {
+              values.push(mapped.id);
+              await pool.query(
+                `UPDATE opportunities SET ${updates.join(", ")}, updated_at = NOW() WHERE id = $${paramIdx}`,
+                values,
+              );
+              enriched_count++;
+            }
+          }).catch((e) => {
+            log.warn("govwin_poll_enrichment_error", { id: mapped.id, error: (e as Error).message });
+          })
+        );
+
+        Promise.resolve(queueCaptureCoachIfNeeded(mapped.id)).catch((e) => {
+          log.warn("govwin_poll_capture_coach_error", { id: mapped.id, error: (e as Error).message });
+        });
+      } catch (e) {
+        errors++;
+        log.warn("govwin_poll_ingest_error", { error: (e as Error).message });
+      }
+    }
+
+    await Promise.allSettled(enrichmentPromises);
+
+    // Update feed sync stats
+    try {
+      await pool.query(`
+        UPDATE gov_source_feeds SET
+          last_sync_at = NOW(),
+          last_sync_count = $1,
+          error_count = CASE WHEN $2 > 0 THEN error_count + 1 ELSE 0 END,
+          updated_at = NOW()
+        WHERE source = 'govwin'
+      `, [upserted, errors]);
+    } catch (e) {
+      log.warn("govwin_poll_feed_update_error", { error: (e as Error).message });
+    }
+
+    // Cleanup old call log entries (>7 days)
+    try {
+      await pool.query("DELETE FROM govwin_call_log WHERE called_at < NOW() - INTERVAL '7 days'");
+    } catch {
+      // non-critical
+    }
+
+    log.info("govwin_poll_complete", {
+      upserted,
+      enriched: enriched_count,
+      low_confidence_flagged: low_confidence_count,
+      errors,
+      total: pollResult.totalFetched,
+      skippedUnchanged: pollResult.totalSkippedUnchanged,
+      durationMs: Date.now() - startTime,
+    });
+
+    res.json(successEnvelope("gda-ingest", "govwin-poll", {
+      upserted,
+      enriched: enriched_count,
+      low_confidence_flagged: low_confidence_count,
+      errors,
+      total: pollResult.totalFetched,
+      skippedUnchanged: pollResult.totalSkippedUnchanged,
+      searchSummary: pollResult.searchSummary,
+      rateLimit: pollResult.rateLimit,
+      durationMs: Date.now() - startTime,
+      timestamp: pollResult.timestamp,
+    }));
+  } catch (e) {
+    log.error("govwin_poll_fatal", { error: (e as Error).message });
+    res.status(500).json(errorEnvelope("gda-ingest", "govwin-poll", {
+      code: "POLL_ERROR",
+      message: (e as Error).message,
+      detail: null,
+    }));
+  }
+});
+
+/** Map GovWin WSAPI opportunity to GDA schema */
+export function mapGovWinOpportunity(raw: GovWinOpportunity): {
+  id: string;
+  title: string;
+  status: string;
+  solicitation_number: string | null;
+  set_aside: string | null;
+  due_date: string | null;
+  description: string | null;
+  agency: string | null;
+  naics: string | null;
+  value_estimated: number | null;
+  raw_source_url: string | null;
+  data_source: string;
+  govwin_update_date: string | null;
+  created_at: string;
+  updated_at: string;
+} {
+  // oppValue is in thousands per API docs — multiply by 1,000
+  let valueEstimated: number | null = null;
+  if (raw.oppValue) {
+    const parsed = parseFloat(raw.oppValue);
+    if (Number.isFinite(parsed)) valueEstimated = parsed * 1000;
+  }
+
+  return {
+    id: `govwin-${raw.id}`,
+    title: raw.title ?? "Untitled",
+    status: mapGovWinStatus(raw.status),
+    solicitation_number: raw.solicitationNumber ?? null,
+    set_aside: raw.competitionTypes?.map(c => c.title).join(", ") ?? null,
+    due_date: raw.solicitationDate?.value ?? null,
+    description: raw.description ?? null,
+    agency: raw.govEntity?.title ?? null,
+    naics: raw.primaryNAICS?.title ?? null,
+    value_estimated: valueEstimated,
+    raw_source_url: raw.sourceURL ?? (raw.links?.webHref
+      ? `https://iq.govwin.com/neo/opportunity/view/${raw.iqOppId}`
+      : null),
+    data_source: "govwin",
+    govwin_update_date: raw.updateDate ?? null,
+    created_at: raw.createdDate ?? new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+/** Map GovWin status to GDA pipeline status */
+export function mapGovWinStatus(status?: string): string {
+  if (!status) return "discovery";
+  const lower = status.toLowerCase();
+  if (lower.includes("awarded") || lower.includes("won")) return "won";
+  if (lower.includes("cancelled") || lower.includes("canceled") || lower.includes("closed")) return "lost";
+  if (lower.includes("pre-rfp") || lower.includes("forecasted")) return "discovery";
+  if (lower.includes("rfp") || lower.includes("solicitation")) return "qualified";
   return "discovery";
 }
 

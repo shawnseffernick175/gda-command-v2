@@ -63,8 +63,14 @@ router.get("/", async (_req, res) => {
     },
     {
       name: "GovWin IQ",
-      configured: !!process.env.GOVWIN_API_KEY,
-      missing: process.env.GOVWIN_API_KEY ? [] : ["GOVWIN_API_KEY"],
+      configured: !!process.env.GOVWIN_CLIENT_ID && !!process.env.GOVWIN_CLIENT_SECRET &&
+                  !!process.env.GOVWIN_USERNAME && !!process.env.GOVWIN_PASSWORD,
+      missing: [
+        ...(!process.env.GOVWIN_CLIENT_ID ? ["GOVWIN_CLIENT_ID"] : []),
+        ...(!process.env.GOVWIN_CLIENT_SECRET ? ["GOVWIN_CLIENT_SECRET"] : []),
+        ...(!process.env.GOVWIN_USERNAME ? ["GOVWIN_USERNAME"] : []),
+        ...(!process.env.GOVWIN_PASSWORD ? ["GOVWIN_PASSWORD"] : []),
+      ],
     },
     {
       name: "GovTribe",

@@ -104,12 +104,14 @@ describe("F-006: content-type validation for gov source APIs", () => {
     expect(govSources).toContain('contentType.includes("text/html")');
   });
 
-  it("GovWin fetch calls validateJsonResponse before parsing", () => {
+  it("GovWin now uses WSAPI client (govwin-client.ts) with OAuth2", () => {
+    // The old fetchGovWinOpportunities is a stub that defers to the poll endpoint.
+    // The real WSAPI client validates JSON content-type in govwin-client.ts.
     const govwinBlock = govSources.slice(
       govSources.indexOf("fetchGovWinOpportunities"),
       govSources.indexOf("syncGovSources"),
     );
-    expect(govwinBlock).toContain("validateJsonResponse(resp");
+    expect(govwinBlock).toContain("POST /api/ingest/govwin/poll");
   });
 });
 

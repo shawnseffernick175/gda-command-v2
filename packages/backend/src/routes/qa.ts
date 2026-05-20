@@ -366,14 +366,15 @@ router.get("/source-health", async (_req, res) => {
     // Check for missing API keys
     const envKeys: Record<string, string | undefined> = {
       sam_gov: process.env.SAM_API_KEY,
-      govwin: process.env.GOVWIN_API_KEY,
+      govwin: process.env.GOVWIN_CLIENT_ID,
       govtribe: process.env.GOVTRIBE_API_KEY,
+      govtribe_zapier: process.env.GOVTRIBE_API_KEY,
     };
 
     const sources = rows.map((r: Record<string, unknown>) => {
       const apiKeyName = r.source === "sam_gov" ? "SAM_API_KEY"
-        : r.source === "govwin" ? "GOVWIN_API_KEY"
-        : r.source === "govtribe" ? "GOVTRIBE_API_KEY"
+        : r.source === "govwin" ? "GOVWIN_CLIENT_ID"
+        : r.source === "govtribe" || r.source === "govtribe_zapier" ? "GOVTRIBE_API_KEY"
         : null;
 
       let status: string;
@@ -652,13 +653,13 @@ router.post("/source-health/snapshot", async (req, res) => {
       // Check for missing API keys
       const envKeys: Record<string, string | undefined> = {
         sam_gov: process.env.SAM_API_KEY,
-        govwin: process.env.GOVWIN_API_KEY,
+        govwin: process.env.GOVWIN_CLIENT_ID,
         govtribe: process.env.GOVTRIBE_API_KEY,
         govtribe_zapier: process.env.GOVTRIBE_API_KEY,
       };
       const envKeyNames: Record<string, string> = {
         sam_gov: "SAM_API_KEY",
-        govwin: "GOVWIN_API_KEY",
+        govwin: "GOVWIN_CLIENT_ID",
         govtribe: "GOVTRIBE_API_KEY",
         govtribe_zapier: "GOVTRIBE_API_KEY",
       };
