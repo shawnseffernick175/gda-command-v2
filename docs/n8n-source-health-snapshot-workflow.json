@@ -1,0 +1,80 @@
+{
+  "name": "GDA.qa.source-health-snapshot",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 11 * * *"
+            }
+          ]
+        }
+      },
+      "id": "sh-cron",
+      "name": "Daily 7am ET",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "path": "source-health-snapshot-trigger",
+        "responseMode": "lastNode",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "id": "sh-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 500],
+      "webhookId": "source-health-snapshot-trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GDA_BASE_URL }}/api/qa/source-health/snapshot",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "sh-call",
+      "name": "POST Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "USE_YOUR_GDA_WEBHOOK_AUTH_CREDENTIAL_ID",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 7am ET": {
+      "main": [
+        [{ "node": "POST Snapshot", "type": "main", "index": 0 }]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [{ "node": "POST Snapshot", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Daily source health snapshot — queries each gov data source's current state and writes to source_health_snapshots table. Runs at 7am ET (11:00 UTC). Manual trigger available at /webhook/source-health-snapshot-trigger."
+  }
+}

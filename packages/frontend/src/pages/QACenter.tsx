@@ -16,6 +16,7 @@ import {
   type SAMVerifyRun,
   type SourceHealthData,
   type SourceHealthItem,
+  type SourceHealthSnapshot,
 } from "../api/client";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -150,6 +151,8 @@ export default function QACenter() {
           </span>
         )}
       </div>
+
+      {sourceHealth && <SourceStatusStrip data={sourceHealth} />}
 
       {health && <HealthPanel health={health} />}
 
@@ -889,6 +892,191 @@ const tdStyle: React.CSSProperties = {
   padding: "10px 12px",
   borderBottom: "1px solid var(--color-border)",
 };
+
+// ---------------------------------------------------------------------------
+// Source Status Strip — top-level overview of all opportunity trackers
+// ---------------------------------------------------------------------------
+const SOURCE_DISPLAY: Record<string, { label: string; roleLabel: string }> = {
+  sam_gov: { label: "SAM.gov", roleLabel: "Primary Discovery" },
+  usaspending: { label: "USAspending", roleLabel: "Enrichment" },
+  fpds: { label: "FPDS", roleLabel: "Enrichment" },
+  govtribe: { label: "GovTribe", roleLabel: "Primary Discovery" },
+  govtribe_zapier: { label: "GovTribe", roleLabel: "Primary Discovery" },
+  govwin: { label: "GovWin", roleLabel: "Primary Discovery" },
+};
+
+const OVERALL_STATUS_CONFIG: Record<string, { bg: string; color: string; label: string }> = {
+  all_healthy: { bg: "rgba(34,197,94,0.15)", color: "#22c55e", label: "All Sources Healthy" },
+  degraded: { bg: "rgba(245,158,11,0.15)", color: "#f59e0b", label: "Sources Degraded" },
+  critical: { bg: "rgba(239,68,68,0.15)", color: "#ef4444", label: "Sources Critical" },
+  unknown: { bg: "rgba(107,114,128,0.15)", color: "#6b7280", label: "No Snapshot Data" },
+};
+
+const STRIP_STATUS_COLORS: Record<string, string> = {
+  healthy: "#22c55e",
+  degraded: "#f59e0b",
+  error: "#ef4444",
+  deprecated: "#6b7280",
+  planned: "#9ca3af",
+  missing_key: "#f97316",
+};
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return "Never";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function SourceStatusStrip({ data }: { data: SourceHealthData }) {
+  const snapshots = data.latest_snapshots ?? [];
+  const overallStatus = data.overall_status ?? "unknown";
+  const config = OVERALL_STATUS_CONFIG[overallStatus] ?? OVERALL_STATUS_CONFIG.unknown;
+
+  // Merge snapshots with source feed data to show 5 cards
+  // Collapse govtribe + govtribe_zapier into one "GovTribe" card
+  const displaySources = ["sam_gov", "usaspending", "fpds", "govtribe", "govwin"];
+
+  const cardData = displaySources.map((src) => {
+    // For govtribe, prefer govtribe_zapier snapshot if available
+    const snap = snapshots.find((s: SourceHealthSnapshot) =>
+      src === "govtribe"
+        ? (s.source === "govtribe_zapier" || s.source === "govtribe")
+        : s.source === src,
+    );
+    const feed = data.sources.find((s: SourceHealthItem) =>
+      src === "govtribe"
+        ? (s.source === "govtribe_zapier" || s.source === "govtribe")
+        : s.source === src,
+    );
+    const display = SOURCE_DISPLAY[src] ?? { label: src, roleLabel: "Unknown" };
+
+    return {
+      source: src,
+      label: display.label,
+      roleLabel: snap?.role === "enrichment" ? "Enrichment" : display.roleLabel,
+      status: snap?.status ?? feed?.status ?? "planned",
+      lastRecordAt: snap?.last_record_at ?? feed?.last_sync_at ?? null,
+      recordsThisWeek: snap?.records_last_7d ?? null,
+      callsThisWeek: snap?.calls_last_7d ?? null,
+      role: snap?.role ?? (["usaspending", "fpds"].includes(src) ? "enrichment" : "primary"),
+      statusReason: snap?.status_reason ?? null,
+      meta: snap?.meta ?? {},
+    };
+  });
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      {/* Overall status pill */}
+      <div style={{ marginBottom: 12 }}>
+        <span style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 14px",
+          borderRadius: 20,
+          background: config.bg,
+          color: config.color,
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: config.color }} />
+          {config.label}
+        </span>
+      </div>
+
+      {/* Source cards */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(5, 1fr)",
+        gap: 12,
+      }}>
+        {cardData.map((card) => (
+          <SourceCard key={card.source} card={card} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SourceCard({ card }: {
+  card: {
+    source: string;
+    label: string;
+    roleLabel: string;
+    status: string;
+    lastRecordAt: string | null;
+    recordsThisWeek: number | null;
+    callsThisWeek: number | null;
+    role: string;
+    statusReason: string | null;
+    meta: Record<string, unknown>;
+  };
+}) {
+  const dotColor = STRIP_STATUS_COLORS[card.status] ?? "#6b7280";
+
+  return (
+    <div style={{
+      background: "var(--color-surface)",
+      border: "1px solid var(--color-border)",
+      borderRadius: 8,
+      padding: "14px 16px",
+      position: "relative",
+      minHeight: 100,
+    }}>
+      {/* Status dot — top right */}
+      <span style={{
+        position: "absolute",
+        top: 12,
+        right: 12,
+        width: 10,
+        height: 10,
+        borderRadius: "50%",
+        background: dotColor,
+        boxShadow: card.status === "error" ? `0 0 6px ${dotColor}` : undefined,
+      }} />
+
+      {/* Source name */}
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{card.label}</div>
+      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginBottom: 10 }}>{card.roleLabel}</div>
+
+      {/* Last data */}
+      <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 4 }}>
+        Last data: {timeAgo(card.lastRecordAt)}
+      </div>
+
+      {/* Records or calls this week */}
+      <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 4 }}>
+        {card.role === "enrichment"
+          ? `${card.callsThisWeek ?? 0} calls this week`
+          : `${card.recordsThisWeek ?? 0} records this week`}
+      </div>
+
+      {/* SAM verify gap */}
+      {card.meta.verify_gap_pct != null && (
+        <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
+          Verify gap: {(card.meta.verify_gap_pct as number).toFixed(1)}%
+        </div>
+      )}
+
+      {/* Status reason if not healthy */}
+      {card.statusReason && (
+        <div style={{
+          fontSize: 11,
+          color: dotColor,
+          marginTop: 6,
+          lineHeight: 1.3,
+        }}>
+          {card.statusReason}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Data Source Health Panel

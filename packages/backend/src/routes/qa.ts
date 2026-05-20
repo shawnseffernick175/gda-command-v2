@@ -422,6 +422,36 @@ router.get("/source-health", async (_req, res) => {
       govtribe_credits = await getGovTribeCreditCapStatus();
     } catch { /* credit ledger table may not exist yet */ }
 
+    // Latest snapshot per source (from source_health_snapshots table)
+    let latest_snapshots: Record<string, unknown>[] = [];
+    let overall_status: string = "unknown";
+    try {
+      const snapResult = await pool.query(
+        `SELECT DISTINCT ON (source)
+           source, role, status, last_record_at,
+           records_last_7d, records_last_30d, calls_last_7d,
+           error_count_7d, status_reason, meta, snapshot_at
+         FROM source_health_snapshots
+         ORDER BY source, snapshot_at DESC`,
+      );
+      latest_snapshots = snapResult.rows;
+
+      // Compute overall_status from latest snapshots
+      const primarySnaps = latest_snapshots.filter((s: Record<string, unknown>) =>
+        s.role === "primary" && !["deprecated", "planned"].includes(s.status as string));
+      const enrichSnaps = latest_snapshots.filter((s: Record<string, unknown>) =>
+        s.role === "enrichment" && !["deprecated", "planned"].includes(s.status as string));
+
+      if (primarySnaps.some((s: Record<string, unknown>) => s.status === "error" || s.status === "missing_key")) {
+        overall_status = "critical";
+      } else if (primarySnaps.some((s: Record<string, unknown>) => s.status === "degraded") ||
+                 enrichSnaps.some((s: Record<string, unknown>) => s.status === "error")) {
+        overall_status = "degraded";
+      } else if (latest_snapshots.length > 0) {
+        overall_status = "all_healthy";
+      }
+    } catch { /* table may not exist yet */ }
+
     const overall = erroring.length > 0
       ? "degraded"
       : active.length === 0
@@ -445,11 +475,13 @@ router.get("/source-health", async (_req, res) => {
         "list",
         {
           overall,
+          overall_status,
           total: rows.length,
           active: active.length,
           deprecated: deprecated.length,
           erroring: erroring.length,
           sources,
+          latest_snapshots,
           low_confidence_incumbents,
           govtribe_credits,
         },
@@ -490,6 +522,265 @@ router.get("/govtribe-health", async (_req, res) => {
       errorEnvelope("GDA.qa.govtribe-health", "check", {
         code: "INTERNAL",
         message: (e as Error).message ?? "Failed to check GovTribe health",
+        detail: null,
+      })
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/qa/source-health/snapshot — compute & store source health snapshot
+// Called by n8n cron (daily 7am ET) or manually via API.
+// Auth: x-gda-key header (same as ingest endpoints).
+// ---------------------------------------------------------------------------
+router.post("/source-health/snapshot", async (req, res) => {
+  // Auth check
+  const key = process.env.GDA_WEBHOOK_KEY;
+  if (!key) {
+    return res.status(503).json(
+      errorEnvelope("GDA.qa.source-health-snapshot", "create", {
+        code: "NOT_CONFIGURED",
+        message: "GDA_WEBHOOK_KEY not set",
+        detail: null,
+      })
+    );
+  }
+  const provided = req.headers["x-gda-key"] as string;
+  if (provided !== key) {
+    return res.status(401).json(
+      errorEnvelope("GDA.qa.source-health-snapshot", "create", {
+        code: "UNAUTHORIZED",
+        message: "Invalid or missing x-gda-key header",
+        detail: null,
+      })
+    );
+  }
+
+  const { getPool } = await import("../lib/db");
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("GDA.qa.source-health-snapshot", "create", {
+        code: "NO_DB",
+        message: "Database not available",
+        detail: null,
+      })
+    );
+  }
+
+  try {
+    const snapshotAt = new Date().toISOString();
+
+    // Get all source feeds with their roles
+    const { rows: feeds } = await pool.query(
+      `SELECT id, source, name, enabled, last_sync_at, last_sync_count,
+              error_count, deprecated_at, deprecation_reason,
+              COALESCE(role, 'primary') AS role
+       FROM gov_source_feeds ORDER BY source`,
+    );
+
+    const results: Array<{
+      source: string;
+      role: string;
+      status: string;
+      last_record_at: string | null;
+      records_last_7d: number;
+      records_last_30d: number;
+      calls_last_7d: number;
+      error_count_7d: number;
+      status_reason: string | null;
+      meta: Record<string, unknown>;
+    }> = [];
+
+    for (const feed of feeds) {
+      const src = feed.source as string;
+      const role = feed.role as string;
+      const meta: Record<string, unknown> = {};
+
+      // Record counts from opportunities table
+      let lastRecordAt: string | null = null;
+      let records7d = 0;
+      let records30d = 0;
+
+      try {
+        const lrResult = await pool.query(
+          `SELECT MAX(created_at) AS last_at FROM opportunities WHERE data_source = $1`,
+          [src],
+        );
+        lastRecordAt = lrResult.rows[0]?.last_at ?? null;
+      } catch { /* column/table may not exist */ }
+
+      try {
+        const r7 = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM opportunities WHERE data_source = $1 AND created_at > NOW() - INTERVAL '7 days'`,
+          [src],
+        );
+        records7d = parseInt(r7.rows[0]?.cnt ?? "0", 10);
+
+        const r30 = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM opportunities WHERE data_source = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+          [src],
+        );
+        records30d = parseInt(r30.rows[0]?.cnt ?? "0", 10);
+      } catch { /* column may not exist */ }
+
+      // Enrichment call counts
+      let calls7d = 0;
+      let errorCount7d = 0;
+
+      if (role === "enrichment") {
+        try {
+          const callResult = await pool.query(
+            `SELECT COUNT(*) AS cnt FROM enrichment_call_log WHERE source = $1 AND called_at > NOW() - INTERVAL '7 days'`,
+            [src],
+          );
+          calls7d = parseInt(callResult.rows[0]?.cnt ?? "0", 10);
+
+          const errResult = await pool.query(
+            `SELECT COUNT(*) AS cnt FROM enrichment_call_log WHERE source = $1 AND called_at > NOW() - INTERVAL '7 days' AND success = false`,
+            [src],
+          );
+          errorCount7d = parseInt(errResult.rows[0]?.cnt ?? "0", 10);
+        } catch { /* table may not exist */ }
+      } else {
+        errorCount7d = (feed.error_count as number) ?? 0;
+      }
+
+      // Check for missing API keys
+      const envKeys: Record<string, string | undefined> = {
+        sam_gov: process.env.SAM_API_KEY,
+        govwin: process.env.GOVWIN_API_KEY,
+        govtribe: process.env.GOVTRIBE_API_KEY,
+      };
+
+      // Status logic
+      let status: string;
+      let statusReason: string | null = null;
+
+      if (feed.deprecated_at) {
+        status = "deprecated";
+        statusReason = (feed.deprecation_reason as string) ?? "Source deprecated";
+      } else if (!feed.enabled) {
+        status = "planned";
+        statusReason = "Source not yet enabled";
+      } else if (envKeys[src] !== undefined && !envKeys[src]) {
+        status = "missing_key";
+        statusReason = "API key not configured in environment";
+      } else if (role === "primary") {
+        // Primary source status logic
+        const lastSync = feed.last_sync_at ? new Date(feed.last_sync_at as string) : null;
+        const hoursSinceSync = lastSync
+          ? (Date.now() - lastSync.getTime()) / (1000 * 60 * 60)
+          : Infinity;
+
+        if (errorCount7d > 0 || hoursSinceSync > 36) {
+          status = "error";
+          statusReason = hoursSinceSync > 36
+            ? `No sync in ${Math.round(hoursSinceSync)} hours (threshold: 36h)`
+            : `${errorCount7d} errors in last 7 days`;
+        } else if (records7d === 0) {
+          status = "degraded";
+          statusReason = "Sync ran but zero new records in last 7 days — may need investigation";
+        } else {
+          status = "healthy";
+        }
+      } else {
+        // Enrichment source status logic
+        if (errorCount7d > 0 && calls7d > 0 && errorCount7d / calls7d > 0.5) {
+          status = "error";
+          statusReason = `${errorCount7d}/${calls7d} calls failed in last 7 days (>${Math.round(50)}% failure rate)`;
+        } else if (errorCount7d > 0) {
+          status = "degraded";
+          statusReason = `${errorCount7d} failed calls in last 7 days (${calls7d} total)`;
+        } else {
+          // Zero calls is normal for enrichment — don't flag as error
+          status = "healthy";
+        }
+      }
+
+      // Add source-specific meta
+      if (src === "govtribe" || src === "govtribe_zapier") {
+        try {
+          const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+          meta.credit_cap_status = await getGovTribeCreditCapStatus();
+        } catch { /* credit ledger may not exist */ }
+      }
+      if (src === "sam_gov") {
+        try {
+          const verifyResult = await pool.query(
+            `SELECT status, sam_count, gda_count, gap_pct FROM sam_verification_runs ORDER BY ran_at DESC LIMIT 1`,
+          );
+          if (verifyResult.rows[0]) {
+            meta.verify_gap_pct = verifyResult.rows[0].gap_pct;
+            meta.verify_status = verifyResult.rows[0].status;
+            meta.verify_sam_count = verifyResult.rows[0].sam_count;
+            meta.verify_gda_count = verifyResult.rows[0].gda_count;
+          }
+        } catch { /* sam_verification_runs may not exist */ }
+      }
+
+      results.push({
+        source: src,
+        role,
+        status,
+        last_record_at: lastRecordAt,
+        records_last_7d: records7d,
+        records_last_30d: records30d,
+        calls_last_7d: calls7d,
+        error_count_7d: errorCount7d,
+        status_reason: statusReason,
+        meta,
+      });
+
+      // Write snapshot row
+      await pool.query(
+        `INSERT INTO source_health_snapshots
+           (id, snapshot_at, source, role, status, last_record_at,
+            records_last_7d, records_last_30d, calls_last_7d, error_count_7d,
+            status_reason, meta)
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          snapshotAt, src, role, status, lastRecordAt,
+          records7d, records30d, calls7d, errorCount7d,
+          statusReason, JSON.stringify(meta),
+        ],
+      );
+    }
+
+    // Compute overall status
+    const primarySources = results.filter((r) => r.role === "primary");
+    const enrichmentSources = results.filter((r) => r.role === "enrichment");
+    const activePrimary = primarySources.filter((r) => !["deprecated", "planned"].includes(r.status));
+    const activeEnrichment = enrichmentSources.filter((r) => !["deprecated", "planned"].includes(r.status));
+
+    let overallStatus: string;
+    if (activePrimary.some((r) => r.status === "error" || r.status === "missing_key")) {
+      overallStatus = "critical";
+    } else if (activePrimary.some((r) => r.status === "degraded") || activeEnrichment.some((r) => r.status === "error")) {
+      overallStatus = "degraded";
+    } else {
+      overallStatus = "all_healthy";
+    }
+
+    res.json(
+      successEnvelope("GDA.qa.source-health-snapshot", "create", {
+        snapshot_at: snapshotAt,
+        overall_status: overallStatus,
+        sources: results,
+      }, {
+        count: results.length,
+        hint: overallStatus === "all_healthy"
+          ? "All sources operational"
+          : overallStatus === "degraded"
+            ? "Some sources degraded — check status_reason"
+            : "Critical: primary source(s) in error or missing keys",
+      })
+    );
+  } catch (e: unknown) {
+    res.status(500).json(
+      errorEnvelope("GDA.qa.source-health-snapshot", "create", {
+        code: "INTERNAL",
+        message: (e as Error).message ?? "Failed to create snapshot",
         detail: null,
       })
     );
