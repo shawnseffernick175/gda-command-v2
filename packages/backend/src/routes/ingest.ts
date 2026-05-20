@@ -1005,7 +1005,7 @@ router.post("/govtribe", async (req, res) => {
 // POST /api/ingest/govtribe/poll — Direct GovTribe MCP poll (replaces Zapier)
 // Runs all 7 saved search equivalents against GovTribe MCP, then feeds results
 // through the same ingest pipeline as POST /api/ingest/govtribe.
-// Called by n8n cron every 4 hours or manually via API.
+// Called by n8n cron (Mon + Thu 6am ET) or manually via API.
 // ---------------------------------------------------------------------------
 router.post("/govtribe/poll", async (req, res) => {
   if (!verifyIngestKey(req, res)) return;
@@ -1023,6 +1023,22 @@ router.post("/govtribe/poll", async (req, res) => {
     // Poll GovTribe MCP for all 7 search configs
     const pollResult = await pollGovTribeMCP();
 
+    // If poll was blocked by credit cap, return immediately with cap info
+    if (pollResult.blocked) {
+      return res.status(429).json(successEnvelope("gda-ingest", "govtribe-poll", {
+        upserted: 0,
+        enriched: 0,
+        low_confidence_flagged: 0,
+        errors: 0,
+        total: 0,
+        searchSummary: [],
+        blocked: pollResult.blocked,
+        creditCapStatus: pollResult.creditCapStatus,
+        durationMs: Date.now() - startTime,
+        timestamp: pollResult.timestamp,
+      }));
+    }
+
     if (pollResult.totalUnique === 0) {
       return res.json(successEnvelope("gda-ingest", "govtribe-poll", {
         upserted: 0,
@@ -1031,6 +1047,7 @@ router.post("/govtribe/poll", async (req, res) => {
         errors: 0,
         total: 0,
         searchSummary: pollResult.searchSummary,
+        creditCapStatus: pollResult.creditCapStatus,
         durationMs: Date.now() - startTime,
         timestamp: pollResult.timestamp,
       }));
@@ -1183,6 +1200,7 @@ router.post("/govtribe/poll", async (req, res) => {
       errors,
       total: pollResult.totalUnique,
       searchSummary: pollResult.searchSummary,
+      creditCapStatus: pollResult.creditCapStatus,
       durationMs: Date.now() - startTime,
       timestamp: pollResult.timestamp,
     }));

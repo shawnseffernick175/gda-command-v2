@@ -589,3 +589,64 @@ describe("GovTribe direct poll — search config", () => {
     expect(entry.description).toContain("direct poll");
   });
 });
+
+// ---------------------------------------------------------------------------
+// GovTribe Credit Cap — guardrail tests
+// ---------------------------------------------------------------------------
+describe("GovTribe credit cap system", () => {
+  it("exports getGovTribeCreditCapStatus with correct shape", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status).toHaveProperty("cycleCap");
+    expect(status).toHaveProperty("monthlyCap");
+    expect(status).toHaveProperty("monthlyUsed");
+    expect(status).toHaveProperty("monthKey");
+    expect(status).toHaveProperty("alertThreshold");
+    expect(status).toHaveProperty("stopThreshold");
+    expect(status).toHaveProperty("monthlyAlertTriggered");
+    expect(status).toHaveProperty("monthlyStopTriggered");
+  });
+
+  it("default cycle cap is 150", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.cycleCap).toBe(150);
+  });
+
+  it("default monthly cap is 1200", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.monthlyCap).toBe(1200);
+  });
+
+  it("alert threshold is 80% of monthly cap", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.alertThreshold).toBe(Math.floor(1200 * 0.80));
+  });
+
+  it("stop threshold is 95% of monthly cap", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.stopThreshold).toBe(Math.floor(1200 * 0.95));
+  });
+
+  it("GovTribePollResponse includes creditCapStatus and blocked fields", async () => {
+    // Verify the type exports exist (compile-time check via import)
+    const mod = await import("../lib/gov-sources");
+    expect(typeof mod.getGovTribeCreditCapStatus).toBe("function");
+    expect(typeof mod.getGovTribeCreditUsage).toBe("function");
+    expect(typeof mod.resetGovTribeCreditCycle).toBe("function");
+  });
+
+  it("credit ledger migration exists", async () => {
+    const fs = await import("fs");
+    const path = "src/db/migrations/053_govtribe_credit_ledger.sql";
+    expect(fs.existsSync(path)).toBe(true);
+    const content = fs.readFileSync(path, "utf8");
+    expect(content).toContain("govtribe_credit_ledger");
+    expect(content).toContain("month_key");
+    expect(content).toContain("credits_used");
+    expect(content).toContain("govtribe_credit_monthly");
+  });
+});

@@ -415,11 +415,29 @@ router.get("/source-health", async (_req, res) => {
       low_confidence_incumbents = parseInt(lcResult.rows[0]?.count ?? "0", 10);
     } catch { /* column may not exist yet */ }
 
+    // GovTribe MCP credit cap status
+    let govtribe_credits = null;
+    try {
+      const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+      govtribe_credits = await getGovTribeCreditCapStatus();
+    } catch { /* credit ledger table may not exist yet */ }
+
     const overall = erroring.length > 0
       ? "degraded"
       : active.length === 0
         ? "error"
         : "operational";
+
+    const hints: string[] = [];
+    if (low_confidence_incumbents > 0) {
+      hints.push(`${low_confidence_incumbents} opportunities with low-confidence incumbent matches awaiting review`);
+    }
+    if (govtribe_credits?.monthlyAlertTriggered) {
+      hints.push(
+        `GovTribe MCP credits at ${govtribe_credits.monthlyUsed}/${govtribe_credits.monthlyCap} this month (${Math.round((govtribe_credits.monthlyUsed / govtribe_credits.monthlyCap) * 100)}%)` +
+        (govtribe_credits.monthlyStopTriggered ? " — POLLING STOPPED" : " — approaching limit"),
+      );
+    }
 
     res.json(
       successEnvelope(
@@ -433,12 +451,11 @@ router.get("/source-health", async (_req, res) => {
           erroring: erroring.length,
           sources,
           low_confidence_incumbents,
+          govtribe_credits,
         },
         {
           count: rows.length,
-          hint: low_confidence_incumbents > 0
-            ? `${low_confidence_incumbents} opportunities with low-confidence incumbent matches awaiting review`
-            : undefined,
+          hint: hints.length > 0 ? hints.join("; ") : undefined,
         }
       )
     );
