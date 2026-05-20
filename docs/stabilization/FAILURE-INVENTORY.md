@@ -41,7 +41,7 @@ Sources examined:
 | F-015 | Every 6h | P2 | Ingest mappers (SAM, GovTribe, GovWin, FPDS) lack consistent input sanitization | Open (tracked separately) |
 | F-016 | Always | P2 | Schema-mapper drift — mappers write fields the DB silently drops, no detection | Open (tracked separately) |
 | F-017 | On deploy | P1 | Migration system tests fresh-deploy only, not production-state-dependent migrations — already produced one incident (PR #224 / migration 045 UNIQUE violation) | **Fixed** (PR #243 — harness + 3 paired tests, PR #246 — allowlist tightening) |
-| F-018 | Unknown | P2 | Existing migrations may have unmarked state-dependent operations without corresponding regression tests | **Fixed** (PR #247 — full audit of 55 migrations, 8 paired tests covering all high-risk state-dependent migrations) |
+| F-018 | Unknown | P2 | Existing migrations may have unmarked state-dependent operations without corresponding regression tests | **Fixed** (PR #247 — full audit of 55 migrations, 9 paired tests covering all high-risk state-dependent migrations) |
 | F-019 | On every deploy | P1 | Production state modified outside canonical deploy path — sessions applied migrations from unmerged branches | Open |
 
 ---
