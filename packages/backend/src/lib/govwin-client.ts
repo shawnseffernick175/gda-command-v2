@@ -43,6 +43,10 @@ interface TokenState {
 
 let tokenState: TokenState | null = null;
 
+/** In-flight token fetch promise — prevents concurrent password grants that
+ *  could burn multiple lockout-triggering attempts. */
+let tokenFetchInFlight: Promise<string> | null = null;
+
 /** Proactive refresh 1h before expiry (11h into the 12h window). */
 const REFRESH_BUFFER_MS = 60 * 60 * 1000;
 
@@ -51,22 +55,33 @@ export async function getGovWinAccessToken(): Promise<string> {
     return tokenState.accessToken;
   }
 
-  // Try refresh first if we have a refresh token
-  if (tokenState?.refreshToken) {
-    try {
-      const refreshed = await refreshAccessToken(tokenState.refreshToken);
-      tokenState = refreshed;
-      return refreshed.accessToken;
-    } catch {
-      log.warn("govwin_refresh_failed", { hint: "Falling back to password grant" });
-      tokenState = null;
-    }
-  }
+  // Coalesce concurrent callers onto a single in-flight fetch
+  if (tokenFetchInFlight) return tokenFetchInFlight;
 
-  // Password grant
-  const fresh = await passwordGrant();
-  tokenState = fresh;
-  return fresh.accessToken;
+  tokenFetchInFlight = (async () => {
+    try {
+      // Try refresh first if we have a refresh token
+      if (tokenState?.refreshToken) {
+        try {
+          const refreshed = await refreshAccessToken(tokenState.refreshToken);
+          tokenState = refreshed;
+          return refreshed.accessToken;
+        } catch {
+          log.warn("govwin_refresh_failed", { hint: "Falling back to password grant" });
+          tokenState = null;
+        }
+      }
+
+      // Password grant
+      const fresh = await passwordGrant();
+      tokenState = fresh;
+      return fresh.accessToken;
+    } finally {
+      tokenFetchInFlight = null;
+    }
+  })();
+
+  return tokenFetchInFlight;
 }
 
 async function passwordGrant(): Promise<TokenState> {
@@ -528,4 +543,5 @@ async function getStoredUpdateDates(): Promise<Map<string, string>> {
 // For testing
 export function _resetTokenState(): void {
   tokenState = null;
+  tokenFetchInFlight = null;
 }

@@ -8,6 +8,19 @@ vi.mock("../lib/db", () => ({
   getPool: vi.fn(() => null),
 }));
 
+// Mocks needed for importing the prod ingest router (used by prod mapper tests)
+vi.mock("express", () => ({
+  Router: vi.fn(() => ({ post: vi.fn(), get: vi.fn(), use: vi.fn() })),
+}));
+vi.mock("../middleware/envelope", () => ({
+  successEnvelope: vi.fn(),
+  errorEnvelope: vi.fn(),
+}));
+vi.mock("../lib/email", () => ({ notify: vi.fn() }));
+vi.mock("../agents/auto-capture-coach", () => ({ queueCaptureCoachIfNeeded: vi.fn() }));
+vi.mock("../lib/sam-enrichment", () => ({ enrichOpportunity: vi.fn() }));
+vi.mock("../lib/gov-sources", () => ({ pollGovTribeMCP: vi.fn() }));
+
 // ---------------------------------------------------------------------------
 // GovWin WSAPI integration tests — OAuth, mapping, dedup, rate limiting
 // ---------------------------------------------------------------------------
@@ -277,6 +290,37 @@ describe("GovWin OAuth2 token management", () => {
 
     await expect(getGovWinAccessToken()).rejects.toThrow("GOVWIN_CLIENT_ID not configured");
   });
+
+  it("coalesces concurrent calls into a single password grant (race condition guard)", async () => {
+    let resolveGrant!: (value: Response) => void;
+    const grantPromise = new Promise<Response>((resolve) => { resolveGrant = resolve; });
+
+    global.fetch = vi.fn().mockReturnValueOnce(grantPromise) as unknown as typeof fetch;
+
+    const { getGovWinAccessToken, _resetTokenState } = await import("../lib/govwin-client");
+    _resetTokenState();
+
+    // Fire two concurrent calls before the first resolves
+    const p1 = getGovWinAccessToken();
+    const p2 = getGovWinAccessToken();
+
+    // Resolve the single in-flight grant
+    resolveGrant({
+      ok: true,
+      json: async () => ({
+        access_token: "shared-token",
+        refresh_token: "shared-refresh",
+        expires_in: 43199,
+        token_type: "bearer",
+      }),
+    } as Response);
+
+    const [t1, t2] = await Promise.all([p1, p2]);
+    expect(t1).toBe("shared-token");
+    expect(t2).toBe("shared-token");
+    // Only one fetch call — not two
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("GovWin rate limit guard", () => {
@@ -375,6 +419,41 @@ describe("GovWin poll search config", () => {
     const defaultSearch = { oppType: "OPP,TNS", dateFrom: "-1W" };
     expect(defaultSearch.oppType).toBe("OPP,TNS");
     expect(defaultSearch.dateFrom).toBe("-1W");
+  });
+});
+
+describe("GovWin prod mapper — sourceURL precedence (regression for operator precedence bug)", () => {
+  it("preserves sourceURL when both sourceURL and links.webHref are present", async () => {
+    const { mapGovWinOpportunity } = await import("../routes/ingest");
+    const result = mapGovWinOpportunity({
+      id: "OPP999",
+      iqOppId: 999,
+      title: "Test",
+      sourceURL: "https://sam.gov/opp/abc123/view",
+      links: { webHref: "https://iq.govwin.com/neo/opportunity/view/999" },
+    });
+    expect(result.raw_source_url).toBe("https://sam.gov/opp/abc123/view");
+  });
+
+  it("falls back to GovWin URL when sourceURL is absent but webHref is present", async () => {
+    const { mapGovWinOpportunity } = await import("../routes/ingest");
+    const result = mapGovWinOpportunity({
+      id: "OPP998",
+      iqOppId: 998,
+      title: "Test",
+      links: { webHref: "https://iq.govwin.com/neo/opportunity/view/998" },
+    });
+    expect(result.raw_source_url).toBe("https://iq.govwin.com/neo/opportunity/view/998");
+  });
+
+  it("returns null when neither sourceURL nor webHref is present", async () => {
+    const { mapGovWinOpportunity } = await import("../routes/ingest");
+    const result = mapGovWinOpportunity({
+      id: "OPP997",
+      iqOppId: 997,
+      title: "Test",
+    });
+    expect(result.raw_source_url).toBeNull();
   });
 });
 

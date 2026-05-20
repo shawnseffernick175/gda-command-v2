@@ -1454,7 +1454,7 @@ router.post("/govwin/poll", async (req, res) => {
 });
 
 /** Map GovWin WSAPI opportunity to GDA schema */
-function mapGovWinOpportunity(raw: GovWinOpportunity): {
+export function mapGovWinOpportunity(raw: GovWinOpportunity): {
   id: string;
   title: string;
   status: string;
@@ -1500,7 +1500,7 @@ function mapGovWinOpportunity(raw: GovWinOpportunity): {
 }
 
 /** Map GovWin status to GDA pipeline status */
-function mapGovWinStatus(status?: string): string {
+export function mapGovWinStatus(status?: string): string {
   if (!status) return "discovery";
   const lower = status.toLowerCase();
   if (lower.includes("awarded") || lower.includes("won")) return "won";
