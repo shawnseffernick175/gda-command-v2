@@ -366,14 +366,16 @@ router.get("/source-health", async (_req, res) => {
     // Check for missing API keys
     const envKeys: Record<string, string | undefined> = {
       sam_gov: process.env.SAM_API_KEY,
-      govwin: process.env.GOVWIN_CLIENT_ID,
+      govwin: process.env.GOVWIN_CLIENT_ID && process.env.GOVWIN_CLIENT_SECRET &&
+              process.env.GOVWIN_USERNAME && process.env.GOVWIN_PASSWORD
+              ? "configured" : undefined,
       govtribe: process.env.GOVTRIBE_API_KEY,
       govtribe_zapier: process.env.GOVTRIBE_API_KEY,
     };
 
     const sources = rows.map((r: Record<string, unknown>) => {
       const apiKeyName = r.source === "sam_gov" ? "SAM_API_KEY"
-        : r.source === "govwin" ? "GOVWIN_CLIENT_ID"
+        : r.source === "govwin" ? "GOVWIN_CLIENT_ID, GOVWIN_CLIENT_SECRET, GOVWIN_USERNAME, GOVWIN_PASSWORD"
         : r.source === "govtribe" || r.source === "govtribe_zapier" ? "GOVTRIBE_API_KEY"
         : null;
 
@@ -653,13 +655,15 @@ router.post("/source-health/snapshot", async (req, res) => {
       // Check for missing API keys
       const envKeys: Record<string, string | undefined> = {
         sam_gov: process.env.SAM_API_KEY,
-        govwin: process.env.GOVWIN_CLIENT_ID,
+        govwin: process.env.GOVWIN_CLIENT_ID && process.env.GOVWIN_CLIENT_SECRET &&
+                process.env.GOVWIN_USERNAME && process.env.GOVWIN_PASSWORD
+                ? "configured" : undefined,
         govtribe: process.env.GOVTRIBE_API_KEY,
         govtribe_zapier: process.env.GOVTRIBE_API_KEY,
       };
       const envKeyNames: Record<string, string> = {
         sam_gov: "SAM_API_KEY",
-        govwin: "GOVWIN_CLIENT_ID",
+        govwin: "GOVWIN_CLIENT_ID, GOVWIN_CLIENT_SECRET, GOVWIN_USERNAME, GOVWIN_PASSWORD",
         govtribe: "GOVTRIBE_API_KEY",
         govtribe_zapier: "GOVTRIBE_API_KEY",
       };
