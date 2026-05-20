@@ -93,6 +93,7 @@ See paired tests for examples:
 - `009_capture_stage.test.ts` — UPDATE opportunities with status→stage mapping
 - `010_opp_data_source.test.ts` — UPDATE opportunities with URL-based classification
 - `027_remove_mock_data.test.ts` — DELETE mock data by ID pattern, preserve real data
+- `028_fix_mock_data_patterns.test.ts` — DELETE mock data by corrected prefixes, adversarial rows
 - `045_rename_duplicate_migrations.test.ts` — DELETE from schema_migrations
 - `047_gov_source_deprecation.test.ts` — UPDATE gov_source_feeds to deprecate feeds
 - `048_cleanup_fake_dibbs_records.test.ts` — DELETE from opportunities + FK tables
@@ -114,7 +115,7 @@ All 55 migrations have been audited. The following are **state-dependent**
 | 018_fix_bot_glossary_and_sources_columns | UPDATE bot_glossary/bot_sources | ⚠️ low risk — populates columns added in same migration |
 | 023_rename_backlog_kpi | UPDATE single KPI label | ⚠️ low risk — single-row rename |
 | 027_remove_mock_data | DELETE mock rows by ID pattern | ✅ |
-| 028_fix_mock_data_patterns | DELETE mock rows by ID pattern | ⚠️ same pattern as 027 |
+| 028_fix_mock_data_patterns | DELETE mock rows by corrected ID patterns (CON-, APR-, RPT-, CR-) | ✅ |
 | 029_q1_2026_financial_kpis | UPDATE financial KPIs with real data | ⚠️ low risk — seed data override |
 | 045_rename_duplicate_migrations | DELETE from schema_migrations | ✅ |
 | 047_gov_source_deprecation | UPDATE gov_source_feeds | ✅ |
