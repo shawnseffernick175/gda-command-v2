@@ -25,7 +25,7 @@ Log into [GovTribe](https://govtribe.com) and create saved searches for each cat
 | 3 | GDA-Opps-Opportunistic | Federal Opportunities | "advisory services" \| innovation \| ISR \| EW | 541611, 541690, 541715 |
 | 4 | GDA-Awards-Core | Federal Awards | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity \| "systems engineering" | 541511, 541512, 541519, 541330 |
 | 5 | GDA-Awards-Growth | Federal Awards | CMMC \| "AI/ML" \| DEVCOM | 541511, 541512, 541715 |
-| 6 | GDA-Forecasts-Core | Federal Forecasts | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity | 541512, 541519 |
+| 6 | GDA-Forecasts-Core | Federal Forecasts | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity | 541511, 541512, 541519 |
 | 7 | GDA-Forecasts-Growth | Federal Forecasts | "AI/ML" \| CMMC \| DEVCOM \| innovation | 541715, 518210 |
 
 ### 2. Create n8n Workflow: `GDA.ingest.govtribe-zapier`
