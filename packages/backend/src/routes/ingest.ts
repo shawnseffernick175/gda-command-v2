@@ -1489,9 +1489,9 @@ function mapGovWinOpportunity(raw: GovWinOpportunity): {
     agency: raw.govEntity?.title ?? null,
     naics: raw.primaryNAICS?.title ?? null,
     value_estimated: valueEstimated,
-    raw_source_url: raw.sourceURL ?? raw.links?.webHref
+    raw_source_url: raw.sourceURL ?? (raw.links?.webHref
       ? `https://iq.govwin.com/neo/opportunity/view/${raw.iqOppId}`
-      : null,
+      : null),
     data_source: "govwin",
     govwin_update_date: raw.updateDate ?? null,
     created_at: raw.createdDate ?? new Date().toISOString(),

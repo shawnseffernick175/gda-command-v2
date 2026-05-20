@@ -451,7 +451,7 @@ export async function pollGovWin(): Promise<GovWinPollResponse> {
         seenIds.add(opp.id);
 
         // updateDate dedup: skip if unchanged
-        const stored = storedUpdates.get(opp.id);
+        const stored = storedUpdates.get(`govwin-${opp.id}`);
         if (stored && opp.updateDate && stored === opp.updateDate) {
           skipped++;
           continue;
