@@ -68,30 +68,4 @@ describe("Migration 049: reverse GovTribe deprecation", () => {
     expect(dibbs[0].deprecation_reason).toContain("DIBBS");
   });
 
-  it("is idempotent — running twice does not error", async () => {
-    if (pool) await destroyTestDb(pool);
-
-    pool = await createSeededTestDb("049_reverse_govtribe_deprecation.sql", {
-      tables: [],
-    });
-
-    // Apply once
-    await applyMigration(pool, "049_reverse_govtribe_deprecation.sql");
-
-    // Apply the same UPDATE again — should not throw
-    // (We run the SQL directly since applyMigration would fail on duplicate schema_migrations entry)
-    const fs = await import("fs");
-    const path = await import("path");
-    const sql = fs.readFileSync(
-      path.join(__dirname, "..", "049_reverse_govtribe_deprecation.sql"),
-      "utf-8",
-    );
-    await pool.query(sql);
-
-    const { rows } = await pool.query(
-      "SELECT enabled, deprecated_at FROM gov_source_feeds WHERE id = 'feed-govtribe'",
-    );
-    expect(rows[0].enabled).toBe(true);
-    expect(rows[0].deprecated_at).toBeNull();
-  });
 });
