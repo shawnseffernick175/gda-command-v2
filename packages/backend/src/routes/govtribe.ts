@@ -62,7 +62,9 @@ router.get("/credits", (_req, res) => {
     successEnvelope("GDA.govtribe.credits", "usage", usage, {
       hint: usage.budgetExceeded
         ? `Budget exceeded: ${usage.totalCredits}/${usage.budgetLimit} credits`
-        : `${usage.totalCredits}/${usage.budgetLimit} credits used (${Math.round((usage.totalCredits / usage.budgetLimit) * 100)}%)`,
+        : usage.budgetLimit != null
+          ? `${usage.totalCredits}/${usage.budgetLimit} credits used (${Math.round((usage.totalCredits / usage.budgetLimit) * 100)}%)`
+          : `${usage.totalCredits} credits used`,
     })
   );
 });
