@@ -80,6 +80,7 @@ export async function enrichFromSAM(opp: {
     });
 
     if (!result.opportunitiesData?.length) {
+      logEnrichmentCall({ source: "sam_gov", success: true, duration_ms: Date.now() - samCallStart });
       return { enriched: false, fields: {}, sam_match: false };
     }
 
@@ -237,6 +238,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     const result = await searchAwards(params);
 
     if (!result.results?.length) {
+      logEnrichmentCall({ source: "usaspending", success: true, duration_ms: Date.now() - usaCallStart });
       return { incumbent: null, incumbent_confidence: null, incumbent_source: null };
     }
 
@@ -271,6 +273,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     scored.sort((a, b) => b.matchScore - a.matchScore);
 
     if (scored[0].matchScore === 0) {
+      logEnrichmentCall({ source: "usaspending", success: true, duration_ms: Date.now() - usaCallStart });
       return { incumbent: null, incumbent_confidence: null, incumbent_source: null };
     }
 

@@ -151,6 +151,13 @@ describe("Primary source status logic", () => {
     expect(qaRoutes).toContain("GOVTRIBE_API_KEY");
     expect(qaRoutes).toContain("missing_key");
   });
+
+  it("uses 'in' operator for missing_key check (not !== undefined)", () => {
+    // Devin Review bug: `envKeys[src] !== undefined` fails when env var is unset
+    // because undefined !== undefined is false. Must use `src in envKeys`.
+    expect(qaRoutes).toContain("src in envKeys && !envKeys[src]");
+    expect(qaRoutes).not.toContain("envKeys[src] !== undefined");
+  });
 });
 
 describe("Enrichment source status logic", () => {

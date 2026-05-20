@@ -663,7 +663,7 @@ router.post("/source-health/snapshot", async (req, res) => {
       } else if (!feed.enabled) {
         status = "planned";
         statusReason = "Source not yet enabled";
-      } else if (envKeys[src] !== undefined && !envKeys[src]) {
+      } else if (src in envKeys && !envKeys[src]) {
         status = "missing_key";
         statusReason = "API key not configured in environment";
       } else if (role === "primary") {
