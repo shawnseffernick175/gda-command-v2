@@ -250,13 +250,13 @@ export const WEBHOOK_REGISTRY: Record<string, WebhookEntry> = {
     description: "Prompt library management",
   },
 
-  // === LIVE — n8n workflow nV36K8LgL31nY37b activated 2026-05-20 ===
+  // === LIVE — n8n workflow 5KuF4KZ8uxYcbUN5 (cron every 4h) ===
   "govtribe-ingest": {
     path: "govtribe-ingest",
     status: "live",
-    n8nWorkflow: "GDA.ingest.govtribe-zapier",
+    n8nWorkflow: "GDA.ingest.govtribe-cron",
     usedBy: "ingest.ts",
-    description: "GovTribe Saved Search → Zapier → n8n → GDA ingest pipeline (Tier 1)",
+    description: "GovTribe MCP direct poll → n8n cron → GDA ingest pipeline (Tier 1)",
   },
 
   // === PLANNED (HTTP 404) — no n8n workflow yet ===

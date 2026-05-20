@@ -169,7 +169,12 @@ const GOVTRIBE_MCP_URL = "https://govtribe.com/mcp";
 // ---------------------------------------------------------------------------
 // Credit tracking — metered usage per GovTribe pricing table
 // Credits are charged per 10 results returned. The cost varies by tool.
-// This tracker runs in-process; resets on server restart.
+//
+// Budget guardrails:
+//   Per-cycle cap  — default 150 credits (one full poll ~115 credits + headroom)
+//   Per-month cap  — default 1,200 credits (~30% headroom over 920 baseline)
+//   Alert at 80% of monthly cap, hard stop at 95%.
+//   All usage persisted to govtribe_credit_ledger for Source Health panel.
 // ---------------------------------------------------------------------------
 
 const CREDIT_COSTS_PER_10: Record<string, number> = {
@@ -182,6 +187,21 @@ const CREDIT_COSTS_PER_10: Record<string, number> = {
   Labor_Ceiling_Rate_Benchmarks: 4,
 };
 
+const CYCLE_CREDIT_CAP = parseIntEnv(process.env.GOVTRIBE_CYCLE_CREDIT_CAP, 150);
+const MONTHLY_CREDIT_CAP = parseIntEnv(process.env.GOVTRIBE_MONTHLY_CREDIT_CAP, 1200);
+const MONTHLY_ALERT_PCT = 0.80;
+const MONTHLY_STOP_PCT = 0.95;
+
+function parseIntEnv(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function currentMonthKey(): string {
+  return new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+}
+
 interface CreditUsage {
   totalCredits: number;
   callCount: number;
@@ -191,12 +211,16 @@ interface CreditUsage {
   budgetExceeded: boolean;
 }
 
-const GOVTRIBE_CREDIT_BUDGET_ENV = process.env.GOVTRIBE_CREDIT_BUDGET;
-
-function parseBudgetLimit(raw: string | undefined): number | null {
-  if (!raw) return null;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
+export interface CreditCapStatus {
+  cycleCap: number;
+  cycleUsed: number;
+  monthlyCap: number;
+  monthlyUsed: number;
+  monthKey: string;
+  alertThreshold: number;
+  stopThreshold: number;
+  monthlyAlertTriggered: boolean;
+  monthlyStopTriggered: boolean;
 }
 
 const creditUsage: CreditUsage = {
@@ -204,7 +228,7 @@ const creditUsage: CreditUsage = {
   callCount: 0,
   byTool: {},
   cycleStartedAt: new Date().toISOString(),
-  budgetLimit: parseBudgetLimit(GOVTRIBE_CREDIT_BUDGET_ENV),
+  budgetLimit: MONTHLY_CREDIT_CAP,
   budgetExceeded: false,
 };
 
@@ -245,6 +269,87 @@ export function resetGovTribeCreditCycle(): void {
   creditUsage.byTool = {};
   creditUsage.cycleStartedAt = new Date().toISOString();
   creditUsage.budgetExceeded = false;
+}
+
+/** Fetch monthly credit total from the DB ledger. */
+async function getMonthlyCreditsUsed(monthKey?: string): Promise<number> {
+  const pool = getPool();
+  if (!pool) return 0;
+  const mk = monthKey ?? currentMonthKey();
+  try {
+    const { rows } = await pool.query(
+      `SELECT COALESCE(SUM(credits_used), 0)::int AS total FROM govtribe_credit_ledger WHERE month_key = $1`,
+      [mk],
+    );
+    return rows[0]?.total ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Record credit usage for a search in the persistent ledger. */
+async function recordCreditUsage(
+  cycleId: string, searchName: string, toolName: string,
+  creditsUsed: number, resultsCount: number,
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO govtribe_credit_ledger (cycle_id, month_key, search_name, tool_name, credits_used, results_count)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [cycleId, currentMonthKey(), searchName, toolName, creditsUsed, resultsCount],
+    );
+  } catch (e) {
+    log.warn("govtribe_credit_ledger_write_error", { error: (e as Error).message });
+  }
+}
+
+/** Check whether the monthly cap allows another poll cycle. */
+async function checkMonthlyCap(): Promise<{
+  allowed: boolean;
+  monthlyUsed: number;
+  alertTriggered: boolean;
+  stopTriggered: boolean;
+}> {
+  const monthlyUsed = await getMonthlyCreditsUsed();
+  const alertThreshold = Math.floor(MONTHLY_CREDIT_CAP * MONTHLY_ALERT_PCT);
+  const stopThreshold = Math.floor(MONTHLY_CREDIT_CAP * MONTHLY_STOP_PCT);
+
+  const alertTriggered = monthlyUsed >= alertThreshold;
+  const stopTriggered = monthlyUsed >= stopThreshold;
+
+  if (alertTriggered && !stopTriggered) {
+    log.warn("govtribe_monthly_credit_alert", {
+      monthlyUsed, monthlyCap: MONTHLY_CREDIT_CAP, pct: Math.round((monthlyUsed / MONTHLY_CREDIT_CAP) * 100),
+    });
+  }
+  if (stopTriggered) {
+    log.error("govtribe_monthly_credit_stop", {
+      monthlyUsed, monthlyCap: MONTHLY_CREDIT_CAP, pct: Math.round((monthlyUsed / MONTHLY_CREDIT_CAP) * 100),
+    });
+  }
+
+  return { allowed: !stopTriggered, monthlyUsed, alertTriggered, stopTriggered };
+}
+
+/** Get full credit cap status for Source Health panel. */
+export async function getGovTribeCreditCapStatus(): Promise<CreditCapStatus> {
+  const monthlyUsed = await getMonthlyCreditsUsed();
+  const alertThreshold = Math.floor(MONTHLY_CREDIT_CAP * MONTHLY_ALERT_PCT);
+  const stopThreshold = Math.floor(MONTHLY_CREDIT_CAP * MONTHLY_STOP_PCT);
+
+  return {
+    cycleCap: CYCLE_CREDIT_CAP,
+    cycleUsed: creditUsage.totalCredits,
+    monthlyCap: MONTHLY_CREDIT_CAP,
+    monthlyUsed,
+    monthKey: currentMonthKey(),
+    alertThreshold,
+    stopThreshold,
+    monthlyAlertTriggered: monthlyUsed >= alertThreshold,
+    monthlyStopTriggered: monthlyUsed >= stopThreshold,
+  };
 }
 
 interface GovTribeMCPResponse {
@@ -1029,6 +1134,190 @@ export async function syncGovSources(): Promise<GovSourceResult[]> {
   }
 
   return results;
+}
+
+// ---------------------------------------------------------------------------
+// GovTribe Direct Poll — replaces Zapier trigger chain
+// Runs all 7 saved search equivalents against GovTribe MCP, returns raw results
+// in the ingest-compatible format (same shape as Zapier webhook payloads).
+// Called by POST /api/ingest/govtribe/poll and n8n cron.
+// ---------------------------------------------------------------------------
+
+export interface GovTribePollSearchConfig {
+  name: string;
+  tool: "Search_Federal_Contract_Opportunities" | "Search_Federal_Contract_Awards" | "Search_Federal_Forecasts";
+  keywords: string[];
+}
+
+export interface GovTribePollResult {
+  searchName: string;
+  status: "ok" | "error" | "skipped";
+  count: number;
+  total: number;
+  error?: string;
+}
+
+export interface GovTribePollResponse {
+  results: Record<string, unknown>[];
+  searchSummary: GovTribePollResult[];
+  totalUnique: number;
+  timestamp: string;
+  creditCapStatus?: CreditCapStatus;
+  blocked?: string;
+}
+
+const GOVTRIBE_POLL_SEARCHES: GovTribePollSearchConfig[] = [
+  { name: "GDA-Opps-Core", tool: "Search_Federal_Contract_Opportunities",
+    keywords: ["SETA", "C5ISR", "PEO IEW&S", "CPE IEW&S", "PEO C3N", "CPE C3N", "cybersecurity", "systems engineering"] },
+  { name: "GDA-Opps-Growth", tool: "Search_Federal_Contract_Opportunities",
+    keywords: ["CMMC", "AI/ML", "XR/AR", "DEVCOM", "synthetic training"] },
+  { name: "GDA-Opps-Opportunistic", tool: "Search_Federal_Contract_Opportunities",
+    keywords: ["advisory services", "innovation", "ISR", "EW"] },
+  { name: "GDA-Awards-Core", tool: "Search_Federal_Contract_Awards",
+    keywords: ["SETA", "C5ISR", "PEO IEW&S", "CPE IEW&S", "cybersecurity", "systems engineering"] },
+  { name: "GDA-Awards-Growth", tool: "Search_Federal_Contract_Awards",
+    keywords: ["CMMC", "AI/ML", "DEVCOM"] },
+  { name: "GDA-Forecasts-Core", tool: "Search_Federal_Forecasts",
+    keywords: ["SETA", "C5ISR", "PEO IEW&S", "CPE IEW&S", "cybersecurity"] },
+  { name: "GDA-Forecasts-Growth", tool: "Search_Federal_Forecasts",
+    keywords: ["AI/ML", "CMMC", "DEVCOM", "innovation"] },
+];
+
+export function getGovTribePollSearches(): GovTribePollSearchConfig[] {
+  return GOVTRIBE_POLL_SEARCHES;
+}
+
+export async function pollGovTribeMCP(): Promise<GovTribePollResponse> {
+  if (!GOVTRIBE_API_KEY) {
+    throw new Error("GOVTRIBE_API_KEY not configured");
+  }
+
+  // --- Monthly cap check: refuse to start if at 95% of monthly cap ---
+  const capCheck = await checkMonthlyCap();
+  if (!capCheck.allowed) {
+    log.error("govtribe_poll_blocked_monthly_cap", {
+      monthlyUsed: capCheck.monthlyUsed, monthlyCap: MONTHLY_CREDIT_CAP,
+    });
+    return {
+      results: [],
+      searchSummary: [],
+      totalUnique: 0,
+      timestamp: new Date().toISOString(),
+      creditCapStatus: await getGovTribeCreditCapStatus(),
+      blocked: `Monthly credit cap reached (${capCheck.monthlyUsed}/${MONTHLY_CREDIT_CAP} credits used). Poll skipped.`,
+    };
+  }
+
+  const cycleId = `poll-${Date.now()}`;
+  resetGovTribeCreditCycle();
+
+  const allResults: Record<string, unknown>[] = [];
+  const searchSummary: GovTribePollResult[] = [];
+  const seenIds = new Set<string>();
+  let cycleCreditsUsed = 0;
+
+  for (const search of GOVTRIBE_POLL_SEARCHES) {
+    // --- Per-cycle cap check: stop mid-poll if cycle cap exceeded ---
+    if (cycleCreditsUsed >= CYCLE_CREDIT_CAP) {
+      log.warn("govtribe_poll_cycle_cap_reached", {
+        cycleCreditsUsed, cycleCap: CYCLE_CREDIT_CAP, skippedSearch: search.name,
+      });
+      searchSummary.push({
+        searchName: search.name, status: "skipped", count: 0, total: 0,
+        error: `Cycle credit cap reached (${cycleCreditsUsed}/${CYCLE_CREDIT_CAP})`,
+      });
+      continue;
+    }
+
+    try {
+      const query = search.keywords.map(kw => kw.includes(" ") ? `"${kw}"` : kw).join(" OR ");
+      const fieldsForTool = search.tool === "Search_Federal_Contract_Awards"
+        ? [
+            "govtribe_id", "name", "contract_number", "award_date",
+            "completion_date", "dollars_obligated", "ceiling_value",
+            "set_aside_type", "awardee", "contracting_federal_agency",
+            "naics_category", "psc_category", "place_of_performance", "govtribe_url",
+          ]
+        : search.tool === "Search_Federal_Forecasts"
+        ? [
+            "govtribe_id", "name", "description",
+            "estimated_value_low", "estimated_value_high",
+            "estimated_solicitation_date", "estimated_award_date",
+            "federal_agency", "naics_category", "place_of_performance", "govtribe_url",
+          ]
+        : [
+            "govtribe_id", "name", "solicitation_number", "posted_date",
+            "due_date", "opportunity_type", "set_aside_type", "federal_agency",
+            "naics_category", "place_of_performance", "govtribe_url",
+            "government_description", "ai_description",
+          ];
+
+      const sortForTool = search.tool === "Search_Federal_Contract_Awards"
+        ? { key: "awardDate", direction: "desc" }
+        : search.tool === "Search_Federal_Forecasts"
+        ? undefined
+        : { key: "postedDate", direction: "desc" };
+
+      const args: Record<string, unknown> = {
+        search_mode: "keyword",
+        query,
+        fields_to_return: fieldsForTool,
+        per_page: 50,
+        page: 1,
+      };
+      if (sortForTool) args.sort = sortForTool;
+
+      const text = await callGovTribeMCP(search.tool, args);
+      const parsed = JSON.parse(text) as { data?: Record<string, unknown>[]; total?: number };
+      const records = parsed.data ?? [];
+
+      const { credits } = trackCredits(search.tool, records.length);
+      cycleCreditsUsed += credits;
+
+      // Persist to DB ledger
+      await recordCreditUsage(cycleId, search.name, search.tool, credits, records.length);
+
+      for (const r of records) {
+        const id = r.govtribe_id as string | undefined;
+        if (!id || seenIds.has(id)) continue;
+        seenIds.add(id);
+
+        const oppType = search.tool === "Search_Federal_Contract_Awards"
+          ? "Award"
+          : search.tool === "Search_Federal_Forecasts"
+          ? "Forecast"
+          : (r.opportunity_type as string) ?? undefined;
+
+        allResults.push({
+          id,
+          name: r.name,
+          solicitation_number: r.solicitation_number ?? r.contract_number ?? null,
+          posted_date: r.posted_date ?? r.award_date ?? null,
+          due_date: r.due_date ?? null,
+          opportunity_type: oppType,
+          set_aside_type: r.set_aside_type ?? null,
+          government_description: r.government_description ?? r.description ?? null,
+          ai_description: r.ai_description ?? null,
+          url: r.govtribe_url ?? null,
+          source_search: search.name,
+        });
+      }
+
+      searchSummary.push({ searchName: search.name, status: "ok", count: records.length, total: parsed.total ?? 0 });
+      log.info("govtribe_poll_search", { search: search.name, count: records.length, total: parsed.total ?? 0, credits });
+    } catch (e) {
+      searchSummary.push({ searchName: search.name, status: "error", count: 0, total: 0, error: (e as Error).message });
+      log.warn("govtribe_poll_search_error", { search: search.name, error: (e as Error).message });
+    }
+  }
+
+  return {
+    results: allResults,
+    searchSummary,
+    totalUnique: allResults.length,
+    timestamp: new Date().toISOString(),
+    creditCapStatus: await getGovTribeCreditCapStatus(),
+  };
 }
 
 // ---------------------------------------------------------------------------

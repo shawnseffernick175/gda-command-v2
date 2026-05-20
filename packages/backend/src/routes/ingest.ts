@@ -14,6 +14,7 @@ import { getPool } from "../lib/db";
 import { notify } from "../lib/email";
 import { queueCaptureCoachIfNeeded } from "../agents/auto-capture-coach";
 import { enrichOpportunity } from "../lib/sam-enrichment";
+import { pollGovTribeMCP } from "../lib/gov-sources";
 
 const router = Router();
 
@@ -998,6 +999,219 @@ router.post("/govtribe", async (req, res) => {
     total: rawItems.length,
     timestamp: new Date().toISOString(),
   }));
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/ingest/govtribe/poll — Direct GovTribe MCP poll (replaces Zapier)
+// Runs all 7 saved search equivalents against GovTribe MCP, then feeds results
+// through the same ingest pipeline as POST /api/ingest/govtribe.
+// Called by n8n cron (Mon + Thu 6am ET) or manually via API.
+// ---------------------------------------------------------------------------
+router.post("/govtribe/poll", async (req, res) => {
+  if (!verifyIngestKey(req, res)) return;
+
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(errorEnvelope("gda-ingest", "govtribe-poll", {
+      code: "DB_UNAVAILABLE", message: "Database not configured", detail: null,
+    }));
+  }
+
+  const startTime = Date.now();
+
+  try {
+    // Poll GovTribe MCP for all 7 search configs
+    const pollResult = await pollGovTribeMCP();
+
+    // If poll was blocked by credit cap, return immediately with cap info
+    if (pollResult.blocked) {
+      return res.status(429).json(successEnvelope("gda-ingest", "govtribe-poll", {
+        upserted: 0,
+        enriched: 0,
+        low_confidence_flagged: 0,
+        errors: 0,
+        total: 0,
+        searchSummary: [],
+        blocked: pollResult.blocked,
+        creditCapStatus: pollResult.creditCapStatus,
+        durationMs: Date.now() - startTime,
+        timestamp: pollResult.timestamp,
+      }));
+    }
+
+    if (pollResult.totalUnique === 0) {
+      return res.json(successEnvelope("gda-ingest", "govtribe-poll", {
+        upserted: 0,
+        enriched: 0,
+        low_confidence_flagged: 0,
+        errors: 0,
+        total: 0,
+        searchSummary: pollResult.searchSummary,
+        creditCapStatus: pollResult.creditCapStatus,
+        durationMs: Date.now() - startTime,
+        timestamp: pollResult.timestamp,
+      }));
+    }
+
+    // Feed poll results through the existing ingest pipeline
+    let upserted = 0;
+    let enriched_count = 0;
+    let low_confidence_count = 0;
+    let errors = 0;
+    const enrichmentPromises: Promise<void>[] = [];
+
+    for (const raw of pollResult.results) {
+      try {
+        const id = raw.id ? `govtribe-${raw.id}` : null;
+        if (!id) {
+          errors++;
+          continue;
+        }
+
+        const mapped = {
+          id,
+          title: (raw.name ?? raw.title ?? "Untitled") as string,
+          solicitation_number: (raw.solicitation_number ?? null) as string | null,
+          set_aside: (raw.set_aside_type ?? null) as string | null,
+          due_date: (raw.due_date ?? null) as string | null,
+          description: (raw.government_description ?? raw.description ?? null) as string | null,
+          ai_summary: (raw.ai_description ?? null) as string | null,
+          raw_source_url: (raw.url ?? null) as string | null,
+          status: mapOpportunityType(raw.opportunity_type as string | undefined),
+          data_source: "govtribe_zapier",
+          created_at: (raw.created_at as string) ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        await pool.query(`
+          INSERT INTO opportunities (id, title, status, solicitation_number,
+            set_aside, due_date, description, ai_summary, raw_source_url,
+            data_source, created_at, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          ON CONFLICT (id) DO UPDATE SET
+            title = EXCLUDED.title,
+            solicitation_number = COALESCE(EXCLUDED.solicitation_number, opportunities.solicitation_number),
+            set_aside = COALESCE(EXCLUDED.set_aside, opportunities.set_aside),
+            due_date = COALESCE(EXCLUDED.due_date, opportunities.due_date),
+            description = COALESCE(EXCLUDED.description, opportunities.description),
+            ai_summary = COALESCE(EXCLUDED.ai_summary, opportunities.ai_summary),
+            raw_source_url = COALESCE(EXCLUDED.raw_source_url, opportunities.raw_source_url),
+            data_source = EXCLUDED.data_source,
+            updated_at = NOW()
+        `, [
+          mapped.id, mapped.title, mapped.status, mapped.solicitation_number,
+          mapped.set_aside, mapped.due_date, mapped.description, mapped.ai_summary,
+          mapped.raw_source_url, mapped.data_source, mapped.created_at, mapped.updated_at,
+        ]);
+        upserted++;
+
+        enrichmentPromises.push(
+          enrichOpportunity({
+            solicitation_number: mapped.solicitation_number,
+            title: mapped.title,
+            description: mapped.description,
+          }).then(async (result) => {
+            if (!result.enriched) return;
+
+            const updates: string[] = [];
+            const values: unknown[] = [];
+            let paramIdx = 1;
+
+            for (const [key, val] of Object.entries(result.fields)) {
+              if (val != null) {
+                updates.push(`${key} = COALESCE($${paramIdx}, ${key})`);
+                values.push(val);
+                paramIdx++;
+              }
+            }
+
+            if (result.incumbent && result.incumbent_confidence) {
+              if (result.incumbent_confidence === "low") {
+                updates.push(`incumbent_confidence = $${paramIdx}`);
+                values.push("low");
+                paramIdx++;
+                updates.push(`incumbent_source = $${paramIdx}`);
+                values.push(result.incumbent_source);
+                paramIdx++;
+                low_confidence_count++;
+              } else {
+                updates.push(`incumbent = $${paramIdx}`);
+                values.push(result.incumbent);
+                paramIdx++;
+                updates.push(`incumbent_confidence = $${paramIdx}`);
+                values.push(result.incumbent_confidence);
+                paramIdx++;
+                updates.push(`incumbent_source = $${paramIdx}`);
+                values.push(result.incumbent_source);
+                paramIdx++;
+              }
+            }
+
+            if (updates.length > 0) {
+              values.push(mapped.id);
+              await pool.query(
+                `UPDATE opportunities SET ${updates.join(", ")}, updated_at = NOW() WHERE id = $${paramIdx}`,
+                values,
+              );
+              enriched_count++;
+            }
+          }).catch((e) => {
+            log.warn("govtribe_poll_enrichment_error", { id, error: (e as Error).message });
+          })
+        );
+
+        Promise.resolve(queueCaptureCoachIfNeeded(mapped.id)).catch((e) => {
+          log.warn("govtribe_poll_capture_coach_error", { id: mapped.id, error: (e as Error).message });
+        });
+      } catch (e) {
+        errors++;
+        log.warn("govtribe_poll_ingest_error", { error: (e as Error).message });
+      }
+    }
+
+    await Promise.allSettled(enrichmentPromises);
+
+    try {
+      await pool.query(`
+        UPDATE gov_source_feeds SET
+          last_sync_at = NOW(),
+          last_sync_count = $1,
+          error_count = CASE WHEN $2 > 0 THEN error_count + 1 ELSE 0 END,
+          updated_at = NOW()
+        WHERE id = 'feed-govtribe-zapier'
+      `, [upserted, errors]);
+    } catch (e) {
+      log.warn("govtribe_poll_feed_update_error", { error: (e as Error).message });
+    }
+
+    log.info("govtribe_poll_complete", {
+      upserted,
+      enriched: enriched_count,
+      low_confidence_flagged: low_confidence_count,
+      errors,
+      total: pollResult.totalUnique,
+      durationMs: Date.now() - startTime,
+    });
+
+    res.json(successEnvelope("gda-ingest", "govtribe-poll", {
+      upserted,
+      enriched: enriched_count,
+      low_confidence_flagged: low_confidence_count,
+      errors,
+      total: pollResult.totalUnique,
+      searchSummary: pollResult.searchSummary,
+      creditCapStatus: pollResult.creditCapStatus,
+      durationMs: Date.now() - startTime,
+      timestamp: pollResult.timestamp,
+    }));
+  } catch (e) {
+    log.error("govtribe_poll_fatal", { error: (e as Error).message });
+    res.status(500).json(errorEnvelope("gda-ingest", "govtribe-poll", {
+      code: "POLL_ERROR",
+      message: (e as Error).message,
+      detail: null,
+    }));
+  }
 });
 
 /** Map GovTribe opportunity_type to GDA status */

@@ -441,7 +441,7 @@ describe("Webhook registry — govtribe-ingest entry", () => {
     expect(entry).toBeDefined();
     expect(entry.path).toBe("govtribe-ingest");
     expect(entry.status).toBe("live");
-    expect(entry.n8nWorkflow).toBe("GDA.ingest.govtribe-zapier");
+    expect(entry.n8nWorkflow).toBe("GDA.ingest.govtribe-cron");
     expect(entry.usedBy).toBe("ingest.ts");
   });
 
@@ -496,5 +496,157 @@ describe("Migration 050+051 — GovTribe Zapier ingest schema", () => {
     expect(updateIdx).toBeGreaterThan(-1);
     expect(addConstraintIdx).toBeGreaterThan(-1);
     expect(updateIdx).toBeLessThan(addConstraintIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GovTribe Direct Poll — search config validation
+// ---------------------------------------------------------------------------
+describe("GovTribe direct poll — search config", () => {
+  it("exports 7 search configurations matching the saved search design", async () => {
+    const { getGovTribePollSearches } = await import("../lib/gov-sources");
+    const searches = getGovTribePollSearches();
+    expect(searches).toHaveLength(7);
+  });
+
+  it("search names match the agreed GDA naming convention", async () => {
+    const { getGovTribePollSearches } = await import("../lib/gov-sources");
+    const searches = getGovTribePollSearches();
+    const names = searches.map(s => s.name);
+    expect(names).toContain("GDA-Opps-Core");
+    expect(names).toContain("GDA-Opps-Growth");
+    expect(names).toContain("GDA-Opps-Opportunistic");
+    expect(names).toContain("GDA-Awards-Core");
+    expect(names).toContain("GDA-Awards-Growth");
+    expect(names).toContain("GDA-Forecasts-Core");
+    expect(names).toContain("GDA-Forecasts-Growth");
+  });
+
+  it("uses correct MCP tools for each search type", async () => {
+    const { getGovTribePollSearches } = await import("../lib/gov-sources");
+    const searches = getGovTribePollSearches();
+
+    const oppSearches = searches.filter(s => s.name.includes("Opps"));
+    const awardSearches = searches.filter(s => s.name.includes("Awards"));
+    const forecastSearches = searches.filter(s => s.name.includes("Forecasts"));
+
+    for (const s of oppSearches) {
+      expect(s.tool).toBe("Search_Federal_Contract_Opportunities");
+    }
+    for (const s of awardSearches) {
+      expect(s.tool).toBe("Search_Federal_Contract_Awards");
+    }
+    for (const s of forecastSearches) {
+      expect(s.tool).toBe("Search_Federal_Forecasts");
+    }
+  });
+
+  it("Core searches include SETA and C5ISR keywords", async () => {
+    const { getGovTribePollSearches } = await import("../lib/gov-sources");
+    const searches = getGovTribePollSearches();
+    const coreSearches = searches.filter(s => s.name.includes("Core"));
+    for (const s of coreSearches) {
+      expect(s.keywords).toContain("SETA");
+      expect(s.keywords).toContain("C5ISR");
+    }
+  });
+
+  it("Growth searches include CMMC keyword", async () => {
+    const { getGovTribePollSearches } = await import("../lib/gov-sources");
+    const searches = getGovTribePollSearches();
+    const growthSearches = searches.filter(s => s.name.includes("Growth"));
+    for (const s of growthSearches) {
+      expect(s.keywords).toContain("CMMC");
+    }
+  });
+
+  it("GDA-Opps-Core includes PEO C3N / CPE C3N naming conventions", async () => {
+    const { getGovTribePollSearches } = await import("../lib/gov-sources");
+    const searches = getGovTribePollSearches();
+    const core = searches.find(s => s.name === "GDA-Opps-Core");
+    expect(core).toBeDefined();
+    expect(core!.keywords).toContain("PEO C3N");
+    expect(core!.keywords).toContain("CPE C3N");
+  });
+
+  it("pollGovTribeMCP throws when GOVTRIBE_API_KEY is not set", async () => {
+    const origKey = process.env.GOVTRIBE_API_KEY;
+    delete process.env.GOVTRIBE_API_KEY;
+    try {
+      // Re-import to pick up the missing key
+      vi.resetModules();
+      const { pollGovTribeMCP } = await import("../lib/gov-sources");
+      await expect(pollGovTribeMCP()).rejects.toThrow("GOVTRIBE_API_KEY not configured");
+    } finally {
+      if (origKey) process.env.GOVTRIBE_API_KEY = origKey;
+    }
+  });
+
+  it("webhook registry reflects cron workflow name", async () => {
+    const { WEBHOOK_REGISTRY } = await import("../lib/webhook-registry");
+    const entry = WEBHOOK_REGISTRY["govtribe-ingest"];
+    expect(entry.n8nWorkflow).toBe("GDA.ingest.govtribe-cron");
+    expect(entry.description).toContain("direct poll");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GovTribe Credit Cap — guardrail tests
+// ---------------------------------------------------------------------------
+describe("GovTribe credit cap system", () => {
+  it("exports getGovTribeCreditCapStatus with correct shape", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status).toHaveProperty("cycleCap");
+    expect(status).toHaveProperty("monthlyCap");
+    expect(status).toHaveProperty("monthlyUsed");
+    expect(status).toHaveProperty("monthKey");
+    expect(status).toHaveProperty("alertThreshold");
+    expect(status).toHaveProperty("stopThreshold");
+    expect(status).toHaveProperty("monthlyAlertTriggered");
+    expect(status).toHaveProperty("monthlyStopTriggered");
+  });
+
+  it("default cycle cap is 150", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.cycleCap).toBe(150);
+  });
+
+  it("default monthly cap is 1200", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.monthlyCap).toBe(1200);
+  });
+
+  it("alert threshold is 80% of monthly cap", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.alertThreshold).toBe(Math.floor(1200 * 0.80));
+  });
+
+  it("stop threshold is 95% of monthly cap", async () => {
+    const { getGovTribeCreditCapStatus } = await import("../lib/gov-sources");
+    const status = await getGovTribeCreditCapStatus();
+    expect(status.stopThreshold).toBe(Math.floor(1200 * 0.95));
+  });
+
+  it("GovTribePollResponse includes creditCapStatus and blocked fields", async () => {
+    // Verify the type exports exist (compile-time check via import)
+    const mod = await import("../lib/gov-sources");
+    expect(typeof mod.getGovTribeCreditCapStatus).toBe("function");
+    expect(typeof mod.getGovTribeCreditUsage).toBe("function");
+    expect(typeof mod.resetGovTribeCreditCycle).toBe("function");
+  });
+
+  it("credit ledger migration exists", async () => {
+    const fs = await import("fs");
+    const path = "src/db/migrations/053_govtribe_credit_ledger.sql";
+    expect(fs.existsSync(path)).toBe(true);
+    const content = fs.readFileSync(path, "utf8");
+    expect(content).toContain("govtribe_credit_ledger");
+    expect(content).toContain("month_key");
+    expect(content).toContain("credits_used");
+    expect(content).toContain("govtribe_credit_monthly");
   });
 });

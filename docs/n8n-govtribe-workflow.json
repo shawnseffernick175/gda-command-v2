@@ -1,31 +1,41 @@
 {
-  "name": "GDA.ingest.govtribe-zapier",
+  "name": "GDA.ingest.govtribe-cron",
   "nodes": [
     {
       "parameters": {
-        "path": "govtribe-ingest",
-        "authentication": "headerAuth",
-        "responseMode": "responseNode",
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 1,4"
+            }
+          ]
+        }
+      },
+      "id": "gt-cron",
+      "name": "Mon + Thu 6am ET",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "path": "govtribe-cron-trigger",
+        "responseMode": "lastNode",
         "options": {},
         "httpMethod": "POST"
       },
-      "id": "gt-webhook",
-      "name": "GovTribe Webhook",
+      "id": "gt-manual",
+      "name": "Manual Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
-      "webhookId": "govtribe-ingest",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "F4J3vYsPrJrYiO49",
-          "name": "GDA Webhook Auth v2"
-        }
-      }
+      "position": [240, 500],
+      "webhookId": "govtribe-cron-trigger"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.GDA_BASE_URL || 'http://localhost:3001' }}/api/ingest/govtribe",
+        "url": "={{ $env.GDA_BASE_URL || 'http://localhost:3001' }}/api/ingest/govtribe/poll",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -41,58 +51,36 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.body || $json) }}",
+        "jsonBody": "{}",
         "options": {
-          "timeout": 30000
+          "timeout": 120000
         }
       },
-      "id": "gt-forward",
-      "name": "Forward to GDA Ingest",
+      "id": "gt-poll",
+      "name": "GDA GovTribe Poll",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 300]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}",
-        "options": {}
-      },
-      "id": "gt-respond",
-      "name": "Respond OK",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [750, 300]
+      "position": [500, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
     }
   ],
   "connections": {
-    "GovTribe Webhook": {
-      "main": [
-        [
-          {
-            "node": "Forward to GDA Ingest",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Mon + Thu 6am ET": {
+      "main": [[{"node": "GDA GovTribe Poll", "type": "main", "index": 0}]]
     },
-    "Forward to GDA Ingest": {
-      "main": [
-        [
-          {
-            "node": "Respond OK",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Manual Trigger": {
+      "main": [[{"node": "GDA GovTribe Poll", "type": "main", "index": 0}]]
     }
   },
   "settings": {
     "executionOrder": "v1",
     "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "none",
+    "saveDataSuccessExecution": "all",
     "saveManualExecutions": true,
     "saveExecutionProgress": true,
     "callerPolicy": "workflowsFromSameOwner"
