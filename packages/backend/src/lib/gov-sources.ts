@@ -1091,7 +1091,7 @@ export async function pollGovTribeMCP(): Promise<GovTribePollResponse> {
 
   for (const search of GOVTRIBE_POLL_SEARCHES) {
     try {
-      const query = search.keywords.join(" OR ");
+      const query = search.keywords.map(kw => kw.includes(" ") ? `"${kw}"` : kw).join(" OR ");
       const fieldsForTool = search.tool === "Search_Federal_Contract_Awards"
         ? [
             "govtribe_id", "name", "contract_number", "award_date",
