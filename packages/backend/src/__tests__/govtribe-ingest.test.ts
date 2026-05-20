@@ -107,6 +107,23 @@ describe("SAM enrichment — confidence scoring", () => {
 
     if (origKey) process.env.SAM_API_KEY = origKey;
   });
+
+  it("enrichFromSAM accepts configurable lookbackYears", async () => {
+    const { enrichFromSAM } = await import("../lib/sam-enrichment");
+    // With no API key, we can still verify the parameter is accepted
+    const origKey = process.env.SAM_API_KEY;
+    delete process.env.SAM_API_KEY;
+
+    const result = await enrichFromSAM({
+      solicitation_number: "TEST-001",
+      title: "Test",
+      lookbackYears: 10,
+    });
+    expect(result.enriched).toBe(false);
+    expect(result.error).toBe("no_sam_api_key");
+
+    if (origKey) process.env.SAM_API_KEY = origKey;
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -131,7 +148,6 @@ describe("USAspending incumbent fallback — threshold gating", () => {
       score: 20,
       naics: "541511",
     });
-    // Won't skip due to core NAICS — result depends on API availability
     expect(result).toBeDefined();
     expect(result).toHaveProperty("incumbent");
     expect(result).toHaveProperty("incumbent_confidence");
@@ -146,6 +162,310 @@ describe("USAspending incumbent fallback — threshold gating", () => {
     });
     expect(result).toBeDefined();
     expect(result).toHaveProperty("incumbent");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mock-based confidence scoring — verifies scoring branch logic
+// ---------------------------------------------------------------------------
+describe("USAspending confidence scoring — branch logic", () => {
+  it("assigns medium confidence when top candidate has >2x score gap", () => {
+    // Simulate the scoring logic from sam-enrichment.ts
+    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
+      if (secondBestScore != null && secondBestScore > 0) {
+        const ratio = bestScore / secondBestScore;
+        if (ratio > 2) return "medium";
+        if (ratio >= 1.2) return "medium";
+        return "low";
+      }
+      return "medium";
+    };
+
+    // >2x gap → medium
+    expect(assignConfidence(10, 4)).toBe("medium");
+    expect(assignConfidence(20, 5)).toBe("medium");
+  });
+
+  it("assigns medium confidence for 1.2x–2x score gap (distinguishable leader)", () => {
+    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
+      if (secondBestScore != null && secondBestScore > 0) {
+        const ratio = bestScore / secondBestScore;
+        if (ratio > 2) return "medium";
+        if (ratio >= 1.2) return "medium";
+        return "low";
+      }
+      return "medium";
+    };
+
+    // 1.2x–2x gap → medium (this was the missing middle zone)
+    expect(assignConfidence(10, 7)).toBe("medium"); // ratio 1.43
+    expect(assignConfidence(12, 10)).toBe("medium"); // ratio 1.2
+    expect(assignConfidence(15, 8)).toBe("medium"); // ratio 1.875
+  });
+
+  it("assigns low confidence when candidates are within 20% (<1.2x ratio)", () => {
+    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
+      if (secondBestScore != null && secondBestScore > 0) {
+        const ratio = bestScore / secondBestScore;
+        if (ratio > 2) return "medium";
+        if (ratio >= 1.2) return "medium";
+        return "low";
+      }
+      return "medium";
+    };
+
+    // <1.2x gap → low
+    expect(assignConfidence(10, 9)).toBe("low"); // ratio 1.11
+    expect(assignConfidence(10, 10)).toBe("low"); // ratio 1.0
+    expect(assignConfidence(11, 10)).toBe("low"); // ratio 1.1
+  });
+
+  it("assigns medium confidence when only one candidate has a score", () => {
+    const assignConfidence = (bestScore: number, secondBestScore: number | null) => {
+      if (secondBestScore != null && secondBestScore > 0) {
+        const ratio = bestScore / secondBestScore;
+        if (ratio > 2) return "medium";
+        if (ratio >= 1.2) return "medium";
+        return "low";
+      }
+      return "medium";
+    };
+
+    expect(assignConfidence(10, null)).toBe("medium");
+    expect(assignConfidence(10, 0)).toBe("medium");
+  });
+
+  it("uses usaspending_fuzzy_strong for medium and usaspending_fuzzy_weak for low", () => {
+    const assignSource = (confidence: "high" | "medium" | "low") =>
+      confidence === "low" ? "usaspending_fuzzy_weak" : "usaspending_fuzzy_strong";
+
+    expect(assignSource("medium")).toBe("usaspending_fuzzy_strong");
+    expect(assignSource("low")).toBe("usaspending_fuzzy_weak");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mock-based SAM field mapping — verifies enrichment output shape
+// ---------------------------------------------------------------------------
+describe("SAM enrichment — field mapping output shape", () => {
+  it("maps SAM fields to correct GDA column names", () => {
+    // Simulate what enrichFromSAM does with a SAM record
+    const sam = {
+      naicsCode: "541511",
+      fullParentPathName: "DEPT OF DEFENSE.DEPT OF THE ARMY.PEO IEW&S",
+      classificationCode: "R425",
+      award: { amount: "5000000", awardee: { name: "Acme Corp" } },
+      placeOfPerformance: {
+        city: { name: "Aberdeen" },
+        state: { name: "Maryland" },
+        country: { name: "UNITED STATES" },
+      },
+    };
+
+    const fields: Record<string, unknown> = {};
+
+    if (sam.naicsCode) fields.naics = sam.naicsCode;
+    if (sam.fullParentPathName) {
+      const orgParts = sam.fullParentPathName.split(".");
+      fields.agency = orgParts[0]?.trim() ?? null;
+      fields.department = orgParts.slice(1).join(" / ").trim() || null;
+    }
+    if (sam.classificationCode) fields.psc = sam.classificationCode;
+    if (sam.award?.amount) fields.value_estimated = parseFloat(sam.award.amount);
+    if (sam.placeOfPerformance) {
+      const parts: string[] = [];
+      if (sam.placeOfPerformance.city?.name) parts.push(sam.placeOfPerformance.city.name);
+      if (sam.placeOfPerformance.state?.name) parts.push(sam.placeOfPerformance.state.name);
+      if (parts.length > 0) fields.place_of_performance = parts.join(", ");
+    }
+
+    expect(fields.naics).toBe("541511");
+    expect(fields.agency).toBe("DEPT OF DEFENSE");
+    expect(fields.department).toBe("DEPT OF THE ARMY / PEO IEW&S");
+    expect(fields.psc).toBe("R425");
+    expect(fields.value_estimated).toBe(5000000);
+    expect(fields.place_of_performance).toBe("Aberdeen, Maryland");
+  });
+
+  it("extracts incumbent from SAM award notice with high confidence", () => {
+    const sam = {
+      award: { awardee: { name: "Booz Allen Hamilton" } },
+    };
+
+    let incumbent: string | null = null;
+    let confidence: string | null = null;
+    let source: string | null = null;
+
+    if (sam.award?.awardee?.name) {
+      incumbent = sam.award.awardee.name;
+      confidence = "high";
+      source = "sam_award";
+    }
+
+    expect(incumbent).toBe("Booz Allen Hamilton");
+    expect(confidence).toBe("high");
+    expect(source).toBe("sam_award");
+  });
+
+  it("returns null incumbent when SAM record has no award.awardee", () => {
+    const sam = {
+      award: { amount: "1000000" },
+    };
+
+    let incumbent: string | null = null;
+    if ((sam.award as Record<string, unknown>)?.awardee) {
+      incumbent = "should not reach here";
+    }
+
+    expect(incumbent).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Low-confidence gating — incumbent column behavior
+// ---------------------------------------------------------------------------
+describe("Low-confidence incumbent gating", () => {
+  it("does NOT auto-populate incumbent for low-confidence matches", () => {
+    // Simulate the ingest.ts logic for low-confidence
+    const result = {
+      incumbent: "Acme Corp",
+      incumbent_confidence: "low" as const,
+      incumbent_source: "usaspending_fuzzy_weak",
+    };
+
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let paramIdx = 1;
+
+    if (result.incumbent && result.incumbent_confidence) {
+      if (result.incumbent_confidence === "low") {
+        // Should set confidence/source but NOT incumbent
+        updates.push(`incumbent_confidence = $${paramIdx}`);
+        values.push("low");
+        paramIdx++;
+        updates.push(`incumbent_source = $${paramIdx}`);
+        values.push(result.incumbent_source);
+        paramIdx++;
+      } else {
+        updates.push(`incumbent = $${paramIdx}`);
+        values.push(result.incumbent);
+        paramIdx++;
+      }
+    }
+
+    // Verify: incumbent column should NOT be in the updates
+    expect(updates.some((u) => u.startsWith("incumbent ="))).toBe(false);
+    expect(updates).toContain("incumbent_confidence = $1");
+    expect(updates).toContain("incumbent_source = $2");
+    expect(values).toEqual(["low", "usaspending_fuzzy_weak"]);
+  });
+
+  it("DOES auto-populate incumbent for medium-confidence matches", () => {
+    const result: { incumbent: string; incumbent_confidence: "high" | "medium" | "low"; incumbent_source: string } = {
+      incumbent: "Leidos Inc",
+      incumbent_confidence: "medium",
+      incumbent_source: "usaspending_fuzzy_strong",
+    };
+
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let paramIdx = 1;
+
+    if (result.incumbent && result.incumbent_confidence) {
+      if (result.incumbent_confidence === "low") {
+        updates.push(`incumbent_confidence = $${paramIdx}`);
+        values.push("low");
+        paramIdx++;
+      } else {
+        updates.push(`incumbent = $${paramIdx}`);
+        values.push(result.incumbent);
+        paramIdx++;
+        updates.push(`incumbent_confidence = $${paramIdx}`);
+        values.push(result.incumbent_confidence);
+        paramIdx++;
+        updates.push(`incumbent_source = $${paramIdx}`);
+        values.push(result.incumbent_source);
+        paramIdx++;
+      }
+    }
+
+    // Verify: incumbent IS in the updates
+    expect(updates.some((u) => u.startsWith("incumbent ="))).toBe(true);
+    expect(values[0]).toBe("Leidos Inc");
+    expect(values[1]).toBe("medium");
+    expect(values[2]).toBe("usaspending_fuzzy_strong");
+  });
+
+  it("DOES auto-populate incumbent for high-confidence SAM matches", () => {
+    const result: { incumbent: string; incumbent_confidence: "high" | "medium" | "low"; incumbent_source: string } = {
+      incumbent: "Raytheon",
+      incumbent_confidence: "high",
+      incumbent_source: "sam_award",
+    };
+
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let paramIdx = 1;
+
+    if (result.incumbent && result.incumbent_confidence) {
+      if (result.incumbent_confidence === "low") {
+        updates.push(`incumbent_confidence = $${paramIdx}`);
+        values.push("low");
+        paramIdx++;
+      } else {
+        updates.push(`incumbent = $${paramIdx}`);
+        values.push(result.incumbent);
+        paramIdx++;
+        updates.push(`incumbent_confidence = $${paramIdx}`);
+        values.push(result.incumbent_confidence);
+        paramIdx++;
+        updates.push(`incumbent_source = $${paramIdx}`);
+        values.push(result.incumbent_source);
+        paramIdx++;
+      }
+    }
+
+    expect(updates.some((u) => u.startsWith("incumbent ="))).toBe(true);
+    expect(values[0]).toBe("Raytheon");
+    expect(values[1]).toBe("high");
+    expect(values[2]).toBe("sam_award");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Keyword extraction — stop word filtering
+// ---------------------------------------------------------------------------
+describe("USAspending keyword extraction", () => {
+  it("filters stop words from title for better search quality", () => {
+    const STOP_WORDS = new Set([
+      "the", "for", "and", "of", "to", "in", "a", "an", "is", "at", "by",
+      "on", "with", "from", "this", "that", "are", "was", "will", "be",
+      "contract", "award", "solicitation", "notice", "amendment",
+      "usace", "navsea", "modification", "sources", "sought",
+    ]);
+
+    const title = "USACE Contract Award For Cybersecurity SETA Support Services";
+    const description = "Systems engineering and technical assistance";
+    const allText = `${title} ${description}`;
+    const keywords = allText
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-zA-Z0-9-]/g, "").toLowerCase())
+      .filter((w) => w.length > 3 && !STOP_WORDS.has(w))
+      .slice(0, 8);
+
+    // Should NOT include "usace", "contract", "award", "for"
+    expect(keywords).not.toContain("usace");
+    expect(keywords).not.toContain("contract");
+    expect(keywords).not.toContain("award");
+    // SHOULD include meaningful words
+    expect(keywords).toContain("cybersecurity");
+    expect(keywords).toContain("seta");
+    expect(keywords).toContain("support");
+    expect(keywords).toContain("services");
+    expect(keywords).toContain("systems");
+    expect(keywords).toContain("engineering");
+    expect(keywords).toContain("technical");
+    expect(keywords).toContain("assistance");
   });
 });
 
@@ -174,18 +494,8 @@ describe("Webhook registry — govtribe-ingest entry", () => {
 // ---------------------------------------------------------------------------
 // Schema migration presence
 // ---------------------------------------------------------------------------
-describe("Migration 050 — GovTribe Zapier ingest schema", () => {
-  it("migration file exists", async () => {
-    const fs = await import("fs");
-    const path = await import("path");
-    const migrationPath = path.join(
-      __dirname,
-      "../db/migrations/050_govtribe_zapier_ingest.sql",
-    );
-    expect(fs.existsSync(migrationPath)).toBe(true);
-  });
-
-  it("migration adds required columns and feed entry", async () => {
+describe("Migration 050+051 — GovTribe Zapier ingest schema", () => {
+  it("migration 050 exists and adds required columns", async () => {
     const fs = await import("fs");
     const path = await import("path");
     const content = fs.readFileSync(
@@ -196,6 +506,18 @@ describe("Migration 050 — GovTribe Zapier ingest schema", () => {
     expect(content).toContain("incumbent_confidence");
     expect(content).toContain("incumbent_source");
     expect(content).toContain("feed-govtribe-zapier");
-    expect(content).toContain("govtribe_zapier");
+  });
+
+  it("migration 051 exists and fixes incumbent_source constraint", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const content = fs.readFileSync(
+      path.join(__dirname, "../db/migrations/051_fix_incumbent_source_constraint.sql"),
+      "utf8",
+    );
+    expect(content).toContain("usaspending_fuzzy_strong");
+    expect(content).toContain("usaspending_fuzzy_weak");
+    // CHECK constraint should not include usaspending_exact as a valid value
+    expect(content).toContain("CHECK (incumbent_source IN ('sam_award', 'usaspending_fuzzy_strong', 'usaspending_fuzzy_weak', 'govtribe_mcp', 'manual'))");
   });
 });

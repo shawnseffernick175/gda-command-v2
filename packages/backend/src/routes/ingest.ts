@@ -846,6 +846,7 @@ router.post("/govtribe", async (req, res) => {
   let enriched_count = 0;
   let low_confidence_count = 0;
   let errors = 0;
+  const enrichmentPromises: Promise<void>[] = [];
 
   for (const raw of rawItems) {
     try {
@@ -894,70 +895,86 @@ router.post("/govtribe", async (req, res) => {
       ]);
       upserted++;
 
-      // Auto-enrich via SAM cross-reference (async, fire-and-forget)
-      enrichOpportunity({
-        solicitation_number: mapped.solicitation_number,
-        title: mapped.title,
-        description: mapped.description,
-      }).then(async (result) => {
-        if (!result.enriched) return;
+      // Auto-enrich via SAM cross-reference — awaited before response
+      enrichmentPromises.push(
+        enrichOpportunity({
+          solicitation_number: mapped.solicitation_number,
+          title: mapped.title,
+          description: mapped.description,
+        }).then(async (result) => {
+          if (!result.enriched) return;
 
-        const updates: string[] = [];
-        const values: unknown[] = [];
-        let paramIdx = 1;
+          const updates: string[] = [];
+          const values: unknown[] = [];
+          let paramIdx = 1;
 
-        // SAM-derived fields
-        for (const [key, val] of Object.entries(result.fields)) {
-          if (val != null) {
-            updates.push(`${key} = COALESCE($${paramIdx}, ${key})`);
-            values.push(val);
-            paramIdx++;
+          // SAM-derived fields
+          for (const [key, val] of Object.entries(result.fields)) {
+            if (val != null) {
+              updates.push(`${key} = COALESCE($${paramIdx}, ${key})`);
+              values.push(val);
+              paramIdx++;
+            }
           }
-        }
 
-        // Incumbent fields
-        if (result.incumbent) {
-          updates.push(`incumbent = $${paramIdx}`);
-          values.push(result.incumbent);
-          paramIdx++;
-          updates.push(`incumbent_confidence = $${paramIdx}`);
-          values.push(result.incumbent_confidence);
-          paramIdx++;
-          updates.push(`incumbent_source = $${paramIdx}`);
-          values.push(result.incumbent_source);
-          paramIdx++;
-
-          if (result.incumbent_confidence === "low") {
-            low_confidence_count++;
+          // Incumbent fields — only auto-populate for high/medium confidence.
+          // Low-confidence matches are flagged for manual review, NOT written to incumbent column.
+          if (result.incumbent && result.incumbent_confidence) {
+            if (result.incumbent_confidence === "low") {
+              // Flag for review: set confidence/source markers but leave incumbent null
+              updates.push(`incumbent_confidence = $${paramIdx}`);
+              values.push("low");
+              paramIdx++;
+              updates.push(`incumbent_source = $${paramIdx}`);
+              values.push(result.incumbent_source);
+              paramIdx++;
+              low_confidence_count++;
+            } else {
+              // High or medium confidence — auto-populate
+              updates.push(`incumbent = $${paramIdx}`);
+              values.push(result.incumbent);
+              paramIdx++;
+              updates.push(`incumbent_confidence = $${paramIdx}`);
+              values.push(result.incumbent_confidence);
+              paramIdx++;
+              updates.push(`incumbent_source = $${paramIdx}`);
+              values.push(result.incumbent_source);
+              paramIdx++;
+            }
           }
-        }
 
-        if (updates.length > 0) {
-          values.push(mapped.id);
-          await pool.query(
-            `UPDATE opportunities SET ${updates.join(", ")}, updated_at = NOW() WHERE id = $${paramIdx}`,
-            values,
-          );
-          enriched_count++;
+          if (updates.length > 0) {
+            values.push(mapped.id);
+            await pool.query(
+              `UPDATE opportunities SET ${updates.join(", ")}, updated_at = NOW() WHERE id = $${paramIdx}`,
+              values,
+            );
+            enriched_count++;
 
-          log.info("govtribe_enrichment_applied", {
-            id: mapped.id,
-            fields: Object.keys(result.fields),
-            incumbent: result.incumbent ?? null,
-            incumbent_confidence: result.incumbent_confidence ?? null,
-          });
-        }
-      }).catch((e) => {
-        log.warn("govtribe_enrichment_error", { id: mapped.id, error: (e as Error).message });
+            log.info("govtribe_enrichment_applied", {
+              id: mapped.id,
+              fields: Object.keys(result.fields),
+              incumbent: result.incumbent ?? null,
+              incumbent_confidence: result.incumbent_confidence ?? null,
+            });
+          }
+        }).catch((e) => {
+          log.warn("govtribe_enrichment_error", { id: mapped.id, error: (e as Error).message });
+        })
+      );
+
+      // Auto-trigger Capture Coach (catch to prevent unhandled rejection — F-002 pattern)
+      Promise.resolve(queueCaptureCoachIfNeeded(mapped.id)).catch((e) => {
+        log.warn("govtribe_capture_coach_error", { id: mapped.id, error: (e as Error).message });
       });
-
-      // Auto-trigger Capture Coach
-      queueCaptureCoachIfNeeded(mapped.id);
     } catch (e) {
       errors++;
       log.warn("govtribe_ingest_error", { error: (e as Error).message });
     }
   }
+
+  // Wait for all enrichment to complete so response counters are accurate
+  await Promise.allSettled(enrichmentPromises);
 
   // Update gov_source_feeds tracking
   try {
