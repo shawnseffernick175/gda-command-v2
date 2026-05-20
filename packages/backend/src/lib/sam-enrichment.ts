@@ -14,6 +14,7 @@
 import { searchOpportunities, type SAMOpportunityRaw } from "./sam-api";
 import { searchAwards, type USASpendingAward } from "./fpds-api";
 import { log } from "./logger";
+import { logEnrichmentCall } from "./enrichment-logger";
 
 export interface EnrichmentResult {
   enriched: boolean;
@@ -61,6 +62,7 @@ export async function enrichFromSAM(opp: {
     return { enriched: false, fields: {}, error: "no_sam_api_key" };
   }
 
+  const samCallStart = Date.now();
   try {
     const now = new Date();
     const lookbackYears = opp.lookbackYears ?? 5;
@@ -78,6 +80,7 @@ export async function enrichFromSAM(opp: {
     });
 
     if (!result.opportunitiesData?.length) {
+      logEnrichmentCall({ source: "sam_gov", success: true, duration_ms: Date.now() - samCallStart });
       return { enriched: false, fields: {}, sam_match: false };
     }
 
@@ -137,6 +140,8 @@ export async function enrichFromSAM(opp: {
       sam_records: result.opportunitiesData.length,
     });
 
+    logEnrichmentCall({ source: "sam_gov", success: true, duration_ms: Date.now() - samCallStart });
+
     return {
       enriched,
       fields,
@@ -150,6 +155,7 @@ export async function enrichFromSAM(opp: {
       solicitation_number: opp.solicitation_number,
       error: (e as Error).message,
     });
+    logEnrichmentCall({ source: "sam_gov", success: false, error_message: (e as Error).message, duration_ms: Date.now() - samCallStart });
     return { enriched: false, fields: {}, error: (e as Error).message };
   }
 }
@@ -197,6 +203,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     return { incumbent: null, incumbent_confidence: null, incumbent_source: null };
   }
 
+  const usaCallStart = Date.now();
   try {
     // Build search parameters — extract meaningful keywords, skip stop words
     const STOP_WORDS = new Set([
@@ -231,6 +238,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     const result = await searchAwards(params);
 
     if (!result.results?.length) {
+      logEnrichmentCall({ source: "usaspending", success: true, duration_ms: Date.now() - usaCallStart });
       return { incumbent: null, incumbent_confidence: null, incumbent_source: null };
     }
 
@@ -265,6 +273,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     scored.sort((a, b) => b.matchScore - a.matchScore);
 
     if (scored[0].matchScore === 0) {
+      logEnrichmentCall({ source: "usaspending", success: true, duration_ms: Date.now() - usaCallStart });
       return { incumbent: null, incumbent_confidence: null, incumbent_source: null };
     }
 
@@ -283,6 +292,8 @@ export async function enrichIncumbentFromUSAspending(opp: {
       candidates: scored.filter((s) => s.matchScore > 0).length,
     });
 
+    logEnrichmentCall({ source: "usaspending", success: true, duration_ms: Date.now() - usaCallStart });
+
     return {
       incumbent: recipientName,
       incumbent_confidence: confidence,
@@ -290,6 +301,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     };
   } catch (e) {
     log.warn("usaspending_incumbent_error", { error: (e as Error).message });
+    logEnrichmentCall({ source: "usaspending", success: false, error_message: (e as Error).message, duration_ms: Date.now() - usaCallStart });
     return { incumbent: null, incumbent_confidence: null, incumbent_source: null };
   }
 }

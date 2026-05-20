@@ -171,13 +171,29 @@ export interface SourceHealthItem {
   api_key_configured: boolean | null;
 }
 
+export interface SourceHealthSnapshot {
+  source: string;
+  role: "primary" | "enrichment";
+  status: "healthy" | "degraded" | "error" | "deprecated" | "planned" | "missing_key";
+  last_record_at: string | null;
+  records_last_7d: number;
+  records_last_30d: number;
+  calls_last_7d: number;
+  error_count_7d: number;
+  status_reason: string | null;
+  meta: Record<string, unknown>;
+  snapshot_at: string;
+}
+
 export interface SourceHealthData {
   overall: "operational" | "degraded" | "error";
+  overall_status: "all_healthy" | "degraded" | "critical" | "unknown";
   total: number;
   active: number;
   deprecated: number;
   erroring: number;
   sources: SourceHealthItem[];
+  latest_snapshots: SourceHealthSnapshot[];
 }
 
 export function fetchSourceHealth() {
