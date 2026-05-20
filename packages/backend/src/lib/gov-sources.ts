@@ -972,61 +972,19 @@ export async function checkGovTribeHealth(): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// GovWin IQ Client (requires subscription API key)
+// GovWin IQ Client — now uses WSAPI via govwin-client.ts (F-006)
+// The old iq.govwin.com/neo/api/v1 endpoint with X-Api-Key was wrong.
+// Real API: services.govwin.com/neo-ws with OAuth2 bearer tokens.
+// Poll endpoint: POST /api/ingest/govwin/poll (see ingest.ts)
 // ---------------------------------------------------------------------------
-const GOVWIN_API_KEY = process.env.GOVWIN_API_KEY;
 
-async function fetchGovWinOpportunities(params: Record<string, unknown>): Promise<GovOpportunity[]> {
-  if (!GOVWIN_API_KEY) return [];
-
-  const categories = (params.categories ?? []) as string[];
-  const results: GovOpportunity[] = [];
-
-  try {
-    // GovWin uses a REST API with authentication
-    const resp = await fetch("https://iq.govwin.com/neo/api/v1/opportunities", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Api-Key": GOVWIN_API_KEY,
-      },
-      body: JSON.stringify({
-        filters: { categories, status: "active" },
-        limit: 100,
-        sort: { field: "postedDate", direction: "desc" },
-      }),
-    });
-
-    if (!resp.ok) {
-      log.warn("govwin_fetch_error", { status: resp.status, url: resp.url });
-      return [];
-    }
-
-    if (!validateJsonResponse(resp, "govwin")) {
-      return [];
-    }
-
-    const data = await resp.json() as { items?: Array<Record<string, unknown>> };
-    for (const item of data.items ?? []) {
-      results.push({
-        external_id: `govwin-${String(item.id ?? "")}`,
-        source: "govwin",
-        title: String(item.title ?? ""),
-        description: String(item.synopsis ?? ""),
-        agency: String(item.agency ?? ""),
-        posted_date: item.postedDate ? String(item.postedDate) : undefined,
-        due_date: item.responseDate ? String(item.responseDate) : undefined,
-        naics_code: item.naicsCode ? String(item.naicsCode) : undefined,
-        set_aside: item.setAside ? String(item.setAside) : undefined,
-        url: `https://iq.govwin.com/neo/opportunity/${String(item.id ?? "")}`,
-        value_estimate: item.estimatedValue ? Number(item.estimatedValue) : undefined,
-      });
-    }
-  } catch (e) {
-    log.warn("govwin_fetch_error", { error: (e as Error).message });
-  }
-
-  return results;
+async function fetchGovWinOpportunities(_params: Record<string, unknown>): Promise<GovOpportunity[]> {
+  // GovWin integration now runs via POST /api/ingest/govwin/poll
+  // which uses the WSAPI client (govwin-client.ts) with OAuth2 auth.
+  // This sync-based function is kept for backward compatibility
+  // but returns empty — the poll endpoint handles everything.
+  log.info("govwin_sync_skipped", { hint: "Use POST /api/ingest/govwin/poll instead" });
+  return [];
 }
 
 // ---------------------------------------------------------------------------

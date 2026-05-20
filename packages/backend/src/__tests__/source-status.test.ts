@@ -165,7 +165,7 @@ describe("Primary source status logic", () => {
 
   it("checks for missing API keys including govtribe_zapier", () => {
     expect(qaRoutes).toContain("SAM_API_KEY");
-    expect(qaRoutes).toContain("GOVWIN_API_KEY");
+    expect(qaRoutes).toContain("GOVWIN_CLIENT_ID");
     expect(qaRoutes).toContain("GOVTRIBE_API_KEY");
     expect(qaRoutes).toContain("missing_key");
     // govtribe_zapier must also be in the envKeys check

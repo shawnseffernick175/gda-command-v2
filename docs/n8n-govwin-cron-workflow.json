@@ -1,0 +1,122 @@
+{
+  "name": "GDA.ingest.govwin-cron",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "govwin-cron-trigger",
+      "name": "Daily 6am ET (10:00 UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gda.csr-llc.tech/api/ingest/govwin/poll",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": false,
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "govwin-poll-request",
+      "name": "Poll GovWin WSAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "USE_YOUR_GDA_WEBHOOK_AUTH_CREDENTIAL_ID",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gda.csr-llc.tech/api/ingest/govwin/poll",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": false,
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "govwin-manual-trigger-request",
+      "name": "Poll GovWin WSAPI (Manual)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "USE_YOUR_GDA_WEBHOOK_AUTH_CREDENTIAL_ID",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "govwin-poll-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "govwin-manual-webhook",
+      "name": "Manual Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 500],
+      "webhookId": "govwin-poll-trigger"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "govwin-manual-response",
+      "name": "Return Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [700, 500]
+    }
+  ],
+  "connections": {
+    "Daily 6am ET (10:00 UTC)": {
+      "main": [[{ "node": "Poll GovWin WSAPI", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger Webhook": {
+      "main": [[{ "node": "Poll GovWin WSAPI (Manual)", "type": "main", "index": 0 }]]
+    },
+    "Poll GovWin WSAPI (Manual)": {
+      "main": [[{ "node": "Return Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0
+}
