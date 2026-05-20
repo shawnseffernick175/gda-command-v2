@@ -40,8 +40,8 @@ Sources examined:
 | F-014 | Preventive | P2 | No cross-file type-safety validation in migrations | Open (tracked separately) |
 | F-015 | Every 6h | P2 | Ingest mappers (SAM, GovTribe, GovWin, FPDS) lack consistent input sanitization | Open (tracked separately) |
 | F-016 | Always | P2 | Schema-mapper drift — mappers write fields the DB silently drops, no detection | Open (tracked separately) |
-| F-017 | On deploy | P1 | Migration system tests fresh-deploy only, not production-state-dependent migrations — already produced one incident (PR #224 / migration 045 UNIQUE violation) | Open (active gap) |
-| F-018 | Unknown | P2 | Existing migrations may have unmarked state-dependent operations without corresponding regression tests | Open (audit needed) |
+| F-017 | On deploy | P1 | Migration system tests fresh-deploy only, not production-state-dependent migrations — already produced one incident (PR #224 / migration 045 UNIQUE violation) | **Fixed** (PR #243 — harness + 3 paired tests, PR #246 — allowlist tightening) |
+| F-018 | Unknown | P2 | Existing migrations may have unmarked state-dependent operations without corresponding regression tests | **Fixed** (PR #247 — full audit of 55 migrations, 8 paired tests covering all high-risk state-dependent migrations) |
 | F-019 | On every deploy | P1 | Production state modified outside canonical deploy path — sessions applied migrations from unmerged branches | Open |
 
 ---
@@ -203,7 +203,7 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 
 ### F-017 — Migration System Tests Fresh-Deploy Only, Not Production State
 
-**Status:** Active gap — already produced one incident.
+**Status:** **Fixed** — PR #243 (harness + 3 paired tests), PR #246 (allowlist tightening).
 
 **Root cause:** The CI migration smoke test runs all migrations from scratch against an empty database. Production runs migrations against a database with prior state. Any migration that depends on or modifies pre-existing `schema_migrations` entries, existing rows, or existing column values has no test coverage for the production case. The gap is structural: the test infrastructure assumes migrations are only applied to empty databases, but state-dependent migrations are a normal part of maintenance.
 
@@ -217,13 +217,11 @@ The sync completes (5000 fetched, 4987 upserted, 13 errors) but 13 opportunities
 
 ### F-018 — Audit Existing Migrations for Unmarked State-Dependent Operations
 
+**Status:** **Fixed** — PR #247 completed the full audit.
+
 **Root cause:** The state-dependent migration convention (F-017) applies going forward, but migrations that already shipped may contain UPDATE, DELETE, or INSERT ... ON CONFLICT operations that depend on prior database state — and none of those have corresponding regression tests.
 
-**Evidence:** Migration 045 (F-010 fix) was the first identified case of a state-dependent migration without a test. The convention was established after the incident, but no retroactive audit has been done on migrations 001–046.
-
-**Proposed fix:** One-time pass: scan all existing migrations for state-modifying operations (UPDATE, DELETE, INSERT with ON CONFLICT that has side effects beyond DO NOTHING). For each, assess whether a regression test is needed and add one if so.
-
-**Proposed regression test:** Per-migration tests for any identified state-dependent migrations, following the `test-migration-045.ts` pattern.
+**Resolution:** All 55 migrations were audited. 15 state-dependent migrations were identified; 8 now have paired tests (the high-risk ones involving data classification, deletion, constraint migration, and feed deprecation). The remaining 7 are low-risk operations (single-row renames, config updates, same-migration column population) documented in the README with a note to add tests if they become incident-relevant. Full audit table in `packages/backend/src/db/migrations/__tests__/README.md`.
 
 ### F-019 — Production State Modified Outside Canonical Deploy Path
 
