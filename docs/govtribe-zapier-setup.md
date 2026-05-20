@@ -1,83 +1,90 @@
-# GovTribe Tier 1: Zapier → n8n → GDA Ingest Pipeline
+# GovTribe Tier 1: Direct MCP Poll → GDA Ingest Pipeline
 
 ## Architecture
 
 ```
-GovTribe Saved Searches → Zapier (Pro, $49.99/month) → n8n webhook → GDA /api/ingest/govtribe
-                                                                      ↓
-                                                                SAM.gov enrichment (free)
-                                                                      ↓
-                                                                USAspending fallback (free)
+n8n Cron (every 4h) → POST /api/ingest/govtribe/poll
+                        ↓
+                   GovTribe MCP (7 saved search configs)
+                        ↓
+                   Upsert to opportunities table
+                        ↓
+                   SAM.gov enrichment (free)
+                        ↓
+                   USAspending fallback (free)
 ```
 
-**Cost:** $0/month in MCP credits. Zapier Pro at $49.99/month for 2,000 tasks.
+**Cost:** GovTribe MCP credits only (3-4 credits per 10 results per search). No Zapier subscription needed.
 
-## Setup Steps
+## How It Works
 
-### 1. Create GovTribe Saved Searches
+The GDA backend contains the 7 saved search configurations matching the GovTribe design:
 
-Log into [GovTribe](https://govtribe.com) and create saved searches for each category:
+| # | Name | MCP Tool | Keywords | NAICS Filter (in GovTribe UI) |
+|---|------|----------|----------|-------------------------------|
+| 1 | GDA-Opps-Core | Search_Federal_Contract_Opportunities | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| "PEO C3N" \| "CPE C3N" \| cybersecurity \| "systems engineering" | 541511, 541512, 541519, 541330, 541611, 541690 |
+| 2 | GDA-Opps-Growth | Search_Federal_Contract_Opportunities | CMMC \| "AI/ML" \| "XR/AR" \| DEVCOM \| "synthetic training" | 541511, 541512, 541715, 518210 |
+| 3 | GDA-Opps-Opportunistic | Search_Federal_Contract_Opportunities | "advisory services" \| innovation \| ISR \| EW | 541611, 541690, 541715 |
+| 4 | GDA-Awards-Core | Search_Federal_Contract_Awards | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity \| "systems engineering" | 541511, 541512, 541519, 541330 |
+| 5 | GDA-Awards-Growth | Search_Federal_Contract_Awards | CMMC \| "AI/ML" \| DEVCOM | 541511, 541512, 541715 |
+| 6 | GDA-Forecasts-Core | Search_Federal_Forecasts | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity | 541511, 541512, 541519 |
+| 7 | GDA-Forecasts-Growth | Search_Federal_Forecasts | "AI/ML" \| CMMC \| DEVCOM \| innovation | 541715, 518210 |
 
-| # | Name | Type | Keywords | NAICS Filter |
-|---|------|------|----------|--------------|
-| 1 | GDA-Opps-Core | Federal Opportunities | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| "PEO C3N" \| "CPE C3N" \| cybersecurity \| "systems engineering" | 541511, 541512, 541519, 541330, 541611, 541690 |
-| 2 | GDA-Opps-Growth | Federal Opportunities | CMMC \| "AI/ML" \| "XR/AR" \| DEVCOM \| "synthetic training" | 541511, 541512, 541715, 518210 |
-| 3 | GDA-Opps-Opportunistic | Federal Opportunities | "advisory services" \| innovation \| ISR \| EW | 541611, 541690, 541715 |
-| 4 | GDA-Awards-Core | Federal Awards | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity \| "systems engineering" | 541511, 541512, 541519, 541330 |
-| 5 | GDA-Awards-Growth | Federal Awards | CMMC \| "AI/ML" \| DEVCOM | 541511, 541512, 541715 |
-| 6 | GDA-Forecasts-Core | Federal Forecasts | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity | 541511, 541512, 541519 |
-| 7 | GDA-Forecasts-Growth | Federal Forecasts | "AI/ML" \| CMMC \| DEVCOM \| innovation | 541715, 518210 |
+When `POST /api/ingest/govtribe/poll` is called:
+1. Runs all 7 searches against GovTribe MCP at `https://govtribe.com/mcp`
+2. Deduplicates results by `govtribe_id`
+3. Upserts each record into the `opportunities` table (prefixed as `govtribe-{id}`)
+4. Auto-enriches via SAM cross-reference and USAspending fallback
+5. Updates `gov_source_feeds` tracking
 
-### 2. Create n8n Workflow: `GDA.ingest.govtribe-zapier`
+## Setup
 
-In n8n, create a new workflow:
+### 1. n8n Cron Workflow
 
-1. **Webhook node** — path: `govtribe-ingest`, method: POST
-2. **HTTP Request node** — POST to `${GDA_BASE_URL}/api/ingest/govtribe`
-   - Headers: `x-gda-key: ${GDA_WEBHOOK_KEY}`
-   - Body: forward the incoming Zapier payload as-is
-3. Activate the workflow
+Import `docs/n8n-govtribe-workflow.json` into n8n. The workflow:
+- **Cron trigger**: runs every 4 hours
+- **Manual trigger**: webhook at `/webhook/govtribe-cron-trigger` for on-demand polling
+- **HTTP Request**: calls `POST /api/ingest/govtribe/poll` with `x-gda-key` auth
 
-The webhook URL will be: `${N8N_BASE_URL}/webhook/govtribe-ingest`
+n8n Workflow ID: `5KuF4KZ8uxYcbUN5` (GDA.ingest.govtribe-cron)
 
-### 3. Create Zapier Zaps
+### 2. Environment Variables
 
-For each saved search, create a Zapier Zap:
+Required on the GDA backend:
+- `GOVTRIBE_API_KEY` — Bearer token for GovTribe MCP
+- `GDA_WEBHOOK_KEY` — Shared key for n8n → GDA auth
 
-**Trigger:** GovTribe → "New Results for [Saved Search Type] Saved Search"
-- Select the saved search created in step 1
+Required on n8n (set via `$env` or hardcoded in credential):
+- `GDA_BASE_URL` — Base URL of the GDA backend
+- `GDA_WEBHOOK_KEY` — Same shared key
 
-**Action:** Webhooks by Zapier → POST
-- URL: Your n8n webhook URL from step 2
-- Payload Type: JSON
-- Data: Map all available GovTribe fields
-
-Create 7 Zaps (one per saved search). All point to the same n8n webhook URL.
-
-### 4. Verify
-
-After a Zap triggers (or test manually in Zapier):
+### 3. Verify
 
 ```bash
-# Check Source Health
-curl -H "Authorization: Bearer $TOKEN" $GDA_URL/api/qa/source-health | jq '.data.sources[] | select(.source == "govtribe_zapier")'
+# Manual poll trigger via n8n webhook
+curl -X POST https://n8n.csr-llc.tech/webhook/govtribe-cron-trigger
 
-# Check ingested opportunities
-curl -H "Authorization: Bearer $TOKEN" $GDA_URL/api/ingest/status | jq '.data.recordCounts'
+# Direct poll via GDA API
+curl -X POST -H "x-gda-key: $GDA_WEBHOOK_KEY" -H "Content-Type: application/json" \
+  $GDA_URL/api/ingest/govtribe/poll
+
+# Check Source Health
+curl -H "Authorization: Bearer $TOKEN" $GDA_URL/api/qa/source-health | \
+  jq '.data.sources[] | select(.source == "govtribe_zapier")'
 ```
 
 ## Field Mapping
 
-| GovTribe Zapier Field | GDA Column | Notes |
+| GovTribe MCP Field | GDA Column | Notes |
 |---|---|---|
-| `id` | `id` (prefixed as `govtribe-{id}`) | Prevents collision with SAM IDs |
-| `name` / `title` | `title` | |
-| `solicitation_number` | `solicitation_number` | Key for SAM cross-reference |
+| `govtribe_id` | `id` (prefixed as `govtribe-{id}`) | Prevents collision with SAM IDs |
+| `name` | `title` | |
+| `solicitation_number` / `contract_number` | `solicitation_number` | Key for SAM cross-reference |
 | `set_aside_type` | `set_aside` | |
 | `due_date` | `due_date` | |
-| `government_description` | `description` | Full scope of work text |
+| `government_description` / `description` | `description` | Full scope of work text |
 | `ai_description` | `ai_summary` | GovTribe AI-generated summary |
-| `source_url` / `url` | `raw_source_url` | |
+| `govtribe_url` | `raw_source_url` | |
 | `opportunity_type` | `status` | Mapped: Award→won, Solicitation→qualified, Pre-Sol→discovery |
 
 ## SAM Enrichment (Automatic, Free)
@@ -109,17 +116,27 @@ Low-confidence records appear in Source Health panel: *"N opportunities with low
 
 ## Webhook Registry
 
-The `govtribe-ingest` webhook is registered in `webhook-registry.ts` with status `planned`. Once the n8n workflow is activated, update the status to `live`:
+The `govtribe-ingest` webhook is registered in `packages/backend/src/lib/webhook-registry.ts`:
 
 ```typescript
-// In webhook-registry.ts, change:
-status: "planned" → status: "live"
+"govtribe-ingest": {
+  path: "govtribe-ingest",
+  status: "live",
+  n8nWorkflow: "GDA.ingest.govtribe-cron",
+  usedBy: "ingest.ts",
+  description: "GovTribe MCP → n8n cron → GDA ingest pipeline (Tier 1, direct poll)",
+}
 ```
 
-## Zapier Task Budget
+## Architecture Change: Zapier → Direct Poll
 
-| Plan | Tasks/Month | Cost | Fits? |
-|---|---|---|---|
-| Free | 100 | $0 | No — 720-1,920 projected |
-| Starter | 750 | $19.99 | Tight with NAICS filters |
-| **Pro** | **2,000** | **$49.99** | **Recommended — headroom for all 7 searches** |
+Originally designed as `GovTribe Saved Searches → Zapier → n8n webhook → GDA ingest`.
+Changed to `n8n cron → GDA poll endpoint → GovTribe MCP → GDA ingest`.
+
+**Reason:** Zapier login blocked by CAPTCHA and Google OAuth, no programmatic API for Zap creation.
+
+**Benefits:**
+- Eliminates Zapier dependency and $49.99/month subscription
+- All search logic lives in GDA backend (TypeScript, testable, version-controlled)
+- n8n only handles scheduling — no secrets or complex logic needed
+- Same SAM enrichment + confidence scoring pipeline
