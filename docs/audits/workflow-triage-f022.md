@@ -110,11 +110,10 @@ Three workflows hit n8n's 300-second Code node execution limit (F-021 §4). Fix:
 
 | Classification | Count | Percentage |
 |---------------|-------|-----------|
-| **keep-and-fix** | 25 | 53% |
-| **keep-and-investigate** | 18 | 38% |
+| **keep-and-fix** | 24 | 51% |
+| **keep-and-investigate** | 20 | 43% |
 | **archive** | 2 | 4% |
 | **frozen-observe-only** | 1 | 2% |
-| **currently-working** | 1 | 2% |
 
 ### Keep-and-Fix: Shared Root Cause Grouping
 
