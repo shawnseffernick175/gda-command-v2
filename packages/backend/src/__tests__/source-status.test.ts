@@ -203,12 +203,17 @@ describe("Enrichment source status logic", () => {
     expect(qaRoutes).toContain("Zero calls is normal for enrichment");
   });
 
-  it("error when >50% of enrichment calls fail", () => {
-    expect(qaRoutes).toContain("errorCount7d / calls7d > 0.5");
-    expect(qaRoutes).toContain("failure rate");
+  it("error when >25% of enrichment calls fail", () => {
+    expect(qaRoutes).toContain("errorCount7d / calls7d > 0.25");
+    expect(qaRoutes).toContain(">25% failure rate");
   });
 
-  it("degraded when some enrichment calls fail but below 50%", () => {
+  it("degraded when >5% of enrichment calls fail", () => {
+    expect(qaRoutes).toContain("errorCount7d / calls7d > 0.05");
+    expect(qaRoutes).toContain(">5% failure rate");
+  });
+
+  it("degraded when some enrichment calls fail but below 5%", () => {
     expect(qaRoutes).toContain("failed calls in last 7 days");
   });
 });
