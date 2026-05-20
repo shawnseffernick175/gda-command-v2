@@ -361,9 +361,9 @@ describe("Low-confidence incumbent gating", () => {
   });
 
   it("DOES auto-populate incumbent for medium-confidence matches", () => {
-    const result = {
+    const result: { incumbent: string; incumbent_confidence: "high" | "medium" | "low"; incumbent_source: string } = {
       incumbent: "Leidos Inc",
-      incumbent_confidence: "medium" as const,
+      incumbent_confidence: "medium",
       incumbent_source: "usaspending_fuzzy_strong",
     };
 
@@ -397,9 +397,9 @@ describe("Low-confidence incumbent gating", () => {
   });
 
   it("DOES auto-populate incumbent for high-confidence SAM matches", () => {
-    const result = {
+    const result: { incumbent: string; incumbent_confidence: "high" | "medium" | "low"; incumbent_source: string } = {
       incumbent: "Raytheon",
-      incumbent_confidence: "high" as const,
+      incumbent_confidence: "high",
       incumbent_source: "sam_award",
     };
 
