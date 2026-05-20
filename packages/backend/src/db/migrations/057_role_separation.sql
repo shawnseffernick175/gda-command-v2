@@ -34,7 +34,11 @@ END
 $$;
 
 -- Grant gda_migrator full privileges on the current database
-GRANT ALL PRIVILEGES ON DATABASE gda_command TO gda_migrator;
+DO $$
+BEGIN
+  EXECUTE format('GRANT ALL PRIVILEGES ON DATABASE %I TO gda_migrator', current_database());
+END
+$$;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gda_migrator;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO gda_migrator;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO gda_migrator;
@@ -43,7 +47,11 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO gda_migrator
 GRANT CREATE ON SCHEMA public TO gda_migrator;
 
 -- Grant gda_drift_reader SELECT on schema_migrations only
-GRANT CONNECT ON DATABASE gda_command TO gda_drift_reader;
+DO $$
+BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO gda_drift_reader', current_database());
+END
+$$;
 GRANT USAGE ON SCHEMA public TO gda_drift_reader;
 GRANT SELECT ON schema_migrations TO gda_drift_reader;
 
