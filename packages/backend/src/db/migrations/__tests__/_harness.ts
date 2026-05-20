@@ -17,6 +17,22 @@ import path from "path";
 
 const MIGRATIONS_DIR = path.join(__dirname, "..");
 
+/**
+ * Migrations that are allowed to fail during test-DB setup.
+ *
+ * These require extensions (pgvector) or reference tables created by
+ * extension-dependent migrations that may not be available in CI.
+ * Any migration NOT on this list that fails will throw immediately —
+ * this prevents real migration ordering bugs from being silently masked.
+ *
+ * To add a new entry: only add migrations that depend on optional Postgres
+ * extensions not installed in the CI test database.
+ */
+const ALLOWED_FAILURE_MIGRATIONS = new Set([
+  "004_pgvector.sql",     // CREATE EXTENSION vector + document_embeddings table
+  "039b_pgvector_safe.sql", // DO $$ ... CREATE EXTENSION vector (safe wrapper)
+]);
+
 /** Seed specification: array of tables with rows to insert */
 export interface SeedSpec {
   tables: Array<{
@@ -92,13 +108,10 @@ export async function createSeededTestDb(
         await client.query("COMMIT");
       } catch (e) {
         await client.query("ROLLBACK");
-        // Some migrations may fail on missing extensions (pgvector, etc.)
-        // — skip gracefully since we only need the tables relevant to our test
-        const msg = (e as Error).message;
-        const isExtensionError = /extension|could not open/i.test(msg);
-        const isTableMissing = /relation ".*" does not exist/i.test(msg);
-        if (isExtensionError || isTableMissing) {
-          // Record as applied so subsequent migrations don't re-try
+        // Only skip failures for migrations on the known allowlist
+        // (extension-dependent migrations that can't run in CI).
+        // All other failures throw immediately to catch real bugs.
+        if (ALLOWED_FAILURE_MIGRATIONS.has(file)) {
           try {
             await client.query(
               "INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING",
