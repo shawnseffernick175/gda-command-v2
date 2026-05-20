@@ -942,17 +942,15 @@ function SourceStatusStrip({ data }: { data: SourceHealthData }) {
   const displaySources = ["sam_gov", "usaspending", "fpds", "govtribe", "govwin"];
 
   const cardData = displaySources.map((src) => {
-    // For govtribe, prefer govtribe_zapier snapshot if available
-    const snap = snapshots.find((s: SourceHealthSnapshot) =>
-      src === "govtribe"
-        ? (s.source === "govtribe_zapier" || s.source === "govtribe")
-        : s.source === src,
-    );
-    const feed = data.sources.find((s: SourceHealthItem) =>
-      src === "govtribe"
-        ? (s.source === "govtribe_zapier" || s.source === "govtribe")
-        : s.source === src,
-    );
+    // For govtribe, prefer govtribe_zapier snapshot (active ingest feed) over govtribe
+    const snap = src === "govtribe"
+      ? (snapshots.find((s: SourceHealthSnapshot) => s.source === "govtribe_zapier")
+        ?? snapshots.find((s: SourceHealthSnapshot) => s.source === "govtribe"))
+      : snapshots.find((s: SourceHealthSnapshot) => s.source === src);
+    const feed = src === "govtribe"
+      ? (data.sources.find((s: SourceHealthItem) => s.source === "govtribe_zapier")
+        ?? data.sources.find((s: SourceHealthItem) => s.source === "govtribe"))
+      : data.sources.find((s: SourceHealthItem) => s.source === src);
     const display = SOURCE_DISPLAY[src] ?? { label: src, roleLabel: "Unknown" };
 
     return {
