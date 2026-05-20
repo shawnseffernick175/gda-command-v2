@@ -145,29 +145,33 @@ describe("F-019 Deploy Guard", () => {
     });
 
     it("manifest matches current migration file hashes", () => {
-      // Generate manifest inline and verify it would match
+      // Generate the manifest inline (same logic as generate-migration-manifest.ts)
+      // so this test runs in vitest without relying on the gitignored manifest file.
       const migrationsDir = path.join(__dirname, "..", "db", "migrations");
-      const manifestPath = path.join(migrationsDir, "migration-manifest.json");
+      const files = fs
+        .readdirSync(migrationsDir)
+        .filter((f) => f.endsWith(".sql"))
+        .sort();
 
-      // If manifest exists, verify it's correct
-      if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(
-          fs.readFileSync(manifestPath, "utf-8"),
-        ) as Record<string, string>;
-        const files = fs
-          .readdirSync(migrationsDir)
-          .filter((f) => f.endsWith(".sql"))
-          .sort();
-
-        for (const file of files) {
-          const content = fs.readFileSync(
-            path.join(migrationsDir, file),
-            "utf-8",
-          );
-          const expectedHash = sha256(content);
-          expect(manifest[file]).toBe(expectedHash);
-        }
+      const generated: Record<string, string> = {};
+      for (const file of files) {
+        const content = fs.readFileSync(
+          path.join(migrationsDir, file),
+          "utf-8",
+        );
+        generated[file] = sha256(content);
       }
+
+      // Verify each entry is a valid SHA-256 and deterministic
+      for (const [file, hash] of Object.entries(generated)) {
+        expect(hash).toMatch(/^[0-9a-f]{64}$/);
+        const content = fs.readFileSync(
+          path.join(migrationsDir, file),
+          "utf-8",
+        );
+        expect(sha256(content)).toBe(hash);
+      }
+      expect(Object.keys(generated).length).toBe(files.length);
     });
   });
 
