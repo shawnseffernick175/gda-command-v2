@@ -144,9 +144,10 @@ describe("F-019 Deploy Guard", () => {
       }
     });
 
-    it("manifest matches current migration file hashes", () => {
-      // Generate the manifest inline (same logic as generate-migration-manifest.ts)
-      // so this test runs in vitest without relying on the gitignored manifest file.
+    it("hashing logic is deterministic and complete for all migration files", () => {
+      // Manifest-file correctness is verified at Docker build time and at runtime
+      // via verifyManifest(), not in vitest. This test verifies the hashing logic
+      // itself: deterministic, valid hex, and covers every .sql file.
       const migrationsDir = path.join(__dirname, "..", "db", "migrations");
       const files = fs
         .readdirSync(migrationsDir)
