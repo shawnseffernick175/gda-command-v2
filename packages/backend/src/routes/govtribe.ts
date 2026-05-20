@@ -64,7 +64,7 @@ router.get("/credits", (_req, res) => {
         ? `Budget exceeded: ${usage.totalCredits}/${usage.budgetLimit} credits`
         : usage.budgetLimit != null
           ? `${usage.totalCredits}/${usage.budgetLimit} credits used (${Math.round((usage.totalCredits / usage.budgetLimit) * 100)}%)`
-          : `${usage.totalCredits} credits used (no budget limit set — set GOVTRIBE_CREDIT_BUDGET)`,
+          : `${usage.totalCredits} credits used`,
     })
   );
 });
