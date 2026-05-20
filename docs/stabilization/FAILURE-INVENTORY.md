@@ -43,6 +43,10 @@ Sources examined:
 | F-017 | On deploy | P1 | Migration system tests fresh-deploy only, not production-state-dependent migrations — already produced one incident (PR #224 / migration 045 UNIQUE violation) | **Fixed** (PR #243 — harness + 3 paired tests, PR #246 — allowlist tightening) |
 | F-018 | Unknown | P2 | Existing migrations may have unmarked state-dependent operations without corresponding regression tests | **Fixed** (PR #247 — full audit of 55 migrations, 9 paired tests covering all high-risk state-dependent migrations) |
 | F-019 | On every deploy | P1 | Production state modified outside canonical deploy path — sessions applied migrations from unmerged branches | **Partially Fixed** (PR #250 — manifest verification, provenance recording, drift check shipped; role separation deferred to F-020 — pending infrastructure-level role demotion of `gda` from SUPERUSER, which requires a one-time human SSH session as superuser since `gda` is the only superuser in the cluster) |
+| F-020 | Preventive | P1 | Demote `gda` Postgres role from SUPERUSER to enable F-019 role separation | **Blocked by F-023** — cannot demote `gda` until shadow schema DDL is migrated; 39 tables created by n8n workflows via `CREATE TABLE IF NOT EXISTS` would break immediately on demotion. See #251 for runbook, #258 for blocker. |
+| F-021 | Always | P1 | 96% of scheduled n8n workflows not firing — 168 of 174 active workflows have zero execution records | **Fixed** (PR #256 — workflow inventory audit documenting root cause hypothesis: queue/activation failure) |
+| F-022 | Always | P1 | 168 silent workflows need triage before alert automation can ship | **In Progress** — 47 cron workflows classified; 25 keep-and-fix, 18 investigate, 2 archive. See #257. |
+| F-023 | On every n8n execution | P1 | 39 Postgres tables created by n8n workflows outside migration system — shadow schema bypasses all F-019 controls | **Open** — inventory complete, schema capture + backfill migrations pending. See #258. |
 
 ---
 
