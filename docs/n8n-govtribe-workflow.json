@@ -3,28 +3,35 @@
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "POST",
         "path": "govtribe-ingest",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "httpMethod": "POST"
       },
-      "id": "webhook-govtribe",
-      "name": "Webhook: govtribe-ingest",
+      "id": "gt-webhook",
+      "name": "GovTribe Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [250, 300],
-      "webhookId": "govtribe-ingest"
+      "position": [240, 300],
+      "webhookId": "govtribe-ingest",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.GDA_BASE_URL || 'http://localhost:3001' }}/api/ingest/govtribe",
+        "url": "http://localhost:3001/api/ingest/govtribe",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "x-gda-key",
-              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+              "value": "={{ $env.GDA_WEBHOOK_KEY || '' }}"
             },
             {
               "name": "Content-Type",
@@ -34,12 +41,12 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json) }}",
+        "jsonBody": "={{ JSON.stringify($json.body || $json) }}",
         "options": {
           "timeout": 30000
         }
       },
-      "id": "http-forward",
+      "id": "gt-forward",
       "name": "Forward to GDA Ingest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -48,9 +55,10 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify($json) }}"
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
       },
-      "id": "respond-success",
+      "id": "gt-respond",
       "name": "Respond OK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -58,7 +66,7 @@
     }
   ],
   "connections": {
-    "Webhook: govtribe-ingest": {
+    "GovTribe Webhook": {
       "main": [
         [
           {
@@ -82,17 +90,11 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
-  },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
-  "tags": [
-    {
-      "name": "GDA"
-    },
-    {
-      "name": "ingest"
-    }
-  ]
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
 }
