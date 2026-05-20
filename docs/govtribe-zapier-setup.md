@@ -20,13 +20,13 @@ Log into [GovTribe](https://govtribe.com) and create saved searches for each cat
 
 | # | Name | Type | Keywords | NAICS Filter |
 |---|------|------|----------|--------------|
-| 1 | GDA-Opps-Core | Federal Opportunities | SETA, C5ISR, PEO IEW&S, cybersecurity, systems engineering | 541511, 541512, 541519, 541330, 541611, 541690 |
-| 2 | GDA-Opps-Growth | Federal Opportunities | CMMC, AI/ML, XR/AR, DEVCOM, synthetic training | 541511, 541512, 541715, 518210 |
-| 3 | GDA-Opps-Opportunistic | Federal Opportunities | advisory services, innovation, ISR, EW | 541611, 541690, 541715 |
-| 4 | GDA-Awards-Core | Federal Awards | SETA, C5ISR, cybersecurity, systems engineering | 541511, 541512, 541519, 541330 |
-| 5 | GDA-Awards-Growth | Federal Awards | CMMC, AI/ML, DEVCOM | 541511, 541512, 541715 |
-| 6 | GDA-Forecasts-Core | Federal Forecasts | SETA, C5ISR, PEO IEW&S, cybersecurity | 541511, 541512, 541519 |
-| 7 | GDA-Forecasts-Growth | Federal Forecasts | AI/ML, CMMC, DEVCOM, innovation | 541715, 518210 |
+| 1 | GDA-Opps-Core | Federal Opportunities | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| "PEO C3N" \| "CPE C3N" \| cybersecurity \| "systems engineering" | 541511, 541512, 541519, 541330, 541611, 541690 |
+| 2 | GDA-Opps-Growth | Federal Opportunities | CMMC \| "AI/ML" \| "XR/AR" \| DEVCOM \| "synthetic training" | 541511, 541512, 541715, 518210 |
+| 3 | GDA-Opps-Opportunistic | Federal Opportunities | "advisory services" \| innovation \| ISR \| EW | 541611, 541690, 541715 |
+| 4 | GDA-Awards-Core | Federal Awards | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity \| "systems engineering" | 541511, 541512, 541519, 541330 |
+| 5 | GDA-Awards-Growth | Federal Awards | CMMC \| "AI/ML" \| DEVCOM | 541511, 541512, 541715 |
+| 6 | GDA-Forecasts-Core | Federal Forecasts | SETA \| C5ISR \| "PEO IEW&S" \| "CPE IEW&S" \| cybersecurity | 541511, 541512, 541519 |
+| 7 | GDA-Forecasts-Growth | Federal Forecasts | "AI/ML" \| CMMC \| DEVCOM \| innovation | 541715, 518210 |
 
 ### 2. Create n8n Workflow: `GDA.ingest.govtribe-zapier`
 
@@ -102,8 +102,8 @@ After ingest, each opportunity with a `solicitation_number` is automatically enr
 |---|---|---|---|
 | `high` | SAM Award Notice (exact solicitation match) | Direct awardee found | Yes |
 | `high` | USAspending PIID match | Award ID derivable | Yes |
-| `medium` | USAspending fuzzy (keyword+agency+NAICS, top result >2x second) | Relevance ≥70 or core keyword/NAICS | Yes, with flag |
-| `low` | USAspending fuzzy (multiple similar-scoring candidates) | Same gating as medium | No — flagged for manual review |
+| `medium` | USAspending fuzzy (keyword+agency+NAICS, top result ≥1.2x second) | Relevance ≥70 or core keyword/NAICS | Yes, with flag |
+| `low` | USAspending fuzzy (top result <1.2x second, ambiguous) | Same gating as medium | No — flagged for manual review |
 
 Low-confidence records appear in Source Health panel: *"N opportunities with low-confidence incumbent matches awaiting review"*
 
