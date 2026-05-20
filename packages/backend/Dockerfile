@@ -19,6 +19,9 @@ COPY packages/backend/ packages/backend/
 RUN npm run build --workspace=@gda/shared
 RUN npm run build --workspace=@gda/backend
 
+# Generate migration manifest (F-019: hash verification at runtime)
+RUN npx tsx packages/backend/src/db/generate-migration-manifest.ts
+
 # ---- Production Stage ----
 FROM node:20-alpine AS production
 
@@ -36,8 +39,9 @@ RUN npm ci --workspace=@gda/shared --workspace=@gda/backend --include-workspace-
 COPY --from=builder /app/packages/shared/dist/ packages/shared/dist/
 COPY --from=builder /app/packages/backend/dist/ packages/backend/dist/
 
-# Copy SQL migration files (read at runtime by migrate.js)
+# Copy SQL migration files + manifest (read at runtime by migrate.js)
 COPY packages/backend/src/db/migrations/ packages/backend/src/db/migrations/
+COPY --from=builder /app/packages/backend/src/db/migrations/migration-manifest.json packages/backend/src/db/migrations/migration-manifest.json
 
 # Copy entrypoint
 COPY packages/backend/docker-entrypoint.sh /docker-entrypoint.sh
@@ -53,6 +57,10 @@ RUN mkdir -p /var/backups/gda/daily /var/backups/gda/weekly /var/uploads/gda
 RUN addgroup -g 1001 -S gda && adduser -u 1001 -S gda -G gda
 RUN chown -R gda:gda /var/backups/gda /var/uploads/gda
 USER gda
+
+# Bake deploy commit SHA into image (set via --build-arg at docker build time)
+ARG DEPLOY_COMMIT_SHA=unknown
+ENV DEPLOY_COMMIT_SHA=$DEPLOY_COMMIT_SHA
 
 ENV NODE_ENV=production
 ENV PORT=3001
