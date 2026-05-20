@@ -49,6 +49,20 @@ jobs:
           head -50 /tmp/audit.txt >> /tmp/drift.md
           echo '```' >> /tmp/drift.md
 
+      - name: Migration schema drift check (F-019)
+        if: ${{ secrets.DRIFT_DATABASE_URL != '' }}
+        env:
+          DRIFT_DATABASE_URL: ${{ secrets.DRIFT_DATABASE_URL }}
+        run: |
+          echo "" >> /tmp/drift.md
+          echo "## Migration Schema Drift (F-019)" >> /tmp/drift.md
+          npx tsx packages/backend/src/db/check-migration-drift.ts 2>&1 | tee /tmp/migration-drift.txt
+          if [ -s /tmp/migration-drift.txt ]; then
+            echo '```' >> /tmp/drift.md
+            cat /tmp/migration-drift.txt >> /tmp/drift.md
+            echo '```' >> /tmp/drift.md
+          fi
+
       - name: Create issue if drift detected
         if: always()
         env:

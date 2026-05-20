@@ -23,6 +23,8 @@ services:
     build:
       context: .
       dockerfile: packages/backend/Dockerfile
+      args:
+        DEPLOY_COMMIT_SHA: ${DEPLOY_COMMIT_SHA:-unknown}
     container_name: gda-backend
     restart: unless-stopped
     depends_on:
@@ -32,6 +34,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-gda}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gda_command}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
       AUTH_REQUIRED: "true"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       N8N_BASE_URL: ${N8N_BASE_URL:-}
