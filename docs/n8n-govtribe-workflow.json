@@ -1,0 +1,98 @@
+{
+  "name": "GDA.ingest.govtribe-zapier",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "govtribe-ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-govtribe",
+      "name": "Webhook: govtribe-ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "govtribe-ingest"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GDA_BASE_URL || 'http://localhost:3001' }}/api/ingest/govtribe",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "http-forward",
+      "name": "Forward to GDA Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-success",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: govtribe-ingest": {
+      "main": [
+        [
+          {
+            "node": "Forward to GDA Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward to GDA Ingest": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "GDA"
+    },
+    {
+      "name": "ingest"
+    }
+  ]
+}
