@@ -417,10 +417,12 @@ describe("SourceStatusStrip React component", () => {
     expect(qaFrontend).toContain("type SourceHealthSnapshot");
   });
 
-  it("collapses govtribe + govtribe_zapier into one card", () => {
+  it("collapses govtribe + govtribe_zapier into one card, preferring govtribe_zapier", () => {
     expect(qaFrontend).toContain("govtribe_zapier");
-    // Should prefer govtribe_zapier data when available
-    expect(qaFrontend).toContain("s.source === \"govtribe_zapier\" || s.source === \"govtribe\"");
+    // Must prefer govtribe_zapier (active ingest feed) over govtribe
+    expect(qaFrontend).toContain("s.source === \"govtribe_zapier\"");
+    // Uses nullish coalescing to fall back to govtribe
+    expect(qaFrontend).toContain("s.source === \"govtribe\")");
   });
 });
 
