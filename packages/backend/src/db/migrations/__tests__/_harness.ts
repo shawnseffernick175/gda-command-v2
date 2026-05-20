@@ -62,71 +62,77 @@ export async function createSeededTestDb(
   (testPool as TestPool).__testDbName = testDbName;
   (testPool as TestPool).__adminUrl = dbUrl;
 
-  // Create schema_migrations table
-  await testPool.query(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
+  try {
+    // Create schema_migrations table
+    await testPool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
 
-  // Get all migration files in order, stopping before the target
-  const files = fs
-    .readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
+    // Get all migration files in order, stopping before the target
+    const files = fs
+      .readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
 
-  for (const file of files) {
-    if (file === upToBefore) break;
-    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), "utf-8");
-    const client = await testPool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query(sql);
-      await client.query(
-        "INSERT INTO schema_migrations (name) VALUES ($1)",
-        [file],
-      );
-      await client.query("COMMIT");
-    } catch (e) {
-      await client.query("ROLLBACK");
-      // Some migrations may fail on missing extensions (pgvector, etc.)
-      // — skip gracefully since we only need the tables relevant to our test
-      const msg = (e as Error).message;
-      const isExtensionError = /extension|could not open/i.test(msg);
-      const isTableMissing = /relation ".*" does not exist/i.test(msg);
-      if (isExtensionError || isTableMissing) {
-        // Record as applied so subsequent migrations don't re-try
-        try {
-          await client.query(
-            "INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING",
-            [file],
-          );
-        } catch { /* ignore */ }
-        continue;
+    for (const file of files) {
+      if (file === upToBefore) break;
+      const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), "utf-8");
+      const client = await testPool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(sql);
+        await client.query(
+          "INSERT INTO schema_migrations (name) VALUES ($1)",
+          [file],
+        );
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK");
+        // Some migrations may fail on missing extensions (pgvector, etc.)
+        // — skip gracefully since we only need the tables relevant to our test
+        const msg = (e as Error).message;
+        const isExtensionError = /extension|could not open/i.test(msg);
+        const isTableMissing = /relation ".*" does not exist/i.test(msg);
+        if (isExtensionError || isTableMissing) {
+          // Record as applied so subsequent migrations don't re-try
+          try {
+            await client.query(
+              "INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING",
+              [file],
+            );
+          } catch { /* ignore */ }
+          continue;
+        }
+        throw e;
+      } finally {
+        client.release();
       }
-      throw e;
-    } finally {
-      client.release();
     }
-  }
 
-  // Seed fixture data
-  for (const { table, rows } of seed.tables) {
-    for (const row of rows) {
-      const keys = Object.keys(row);
-      const values = Object.values(row);
-      const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
-      const cols = keys.map((k) => `"${k}"`).join(", ");
-      await testPool.query(
-        `INSERT INTO "${table}" (${cols}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
-        values,
-      );
+    // Seed fixture data
+    for (const { table, rows } of seed.tables) {
+      for (const row of rows) {
+        const keys = Object.keys(row);
+        const values = Object.values(row);
+        const placeholders = keys.map((_, i) => `$${i + 1}`).join(", ");
+        const cols = keys.map((k) => `"${k}"`).join(", ");
+        await testPool.query(
+          `INSERT INTO "${table}" (${cols}) VALUES (${placeholders}) ON CONFLICT DO NOTHING`,
+          values,
+        );
+      }
     }
-  }
 
-  return testPool;
+    return testPool;
+  } catch (e) {
+    // Clean up pool and ephemeral database on setup failure
+    await destroyTestDb(testPool);
+    throw e;
+  }
 }
 
 /**
@@ -171,8 +177,8 @@ export async function destroyTestDb(pool: pg.Pool): Promise<void> {
     await adminPool.query(`
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
-      WHERE datname = '${testDbName}' AND pid <> pg_backend_pid()
-    `);
+      WHERE datname = $1 AND pid <> pg_backend_pid()
+    `, [testDbName]);
     await adminPool.query(`DROP DATABASE IF EXISTS "${testDbName}"`);
   } finally {
     await adminPool.end();
