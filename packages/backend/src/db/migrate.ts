@@ -206,21 +206,30 @@ async function run() {
       count++;
 
       // After applying 056, re-check for provenance columns so subsequent
-      // migrations in the same run get provenance recorded
+      // migrations in the same run get provenance recorded.
+      // Wrapped in its own try-catch: backfill is non-essential enrichment
+      // and must not abort the migration run after 056 is already committed.
       if (file === "056_schema_migrations_provenance.sql" && !provenance) {
-        provenance = await hasProvenanceColumns(pool);
-        if (provenance) {
-          process.stdout.write(
-            "[migrate] provenance columns now active — subsequent migrations will record provenance\n",
-          );
-          const { rows: userRows } = await pool.query("SELECT current_user");
-          pgCurrentUser = userRows[0].current_user;
-          // Backfill provenance on the 056 row itself
-          await pool.query(
-            `UPDATE schema_migrations
-             SET commit_sha = $1, applied_by = $2, file_sha256 = $3
-             WHERE name = $4 AND file_sha256 IS NULL`,
-            [DEPLOY_COMMIT_SHA, pgCurrentUser, fileHash, file],
+        try {
+          provenance = await hasProvenanceColumns(pool);
+          if (provenance) {
+            process.stdout.write(
+              "[migrate] provenance columns now active — subsequent migrations will record provenance\n",
+            );
+            const { rows: userRows } = await pool.query(
+              "SELECT current_user",
+            );
+            pgCurrentUser = userRows[0].current_user;
+            await pool.query(
+              `UPDATE schema_migrations
+               SET commit_sha = $1, applied_by = $2, file_sha256 = $3
+               WHERE name = $4 AND file_sha256 IS NULL`,
+              [DEPLOY_COMMIT_SHA, pgCurrentUser, fileHash, file],
+            );
+          }
+        } catch (backfillErr) {
+          process.stderr.write(
+            `[migrate] WARNING: provenance backfill failed for 056: ${(backfillErr as Error).message}\n`,
           );
         }
       }

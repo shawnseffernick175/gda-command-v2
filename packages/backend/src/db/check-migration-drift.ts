@@ -26,10 +26,18 @@ function sha256(content: string): string {
 async function run() {
   const pool = new pg.Pool({ connectionString: DRIFT_DATABASE_URL });
 
+  // Check whether file_sha256 column exists (added by migration 056)
+  const { rows: colCheck } = await pool.query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'schema_migrations' AND column_name = 'file_sha256'
+  `);
+  const hasFileHash = colCheck.length > 0;
+
   // Get all applied migrations from production
-  const { rows } = await pool.query(
-    "SELECT name, file_sha256 FROM schema_migrations ORDER BY id",
-  );
+  const query = hasFileHash
+    ? "SELECT name, file_sha256 FROM schema_migrations ORDER BY id"
+    : "SELECT name FROM schema_migrations ORDER BY id";
+  const { rows } = await pool.query(query);
 
   // Read local migration files
   const migrationsDir = path.join(__dirname, "migrations");
@@ -42,7 +50,8 @@ async function run() {
   let driftFound = false;
 
   for (const row of rows) {
-    const { name, file_sha256: prodHash } = row;
+    const name: string = row.name;
+    const prodHash: string | null = hasFileHash ? row.file_sha256 : null;
 
     if (!localFiles.has(name)) {
       process.stdout.write(
