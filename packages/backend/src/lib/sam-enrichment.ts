@@ -155,6 +155,25 @@ export async function enrichFromSAM(opp: {
 }
 
 /**
+ * Determine incumbent confidence from USAspending score gap.
+ * Exported so tests can call the real function instead of duplicating logic.
+ *
+ * - ratio >= 1.2 (clear leader) → medium
+ * - ratio < 1.2 (ambiguous, within 20%) → low (flag for review)
+ * - single candidate (no second score) → medium
+ */
+export function assignConfidence(
+  bestScore: number,
+  secondBestScore: number | null,
+): "high" | "medium" | "low" {
+  if (secondBestScore != null && secondBestScore > 0) {
+    const ratio = bestScore / secondBestScore;
+    return ratio >= 1.2 ? "medium" : "low";
+  }
+  return "medium";
+}
+
+/**
  * USAspending incumbent fallback — keyword + agency + NAICS fuzzy match.
  * Only runs for high-scoring opportunities (relevance ≥70 or core keyword/NAICS match).
  */
@@ -252,24 +271,7 @@ export async function enrichIncumbentFromUSAspending(opp: {
     const best = scored[0];
     const secondBest = scored.length > 1 ? scored[1] : null;
 
-    // Determine confidence based on score gap
-    // Design: >2x gap → medium, 1.2x–2x → medium (distinguishable leader),
-    //         <1.2x → low (ambiguous, flag for review)
-    let confidence: "high" | "medium" | "low";
-    if (secondBest && secondBest.matchScore > 0) {
-      const ratio = best.matchScore / secondBest.matchScore;
-      if (ratio > 2) {
-        confidence = "medium";
-      } else if (ratio >= 1.2) {
-        confidence = "medium";
-      } else {
-        // Multiple candidates within 20% — low confidence, flag for review
-        confidence = "low";
-      }
-    } else {
-      // Only one candidate with a score — medium confidence
-      confidence = "medium";
-    }
+    const confidence = assignConfidence(best.matchScore, secondBest?.matchScore ?? null);
 
     const recipientName = best.award["Recipient Name"];
 
