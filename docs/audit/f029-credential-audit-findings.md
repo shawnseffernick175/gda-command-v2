@@ -76,10 +76,10 @@ abandoned from earlier development.
 | # | Credential | ID | Type | Target | Recommendation | Priority |
 |---|---|---|---|---|---|---|
 | 1 | GDA GitHub Bridge PAT | TBzQR4MBiWOGoJmV | httpHeaderAuth | GitHub API (`ghp_grzU...`) | **Delete** — PAT may still be valid on GitHub; revoke PAT first, then delete credential | Before F-034 |
-| 2 | GDA GitHub Bridge Webhook Secret | 8fS9ihGIWT6gUpio | httpHeaderAuth | Webhook auth (`gda-bridge-k9x2mq7r4n8v`) | **Delete** — no webhook consumer exists | Before F-034 |
+| 2 | GDA GitHub Bridge Webhook Secret | 8fS9ihGIWT6gUpio | httpHeaderAuth | Webhook auth (`gda-bridge-...`) | **Delete** — no webhook consumer exists | Before F-034 |
 | 3 | gda Google Gemini E2E Test | IbQJuYuO5D9w9Af4 | googlePalmApi | Google Gemini (`AIzaSyBD...`) | **Delete** — test credential, no production use | Before F-034 |
 | 4 | Postgres account | yK1VVsSN3tn0baVm | postgres | `n8n-envision-postgres-1` / `n8n` DB | **Keep for now** — this is n8n's own internal DB credential. Though zero *workflow* nodes reference it, n8n may use it internally. Safe to delete only after confirming n8n doesn't use it for internal operations. | Independent |
-| 5 | QA Webhook Auth | 3pU3F6Su9mpJ9nei | httpHeaderAuth | `x-gda-key: gda-webhook-secret-2026` | **Delete** — identical value to "GDA Webhook Auth" and "GDA Webhook Auth v2". Redundant. | Before F-034 |
+| 5 | QA Webhook Auth | 3pU3F6Su9mpJ9nei | httpHeaderAuth | `x-gda-key: (redacted)` | **Delete** — identical value to "GDA Webhook Auth" and "GDA Webhook Auth v2". Redundant. | Before F-034 |
 | 6 | Redis account | F6aCGUnktFFSwjS8 | redis | `n8n-envision-redis-1` | **Keep for now** — Redis is configured via env var (`QUEUE_BULL_REDIS_HOST`), but this credential may be used by community packages or future workflows. Low risk to keep. | Independent |
 
 **Action:** Delete credentials #1, #2, #3, #5. Revoke the GitHub PAT
@@ -227,9 +227,9 @@ Three credentials with identical purpose and value:
 
 | Credential | ID | Value | Workflows |
 |---|---|---|---|
-| GDA Webhook Auth v2 | F4J3vYsPrJrYiO49 | `x-gda-key: gda-webhook-secret-2026` | 127 |
-| GDA Webhook Auth | 1pNPY36DDz49OtKL | `x-gda-key: gda-webhook-secret-2026` | 11 |
-| QA Webhook Auth | 3pU3F6Su9mpJ9nei | `x-gda-key: gda-webhook-secret-2026` | 0 |
+| GDA Webhook Auth v2 | F4J3vYsPrJrYiO49 | `x-gda-key: (redacted)` | 127 |
+| GDA Webhook Auth | 1pNPY36DDz49OtKL | `x-gda-key: (redacted)` | 11 |
+| QA Webhook Auth | 3pU3F6Su9mpJ9nei | `x-gda-key: (redacted)` | 0 |
 
 All three have identical header name and value. "v2" is the active one
 (127 workflows). The original has 11 workflows still referencing it.
