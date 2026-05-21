@@ -484,6 +484,8 @@ Items that must happen before any new work. Small, urgent, no architecture decis
 | (cleanup) | intel-feed persistent daily error capture | **Open** | 3 consecutive 08:00 UTC errors with execution data pruned. `saveDataSuccessExecution` now set to `all` — next error will be capturable. Diagnosis pending. |
 | F-032a | CORS fix | **Open** | CORS allows all origins — P0 from Phase 4 audit (RISK-001). 30-minute fix. Restrict to `gda.csr-llc.tech`. Does not wait for architecture decisions. |
 | F-029 | Credential and configuration audit | **Open** | Read-only. If the most critical credential was wrong, what else is? Trust is zero until credentials are validated. No architecture dependency. If this surfaces another F-023-class wound, we need to know before F-026 decisions get baked in. |
+| F-025a | Commit rebuild PDFs to repo | **Open** | 15-minute task. PDFs are the governing documents — they must be in the repo. No reconciliation in this step; F-025b handles that. |
+| F-020 | Role demotion (`gda` NOSUPERUSER) | **Open — confirmed unblocked** | All 323 Postgres nodes target `n8n-envision-postgres-1`. Zero DDL against `gda_command`. Docker networks isolated. Decision already made (#251 confirmation). This is implementation, not a decision — belongs in Tier 0. |
 
 ### Tier 1 — Foundational Decisions
 
@@ -491,14 +493,11 @@ Architecture calls that everything else depends on. No implementation — just d
 
 | F-XXX | Item | Depends On | Rationale |
 |---|---|---|---|
-| F-025a | Commit rebuild PDFs to repo | Nothing | 15-minute task. PDFs are the governing documents — they must be in the repo. |
-| F-025b | Reconcile contradictions affecting F-026 | F-025a | The destination must be coherent before we can sequence toward it. The Rule 7 vs. migration 017 contradiction must be resolved. PDFs are canonical; surface where Master Doc disagrees; Shawn rules. |
+| F-025b | Reconcile contradictions affecting F-026 | F-025a (Tier 0) | The destination must be coherent before we can sequence toward it. The Rule 7 vs. migration 017 contradiction must be resolved. PDFs are canonical; surface where Master Doc disagrees; Shawn rules. |
 | F-026 | System-of-record architecture decision | F-025b | Which database holds truth? How do workflows deliver data to the backend? Every data-path fix downstream depends on this answer. |
-| F-020 | Role demotion (`gda` NOSUPERUSER) | Nothing — **confirmed unblocked** | All 323 Postgres nodes target `n8n-envision-postgres-1`. Zero DDL against `gda_command`. Docker networks are isolated. Demotion is safe. Foundational security control that makes deploy guard (F-019) enforceable. |
 
-**Within tier — parallel tracks:**
-- Track A: F-025a → F-025b → F-026 (sequential — PDFs in repo → reconcile contradictions → architecture decision)
-- Track B: F-020 (confirmed unblocked — role demotion is infrastructure, not architecture)
+**Within tier — sequential:**
+- F-025b → F-026 (reconcile contradictions → architecture decision)
 
 ### Tier 2 — Foundation Work / Inventories
 
@@ -559,8 +558,8 @@ Tier 3 is substantially complete.
 ### Tier Execution Summary
 
 ```
-Tier 0 (now):        5 items — idiq bug, intel-feed capture, F-032a CORS, F-029 cred audit, saveData cleanup (done)
-Tier 1 (next):       3 items — F-025a, F-025b, F-026 (+ F-020 in parallel, confirmed unblocked)
+Tier 0 (now):        7 items — idiq bug, intel-feed capture, F-032a CORS, F-029 cred audit, F-025a PDFs, F-020 role demotion, saveData verify
+Tier 1 (next):       2 items — F-025b, F-026
 Tier 2 (parallel):   5 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030, F-014 scope, F-016 scope
 Tier 3 (after T1):   7 items — F-023 impl, F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion
 Tier 4 (after T3):   12+ items — all product work, cleanup, docs
