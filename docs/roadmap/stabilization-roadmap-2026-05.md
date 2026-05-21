@@ -1,8 +1,8 @@
 # GDA Command v2 — Stabilization Roadmap
 
-**Date:** 2026-05-21
+**Date:** 2026-05-21 (updated 2026-05-19)
 **Author:** Devin (reviewed by Shawn Seffernick)
-**Status:** DRAFT — pending Shawn's review
+**Status:** APPROVED — decisions locked 2026-05-19
 **Scope:** Reconcile all F-XXX work (F-001 through F-024), surface skipped items,
 map current state vs. destination, identify new work, and propose execution ordering.
 
@@ -18,11 +18,11 @@ map current state vs. destination, identify new work, and propose execution orde
 - Backend route inventory from F-023 analysis (158 lines — 57 routes mapped)
 - `docs/roadmap/findings-to-fxxx-mapping.md` (reconciliation of FINDINGS.md against F-XXX)
 
-**Documents that do not exist:**
-- `docs/rebuild/` — no rebuild charter, PRD, product roadmap, or stability standard as separate files
-- These exist as PDFs in Shawn's project context but are NOT in the repo
-- The Master Doc (§2 Core Rules, §6 Pages Built, §10 TODO, §14 Design Decisions) is the only
-  in-repo destination definition
+**Documents that did not exist at roadmap draft time (now resolved):**
+- `docs/rebuild/` — created by F-025a (PR #264). Now contains: rebuild charter, PRD, product
+  roadmap, and stability standard PDFs.
+- The Master Doc (§2 Core Rules, §6 Pages Built, §10 TODO, §14 Design Decisions) remains the
+  primary in-repo destination definition. PDFs are the **governing** documents per project rules.
 
 ---
 
@@ -147,7 +147,7 @@ This is the closest thing to a "stability standard" in the repo. It implies:
 2. Every feature must pass tests (tests must exist)
 3. Every feature must fail visibly (observability must exist)
 
-### Contradiction: Migration 017 vs. Core Rule 7
+### Contradiction: Migration 017 vs. Core Rule 7 — RESOLVED
 
 **Core Rule 7:** "PostgreSQL is truth."
 
@@ -156,21 +156,24 @@ This is the closest thing to a "stability standard" in the repo. It implies:
 > "n8n webhook = primary source of truth for opportunities"
 > "Local DB = fallback and user-generated data"
 
-These cannot both be operative:
-- If PostgreSQL is truth (Rule 7), then `gda_command` should hold all authoritative data,
-  workflows should write to it, and the migration system governs all schema.
-- If n8n webhooks are primary (migration 017), then `gda_command` is a cache/fallback,
-  authoritative data lives wherever n8n puts it, and the migration system doesn't govern
-  workflow tables.
+**Decision (F-025b — locked 2026-05-19):** PostgreSQL is truth. The rebuild charter and PRD
+(governing PDFs) win over Migration 017's seeded language. Migration 017's `bot_sources` data
+gets corrected as part of the consolidation work. Reasoning: treating seeded implementation data
+as canonical is what produced four months of drift; the architectural intent in the governing
+PDFs defines the destination.
+
+**Decision (F-026 — locked 2026-05-19):** Consolidate. All application data into `gda_command`.
+One Postgres. Workflows write there, backend reads there. The 76 shadow tables in
+`n8n-envision-postgres-1` migrate into `gda_command` under the migration system. 323 workflow
+Postgres nodes repoint to the "GDA Postgres" credential (which itself repoints to `gda-postgres`
+as `gda_app`). No hybrid. No sync layer. Reasoning: hybrid guarantees another split-brain-class
+problem; sync adds a new place for silent failure; consolidation has bounded one-time cost and
+zero ongoing maintenance burden.
 
 The current system operates as if migration 017 is true: DUAL-path routes try n8n webhook first,
 fall back to DB. But the "GDA Postgres" credential misconfiguration means the DB fallback hits
-empty tables. **Neither document's vision is implemented correctly.**
-
-**This contradiction requires Shawn's call.** The rebuild charter, PRD, and stability standard
-PDFs are the **governing** documents per project rules. The Master Doc is current implementation,
-not destination. F-025b surfaces where the Master Doc disagrees with the PDFs; Shawn rules on
-each. See proposed F-025a/F-025b (Section 4) for the reconciliation work.
+empty tables. **Neither document's vision was implemented correctly. Both are now superseded
+by the locked decisions above.**
 
 ### Supplementary: PDF Documents (Not in Repo)
 
@@ -323,42 +326,66 @@ governing documents are versioned alongside the code.
 
 **Dependency:** None. Can start immediately. Blocks nothing.
 
-### F-025b: Reconcile Contradictions That Affect F-026
+### F-025b: Reconcile Contradictions That Affect F-026 — DECISION LOCKED
 
 **Title:** Surface where GDA-COMMAND-MASTER-DOC.md disagrees with the governing PDFs; Shawn
 rules on each.
 
-**Description:** The rebuild charter, PRD, product roadmap, and stability standard PDFs are the
-**governing** documents per project rules. The Master Doc is current implementation, not
-destination. This task: (a) creates a reconciliation document noting where the Master Doc
-disagrees with the PDFs, (b) flags specifically the Rule 7 "PostgreSQL is truth" vs. migration
-017 "n8n webhook = primary source of truth" contradiction plus any PDF language about
-system-of-record, (c) Shawn rules on each disagreement — this is not "reconcile and pick a
-winner," it is "the PDFs are canonical, surface disagreements, I rule."
+**Decision (locked 2026-05-19):** PostgreSQL is truth. The rebuild charter and PRD (governing
+PDFs) win over Migration 017's seeded "n8n webhook = primary" language. Migration 017's
+`bot_sources` data gets corrected. Remaining work: document the full reconciliation of all
+Master Doc vs. PDF disagreements (not just the system-of-record question).
 
-**Priority:** P0 — the architecture decision (F-026) cannot be made coherently if the destination
-is incoherent.
+**Priority:** P0 — decision is locked; documentation deliverable remains.
 
-**Dependency:** F-025a (PDFs must be in repo to reference). Blocks F-026.
+**Dependency:** F-025a (completed — PDFs in repo). Unblocks F-026 (decision locked).
 
-### F-026: System-of-Record Architecture Decision
+### F-026: System-of-Record Architecture Decision + Consolidation — DECISION LOCKED
 
-**Title:** Decide system-of-record architecture and resolve workflow→backend data path.
+**Title:** Consolidate all application data into `gda_command`. One Postgres.
 
-**Description:** F-023 discovered that all 323 n8n Postgres nodes use a "GDA Postgres" credential
-pointing to `n8n-envision-postgres-1` (the n8n database), not `gda-v2-postgres` (the GDA backend
-database). Zero backend routes read any workflow-produced table. The table naming conventions
-don't even match (workflows use `gda_` prefix, backend uses unprefixed names). Three independent
-decisions are tangled: (a) which Postgres holds application data, (b) how workflows communicate
-output to the backend, (c) what "PostgreSQL is truth" means when two Postgres instances exist.
-This task surfaces the decision with full evidence and gets Shawn's call. It does NOT implement
-the decision — implementation is Tier 3.
+**Decision (locked 2026-05-19):** Consolidate. All data into `gda_command` on `gda-postgres`.
+Workflows write there, backend reads there. No hybrid. No sync layer.
 
-**Priority:** P0 — every DUAL-path route, every workflow consumer claim, and every downstream
-fix depends on this decision.
+**Scope — what IS in F-026:**
+- Move 62 net-new tables from `n8n-envision-postgres-1` to `gda_command`, **dropping the `gda_` prefix**
+  (scripted `sed` on exported JSON for the 323 workflow node updates, not manual)
+- Create proper migrations for all moved tables under the migration system
+- Repoint all 323 workflow Postgres nodes to new "GDA Postgres" credential → `gda-postgres` as `gda_app`
+- Network bridge so n8n can reach `gda-postgres`
+- Smoke test on non-critical workflows before full cutover
 
-**Dependency:** F-025b (reconciliation of governing PDFs vs. Master Doc — needed to know what
-"PostgreSQL is truth" actually means per the canonical destination).
+**Scope — what is NOT in F-026:**
+- The 12 same-concept-different-schema overlapping tables (e.g., `opportunities` vs.
+  `gda_opportunity_tracker`). Each gets a separate Tier 3 work item with per-table decisions
+  on which is authoritative, merge strategy, and migration plan.
+- Frontend "Live API" / "Live DB" relabeling — parallel cleanup, not blocking.
+- Migration 017 `bot_sources` correction — parallel cleanup.
+
+**Hard acceptance criteria:**
+- All 323 workflow nodes use `gda_app` (NOSUPERUSER) credential, not bootstrap `gda` superuser
+- Docker network bridge verified with read-only test workflow before any data migration
+- Dry-run on snapshot/copy before production migration of 62 tables
+
+**Implementation sequencing (Shawn-approved 2026-05-19):**
+
+| Step | Work | Tier | Prereqs |
+|---|---|---|---|
+| Step 1 — Pre-flight | Kill orphan containers, restrict `N8N_CORS_ALLOWED_ORIGINS`, enable pgvector, document `gda_app` credential | Tier 0 | None |
+| Step 2 — Network bridge | Add `gda-postgres` to shared external Docker network reachable by n8n. Verify with one read-only test workflow. | Tier 1→3 | Step 1 |
+| Step 3 — Schema migration | Migrate 62 net-new tables into `gda_command` with `gda_` prefix dropped. Proper migrations. Dry-run first. | Tier 3 | Step 2 |
+| Step 4 — Workflow repoint | Scripted JSON edit of 323 Postgres nodes. New credential → `gda-postgres` as `gda_app`. Smoke test non-critical first, then full cutover. | Tier 3 | Step 3 |
+| Step 5 — Overlap reconciliation | 12 per-table work items (separate from F-026). Which is authoritative, merge strategy, migration plan. | Tier 3 backlog | Step 4 |
+
+**Parallel (any time after Step 3):**
+- Migration 017 `bot_sources` seed correction
+- `book-of-truths.ts` route fix
+- Frontend "Live API" / "Live DB" relabel across ~8 pages
+- Backend `source: "n8n" | "db"` response field cleanup
+
+**Priority:** P0 — every data-path fix depends on this.
+
+**Dependency:** F-025b (locked). Prereqs: Tier 0 pre-flight items complete.
 
 ### F-027: End-to-End Integration Test Discipline
 
@@ -517,24 +544,24 @@ Items that must happen before any new work. Small, urgent, no architecture decis
 | F-XXX | Item | Status | Rationale |
 |---|---|---|---|
 | (cleanup) | `saveDataSuccessExecution` flip for remaining workflows | **Done** (F-024 follow-up) | Observability prerequisite. Already executed. |
-| (cleanup) | `gda_idiq_tracker` CHECK constraint bug fix | **Open** | Live bug: `DEFAULT 'monitoring'` violates `CHECK (holder, teaming, targeting)`. Every INSERT using default value fails. Fix in workflow SQL today. Re-apply as migration if F-026 consolidates workflow tables into `gda_command`. |
-| (cleanup) | intel-feed persistent daily error capture | **Open** | 3 consecutive 08:00 UTC errors with execution data pruned. `saveDataSuccessExecution` now set to `all` — next error will be capturable. Diagnosis pending. |
-| F-032a | CORS fix | **Open** | CORS allows all origins — P0 from Phase 4 audit (RISK-001). 30-minute fix. Restrict to `gda.csr-llc.tech`. Does not wait for architecture decisions. |
-| F-029 | Credential and configuration audit | **Open** | Read-only. If the most critical credential was wrong, what else is? Trust is zero until credentials are validated. No architecture dependency. If this surfaces another F-023-class wound, we need to know before F-026 decisions get baked in. |
-| F-025a | Commit rebuild PDFs to repo | **Open** | 15-minute task. PDFs are the governing documents — they must be in the repo. No reconciliation in this step; F-025b handles that. |
-| F-020 | Role demotion (`gda` NOSUPERUSER) | **Open — confirmed unblocked** | All 323 Postgres nodes target `n8n-envision-postgres-1`. Zero DDL against `gda_command`. Docker networks isolated. Decision already made (#251 confirmation). This is implementation, not a decision — belongs in Tier 0. |
+| (cleanup) | `gda_idiq_tracker` CHECK constraint bug fix | **Done** | DEFAULT fixed from `monitoring` to `targeting` in DB and workflow SQL. Re-apply as migration if F-026 consolidates. |
+| (cleanup) | intel-feed persistent daily error capture | **Open** | 3 consecutive 08:00 UTC errors with execution data pruned. `saveDataSuccessExecution` now set to `all` — next error (05/22 08:00 UTC) will be capturable. Diagnosis pending. |
+| F-032a | CORS fix (backend) | **Done** | Backend CORS already correctly restricted to `gda.csr-llc.tech` in production. Verified — no code change needed. |
+| (F-026 pre-flight) | n8n CORS restriction | **Open — P0 prerequisite to F-026** | `N8N_CORS_ALLOWED_ORIGINS=*` is wide open. Once n8n writes to `gda_command`, this is an unauthenticated write path into the app DB. Restrict to known origins BEFORE cutover. |
+| (F-026 pre-flight) | Kill orphan containers | **Open** | `gda-v2-postgres`, `gda-v2-backend`, `gda-v2-frontend` are orphans from old deployment. Two Postgres containers during migration is how data ends up in the wrong place. Remove before consolidation work. |
+| (F-026 pre-flight) | Enable pgvector on gda-postgres | **Open** | Prerequisite for `gda_embeddings` table migration and F-033 corpus work. `CREATE EXTENSION vector` on `gda-postgres`. |
+| F-029 | Credential and configuration audit | **Done** (findings posted on #258) | Key: SAM/OpenAI keys differ between backend and n8n, 6 unused credentials, n8n CORS wide open, undocumented Firecrawl/Pinecone env vars. Awaiting Shawn review for remediation. |
+| F-025a | Commit rebuild PDFs to repo | **Done** (PR #264) | PDFs committed to `docs/rebuild/`. |
+| F-020 | Role demotion (`gda_app` NOSUPERUSER) | **Done** | `gda_app` created in `gda-postgres`. Backend running as `gda_app`. Health check returns `ok`. PG16 won't demote bootstrap user — separate application role used instead. |
 
-### Tier 1 — Foundational Decisions
+### Tier 1 — Foundational Decisions — LOCKED
 
-Architecture calls that everything else depends on. No implementation — just decisions documented.
+Both architecture decisions locked 2026-05-19. Documentation deliverables remain.
 
-| F-XXX | Item | Depends On | Rationale |
+| F-XXX | Item | Status | Rationale |
 |---|---|---|---|
-| F-025b | Reconcile contradictions affecting F-026 | F-025a (Tier 0) | The destination must be coherent before we can sequence toward it. The Rule 7 vs. migration 017 contradiction must be resolved. PDFs are canonical; surface where Master Doc disagrees; Shawn rules. |
-| F-026 | System-of-record architecture decision | F-025b | Which database holds truth? How do workflows deliver data to the backend? Every data-path fix downstream depends on this answer. |
-
-**Within tier — sequential:**
-- F-025b → F-026 (reconcile contradictions → architecture decision)
+| F-025b | Reconcile contradictions affecting F-026 | **DECISION LOCKED** — PostgreSQL is truth. Governing PDFs win over migration 017 seed data. | Documentation deliverable: reconcile all Master Doc vs. PDF disagreements (not just system-of-record). |
+| F-026 | System-of-record: consolidate to `gda_command` | **DECISION LOCKED** — one Postgres, no hybrid, no sync layer. | Implementation sequencing defined (Steps 1-5). See Section 4 F-026 for full breakdown. |
 
 ### Tier 2 — Foundation Work / Inventories
 
@@ -555,13 +582,17 @@ Address what inventories surface. Implementation work.
 
 | F-XXX | Item | Depends On | Rationale |
 |---|---|---|---|
-| F-023 | Shadow schema resolution (implementation) | F-026 | The fix path (credential change, data migration, table consolidation, workflow DDL removal) depends entirely on the Tier 1 architecture decision. |
-| F-028 | Contract enforcement (implementation) | F-026, F-028 audit | Routes serving workflow data need to know which database to query. Enforcement follows the audit. |
-| F-015 | Ingest mapper sanitization | F-026 | Mapper fixes may change depending on whether mappers write to `gda_command` or to n8n DB. |
-| F-027 | E2E integration test suite | F-026 | Tests need to know the expected data path to assert against. |
-| F-031 | Workflow consolidation (execution) | F-026, F-022 Subtask A | Archive/merge decisions need the architecture decision and the webhook mapping. |
+| F-026 Steps 2–4 | Consolidation implementation (network bridge → schema migration → workflow repoint) | Tier 0 pre-flight complete | See F-026 Section 4 for 5-step breakdown. 62 net-new tables migrated with `gda_` prefix dropped. 323 workflow nodes repointed via scripted JSON edit. `gda_app` credential enforced. |
+| F-026 overlap | Per-table reconciliation (12 overlapping tables) | F-026 Steps 2–4 | **NOT in F-026 scope.** Separate work item per table: `opportunities` vs `gda_opportunity_tracker`, `capture_plans` vs `gda_capture_plans`, `intel_items` vs `gda_intelligence_log`, etc. Each needs: which is authoritative, merge strategy, migration plan. |
+| (F-026 parallel) | Migration 017 `bot_sources` seed correction | F-026 Step 3 | Correct "n8n webhook = primary source of truth" seeded language. Update `book-of-truths.ts` route. |
+| (F-026 parallel) | Frontend "Live API" / "Live DB" relabel | F-026 Step 3 | Post-consolidation, the source distinction is meaningless. ~8 pages need relabeling. Backend `source: "n8n" \| "db"` response field cleanup. |
+| F-023 | Shadow schema resolution (implementation) | F-026 Steps 2–4 | Fix path now defined: consolidation per F-026 sequencing. |
+| F-028 | Contract enforcement (implementation) | F-028 audit | Routes now all read from `gda_command`. Enforcement follows the audit. |
+| F-015 | Ingest mapper sanitization | F-026 Steps 2–4 | Mappers write to `gda_command` post-consolidation. |
+| F-027 | E2E integration test suite | F-026 Steps 2–4 | Tests assert against `gda_command` as single source. |
+| F-031 | Workflow consolidation (execution) | F-026 Steps 2–4, F-022 Subtask A | Archive/merge decisions need the consolidation complete and the webhook mapping. |
 | F-032b | Security hardening (xlsx, webhook registry, health endpoints) | Nothing | RISK-002 (P1), RISK-003 (P2), RISK-004 (P3). None individually urgent but collectively represent unaddressed audit findings. |
-| F-019 | Scope expansion (if needed) | F-026 | If the architecture decision puts workflow tables under `gda_command`, F-019's manifest/drift check needs to cover them. |
+| F-019 | Scope expansion | F-026 Steps 2–4 | Consolidation puts workflow tables under `gda_command` — F-019's manifest/drift check must cover them. |
 | F-033 Phase 2 | AI knowledge corpus implementation + WIFCON first source | F-033 Step 0 + Shawn approval | Ingest workflow for WIFCON, embedding pipeline, vector store, retrieval API endpoint (standard JSON envelope), pattern documentation for adding subsequent sources (FAR text, GAO decisions). |
 
 ### Tier 4 — Product Work
@@ -589,24 +620,33 @@ Tier 3 is substantially complete.
 
 | F-XXX | Expected Tier | Actual Tier | Why |
 |---|---|---|---|
-| F-023 (implementation) | Tier 1 (it's the "biggest" problem) | Tier 3 | Implementation depends on F-026 architecture decision. The inventory/analysis is Tier 1 work; the fix is Tier 3. |
-| F-015 (mapper sanitization) | Tier 2 (it's a known gap) | Tier 3 | Mapper target database depends on F-026. Scoping can happen in Tier 2; fixes in Tier 3. |
-| F-027 (E2E tests) | Tier 2 (tests should come early) | Tier 3 | The tests need to know the expected data path, which isn't decided until F-026. Test *methodology* can be defined in Tier 2; test *implementation* is Tier 3. |
+| F-023 (implementation) | Tier 1 (it's the "biggest" problem) | Tier 3 | Implementation is part of F-026 consolidation sequencing. Decision is locked; implementation follows Steps 2–4. |
+| F-026 (implementation) | Tier 1 (it's a "decision") | Tier 3 | Decision is locked (Tier 1). Implementation (network bridge, schema migration, workflow repoint) is Tier 3 work with 5-step sequencing. |
+| F-015 (mapper sanitization) | Tier 2 (it's a known gap) | Tier 3 | Mappers write to `gda_command` post-consolidation. Scoping can happen in Tier 2; fixes in Tier 3. |
+| F-027 (E2E tests) | Tier 2 (tests should come early) | Tier 3 | Tests assert against `gda_command` post-consolidation. Test *methodology* can be defined in Tier 2; test *implementation* is Tier 3. |
+| 12-table overlap reconciliation | "Part of F-026" | Tier 3 backlog (separate) | Explicitly scoped OUT of F-026 to keep consolidation bounded. Each table needs per-table authority/merge/migration decisions. |
 | Product work | "We should be building features" | Tier 4 | Every data-dependent feature renders wrong data until the data path is fixed. Building product on a broken foundation is what got us here. |
 
 ### Tier Execution Summary
 
 ```
-Tier 0 (now):        7 items — idiq bug, intel-feed capture, F-032a CORS, F-029 cred audit, F-025a PDFs, F-020 role demotion, saveData verify
-Tier 1 (next):       2 items — F-025b, F-026
-Tier 2 (parallel):   6 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030, F-014 scope, F-016 scope, F-033 Step 0 (corpus inventory)
-Tier 3 (after T1):   8 items — F-023 impl, F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion, F-033 Phase 2 (corpus + WIFCON)
+Tier 0 (now):        10 items — saveData verify (DONE), idiq bug (DONE), F-032a CORS (DONE),
+                     F-029 cred audit (DONE), F-025a PDFs (DONE), F-020 role demotion (DONE),
+                     intel-feed capture (pending 05/22), n8n CORS restriction, orphan
+                     container cleanup, pgvector enable
+Tier 1 (LOCKED):     2 decisions — F-025b (PostgreSQL is truth), F-026 (consolidate to gda_command)
+Tier 2 (parallel):   6 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030,
+                     F-014 scope, F-016 scope, F-033 Step 0 (corpus inventory)
+Tier 3 (after T0):   12 items — F-026 Steps 2-4 (consolidation impl), 12-table overlap
+                     reconciliation, migration 017 correction, frontend relabel, F-023 impl,
+                     F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion,
+                     F-033 Phase 2 (corpus + WIFCON)
 Tier 4 (after T3):   11+ items — all product work, cleanup, docs (STALE-003 moved to F-033)
 ```
 
 ---
 
-*This document is a sequencing plan, not a design document. It does not propose how to implement
-any item — only what order to address them in. Architecture decisions (F-025b, F-026) are Shawn's
-calls. Time estimates are intentionally omitted — ordering is determined by dependencies and risk,
-not calendar.*
+*This document is a sequencing plan, not a design document. Architecture decisions (F-025b,
+F-026) were locked by Shawn on 2026-05-19. F-026 implementation follows the 5-step sequencing
+defined in Section 4. Time estimates are intentionally omitted — ordering is determined by
+dependencies and risk, not calendar.*
