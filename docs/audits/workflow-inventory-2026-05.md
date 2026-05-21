@@ -112,7 +112,7 @@ docker exec n8n-app env | grep -i prune
 | Workflow | ID | Notes |
 |----------|----|-------|
 | GDA.auto.incumbent-enrichment | `oYwPpPdNCixRKItz` | **DELETED 2026-05-21** (F-022 Cat A — never executed, manual trigger) |
-| GDA.batch.doc-ingest | `lcZkdOog2DOuMPgB` | **DELETED 2026-05-21** (F-022 Cat B — no caller found) |
+| GDA.batch.doc-ingest | `lcZkdOog2DOuMPgB` | **DELETED 2026-05-21** (F-022 Cat B — no caller found). Note: was inactive at audit time (May 20) but found active=true at deletion (May 21). Stats reflect state at deletion. |
 | GDA.cron.fast-track-ingest | `bU3PjkpSuVZP8Zue` | Old version; active version at `MJapg8dGkvEzLn0K` |
 | GDA.doctrine.finalize-sprint | `qn4h5DQrv4g0KL95` | |
 | GDA.ingest.govtribe-cron | `5KuF4KZ8uxYcbUN5` | Superseded by GDA backend MCP poll (PR #237) |
