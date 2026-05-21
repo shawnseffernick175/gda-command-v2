@@ -9,6 +9,8 @@ jobs:
   drift-check:
     name: Codebase Drift Check
     runs-on: ubuntu-latest
+    env:
+      DRIFT_DATABASE_URL: ${{ secrets.DRIFT_DATABASE_URL }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -50,8 +52,6 @@ jobs:
           echo '```' >> /tmp/drift.md
 
       - name: Migration schema drift check (F-019)
-        env:
-          DRIFT_DATABASE_URL: ${{ secrets.DRIFT_DATABASE_URL }}
         if: env.DRIFT_DATABASE_URL != ''
         run: |
           echo "" >> /tmp/drift.md
