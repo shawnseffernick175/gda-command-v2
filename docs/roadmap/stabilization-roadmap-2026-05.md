@@ -469,6 +469,43 @@ public health endpoint.
 
 **Dependency:** None. Can start anytime. Tier 3.
 
+### F-033: AI Knowledge Corpus Foundation
+
+**Title:** Build the AI knowledge corpus that every rebuild-charter AI tool depends on.
+
+**Description:** GDA's value proposition is AI analysis tools (Compliance Matrix, Proposal Review,
+Prompt Architect, AI Agent Chat) on top of a federal acquisition knowledge corpus. The Phase 4
+audit (STALE-003) found 1 of 23 documents embedded. Every AI tool the rebuild charter and PRD
+call for depends on a functioning corpus. Building the corpus foundation as part of stabilization
+— alongside data-path fixes — means the AI tools have something to consume the moment they're
+built. Deferring to Tier 4 means stabilizing a platform with no analytical depth.
+
+**Two phases:**
+
+**F-033 Step 0 (Tier 2):** Embedding pipeline inventory — read-only scoping. Covers:
+1. Pipeline architecture — where embedding happens, what triggers it, what model, where vectors
+   land. File paths, workflow IDs, table names, config.
+2. Vector storage — pgvector in `gda_command`, separate Postgres, or external service
+   (Pinecone/Weaviate/Qdrant)? If pgvector, which table, dimensions, index type.
+3. Retrieval interface — API route doing similarity search? Query shape? Frontend calling it?
+4. Current corpus contents — which 1 of 23 documents is embedded? What are the other 22,
+   where do they live?
+5. Why is it 1/23? Pipeline abandoned mid-build? Gated? Failing silently?
+6. F-026 dependency — does vector storage location depend on the system-of-record decision,
+   or does it sidestep it?
+7. Recommendation: extend existing pipeline or build fresh? Justify with specifics.
+
+**F-033 Phase 2 (Tier 3):** Corpus implementation + WIFCON as first source. Scope written after
+Step 0 findings land and Shawn approves direction. Expected: ingest workflow for WIFCON (homepage
+policy aggregator + Vern Edwards blog + forum), embedding pipeline, vector store, retrieval API
+endpoint returning standard JSON envelope, documentation of the pattern so adding source #2
+(FAR text), #3 (GAO decisions), etc., is mechanical.
+
+**Priority:** P1 — strategic. The corpus is the moat. Every AI tool depends on it.
+
+**Dependency:** Step 0 has no blockers (read-only inventory). Phase 2 depends on Step 0 findings
+and Shawn's approval of direction.
+
 ---
 
 ## Section 5: The Ordering
@@ -510,6 +547,7 @@ Read-only or low-risk write work that surfaces what's broken without changing it
 | F-030 | Frozen workflow review | F-024 (done) | Check whether freeze reasons still hold post-upgrade. Read-only assessment. |
 | F-014 | Cross-file type-safety in migrations (scope) | Nothing | Was skipped without justification. At minimum, scope it: what does "cross-file type-safety" mean concretely, what would a check look like, how many migrations are at risk? |
 | F-016 | Schema-mapper drift detection (scope) | F-026 | Scoping depends on the architecture decision — if workflows consolidate into `gda_command`, the mapper-to-schema check looks different than if the split-brain is formalized. |
+| F-033 Step 0 | AI knowledge corpus — embedding pipeline inventory | Nothing | Read-only scoping: pipeline architecture, vector storage, retrieval interface, current corpus contents (1/23 embedded per STALE-003), why only 1/23, F-026 dependency analysis, extend-vs-rebuild recommendation. Same posture as F-028/F-022/F-030 audit phases. |
 
 ### Tier 3 — Targeted Fixes
 
@@ -524,6 +562,7 @@ Address what inventories surface. Implementation work.
 | F-031 | Workflow consolidation (execution) | F-026, F-022 Subtask A | Archive/merge decisions need the architecture decision and the webhook mapping. |
 | F-032b | Security hardening (xlsx, webhook registry, health endpoints) | Nothing | RISK-002 (P1), RISK-003 (P2), RISK-004 (P3). None individually urgent but collectively represent unaddressed audit findings. |
 | F-019 | Scope expansion (if needed) | F-026 | If the architecture decision puts workflow tables under `gda_command`, F-019's manifest/drift check needs to cover them. |
+| F-033 Phase 2 | AI knowledge corpus implementation + WIFCON first source | F-033 Step 0 + Shawn approval | Ingest workflow for WIFCON, embedding pipeline, vector store, retrieval API endpoint (standard JSON envelope), pattern documentation for adding subsequent sources (FAR text, GAO decisions). |
 
 ### Tier 4 — Product Work
 
@@ -541,7 +580,7 @@ Tier 3 is substantially complete.
 | Shipley stage dropdown (TODO #4) | F-026 | `gda_opportunity_tracker` is in n8n DB. |
 | Per-opp AI chat (TODO #5) | Product decision | Not data-path-dependent. Could start earlier. |
 | STALE-001 (record_version empty) | F-009, F-026 | Versioning system needs retroactive snapshots + trigger verification with live data. |
-| STALE-003 (1/23 docs embedded) | Product decision | RAG quality. Independent of infrastructure. |
+| STALE-003 (1/23 docs embedded) | F-033 | Addressed by F-033 corpus foundation. Moved from Tier 4 to Tier 2 (inventory) / Tier 3 (implementation). |
 | PERF-002/PERF-003 (code splitting) | None | Frontend performance. Independent. Can happen anytime. |
 | DEAD-001/DEAD-002 (cleanup) | None | Repo hygiene. Lowest priority. |
 | DOC-002 (API docs) | F-028 audit | API docs should follow the contract audit, not precede it. |
@@ -560,9 +599,9 @@ Tier 3 is substantially complete.
 ```
 Tier 0 (now):        7 items — idiq bug, intel-feed capture, F-032a CORS, F-029 cred audit, F-025a PDFs, F-020 role demotion, saveData verify
 Tier 1 (next):       2 items — F-025b, F-026
-Tier 2 (parallel):   5 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030, F-014 scope, F-016 scope
-Tier 3 (after T1):   7 items — F-023 impl, F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion
-Tier 4 (after T3):   12+ items — all product work, cleanup, docs
+Tier 2 (parallel):   6 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030, F-014 scope, F-016 scope, F-033 Step 0 (corpus inventory)
+Tier 3 (after T1):   8 items — F-023 impl, F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion, F-033 Phase 2 (corpus + WIFCON)
+Tier 4 (after T3):   11+ items — all product work, cleanup, docs (STALE-003 moved to F-033)
 ```
 
 ---
