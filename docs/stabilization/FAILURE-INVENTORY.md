@@ -47,7 +47,7 @@ Sources examined:
 | F-021 | Always | P1 | 96% of scheduled n8n workflows not firing — 168 of 174 active workflows have zero execution records | **Fixed** (PR #256 — workflow inventory audit documenting root cause hypothesis: queue/activation failure) |
 | F-022 | Always | P1 | 168 silent workflows need triage before alert automation can ship | **In Progress** — 47 cron workflows classified; 24 keep-and-fix, 20 investigate, 2 archive. Webhook workflows still pending. See #257. |
 | F-023 | On every n8n execution | P1 | 39 Postgres tables created by n8n workflows outside migration system — shadow schema bypasses all F-019 controls | **Open** — inventory complete, schema capture + backfill migrations pending. See #258. |
-| F-024 | Always | P1 | n8n queue/activation failure — 43 cron workflows have valid schedules but zero executions | **Open** — needs VPS SSH access to diagnose. When fixed, 22 keep-and-fix workflows start working without per-workflow changes. See #260. |
+| F-024 | Always | P1 | n8n queue/activation failure — 43 cron workflows have valid schedules but zero executions | **In Progress** — root cause confirmed (n8n 2.14.2 scheduler bug, see n8n-io/n8n#30269). Fix order: F-024 (scheduler fix) → F-023 (shadow schema backfill) → F-020 (role demotion). See #260. |
 
 ---
 
