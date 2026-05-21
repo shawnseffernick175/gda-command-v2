@@ -601,7 +601,7 @@ Three PRs, sequential. Each self-contained with docs and rollback notes.
 showing traces, architect sign-off.
 
 **Non-goals (explicit deferrals):** Migrating every LLM call site to LiteLLM, backfilling
-embeddings, semantic dedupe (F-035 candidate), watchlist matching (F-036 candidate),
+embeddings, semantic dedupe (F-038 candidate), watchlist matching (F-036 candidate),
 SAM.gov mod/award subscriptions (F-037 candidate), BullMQ/queue system, feature flags,
 Vercel AI SDK, PDF parser selection, Promptfoo eval harness.
 
@@ -656,6 +656,7 @@ Read-only or low-risk write work that surfaces what's broken without changing it
 | F-016 | Schema-mapper drift detection (scope) | F-026 | Scoping depends on the architecture decision — if workflows consolidate into `gda_command`, the mapper-to-schema check looks different than if the split-brain is formalized. |
 | F-033 Step 0 | AI knowledge corpus — embedding pipeline inventory | Nothing | Read-only scoping: pipeline architecture, vector storage, retrieval interface, current corpus contents (1/23 embedded per STALE-003), why only 1/23, F-026 dependency analysis, extend-vs-rebuild recommendation. Same posture as F-028/F-022/F-030 audit phases. |
 | F-034 | AI Infrastructure Foundation (LiteLLM + embedding service + Langfuse) | F-026 complete, F-029 remediation closed, pgvector enabled, Tier 0 closed | Three self-hosted Docker services. Sequential: LiteLLM → embedding service → Langfuse. Foundation for F-033 Phase 2, Capture Intelligence, all future AI features. **DO NOT START until all prerequisites verified.** Architect approval required. |
+| F-035 | Security: hardcoded secrets in n8n workflow source code | Nothing (can start anytime) | 10 hardcoded secret values across 9 workflows: 1 GitHub PAT (HIGH), 5 SAM API key refs (MEDIUM), 3 n8n API key refs (HIGH). Must land **before F-034** — F-034 introduces more secret material (LiteLLM/Langfuse keys) and hardcoding precedent cannot stand. Discovered during F-029 R-2 reconciliation, 2026-05-21. Tracked: #271. |
 
 ### Tier 3 — Targeted Fixes
 
@@ -716,9 +717,10 @@ Tier 0 (now):        10 items — saveData verify (DONE), idiq bug (DONE), F-032
                      intel-feed capture (pending 05/22), n8n CORS restriction, orphan
                      container cleanup, pgvector enable
 Tier 1 (LOCKED):     2 decisions — F-025b (PostgreSQL is truth), F-026 (consolidate to gda_command)
-Tier 2 (parallel):   7 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030,
+Tier 2 (parallel):   8 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030,
                      F-014 scope, F-016 scope, F-033 Step 0 (corpus inventory),
-                     F-034 (AI infra: LiteLLM + embeddings + Langfuse)
+                     F-034 (AI infra: LiteLLM + embeddings + Langfuse),
+                     F-035 (hardcoded secrets in n8n workflows — before F-034)
 Tier 3 (after T0):   12 items — F-026 Steps 2-4 (consolidation impl), 12-table overlap
                      reconciliation, migration 017 correction, frontend relabel, F-023 impl,
                      F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion,
