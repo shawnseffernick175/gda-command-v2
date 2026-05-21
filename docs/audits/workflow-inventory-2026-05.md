@@ -284,12 +284,12 @@ The user's suggested categories were: status, trigger type, external dependencie
 | Active workflows | 170 (4 active orphans deleted F-022) |
 | Inactive workflows | 9 (2 inactive orphans deleted F-022) |
 | Active with executions in log | 6 |
-| Active with zero executions | 168 |
+| Active with zero executions | 164 (was 168; 4 active orphans deleted F-022) |
 | Cron-triggered (active) | 47 |
 | Cron with zero executions | 43 |
-| Webhook-triggered (active) | 124 |
+| Webhook-triggered (active) | 121 (was 124; 3 webhook orphans deleted F-022) |
 | Webhook with executions | 1 |
-| Other trigger (active) | 3 |
+| Other trigger (active) | 2 (was 3; 1 form-trigger orphan deleted F-022) |
 | Total executions in log | 222 |
 | Successful executions | 216 |
 | Error executions | 5 |
