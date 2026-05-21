@@ -51,7 +51,7 @@ map current state vs. destination, identify new work, and propose execution orde
 | F-017 | Migration tests don't cover production state | Build test harness | **Fixed** (PR #243, #246) | Harness built. 3 paired tests. Allowlist tightened. |
 | F-018 | Unmarked state-dependent migrations | Full audit + paired tests | **Fixed** (PR #247, #248) | 55 migrations audited. 9 paired tests covering all high-risk state-dependent migrations. |
 | F-019 | Production state modified outside deploy path | Deploy guard | **Partially Fixed** (PR #250, #252) | Manifest verification, provenance recording, drift check shipped. Role separation deferred to F-020. **F-023 finding widens the wound:** F-019's controls scope to `gda_command` only. The 76 shadow tables in `n8n-envision-postgres-1` are completely invisible to manifest verification, provenance, and drift check. F-019 is technically correct for its scope but the scope is too narrow given F-023. |
-| F-020 | Demote `gda` from SUPERUSER | One-time infrastructure procedure | **Blocked → possibly unblocked** | Originally blocked by F-023 (DDL in workflows would break after demotion). **F-023 Q2 finding changes this:** All 44 DDL operations target `n8n-envision-postgres-1`, not `gda_command`. Zero workflows run DDL against `gda_command`. F-020's demotion scope is `gda_command` only. The blocker may have evaporated — but this needs explicit confirmation before proceeding. See #251 for runbook. |
+| F-020 | Demote `gda` from SUPERUSER | One-time infrastructure procedure | **Confirmed unblocked** | Originally blocked by F-023 (DDL in workflows would break after demotion). **Confirmed 2026-05-19:** All 323 Postgres nodes (304 active, 19 inactive) use exactly one credential ("GDA Postgres") pointing at `n8n-envision-postgres-1`. Zero workflows connect to `gda-v2-postgres`. Zero DDL operations target `gda_command`. Docker networks are physically isolated (n8n on `n8n-envision_envision-internal`, gda-v2-postgres on `gda-command-v2_gda-internal` — zero overlap). The F-020 → F-023 dependency is **invalidated**. See #251 for raw query results. |
 | F-021 | 96% of scheduled workflows not firing | Workflow inventory audit | **Fixed** (PR #256) | Inventory document produced. Root cause hypothesis (queue/activation failure) confirmed by F-024. |
 | F-022 | 168 silent workflows need triage | Classify all workflows | **In Progress** | 47 cron workflows classified (24 keep-and-fix, 20 investigate, 2 archive, 1 frozen). 124 webhook workflows still pending (Subtask A). **F-023 finding invalidates some consumer claims:** 7 keep-and-fix workflows had "backend SQL reads" claimed as consumers, but those reads hit empty tables in `gda_command`. The actual working consumer is the n8n webhook chain, not direct SQL. Classifications still hold but justifications need correction. |
 | F-023 | Shadow schema DDL — 39 tables outside migration system | Inventory + backfill + workflow cleanup | **Open — reframed** | Original scope (backfill 39 shadow tables into gda_command migrations) was based on a false assumption: that the tables were in `gda_command`. They're in `n8n-envision-postgres-1`. The problem is now understood as: (a) "GDA Postgres" credential misconfiguration since day one, (b) split-brain database with zero data path between workflow output and backend SQL queries, (c) table naming mismatch (workflows use `gda_` prefix, backend uses unprefixed names). Architecture decision pending — consolidate vs. formalize webhook layer vs. hybrid. Prerequisite: backend route inventory (delivered), F-020 dependency analysis (delivered — F-020 is NOT blocked by F-023). |
@@ -104,7 +104,7 @@ committed to the repo. This means:
 - Drift between the Master Doc and the PDFs is invisible
 - The destination definition lives outside the codebase
 
-**This is itself a stabilization problem.** See proposed F-025 (Section 4).
+**This is itself a stabilization problem.** See proposed F-025a/F-025b (Section 4).
 
 ### Destination Criteria (Quoted from Master Doc)
 
@@ -167,14 +167,16 @@ The current system operates as if migration 017 is true: DUAL-path routes try n8
 fall back to DB. But the "GDA Postgres" credential misconfiguration means the DB fallback hits
 empty tables. **Neither document's vision is implemented correctly.**
 
-**This contradiction requires Shawn's call.** The architecture fix depends on which document
-is canonical. See proposed F-025 (Section 4) for the reconciliation work.
+**This contradiction requires Shawn's call.** The rebuild charter, PRD, and stability standard
+PDFs are the **governing** documents per project rules. The Master Doc is current implementation,
+not destination. F-025b surfaces where the Master Doc disagrees with the PDFs; Shawn rules on
+each. See proposed F-025a/F-025b (Section 4) for the reconciliation work.
 
 ### Supplementary: PDF Documents (Not in Repo)
 
 Per Shawn's direction: the rebuild charter, PRD, product roadmap, and stability standard exist
 as PDFs outside the repo. Where the Master Doc and PDFs disagree, this roadmap notes the
-contradiction but does not resolve it — that resolution is part of F-025.
+contradiction but does not resolve it — that resolution is part of F-025b.
 
 Known disagreements surfaced so far:
 - Master Doc §2 Rule 7 says "PostgreSQL is truth"
@@ -197,7 +199,7 @@ work via webhook but their DB fallback returns empty/stale data.
 
 **Gap:** Foundational. Cannot be closed without the system-of-record architecture decision (F-023).
 
-**F-XXX:** F-023 (open), plus proposed F-025 (system-of-record decision).
+**F-XXX:** F-023 (open), plus proposed F-025b → F-026 (reconciliation then system-of-record decision).
 
 ### 3.2 — "Standard JSON envelope on every endpoint" (Core Rule 4)
 
@@ -233,7 +235,7 @@ in `gda_command` and 451 in `n8n`. `opportunities` has 10 in `gda_command` and 1
 
 **Gap:** Total. The data is not just non-identical — there's no synchronization mechanism at all.
 
-**F-XXX:** F-023 (open), proposed F-025 (system-of-record decision).
+**F-XXX:** F-023 (open), proposed F-025b → F-026 (reconciliation then system-of-record decision).
 
 ### 3.5 — Persistent KPI Strip (Design Decision §14.1)
 
@@ -251,10 +253,10 @@ with placeholder/zero values on most pages.
 opportunity data feeding it comes from 10 seed records in `gda_command` while 1,757 real records
 sit in the n8n database. The scoring is running against the wrong data.
 
-**Gap:** Blocked by F-023/F-025 (system-of-record decision). Once data path is fixed, scoring
+**Gap:** Blocked by F-023/F-026 (system-of-record decision). Once data path is fixed, scoring
 can operate on real data.
 
-**F-XXX:** F-023 (open), product work after data path is resolved.
+**F-XXX:** F-023 (open), F-026 (system-of-record decision), then product work after data path is resolved.
 
 ### 3.7 — Ops Tracker / Pipeline Separation
 
@@ -265,7 +267,7 @@ enforces that Pipeline requires `approved_at IS NOT NULL`. This separation exist
 of 1,757 opportunities is in the n8n database. The separation is structurally correct but
 operating on incomplete data.
 
-**F-XXX:** Same data path issue — F-023/F-025.
+**F-XXX:** Same data path issue — F-023/F-026.
 
 ### 3.8 — Financial Bible Drill-Downs
 
@@ -288,7 +290,7 @@ operating on incomplete data.
 **Gap:** Compliance is a data-path issue (F-023). Prompt Architect and Proposal Review need
 content population — not structural fixes, but product work.
 
-**F-XXX:** Compliance → F-023/F-025. Others → product work.
+**F-XXX:** Compliance → F-023/F-026. Others → product work.
 
 ### 3.10 — Smoke / API Contract / Business-Journey E2E Tests
 
@@ -308,23 +310,36 @@ content population — not structural fixes, but product work.
 
 Continuing the sequence from F-024.
 
-### F-025: Reconcile Rebuild Documentation
+### F-025a: Commit Rebuild PDFs to Repo
 
-**Title:** Commit charter/PRD/stability standard/roadmap PDFs into `docs/rebuild/` and reconcile
-against GDA-COMMAND-MASTER-DOC.md.
+**Title:** Commit charter/PRD/stability standard/roadmap PDFs into `docs/rebuild/`.
 
 **Description:** The destination definition for the rebuild lives outside the codebase (PDFs in
 Shawn's project context). Future contributors only see the Master Doc, and drift between the
-Master Doc and the PDFs is invisible. This task: (a) commits the PDFs to `docs/rebuild/`, (b)
-creates a reconciliation document noting where the Master Doc and PDFs disagree, (c) documents
-which source is canonical when they conflict (specifically the Rule 7 "PostgreSQL is truth"
-vs. migration 017 "n8n webhook = primary source of truth" contradiction), and (d) updates the
-Master Doc to reflect the agreed canonical position.
+Master Doc and the PDFs is invisible. This task commits the PDFs to `docs/rebuild/` so the
+governing documents are versioned alongside the code.
 
-**Priority:** P1 — the architecture decision (F-023) cannot be made coherently if the destination
+**Priority:** P1 — 15-minute task. The PDFs are the governing documents per project rules.
+
+**Dependency:** None. Can start immediately. Blocks nothing.
+
+### F-025b: Reconcile Contradictions That Affect F-026
+
+**Title:** Surface where GDA-COMMAND-MASTER-DOC.md disagrees with the governing PDFs; Shawn
+rules on each.
+
+**Description:** The rebuild charter, PRD, product roadmap, and stability standard PDFs are the
+**governing** documents per project rules. The Master Doc is current implementation, not
+destination. This task: (a) creates a reconciliation document noting where the Master Doc
+disagrees with the PDFs, (b) flags specifically the Rule 7 "PostgreSQL is truth" vs. migration
+017 "n8n webhook = primary source of truth" contradiction plus any PDF language about
+system-of-record, (c) Shawn rules on each disagreement — this is not "reconcile and pick a
+winner," it is "the PDFs are canonical, surface disagreements, I rule."
+
+**Priority:** P0 — the architecture decision (F-026) cannot be made coherently if the destination
 is incoherent.
 
-**Dependency:** None. Can start immediately. Blocks F-026.
+**Dependency:** F-025a (PDFs must be in repo to reference). Blocks F-026.
 
 ### F-026: System-of-Record Architecture Decision
 
@@ -342,8 +357,8 @@ the decision — implementation is Tier 3.
 **Priority:** P0 — every DUAL-path route, every workflow consumer claim, and every downstream
 fix depends on this decision.
 
-**Dependency:** F-025 (rebuild docs reconciliation — needed to know what "PostgreSQL is truth"
-actually means per the canonical destination).
+**Dependency:** F-025b (reconciliation of governing PDFs vs. Master Doc — needed to know what
+"PostgreSQL is truth" actually means per the canonical destination).
 
 ### F-027: End-to-End Integration Test Discipline
 
@@ -371,9 +386,9 @@ against).
 endpoint. No audit has checked compliance. The Phase 4 FINDINGS.md did not cover this. This task:
 (a) inventories every route's response format, (b) documents deviations, (c) proposes whether
 to enforce via middleware or per-route, (d) implements enforcement. Also covers the 14 unaddressed
-FINDINGS.md items that naturally roll into route-level work: RISK-001 (CORS), RISK-003 (webhook
-registry auth), RISK-004 (health endpoint exposure), BROKEN-002/PERF-001 (SAM pagination),
-OBSERVE-003 (health check n8n coverage).
+FINDINGS.md items that naturally roll into route-level work: BROKEN-002/PERF-001 (SAM pagination),
+OBSERVE-003 (health check n8n coverage). (RISK-001/CORS is now F-032a; RISK-003/RISK-004 are
+now F-032b.)
 
 **Priority:** P2 — structural quality. Not blocking other work but accumulating technical debt.
 
@@ -428,20 +443,31 @@ burden and confusion.
 **Dependency:** F-026 (system-of-record decision — some webhook workflows may need to change
 behavior depending on the architecture choice).
 
-### F-032: Security Hardening Pass
+### F-032a: CORS Fix
 
-**Title:** Address FINDINGS.md security items — CORS, xlsx vuln, webhook registry, health endpoints.
+**Title:** Restrict CORS to `gda.csr-llc.tech`.
 
-**Description:** Four security findings from the Phase 4 audit have no corresponding F-XXX:
-RISK-001 (CORS allows all origins, P0), RISK-002 (xlsx prototype pollution, P1), RISK-003
-(webhook registry publicly accessible, P2), RISK-004 (health endpoints expose internals, P3).
-This task addresses all four as a single pass: (a) restrict CORS to `gda.csr-llc.tech`, (b)
-replace `xlsx` with `exceljs` or remove if unused, (c) put webhook registry behind auth, (d)
-strip internal details from public health endpoint.
+**Description:** RISK-001 (Phase 4 audit, P0): CORS allows all origins. 30-minute fix —
+restrict `Access-Control-Allow-Origin` to `gda.csr-llc.tech` (and localhost for dev).
 
-**Priority:** P1 — RISK-001 (CORS) alone is P0 per FINDINGS.md.
+**Priority:** P0 — actively exploitable misconfiguration.
 
-**Dependency:** None. Can start immediately.
+**Dependency:** None. Tier 0.
+
+### F-032b: Security Hardening — xlsx, Webhook Registry, Health Endpoints
+
+**Title:** Address remaining FINDINGS.md security items — xlsx vuln, webhook registry auth,
+health endpoint exposure.
+
+**Description:** Three security findings from the Phase 4 audit beyond CORS:
+RISK-002 (xlsx prototype pollution, P1), RISK-003 (webhook registry publicly accessible, P2),
+RISK-004 (health endpoints expose internals, P3). This task: (a) replace `xlsx` with `exceljs`
+or remove if unused, (b) put webhook registry behind auth, (c) strip internal details from
+public health endpoint.
+
+**Priority:** P2 — none are P0-urgent individually.
+
+**Dependency:** None. Can start anytime. Tier 3.
 
 ---
 
@@ -454,9 +480,10 @@ Items that must happen before any new work. Small, urgent, no architecture decis
 | F-XXX | Item | Status | Rationale |
 |---|---|---|---|
 | (cleanup) | `saveDataSuccessExecution` flip for remaining workflows | **Done** (F-024 follow-up) | Observability prerequisite. Already executed. |
-| (cleanup) | `gda_idiq_tracker` CHECK constraint bug fix | **Open** | Live bug: `DEFAULT 'monitoring'` violates `CHECK (holder, teaming, targeting)`. Every INSERT using default value fails. Fix in workflow SQL, not migration (table is in n8n DB). |
+| (cleanup) | `gda_idiq_tracker` CHECK constraint bug fix | **Open** | Live bug: `DEFAULT 'monitoring'` violates `CHECK (holder, teaming, targeting)`. Every INSERT using default value fails. Fix in workflow SQL today. Re-apply as migration if F-026 consolidates workflow tables into `gda_command`. |
 | (cleanup) | intel-feed persistent daily error capture | **Open** | 3 consecutive 08:00 UTC errors with execution data pruned. `saveDataSuccessExecution` now set to `all` — next error will be capturable. Diagnosis pending. |
-| F-032 | Security hardening pass (CORS P0) | **Open** | CORS allows all origins is a P0 from Phase 4 audit. The CORS fix specifically is 30 minutes and should not wait for architecture decisions. |
+| F-032a | CORS fix | **Open** | CORS allows all origins — P0 from Phase 4 audit (RISK-001). 30-minute fix. Restrict to `gda.csr-llc.tech`. Does not wait for architecture decisions. |
+| F-029 | Credential and configuration audit | **Open** | Read-only. If the most critical credential was wrong, what else is? Trust is zero until credentials are validated. No architecture dependency. If this surfaces another F-023-class wound, we need to know before F-026 decisions get baked in. |
 
 ### Tier 1 — Foundational Decisions
 
@@ -464,15 +491,14 @@ Architecture calls that everything else depends on. No implementation — just d
 
 | F-XXX | Item | Depends On | Rationale |
 |---|---|---|---|
-| F-025 | Reconcile rebuild documentation | Nothing | The destination must be coherent before we can sequence toward it. The Rule 7 vs. migration 017 contradiction must be resolved. |
-| F-026 | System-of-record architecture decision | F-025 | Which database holds truth? How do workflows deliver data to the backend? Every data-path fix downstream depends on this answer. |
-| F-029 | Credential and configuration audit | Nothing | If the most critical credential was wrong, what else is? Trust in the system is zero until credentials are validated. Can run in parallel with F-025/F-026. |
-| F-020 | Role demotion (`gda` NOSUPERUSER) | Confirmation that zero workflows DDL against `gda_command` | Originally blocked by F-023. F-023 Q2 analysis shows all DDL targets `n8n-envision-postgres-1`. If confirmed, F-020 is unblocked and should proceed — it's a foundational security control that makes the deploy guard (F-019) actually enforceable. |
+| F-025a | Commit rebuild PDFs to repo | Nothing | 15-minute task. PDFs are the governing documents — they must be in the repo. |
+| F-025b | Reconcile contradictions affecting F-026 | F-025a | The destination must be coherent before we can sequence toward it. The Rule 7 vs. migration 017 contradiction must be resolved. PDFs are canonical; surface where Master Doc disagrees; Shawn rules. |
+| F-026 | System-of-record architecture decision | F-025b | Which database holds truth? How do workflows deliver data to the backend? Every data-path fix downstream depends on this answer. |
+| F-020 | Role demotion (`gda` NOSUPERUSER) | Nothing — **confirmed unblocked** | All 323 Postgres nodes target `n8n-envision-postgres-1`. Zero DDL against `gda_command`. Docker networks are isolated. Demotion is safe. Foundational security control that makes deploy guard (F-019) enforceable. |
 
 **Within tier — parallel tracks:**
-- Track A: F-025 → F-026 (sequential — can't decide architecture without knowing destination)
-- Track B: F-029 (independent — credential audit can start day one)
-- Track C: F-020 (independent if confirmed unblocked — role demotion is infrastructure, not architecture)
+- Track A: F-025a → F-025b → F-026 (sequential — PDFs in repo → reconcile contradictions → architecture decision)
+- Track B: F-020 (confirmed unblocked — role demotion is infrastructure, not architecture)
 
 ### Tier 2 — Foundation Work / Inventories
 
@@ -481,7 +507,7 @@ Read-only or low-risk write work that surfaces what's broken without changing it
 | F-XXX | Item | Depends On | Rationale |
 |---|---|---|---|
 | F-028 | Backend route contract audit (inventory phase) | Nothing | Maps every route's response format, database reads, and frontend usage. The audit portion is read-only. |
-| F-022 | Webhook dependency mapping (Subtask A) | Nothing | 124 webhook workflows still unclassified. Read-only triage. |
+| F-022 | Webhook dependency mapping (Subtask A) + consumer claim correction | Nothing | 124 webhook workflows still unclassified. Read-only triage. **Explicit deliverable:** correct the 7 keep-and-fix workflows whose consumer claims were invalidated by F-023 (claimed "backend SQL reads" that hit empty tables in `gda_command` — actual working consumer is n8n webhook chain). Produce corrected triage doc. |
 | F-030 | Frozen workflow review | F-024 (done) | Check whether freeze reasons still hold post-upgrade. Read-only assessment. |
 | F-014 | Cross-file type-safety in migrations (scope) | Nothing | Was skipped without justification. At minimum, scope it: what does "cross-file type-safety" mean concretely, what would a check look like, how many migrations are at risk? |
 | F-016 | Schema-mapper drift detection (scope) | F-026 | Scoping depends on the architecture decision — if workflows consolidate into `gda_command`, the mapper-to-schema check looks different than if the split-brain is formalized. |
@@ -497,6 +523,7 @@ Address what inventories surface. Implementation work.
 | F-015 | Ingest mapper sanitization | F-026 | Mapper fixes may change depending on whether mappers write to `gda_command` or to n8n DB. |
 | F-027 | E2E integration test suite | F-026 | Tests need to know the expected data path to assert against. |
 | F-031 | Workflow consolidation (execution) | F-026, F-022 Subtask A | Archive/merge decisions need the architecture decision and the webhook mapping. |
+| F-032b | Security hardening (xlsx, webhook registry, health endpoints) | Nothing | RISK-002 (P1), RISK-003 (P2), RISK-004 (P3). None individually urgent but collectively represent unaddressed audit findings. |
 | F-019 | Scope expansion (if needed) | F-026 | If the architecture decision puts workflow tables under `gda_command`, F-019's manifest/drift check needs to cover them. |
 
 ### Tier 4 — Product Work
@@ -532,16 +559,16 @@ Tier 3 is substantially complete.
 ### Tier Execution Summary
 
 ```
-Tier 0 (now):        4 items — idiq bug, intel-feed capture, CORS fix, saveData cleanup (done)
-Tier 1 (next):       4 items — F-025, F-026, F-029, F-020
-Tier 2 (parallel):   5 items — F-028 audit, F-022 Subtask A, F-030, F-014 scope, F-016 scope
-Tier 3 (after T1):   6 items — F-023 impl, F-028 impl, F-015, F-027, F-031, F-019 expansion
+Tier 0 (now):        5 items — idiq bug, intel-feed capture, F-032a CORS, F-029 cred audit, saveData cleanup (done)
+Tier 1 (next):       3 items — F-025a, F-025b, F-026 (+ F-020 in parallel, confirmed unblocked)
+Tier 2 (parallel):   5 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030, F-014 scope, F-016 scope
+Tier 3 (after T1):   7 items — F-023 impl, F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion
 Tier 4 (after T3):   12+ items — all product work, cleanup, docs
 ```
 
 ---
 
 *This document is a sequencing plan, not a design document. It does not propose how to implement
-any item — only what order to address them in. Architecture decisions (F-025, F-026) are Shawn's
+any item — only what order to address them in. Architecture decisions (F-025b, F-026) are Shawn's
 calls. Time estimates are intentionally omitted — ordering is determined by dependencies and risk,
 not calendar.*
