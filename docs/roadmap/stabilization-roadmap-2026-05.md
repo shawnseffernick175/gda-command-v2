@@ -530,8 +530,88 @@ endpoint returning standard JSON envelope, documentation of the pattern so addin
 
 **Priority:** P1 — strategic. The corpus is the moat. Every AI tool depends on it.
 
-**Dependency:** Step 0 has no blockers (read-only inventory). Phase 2 depends on Step 0 findings
-and Shawn's approval of direction.
+**Dependency:** Step 0 has no blockers (read-only inventory). Phase 2 depends on Step 0 findings,
+Shawn's approval of direction, and F-034 (embedding service is Deliverable 2 of F-034).
+
+### F-034: AI Infrastructure Foundation
+
+**Title:** Establish the AI infrastructure layer (LiteLLM gateway, embedding service, Langfuse
+observability) that every subsequent agentic / LLM feature in GDA Command depends on.
+
+**Status:** Queued — DO NOT START until F-026 cutover is complete and verified.
+
+**Description:** Three self-hosted Docker services on the existing VPS. No external SaaS
+dependencies for prompt/response data. This is the foundation for F-033 (AI Knowledge Corpus),
+Capture Intelligence module (BOE + Past Performance extraction), and all future agentic loops,
+opportunity classifiers, semantic dedupe, and watchlist matching.
+
+**Hard prerequisites (ALL must be true before F-034 begins):**
+1. F-026 consolidation complete — one Postgres (`gda-postgres`), all workflow nodes repointed
+   to `gda_app` credential, orphan containers removed.
+2. F-029 credential remediation complete — no stray Pinecone env vars, no key drift between
+   backend and n8n, CORS restricted.
+3. `pgvector` extension verified enabled on `gda-postgres` (F-026 Step 1 pre-flight).
+4. Tier 0 closed.
+
+**Three deliverables (sequential, not parallel):**
+
+**Deliverable 1 — LiteLLM gateway (self-hosted):**
+- Docker service on shared internal network with `gda-postgres` and backend.
+- Postgres-backed config/logging under `litellm` schema (NOT public schema).
+- Master key + virtual API keys (separate keys for backend and n8n).
+- All upstream model-provider API keys removed from backend env and n8n credentials —
+  only LiteLLM holds upstream keys.
+- Models configured: `gpt-4o`, `gpt-4o-mini`, `text-embedding-3-small`, `claude-sonnet-4`.
+- Cost tracking enabled per virtual key.
+- One n8n workflow + one backend route updated as proof-of-life.
+- Documented in `docs/infra/litellm.md`.
+
+**Deliverable 2 — Embedding service (backend-owned):**
+- Backend service module: `POST /api/internal/embeddings/embed` + `POST /api/internal/embeddings/search`.
+- One embedding model pinned: `text-embedding-3-small` (1536 dims). Model name + dimensions
+  stored with every vector. Mixing models forbidden.
+- All calls routed through LiteLLM (Deliverable 1).
+- `gda_embeddings` schema: `(id, entity_type, entity_id, embedding vector(1536), model_name,
+  model_version, content_hash, created_at, updated_at)`. Unique index on `(entity_type, entity_id)`.
+  IVFFLAT or HNSW index on `embedding`. Content hash check — skip re-embedding if unchanged.
+- Internal-only routes, not exposed publicly.
+- One real entity type wired end-to-end as proof-of-life (`opportunity_title_description`).
+- Documented in `docs/infra/embeddings.md`.
+
+**Deliverable 3 — Langfuse (self-hosted):**
+- Docker service on shared internal network.
+- Backed by `gda-postgres` under `langfuse` schema (NOT public).
+- LiteLLM configured to emit traces to Langfuse.
+- Retention: full prompt/response payloads 90 days, aggregated stats indefinite.
+- Admin auth configured. Not publicly exposed without auth.
+- Documented in `docs/infra/langfuse.md`.
+
+**Sequencing:** LiteLLM first (dependency for other two) → Embedding service → Langfuse.
+Three PRs, sequential. Each self-contained with docs and rollback notes.
+
+**Architectural requirements:**
+1. One shared Docker network (continuation of F-026 Step 2 network bridge).
+2. Schema isolation: each service gets its own Postgres schema (`litellm`, `langfuse`).
+3. All upstream LLM API keys live in LiteLLM only — removed from backend `.env` and n8n.
+4. Backup coverage: all new schemas included in daily Postgres dump.
+5. No public exposure without auth.
+
+**Acceptance for closure:** All three deliverables merged, proof-of-life callers running,
+`docs/infra/` documentation for all three, cost attribution visible for 7+ days, Langfuse
+showing traces, architect sign-off.
+
+**Non-goals (explicit deferrals):** Migrating every LLM call site to LiteLLM, backfilling
+embeddings, semantic dedupe (F-035 candidate), watchlist matching (F-036 candidate),
+SAM.gov mod/award subscriptions (F-037 candidate), BullMQ/queue system, feature flags,
+Vercel AI SDK, PDF parser selection, Promptfoo eval harness.
+
+**Cost:** ~13–23 hours Devin time post-F-026. <$30/mo ongoing (embedding API through LiteLLM).
+All infra on existing VPS at $0 incremental hosting.
+
+**Priority:** P1 — foundational. Every AI feature depends on this infrastructure.
+
+**Dependency:** F-026 complete + F-029 remediation closed + pgvector enabled + Tier 0 closed.
+Architect approval required before implementation begins.
 
 ---
 
@@ -575,6 +655,7 @@ Read-only or low-risk write work that surfaces what's broken without changing it
 | F-014 | Cross-file type-safety in migrations (scope) | Nothing | Was skipped without justification. At minimum, scope it: what does "cross-file type-safety" mean concretely, what would a check look like, how many migrations are at risk? |
 | F-016 | Schema-mapper drift detection (scope) | F-026 | Scoping depends on the architecture decision — if workflows consolidate into `gda_command`, the mapper-to-schema check looks different than if the split-brain is formalized. |
 | F-033 Step 0 | AI knowledge corpus — embedding pipeline inventory | Nothing | Read-only scoping: pipeline architecture, vector storage, retrieval interface, current corpus contents (1/23 embedded per STALE-003), why only 1/23, F-026 dependency analysis, extend-vs-rebuild recommendation. Same posture as F-028/F-022/F-030 audit phases. |
+| F-034 | AI Infrastructure Foundation (LiteLLM + embedding service + Langfuse) | F-026 complete, F-029 remediation closed, pgvector enabled, Tier 0 closed | Three self-hosted Docker services. Sequential: LiteLLM → embedding service → Langfuse. Foundation for F-033 Phase 2, Capture Intelligence, all future AI features. **DO NOT START until all prerequisites verified.** Architect approval required. |
 
 ### Tier 3 — Targeted Fixes
 
@@ -593,7 +674,7 @@ Address what inventories surface. Implementation work.
 | F-031 | Workflow consolidation (execution) | F-026 Steps 2–4, F-022 Subtask A | Archive/merge decisions need the consolidation complete and the webhook mapping. |
 | F-032b | Security hardening (xlsx, webhook registry, health endpoints) | Nothing | RISK-002 (P1), RISK-003 (P2), RISK-004 (P3). None individually urgent but collectively represent unaddressed audit findings. |
 | F-019 | Scope expansion | F-026 Steps 2–4 | Consolidation puts workflow tables under `gda_command` — F-019's manifest/drift check must cover them. |
-| F-033 Phase 2 | AI knowledge corpus implementation + WIFCON first source | F-033 Step 0 + Shawn approval | Ingest workflow for WIFCON, embedding pipeline, vector store, retrieval API endpoint (standard JSON envelope), pattern documentation for adding subsequent sources (FAR text, GAO decisions). |
+| F-033 Phase 2 | AI knowledge corpus implementation + WIFCON first source | F-033 Step 0 + F-034 (embedding service) + Shawn approval | Ingest workflow for WIFCON, embedding pipeline (via F-034 embedding service), vector store, retrieval API endpoint (standard JSON envelope), pattern documentation for adding subsequent sources (FAR text, GAO decisions). |
 
 ### Tier 4 — Product Work
 
@@ -635,12 +716,13 @@ Tier 0 (now):        10 items — saveData verify (DONE), idiq bug (DONE), F-032
                      intel-feed capture (pending 05/22), n8n CORS restriction, orphan
                      container cleanup, pgvector enable
 Tier 1 (LOCKED):     2 decisions — F-025b (PostgreSQL is truth), F-026 (consolidate to gda_command)
-Tier 2 (parallel):   6 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030,
-                     F-014 scope, F-016 scope, F-033 Step 0 (corpus inventory)
+Tier 2 (parallel):   7 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030,
+                     F-014 scope, F-016 scope, F-033 Step 0 (corpus inventory),
+                     F-034 (AI infra: LiteLLM + embeddings + Langfuse)
 Tier 3 (after T0):   12 items — F-026 Steps 2-4 (consolidation impl), 12-table overlap
                      reconciliation, migration 017 correction, frontend relabel, F-023 impl,
                      F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion,
-                     F-033 Phase 2 (corpus + WIFCON)
+                     F-033 Phase 2 (corpus + WIFCON, depends on F-034 embedding service)
 Tier 4 (after T3):   11+ items — all product work, cleanup, docs (STALE-003 moved to F-033)
 ```
 
