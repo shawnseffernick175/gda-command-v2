@@ -717,9 +717,10 @@ Tier 0 (now):        10 items — saveData verify (DONE), idiq bug (DONE), F-032
                      intel-feed capture (pending 05/22), n8n CORS restriction, orphan
                      container cleanup, pgvector enable
 Tier 1 (LOCKED):     2 decisions — F-025b (PostgreSQL is truth), F-026 (consolidate to gda_command)
-Tier 2 (parallel):   7 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030,
+Tier 2 (parallel):   8 items — F-028 audit, F-022 Subtask A + consumer corrections, F-030,
                      F-014 scope, F-016 scope, F-033 Step 0 (corpus inventory),
-                     F-034 (AI infra: LiteLLM + embeddings + Langfuse)
+                     F-034 (AI infra: LiteLLM + embeddings + Langfuse),
+                     F-035 (hardcoded secrets in n8n workflows — before F-034)
 Tier 3 (after T0):   12 items — F-026 Steps 2-4 (consolidation impl), 12-table overlap
                      reconciliation, migration 017 correction, frontend relabel, F-023 impl,
                      F-028 impl, F-015, F-027, F-031, F-032b security, F-019 expansion,
