@@ -116,13 +116,13 @@ NO_SEQUENCE_TABLES="gda_trend_arrays"
 # ─── Helper: run SQL on source ─────────────────────────────────────────────────
 
 src_sql() {
-  docker exec "$SRC_CONTAINER" psql -U "$SRC_USER" -d "$SRC_DB" -t -c "$1" 2>/dev/null | tr -d ' \n'
+  docker exec "$SRC_CONTAINER" psql -U "$SRC_USER" -d "$SRC_DB" -t -c "$1" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
 # ─── Helper: run SQL on target ─────────────────────────────────────────────────
 
 tgt_sql() {
-  docker exec "$TGT_CONTAINER" psql -U "$TGT_USER" -d "$TGT_DB" -t -c "$1" 2>/dev/null | tr -d ' \n'
+  docker exec "$TGT_CONTAINER" psql -U "$TGT_USER" -d "$TGT_DB" -t -c "$1" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
 # ─── Pre-flight: pgvector check (Section 5, decision #5) ──────────────────────
@@ -229,7 +229,7 @@ for TABLE in "${TABLES[@]}"; do
   # in F-023b but retained old sequence name risk_register_id_seq on source).
   log "  Restoring to $TGT_CONTAINER..."
   docker exec "$TGT_CONTAINER" pg_restore --list "/tmp/${TABLE}.dump" \
-    | grep -v 'SEQUENCE SET' > "$DUMP_DIR/${TABLE}.toc" 2>>"$LOGFILE"
+    | { grep -v 'SEQUENCE SET' || true; } > "$DUMP_DIR/${TABLE}.toc" 2>>"$LOGFILE"
   docker cp "$DUMP_DIR/${TABLE}.toc" "$TGT_CONTAINER:/tmp/${TABLE}.toc" 2>>"$LOGFILE"
 
   if ! docker exec "$TGT_CONTAINER" pg_restore -U "$TGT_USER" -d "$TGT_DB" \
