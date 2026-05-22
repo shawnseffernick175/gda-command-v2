@@ -20,6 +20,20 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - Deploy via: `docker-compose -f docker-compose.prod.yml up -d --build` on the production server
 - SSH may be needed to run migrations on the production database
 
+### Staging Environment (F-036)
+- **Container**: `gda-postgres-staging` on VPS (187.77.206.105)
+- **Port**: `127.0.0.1:5433` (localhost-only, no Traefik exposure)
+- **User/Pass**: `gda_staging` / `staging_only_not_prod`
+- **Databases**: `n8n_staging` (clone of n8n prod), `gda_command_staging` (clone of gda_command)
+- **PostgreSQL**: 16.14 with pgvector 0.8.2 (matches prod exactly)
+- **Resource limits**: 256MB RAM, 0.5 CPU
+- **Refresh**: Nightly at 3 AM EST via `/root/refresh-staging.sh` (cron with `CRON_TZ=America/New_York`)
+- **Backup**: `/root/backup-before-migration.sh <db_name>` — creates timestamped dump in `/root/backups/`
+- **Docker networks**: `gda-command-v2_gda` + `n8n_default` (NOT on `n8n-envision_envision-internal`)
+- **SSH access**: `sshpass -p '$HOSTINGER_VPS_PASSWORD' ssh root@$HOSTINGER_VPS_IP`
+- **Connect via psql**: `PGPASSWORD=staging_only_not_prod psql -h 127.0.0.1 -p 5433 -U gda_staging -d gda_command_staging`
+- **Connect via docker exec**: `docker exec gda-postgres-staging psql -U gda_staging -d gda_command_staging`
+
 ### Database Notes
 - The `description` column may not exist locally — run `ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS description TEXT;` if backend returns empty results
 - The `capture_stage` column stores explicit Shipley stage overrides — check it exists if stage dropdown tests fail
@@ -32,10 +46,32 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - `lsof` may not be available — use `ss` instead
 
 ## Devin Secrets Needed
-- `PROD_SSH_KEY` — SSH key for production server access
+- `HOSTINGER_VPS_PASSWORD` — VPS root password (also available as env var `HOSTINGER_VPS_PASSWORD`)
+- `HOSTINGER_VPS_IP` — VPS IP address (also available as env var `HOSTINGER_VPS_IP`)
 - `OPENAI_API_KEY` — for AI analysis features (OODA, Capture Coach, AI Gateway summarizer)
 
+## VPS Access
+- IP and password are available as environment variables: `HOSTINGER_VPS_IP`, `HOSTINGER_VPS_PASSWORD`
+- Use `sshpass` for non-interactive SSH: `sshpass -p "$HOSTINGER_VPS_PASSWORD" ssh -o StrictHostKeyChecking=no root@"$HOSTINGER_VPS_IP" "<command>"`
+- For multi-line scripts, write to a local file first and `scp` it, then execute remotely — heredocs with complex quoting often break over SSH
+- VPS timezone is UTC; cron uses `CRON_TZ=America/New_York` for EST scheduling
+
 ## Key Testing Flows
+
+### Staging Infrastructure (F-036)
+**Test procedure (all shell-based, no recording needed):**
+1. Verify container: `docker ps --format '{{.Names}} {{.Status}} {{.Ports}}' | grep staging` — should show "Up" with `127.0.0.1:5433->5432/tcp`
+2. Verify PG version: `docker exec gda-postgres-staging psql -U gda_staging -d gda_command_staging -t -c "SELECT version();"` — should contain `16.`
+3. Verify pgvector: `SELECT extversion FROM pg_extension WHERE extname='vector';` — should be `0.8.2`
+4. Verify resource limits: `docker inspect gda-postgres-staging --format '{{.HostConfig.Memory}}'` → 268435456 (256MB)
+5. Count tables: `SELECT count(*) FROM information_schema.tables WHERE table_schema='public';` — gda_command_staging ≥84, n8n_staging ≥154
+6. Key parity checks: `gda_opportunity_tracker` ~1780, `gda_embeddings` ~821, `sam_opportunities` ~13472, `schema_migrations` = number of migration files
+7. Refresh script: `/root/refresh-staging.sh` — should exit 0, log parity verification. Run twice to test idempotency.
+8. Backup script: `/root/backup-before-migration.sh gda_command_staging` — should create `.dump` file >0 bytes in `/root/backups/`
+9. Cron: `crontab -l | grep -B1 refresh-staging` — should show `CRON_TZ=America/New_York` and `0 3 * * *`
+10. Network: `ss -tlnp | grep 5433` — should show docker-proxy listening on 127.0.0.1
+
+**Known issue**: `n8n-envision-postgres-1` is on `n8n-envision_envision-internal` network, staging is on `n8n_default`. Cross-container DNS resolution from n8n postgres to staging may fail. This is expected — CI uses SSH tunnel, not cross-container DNS.
 
 ### W6: Capture Discipline Dashboard
 **Test procedure:**
@@ -98,36 +134,10 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 
 **What to check in HTML:** The `<select>` element's `selectedindex` attribute and the `selected="true"` option value.
 
-### KPI Strip
-- Should show exactly 5 KPIs: Orders, Sales, EBIT, Gross Profit, ROS
-- Values should be real Q1 FY2026 data (not placeholder/mock)
-- Each KPI has a drill-down on click
-
-### No Bid Filtering
-- Default OpsTracker view should NOT show "No Bid" opportunities
-- "No Bid" filter option exists in the status dropdown for explicit viewing
-- Expired opportunities (past due date) should be "No Bid", not "Lost"
-
-### Knowledge Base Upload
-- Test with both PDF and XLSX files
-- XLSX files may arrive as `application/octet-stream` MIME type — the backend has extension-based fallback
-- 27 document types available in dropdown
-- 7 action options (Store & Index, Ingest into Financial Bible, etc.)
-- Selecting "Financials" type auto-sets action to "Ingest into Financial Bible"
-
-### Financial Bible
-- Monthly trend charts (Revenue, Orders, Profitability, Cost Breakdown)
-- YTD vs Annual Target progress bars with pace markers
-- Monthly breakdown table with Jan/Feb/Mar actuals
-- Variance analysis with month-over-month changes
-
-## Common Issues
-- **Backend returns empty results:** Check `DATABASE_URL` env var is set, and required columns exist
-- **Stage dropdown reverts after reload:** The `capture_stage` column or the frontend `opp.capture_stage ?? statusToShipley(opp.status)` logic may be missing
-- **XLSX upload fails:** Check MIME type handling — extension-based fallback should handle `application/octet-stream`
-- **Health tab errors:** Check for missing columns in agent queries (e.g., `summary` column)
-- **401 errors on pages:** JWT token may have expired — check auto-refresh logic
-- **PostgreSQL NUMERIC as string:** pg driver returns NUMERIC columns as strings. Use `Number()` for all numeric comparisons in backend code (e.g., `Number(row.score) === 0` not `row.score === 0`)
-- **Backend won't start:** Ensure all required env vars are exported: DATABASE_URL, AUTH_REQUIRED, JWT_SECRET, OPENAI_API_KEY, GDA_WEBHOOK_KEY
-- **Port 3001 in use:** Use `ss -tlnp | grep 3001` to find PID, then kill it. `lsof` might not be available.
-- **Session expiration during testing:** Log in once and use sidebar navigation to stay in the SPA. Direct URL navigation may trigger session expiry.
+## General Testing Tips
+- Infrastructure/VPS testing is shell-only — no screen recording needed
+- UI testing requires recording — maximize browser window before starting
+- For SSH commands with complex quoting (heredocs, nested quotes), write script to local file first, SCP to VPS, then execute
+- VPS password is in env var `HOSTINGER_VPS_PASSWORD` — do not hardcode in scripts
+- When testing staging DB operations, always verify row counts against known baselines (check PR descriptions or audit docs for expected values)
+- CI staging job requires `VPS_SSH_KEY` and `VPS_HOST` GitHub Actions secrets — without them it gracefully skips with environmental warning
