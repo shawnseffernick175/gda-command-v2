@@ -4,7 +4,7 @@
 -- F-026 Step 3 will migrate data from n8n DB to gda_command using this schema.
 
 CREATE TABLE IF NOT EXISTS gda_trend_arrays (
-  metric_name VARCHAR(100) NOT NULL,
+  metric_name VARCHAR(100) NOT NULL PRIMARY KEY,
   spark_data JSONB NOT NULL DEFAULT '[]'::jsonb,
   latest_value NUMERIC,
   delta_pct NUMERIC,
