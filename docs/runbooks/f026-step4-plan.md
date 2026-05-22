@@ -629,10 +629,10 @@ curl -s "$N8N_API/workflows?active=true&limit=200" -H "X-N8N-API-KEY: $API_KEY" 
 
 1. Verify preconditions (Section 1)
 2. Capture pre-cutover active count (expect 157)
-3. **Capture n8n DB ADOPT table row counts (baseline for freeze test — Section 8d)**
-4. Pause 17 writers via `POST /deactivate`
-5. Verify active count = 140
-6. Wait 30 seconds for any in-flight executions to drain
+3. Pause 17 writers via `POST /deactivate`
+4. Verify active count = 140
+5. Wait 30 seconds for any in-flight executions to drain
+6. **Capture n8n DB ADOPT table row counts (baseline for freeze test — Section 8d)**
 
 ### Phase B: Backup gda_command
 
