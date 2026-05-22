@@ -122,7 +122,7 @@ adds the rest. The live schema (used in migrations) is always the superset.
 | `gda_action_items` | GDA.api.daily-actions | 7 | 2 | WF defines `id, action_text`; live has 5 more (deadline, owner, status, source_meeting, created_at) |
 | `gda_competitor_watchlist` | GDA.api.competitor-watchlist | 37 | 3 | WF defines `id, name, size`; live has 34 more (added by enrichment workflows) |
 | `gda_contacts` | GDA.api.contacts | 17 | 16 | Live has `updated_at` not in WF CREATE |
-| `gda_dashboard_intel_cache` | GDA.api.daily-actions | 3 | 2 | **Notable**: WF defines `cache_key` column NOT in live; live has `data`, `created_at` instead |
+| `gda_dashboard_intel_cache` | GDA.api.daily-actions | 3 | 2 | WF defines `id, cache_key`; live has `id, data, created_at`. The `cache_key` column was likely renamed to `data` (JSONB) at some point. Migration uses live schema. |
 | `gda_saved_opportunities` | GDA.api.saved-opps | 20 | 18 | Live has `primary_fit`, `updated_at` not in WF CREATE |
 | `gda_teaming_partners` | GDA.api.teaming-scorer | 23 | 3 | WF defines `id, name, company`; live has 20 more |
 | `gda_teaming_partners` | GDA.api.teaming-finder | 23 | 2 | WF defines `id, name`; live has 21 more |
@@ -132,9 +132,11 @@ adds the rest. The live schema (used in migrations) is always the superset.
 **14 tables have NO `CREATE TABLE` in any workflow** — they were created manually or by
 workflows that have since been deleted.
 
-**All migrations use the live schema.** The `gda_dashboard_intel_cache` divergence (`cache_key`
-in workflow but not live) suggests the column was renamed or replaced at some point — the
-migration uses the live schema (`cache_type`, `data`, `created_at`).
+**All migrations use the live schema.** The `gda_dashboard_intel_cache` divergence is the
+only case where a workflow column (`cache_key`) doesn't exist in live — it was likely renamed
+to `data` (JSONB). Migration 068 uses the live schema: `id SERIAL PK, data JSONB NOT NULL,
+created_at TIMESTAMPTZ DEFAULT now()`. Verified via `\d gda_dashboard_intel_cache` on
+n8n-envision-postgres-1 (2026-05-22).
 
 ---
 
@@ -156,3 +158,18 @@ The step will:
 2. `INSERT INTO gda_command.<table> SELECT * FROM n8n.<table>` for each ADOPT table
 3. Update n8n workflow credentials to point at `gda-postgres` instead of `n8n-envision-postgres-1`
 4. Verify data integrity (row counts, FK constraints, index usage)
+
+---
+
+## F-026 Step 3 Cleanup Candidates
+
+The following schema issues are preserved as-is in ADOPT migrations (matching live) but
+should be normalized during or after the F-026 Step 3 data migration phase.
+
+| Table | Issue | Recommended Fix | Priority |
+|-------|-------|-----------------|----------|
+| `gda_opportunity_tracker` | `programs_json TEXT DEFAULT '[]'::jsonb` — type/default mismatch. Column is TEXT but default is a JSONB literal. Postgres tolerates via implicit cast, but breaks if column type is ever changed. | Either change column to `JSONB` or change default to `'[]'::text`. Requires data audit to confirm all values are valid JSON. | Medium |
+| `opportunity_alerts` | Duplicate indexes on `due_date`: `idx_opp_alerts_due` and `idx_opp_due` are identical btree indexes on the same column. Wastes write I/O and storage. | Drop one of the two indexes (keep `idx_opp_alerts_due` for naming consistency). | Low |
+| `gda_competitor_watchlist` | Duplicate indexes on `name`: `gda_competitor_watchlist_name_key` (UNIQUE) and `idx_cw_name` (non-unique btree). The unique index already serves as a btree lookup. | Drop `idx_cw_name` — the unique constraint index covers all queries. | Low |
+| `gda_risk_register` | Cosmetic index names from F-023b: indexes retained their original `risk_register_*` names after the table rename to `gda_risk_register`. Postgres auto-renames `_pkey` but not user-created indexes. | Rename indexes to `gda_risk_register_*` pattern for consistency. | Low |
+| `gda_contacts` | `govtribe_id` has a unique index but the column is nullable. In PostgreSQL, multiple NULLs are allowed in a unique index (NULLs are not considered equal). This is technically correct but may mask data issues if contacts are inserted without govtribe_id. | Add `NOT NULL` if all contacts should have a govtribe_id, or add a partial unique index `WHERE govtribe_id IS NOT NULL`. | Low |
