@@ -2,8 +2,8 @@
 
 **Date:** 2026-05-22
 **Author:** Devin (automated audit)
-**Status:** STEP 2 EXECUTED — 12 tables dropped, 6 deferred to F-023a
-**Updated:** 2026-05-22 (post-execution classification refresh)
+**Status:** F-023a EXECUTED — 17 tables dropped, 1 promoted to ADOPT
+**Updated:** 2026-05-22 (F-023a execution — 5 deferred tables dropped, gda_touchpoints adopted)
 **Issue:** [#258](https://github.com/shawnseffernick175/gda-command-v2/issues/258)
 
 ---
@@ -34,9 +34,9 @@ and will accumulate PII in production use.
 | Infrastructure tables (`_migrations`, `schema_migrations`) | 2 |
 | **Shadow tables in `gda_command`** | **0** |
 | | |
-| **n8n database (`n8n` in `n8n-envision-postgres-1`)** | **161 tables** (was 173 pre-drop) |
+| **n8n database (`n8n` in `n8n-envision-postgres-1`)** | **156 tables** (was 173 pre-drop) |
 | n8n internal tables (managed by n8n's migration system) | 92 |
-| **Shadow tables (workflow-created, not migration-tracked)** | **69** (was 81; 12 dropped 2026-05-22) |
+| **Shadow tables (workflow-created, not migration-tracked)** | **64** (was 81; 17 dropped total) |
 
 ### Key Finding
 
@@ -58,12 +58,11 @@ All 81 shadow tables were created by n8n workflows using the "GDA Postgres" cred
 
 | Classification | Count | % | Total Size | Notes |
 |---------------|-------|---|-----------|-------|
-| **ADOPT** | 27 | 39% | ~20 MB | +2 promoted from DOCUMENT-ONLY (PII) |
-| **DOCUMENT-ONLY** | 36 | 52% | ~3.4 MB | −2 promoted to ADOPT |
-| **DROPPED** | 12 | — | — | Executed 2026-05-22 |
-| **DEFERRED (F-023a)** | 6 | — | ~0.5 MB | 5 non-empty orphans + 1 with workflow ref |
+| **ADOPT** | 28 | 44% | ~20 MB | +2 PII promoted, +1 gda_touchpoints (F-023a) |
+| **DOCUMENT-ONLY** | 36 | 56% | ~3.4 MB | −2 promoted to ADOPT |
+| **DROPPED** | 17 | — | — | 12 (Step 2) + 5 (F-023a) |
 | **EXCLUDED (n8n-internal)** | 5 | — | ~8 MB | Confirmed n8n migration-managed |
-| **Active Total** | **69** | 100% | ~23.9 MB | 27 ADOPT + 36 DOCUMENT-ONLY + 6 DEFERRED |
+| **Active Total** | **64** | 100% | ~23.4 MB | 28 ADOPT + 36 DOCUMENT-ONLY |
 
 ---
 
@@ -80,7 +79,7 @@ All 81 shadow tables were created by n8n workflows using the "GDA Postgres" cred
 
 ## Per-Table Classification
 
-### ADOPT — 27 tables (must be brought into migration system)
+### ADOPT — 28 tables (must be brought into migration system)
 
 | # | Table | Cols | Rows | Size | Indexes | Workflows | Justification |
 |---|-------|------|------|------|---------|-----------|---------------|
@@ -110,7 +109,8 @@ All 81 shadow tables were created by n8n workflows using the "GDA Postgres" cred
 | 24 | `gda_win_loss_db` | — | 10 | — | — | 1 | Win/loss database — 1 workflow |
 | 25 | `gda_trend_arrays` | — | 15 | — | — | 1 | Trend arrays — 1 workflow, actively updated |
 | 26 | `gda_contacts` | 17 | 0 | 80 kB | — | 2 | **PROMOTED from DOCUMENT-ONLY** — PII columns (email, phone) require migration tracking |
-| 27 | `gda_relationships` | 13 | 0 | 16 kB | — | 1 | **PROMOTED from DOCUMENT-ONLY** — PII columns (email, phone) require migration tracking |
+| 27 | `gda_relationships` | 13 | 0 | 16 kB | — | 1 | **PROMOTED from DOCUMENT-ONLY** — PII columns (email, phone) require migration tracking. **MIGRATION_PENDING** → [057_n8n_gda_relationships.sql](../../packages/backend/src/db/migrations/057_n8n_gda_relationships.sql) |
+| 28 | `gda_touchpoints` | 7 | 0 | 8 kB | — | 1 | **PROMOTED from DEFERRED** (F-023a) — FK child of `gda_relationships`, companion table for relationship-tracker workflow. **MIGRATION_PENDING** → [058_n8n_gda_touchpoints.sql](../../packages/backend/src/db/migrations/058_n8n_gda_touchpoints.sql) |
 
 ### DOCUMENT-ONLY — 36 tables (managed by specific workflows)
 
@@ -155,10 +155,10 @@ All 81 shadow tables were created by n8n workflows using the "GDA Postgres" cred
 | 37 | ~~`gda_relationships`~~ | — | — | — | — | **PROMOTED TO ADOPT** (PII — email, phone columns) |
 | 38 | `gda_stage_audit` | 8 | ~12 | 96 kB | 2 | `GDA.event.bidirectional-sync`, `GDA.cron.amendment-monitor` |
 
-### DROPPED — 12 tables (executed 2026-05-22)
+### DROPPED — 17 tables (12 Step 2 + 5 F-023a)
 
-All confirmed 0 rows, 0 workflow refs, 0 backend code refs at time of drop.
-Schemas archived to `/tmp/f023-drop-archive/` on VPS. View `ft_need_view` also dropped (depended on `ft_need_tag`).
+Tables 1-12 confirmed 0 rows at time of drop (Step 2). Tables 13-17 had stale orphan data (F-023a).
+All 0 workflow refs, 0 backend code refs. Schemas archived on VPS. View `ft_need_view` also dropped (depended on `ft_need_tag`).
 
 | # | Table | Drop Order | Response | Archive |
 |---|-------|-----------|----------|--------|
@@ -174,25 +174,25 @@ Schemas archived to `/tmp/f023-drop-archive/` on VPS. View `ft_need_view` also d
 | 10 | `gda_risk_register` | 10 | DROP TABLE | `/tmp/f023-drop-archive/gda_risk_register.sql` |
 | 11 | `gda_tmp_deploy` | 11 | DROP TABLE | `/tmp/f023-drop-archive/gda_tmp_deploy.sql` |
 | 12 | `gda_trend_snapshots` | 12 | DROP TABLE | `/tmp/f023-drop-archive/gda_trend_snapshots.sql` |
+| 13 | `gda_incumbent_log` | F-023a | DROP TABLE (19 rows) | `/tmp/f023-deferred-archive/gda_incumbent_log.sql` |
+| 14 | `gda_market_benchmarks` | F-023a | DROP TABLE (20 rows) | `/tmp/f023-deferred-archive/gda_market_benchmarks.sql` |
+| 15 | `gda_pre_sam_intel` | F-023a | DROP TABLE (53 rows) | `/tmp/f023-deferred-archive/gda_pre_sam_intel.sql` |
+| 16 | `gda_target_agencies` | F-023a | DROP TABLE (5 rows) | `/tmp/f023-deferred-archive/gda_target_agencies.sql` |
+| 17 | `gda_vehicle_tracker` | F-023a | DROP TABLE (14 rows) | `/tmp/f023-deferred-archive/gda_vehicle_tracker.sql` |
 
 > **Note:** `ft_need_view` (a SQL view joining `ft_need_tag` to `ft_opportunity_signal`)
 > was also dropped. It was referenced by `GDA.api.fast-track-needs` (l6X3n5paaIqMKWxB)
 > but the underlying table had 0 rows, so the view returned nothing useful.
 
-### DEFERRED to F-023a — 6 tables (architect review required)
+### DEFERRED to F-023a — RESOLVED (0 remaining)
 
-| # | Table | Rows | Cols | Workflow Refs | Reason Deferred | Archive |
-|---|-------|------|------|--------------|----------------|--------|
-| 1 | `gda_incumbent_log` | 19 | 10 | 0 | Non-empty orphan, stale data (0 pg_stat inserts) | `/tmp/f023-deferred-archive/gda_incumbent_log.sql` |
-| 2 | `gda_market_benchmarks` | 20 | 17 | 0 | Non-empty orphan, stale data (0 pg_stat inserts) | `/tmp/f023-deferred-archive/gda_market_benchmarks.sql` |
-| 3 | `gda_pre_sam_intel` | 53 | 11 | 0 | Non-empty orphan, stale data (0 pg_stat inserts) | `/tmp/f023-deferred-archive/gda_pre_sam_intel.sql` |
-| 4 | `gda_target_agencies` | 5 | 10 | 0 | Non-empty orphan, stale data (0 pg_stat inserts) | `/tmp/f023-deferred-archive/gda_target_agencies.sql` |
-| 5 | `gda_vehicle_tracker` | 14 | 11 | 0 | Non-empty orphan, stale data (0 pg_stat inserts) | `/tmp/f023-deferred-archive/gda_vehicle_tracker.sql` |
-| 6 | `gda_touchpoints` | 0 | 7 | 1 (`GDA.api.relationship-tracker`) | Has active workflow ref (uses `CREATE TABLE IF NOT EXISTS` — self-healing) | `/tmp/f023-deferred-archive/gda_touchpoints.sql` |
+All 6 deferred tables resolved in F-023a execution:
+- **5 DROPPED:** `gda_incumbent_log`, `gda_market_benchmarks`, `gda_pre_sam_intel`, `gda_target_agencies`, `gda_vehicle_tracker` (moved to DROPPED table above)
+- **1 PROMOTED TO ADOPT:** `gda_touchpoints` (moved to ADOPT table above, migration 058 generated)
 
-All 5 non-empty tables show `inserts=0, updates=0, deletes=0` in `pg_stat_user_tables` — data
-was inserted before the last stats reset (likely a Postgres restart). Never autoanalyzed/autovacuumed.
-All schema+data archived to `/tmp/f023-deferred-archive/` on VPS.
+Architect override: Original ARCHIVE-THEN-DROP recommendations changed to plain DROP
+(stale single-batch snapshots from deleted workflows, re-fetchable from live sources).
+Schema+data archives remain in `/tmp/f023-deferred-archive/` on VPS.
 
 ---
 
@@ -238,15 +238,14 @@ reach `gda-postgres`. The goal of F-026 Steps 3/4/5 is to migrate data from
 
 ### Impact Summary
 
-**69 remaining shadow tables are in `n8n-envision-postgres-1`** — the database that F-026 Steps
-3/4/5 will either migrate from or decommission. 12 orphan tables already dropped.
+**64 remaining shadow tables are in `n8n-envision-postgres-1`** — the database that F-026 Steps
+3/4/5 will either migrate from or decommission. 17 orphan tables dropped, F-023a deferred bucket resolved.
 
 | Bucket | F-026 Impact |
 |--------|-------------|
-| **ADOPT (27)** | Must have migration files generated in `gda_command` schema before data can be migrated. These tables need `CREATE TABLE` + `CREATE INDEX` + `ALTER TABLE ADD CONSTRAINT` migrations. |
+| **ADOPT (28)** | Must have migration files generated in `gda_command` schema before data can be migrated. 2 of 28 already have migrations: `gda_relationships` (057) and `gda_touchpoints` (058). Remaining 26 need `CREATE TABLE` + `CREATE INDEX` + `ALTER TABLE ADD CONSTRAINT` migrations in F-023c. |
 | **DOCUMENT-ONLY (36)** | Two paths: (a) migrate to `gda_command` with new migrations, or (b) remain in n8n DB if workflows continue to use n8n's internal Postgres credential. Architect decision required. |
-| **DROPPED (12)** | Already removed 2026-05-22 — no migration needed. |
-| **DEFERRED (6)** | Resolve in F-023a before F-026 Step 3. |
+| **DROPPED (17)** | Already removed — no migration needed. |
 | **pgvector on `gda-postgres`** | **Installed — v0.8.2.** `gda_embeddings` migration can use `vector` type directly. |
 
 ### Critical Tables for F-026 Step 3
@@ -350,9 +349,9 @@ Tables with recent write activity (inserts/updates/deletes > 0 since last Postgr
   (migration-tracked, different schema) requires architect spec before resolution
 - Do NOT execute rename until spec is provided
 
-### 4. ADOPT bucket (27 tables) — F-026 Step 3 prerequisite
-- For each ADOPT table, generate a migration file in `packages/backend/src/db/migrations/`
-  that creates the equivalent table in `gda_command`
+### 4. ADOPT bucket (28 tables) — F-026 Step 3 prerequisite
+- **2 of 28 already have migrations:** `gda_relationships` (057) and `gda_touchpoints` (058)
+- Remaining 26 need migration files in `packages/backend/src/db/migrations/`
 - Resolve the `risk_register` name collision first (F-023b, blocking)
 - `gda_embeddings` pgvector dependency: **pgvector v0.8.2 confirmed installed on `gda-postgres`**
 - After migrations are in place, F-026 Step 3 can `INSERT INTO ... SELECT FROM` across databases
