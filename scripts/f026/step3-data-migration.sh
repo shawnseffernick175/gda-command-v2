@@ -185,12 +185,17 @@ for TABLE in "${TABLES[@]}"; do
   log "  Target count: $TGT_COUNT"
 
   # 3-way idempotency decision tree (Section 5, decision #2)
-  if [ "$TGT_COUNT" = "0" ]; then
-    log "  Decision: COPY (target is empty)"
-  elif [ "$TGT_COUNT" = "$SRC_COUNT" ]; then
+  # Check SKIP first: handles both populated tables (N==N) and empty tables (0==0).
+  if [ "$TGT_COUNT" = "$SRC_COUNT" ] && [ "$TGT_COUNT" != "0" ]; then
     log "  Decision: SKIP (target count $TGT_COUNT == source count $SRC_COUNT)"
     SKIPPED=$((SKIPPED + 1))
     continue
+  elif [ "$TGT_COUNT" = "0" ] && [ "$SRC_COUNT" = "0" ]; then
+    log "  Decision: SKIP (both source and target empty)"
+    SKIPPED=$((SKIPPED + 1))
+    continue
+  elif [ "$TGT_COUNT" = "0" ]; then
+    log "  Decision: COPY (target is empty, source has $SRC_COUNT rows)"
   else
     log "  HALT: target has $TGT_COUNT rows but source has $SRC_COUNT — partial migration detected"
     log "  Manual investigation required. Do NOT continue."
@@ -218,24 +223,35 @@ for TABLE in "${TABLES[@]}"; do
   docker cp "$DUMP_DIR/${TABLE}.dump" "$TGT_CONTAINER:/tmp/${TABLE}.dump" 2>>"$LOGFILE"
 
   # pg_restore to target (data-only, single-transaction)
+  # Filter out SEQUENCE SET entries from the TOC — we do our own sequence sync
+  # after each table (Section 5, decision #6). This prevents failures when
+  # source sequence names don't match target (e.g. gda_risk_register was renamed
+  # in F-023b but retained old sequence name risk_register_id_seq on source).
   log "  Restoring to $TGT_CONTAINER..."
+  docker exec "$TGT_CONTAINER" pg_restore --list "/tmp/${TABLE}.dump" \
+    | grep -v 'SEQUENCE SET' > "$DUMP_DIR/${TABLE}.toc" 2>>"$LOGFILE"
+  docker cp "$DUMP_DIR/${TABLE}.toc" "$TGT_CONTAINER:/tmp/${TABLE}.toc" 2>>"$LOGFILE"
+
   if ! docker exec "$TGT_CONTAINER" pg_restore -U "$TGT_USER" -d "$TGT_DB" \
     --data-only --no-owner --no-privileges --single-transaction \
+    --use-list="/tmp/${TABLE}.toc" \
     "/tmp/${TABLE}.dump" 2>>"$LOGFILE"; then
     log "  FAIL: pg_restore failed for $TABLE (rolled back via --single-transaction)"
     FAILED=$((FAILED + 1))
     FAILURES+=("$TABLE:pg_restore")
     # Clean up temp files
     docker exec "$SRC_CONTAINER" rm -f "/tmp/${TABLE}.dump" 2>/dev/null || true
-    docker exec "$TGT_CONTAINER" rm -f "/tmp/${TABLE}.dump" 2>/dev/null || true
-    rm -f "$DUMP_DIR/${TABLE}.dump" 2>/dev/null || true
+    docker exec "$TGT_CONTAINER" rm -f "/tmp/${TABLE}.dump" "/tmp/${TABLE}.toc" 2>/dev/null || true
+    rm -f "$DUMP_DIR/${TABLE}.dump" "$DUMP_DIR/${TABLE}.toc" 2>/dev/null || true
     continue
   fi
 
   # Sequence sync (Section 5, decision #6)
   if [[ ! " $NO_SEQUENCE_TABLES " =~ " $TABLE " ]]; then
     log "  Syncing sequence for $TABLE..."
-    tgt_sql "SELECT setval(pg_get_serial_sequence('${TABLE}', 'id'), COALESCE((SELECT MAX(id) FROM ${TABLE}), 1), (SELECT MAX(id) FROM ${TABLE}) IS NOT NULL);"
+    # GREATEST ensures we never pass 0 to setval (sequences have minvalue=1).
+    # Handles: empty table (MAX=NULL→1,false), id=0 row (MAX=0→1,false), normal (MAX=N→N,true).
+    tgt_sql "SELECT setval(pg_get_serial_sequence('${TABLE}', 'id'), GREATEST(COALESCE((SELECT MAX(id) FROM ${TABLE}), 1), 1), (SELECT MAX(id) FROM ${TABLE}) IS NOT NULL AND (SELECT MAX(id) FROM ${TABLE}) >= 1);"
     SEQ_VAL=$(tgt_sql "SELECT last_value FROM $(tgt_sql "SELECT pg_get_serial_sequence('${TABLE}', 'id');");")
     log "  Sequence synced to: $SEQ_VAL"
   else
@@ -280,8 +296,8 @@ for TABLE in "${TABLES[@]}"; do
 
   # Clean up temp files
   docker exec "$SRC_CONTAINER" rm -f "/tmp/${TABLE}.dump" 2>/dev/null || true
-  docker exec "$TGT_CONTAINER" rm -f "/tmp/${TABLE}.dump" 2>/dev/null || true
-  rm -f "$DUMP_DIR/${TABLE}.dump" 2>/dev/null || true
+  docker exec "$TGT_CONTAINER" rm -f "/tmp/${TABLE}.dump" "/tmp/${TABLE}.toc" 2>/dev/null || true
+  rm -f "$DUMP_DIR/${TABLE}.dump" "$DUMP_DIR/${TABLE}.toc" 2>/dev/null || true
 done
 
 # ─── Clean up dump directory ──────────────────────────────────────────────────
