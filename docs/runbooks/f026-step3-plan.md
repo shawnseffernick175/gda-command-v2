@@ -96,7 +96,7 @@ done
 | 27 | gda_trend_arrays | 15 | 083 | |
 | 28 | gda_contacts | 2 | 084 | PII (email, phone) |
 
-**Total: 4,612 rows across 28 tables (~20 MB including indexes)**
+**Total: 4,562 rows across 28 tables (~20 MB including indexes)**
 
 ### 3b. Row counts of all existing tables on gda_command (target — must be unchanged after migration)
 
@@ -244,8 +244,9 @@ Per-table flow:
      --data-only --no-owner --no-privileges --single-transaction \
      /tmp/<table>.dump
 
-5. Verify row count matches source
-6. Clean up temp files on both containers and host
+5. Sync SERIAL sequences to MAX(id) (see Section 5, design decision #8)
+6. Verify row count matches source
+7. Clean up temp files on both containers and host
 ```
 
 This is the same pattern used for F-036 staging population, which was tested end-to-end.
@@ -324,13 +325,26 @@ This is the same pattern used for F-036 staging population, which was tested end
    - Verifies the `embedding` column type matches: both must be `vector(1536)`
    - If either check fails, HALT with a clear error
 
-6. **Verbose logging.** All output logged to `/var/log/f026-step3-migration-<target>-<timestamp>.log`
+6. **Sequence synchronization.** After each table restore, sync SERIAL sequences to avoid
+   PK conflicts when Step 4 repoints workflows and they start INSERTing new rows:
+   ```sql
+   -- For each table with a SERIAL/IDENTITY PK (all 27 except gda_trend_arrays which uses VARCHAR PK):
+   SELECT setval(
+     pg_get_serial_sequence('<table>', 'id'),
+     COALESCE((SELECT MAX(id) FROM <table>), 0)
+   );
+   ```
+   `gda_trend_arrays` uses `metric_name VARCHAR` as its PK (natural key, no sequence) — skipped.
+   Without this step, sequences on gda_command would remain at their default start value (1),
+   causing duplicate PK errors on the first INSERT after Step 4 credential repoint.
+
+7. **Verbose logging.** All output logged to `/var/log/f026-step3-migration-<target>-<timestamp>.log`
    with ISO timestamps. Log includes:
    - Pre-flight check results
    - Per-table: source count, dump size, restore result, target count, PASS/FAIL
    - Summary: total tables, passed, failed, skipped
 
-7. **Configurable containers.** For staging mode, the script adjusts container names and
+8. **Configurable containers.** For staging mode, the script adjusts container names and
    database names:
 
    | Parameter | `--target=staging` | `--target=prod` |
@@ -435,7 +449,28 @@ WHERE tc.table_name IN (<28 tables>) AND tc.constraint_type = 'CHECK';
 -- All should be satisfied (pg_restore would have failed otherwise)
 ```
 
-### 7e. pgvector index on gda_embeddings
+### 7e. Sequence synchronization verification
+
+```sql
+-- For each table with a SERIAL PK, verify sequence is set to at least MAX(id)
+-- (all 27 tables except gda_trend_arrays which uses VARCHAR PK)
+SELECT
+  t.table_name,
+  pg_get_serial_sequence(t.table_name, 'id') AS sequence_name,
+  (SELECT MAX(id) FROM gda_opportunity_tracker) AS max_id,  -- example; script iterates all tables
+  last_value AS sequence_value
+FROM information_schema.tables t
+JOIN pg_sequences ps ON ps.schemaname = 'public'
+  AND ps.sequencename = (pg_get_serial_sequence(t.table_name, 'id'))::text
+WHERE t.table_schema = 'public'
+  AND t.table_name IN (<27 SERIAL-PK tables>);
+-- Expected: sequence_value >= max_id for every table
+```
+
+**Halt condition:** If any sequence value < MAX(id), the sequence was not synced — fix before
+proceeding to Step 4.
+
+### 7f. pgvector index on gda_embeddings
 
 ```sql
 -- Verify the IVFFlat index exists and is usable
@@ -784,4 +819,4 @@ closes, between morning and evening cron waves). ~15:00 UTC.
 | 3 (independent) | 27 | gda_trend_arrays | 083 | 15 | — | — |
 | 3 (independent) | 28 | gda_contacts | 084 | 2 | 80 kB | PII |
 
-**Total: 4,612 rows, ~20 MB**
+**Total: 4,562 rows, ~20 MB**
