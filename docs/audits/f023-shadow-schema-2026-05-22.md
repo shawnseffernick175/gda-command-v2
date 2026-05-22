@@ -2,8 +2,8 @@
 
 **Date:** 2026-05-22
 **Author:** Devin (automated audit)
-**Status:** F-023a EXECUTED — 17 tables dropped, 1 promoted to ADOPT
-**Updated:** 2026-05-22 (F-023a execution — 5 deferred tables dropped, gda_touchpoints adopted)
+**Status:** F-023b EXECUTED — 17 tables dropped, 1 adopted, risk_register collision resolved
+**Updated:** 2026-05-22 (F-023b — risk_register renamed to gda_risk_register, migration 059 generated)
 **Issue:** [#258](https://github.com/shawnseffernick175/gda-command-v2/issues/258)
 
 ---
@@ -87,7 +87,7 @@ All 81 shadow tables were created by n8n workflows using the "GDA Postgres" cred
 | 2 | `gda_capture_plans` | 13 | ~98 | 696 kB | 2 | 25 | Capture planning — second most-referenced table |
 | 3 | `gda_intelligence_log` | 7 | 54 | 136 kB | 4 | 14 | Intelligence feed log — 14 workflows write/read |
 | 4 | `gda_competitor_watchlist` | 37 | 4 | 184 kB | 4 | 9 | Competitor intelligence — 9 workflows, complex schema |
-| 5 | `risk_register` | 25 | 459 | 488 kB | 8 | 8 | Risk management — 8 workflows, 459 active rows |
+| 5 | `gda_risk_register` | 25 | 464 | 488 kB | 8 | 8 | Risk management — 8 workflows, renamed from `risk_register` (F-023b). **MIGRATION_PENDING** → [059_n8n_gda_risk_register.sql](../../packages/backend/src/db/migrations/059_n8n_gda_risk_register.sql) |
 | 6 | `opportunity_alerts` | 25 | ~5 | 216 kB | 9 | 7 | Alert system — 7 workflows, heavily indexed |
 | 7 | `gda_competitor_cache` | 5 | 1 | 168 kB | 4 | 6 | Competitor data cache — 6 workflows |
 | 8 | `gda_action_items` | 7 | 47 | 584 kB | 4 | 5 | Action items — 5 workflows, actively written |
@@ -256,22 +256,21 @@ These ADOPT tables have the most production data and would require the most care
 |-------|------|------|-----------|
 | `gda_opportunity_tracker` | 1,780 | 1.7 MB | **HIGH** — core pipeline, 54 workflows depend on it |
 | `gda_embeddings` | ~821 | **14 MB** | **HIGH** — vector data, requires pgvector extension |
-| `risk_register` | 459 | 488 kB | **MEDIUM** — name collides with migration-tracked `risk_register` in `gda_command` |
+| `gda_risk_register` | 464 | 488 kB | **RESOLVED** — renamed from `risk_register` (F-023b), no longer collides |
 | `daily_trends` | 528 | 200 kB | LOW |
 | `gda_error_log` | 334 | 88 kB | LOW |
 | `ft_opportunity_signal` | 232 | 256 kB | LOW |
 
-### `risk_register` Name Collision
+### `risk_register` Name Collision — RESOLVED (F-023b)
 
-The `risk_register` table in `n8n-envision-postgres-1` (459 rows, 8 workflow consumers)
-has the **same name** as the migration-tracked `risk_register` in `gda_command` (created
-by migration `012_risk_register_and_company.sql`). The schemas differ:
+The n8n shadow table was renamed from `risk_register` to `gda_risk_register` (F-023b, 2026-05-22).
+All 8 consuming workflows updated in-place to use the new name.
 
-- `gda_command.risk_register`: 25 columns (has `deleted_at`, versioning triggers, etc.)
-- `n8n.risk_register`: 25 columns (different column set, workflow-managed)
+- `gda_command.risk_register`: 19 columns (migration-tracked, opportunity-level risk tracking) — **unchanged**
+- `n8n.gda_risk_register`: 25 columns (workflow-managed, auto-risk generation + deadline escalation)
+- Migration 059 generated for future F-026 Step 3 consolidation
 
-**F-026 Step 3 must resolve this collision** — either merge data, rename one table, or
-designate one as authoritative. This is a **blocking issue** for Step 3 planning.
+**Collision no longer blocks F-026 Step 3.**
 
 ---
 
@@ -280,7 +279,7 @@ designate one as authoritative. This is a **blocking issue** for Step 3 planning
 ```
 ft_signal_source ← ft_opportunity_signal ← ~~ft_need_tag~~ (DROPPED)
 gda_opportunity_tracker ← gda_decision_memory ← ~~gda_outcome_tracker~~ (DROPPED)
-gda_relationships ← gda_touchpoints (DEFERRED to F-023a)
+gda_relationships ← gda_touchpoints (ADOPT, migration 058)
 insights_metadata ← insights_by_period
 insights_metadata ← insights_raw
 ```
@@ -320,7 +319,7 @@ Tables with recent write activity (inserts/updates/deletes > 0 since last Postgr
 | `gda_mega_cache` | 0 | 131 | 0 | 2026-05-18 |
 | `gda_competitor_cache` | 128 | 0 | 3 | — |
 | `gda_error_log` | 116 | 0 | 0 | 2026-05-09 |
-| `risk_register` | 106 | 84 | 0 | 2026-05-21 |
+| `gda_risk_register` | 106 | 84 | 0 | 2026-05-21 |
 | `insights_metadata` | 20 | 997 | 0 | 2026-05-21 |
 | `gda_intelligence_log` | 68 | 0 | 5 | — |
 | `gda_dept_market` | 0 | 24 | 0 | — |
@@ -344,15 +343,15 @@ Tables with recent write activity (inserts/updates/deletes > 0 since last Postgr
 - Decide on `gda_touchpoints`: keep with `gda_relationships` (both ADOPT) or drop?
 - All 6 archived to `/tmp/f023-deferred-archive/` on VPS
 
-### 3. F-023b: Risk Register Collision — Deferred
-- `risk_register` name collision between n8n DB (459 rows, 8 workflows) and `gda_command`
-  (migration-tracked, different schema) requires architect spec before resolution
-- Do NOT execute rename until spec is provided
+### 3. ~~F-023b: Risk Register Collision~~ — RESOLVED
+- `risk_register` renamed to `gda_risk_register` in n8n DB (2026-05-22)
+- All 8 consuming workflows updated in-place
+- Migration 059 generated for F-026 Step 3 consolidation
 
 ### 4. ADOPT bucket (28 tables) — F-026 Step 3 prerequisite
-- **2 of 28 already have migrations:** `gda_relationships` (057) and `gda_touchpoints` (058)
-- Remaining 26 need migration files in `packages/backend/src/db/migrations/`
-- Resolve the `risk_register` name collision first (F-023b, blocking)
+- **3 of 28 already have migrations:** `gda_relationships` (057), `gda_touchpoints` (058), `gda_risk_register` (059)
+- Remaining 25 need migration files in `packages/backend/src/db/migrations/`
+- ~~Resolve the `risk_register` name collision first (F-023b, blocking)~~ DONE
 - `gda_embeddings` pgvector dependency: **pgvector v0.8.2 confirmed installed on `gda-postgres`**
 - After migrations are in place, F-026 Step 3 can `INSERT INTO ... SELECT FROM` across databases
 
@@ -481,8 +480,8 @@ Most-referenced table in the fleet (54 workflows).
 | contract_type | varchar | YES | |
 | gda_label | varchar | YES | |
 
-### risk_register (25 columns)
-In n8n DB — distinct from migration-tracked `risk_register` in `gda_command`.
+### gda_risk_register (25 columns)
+In n8n DB — renamed from `risk_register` (F-023b). Distinct from migration-tracked `risk_register` in `gda_command`.
 
 | Column | Type | Nullable | Default |
 |--------|------|----------|---------|

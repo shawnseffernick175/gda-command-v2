@@ -60,5 +60,6 @@
   "055_govwin_wsapi_integration.sql": "63832f553ce7f51696d237ff630aac6585281c6ac1b95a9f1fcf96378f713eea",
   "056_schema_migrations_provenance.sql": "edfa06d3d0525043d89f31bfa8289c4b2bbf7a4291386bf077b70a5bb0b0e7c6",
   "057_n8n_gda_relationships.sql": "ba69ed4a7b8f0393fa4d4654e5153a8059b87f92ee3efc0a902e4a720c135dd6",
-  "058_n8n_gda_touchpoints.sql": "93ad6c6a25e7840cfdd87e1a136787c64dc43e38dbbc554f267a6d34feafd6e6"
+  "058_n8n_gda_touchpoints.sql": "93ad6c6a25e7840cfdd87e1a136787c64dc43e38dbbc554f267a6d34feafd6e6",
+  "059_n8n_gda_risk_register.sql": "6b857c27228ccfc403b9c8492e1af2f6ca5c149388c429f4c876c14b83ab01f7"
 }
