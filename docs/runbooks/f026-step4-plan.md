@@ -8,6 +8,145 @@
 
 ---
 
+## 0. Phase 0 — Table-Existence Matrix (Mandatory Pre-Flight)
+
+### ⚠ HALT GATE: This section must pass before Step 4 PR 2 is opened.
+
+The 122 workflows that use HwronxMmGY5XDGEt currently connect to `n8n-envision-postgres-1/n8n`.
+After the credential cutover, they will connect to `gda-postgres/gda_command`. Any table
+that exists on the n8n DB but NOT on gda_command will cause workflow failures post-cutover.
+
+### 0a. Table-Existence Matrix
+
+Analysis of SQL queries embedded in the 122 workflows identified **60 distinct tables**
+referenced. Cross-referencing against both databases:
+
+| Table | n8n DB | gda_command | Category | Rows (n8n) | Impact |
+|-------|:------:|:-----------:|----------|------------|--------|
+| **28 ADOPT tables (migrated in Step 3)** | | | | | |
+| daily_trends | ✅ | ✅ | ADOPT | 537 | Safe — exists on both |
+| ft_opportunity_signal | ✅ | ✅ | ADOPT | 234 | Safe — exists on both |
+| ft_signal_source | ✅ | ✅ | ADOPT | 10 | Safe — exists on both |
+| gda_action_items | ✅ | ✅ | ADOPT | 47 | Safe — exists on both |
+| gda_active_contracts | ✅ | ✅ | ADOPT | 5 | Safe — exists on both |
+| gda_capture_plans | ✅ | ✅ | ADOPT | 110 | Safe — exists on both |
+| gda_competitor_cache | ✅ | ✅ | ADOPT | 1 | Safe — exists on both |
+| gda_competitor_watchlist | ✅ | ✅ | ADOPT | 46 | Safe — exists on both |
+| gda_contacts | ✅ | ✅ | ADOPT | 2 | Safe — exists on both |
+| gda_dashboard_intel_cache | ✅ | ✅ | ADOPT | 6 | Safe — exists on both |
+| gda_embeddings | ✅ | ✅ | ADOPT | 821 | Safe — exists on both |
+| gda_error_log | ✅ | ✅ | ADOPT | 334 | Safe — exists on both |
+| gda_intelligence_log | ✅ | ✅ | ADOPT | 54 | Safe — exists on both |
+| gda_learned_weights | ✅ | ✅ | ADOPT | 18 | Safe — exists on both |
+| gda_morning_briefings | ✅ | ✅ | ADOPT | 40 | Safe — exists on both |
+| gda_opportunity_alerts | ✅ | ✅ | ADOPT | 7 | Safe — exists on both |
+| gda_opportunity_tracker | ✅ | ✅ | ADOPT | 1780 | Safe — exists on both |
+| gda_relationships | ✅ | ✅ | ADOPT | 0 | Safe — exists on both |
+| gda_risk_register | ✅ | ✅ | ADOPT | 464 | Safe — exists on both |
+| gda_saved_opportunities | ✅ | ✅ | ADOPT | 0 | Safe — exists on both |
+| gda_teaming_partners | ✅ | ✅ | ADOPT | 12 | Safe — exists on both |
+| gda_touchpoints | ✅ | ✅ | ADOPT | 0 | Safe — exists on both |
+| gda_trend_arrays | ✅ | ✅ | ADOPT | 15 | Safe — exists on both |
+| gda_wargames | ✅ | ✅ | ADOPT | 1 | Safe — exists on both |
+| gda_win_loss | ✅ | ✅ | ADOPT | 6 | Safe — exists on both |
+| gda_win_loss_db | ✅ | ✅ | ADOPT | 10 | Safe — exists on both |
+| govtribe_cache | ✅ | ✅ | ADOPT | 0 | Safe — exists on both |
+| opportunity_alerts | ✅ | ✅ | ADOPT | 2 | Safe — exists on both |
+| | | | | | |
+| **30 N8N-ONLY tables (exist on n8n, NOT on gda_command)** | | | | | |
+| gda_action_history | ✅ | ❌ | N8N-ONLY | 6 | **BREAKS** after cutover |
+| gda_ai_feedback | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_aop_tracker | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_approval_queue | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_capture_lessons | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_chat_history | ✅ | ❌ | N8N-ONLY | 6 | **BREAKS** after cutover |
+| gda_clause_library | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_competitor_crawls | ✅ | ❌ | N8N-ONLY | 30 | **BREAKS** after cutover |
+| gda_compliance_matrices | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_contract_vehicles | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_daily_briefings | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_daily_briefs | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_deep_research | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_dept_market | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_discussions | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_doc_inbox | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_e2e_reports | ✅ | ❌ | N8N-ONLY | 27 | **BREAKS** after cutover |
+| gda_feedback | ✅ | ❌ | N8N-ONLY | 8 | **BREAKS** after cutover |
+| gda_health_scans | ✅ | ❌ | N8N-ONLY | 3 | **BREAKS** after cutover |
+| gda_idiq_tracker | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_incumbent_analysis | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_knowledge_base | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_learning_log | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_meeting_notes | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_mega_cache | ✅ | ❌ | N8N-ONLY | 1 | **BREAKS** after cutover |
+| gda_naics_tracking | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_ndaa_intel | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_ooda_loops | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_prompt_architect_memory | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| gda_pwin_scores | ✅ | ❌ | N8N-ONLY | 0 | **BREAKS** after cutover |
+| | | | | | |
+| **2 GDA-ONLY tables (exist on gda_command, not referenced from n8n)** | | | | | |
+| doctrine_drafts | ❌ | ✅ | GDA-ONLY | — | Safe — already on target |
+| doctrine_publish_runs | ❌ | ✅ | GDA-ONLY | — | Safe — already on target |
+
+### 0b. Summary
+
+| Category | Count | Status |
+|----------|-------|--------|
+| ADOPT (both DBs) | 28 | ✅ Safe — migrated in Step 3 |
+| N8N-ONLY | **30** | **🛑 HALT — will break after cutover** |
+| GDA-ONLY | 2 | ✅ Safe — already on target DB |
+
+### 0c. The problem
+
+The 30 N8N-ONLY tables are shadow tables classified as **KEEP** in the F-023 inventory
+(docs/audits/f023-shadow-schema-2026-05-22.md). They were not part of the 28-table ADOPT
+set because they were deemed lower-priority or had no active writer workflows at the time
+of classification.
+
+However, **the 122 workflows that use HwronxMmGY5XDGEt reference these tables in their SQL
+queries.** After the credential cutover, these queries will fail with
+`ERROR: relation "gda_chat_history" does not exist` (or similar) because gda_command has
+no such tables.
+
+### 0d. Activity profile of the 30 N8N-ONLY tables
+
+| Activity Level | Tables | Count |
+|---------------|--------|-------|
+| Active writes (INS > 0) | gda_competitor_crawls(30), gda_e2e_reports(27), gda_feedback(8), gda_chat_history(6), gda_action_history(6), gda_health_scans(3) | 6 |
+| Active updates only | gda_mega_cache(131 UPD), gda_dept_market(24 UPD) | 2 |
+| Empty / zero activity | All others | 22 |
+
+### 0e. Resolution options (architect decision required)
+
+1. **Expand ADOPT scope:** Generate migrations for the 30 tables, copy data, then proceed
+   with Step 4. This is the same pattern as F-023c + Step 3 but for a larger set. Adds
+   ~81 total rows of data. Most tables are empty.
+
+2. **Create empty table stubs:** Generate CREATE TABLE migrations for the 30 tables on
+   gda_command WITHOUT copying data. Workflows would read empty results instead of failing.
+   Data copy can follow later. Quick but loses the 81 rows of existing data.
+
+3. **Split the credential:** Keep HwronxMmGY5XDGEt pointing at n8n DB for the 30 N8N-ONLY
+   tables, and create a NEW credential pointing at gda_command for the 28 ADOPT tables.
+   Requires per-workflow node edits — contradicts Option A (edit in place) and is complex.
+
+4. **Accept breakage:** Proceed knowing the 30 tables will 404. Most are empty, and the
+   workflows may handle the error gracefully (returning empty arrays). Risk: some workflows
+   may crash entirely and stop serving API responses.
+
+**Recommendation:** Option 1 (expand ADOPT scope). It's the cleanest path. The 30 tables
+have minimal data (81 rows total across 8 non-empty tables). The same pg_dump/pg_restore
+pattern from Step 3 applies.
+
+### 0f. HALT condition
+
+**This matrix must be resolved before Step 4 PR 2 (execution) begins.** If the architect
+approves Option 1, a new sub-step (Step 3b: migrate the 30 additional tables) must be
+completed first.
+
+---
+
 ## 1. Preconditions
 
 Before execution, verify each of the following. HALT on any failure.
@@ -104,7 +243,11 @@ resumed after Step 3).
 
 ```bash
 # Check last execution time for each writer. All should have completed > 30 seconds ago.
-for WF_ID in ldVAxgDGuKJx4354 Qg55lRKjubgsvD28 ...; do
+for WF_ID in ldVAxgDGuKJx4354 Qg55lRKjubgsvD28 9annZcPoqw0DaPKI PeLGDqgLAsEh5Gsd \
+  BQFYbILTezLgqkDY 0E3lCtWt2rdJlMPY MJapg8dGkvEzLn0K M0xPvRs31zQOewfx \
+  7gERqvfD6THg1gWf EcZWryEoS4zyAfGD geW4zw6lvkkizF82 IGw8FBZhZwnwiIe1 \
+  Zb2quk78c5mszZ2C gMEwjeBZbC4GzL3N KIT8cj4V2cMFdSkA lU2uQfmQ6sch69TA \
+  D6nZ235hSF4wGMb5; do
   curl -s "http://localhost:5678/api/v1/executions?workflowId=$WF_ID&limit=1&status=running" \
     -H "X-N8N-API-KEY: $API_KEY" | python3 -c "
 import sys,json; d=json.load(sys.stdin); execs=d.get('data',[]); \
@@ -115,7 +258,28 @@ done
 
 **HALT if:** Any workflow has a running execution. Wait for it to complete before proceeding.
 
-### 1e. Halt conditions summary
+### 1e. Password retrieval
+
+```bash
+# Retrieve gda password from compose env
+cat /root/gda-command-v2/.env | grep POSTGRES_PASSWORD
+# HALT if password is a placeholder, empty, or cannot be retrieved.
+# Do NOT include the password value in any committed file or PR description.
+# Reference as "gda password from compose env" only.
+```
+
+### 1f. VPS repo state
+
+```bash
+cd /root/gda-command-v2
+git log --oneline -1
+# Expect: SHA matches post-PR#297 (64d2fad)
+git status
+# Expect: clean working tree
+# HALT if either check fails — stale state on VPS.
+```
+
+### 1g. Halt conditions summary
 
 | # | Condition | Action |
 |---|-----------|--------|
@@ -124,6 +288,8 @@ done
 | 3 | gda-backend not healthy | HALT — backend issue |
 | 4 | Any writer workflow inactive | HALT — Step 3 resume failure |
 | 5 | Any writer workflow currently running | WAIT until completed, then proceed |
+| 6 | Password cannot be retrieved from .env | HALT — cannot repoint credential |
+| 7 | VPS repo not on expected SHA or dirty | HALT — clean before proceeding |
 
 ---
 
@@ -231,14 +397,15 @@ GDA.intel.an1-incumbent-win-themes, GDA.intel.morning-briefing-v1
 ### Option A: Edit HwronxMmGY5XDGEt in place ✅ RECOMMENDED
 
 **What:** Change the `host` field from `n8n-envision-postgres-1` to `gda-postgres` in the
-existing credential. Also update `database` from `n8n` to `gda_command`, `user` from `n8n`
-to `gda`, and `password` to the gda user's password.
+existing credential via the **n8n UI**. Also update `database` from `n8n` to `gda_command`,
+`user` from `n8n` to `gda`, and `password` to the gda user's password (from compose env).
 
 **Pros:**
 - Atomic: one change, all 122 workflows repointed instantly
 - Zero workflow JSON modifications required
 - No ambiguous intermediate state (some workflows on old, some on new)
 - Simple rollback: re-edit the same 4 fields back to original values
+- n8n UI has built-in connection test — validates before saving
 
 **Cons:**
 - No n8n UI "undo" — rollback requires re-editing the credential
@@ -251,17 +418,15 @@ then update each workflow's node to reference the new credential.
 
 **Cons:**
 - 122 workflow JSON edits required (one per workflow)
-- Each edit is an n8n API call with the full workflow body
 - Risk of partial state: some workflows on old credential, some on new
-- If any edit fails, complex rollback (which workflows were already swapped?)
-- n8n API v1 uses PUT for workflow updates (not PATCH) — must send full workflow body
+- n8n API v1 uses PUT for workflow updates — must send full workflow body
 - Much more opportunity for mistakes
 
 ### Recommendation
 
 **Option A.** It leaves fewer variables moving: one credential edit vs 122 workflow edits.
-The rollback path (re-edit the credential) is equally simple for both options, but Option A
-has no intermediate states to reason about.
+The rollback path (re-edit the credential) is equally simple. Reproducibility is achieved
+through the audit doc (exact field values captured before and after), not a script.
 
 ### Credential field changes
 
@@ -271,13 +436,12 @@ has no intermediate states to reason about.
 | port | 5432 | 5432 |
 | database | n8n | gda_command |
 | user | n8n | gda |
-| password | *(n8n user password)* | *(gda user password)* |
+| password | *(n8n user password)* | *(gda password from compose env — do NOT commit)* |
 | ssl | false | false |
 
 > **IMPORTANT:** The credential data in n8n is encrypted. The edit must be done through
-> the n8n UI (Settings → Credentials → GDA Postgres → Edit) or via the n8n internal API
-> that handles encryption. Direct SQL UPDATE on `credentials_entity.data` will NOT work
-> because the payload is AES-encrypted with n8n's encryption key.
+> the n8n UI (Settings → Credentials → GDA Postgres → Edit). Direct SQL UPDATE on
+> `credentials_entity.data` will NOT work because the payload is AES-encrypted.
 
 ---
 
@@ -300,10 +464,6 @@ DNS: "gda-postgres" resolves from n8n container via Docker embedded DNS
 
 **Verified:** `docker exec n8n-envision-n8n-1 nc -z -w5 gda-postgres 5432` → REACHABLE.
 
-The n8n container and gda-postgres are both on the `n8n_default` Docker network. This was
-established in F-026 Step 2 (PR #273). DNS resolution works — the n8n container can resolve
-`gda-postgres` by container name.
-
 ### 4b. Authentication
 
 ```
@@ -311,39 +471,26 @@ pg_hba.conf on gda-postgres:
   host all all all scram-sha-256
 ```
 
-This allows any host to connect as any user with password authentication (scram-sha-256).
 The n8n container's IP (172.18.0.4) is within the `all` range.
 
 ### 4c. Grants
 
 The `gda` user is the **owner** of all 28 ADOPT tables (verified via `pg_tables.tableowner`).
-As owner, `gda` has full privileges: SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES,
-TRIGGER on all 28 tables. No additional GRANT statements needed.
+Full privileges: SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER.
 
-### 4d. Non-ADOPT table writes
+### 4d. Non-ADOPT table access
 
-The 122 workflows that use HwronxMmGY5XDGEt also read/write to tables OUTSIDE the 28 ADOPT
-set. These are the **original 86 gda_command application tables** that have always lived on
-gda-postgres. Examples: `sam_opportunities`, `opportunities`, `sources`, `enrichment_log`,
-etc. Since gda_command is already the home database for these tables, repointing the
-credential to gda-postgres gives n8n access to BOTH the original 86 AND the 28 ADOPT tables
-in a single connection.
-
-**No grant gap exists.** The `gda` user owns all tables in gda_command.
+> **See Section 0 for the critical finding.** 30 tables referenced by workflows exist on
+> n8n DB only and do NOT exist on gda_command. This must be resolved before execution.
 
 ### 4e. Pre-flight verification command
 
 ```bash
-# From inside n8n container, verify gda user can connect and query an ADOPT table
-docker exec n8n-envision-n8n-1 sh -c "
-  PGPASSWORD='<gda_password>' psql -h gda-postgres -U gda -d gda_command \
-    -c 'SELECT count(*) FROM gda_opportunity_tracker;'"
-# Expect: 1780 (or current count)
+# From gda-postgres, verify auth works
+docker exec gda-postgres psql -U gda -d gda_command -c \
+  'SELECT count(*) FROM gda_opportunity_tracker;'
+# Expect: >= 1780
 ```
-
-> **Note:** The n8n Alpine container doesn't have `psql` installed. Use the `nc` test
-> (Section 4a) for connectivity, and verify auth by running the query from gda-postgres
-> itself or from the host via `docker exec`.
 
 ---
 
@@ -366,7 +513,7 @@ A simple `docker restart gda-backend` would restart the same old image. We need
 
 ### 5b. Restart timing: AFTER credential cutover
 
-**Recommended order:** Pause → Backup → Credential repoint → Backend rebuild → Resume.
+**Recommended order:** Pause → Backup → Credential repoint → Watchdog canary → Backend rebuild → Resume.
 
 Rationale:
 - The credential repoint is the critical cutover. Doing it while workflows are paused
@@ -377,13 +524,16 @@ Rationale:
   workflows will ALSO read/write to gda_command. There's no conflict between the backend
   restart and the credential change — they're independent axes.
 
+**If backend rebuild fails:** Revert credential AND skip workflow resume. This leaves prod
+in pre-change state with writers paused — the lowest-risk rollback target. Do not resume
+workflows against the new credential with a broken backend.
+
 ### 5c. Downtime expectation
 
 - **Backend build:** 30-60 seconds (TypeScript compile + Docker image build)
 - **Backend startup:** 5-10 seconds (Express server + migration check)
 - **Total downtime on gda.csr-llc.tech:** ~45-90 seconds
-- During this window, the frontend will show "Backend Unavailable" but n8n is unaffected
-  (it's an independent container).
+- During this window, the frontend will show "Backend Unavailable" but n8n is unaffected.
 
 ### 5d. Health check sequence (post-restart)
 
@@ -413,20 +563,12 @@ docker exec gda-postgres psql -U gda -d gda_command -t -c "SELECT count(*) FROM 
 docker images gda-command-v2-backend --format "{{.ID}} {{.CreatedAt}}"
 # Identify the previous image (sha256:1b8ca37f1e56...)
 
-# Re-tag and restart with old image
-docker tag sha256:1b8ca37f1e5651184c0f22e031e79d50d2d8710152750eef773756e6c86dcdbf \
-  gda-command-v2-backend:rollback
-docker stop gda-backend
-docker run -d --name gda-backend-rollback \
-  --network gda-command-v2_gda \
-  --restart unless-stopped \
-  <same env vars and volumes as original> \
-  gda-command-v2-backend:rollback
+# Rollback: check out pre-PR#288 code and rebuild
+cd /root/gda-command-v2
+git stash  # or git checkout <old-commit>
+docker compose -f docker-compose.prod.yml build backend
+docker compose -f docker-compose.prod.yml up -d backend
 ```
-
-> **Simplification:** Since the compose file exists at `/root/gda-command-v2/docker-compose.prod.yml`,
-> a `git checkout <old-commit> && docker compose build backend && docker compose up -d backend`
-> is the cleanest rollback path. The old commit is the one currently running (pre-PR#288).
 
 ---
 
@@ -457,9 +599,8 @@ Same 17 writer workflows as Step 3 (docs/audits/f026-step3-writer-workflows-2026
 | 17 | GDA.cron.daily-trends-collect | D6nZ235hSF4wGMb5 | PAUSE |
 
 - **GDA.cron.system-watchdog (LPUSYd4Vpph1Qg7n):** NOT paused. Stays running as canary.
-  It uses HwronxMmGY5XDGEt, so it will experience the credential cutover live. This is
-  intentional — if the watchdog survives the cutover without errors, it's evidence the
-  credential repoint is valid. If it fails, that's an immediate signal to roll back.
+  It uses HwronxMmGY5XDGEt, so it will experience the credential cutover live. If it
+  fails, that's an immediate signal to roll back.
 - **GDA.cron.change-detector (Zb2quk78c5mszZ2C):** PAUSED as #13. It's a writer.
 
 ### 6b. API method
@@ -484,13 +625,14 @@ curl -s "$N8N_API/workflows?active=true&limit=200" -H "X-N8N-API-KEY: $API_KEY" 
 
 ## 7. Execution Order
 
-### Phase A: Pause writer workflows
+### Phase A: Pause writer workflows + capture source DB baseline
 
 1. Verify preconditions (Section 1)
 2. Capture pre-cutover active count (expect 157)
-3. Pause 17 writers via `POST /deactivate`
-4. Verify active count = 140
-5. Wait 30 seconds for any in-flight executions to drain
+3. **Capture n8n DB ADOPT table row counts (baseline for freeze test — Section 8d)**
+4. Pause 17 writers via `POST /deactivate`
+5. Verify active count = 140
+6. Wait 30 seconds for any in-flight executions to drain
 
 ### Phase B: Backup gda_command
 
@@ -507,46 +649,57 @@ Edit HwronxMmGY5XDGEt via n8n UI:
 2. Change `host` from `n8n-envision-postgres-1` to `gda-postgres`
 3. Change `database` from `n8n` to `gda_command`
 4. Change `user` from `n8n` to `gda`
-5. Change `password` to gda user's password
+5. Change `password` to gda user's password (from compose env)
 6. Save
-7. Verify save was successful by testing the credential in n8n UI
+7. Use n8n's built-in "Test" button to verify the credential connects
 
-> **Alternative (scripted):** n8n's internal REST API (not the public v1 API) can update
-> credential data. This would be: `PUT /credentials/{id}` with the full credential body
-> including the encrypted data. However, this requires the n8n encryption key and the
-> correct payload format. The UI is safer for a one-time operation.
+### Phase C.5: Manual watchdog trigger (immediate canary)
 
-### Phase D: Verify credential (pre-resume)
-
-While workflows are still paused:
+Immediately after credential save, manually trigger system-watchdog to verify
+the new credential works. Do NOT wait for the next scheduled run (up to 10 min).
 
 ```bash
-# system-watchdog is still running — check if it fired successfully after the cutover
-# Wait for one watchdog cycle (10 min) or check the last execution
+# Trigger watchdog manually
+curl -s -X POST "$N8N_API/workflows/LPUSYd4Vpph1Qg7n/execute" \
+  -H "X-N8N-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" -d '{}'
+
+# Wait 10 seconds for execution to complete, then check result
+sleep 10
 curl -s "$N8N_API/executions?workflowId=LPUSYd4Vpph1Qg7n&limit=1" \
-  -H "X-N8N-API-KEY: $API_KEY"
-# Expect: most recent execution is post-cutover and status = "success"
-# If status = "error" → HALT. The credential repoint may be wrong.
+  -H "X-N8N-API-KEY: $API_KEY" | python3 -c "
+import sys,json; d=json.load(sys.stdin)['data'][0]; \
+print(f'Status: {d[\"status\"]}  Finished: {d.get(\"stoppedAt\",\"running\")}')"
+# Expect: Status: success
+# If status = "error" → HALT IMMEDIATELY. Revert credential before any other step.
 ```
 
-### Phase E: Restart gda-backend
+### Phase D: Restart gda-backend
 
 ```bash
 cd /root/gda-command-v2
+
+# Pre-build verification
+git log --oneline -1
+# Expect: post-PR#297 SHA (64d2fad)
+git status
+# Expect: clean working tree
+# HALT if either fails
+
 git pull origin main
 docker compose -f docker-compose.prod.yml build backend
 docker compose -f docker-compose.prod.yml up -d backend
 ```
 
 Wait for health check (Section 5d). HALT if backend doesn't come up healthy within 60
-seconds.
+seconds. **If backend fails: revert credential AND skip workflow resume** (Section 5b).
 
-### Phase F: Resume writer workflows
+### Phase E: Resume writer workflows
 
 1. Resume 17 writers via `POST /activate` (same order as paused)
 2. Verify active count = 157
 
-### Phase G: Verification window
+### Phase F: Verification window
 
 See Section 8.
 
@@ -591,16 +744,27 @@ docker exec gda-postgres psql -U gda -d gda_command -c "
 SELECT id, trend_date, updated_at FROM daily_trends ORDER BY updated_at DESC LIMIT 3;"
 ```
 
-### 8d. Source DB freeze verification
+### 8d. Source DB freeze verification (strengthened)
+
+Capture n8n DB ADOPT table counts at **Phase A (pre-pause)** and again at **Phase F
+(post-verification)**. Both snapshots must be EXACTLY equal. Any delta (up OR down) is
+a HALT.
 
 ```bash
-# Row counts on n8n-envision-postgres-1 ADOPT tables should be FROZEN at Step 3 values
-for t in gda_risk_register gda_opportunity_tracker daily_trends gda_action_items \
-  gda_intelligence_log ft_opportunity_signal; do
-  docker exec n8n-envision-postgres-1 psql -U n8n -d n8n -t -c "SELECT count(*) FROM $t;"
+# Capture ALL 28 ADOPT table counts on n8n-envision-postgres-1
+for t in gda_relationships ft_signal_source gda_touchpoints ft_opportunity_signal \
+  gda_risk_register gda_opportunity_tracker gda_capture_plans gda_intelligence_log \
+  gda_competitor_watchlist opportunity_alerts gda_competitor_cache gda_action_items \
+  gda_active_contracts gda_dashboard_intel_cache daily_trends gda_opportunity_alerts \
+  gda_morning_briefings gda_learned_weights gda_win_loss gda_error_log \
+  gda_saved_opportunities gda_teaming_partners gda_embeddings govtribe_cache \
+  gda_wargames gda_win_loss_db gda_trend_arrays gda_contacts; do
+  echo -n "$t: "
+  docker exec n8n-envision-postgres-1 psql -U n8n -d n8n -t -c "SELECT count(*) FROM $t;" | tr -d ' '
 done
-# Compare to docs/audits/f026-step3-prod-presnapshot-20260522.md values
-# If any count increased → HALT. Writes are still going to the old DB.
+# Compare Phase A counts to Phase F counts — must be IDENTICAL.
+# If any count increased → HALT: writes still going to old DB.
+# If any count decreased → HALT: unexpected data deletion on old DB.
 ```
 
 ### 8e. Endpoint health
@@ -634,15 +798,17 @@ After resume, wait 15 minutes and verify:
 | 2 | Connectivity pre-flight fails | Pre-exec | HALT — fix network/DNS before proceeding |
 | 3 | Any auth/grant failure on gda-postgres | Pre-exec | HALT — add grants before proceeding |
 | 4 | Backup script returns non-zero | Phase B | HALT — no rollback target |
-| 5 | system-watchdog fails after credential edit | Phase D | HALT — revert credential immediately |
-| 6 | Backend build fails | Phase E | HALT — revert to old image (Section 5e) |
-| 7 | Backend health check fails within 60s | Phase E | HALT — revert to old image |
-| 8 | schema_migrations count != 88 after restart | Phase E | HALT — migration runner corrupted state |
-| 9 | Any writer workflow fails first post-resume run with DB error | Phase G | HALT — revert credential |
-| 10 | Writes observed in n8n-envision-postgres-1 ADOPT tables post-cutover | Phase G | HALT — credential not properly applied |
-| 11 | Active workflow count != 157 after resume | Phase F | HALT — workflows didn't resume |
-| 12 | Any endpoint returns non-200 | Phase G | HALT — investigate before declaring complete |
-| 13 | Canary workflows don't fire within 15 min | Phase G | HALT — scheduling broken |
+| 5 | Manual watchdog trigger fails (Phase C.5) | Phase C.5 | HALT — revert credential immediately |
+| 6 | Backend build fails | Phase D | HALT — revert credential AND skip resume |
+| 7 | Backend health check fails within 60s | Phase D | HALT — revert credential AND revert backend |
+| 8 | schema_migrations count != 88 after restart | Phase D | HALT — migration runner corrupted state |
+| 9 | Any writer workflow's first post-resume run shows ANY non-success status, OR completes successfully but writes 0 rows when prior cycles consistently wrote N>0 rows | Phase F | HALT — revert credential (catches silent failures: auth succeeded but writes silently dropped or routed wrong) |
+| 10 | n8n DB ADOPT table counts changed between Phase A and Phase F (any delta, up or down) | Phase F | HALT — writes still going to old DB or unexpected deletion |
+| 11 | Active workflow count != 157 after resume | Phase E | HALT — workflows didn't resume |
+| 12 | Any endpoint returns non-200 | Phase F | HALT — investigate before declaring complete |
+| 13 | Canary workflows don't fire within 15 min | Phase F | HALT — scheduling broken |
+| 14 | Password not retrievable from .env | Pre-exec | HALT — cannot repoint credential |
+| 15 | VPS repo not on expected SHA or dirty | Pre-exec | HALT — clean before proceeding |
 
 ---
 
@@ -667,15 +833,9 @@ This instantly reverts all 122 workflows to the old DB. Takes ~30 seconds via UI
 If the rebuilt backend fails:
 
 ```bash
-# Stop the new container
-docker stop gda-backend && docker rm gda-backend
-
-# The old image is still cached:
-# sha256:1b8ca37f1e5651184c0f22e031e79d50d2d8710152750eef773756e6c86dcdbf
-
-# Re-run with old image using compose (check out pre-PR#288 code):
 cd /root/gda-command-v2
 git stash  # or git checkout <old-commit>
+docker compose -f docker-compose.prod.yml build backend
 docker compose -f docker-compose.prod.yml up -d backend
 ```
 
@@ -684,15 +844,23 @@ docker compose -f docker-compose.prod.yml up -d backend
 If data drift is detected (writes went to wrong place, data corruption):
 
 ```bash
-# Restore gda_command from the Phase B backup (selective, 28 ADOPT tables only)
-pg_restore --host=localhost --port=5432 --username=gda --dbname=gda_command \
-  --table=gda_risk_register --table=gda_opportunity_tracker \
-  ... (all 28 tables) \
-  --clean --if-exists --no-owner \
-  /root/backups/gda_command_<timestamp>.dump
+# Restore gda_command from the Phase B backup (selective, per-table, each in its own transaction)
+for TABLE in gda_risk_register gda_opportunity_tracker gda_capture_plans \
+  gda_intelligence_log gda_competitor_watchlist opportunity_alerts \
+  gda_competitor_cache gda_action_items gda_active_contracts \
+  gda_dashboard_intel_cache daily_trends gda_opportunity_alerts \
+  gda_morning_briefings gda_learned_weights gda_win_loss gda_error_log \
+  gda_saved_opportunities gda_teaming_partners gda_embeddings govtribe_cache \
+  gda_wargames gda_win_loss_db gda_trend_arrays gda_contacts \
+  gda_relationships ft_signal_source gda_touchpoints ft_opportunity_signal; do
+  pg_restore --host=localhost --port=5432 --username=gda --dbname=gda_command \
+    --table="$TABLE" --single-transaction --clean --if-exists --no-owner \
+    /root/backups/gda_command_<timestamp>.dump
+done
 ```
 
 > **WARNING:** Do NOT use `--clean` against the full DB. Selective per-table restore only.
+> Each table restored in `--single-transaction` so a failure rolls back only that table.
 > The 86 production application tables must NEVER be touched by rollback.
 
 ### 10d. Recovery matrix
@@ -701,9 +869,9 @@ pg_restore --host=localhost --port=5432 --username=gda --dbname=gda_command \
 |---------|----------------------|---------------------------|
 | Credential wrong (auth error) | Yes — re-edit credential | No |
 | Credential right but data goes to wrong DB | Yes — re-edit credential | Check for split writes |
-| Backend build fails | Yes — use cached old image | No |
+| Backend build fails | Yes — revert credential + old image | No |
 | Backend starts but migrations re-apply | Investigate — may be fine | Maybe — check what ran |
-| Data corruption on ADOPT tables | Yes — restore from backup | Review what caused it |
+| Data corruption on ADOPT tables | Yes — per-table restore from backup | Review what caused it |
 | n8n container crash | Restart n8n container | No |
 | Both credential and backend fail | Revert both independently | Architect should review |
 
@@ -730,56 +898,38 @@ pg_restore --host=localhost --port=5432 --username=gda --dbname=gda_command \
 
 ---
 
-## 12. Open Questions
+## 12. Resolved Questions
 
-### 12a. Credential edit method
+### 12a. Credential edit method — RESOLVED: UI edit
 
-The plan recommends editing HwronxMmGY5XDGEt via the n8n UI. However, if the architect
-prefers a scripted approach (for reproducibility and audit trail), we would need:
-- The n8n encryption key (to encrypt the new credential data)
-- The exact JSON structure of the credential payload
-- A script that calls the n8n internal API endpoint for credential updates
+Per architect: use the native n8n UI path. It has a built-in connection test and is
+well-tested. Reproducibility comes through the audit doc (capture exact field values
+changed), not a script.
 
-**Question for architect:** UI edit (simpler, one-time) or scripted (reproducible, auditable)?
+### 12b. gda user password — RESOLVED: from compose env
 
-### 12b. gda user password
+Pull `POSTGRES_PASSWORD` from `/root/gda-command-v2/.env` or the compose env reference.
+Do NOT include the password value in any committed file or PR description. Reference as
+"gda password from compose env" only. If the password cannot be retrieved, that is a
+HALT condition (Section 1e).
 
-The credential repoint requires the `gda` user's PostgreSQL password. This is set in the
-docker-compose environment (`POSTGRES_PASSWORD`). The execution script or UI operator needs
-access to this value.
+### 12c. Non-ADOPT table existence — ELEVATED to Section 0
 
-**Question for architect:** Is the gda password available in a known location (compose env,
-.env file), or does it need to be provided at execution time?
+See Section 0. **30 tables exist on n8n DB only.** This is a blocking issue that must be
+resolved before Step 4 execution. The original Section 4d assumption ("the 86 application
+tables live on gda-postgres") was partially wrong — the 122 workflows currently query the
+n8n DB for everything, including these 30 non-ADOPT shadow tables that have no counterpart
+on gda_command.
 
-### 12c. Writes to non-ADOPT tables via HwronxMmGY5XDGEt
+### 12d. system-watchdog as live canary — RESOLVED: keep running + manual trigger
 
-Some of the 122 workflows may write to tables in the original 86 gda_command table set
-(e.g., `enrichment_log`, `audit_log`). Currently, these workflows write to these tables on
-**n8n-envision-postgres-1/n8n** — but after the cutover, they'll write to
-**gda-postgres/gda_command** where these tables are the production originals.
+Per architect: keep system-watchdog running as canary. Add a manual trigger immediately
+after credential edit (Phase C.5) via `POST /workflows/LPUSYd4Vpph1Qg7n/execute`. If the
+manual trigger fails, immediately revert credential. This shortens the blind window from
+~10 min to seconds.
 
-This is actually the **correct behavior** — we WANT these writes to go to gda_command. But
-it's worth confirming: are there any tables that exist on n8n-envision-postgres-1/n8n but
-do NOT exist on gda-postgres/gda_command? If a workflow writes to a table that doesn't exist
-on gda_command, that workflow will fail after the cutover.
+### 12e. Backend rebuild scope — RESOLVED: verify SHA + clean tree
 
-**Mitigation:** Before execution, compare the list of tables that exist on both DBs. Any
-table referenced by the 122 workflows that doesn't exist on gda_command is a halt condition.
-
-### 12d. system-watchdog as live canary
-
-The plan keeps system-watchdog running during the cutover as a live canary. If the credential
-repoint breaks DB connectivity, the watchdog will fail within its next 10-minute cycle,
-providing early warning BEFORE we resume the 17 writers.
-
-**Question for architect:** Is this acceptable risk? The alternative is to also pause the
-watchdog (losing the early warning signal) and only discover credential issues when we
-resume all 17 at once.
-
-### 12e. Backend rebuild scope
-
-The `docker compose build backend` command will rebuild from the current repo state on the
-VPS (`/root/gda-command-v2`). This needs to be on the latest `main` (post-PR#297). Verify
-with `git log --oneline -1` before building.
-
-**No ambiguity expected** — just a confirmation step during execution.
+Before build: require BOTH `git log --oneline -1` matches the expected post-#297 SHA AND
+`git status` shows clean working tree on the VPS. Document both checks in the PR. Added
+as Section 1f precondition.
