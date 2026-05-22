@@ -63,6 +63,10 @@ for t in $TABLES; do
 done
 ```
 
+> **Reference data only.** The table below was captured 2026-05-22 18:30 UTC. Execution uses
+> fresh live counts from the pre-flight script above. Drift between this table and live counts
+> is expected (workflows are actively writing to these tables) and is **not** a halt condition.
+
 **Baseline counts (captured 2026-05-22 18:30 UTC):**
 
 | # | Table | Rows | Migration | Notes |
@@ -271,12 +275,29 @@ This is the same pattern used for F-036 staging population, which was tested end
    - `--target=staging`: source=`gda-postgres-staging` (n8n_staging), target=`gda-postgres-staging` (gda_command_staging)
    - `--target=prod`: source=`n8n-envision-postgres-1` (n8n), target=`gda-postgres` (gda_command)
 
-2. **Idempotent.** Before copying each table, the script checks:
-   ```sql
-   SELECT count(*) FROM <table>;
+2. **Idempotent with strict validation.** Before copying each table, the script checks
+   both source and target counts and follows this decision tree:
+
    ```
-   If count > 0 on target, the table is SKIPPED (not truncated, not re-copied). This means
-   re-running after partial failure picks up where it left off.
+   target_count = SELECT count(*) FROM <table> ON TARGET
+   source_count = SELECT count(*) FROM <table> ON SOURCE
+
+   IF target_count == 0:
+       → COPY (normal path — table is empty, proceed with pg_dump/pg_restore)
+   ELSE IF target_count == source_count:
+       → SKIP with log: "<table>: skipped (target count N == source count N)"
+   ELSE:
+       → HALT with error: "<table>: target has <target_count> rows but source has
+         <source_count> — partial migration detected, manual investigation required"
+         Exit non-zero immediately. Do NOT continue to next table.
+   ```
+
+   This ensures:
+   - Clean first run: all tables copied (target_count == 0 for all)
+   - Clean re-run after success: all tables skipped (target == source for all)
+   - Partial failure detected: any table with data that doesn't match source is
+     an error, not a table to silently skip. Requires manual TRUNCATE + re-run
+     or investigation before continuing.
 
 3. **Transactional per-table.** Each `pg_restore` uses `--single-transaction`. If any row
    fails to insert, the entire table copy rolls back. The script logs the failure and continues
@@ -509,17 +530,37 @@ COMMIT;
 "
 ```
 
-### 8b. Restore from backup
+### 8b. Selective restore from backup (28 ADOPT tables only)
+
+> **⚠️ WARNING: Do NOT use `--clean` against the full `gda_command` database.**
+> The pre-migration backup contains ALL tables including the 89 production tables.
+> A `pg_restore --clean` against the full DB would DROP and recreate everything,
+> destroying production table data that may have changed since the backup.
+> Only use selective per-table restore.
 
 ```bash
 # The backup was taken before migration via /root/backup-before-migration.sh
 ls -la /root/backups/gda_command_*.dump  # Find the pre-migration backup
 
-# Restore (only if TRUNCATE approach above is insufficient)
+# Selective restore — one table at a time, ADOPT tables ONLY
+ADOPT_TABLES="gda_relationships gda_touchpoints gda_risk_register gda_opportunity_tracker gda_capture_plans gda_intelligence_log gda_competitor_watchlist opportunity_alerts gda_competitor_cache gda_action_items gda_active_contracts gda_dashboard_intel_cache daily_trends gda_opportunity_alerts gda_morning_briefings gda_learned_weights gda_win_loss gda_error_log gda_saved_opportunities gda_teaming_partners ft_signal_source ft_opportunity_signal gda_embeddings govtribe_cache gda_wargames gda_win_loss_db gda_trend_arrays gda_contacts"
+
 docker cp /root/backups/gda_command_<timestamp>.dump gda-postgres:/tmp/gda_restore.dump
-docker exec gda-postgres pg_restore -U gda -d gda_command \
-  --clean --if-exists --no-owner --no-privileges /tmp/gda_restore.dump
+
+for t in $ADOPT_TABLES; do
+  echo "Restoring $t from backup..."
+  docker exec gda-postgres pg_restore -U gda -d gda_command \
+    --data-only --no-owner --no-privileges \
+    --table="$t" --single-transaction \
+    /tmp/gda_restore.dump
+done
 ```
+
+**The 89 production tables are NEVER touched by rollback under any circumstance.**
+Rollback only affects the 28 ADOPT tables. If Step 8a (TRUNCATE) succeeded, the ADOPT
+tables are already clean and 8b is not needed. Use 8b only if TRUNCATE failed or if you
+need to restore the ADOPT tables to their pre-migration state (which is empty — since
+the tables were created empty by migrations 057–084).
 
 ### 8c. Verify original 89 tables unchanged
 
@@ -630,7 +671,7 @@ done
 
 **Halt condition:** ANY mismatch → STOP and report.
 
-### 9f. Idempotency test — tear down and re-run
+### 9f. Idempotency test — tear down and re-run (proves "from scratch" repeatability)
 
 ```bash
 # Truncate all 28 ADOPT tables on gda_command_staging
@@ -649,16 +690,160 @@ COMMIT;
 
 **Halt condition:** Second rehearsal produces different results than first → STOP.
 
-### 9g. Save rehearsal reports
+### 9g. Idempotency test — re-run on fully populated target (proves true idempotency)
 
-Both parity reports saved to:
+After 9f completes successfully (all 28 tables populated, parity confirmed), run the
+script a **third time WITHOUT truncating** first:
+
+```bash
+# Run migration again — target already has all data from 9f
+/root/scripts/f026/step3-data-migration.sh --target=staging
+```
+
+**Expected result:**
+- All 28 tables report: `skipped (target count N == source count N)`
+- Zero tables copied, zero errors
+- Script exits 0 with log summary: `28 skipped, 0 copied, 0 failed`
+- No row count changes on any table
+
+**This is the real idempotency proof.** Steps 9b and 9f prove the script can populate
+empty tables. Step 9g proves the script is safe to re-run on a fully-populated target
+without duplicating data, truncating, or erroring — which is exactly what happens if
+someone accidentally runs it twice in production.
+
+**Halt condition:** If ANY table is copied (not skipped), or any error occurs → STOP.
+The script should make zero changes on this run.
+
+### 9h. Save rehearsal reports
+
+All three parity reports saved to:
 - `docs/audits/f026-step3-staging-rehearsal-<timestamp>.md`
+- Report must include: Run 1 (fresh), Run 2 (post-truncate), Run 3 (idempotency re-run)
+
+---
+
+## 9½. Execution Timing — Cron Pause for Migration Window
+
+### Problem
+
+Active n8n workflows are continuously writing to the 28 ADOPT tables on `n8n-envision-postgres-1`.
+If a workflow INSERTs or UPDATEs rows during the pg_dump window, the source row count captured
+pre-migration may not match the dump contents, causing false row-count mismatches or inconsistent
+data. Pausing all writer workflows eliminates this drift window entirely.
+
+### 9½a. Inventory of workflows writing to ADOPT tables
+
+Based on write activity analysis (F-023 shadow schema audit, pg_stat_user_tables) and F-023b
+workflow lineage, the following active workflows WRITE to ADOPT tables:
+
+| # | Workflow | ID | Trigger | Tables Written | Write Type |
+|---|----------|----|---------|---------------|------------|
+| 1 | GDA.cron.auto-risk-generation | ldVAxgDGuKJx4354 | cron | gda_risk_register | DDL+WRITE (UPSERT) |
+| 2 | GDA.cron.deadline-escalation | Qg55lRKjubgsvD28 | cron | gda_risk_register | WRITE+DDL (UPDATE) |
+| 3 | GDA.cron.pipeline-health-digest | 9annZcPoqw0DaPKI | cron | gda_risk_register | READ+WRITE |
+| 4 | GDA.cron.sam-sync | — | cron | gda_opportunity_tracker | INSERT+UPDATE (488i/1,314u) |
+| 5 | GDA.cron.fast-track-ingest | — | cron | ft_signal_source, ft_opportunity_signal | INSERT+UPDATE |
+| 6 | GDA.cron.data-sync | — | cron | daily_trends, gda_trend_arrays, gda_learned_weights | INSERT+UPDATE |
+| 7 | GDA.cron.auto-capture-plan | — | cron | gda_capture_plans | UPDATE |
+| 8 | GDA.cron.comp-intel 2 | — | cron | gda_competitor_cache, gda_competitor_watchlist | INSERT+UPDATE |
+| 9 | GDA.cron.auto-opp-analysis | — | cron | gda_intelligence_log, gda_action_items | INSERT+DELETE |
+| 10 | GDA.cron.change-detector | — | cron | gda_opportunity_alerts, opportunity_alerts | INSERT |
+| 11 | GDA.cron.health-scan-daily | — | cron | gda_error_log | INSERT |
+| 12 | GDA.api.intel-feed | — | cron | gda_dashboard_intel_cache, gda_morning_briefings | INSERT+DELETE |
+| 13 | GDA.cron.stage-auto-promote | — | cron | gda_opportunity_tracker | UPDATE |
+| 14 | (any webhook writing to ADOPT tables) | — | webhook | varies | varies |
+
+**Tables with zero write activity:** gda_relationships, gda_touchpoints, gda_saved_opportunities,
+govtribe_cache, gda_wargames, gda_contacts, gda_active_contracts, gda_win_loss, gda_win_loss_db,
+gda_teaming_partners, gda_embeddings. These are safe but we pause all writers as a precaution.
+
+### 9½b. Pause writer workflows before migration
+
+```bash
+# Pause all active cron workflows that write to ADOPT tables
+# Uses n8n REST API: PATCH /workflows/{id} with { "active": false }
+
+WRITER_WF_IDS="ldVAxgDGuKJx4354 Qg55lRKjubgsvD28 9annZcPoqw0DaPKI"
+# Add remaining IDs after verifying from pre-flight workflow scan
+
+echo "=== PAUSING WRITER WORKFLOWS ==="
+for wf_id in $WRITER_WF_IDS; do
+  echo "Pausing workflow $wf_id..."
+  curl -s -X PATCH "http://localhost:5678/api/v1/workflows/$wf_id" \
+    -H "X-N8N-API-KEY: $N8N_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"active": false}' | jq -r '.name + ": " + (.active|tostring)'
+done
+
+echo "=== WAITING 30s FOR IN-FLIGHT EXECUTIONS TO DRAIN ==="
+sleep 30
+
+echo "=== VERIFYING ALL WRITER WORKFLOWS ARE INACTIVE ==="
+for wf_id in $WRITER_WF_IDS; do
+  ACTIVE=$(curl -s "http://localhost:5678/api/v1/workflows/$wf_id" \
+    -H "X-N8N-API-KEY: $N8N_API_KEY" | jq -r '.active')
+  echo "$wf_id: active=$ACTIVE"
+  if [ "$ACTIVE" = "true" ]; then
+    echo "HALT: Workflow $wf_id did not deactivate"
+    exit 1
+  fi
+done
+```
+
+**Halt condition:** If any workflow fails to deactivate → STOP.
+
+### 9½c. Run migration (with writers paused)
+
+Execute the migration script (Section 10c for prod, Section 9b for staging).
+All pg_dump operations now capture consistent snapshots because no workflows
+are writing to the source tables.
+
+### 9½d. Unpause writer workflows after migration
+
+```bash
+echo "=== UNPAUSING WRITER WORKFLOWS ==="
+for wf_id in $WRITER_WF_IDS; do
+  echo "Unpausing workflow $wf_id..."
+  curl -s -X PATCH "http://localhost:5678/api/v1/workflows/$wf_id" \
+    -H "X-N8N-API-KEY: $N8N_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"active": true}' | jq -r '.name + ": " + (.active|tostring)'
+done
+```
+
+### 9½e. Verify unpaused workflows fire successfully
+
+```bash
+# Wait for the next scheduled execution of each unpaused workflow
+# Check execution log after the expected fire time
+
+echo "=== POST-UNPAUSE VERIFICATION ==="
+sleep 120  # Wait 2 minutes for next cron cycles
+
+for wf_id in $WRITER_WF_IDS; do
+  LAST=$(curl -s "http://localhost:5678/api/v1/executions?workflowId=$wf_id&limit=1" \
+    -H "X-N8N-API-KEY: $N8N_API_KEY" | jq -r '.data[0].status')
+  echo "$wf_id: last execution status=$LAST"
+done
+```
+
+**Missed executions during pause:** Cron workflows paused for ~5–10 minutes may miss one
+scheduled execution. This is recoverable — the next scheduled run catches up. A missed
+execution is far less risky than a row-count drift during migration. Log any missed
+executions in the migration report.
+
+### Staging note
+
+For staging rehearsal (Section 9), the cron pause is not strictly required because
+`n8n_staging` is a snapshot and no live workflows write to it. However, the pause/unpause
+procedure should be rehearsed once during staging (using staging workflow IDs if they exist,
+or simulated) to validate the API calls work before doing it in production.
 
 ---
 
 ## 10. Production Execution Procedure
 
-**Only after staging rehearsal passes twice and architect approves.**
+**Only after staging rehearsal passes all three runs (9b, 9f, 9g) and architect approves.**
 
 ### 10a. Backup
 
