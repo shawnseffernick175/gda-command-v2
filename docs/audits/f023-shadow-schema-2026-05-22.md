@@ -2,8 +2,8 @@
 
 **Date:** 2026-05-22
 **Author:** Devin (automated audit)
-**Status:** F-023b EXECUTED — 17 tables dropped, 1 adopted, risk_register collision resolved
-**Updated:** 2026-05-22 (F-023b — risk_register renamed to gda_risk_register, migration 059 generated)
+**Status:** F-023c COMPLETE — all 28 ADOPT tables have migrations (057–084)
+**Updated:** 2026-05-22 (F-023c — 25 ADOPT migration files generated, all 28 tables MIGRATION_PENDING)
 **Issue:** [#258](https://github.com/shawnseffernick175/gda-command-v2/issues/258)
 
 ---
@@ -83,32 +83,32 @@ All 81 shadow tables were created by n8n workflows using the "GDA Postgres" cred
 
 | # | Table | Cols | Rows | Size | Indexes | Workflows | Justification |
 |---|-------|------|------|------|---------|-----------|---------------|
-| 1 | `gda_opportunity_tracker` | 38 | 1,780 | 1,728 kB | 6 | 54 | Core pipeline table — most-referenced table in entire fleet |
-| 2 | `gda_capture_plans` | 13 | ~98 | 696 kB | 2 | 25 | Capture planning — second most-referenced table |
-| 3 | `gda_intelligence_log` | 7 | 54 | 136 kB | 4 | 14 | Intelligence feed log — 14 workflows write/read |
-| 4 | `gda_competitor_watchlist` | 37 | 4 | 184 kB | 4 | 9 | Competitor intelligence — 9 workflows, complex schema |
-| 5 | `gda_risk_register` | 25 | 464 | 488 kB | 8 | 8 | Risk management — 8 workflows, renamed from `risk_register` (F-023b). **MIGRATION_PENDING** → [059_n8n_gda_risk_register.sql](../../packages/backend/src/db/migrations/059_n8n_gda_risk_register.sql) |
-| 6 | `opportunity_alerts` | 25 | ~5 | 216 kB | 9 | 7 | Alert system — 7 workflows, heavily indexed |
-| 7 | `gda_competitor_cache` | 5 | 1 | 168 kB | 4 | 6 | Competitor data cache — 6 workflows |
-| 8 | `gda_action_items` | 7 | 47 | 584 kB | 4 | 5 | Action items — 5 workflows, actively written |
-| 9 | `gda_active_contracts` | 24 | 0 | 32 kB | 1 | 5 | Contract tracking — 5 workflows |
-| 10 | `gda_dashboard_intel_cache` | 3 | 1 | 200 kB | 1 | 5 | Dashboard cache — 5 workflows |
-| 11 | `daily_trends` | 10 | 528 | 200 kB | 4 | 4 | Trend analytics — 528 rows, 4 workflows |
-| 12 | `gda_opportunity_alerts` | 9 | ~7 | 112 kB | 4 | 4 | Opp alert system — 4 workflows |
-| 13 | `gda_morning_briefings` | 7 | 12 | 264 kB | 1 | 4 | Briefing system — 4 workflows, includes bot |
-| 14 | `gda_learned_weights` | 8 | 18 | 64 kB | 3 | 4 | ML weights — 4 workflows, actively updated |
-| 15 | `gda_win_loss` | 25 | ~7 | 64 kB | 1 | 4 | Win/loss analysis — 4 workflows |
-| 16 | `gda_error_log` | 7 | 334 | 88 kB | 1 | 3 | Error logging — 334 rows, 3 workflows |
-| 17 | `gda_saved_opportunities` | 20 | 0 | 40 kB | 1 | 3 | Saved opps — 3 workflows |
-| 18 | `gda_teaming_partners` | 23 | ~12 | 80 kB | 2 | 3 | Teaming tracker — 3 workflows |
-| 19 | `ft_opportunity_signal` | 24 | 232 | 256 kB | 6 | 2 | Fast-track pipeline — 232 signals, FK parent |
-| 20 | `ft_signal_source` | 9 | 10 | 48 kB | 2 | 2 | Fast-track sources — FK parent for ft_* tables |
-| 21 | `gda_embeddings` | 10 | ~821 | **14 MB** | 4 | 2 | Vector embeddings — largest table by size. pgvector v0.8.2 confirmed on `gda-postgres` |
-| 22 | `govtribe_cache` | — | 0 | — | — | 2 | GovTribe data cache — 2 workflows |
-| 23 | `gda_wargames` | — | 0 | — | — | 2 | Wargaming scenarios — 2 workflows |
-| 24 | `gda_win_loss_db` | — | 10 | — | — | 1 | Win/loss database — 1 workflow |
-| 25 | `gda_trend_arrays` | — | 15 | — | — | 1 | Trend arrays — 1 workflow, actively updated |
-| 26 | `gda_contacts` | 17 | 0 | 80 kB | — | 2 | **PROMOTED from DOCUMENT-ONLY** — PII columns (email, phone) require migration tracking |
+| 1 | `gda_opportunity_tracker` | 38 | 1,780 | 1,728 kB | 6 | 54 | Core pipeline table. **MIGRATION_PENDING** → [060](../../packages/backend/src/db/migrations/060_n8n_gda_opportunity_tracker.sql) |
+| 2 | `gda_capture_plans` | 13 | ~110 | 696 kB | 2 | 25 | Capture planning. **MIGRATION_PENDING** → [061](../../packages/backend/src/db/migrations/061_n8n_gda_capture_plans.sql) |
+| 3 | `gda_intelligence_log` | 7 | 54 | 136 kB | 4 | 14 | Intelligence feed log. **MIGRATION_PENDING** → [062](../../packages/backend/src/db/migrations/062_n8n_gda_intelligence_log.sql) |
+| 4 | `gda_competitor_watchlist` | 37 | 46 | 184 kB | 4 | 9 | Competitor intelligence. **MIGRATION_PENDING** → [063](../../packages/backend/src/db/migrations/063_n8n_gda_competitor_watchlist.sql) |
+| 5 | `gda_risk_register` | 25 | 464 | 488 kB | 8 | 8 | Risk management — renamed F-023b. **MIGRATION_PENDING** → [059](../../packages/backend/src/db/migrations/059_n8n_gda_risk_register.sql) |
+| 6 | `opportunity_alerts` | 25 | 2 | 216 kB | 9 | 7 | Alert system. **MIGRATION_PENDING** → [064](../../packages/backend/src/db/migrations/064_n8n_opportunity_alerts.sql) |
+| 7 | `gda_competitor_cache` | 5 | 1 | 168 kB | 4 | 6 | Competitor data cache. **MIGRATION_PENDING** → [065](../../packages/backend/src/db/migrations/065_n8n_gda_competitor_cache.sql) |
+| 8 | `gda_action_items` | 7 | 47 | 584 kB | 4 | 5 | Action items. **MIGRATION_PENDING** → [066](../../packages/backend/src/db/migrations/066_n8n_gda_action_items.sql) |
+| 9 | `gda_active_contracts` | 24 | 5 | 32 kB | 1 | 5 | Contract tracking. **MIGRATION_PENDING** → [067](../../packages/backend/src/db/migrations/067_n8n_gda_active_contracts.sql) |
+| 10 | `gda_dashboard_intel_cache` | 3 | 6 | 200 kB | 1 | 5 | Dashboard cache. **MIGRATION_PENDING** → [068](../../packages/backend/src/db/migrations/068_n8n_gda_dashboard_intel_cache.sql) |
+| 11 | `daily_trends` | 10 | 537 | 200 kB | 4 | 4 | Trend analytics. **MIGRATION_PENDING** → [069](../../packages/backend/src/db/migrations/069_n8n_daily_trends.sql) |
+| 12 | `gda_opportunity_alerts` | 9 | 7 | 112 kB | 4 | 4 | Opp alert system. **MIGRATION_PENDING** → [070](../../packages/backend/src/db/migrations/070_n8n_gda_opportunity_alerts.sql) |
+| 13 | `gda_morning_briefings` | 7 | 40 | 264 kB | 1 | 4 | Briefing system. **MIGRATION_PENDING** → [071](../../packages/backend/src/db/migrations/071_n8n_gda_morning_briefings.sql) |
+| 14 | `gda_learned_weights` | 8 | 18 | 64 kB | 3 | 4 | ML weights. **MIGRATION_PENDING** → [072](../../packages/backend/src/db/migrations/072_n8n_gda_learned_weights.sql) |
+| 15 | `gda_win_loss` | 25 | 6 | 64 kB | 1 | 4 | Win/loss analysis. **MIGRATION_PENDING** → [073](../../packages/backend/src/db/migrations/073_n8n_gda_win_loss.sql) |
+| 16 | `gda_error_log` | 7 | 334 | 88 kB | 1 | 3 | Error logging. **MIGRATION_PENDING** → [074](../../packages/backend/src/db/migrations/074_n8n_gda_error_log.sql) |
+| 17 | `gda_saved_opportunities` | 20 | 0 | 40 kB | 1 | 3 | Saved opps. **MIGRATION_PENDING** → [075](../../packages/backend/src/db/migrations/075_n8n_gda_saved_opportunities.sql) |
+| 18 | `gda_teaming_partners` | 23 | 12 | 80 kB | 2 | 3 | Teaming tracker. **MIGRATION_PENDING** → [076](../../packages/backend/src/db/migrations/076_n8n_gda_teaming_partners.sql) |
+| 19 | `ft_opportunity_signal` | 24 | 234 | 256 kB | 6 | 2 | Fast-track pipeline — FK child of ft_signal_source. **MIGRATION_PENDING** → [078](../../packages/backend/src/db/migrations/078_n8n_ft_opportunity_signal.sql) |
+| 20 | `ft_signal_source` | 9 | 10 | 48 kB | 2 | 2 | Fast-track sources — FK parent. **MIGRATION_PENDING** → [077](../../packages/backend/src/db/migrations/077_n8n_ft_signal_source.sql) |
+| 21 | `gda_embeddings` | 10 | 821 | **14 MB** | 4 | 2 | Vector embeddings — vector(1536), IVFFlat. **MIGRATION_PENDING** → [079](../../packages/backend/src/db/migrations/079_n8n_gda_embeddings.sql) |
+| 22 | `govtribe_cache` | 8 | 0 | — | 4 | 2 | GovTribe data cache. **MIGRATION_PENDING** → [080](../../packages/backend/src/db/migrations/080_n8n_govtribe_cache.sql) |
+| 23 | `gda_wargames` | 30 | 1 | — | 1 | 2 | Wargaming scenarios. **MIGRATION_PENDING** → [081](../../packages/backend/src/db/migrations/081_n8n_gda_wargames.sql) |
+| 24 | `gda_win_loss_db` | 17 | 10 | — | 1 | 1 | Win/loss database. **MIGRATION_PENDING** → [082](../../packages/backend/src/db/migrations/082_n8n_gda_win_loss_db.sql) |
+| 25 | `gda_trend_arrays` | 6 | 15 | — | 1 | 1 | Trend arrays. **MIGRATION_PENDING** → [083](../../packages/backend/src/db/migrations/083_n8n_gda_trend_arrays.sql) |
+| 26 | `gda_contacts` | 17 | 2 | 80 kB | 2 | 2 | PII (email, phone). **MIGRATION_PENDING** → [084](../../packages/backend/src/db/migrations/084_n8n_gda_contacts.sql) |
 | 27 | `gda_relationships` | 13 | 0 | 16 kB | — | 1 | **PROMOTED from DOCUMENT-ONLY** — PII columns (email, phone) require migration tracking. **MIGRATION_PENDING** → [057_n8n_gda_relationships.sql](../../packages/backend/src/db/migrations/057_n8n_gda_relationships.sql) |
 | 28 | `gda_touchpoints` | 7 | 0 | 8 kB | — | 1 | **PROMOTED from DEFERRED** (F-023a) — FK child of `gda_relationships`, companion table for relationship-tracker workflow. **MIGRATION_PENDING** → [058_n8n_gda_touchpoints.sql](../../packages/backend/src/db/migrations/058_n8n_gda_touchpoints.sql) |
 
@@ -344,15 +344,15 @@ Tables with recent write activity (inserts/updates/deletes > 0 since last Postgr
 - All 6 archived to `/tmp/f023-deferred-archive/` on VPS
 
 ### 3. ~~F-023b: Risk Register Collision~~ — RESOLVED
-- `risk_register` renamed to `gda_risk_register` in n8n DB (2026-05-22)
+- `risk_register` renamed to `gda_risk_register` in n8n DB (PR #287, 2026-05-22)
 - All 8 consuming workflows updated in-place
 - Migration 059 generated for F-026 Step 3 consolidation
 
-### 4. ADOPT bucket (28 tables) — F-026 Step 3 prerequisite
-- **3 of 28 already have migrations:** `gda_relationships` (057), `gda_touchpoints` (058), `gda_risk_register` (059)
-- Remaining 25 need migration files in `packages/backend/src/db/migrations/`
-- ~~Resolve the `risk_register` name collision first (F-023b, blocking)~~ DONE
-- `gda_embeddings` pgvector dependency: **pgvector v0.8.2 confirmed installed on `gda-postgres`**
+### 4. ~~ADOPT bucket (28 tables)~~ — ALL MIGRATIONS GENERATED (F-023c)
+- **28 of 28 have migrations:** 057–058 (F-023a), 059 (F-023b), 060–084 (F-023c)
+- `gda_embeddings` pgvector: `vector(1536)`, IVFFlat index (lists=27, cosine), `CREATE EXTENSION IF NOT EXISTS vector`
+- FK ordering: `ft_signal_source` (077) before `ft_opportunity_signal` (078)
+- Migrations are NOT run against production — F-026 Step 3 will execute them
 - After migrations are in place, F-026 Step 3 can `INSERT INTO ... SELECT FROM` across databases
 
 ### 5. DOCUMENT-ONLY bucket (36 tables) — Architect decision
