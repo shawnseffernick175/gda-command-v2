@@ -18,8 +18,8 @@ that exists on the n8n DB but NOT on gda_command will cause workflow failures po
 
 ### 0a. Table-Existence Matrix
 
-Analysis of SQL queries embedded in the 122 workflows identified **60 distinct tables**
-referenced. Cross-referencing against both databases:
+Analysis of SQL queries embedded in the 122 workflows identified **58 distinct tables**
+referenced. Cross-referencing against both databases (plus 2 GDA-only tables for completeness):
 
 | Table | n8n DB | gda_command | Category | Rows (n8n) | Impact |
 |-------|:------:|:-----------:|----------|------------|--------|
