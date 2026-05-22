@@ -57,7 +57,7 @@ SELECT sum(cnt) FROM (
 docker exec gda-postgres psql -U gda -d gda_command -t -c "
 SELECT count(*) FROM gda_touchpoints t
 LEFT JOIN gda_relationships r ON t.relationship_id = r.id
-WHERE r.id IS NULL;"
+WHERE r.id IS NULL AND t.relationship_id IS NOT NULL;"
 # Expect: 0
 
 # FK chain 2: ft_opportunity_signal → ft_signal_source
@@ -212,8 +212,7 @@ GDA.sched.idiq-to-monitor
 GDA.auto.feedback-collector, GDA.bot.telegram-chat,
 GDA.doctrine.pr-merge-draft, GDA.enrichment.capture-plan-cards,
 GDA.error.handler, GDA.event.bidirectional-sync,
-GDA.intel.an1-incumbent-win-themes, GDA.intel.morning-briefing-v1,
-GDA.research.deep-research, GDA.sched.opp-refresh
+GDA.intel.an1-incumbent-win-themes, GDA.intel.morning-briefing-v1
 
 > **Note:** GDA.cron.system-watchdog (LPUSYd4Vpph1Qg7n) uses HwronxMmGY5XDGEt for
 > its DB health-check queries. It will be affected by the cutover but is NOT paused —
