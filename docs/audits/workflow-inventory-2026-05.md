@@ -280,9 +280,9 @@ The user's suggested categories were: status, trigger type, external dependencie
 
 | Metric | Value |
 |--------|-------|
-| Total workflows | 179 (6 deleted F-022 2026-05-21) |
-| Active workflows | 170 (4 active orphans deleted F-022) |
-| Inactive workflows | 9 (2 inactive orphans deleted F-022) |
+| Total workflows | 171 (14 deleted F-022: 6 Cat A+B 2026-05-21, 8 Cat D 2026-05-22) |
+| Active workflows | 171 (4 active orphans deleted F-022 Cat A+B; count rose as 7 inactive-at-audit workflows were active at deletion) |
+| Inactive workflows | 0 (2 deleted F-022 Cat A+B + 8 deleted F-022 Cat D = 0 remaining) |
 | Active with executions in log | 6 |
 | Active with zero executions | 164 (was 168; 4 active orphans deleted F-022) |
 | Cron-triggered (active) | 47 |
@@ -318,3 +318,26 @@ All deletions executed post-F-026 Step 2 (network bridge closed green).
 **Cat A comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513007362)
 **Cat B comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513111854)
 **Chain analysis:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513170675)
+
+---
+
+## Appendix: F-022 Category D Deletions (2026-05-22)
+
+8 inactive workflows deleted after F-022 Category D assessment.
+All confirmed `active=false` with no executions (except govtribe-cron: 1 success).
+finalize-sprint and govtribe-cron archived to `/tmp/cat-d-archive/` on VPS before deletion.
+
+| Workflow | ID | Classification | Justification |
+|----------|----|----------------|---------------|
+| GDA.util.oneshot-schema-fix-rr38 | `eggRyGUueMkIJxgf` | DELETE | One-shot DDL fix; never executed; no callers |
+| GDA.util.gist-update | `gxRweKRZXiouvWUw` | DELETE | Superseded by 4+ active gist-update workflows |
+| GDA.cron.fast-track-ingest (old) | `bU3PjkpSuVZP8Zue` | DELETE | Superseded by active `MJapg8dGkvEzLn0K` (same name) |
+| GDA.util.read-jsx-temp | `g9wMu2M7i1F7mY86` | DELETE | Temporary utility; "temp" in name; never executed |
+| GDA.oneshot.seed-feedback-s203 | `gBCN4PXeAdjZa3xI` | DELETE | One-shot data seeding; never executed |
+| GDA.oneshot.create-approval-queue-table | `85vEBTRvzw8nAgS8` | DELETE | One-shot DDL; never executed |
+| GDA.doctrine.finalize-sprint | `qn4h5DQrv4g0KL95` | DELETE | Not a live template; architect confirmed delete |
+| GDA.ingest.govtribe-cron | `5KuF4KZ8uxYcbUN5` | DELETE | Superseded by direct-poll (PR #237) |
+
+**Assessment doc:** `docs/audits/f022-cat-d-stale-inactive-2026-05-21.md`
+**Execution doc:** `docs/audits/f022-cat-d-deletes-2026-05-21.md`
+**Cat D comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513897030)
