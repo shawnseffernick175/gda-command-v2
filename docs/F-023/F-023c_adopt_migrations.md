@@ -111,6 +111,33 @@ thumb: lists ≈ sqrt(rows)). As data grows past ~10K rows, consider rebuilding 
 
 ---
 
+## Schema-vs-Workflow Divergences
+
+11 of 25 tables have `CREATE TABLE IF NOT EXISTS` in at least one workflow. All divergences
+follow the same pattern: workflow creates a minimal 2–3 column table, then `ALTER TABLE ADD COLUMN`
+adds the rest. The live schema (used in migrations) is always the superset.
+
+| Table | Workflow | Live Cols | WF CREATE Cols | Divergence |
+|-------|----------|-----------|----------------|------------|
+| `gda_action_items` | GDA.api.daily-actions | 7 | 2 | WF defines `id, action_text`; live has 5 more (deadline, owner, status, source_meeting, created_at) |
+| `gda_competitor_watchlist` | GDA.api.competitor-watchlist | 37 | 3 | WF defines `id, name, size`; live has 34 more (added by enrichment workflows) |
+| `gda_contacts` | GDA.api.contacts | 17 | 16 | Live has `updated_at` not in WF CREATE |
+| `gda_dashboard_intel_cache` | GDA.api.daily-actions | 3 | 2 | **Notable**: WF defines `cache_key` column NOT in live; live has `data`, `created_at` instead |
+| `gda_saved_opportunities` | GDA.api.saved-opps | 20 | 18 | Live has `primary_fit`, `updated_at` not in WF CREATE |
+| `gda_teaming_partners` | GDA.api.teaming-scorer | 23 | 3 | WF defines `id, name, company`; live has 20 more |
+| `gda_teaming_partners` | GDA.api.teaming-finder | 23 | 2 | WF defines `id, name`; live has 21 more |
+| `gda_trend_arrays` | GDA.cron.daily-trends-collect | 6 | 1 | WF defines `metric_name` only; live has 5 more |
+| `opportunity_alerts` | GDA.sched.opp-refresh | 25 | 2 | WF defines `id, solicitation_number`; live has 23 more |
+
+**14 tables have NO `CREATE TABLE` in any workflow** — they were created manually or by
+workflows that have since been deleted.
+
+**All migrations use the live schema.** The `gda_dashboard_intel_cache` divergence (`cache_key`
+in workflow but not live) suggests the column was renamed or replaced at some point — the
+migration uses the live schema (`cache_type`, `data`, `created_at`).
+
+---
+
 ## F-026 Step 3 Readiness Summary
 
 | Requirement | Status |
