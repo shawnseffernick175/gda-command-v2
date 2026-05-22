@@ -280,7 +280,7 @@ Compare post-rollback state against pre-state snapshot saved in
 
 - Does **NOT** modify n8n's "Postgres account" credential (n8n→n8n-postgres path untouched)
 - Does **NOT** modify the "GDA Postgres" credential (that's Step 4)
-- Does **NOT** migrate any data (Step 3)
+- Does **NOT** migrate any data (Step 3 — **requires staging rehearsal via F-036 before prod execution**)
 - Does **NOT** change n8n's compose file
 - Does **NOT** change any workflow JSON
 - Does **NOT** expose `gda-postgres` port to the host (stays internal only)

@@ -87,6 +87,45 @@ jobs:
         working-directory: packages/backend
         run: npx vitest run --config vitest.migration.config.ts
 
+  migrations-staging:
+    name: Migration Smoke Test (Staging)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Set up SSH tunnel to staging
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_HOST" ]; then
+            echo "::error::ENVIRONMENTAL FAILURE: VPS_SSH_KEY or VPS_HOST secret not configured. This is an infrastructure issue, not a migration failure."
+            echo "staging_unreachable=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -f -N -L 15432:127.0.0.1:5433 -i ~/.ssh/vps_key -o StrictHostKeyChecking=no root@"$VPS_HOST"
+          sleep 2
+          echo "SSH tunnel established on port 15432"
+      - name: Run migrations against staging
+        if: env.staging_unreachable != 'true'
+        env:
+          DATABASE_URL: postgresql://gda_staging:staging_only_not_prod@localhost:15432/gda_command_staging
+        run: |
+          npx tsx packages/backend/src/db/migrate.ts
+          echo "All migrations passed against staging"
+      - name: Report staging unreachable
+        if: env.staging_unreachable == 'true'
+        run: |
+          echo "::warning::Staging DB unreachable (environmental). Skipping staging migration test. This does NOT indicate a migration problem."
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest

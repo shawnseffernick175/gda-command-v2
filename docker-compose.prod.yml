@@ -20,6 +20,30 @@ services:
       - gda
       - traefik
 
+  postgres-staging:
+    image: pgvector/pgvector:pg16
+    container_name: gda-postgres-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${STAGING_POSTGRES_USER:-gda_staging}
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:-staging_only_not_prod}
+      POSTGRES_DB: gda_command_staging
+    volumes:
+      - pgdata-staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${STAGING_POSTGRES_USER:-gda_staging}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    networks:
+      - gda
+      - traefik
+
   backend:
     build:
       context: .
@@ -95,5 +119,6 @@ networks:
 
 volumes:
   pgdata:
+  pgdata-staging:
   gda-backups:
   gda-uploads:
