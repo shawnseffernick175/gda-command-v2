@@ -111,15 +111,15 @@ docker exec n8n-app env | grep -i prune
 
 | Workflow | ID | Notes |
 |----------|----|-------|
-| GDA.auto.incumbent-enrichment | `oYwPpPdNCixRKItz` | |
-| GDA.batch.doc-ingest | `lcZkdOog2DOuMPgB` | Superseded by active version |
+| GDA.auto.incumbent-enrichment | `oYwPpPdNCixRKItz` | **DELETED 2026-05-21** (F-022 Cat A — never executed, manual trigger) |
+| GDA.batch.doc-ingest | `lcZkdOog2DOuMPgB` | **DELETED 2026-05-21** (F-022 Cat B — no caller found). Note: was inactive at audit time (May 20) but found active=true at deletion (May 21). Stats reflect state at deletion. |
 | GDA.cron.fast-track-ingest | `bU3PjkpSuVZP8Zue` | Old version; active version at `MJapg8dGkvEzLn0K` |
 | GDA.doctrine.finalize-sprint | `qn4h5DQrv4g0KL95` | |
 | GDA.ingest.govtribe-cron | `5KuF4KZ8uxYcbUN5` | Superseded by GDA backend MCP poll (PR #237) |
 | GDA.oneshot.create-approval-queue-table | `85vEBTRvzw8nAgS8` | One-shot migration |
 | GDA.oneshot.seed-feedback-s203 | `gBCN4PXeAdjZa3xI` | One-shot seed |
 | GDA.util.gist-update | `gxRweKRZXiouvWUw` | Duplicate |
-| GDA.util.gist-update | `3ewzE1DpagLYFiyf` | Duplicate |
+| GDA.util.gist-update | `3ewzE1DpagLYFiyf` | **DELETED 2026-05-21** (F-022 Cat B — inactive, active replacement t2209zk3c9x0OS9S) |
 | GDA.util.oneshot-schema-fix-rr38 | `eggRyGUueMkIJxgf` | One-shot fix |
 | GDA.util.read-jsx-temp | `g9wMu2M7i1F7mY86` | Temp utility |
 
@@ -280,19 +280,41 @@ The user's suggested categories were: status, trigger type, external dependencie
 
 | Metric | Value |
 |--------|-------|
-| Total workflows | 185 |
-| Active workflows | 174 |
-| Inactive workflows | 11 |
+| Total workflows | 179 (6 deleted F-022 2026-05-21) |
+| Active workflows | 170 (4 active orphans deleted F-022) |
+| Inactive workflows | 9 (2 inactive orphans deleted F-022) |
 | Active with executions in log | 6 |
-| Active with zero executions | 168 |
+| Active with zero executions | 164 (was 168; 4 active orphans deleted F-022) |
 | Cron-triggered (active) | 47 |
 | Cron with zero executions | 43 |
-| Webhook-triggered (active) | 124 |
+| Webhook-triggered (active) | 121 (was 124; 3 webhook orphans deleted F-022) |
 | Webhook with executions | 1 |
-| Other trigger (active) | 3 |
+| Other trigger (active) | 2 (was 3; 1 form-trigger orphan deleted F-022) |
 | Total executions in log | 222 |
 | Successful executions | 216 |
 | Error executions | 5 |
 | Pending executions | 1 |
 | Log retention window | ~7 days (2026-05-13 to 2026-05-20) |
 | Audit timestamp | 2026-05-20T20:00Z |
+
+---
+
+## Appendix: F-022 Workflow Deletions (2026-05-21)
+
+6 workflows deleted from n8n after F-022 Category A + Category B triage.
+All deletions executed post-F-026 Step 2 (network bridge closed green).
+
+| Workflow | ID | Category | Justification |
+|----------|----|----------|---------------|
+| GDA.form.white-glove-upload | `zyfMktOTcm57NbWy` | Cat A (DEAD) | Active but never executed, form trigger, created Apr 9. Path collision with white-glove-receiver. |
+| GDA.batch.white-glove-receiver | `uBjp6lDUmIB7qXBJ` | Cat B (ORPHAN) | Active webhook trigger, zero executions, no caller in repo/backend/VPS/CI. Path collision with white-glove-upload. |
+| GDA.batch.doc-ingest | `lcZkdOog2DOuMPgB` | Cat B (ORPHAN) | Active webhook trigger, zero executions, no caller found. Active replacement `GDA.api.doc-ingest` serves same function. |
+| GDA.auto.incumbent-enrichment | `oYwPpPdNCixRKItz` | Cat A (DEAD) | Inactive, manual trigger, never executed, created Apr 21. |
+| GDA.util.gist-update | `3ewzE1DpagLYFiyf` | Cat B (ORPHAN) | Inactive duplicate. Active replacement `t2209zk3c9x0OS9S` serves same webhook path. |
+| GDA.event.opp-cross-wire | `pkhbZBYzr6O93XAs` | Cat B (ORPHAN) | Active webhook, zero executions. Calls pwin-calculator (WIRED) but also calls non-existent `/webhook/gda-ooda-loop` (real path is `/webhook/gda-ooda`). Dead scaffolding. |
+
+**Grep pre-check:** "white-glove", "white-glove-upload", "/form/white-glove-upload" — only matches in `All Perplexity/` baseline snapshots (historical). No active code, docs, or external references.
+
+**Cat A comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513007362)
+**Cat B comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513111854)
+**Chain analysis:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513170675)
