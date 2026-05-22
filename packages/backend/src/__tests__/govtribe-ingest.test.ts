@@ -432,23 +432,17 @@ describe("USAspending keyword extraction", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Webhook registry entry
+// Webhook registry entry (govtribe-ingest removed in F-022 Cat E cleanup)
 // ---------------------------------------------------------------------------
-describe("Webhook registry — govtribe-ingest entry", () => {
-  it("includes govtribe-ingest webhook in registry", async () => {
+describe("Webhook registry — govtribe entry removed", () => {
+  it("does not include removed govtribe-ingest webhook", async () => {
     const { WEBHOOK_REGISTRY } = await import("../lib/webhook-registry");
-    const entry = WEBHOOK_REGISTRY["govtribe-ingest"];
-    expect(entry).toBeDefined();
-    expect(entry.path).toBe("govtribe-ingest");
-    expect(entry.status).toBe("live");
-    expect(entry.n8nWorkflow).toBe("GDA.ingest.govtribe-cron");
-    expect(entry.usedBy).toBe("ingest.ts");
+    expect(WEBHOOK_REGISTRY["govtribe-ingest"]).toBeUndefined();
   });
 
-  it("registry summary includes govtribe-ingest in live count", async () => {
+  it("registry summary still has entries", async () => {
     const { getRegistrySummary } = await import("../lib/webhook-registry");
     const summary = getRegistrySummary();
-    expect(summary.live).toBeGreaterThan(0);
     expect(summary.total).toBeGreaterThan(0);
   });
 });
@@ -582,11 +576,9 @@ describe("GovTribe direct poll — search config", () => {
     }
   });
 
-  it("webhook registry reflects cron workflow name", async () => {
+  it("webhook registry no longer includes removed govtribe-ingest", async () => {
     const { WEBHOOK_REGISTRY } = await import("../lib/webhook-registry");
-    const entry = WEBHOOK_REGISTRY["govtribe-ingest"];
-    expect(entry.n8nWorkflow).toBe("GDA.ingest.govtribe-cron");
-    expect(entry.description).toContain("direct poll");
+    expect(WEBHOOK_REGISTRY["govtribe-ingest"]).toBeUndefined();
   });
 });
 

@@ -280,9 +280,9 @@ The user's suggested categories were: status, trigger type, external dependencie
 
 | Metric | Value |
 |--------|-------|
-| Total workflows | 171 (14 deleted F-022: 6 Cat A+B 2026-05-21, 8 Cat D 2026-05-22) |
-| Active workflows | 171 (4 active orphans deleted F-022 Cat A+B; count rose as 7 inactive-at-audit workflows were active at deletion) |
-| Inactive workflows | 0 (2 deleted F-022 Cat A+B + 8 deleted F-022 Cat D = 0 remaining) |
+| Total workflows | 158 (27 deleted F-022: 6 Cat A+B, 8 Cat D, 13 Cat E) |
+| Active workflows | 158 |
+| Inactive workflows | 0 |
 | Active with executions in log | 6 |
 | Active with zero executions | 164 (was 168; 4 active orphans deleted F-022) |
 | Cron-triggered (active) | 47 |
@@ -341,3 +341,32 @@ finalize-sprint and govtribe-cron archived to `/tmp/cat-d-archive/` on VPS befor
 **Assessment doc:** `docs/audits/f022-cat-d-stale-inactive-2026-05-21.md`
 **Execution doc:** `docs/audits/f022-cat-d-deletes-2026-05-21.md`
 **Cat D comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513897030)
+
+---
+
+## Appendix: F-022 Category E Deletions (2026-05-22)
+
+13 active manual/webhook-only utility workflows deleted after F-022 Category E assessment.
+All confirmed `active=true` with 0 executions and no callers at time of deletion.
+All 13 archived to `/tmp/cat-e-archive/` on VPS before deletion.
+Backend registry entries for `govtribe-ingest` and `gda-smart-recommender` removed.
+
+| Workflow | ID | Classification | Justification |
+|----------|----|----------------|---------------|
+| GDA.oneshot.embed-capture-plans | `alHJibzND41T6p93` | DELETE | Oneshot prefix, 0 execs |
+| GDA.oneshot.write-jsx-s202 | `V665zkbwqxWuvAFJ` | DELETE | Oneshot prefix, sprint-specific |
+| GDA.ingest.govtribe-zapier | `nV36K8LgL31nY37b` | DELETE | Superseded by direct-poll (PR #237) |
+| GDA.api.intelligence-dashboard | `vZE5yJhvMvhQUsXx` | INVESTIGATE→DELETE | No code ref, 4 nodes, 0 execs |
+| GDA.api.target-agencies 2 | `43YhEBU38pKBrqcv` | INVESTIGATE→DELETE | No code ref, 4 nodes, 0 execs |
+| GDA.api.landing-brief | `o1XU0vwmF1zBSG4S` | INVESTIGATE→DELETE | No code ref, 6 nodes, 0 execs |
+| GDA.api.scan-history | `qyOybkM9DIHWoLKy` | INVESTIGATE→DELETE | No code ref, 4 nodes, 0 execs |
+| GDA.cron.forecast-ingest | `jC1lR5zpO7IaZqKa` | INVESTIGATE→DELETE | Named cron but webhook-only, 0 execs |
+| GDA.api.chart-generator | `1NQhq7rU89m23Zop` | INVESTIGATE→DELETE | No code ref, 4 nodes, 0 execs |
+| GDA.batch.bulk-data-ingest | `MSwEgLTafx9ASXyJ` | INVESTIGATE→DELETE | Batch tool, 6 nodes, 0 execs |
+| GDA.api.smart-recommender | `MP4p5WX1GRhWNFyv` | INVESTIGATE→DELETE | Registry path mismatch, already 404ing, 0 execs |
+| GDA.api.priority-score-engine | `nLWF3YyCQEnNWo6K` | INVESTIGATE→DELETE | No code ref, 8 nodes, 0 execs |
+| GDA.auto.stage-audit-logger | `6iVNBdDAmzxX2Hc1` | INVESTIGATE→DELETE | No code ref, 4 nodes, 0 execs |
+
+**Assessment doc:** `docs/audits/f022-cat-e-utility-2026-05-21.md`
+**Execution doc:** `docs/audits/f022-cat-e-deletes-2026-05-21.md`
+**Cat E comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257)
