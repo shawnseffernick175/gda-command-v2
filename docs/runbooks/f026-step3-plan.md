@@ -329,9 +329,13 @@ This is the same pattern used for F-036 staging population, which was tested end
    PK conflicts when Step 4 repoints workflows and they start INSERTing new rows:
    ```sql
    -- For each table with a SERIAL/IDENTITY PK (all 27 except gda_trend_arrays which uses VARCHAR PK):
+   -- Uses 3-argument setval: setval(seq, val, is_called)
+   -- When table is empty (MAX(id) IS NULL), sets to 1 with is_called=false so nextval() returns 1.
+   -- When table has data, sets to MAX(id) with is_called=true so nextval() returns MAX(id)+1.
    SELECT setval(
      pg_get_serial_sequence('<table>', 'id'),
-     COALESCE((SELECT MAX(id) FROM <table>), 0)
+     COALESCE((SELECT MAX(id) FROM <table>), 1),
+     (SELECT MAX(id) FROM <table>) IS NOT NULL
    );
    ```
    `gda_trend_arrays` uses `metric_name VARCHAR` as its PK (natural key, no sequence) — skipped.
