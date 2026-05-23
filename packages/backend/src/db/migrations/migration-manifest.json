@@ -116,5 +116,11 @@
   "111_step3b_gda_ndaa_intel.sql": "9522c99e1b32af4359151c053efcd31234e236f22944ba778defea635c5d159a",
   "112_step3b_gda_ooda_loops.sql": "03b5368789bbd24bedbb8c09fed13825fb7507c1054c2ecc1aa5891872e63628",
   "113_step3b_gda_prompt_architect_memory.sql": "63f8fd24aa44142c953478edac09e475fe19f0896ccc0f60273a8daf15efc801",
-  "114_step3b_gda_pwin_scores.sql": "5834850f4590f93b601883e6c548c41bfed7827532a19c3a519707b869a6e89d"
+  "114_step3b_gda_pwin_scores.sql": "5834850f4590f93b601883e6c548c41bfed7827532a19c3a519707b869a6e89d",
+  "115_step4b_gda_pattern_library.sql": "f8c291d8469b14b16d5f372bc9bbc3c5c1bdcc6d075d898437e64c9ec6511178",
+  "116_step4b_gda_stage_audit.sql": "bbb72014e710982de02bb1c21e213ea23218ae2f9d041dff7be29c85792c6f67",
+  "117_step4b_gda_content_store.sql": "8d2f158f4b2a4d3a5a3f21b435cb4ed22778c006a6fe905abeded3aa0945b207",
+  "118_step4b_gda_data_lake.sql": "d06dfc71e5e9d2e093b1bbbc1d425b6817f1aaba4fac6d04a8bd61edca6d345d",
+  "119_step4b_gda_decision_memory.sql": "e78ec234b4dd74f05d1cfd97e6bcb91d8388d8ce6dda1effd0b32369d460ecb5",
+  "120_step4b_gda_interaction_log.sql": "a7ead9572add590baa4f0784d5eea7aa4ddacc7db013879ac3a24441a55d3dc3"
 }
