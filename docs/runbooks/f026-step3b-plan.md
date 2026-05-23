@@ -641,7 +641,7 @@ Use when: schema apply itself caused issues, or a clean revert to pre-Step-3b st
 is required.
 
 ```bash
-# a. Truncate all 30 tables
+# a. Drop all 30 tables (removes schema + data)
 for TABLE in gda_action_history gda_ai_feedback gda_aop_tracker gda_approval_queue \
   gda_capture_lessons gda_chat_history gda_clause_library gda_competitor_crawls \
   gda_compliance_matrices gda_contract_vehicles gda_daily_briefings gda_daily_briefs \
