@@ -215,11 +215,17 @@ Each table is its own transaction. A failure rolls back only that table.
 
 After data copy, for each of the 28 SERIAL-PK tables:
 ```sql
-SELECT setval('<table>_id_seq', GREATEST(COALESCE(MAX(id), 0), 1)) FROM <table>;
+SELECT setval(
+  '<table>_id_seq',
+  GREATEST(COALESCE((SELECT MAX(id) FROM <table>), 1), 1),
+  (SELECT MAX(id) FROM <table>) IS NOT NULL AND (SELECT MAX(id) FROM <table>) >= 1
+);
 ```
 
-The `GREATEST(..., 1)` clamp handles the `id=0` edge case discovered in Step 3
-(gda_competitor_cache). Applied to all SERIAL tables.
+The 3-argument `setval` matches the Step 3 script pattern:
+- For tables with data: `is_called = true` → next INSERT gets MAX(id)+1
+- For empty tables: `is_called = false` → next INSERT gets 1 (not 2)
+- The `GREATEST(..., 1)` clamp handles the `id=0` edge case discovered in Step 3
 
 `gda_approval_queue` (UUID PK) and `gda_mega_cache` (manual integer PK) are skipped
 for sequence sync.
