@@ -83,7 +83,7 @@ Before execution, verify each of the following. HALT on any failure.
 | 28 | gda_ooda_loops | 9 | 3 | 216 kB | SERIAL | 3 | — | — | 4 | — |
 | 29 | gda_prompt_architect_memory | 4 | 0 | 16 kB | SERIAL | 1 | — | — | 1 | — |
 | 30 | gda_pwin_scores | 13 | 12 | 104 kB | SERIAL | 3 | — | — | 3 | — |
-| | **TOTAL** | | **993** | **~3.2 MB** | | **51** | **8** | **5** | **33** | **7** |
+| | **TOTAL** | | **1,024** | **~3.2 MB** | | **50** | **8** | **5** | **33** | **7** |
 
 > **Row count note:** These counts are from the live n8n DB as of 2026-05-23.
 > The PR #298 snapshot showed ~81 rows because it used a point-in-time estimate.
@@ -650,7 +650,7 @@ writer lists. The rest of the 40 are independent.
 
 ### 12c. Row count growth since PR #298
 
-The PR #298 Section 0a matrix estimated ~81 total rows. Current live count is ~993 rows
+The PR #298 Section 0a matrix estimated ~81 total rows. Current live count is ~1,024 rows
 (workflows continued writing). Notable growth:
 - gda_e2e_reports: 27 → 268
 - gda_learning_log: 0 → 331
