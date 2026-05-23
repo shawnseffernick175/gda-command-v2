@@ -79,7 +79,7 @@ All 158 active+inactive workflows scanned for references to the 6 orphan table n
   "type": "httpHeaderAuth",
   "data": {
     "name": "x-gda-key",
-    "value": "gda-webhook-secret-2026"
+    "value": "<REDACTED>"
   },
   "createdAt": "2026-05-13T15:40:40.491Z",
   "updatedAt": "2026-05-17T23:28:06.912Z"
