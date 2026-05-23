@@ -22,7 +22,7 @@ Step 4b migrates all 6 tables to gda_command, closing the gap before Phase 5a re
 |----|-------|---------|
 | PR 1 (this) | Plan document | Architect-read artifact |
 | PR 2 | Migration script + staging rehearsal | 3-pass rehearsal proof (copy, truncate+recopy, idempotency) |
-| PR 3 | Schema apply to prod gda_command | 6 CREATE TABLE migrations applied via psql |
+| PR 3 | Schema apply to prod gda_command | 6 CREATE TABLE migrations (115-120) applied via psql |
 | PR 4 | Production data migration | pg_dump export → psql import, parity verification |
 
 ### Pause window estimate
@@ -403,33 +403,55 @@ n8n-envision-postgres-1 is **NEVER modified** during Step 4b. All operations are
 
 | Gate | Requirement |
 |------|------------|
-| PR 2 → PR 3 | Staging rehearsal passes: full export+import dry run, row count parity on all 6 tables, sequence sync verified |
+| PR 2 → PR 3 | Staging rehearsal passes: full export+import dry run, row count parity on all 6 tables, sequence sync verified, gda_decision_memory FK orphan check = 0 rows, GDA.auto.learning-capture end-to-end trigger confirms backend proxy hits gda_command |
 | PR 3 → PR 4 | CI Migration Smoke Test green, 6 empty tables confirmed on prod gda_command |
 | PR 4 execution | PR 3 schema live on prod AND writers paused AND pre-import row count snapshot captured |
 | PR 4 → complete | All 6 tables: source/dest row count parity, sequences synced, FK constraint on gda_decision_memory valid, canary still green, backend still 200 |
 
 ---
 
-## 10. Open Questions for Architect
+## 10. Open Questions — RESOLVED
+
+All open questions resolved by architect review on 2026-05-23.
 
 ### Q1: gda_decision_memory FK enforcement
 
-`gda_decision_memory.opportunity_id` has a FK to `gda_opportunity_tracker(id)` on the n8n source. Should the migration CREATE TABLE include this FK on gda_command?
+**RESOLVED — YES, include the FK.**
 
-**Arguments for:** Data integrity, matches source schema exactly.  
-**Arguments against:** If opportunity_tracker rows were pruned by retention cron (Step 3 showed −110 delta), orphaned FK values could block import.
+Architect verified against live gda_command at 2026-05-23 1:37 PM EST:
+- Both source rows have `opportunity_id=1150`
+- `gda_opportunity_tracker.id=1150` exists on gda_command
+- Orphan check returns 0 rows
+- FK constraint will be satisfied on import
 
-**Recommendation:** Include the FK in the CREATE TABLE, but verify during staging rehearsal that all `opportunity_id` values in the 2 rows exist in `gda_opportunity_tracker` on gda_command. If any are orphaned, surface before PR 4.
+Include `FOREIGN KEY (opportunity_id) REFERENCES gda_opportunity_tracker(id)` in migration 119. Re-run the orphan check during PR 2 staging rehearsal as belt-and-suspenders (must still return 0 rows pre-import).
 
 ### Q2: Migration numbering
 
-Step 3b used migrations 085-114. What range should Step 4b use? Recommend 115-120 (6 migrations, one per table) to continue the sequence. Confirm with architect.
+**RESOLVED — USE 115-120.**
+
+One migration file per table, continuing Step 3b's 085-114 sequence:
+
+| Migration | File |
+|-----------|------|
+| 115 | `115_create_gda_pattern_library.sql` |
+| 116 | `116_create_gda_stage_audit.sql` |
+| 117 | `117_create_gda_content_store.sql` |
+| 118 | `118_create_gda_data_lake.sql` |
+| 119 | `119_create_gda_decision_memory.sql` (includes FK to gda_opportunity_tracker) |
+| 120 | `120_create_gda_interaction_log.sql` |
 
 ### Q3: Backend proxy SQL execution path
 
-The 4 webhook-auth workflows (learning-capture, pattern-extractor, competitor-auto-enrichment) build SQL via Code nodes and send it through the backend proxy. Is the backend proxy's DB connection definitely gda-postgres/gda_command post-rebuild? If it still routes some queries to n8n DB, the migration may not fully resolve these workflows.
+**RESOLVED — gda_command CONFIRMED, but require end-to-end proof in PR 2 rehearsal.**
 
-**Recommendation:** Verify during PR 2 staging rehearsal by triggering one of these workflows and confirming the SQL executes against gda_command.
+Backend was rebuilt at 12:02:18 EST 2026-05-23 on post-PR#288 image. Direct DB queries against gda_command via gda-postgres credential succeed (architect verified `gda_opportunity_tracker.id=1150` lookup). Canary at 12:00:57 EST passed.
+
+PR 2 staging rehearsal must:
+1. Trigger `GDA.auto.learning-capture` end-to-end (Rvs15RThVvlj3nVz — covers 4 of 6 orphan tables in one fire)
+2. Capture backend log line showing the SQL connection string / DB name
+3. Confirm: hit gda_command (not n8n DB)
+4. If proxy routes anywhere else → HALT
 
 ---
 
