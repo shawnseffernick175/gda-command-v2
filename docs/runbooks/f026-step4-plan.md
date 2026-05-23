@@ -145,6 +145,135 @@ pattern from Step 3 applies.
 approves Option 1, a new sub-step (Step 3b: migrate the 30 additional tables) must be
 completed first.
 
+### 0g. Extraction methodology attestation
+
+**Method:** Two-pass automated extraction from all 122 workflows using HwronxMmGY5XDGEt.
+
+**Pass 1 — Static regex extraction:**
+Regex `\b(gda_[a-z_]+|ft_[a-z_]+|daily_trends|opportunity_alerts|govtribe_cache|doctrine_drafts|doctrine_publish_runs)\b`
+applied to all `parameters` JSON of every node in every workflow that uses credential
+HwronxMmGY5XDGEt. This covers:
+- `executeQuery` operation SQL strings
+- `insert`/`update`/`delete` operation table name fields
+- Any string parameter referencing a table name
+
+**Pass 2 — Dynamic SQL audit (digit-aware regex + Code/Expression node scan):**
+Enhanced regex `\b(gda_[a-z0-9_]+|ft_[a-z0-9_]+|...)\b` to catch table names containing
+digits (e.g., `gda_e2e_reports`). Additionally scanned:
+- **Code nodes** (`n8n-nodes-base.code`): 16 workflows contain JavaScript Code nodes.
+  All use string template literals or concatenation to build SQL, but table names are
+  always **static string literals** — no variable-based table dispatch found.
+- **Expression nodes** (`{{ }}`): n8n expressions interpolate data values (WHERE clauses,
+  INSERT values), never table names. Table names in expression-based SQL are always literal.
+- **JSONB path queries:** No workflow uses JSONB path expressions that act as table dispatch.
+
+**Cross-reference:** All 98 detected strings were compared against `pg_tables` on both
+`n8n-envision-postgres-1/n8n` (156 tables) and `gda-postgres/gda_command` (114 tables).
+
+**Results:**
+- 60 strings match real tables (28 BOTH + 30 N8N-ONLY + 2 GDA-ONLY)
+- 38 strings are false positives:
+  - Column aliases: `gda_score`, `gda_label`, `gda_position` (columns on `gda_opportunity_tracker`)
+  - JavaScript variables: `GDA_CAPS`, `GDA_NAICS`, `GDA_SCOPE` (constants in Code nodes)
+  - JSON field names: `gda_impact`, `gda_relevance`, `gda_threat_summary` (LLM prompt keys)
+  - Subquery aliases: `ft_signals` (AS alias in a subquery)
+  - Non-existent table references: `gda_bd_activities`, `gda_nightly_intel`, `gda_scanner_log`,
+    `gda_proactive_scans`, `gda_win_rate_digests` (workflows use `CREATE TABLE IF NOT EXISTS`
+    to auto-create these at runtime — they'll self-create on whichever DB the credential points to)
+
+**Dynamic SQL coverage attestation:** Dynamic table name construction (string concatenation
+of table names, code-generated table dispatch, eval-based SQL) was NOT found in any of the
+122 workflows. All SQL references use static table name literals.
+
+**58 workflow-referenced tables is confirmed final.** 60 total in the matrix includes 2
+GDA-only tables added for completeness that are not referenced by any workflow.
+
+### 0h. F-023 re-validation
+
+The F-023 inventory classified 36 tables as DOCUMENT-ONLY (the "KEEP" set). Since the
+original KEEP classification turned out to be wrong for 30 of those tables (they ARE
+referenced by workflows and WILL break after cutover), this section re-validates every
+KEEP table against the comprehensive workflow SQL extraction.
+
+**Re-validation method:** Cross-reference each DOCUMENT-ONLY table from
+`docs/audits/f023-shadow-schema-2026-05-22.md` against the Pass 2 extraction results.
+A table "joins ADOPT" if any active workflow's SQL references it.
+
+| # | Table | Workflow SQL refs | Re-validation result |
+|---|-------|:-----------------:|---------------------|
+| 1 | gda_action_history | 7 | **→ ADOPT** (referenced) |
+| 2 | gda_ai_feedback | 4 | **→ ADOPT** (referenced) |
+| 3 | gda_aop_tracker | 6 | **→ ADOPT** (referenced) |
+| 4 | gda_approval_queue | 5 | **→ ADOPT** (referenced) |
+| 5 | gda_capture_lessons | 2 | **→ ADOPT** (referenced) |
+| 6 | gda_chat_history | 4 | **→ ADOPT** (referenced) |
+| 7 | gda_clause_library | 4 | **→ ADOPT** (referenced) |
+| 8 | gda_competitor_crawls | 3 | **→ ADOPT** (referenced) |
+| 9 | gda_compliance_matrices | 3 | **→ ADOPT** (referenced) |
+| 10 | gda_content_store | 0 | Stays DOCUMENT-ONLY ✓ |
+| 11 | gda_contract_vehicles | 12 | **→ ADOPT** (referenced) |
+| 12 | gda_daily_briefings | 2 | **→ ADOPT** (referenced) |
+| 13 | gda_daily_briefs | 3 | **→ ADOPT** (referenced) |
+| 14 | gda_data_lake | 0 | Stays DOCUMENT-ONLY ✓ |
+| 15 | gda_decision_memory | 0 | Stays DOCUMENT-ONLY ✓ |
+| 16 | gda_deep_research | 4 | **→ ADOPT** (referenced) |
+| 17 | gda_dept_market | 3 | **→ ADOPT** (referenced) |
+| 18 | gda_discussions | 7 | **→ ADOPT** (referenced) |
+| 19 | gda_doc_inbox | 5 | **→ ADOPT** (referenced) |
+| 20 | gda_e2e_reports | 5 | **→ ADOPT** (referenced) |
+| 21 | gda_feedback | 11 | **→ ADOPT** (referenced) |
+| 22 | gda_health_scans | 5 | **→ ADOPT** (referenced) |
+| 23 | gda_idiq_tracker | 7 | **→ ADOPT** (referenced) |
+| 24 | gda_incumbent_analysis | 2 | **→ ADOPT** (referenced) |
+| 25 | gda_interaction_log | 0 | Stays DOCUMENT-ONLY ✓ |
+| 26 | gda_knowledge_base | 1 | **→ ADOPT** (referenced) |
+| 27 | gda_learning_log | 3 | **→ ADOPT** (referenced) |
+| 28 | gda_meeting_notes | 1 | **→ ADOPT** (referenced) |
+| 29 | gda_mega_cache | 4 | **→ ADOPT** (referenced) |
+| 30 | gda_naics_tracking | 5 | **→ ADOPT** (referenced) |
+| 31 | gda_ndaa_intel | 3 | **→ ADOPT** (referenced) |
+| 32 | gda_ooda_loops | 5 | **→ ADOPT** (referenced) |
+| 33 | gda_pattern_library | 0 | Stays DOCUMENT-ONLY ✓ |
+| 34 | gda_prompt_architect_memory | 2 | **→ ADOPT** (referenced) |
+| 35 | gda_pwin_scores | 6 | **→ ADOPT** (referenced) |
+| 36 | gda_stage_audit | 0 | Stays DOCUMENT-ONLY ✓ |
+
+**Summary:**
+- **30 tables → ADOPT** (all 30 match the N8N-ONLY list from Section 0a exactly)
+- **6 tables remain DOCUMENT-ONLY** (no workflow SQL references):
+  `gda_content_store`, `gda_data_lake`, `gda_decision_memory`, `gda_interaction_log`,
+  `gda_pattern_library`, `gda_stage_audit`
+- **0 new tables discovered** — the 30-table count is stable
+
+> **Note on gda_stage_audit:** F-023 lists 2 workflow references
+> (`GDA.event.bidirectional-sync`, `GDA.cron.amendment-monitor`), but the comprehensive
+> SQL extraction found these workflows reference `gda_stage_audit_log` (a table that
+> does not exist on either DB), not `gda_stage_audit`. The F-023 workflow count was based
+> on the workflow's credential usage, not its SQL content. The actual table `gda_stage_audit`
+> has no SQL references and will not break after cutover.
+
+### 0i. Step 3b — discrete migration event (architect-mandated)
+
+**ARCHITECT DECISION (2026-05-23):** Option 1 approved — expand ADOPT scope.
+
+The 30-table migration runs as **Step 3b**, a discrete gated sequence with the same 4-PR
+pattern as Step 3:
+
+| PR | Title | Content |
+|----|-------|---------|
+| Step 3b PR 1 | Plan | Mirrors Step 3 PR 1 structure — preconditions, scope (30 tables), approach, constraint checks, halt conditions |
+| Step 3b PR 2 | Script + staging 3-pass rehearsal | Same pass pattern: fresh → truncate+rerun → idempotency proof |
+| Step 3b PR 3 | Schema apply | CREATE TABLE migrations for 30 tables on prod gda_command |
+| Step 3b PR 4 | Production data execution | Writer pause window, backup, pg_dump/pg_restore, verification, canary check |
+
+**Sequencing:**
+- Step 3b PR 1 opens after PR #298 merges
+- Step 4 PR 2 (script + rehearsal) does NOT open until Step 3b PR 4 merges
+- Post-Step 3b: ALL 58 workflow-referenced tables exist on gda_command
+
+**Data scope:** ~81 rows across 8 non-empty tables (22 of 30 are completely empty).
+Same pg_dump/pg_restore pattern as Step 3.
+
 ---
 
 ## 1. Preconditions
@@ -913,13 +1042,11 @@ Do NOT include the password value in any committed file or PR description. Refer
 "gda password from compose env" only. If the password cannot be retrieved, that is a
 HALT condition (Section 1e).
 
-### 12c. Non-ADOPT table existence — ELEVATED to Section 0
+### 12c. Non-ADOPT table existence — ELEVATED to Section 0, RESOLVED: Option 1
 
-See Section 0. **30 tables exist on n8n DB only.** This is a blocking issue that must be
-resolved before Step 4 execution. The original Section 4d assumption ("the 86 application
-tables live on gda-postgres") was partially wrong — the 122 workflows currently query the
-n8n DB for everything, including these 30 non-ADOPT shadow tables that have no counterpart
-on gda_command.
+See Section 0. **30 tables exist on n8n DB only.** Architect decision (2026-05-23): Option 1
+approved — expand ADOPT scope. Step 3b (discrete 4-PR sequence) migrates the 30 tables before
+Step 4 PR 2 opens. See Section 0i for the sequencing plan.
 
 ### 12d. system-watchdog as live canary — RESOLVED: keep running + manual trigger
 

@@ -42,3 +42,12 @@ No inventory row resolved to more than one workflow ambiguously:
 - intel-feed: KIT8cj4V2cMFdSkA is the primary writer. Other related workflows (dashboard-intel 2, sub.dashboard-intel-deep) are downstream consumers, not direct table writers.
 
 **Conclusion:** No halt conditions triggered. 17 writer workflows identified.
+
+## Dormant Feature Observation
+
+> **Note (2026-05-23):** F-026 Step 4 Section 0 analysis revealed that 30 KEEP-shadow tables
+> (originally classified DOCUMENT-ONLY in F-023) are referenced by the 122 HwronxMmGY5XDGEt
+> workflows. Of these 30, 22 are completely empty and the remaining 8 contain only 81 rows
+> total. This pattern suggests "code without data" — workflows writing to tables nobody reads,
+> or features built but never adopted. Revisit during Phase 1.5 UI/feature audit to determine
+> which are dormant features vs dead code.
