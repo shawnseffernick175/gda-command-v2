@@ -121,7 +121,7 @@ Both source rows have `opportunity_id=1150`, which exists in `gda_opportunity_tr
 ### Backend environment variable
 
 ```
-DATABASE_URL=postgresql://gda:26f57dd6109eb0fd55e2464f6850fa6f@postgres:5432/gda_command
+DATABASE_URL=postgresql://gda:<REDACTED>@postgres:5432/gda_command
 ```
 
 Backend is configured to connect to `postgres:5432/gda_command` (Docker DNS resolves `postgres` to the `gda-postgres` container).

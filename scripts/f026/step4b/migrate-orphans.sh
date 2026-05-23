@@ -108,7 +108,7 @@ n8n_api() {
         -H "Content-Type: application/json" \
         -d "$DATA" 2>/dev/null
     else
-      curl -s --fail-with-body -b /tmp/n8n_staging_cookies \
+      curl -s --fail-with-body -b /tmp/n8n_staging_cookies -X "$METHOD" \
         "http://localhost:${N8N_PORT}/rest${ENDPOINT}" 2>/dev/null
     fi
   else
@@ -120,7 +120,7 @@ n8n_api() {
         -d "$DATA" \
         "http://localhost:${N8N_PORT}/api/v1${ENDPOINT}" 2>/dev/null
     else
-      curl -s --fail-with-body \
+      curl -s --fail-with-body -X "$METHOD" \
         -H "accept: application/json" \
         -H "X-N8N-API-KEY: $N8N_API_KEY" \
         "http://localhost:${N8N_PORT}/api/v1${ENDPOINT}" 2>/dev/null
