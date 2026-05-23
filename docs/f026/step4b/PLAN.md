@@ -4,7 +4,7 @@
 **Prerequisite:** Step 4 CLOSED (PR #304, commit d1c56f9, 2026-05-23 12:24 PM EST)  
 **Motivation:** Phase 5a prerequisite per PR #305 (Step 5 master plan)  
 **Plan author:** Devin  
-**Date:** 2026-05-19  
+**Date:** 2026-05-23  
 
 ---
 
@@ -88,7 +88,7 @@ All 158 active+inactive workflows scanned for references to the 6 orphan table n
 
 ### Classification
 
-`F4J3vYsPrJrYiO49` is an **HTTP header authentication credential** (type: `httpHeaderAuth`). It adds header `x-gda-key: gda-webhook-secret-2026` to outgoing HTTP requests. It is **NOT a Postgres credential** and never directly connects to any database.
+`F4J3vYsPrJrYiO49` is an **HTTP header authentication credential** (type: `httpHeaderAuth`). It adds header `x-gda-key: <REDACTED>` to outgoing HTTP requests. It is **NOT a Postgres credential** and never directly connects to any database.
 
 ### How the 4 webhook-auth workflows access the 6 tables
 
