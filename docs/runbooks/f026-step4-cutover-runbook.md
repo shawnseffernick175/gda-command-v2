@@ -172,9 +172,9 @@ git pull origin main
 # Build from post-PR#288 code
 docker build -t gda-backend:latest -f packages/backend/Dockerfile .
 
-# Restart backend
-docker stop gda-backend
-docker start gda-backend
+# Recreate backend container with new image
+cd /root/gda-command-v2
+docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend
 
 # Wait for health
 for i in $(seq 1 30); do
@@ -272,15 +272,15 @@ If anything goes wrong after the credential edit:
 # 1. Edit credential back to pre-cutover target
 docker exec n8n-envision-n8n-1 wget -qO- \
   --method=PATCH \
-  --body-data='{"name":"GDA Postgres","type":"postgres","data":{"host":"postgres","port":5432,"database":"n8n","user":"n8n","password":"R@Nger75-"}}' \
+  --body-data='{"name":"GDA Postgres","type":"postgres","data":{"host":"postgres","port":5432,"database":"n8n","user":"n8n","password":"<N8N_DB_PASSWORD>"}}' \
   --header="accept: application/json" \
   --header="Content-Type: application/json" \
   --header="X-N8N-API-KEY: $N8N_API_KEY" \
   "http://localhost:5678/api/v1/credentials/HwronxMmGY5XDGEt"
 
-# 2. Restart backend on old image (if image was replaced)
-docker stop gda-backend
-docker start gda-backend
+# 2. Recreate backend on old image (if image was replaced)
+cd /root/gda-command-v2
+docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend
 
 # 3. Wait for health
 for i in $(seq 1 30); do

@@ -52,13 +52,13 @@ if [ "$TARGET" = "staging" ]; then
   OLD_PORT="5432"
   OLD_DB="gda_command_n8n_staging"
   OLD_USER="n8n"
-  OLD_PASS="R@Nger75-"
+  OLD_PASS="${N8N_DB_PASSWORD:-R@Nger75-}"
   # Post-cutover target
   NEW_HOST="gda-postgres-staging"
   NEW_PORT="5432"
   NEW_DB="gda_command_staging"
   NEW_USER="gda_staging"
-  NEW_PASS="staging_only_not_prod"
+  NEW_PASS="${GDA_STAGING_DB_PASSWORD:-staging_only_not_prod}"
   # Backend
   BACKEND_CONTAINER="gda-backend-staging"
   BACKEND_IMAGE="gda-backend:f026-step4-rehearsal"
@@ -78,13 +78,13 @@ else
   OLD_PORT="5432"
   OLD_DB="n8n"
   OLD_USER="n8n"
-  OLD_PASS="R@Nger75-"
+  OLD_PASS="${N8N_DB_PASSWORD:?ERROR: N8N_DB_PASSWORD not set}"
   # Post-cutover target (gda-postgres)
   NEW_HOST="gda-postgres"
   NEW_PORT="5432"
   NEW_DB="gda_command"
   NEW_USER="gda"
-  NEW_PASS="FuckThisShit175-"
+  NEW_PASS="${GDA_DB_PASSWORD:?ERROR: GDA_DB_PASSWORD not set}"
   # Backend
   BACKEND_CONTAINER="gda-backend"
   BACKEND_IMAGE="gda-backend:latest"
@@ -151,12 +151,12 @@ n8n_api() {
         --header="accept: application/json" \
         --header="Content-Type: application/json" \
         --header="X-N8N-API-KEY: $N8N_API_KEY" \
-        "http://localhost:5678/api/v1${ENDPOINT}" 2>/dev/null || true
+        "http://localhost:5678/api/v1${ENDPOINT}" 2>/dev/null
     else
       docker exec "$N8N_CONTAINER" wget -qO- \
         --header="accept: application/json" \
         --header="X-N8N-API-KEY: $N8N_API_KEY" \
-        "http://localhost:5678/api/v1${ENDPOINT}" 2>/dev/null || true
+        "http://localhost:5678/api/v1${ENDPOINT}" 2>/dev/null
     fi
   fi
 }
@@ -171,7 +171,7 @@ gda_sql() {
 
 REQUIRED_TABLES=(
   # 28 ADOPT tables
-  capture_plans gda_competitor_cache gda_competitor_watchlist daily_trends
+  gda_capture_plans gda_competitor_cache gda_competitor_watchlist daily_trends
   gda_action_items gda_active_contracts gda_contacts gda_dashboard_intel_cache
   gda_embeddings gda_error_log gda_learned_weights gda_morning_briefings
   gda_opportunity_alerts gda_opportunity_tracker gda_relationships gda_risk_register
@@ -315,12 +315,11 @@ if [ "$TARGET" = "prod" ]; then
   for WF_ID in $WRITER_IDS; do
     WF_ID=$(echo "$WF_ID" | tr -d '[:space:]')
     [ -z "$WF_ID" ] && continue
-    docker exec "$N8N_CONTAINER" wget -qO- \
+    if docker exec "$N8N_CONTAINER" wget -qO- \
       --post-data="" \
       --header="accept: application/json" \
       --header="X-N8N-API-KEY: $N8N_API_KEY" \
-      "http://localhost:5678/api/v1/workflows/$WF_ID/deactivate" > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
+      "http://localhost:5678/api/v1/workflows/$WF_ID/deactivate" > /dev/null 2>&1; then
       PAUSED=$((PAUSED + 1))
     else
       log "WARNING: Failed to pause workflow $WF_ID"
@@ -364,10 +363,9 @@ if [ "$TARGET" = "prod" ]; then
   docker build -t gda-backend:latest -f packages/backend/Dockerfile . 2>&1 | tail -5
   log "Image built"
 
-  log "Stopping backend..."
-  docker stop "$BACKEND_CONTAINER" 2>&1 || true
-  log "Starting backend with new image..."
-  docker start "$BACKEND_CONTAINER" 2>&1
+  log "Recreating backend container with new image..."
+  cd /root/gda-command-v2
+  docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend 2>&1 | tail -5
   
   log "Waiting for health..."
   for i in $(seq 1 30); do
@@ -446,12 +444,11 @@ if [ "$TARGET" = "prod" ]; then
   for WF_ID in $WRITER_IDS; do
     WF_ID=$(echo "$WF_ID" | tr -d '[:space:]')
     [ -z "$WF_ID" ] && continue
-    docker exec "$N8N_CONTAINER" wget -qO- \
+    if docker exec "$N8N_CONTAINER" wget -qO- \
       --post-data="" \
       --header="accept: application/json" \
       --header="X-N8N-API-KEY: $N8N_API_KEY" \
-      "http://localhost:5678/api/v1/workflows/$WF_ID/activate" > /dev/null 2>&1
-    if [ $? -eq 0 ]; then
+      "http://localhost:5678/api/v1/workflows/$WF_ID/activate" > /dev/null 2>&1; then
       RESUMED=$((RESUMED + 1))
     else
       log "WARNING: Failed to resume workflow $WF_ID"
