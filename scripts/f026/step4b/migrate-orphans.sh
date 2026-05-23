@@ -143,14 +143,19 @@ tgt_sql() {
 # ─── Cookie login for staging ──────────────────────────────────────────────────
 
 if [ "$N8N_AUTH_METHOD" = "cookie" ]; then
-  log "Logging in to staging n8n..."
-  LOGIN_RESPONSE=$(curl -s --fail-with-body -c /tmp/n8n_staging_cookies -X POST \
+  log "Attempting staging n8n login..."
+  if curl -s --fail-with-body -c /tmp/n8n_staging_cookies -X POST \
     "http://localhost:${N8N_PORT}/rest/login" \
     -H "Content-Type: application/json" \
-    -d "{\"emailOrLdapLoginId\":\"$N8N_LOGIN_EMAIL\",\"password\":\"$N8N_LOGIN_PASS\"}" 2>&1) || {
-    log "HALT: Staging n8n login failed. Response: $LOGIN_RESPONSE"
-    exit 1
-  }
+    -d "{\"emailOrLdapLoginId\":\"$N8N_LOGIN_EMAIL\",\"password\":\"$N8N_LOGIN_PASS\"}" > /dev/null 2>&1; then
+    log "Staging n8n login OK"
+    N8N_AVAILABLE=true
+  else
+    log "WARNING: Staging n8n not available — workflow pause/unpause will be skipped"
+    N8N_AVAILABLE=false
+  fi
+else
+  N8N_AVAILABLE=true
 fi
 
 # ─── PHASE 0: PRE-FLIGHT ──────────────────────────────────────────────────────
