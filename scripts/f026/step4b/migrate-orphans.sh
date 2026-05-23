@@ -209,13 +209,25 @@ if [ -z "$OPP_EXISTS" ] || [ "$OPP_EXISTS" = "" ]; then
 fi
 log "  gda_opportunity_tracker present on target — OK"
 
-# 0d. FK orphan check (Q1 belt-and-suspenders)
+# 0d. FK orphan check — validate source opportunity_ids exist on TARGET
 log ""
-log "── 0d. FK orphan check (gda_decision_memory.opportunity_id) ──"
-ORPHAN_COUNT=$(src_sql "SELECT COUNT(*) FROM gda_decision_memory dm WHERE dm.opportunity_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM gda_opportunity_tracker ot WHERE ot.id = dm.opportunity_id);")
+log "── 0d. FK orphan check (source gda_decision_memory.opportunity_id vs target gda_opportunity_tracker) ──"
+SRC_OPP_IDS=$(src_sql "SELECT DISTINCT opportunity_id FROM gda_decision_memory WHERE opportunity_id IS NOT NULL;")
+ORPHAN_COUNT=0
+for OPP_ID in $SRC_OPP_IDS; do
+  OPP_ID=$(echo "$OPP_ID" | tr -d '[:space:]')
+  [ -z "$OPP_ID" ] && continue
+  EXISTS_ON_TARGET=$(tgt_sql "SELECT COUNT(*) FROM gda_opportunity_tracker WHERE id = $OPP_ID;")
+  if [ "$EXISTS_ON_TARGET" = "0" ]; then
+    log "  ORPHAN: opportunity_id=$OPP_ID exists in source but NOT in target gda_opportunity_tracker"
+    ORPHAN_COUNT=$((ORPHAN_COUNT + 1))
+  else
+    log "  OK: opportunity_id=$OPP_ID exists on target"
+  fi
+done
 log "  Orphaned opportunity_id values: $ORPHAN_COUNT"
 if [ "$ORPHAN_COUNT" != "0" ]; then
-  log "HALT: $ORPHAN_COUNT orphaned opportunity_id values — FK import will fail"
+  log "HALT: $ORPHAN_COUNT orphaned opportunity_id values — FK import will fail on target"
   exit 1
 fi
 
