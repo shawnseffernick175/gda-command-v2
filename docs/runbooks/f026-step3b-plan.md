@@ -22,13 +22,24 @@ Before execution, verify each of the following. HALT on any failure.
 | Sequence sync | All 27 SERIAL-PK tables seq >= MAX(id) |
 | pgvector self-match | similarity = 1.0 on gda_embeddings |
 
-### 1b. Schema state
+### 1b. Schema state (pre-PR 3 — schema apply)
 
 | Check | Expected |
 |-------|----------|
 | schema_migrations count | 88 |
 | Latest migration | `055_govwin_wsapi_integration.sql` (highest applied; 056-084 are manual-apply tagged) |
 | 30 target tables on gda_command | All must NOT exist (Step 3b PR 3 creates them) |
+
+### 1b′. Schema state (pre-PR 4 — data execution)
+
+> **Note:** By PR 4 execution time, PR 3 has already applied migrations 085-114.
+> Phase A of Section 8 uses these checks instead of 1b.
+
+| Check | Expected |
+|-------|----------|
+| schema_migrations count | 118 (88 + 30) |
+| Latest migration | `114_step3b_gda_pwin_scores.sql` |
+| 30 target tables on gda_command | All EXIST and have 0 rows (empty, awaiting data copy) |
 
 ### 1c. Source data integrity
 
@@ -462,9 +473,10 @@ Same 3-pass pattern as Step 3:
 
 ## 8. Execution Order (PR 4 — Production)
 
-### Phase A: Pre-flight checks (Section 1)
+### Phase A: Pre-flight checks (Sections 1a, 1b′, 1c, 1d)
 
-Verify all preconditions. HALT on any failure.
+Verify preconditions using **Section 1b′** (post-PR3 schema state: 118 migrations,
+30 tables exist and are empty), plus Sections 1a, 1c, 1d. HALT on any failure.
 
 ### Phase B: Backup
 
