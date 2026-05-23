@@ -135,12 +135,12 @@ n8n_api() {
 
   if [ "$N8N_AUTH_METHOD" = "cookie" ]; then
     if [ -n "$DATA" ]; then
-      curl -s -b /tmp/n8n_staging_cookies -X "$METHOD" \
+      curl -s --fail-with-body -b /tmp/n8n_staging_cookies -X "$METHOD" \
         "http://localhost:${N8N_PORT}/rest${ENDPOINT}" \
         -H "Content-Type: application/json" \
         -d "$DATA" 2>/dev/null
     else
-      curl -s -b /tmp/n8n_staging_cookies \
+      curl -s --fail-with-body -b /tmp/n8n_staging_cookies \
         "http://localhost:${N8N_PORT}/rest${ENDPOINT}" 2>/dev/null
     fi
   else
@@ -193,7 +193,7 @@ REQUIRED_TABLES=(
 
 if [ "$N8N_AUTH_METHOD" = "cookie" ]; then
   log "Logging in to staging n8n..."
-  curl -s -c /tmp/n8n_staging_cookies -X POST \
+  curl -s --fail-with-body -c /tmp/n8n_staging_cookies -X POST \
     "http://localhost:${N8N_PORT}/rest/login" \
     -H "Content-Type: application/json" \
     -d "{\"emailOrLdapLoginId\":\"$N8N_LOGIN_EMAIL\",\"password\":\"$N8N_LOGIN_PASS\"}" > /dev/null 2>&1
@@ -379,7 +379,20 @@ if [ "$TARGET" = "prod" ]; then
   
   if [ "$HEALTH" != "200" ]; then
     log "HALT: Backend not healthy after 30s (got $HEALTH)"
-    log "INITIATING ROLLBACK..."
+    log ""
+    log "═══════════════════════════════════════════════════════════════"
+    log "MANUAL INTERVENTION REQUIRED — system is in half-cut-over state:"
+    log "  - Credential $CREDENTIAL_ID points at NEW target ($NEW_HOST/$NEW_DB)"
+    log "  - Backend container is NOT healthy"
+    log "  - Writers remain PAUSED"
+    log ""
+    log "To roll back manually:"
+    log "  scripts/f026/step4-credential-cutover.sh --target=$TARGET --rollback"
+    log "  Then: docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend"
+    log "  Then re-activate writers (see runbook Phase 5)"
+    log ""
+    log "DO NOT unpause writers until backend is healthy and credential state is resolved."
+    log "═══════════════════════════════════════════════════════════════"
     exit 1
   fi
 else

@@ -184,8 +184,25 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# HALT if not healthy after 30s
-[ "$HEALTH" != "200" ] && echo "HALT: Backend not healthy" && exit 1
+# HALT if not healthy after 30s — DO NOT auto-rollback
+if [ "$HEALTH" != "200" ]; then
+  echo "HALT: Backend not healthy after 30s (got $HEALTH)"
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "MANUAL INTERVENTION REQUIRED — system is in half-cut-over state:"
+  echo "  - Credential HwronxMmGY5XDGEt points at NEW target (gda-postgres/gda_command)"
+  echo "  - Backend container is NOT healthy"
+  echo "  - Writers remain PAUSED"
+  echo ""
+  echo "To roll back manually:"
+  echo "  scripts/f026/step4-credential-cutover.sh --target=prod --rollback"
+  echo "  Then: docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend"
+  echo "  Then re-activate writers (see Phase 5 below)"
+  echo ""
+  echo "DO NOT unpause writers until backend is healthy and credential state is resolved."
+  echo "═══════════════════════════════════════════════════════════════"
+  exit 1
+fi
 ```
 
 ---
