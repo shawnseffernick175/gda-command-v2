@@ -136,7 +136,7 @@ no such tables.
    may crash entirely and stop serving API responses.
 
 **Recommendation:** Option 1 (expand ADOPT scope). It's the cleanest path. The 30 tables
-have minimal data (81 rows total across 8 non-empty tables). The same pg_dump/pg_restore
+have minimal data (81 rows total across 7 non-empty tables). The same pg_dump/pg_restore
 pattern from Step 3 applies.
 
 ### 0f. HALT condition
@@ -271,7 +271,7 @@ pattern as Step 3:
 - Step 4 PR 2 (script + rehearsal) does NOT open until Step 3b PR 4 merges
 - Post-Step 3b: ALL 58 workflow-referenced tables exist on gda_command
 
-**Data scope:** ~81 rows across 8 non-empty tables (22 of 30 are completely empty).
+**Data scope:** ~81 rows across 7 non-empty tables (23 of 30 are completely empty).
 Same pg_dump/pg_restore pattern as Step 3.
 
 ---
