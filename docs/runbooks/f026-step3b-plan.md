@@ -598,8 +598,12 @@ for that table.
 
 ### 10c. Full migration rollback
 
-Restore gda_command from the Phase B backup:
+Restore gda_command from the Phase B backup (same `docker exec` pattern as Step 3):
 ```bash
+# Copy backup into the container
+docker cp /root/backups/gda_command_<timestamp>.dump gda-postgres:/tmp/restore.dump
+
+# Per-table restore via docker exec
 for TABLE in gda_action_history gda_ai_feedback gda_aop_tracker gda_approval_queue \
   gda_capture_lessons gda_chat_history gda_clause_library gda_competitor_crawls \
   gda_compliance_matrices gda_contract_vehicles gda_daily_briefings gda_daily_briefs \
@@ -608,12 +612,13 @@ for TABLE in gda_action_history gda_ai_feedback gda_aop_tracker gda_approval_que
   gda_knowledge_base gda_learning_log gda_meeting_notes gda_mega_cache \
   gda_naics_tracking gda_ndaa_intel gda_ooda_loops gda_prompt_architect_memory \
   gda_pwin_scores; do
-  pg_restore --host=localhost --port=5432 --username=gda --dbname=gda_command \
+  docker exec gda-postgres pg_restore -U gda -d gda_command \
     --table="$TABLE" --single-transaction --clean --if-exists --no-owner \
-    /root/backups/gda_command_<timestamp>.dump
+    /tmp/restore.dump
 done
 ```
 
+> Production `gda-postgres` does not expose port 5432 to the host — must use `docker exec`.
 > Each table restored in `--single-transaction` so a failure rolls back only that table.
 
 ### 10d. Recovery matrix
