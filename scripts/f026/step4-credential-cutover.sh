@@ -145,18 +145,17 @@ n8n_api() {
     fi
   else
     if [ -n "$DATA" ]; then
-      docker exec "$N8N_CONTAINER" wget -qO- \
-        --method="$METHOD" \
-        --body-data="$DATA" \
-        --header="accept: application/json" \
-        --header="Content-Type: application/json" \
-        --header="X-N8N-API-KEY: $N8N_API_KEY" \
-        "http://localhost:5678/api/v1${ENDPOINT}" 2>/dev/null
+      curl -s --fail-with-body -X "$METHOD" \
+        -H "accept: application/json" \
+        -H "Content-Type: application/json" \
+        -H "X-N8N-API-KEY: $N8N_API_KEY" \
+        -d "$DATA" \
+        "http://localhost:${N8N_PORT}/api/v1${ENDPOINT}" 2>/dev/null
     else
-      docker exec "$N8N_CONTAINER" wget -qO- \
-        --header="accept: application/json" \
-        --header="X-N8N-API-KEY: $N8N_API_KEY" \
-        "http://localhost:5678/api/v1${ENDPOINT}" 2>/dev/null
+      curl -s --fail-with-body \
+        -H "accept: application/json" \
+        -H "X-N8N-API-KEY: $N8N_API_KEY" \
+        "http://localhost:${N8N_PORT}/api/v1${ENDPOINT}" 2>/dev/null
     fi
   fi
 }
@@ -193,10 +192,13 @@ REQUIRED_TABLES=(
 
 if [ "$N8N_AUTH_METHOD" = "cookie" ]; then
   log "Logging in to staging n8n..."
-  curl -s --fail-with-body -c /tmp/n8n_staging_cookies -X POST \
+  LOGIN_RESPONSE=$(curl -s --fail-with-body -c /tmp/n8n_staging_cookies -X POST \
     "http://localhost:${N8N_PORT}/rest/login" \
     -H "Content-Type: application/json" \
-    -d "{\"emailOrLdapLoginId\":\"$N8N_LOGIN_EMAIL\",\"password\":\"$N8N_LOGIN_PASS\"}" > /dev/null 2>&1
+    -d "{\"emailOrLdapLoginId\":\"$N8N_LOGIN_EMAIL\",\"password\":\"$N8N_LOGIN_PASS\"}" 2>&1) || {
+    log "HALT: Staging n8n login failed. Response: $LOGIN_RESPONSE"
+    exit 1
+  }
 fi
 
 # ─── ROLLBACK MODE ─────────────────────────────────────────────────────────────
@@ -206,7 +208,7 @@ if [ "$ROLLBACK" = true ]; then
   log "── ROLLBACK: Reverting credential to pre-cutover state ──"
 
   ROLLBACK_DATA=$(cat <<EOF
-{"name":"GDA Postgres","type":"postgres","data":{"host":"$OLD_HOST","port":$OLD_PORT,"database":"$OLD_DB","user":"$OLD_USER","password":"$OLD_PASS"}}
+{"name":"GDA Postgres","type":"postgres","data":{"host":"$OLD_HOST","port":$OLD_PORT,"database":"$OLD_DB","user":"$OLD_USER","password":"$OLD_PASS","ssl":"disable","sshAuthenticateWith":"password","sshHost":"","sshPort":22,"sshUser":"","sshPassword":"","privateKey":"","passphrase":""}}
 EOF
 )
 
@@ -344,7 +346,7 @@ CUTOVER_TS=$(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S %Z')
 log "Cutover timestamp: $CUTOVER_TS"
 
 CUTOVER_DATA=$(cat <<EOF
-{"name":"GDA Postgres","type":"postgres","data":{"host":"$NEW_HOST","port":$NEW_PORT,"database":"$NEW_DB","user":"$NEW_USER","password":"$NEW_PASS"}}
+{"name":"GDA Postgres","type":"postgres","data":{"host":"$NEW_HOST","port":$NEW_PORT,"database":"$NEW_DB","user":"$NEW_USER","password":"$NEW_PASS","ssl":"disable","sshAuthenticateWith":"password","sshHost":"","sshPort":22,"sshUser":"","sshPassword":"","privateKey":"","passphrase":""}}
 EOF
 )
 
@@ -365,7 +367,7 @@ if [ "$TARGET" = "prod" ]; then
 
   log "Recreating backend container with new image..."
   cd /root/gda-command-v2
-  docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend 2>&1 | tail -5
+  docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend 2>&1 | tail -5
   
   log "Waiting for health..."
   for i in $(seq 1 30); do
@@ -388,7 +390,7 @@ if [ "$TARGET" = "prod" ]; then
     log ""
     log "To roll back manually:"
     log "  scripts/f026/step4-credential-cutover.sh --target=$TARGET --rollback"
-    log "  Then: docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend"
+    log "  Then: docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend"
     log "  Then re-activate writers (see runbook Phase 5)"
     log ""
     log "DO NOT unpause writers until backend is healthy and credential state is resolved."

@@ -174,7 +174,7 @@ docker build -t gda-backend:latest -f packages/backend/Dockerfile .
 
 # Recreate backend container with new image
 cd /root/gda-command-v2
-docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend
+docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
 
 # Wait for health
 for i in $(seq 1 30); do
@@ -196,7 +196,7 @@ if [ "$HEALTH" != "200" ]; then
   echo ""
   echo "To roll back manually:"
   echo "  scripts/f026/step4-credential-cutover.sh --target=prod --rollback"
-  echo "  Then: docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend"
+  echo "  Then: docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend"
   echo "  Then re-activate writers (see Phase 5 below)"
   echo ""
   echo "DO NOT unpause writers until backend is healthy and credential state is resolved."
@@ -297,7 +297,7 @@ docker exec n8n-envision-n8n-1 wget -qO- \
 
 # 2. Recreate backend on old image (if image was replaced)
 cd /root/gda-command-v2
-docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate gda-backend
+docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
 
 # 3. Wait for health
 for i in $(seq 1 30); do
