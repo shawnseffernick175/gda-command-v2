@@ -222,6 +222,28 @@ fi
 log ""
 log "Pre-flight PASSED"
 
+# ─── Emergency unpause trap (prod safety net) ─────────────────────────────────
+
+UNPAUSED=false
+WRITER_IDS=""
+CANARY_ID="LPUSYd4Vpph1Qg7n"
+CHANGE_DETECTOR_ID="Zb2quk78c5mszZ2C"
+CREDENTIAL_ID="HwronxMmGY5XDGEt"
+
+cleanup() {
+  if [ "$TARGET" = "prod" ] && [ "$UNPAUSED" = false ] && [ -n "${WRITER_IDS:-}" ]; then
+    log "ERROR EXIT: Emergency unpause of workflows..."
+    for WF_ID in $WRITER_IDS; do
+      WF_ID=$(echo "$WF_ID" | tr -d '[:space:]')
+      [ -z "$WF_ID" ] && continue
+      n8n_api "POST" "/workflows/$WF_ID/activate" > /dev/null 2>&1 || true
+    done
+    n8n_api "POST" "/workflows/$CHANGE_DETECTOR_ID/activate" > /dev/null 2>&1 || true
+    log "Emergency unpause complete: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S %Z')"
+  fi
+}
+trap cleanup EXIT
+
 # ─── PHASE 1: WRITER PAUSE ────────────────────────────────────────────────────
 
 log ""
@@ -229,10 +251,6 @@ log "══ PHASE 1: WRITER PAUSE ══"
 
 PAUSE_TS=$(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S %Z')
 log "Pause start: $PAUSE_TS"
-
-CANARY_ID="LPUSYd4Vpph1Qg7n"
-CHANGE_DETECTOR_ID="Zb2quk78c5mszZ2C"
-CREDENTIAL_ID="HwronxMmGY5XDGEt"
 
 if [ "$TARGET" = "prod" ]; then
   N8N_DB_CONTAINER="n8n-envision-postgres-1"
@@ -406,8 +424,13 @@ check_unique() {
   local table=$1
   local cols=$2
   local constraint_name=$3
+  local null_filter="${4:-}"
   local dup_count
-  dup_count=$(tgt_sql "SELECT COUNT(*) FROM (SELECT $cols, COUNT(*) FROM $table GROUP BY $cols HAVING COUNT(*) > 1) sub;")
+  local where_clause=""
+  if [ -n "$null_filter" ]; then
+    where_clause="WHERE $null_filter"
+  fi
+  dup_count=$(tgt_sql "SELECT COUNT(*) FROM (SELECT $cols, COUNT(*) FROM $table $where_clause GROUP BY $cols HAVING COUNT(*) > 1) sub;")
   if [ "$dup_count" = "0" ]; then
     log "  PASS: $constraint_name on $table — 0 duplicates"
   else
@@ -416,8 +439,8 @@ check_unique() {
   fi
 }
 
-check_unique "gda_content_store" "content_hash" "gda_content_store_content_hash_key"
-check_unique "gda_data_lake" "source, source_id, record_type" "gda_data_lake_source_source_id_record_type_key"
+check_unique "gda_content_store" "content_hash" "gda_content_store_content_hash_key" "content_hash IS NOT NULL"
+check_unique "gda_data_lake" "source, source_id, record_type" "gda_data_lake_source_source_id_record_type_key" "source_id IS NOT NULL"
 
 if [ "$UNIQUE_FAIL" -gt 0 ]; then
   log "  HALT: $UNIQUE_FAIL UNIQUE constraint violation(s) detected"
@@ -479,6 +502,7 @@ else
   log "Staging: skip workflow unpause (no live workflows)"
 fi
 
+UNPAUSED=true
 UNPAUSE_END=$(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S %Z')
 log "Unpause complete: $UNPAUSE_END"
 
