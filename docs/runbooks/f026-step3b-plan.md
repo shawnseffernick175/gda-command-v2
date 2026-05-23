@@ -476,7 +476,12 @@ Same 3-pass pattern as Step 3:
 ### Phase A: Pre-flight checks (Sections 1a, 1b′, 1c, 1d)
 
 Verify preconditions using **Section 1b′** (post-PR3 schema state: 118 migrations,
-30 tables exist and are empty), plus Sections 1a, 1c, 1d. HALT on any failure.
+30 tables exist and are empty), plus Sections 1a, 1c, 1d.
+
+**Capture live active workflow count:** `GET /api/v1/workflows?active=true` → store as **N**.
+Do NOT hardcode 157 or any assumed count. N is measured, not constant.
+
+HALT on any failure.
 
 ### Phase B: Backup
 
@@ -505,12 +510,19 @@ Capture exact list of 40 IDs with pause timestamps.
 ```
 GET /api/v1/workflows?active=true
 ```
-Expected: active count = original - 40. HALT if diff != 40.
+Expected: active count = N - 40. HALT if diff != 40.
 
 ### Phase E: Source snapshot
 
+**Wait 10 seconds** after Phase D verification for any in-flight writes to drain.
+This quiesce window ensures the pause has fully taken effect before capturing counts.
+
 Capture row counts for all 30 tables on n8n DB. Save to
 `docs/audits/f026-step3b-prod-presnapshot-<timestamp>.md`. This is the parity baseline.
+
+> **PR description note:** At PR 4 submission, include the delta between these
+> live counts and the PR #299 estimate (~1,024 rows) so reviewers can see how
+> the system was moving during planning.
 
 ### Phase F: Execute migration
 
@@ -542,7 +554,7 @@ Capture resumed timestamps.
 
 ### Phase I: Verify resume
 
-Active workflow count must return to original. HALT if not.
+Active workflow count must return to N (Phase A baseline). HALT if not.
 
 ### Phase J: Canary verification (15-minute wait)
 
@@ -570,6 +582,7 @@ Both should have run by minute 15 since neither was paused.
 | 12 | Active workflow count != original after resume | Phase I | HALT — workflows didn't resume |
 | 13 | Canary workflows don't fire within 15 min | Phase J | HALT — scheduling broken |
 | 14 | Backend health degraded at any verification point | Any | HALT — investigate |
+| 15 | Any of the 40 writer workflows’ first post-resume run shows non-success status, OR succeeds but writes 0 rows when prior cycles consistently wrote N>0 rows | Phase J | HALT — investigate before declaring Step 3b closed |
 
 ---
 
@@ -596,14 +609,17 @@ Per-table `TRUNCATE` on the failed table, then re-run that table only. The
 `--single-transaction` flag on pg_restore ensures a failure rolls back cleanly
 for that table.
 
-### 10c. Full migration rollback
+### 10c. Rollback paths
 
-Restore gda_command from the Phase B backup (same `docker exec` pattern as Step 3):
+Two explicit rollback paths. Pick based on failure mode:
+
+#### 10c.1 — Data rollback (most common case)
+
+Use when: migration script failed mid-flight or data verification failed, but schema
+is correct and should remain.
+
 ```bash
-# Copy backup into the container
-docker cp /root/backups/gda_command_<timestamp>.dump gda-postgres:/tmp/restore.dump
-
-# Per-table restore via docker exec
+# Truncate all 30 tables on gda_command (schema stays, data removed)
 for TABLE in gda_action_history gda_ai_feedback gda_aop_tracker gda_approval_queue \
   gda_capture_lessons gda_chat_history gda_clause_library gda_competitor_crawls \
   gda_compliance_matrices gda_contract_vehicles gda_daily_briefings gda_daily_briefs \
@@ -612,14 +628,55 @@ for TABLE in gda_action_history gda_ai_feedback gda_aop_tracker gda_approval_que
   gda_knowledge_base gda_learning_log gda_meeting_notes gda_mega_cache \
   gda_naics_tracking gda_ndaa_intel gda_ooda_loops gda_prompt_architect_memory \
   gda_pwin_scores; do
-  docker exec gda-postgres pg_restore -U gda -d gda_command \
-    --table="$TABLE" --single-transaction --clean --if-exists --no-owner \
-    /tmp/restore.dump
+  docker exec gda-postgres psql -U gda -d gda_command -c "TRUNCATE $TABLE CASCADE;"
 done
 ```
 
-> Production `gda-postgres` does not expose port 5432 to the host — must use `docker exec`.
-> Each table restored in `--single-transaction` so a failure rolls back only that table.
+Tables remain present but empty. Migrations 085-114 stay applied. Workflows will
+re-populate from their natural cadence after Step 4 cutover.
+
+#### 10c.2 — Full rollback (schema + data + migration history)
+
+Use when: schema apply itself caused issues, or a clean revert to pre-Step-3b state
+is required.
+
+```bash
+# a. Truncate all 30 tables
+for TABLE in gda_action_history gda_ai_feedback gda_aop_tracker gda_approval_queue \
+  gda_capture_lessons gda_chat_history gda_clause_library gda_competitor_crawls \
+  gda_compliance_matrices gda_contract_vehicles gda_daily_briefings gda_daily_briefs \
+  gda_deep_research gda_dept_market gda_discussions gda_doc_inbox gda_e2e_reports \
+  gda_feedback gda_health_scans gda_idiq_tracker gda_incumbent_analysis \
+  gda_knowledge_base gda_learning_log gda_meeting_notes gda_mega_cache \
+  gda_naics_tracking gda_ndaa_intel gda_ooda_loops gda_prompt_architect_memory \
+  gda_pwin_scores; do
+  docker exec gda-postgres psql -U gda -d gda_command -c "DROP TABLE IF EXISTS $TABLE CASCADE;"
+done
+
+# b. Remove migration history for 085-114
+docker exec gda-postgres psql -U gda -d gda_command -c "
+  DELETE FROM schema_migrations
+  WHERE filename ~ '^(085|086|087|088|089|09[0-9]|10[0-9]|11[0-4])_';
+"
+
+# c. Verify schema_migrations count = 88
+docker exec gda-postgres psql -U gda -d gda_command -c "
+  SELECT COUNT(*) FROM schema_migrations;
+"  -- Must return 88
+```
+
+> In most failure modes, 10c.1 (data-only truncate) is sufficient. 10c.2 is the
+> full revert for schema-level issues. The Phase B backup is the safety net of
+> last resort if the audit trail needs to match exactly the pre-Step-3b state.
+
+**Decision tree:**
+
+| Failure mode | Path | Rationale |
+|---|---|---|
+| Script failed mid-table | 10c.1 | Schema is correct, just need clean data slate |
+| Data parity mismatch | 10c.1 | Truncate + re-run the script |
+| Schema migration caused issues | 10c.2 | Full revert to pre-Step-3b state |
+| Unknown/catastrophic | 10c.2 + Phase B backup restore | Nuclear option |
 
 ### 10d. Recovery matrix
 
@@ -651,27 +708,32 @@ done
 
 ## 12. Open Questions
 
-### 12a. gda_mega_cache PK assignment
+### 12a. gda_mega_cache PK assignment — RESOLVED
 
-`gda_mega_cache` has `id INTEGER NOT NULL` as PK but no DEFAULT sequence. The single
-existing row has `id=1` (presumably manually assigned by the workflow's INSERT). The
-migration will copy this row as-is. If the workflow continues to `INSERT INTO gda_mega_cache`
-with an explicit `id` value after cutover, this works. If any workflow uses
-`DEFAULT` or omits `id`, the INSERT will fail.
+**Architect decision:** Leave as-is. Do NOT add a sequence.
 
-**Risk:** Low — the workflow code shows `id: 1` hardcoded in the INSERT. But should we add
-a sequence to be safe?
+`gda_mega_cache` has `id INTEGER NOT NULL` as PK with no DEFAULT sequence. The single
+existing row has `id=1`, hardcoded in the workflow INSERT. Adding a sequence would be a
+schema design change disguised as a fix — migration’s job is faithful copy, not schema
+improvement. Any new INSERT must specify `id` explicitly.
 
-### 12b. Active workflow count at pause time
+> Parked for future: "should gda_mega_cache.id become a sequence?" is a separate cleanup
+> item requiring discussion with all consumers. Not a migration concern.
 
-Step 3 expected 157 active workflows and paused 17 (leaving 140). Step 3b pauses 40, but
-some of those 40 may overlap with the Step 3 writer set that was previously paused and
-resumed. The expected active count before pausing needs to be captured live (not assumed).
+### 12b. Active workflow count at pause time — RESOLVED
+
+**Architect decision:** Capture live in Phase A. Do NOT assume 157.
+
+Phase A captures `GET /api/v1/workflows?active=true` as **N** (measured, not constant).
+Phase D verifies post-pause = N - 40. Phase I verifies post-resume = N. No hardcoded
+counts anywhere in script or runbook.
 
 GDA.cron.data-sync (M0xPvRs31zQOewfx) is the only overlap between Step 3 and Step 3b
 writer lists. The rest of the 40 are independent.
 
-### 12c. Row count growth since PR #298
+### 12c. Row count growth since PR #298 — RESOLVED
+
+**Architect decision:** Surface in PR description, no design action.
 
 The PR #298 Section 0a matrix estimated ~81 total rows. Current live count is ~1,024 rows
 (workflows continued writing). Notable growth:
@@ -683,4 +745,5 @@ The PR #298 Section 0a matrix estimated ~81 total rows. Current live count is ~1
 - gda_meeting_notes: 0 → 43
 
 This is expected behavior (live system). The pre-migration snapshot (Phase E) captures the
-authoritative count at execution time. No action needed — just surface for awareness.
+authoritative count at execution time. At PR 4 submission, the PR description must include
+the delta vs this ~1,024 estimate so reviewers can see system movement during planning.
