@@ -2,9 +2,10 @@
 
 **Status:** PLAN ONLY — no execution until architect approval  
 **Prerequisite:** Step 4 CLOSED (PR #304, commit d1c56f9, 2026-05-23 12:24 PM EST)  
+**Prerequisite:** Step 4b CLOSED (orphan migration — see Section 11)  
 **24-hour soak:** In progress. Shadow tables confirmed idle (delta=0 over 5-min sample at cutover).  
 **Plan author:** Devin  
-**Architect review required:** YES — open questions in Section 10  
+**Architect review required:** YES — all open questions resolved (Section 10)  
 
 ---
 
@@ -19,9 +20,11 @@ Total tables in `public` schema: **156**
 | Category | Count | Decision |
 |----------|-------|----------|
 | 58 known GDA tables (28 ADOPT + 30 N8N-ONLY) | 58 | **DROP** (via rename-first) |
-| 6 orphan GDA tables (on n8n, NOT on gda_command) | 6 | **INVESTIGATE** (see Section 1b) |
+| 6 orphan GDA tables (migrated to gda_command via Step 4b) | 6 | **DROP** (via rename-first, after Step 4b) |
 | 5 non-gda-prefix GDA tables in the 58 set | 5 | Included in the 58 above |
 | n8n internal tables | 92 | **KEEP** — out of scope |
+
+**Total Phase 5a scope: 64 tables** (58 known + 6 orphans migrated via Step 4b)
 
 #### 58 Known GDA Tables — IN SCOPE (DROP)
 
@@ -95,25 +98,25 @@ These exist on both n8n-envision-postgres-1/n8n (shadow) and gda-postgres/gda_co
 | 57 | `gda_prompt_architect_memory` | shadow | 0 |
 | 58 | `gda_pwin_scores` | shadow | 12 |
 
-### 1b. 6 Orphan GDA Tables — INVESTIGATE
+### 1b. 6 Orphan GDA Tables — PHASE 5a SCOPE (migrated via Step 4b prerequisite)
 
-These tables exist on n8n-envision-postgres-1/n8n but do **NOT** exist on gda-postgres/gda_command. They contain data and are referenced by active workflows.
+These tables exist on n8n-envision-postgres-1/n8n but do **NOT** currently exist on gda-postgres/gda_command. They contain data and are referenced by active workflows. **Step 4b** (Section 11) will migrate these 6 tables to gda_command before Phase 5a executes. Step 4b is a separate operation, not part of this plan.
 
 | Table | n8n Rows | gda_command? | Referencing Workflows | Credential Used |
 |-------|----------|--------------|----------------------|-----------------|
-| `gda_content_store` | 13 | NO | GDA.auto.learning-capture (Rvs15RThVvlj3nVz) | F4J3vYsPrJrYiO49 (webhook auth) |
-| `gda_data_lake` | 54 | NO | GDA.cron.competitor-auto-enrichment (51SkEH6ulJrmHdgS) | F4J3vYsPrJrYiO49 (webhook auth) |
-| `gda_decision_memory` | 2 | NO | GDA.auto.learning-capture (Rvs15RThVvlj3nVz) | F4J3vYsPrJrYiO49 (webhook auth) |
-| `gda_interaction_log` | 30 | NO | GDA.auto.learning-capture (Rvs15RThVvlj3nVz) | F4J3vYsPrJrYiO49 (webhook auth) |
-| `gda_pattern_library` | 219 | NO | GDA.auto.pattern-extractor (njIW6V5tCFJIIjfk), GDA.event.bidirectional-sync (3sFvFJwP0xlihoLj) | F4J3vYsPrJrYiO49, HwronxMmGY5XDGEt |
-| `gda_stage_audit` | 12 | NO | GDA.event.bidirectional-sync (3sFvFJwP0xlihoLj), GDA.cron.amendment-monitor (1o8h7yGhLKLoNP0S) | HwronxMmGY5XDGEt |
+| `gda_content_store` | 13 | NO (until Step 4b) | GDA.auto.learning-capture (Rvs15RThVvlj3nVz) | F4J3vYsPrJrYiO49 (webhook auth) |
+| `gda_data_lake` | 54 | NO (until Step 4b) | GDA.cron.competitor-auto-enrichment (51SkEH6ulJrmHdgS) | F4J3vYsPrJrYiO49 (webhook auth) |
+| `gda_decision_memory` | 2 | NO (until Step 4b) | GDA.auto.learning-capture (Rvs15RThVvlj3nVz) | F4J3vYsPrJrYiO49 (webhook auth) |
+| `gda_interaction_log` | 30 | NO (until Step 4b) | GDA.auto.learning-capture (Rvs15RThVvlj3nVz) | F4J3vYsPrJrYiO49 (webhook auth) |
+| `gda_pattern_library` | 219 | NO (until Step 4b) | GDA.auto.pattern-extractor (njIW6V5tCFJIIjfk), GDA.event.bidirectional-sync (3sFvFJwP0xlihoLj) | F4J3vYsPrJrYiO49, HwronxMmGY5XDGEt |
+| `gda_stage_audit` | 12 | NO (until Step 4b) | GDA.event.bidirectional-sync (3sFvFJwP0xlihoLj), GDA.cron.amendment-monitor (1o8h7yGhLKLoNP0S) | HwronxMmGY5XDGEt |
 
 **Key observations:**
-- **`gda_pattern_library`** and **`gda_stage_audit`** are referenced by workflows using `HwronxMmGY5XDGEt` (the pivoted credential). These workflows will ERROR when they try to access these tables on gda_command where they don't exist.
+- **`gda_pattern_library`** and **`gda_stage_audit`** are referenced by workflows using `HwronxMmGY5XDGEt` (the pivoted credential). These workflows will ERROR on next execution because the tables don't exist on gda_command. **Step 4b resolves this urgently.**
 - The other 4 tables (`gda_content_store`, `gda_data_lake`, `gda_decision_memory`, `gda_interaction_log`) are referenced only by workflows using `F4J3vYsPrJrYiO49` (HTTP webhook auth, not a Postgres credential). These workflows build SQL via Code nodes and execute through a backend proxy — they may or may not be affected by the credential cutover.
 - 4 of the 5 referencing workflows have **no execution history** at all (never fired or data pruned). Only `GDA.cron.amendment-monitor` has recent execution (success at 2026-05-23T12:00:00Z).
 
-**Total orphan data:** 330 rows across 6 tables.
+**Total orphan data:** 330 rows across 6 tables. After Step 4b, these will exist on both n8n (shadow) and gda_command (live), making them eligible for Phase 5a rename alongside the 58 known tables.
 
 ### 1c. Tables OUT OF SCOPE (KEEP)
 
@@ -125,11 +128,11 @@ These tables exist on n8n-envision-postgres-1/n8n but do **NOT** exist on gda-po
 
 ## 2. Drop Strategy — Two-Phase
 
-### Phase 5a: Rename (Day 0 — after 24h soak)
+### Phase 5a: Rename (after Step 4b CLOSED + 24h soak elapsed)
 
-Rename all 58 in-scope tables to `_archive_20260523_<original_name>` in the same schema. This forces any workflow still referencing old names to ERROR immediately with `relation "X" does not exist`, instead of silently succeeding against stale data.
+Rename all 64 in-scope tables to `_archive_20260523_<original_name>` in the same schema. This forces any workflow still referencing old names to ERROR immediately with `relation "X" does not exist`, instead of silently succeeding against stale data.
 
-**Exact rename SQL (58 statements):**
+**Exact rename SQL (64 statements):**
 
 ```sql
 -- 28 ADOPT tables
@@ -193,20 +196,30 @@ ALTER TABLE public.gda_ndaa_intel RENAME TO _archive_20260523_gda_ndaa_intel;
 ALTER TABLE public.gda_ooda_loops RENAME TO _archive_20260523_gda_ooda_loops;
 ALTER TABLE public.gda_prompt_architect_memory RENAME TO _archive_20260523_gda_prompt_architect_memory;
 ALTER TABLE public.gda_pwin_scores RENAME TO _archive_20260523_gda_pwin_scores;
+
+-- 6 orphan tables (migrated to gda_command via Step 4b)
+ALTER TABLE public.gda_content_store RENAME TO _archive_20260523_gda_content_store;
+ALTER TABLE public.gda_data_lake RENAME TO _archive_20260523_gda_data_lake;
+ALTER TABLE public.gda_decision_memory RENAME TO _archive_20260523_gda_decision_memory;
+ALTER TABLE public.gda_interaction_log RENAME TO _archive_20260523_gda_interaction_log;
+ALTER TABLE public.gda_pattern_library RENAME TO _archive_20260523_gda_pattern_library;
+ALTER TABLE public.gda_stage_audit RENAME TO _archive_20260523_gda_stage_audit;
 ```
 
-### Phase 5b: Drop (Day 0 + 7 days minimum)
+### Phase 5b: Drop (Day 0 + 7 days minimum — SEPARATE PR)
 
 After 7 days of post-rename stability with zero workflow errors mentioning renamed tables:
 
 ```sql
--- One DROP per archived table (58 total)
+-- One DROP per archived table (64 total)
 DROP TABLE IF EXISTS public._archive_20260523_daily_trends;
 DROP TABLE IF EXISTS public._archive_20260523_ft_opportunity_signal;
 DROP TABLE IF EXISTS public._archive_20260523_ft_signal_source;
--- ... (remaining 55 follow same pattern)
+-- ... (remaining 61 follow same pattern)
 -- Full list generated at execution time from the rename manifest
 ```
+
+Phase 5b is a **separate PR** — irreversible operations get discrete architect-read moments.
 
 ### Why rename-first?
 
@@ -222,7 +235,7 @@ DROP TABLE IF EXISTS public._archive_20260523_ft_signal_source;
 ### Pre-rename backup (Phase 5a, before any rename)
 
 ```bash
-# Full dump of all 58 in-scope GDA tables from n8n DB
+# Full dump of all 64 in-scope GDA tables from n8n DB
 docker exec n8n-envision-postgres-1 pg_dump -U n8n -d n8n \
   --table='daily_trends' \
   --table='ft_opportunity_signal' \
@@ -282,13 +295,21 @@ docker exec n8n-envision-postgres-1 pg_dump -U n8n -d n8n \
   --table='gda_ooda_loops' \
   --table='gda_prompt_architect_memory' \
   --table='gda_pwin_scores' \
+  --table='gda_content_store' \
+  --table='gda_data_lake' \
+  --table='gda_decision_memory' \
+  --table='gda_interaction_log' \
+  --table='gda_pattern_library' \
+  --table='gda_stage_audit' \
   --no-owner --no-acl --clean --if-exists \
   > /root/backups/f026-step5-shadow-tables-pre-rename-$(date +%Y%m%d).sql
 ```
 
 **File location:** `/root/backups/f026-step5-shadow-tables-pre-rename-YYYYMMDD.sql`  
-**Expected size:** > 500KB (58 tables, ~3,636 rows on n8n side)  
+**Expected size:** > 500KB (64 tables, ~3,966 rows on n8n side)  
 **Retention:** 30 days minimum post-Phase 5b  
+
+**Note on orphan tables in backup:** Even though Step 4b will migrate the 6 orphan tables to gda_command before Phase 5a, the orphan source-of-truth is on n8n until Step 4b completes. The Phase 5a backup is our only forensic record post-rename.
 
 ### Existing backup script
 
@@ -300,19 +321,19 @@ docker exec n8n-envision-postgres-1 pg_dump -U n8n -d n8n \
 
 ### 4a. Pre-rename: row count sanity check
 
-For each of the 58 in-scope tables, confirm gda_command row count ≥ n8n shadow row count minus a reasonable retention delta (data-retention cron may have pruned rows on gda_command since cutover).
+For each of the 64 in-scope tables, confirm gda_command row count ≥ n8n shadow row count minus a reasonable retention delta (data-retention cron may have pruned rows on gda_command since cutover).
 
 ```sql
 -- On gda-postgres/gda_command:
 SELECT relname, n_live_tup FROM pg_stat_user_tables
 WHERE schemaname='public'
-AND relname IN ('<58 table names>')
+AND relname IN ('<64 table names>')
 ORDER BY relname;
 
 -- On n8n-envision-postgres-1/n8n (same query):
 SELECT relname, n_live_tup FROM pg_stat_user_tables
 WHERE schemaname='public'
-AND relname IN ('<58 table names>')
+AND relname IN ('<64 table names>')
 ORDER BY relname;
 ```
 
@@ -344,7 +365,7 @@ Manually trigger system-watchdog. Confirm status=success (it queries gda_command
 
 ### 4e. Post-rename: 60-minute monitoring window
 
-Monitor for workflow ERRORs mentioning any of the 58 original table names:
+Monitor for workflow ERRORs mentioning any of the 64 original table names:
 
 ```bash
 # Check n8n execution errors in last 60 min
@@ -367,7 +388,7 @@ for e in data.get('data', []):
 
 ### 5a. Zero errors over 7-day window
 
-Confirm zero workflow execution errors that mention any of the 58 original GDA table names during the 7-day post-rename observation period. Check daily.
+Confirm zero workflow execution errors that mention any of the 64 original GDA table names during the 7-day post-rename observation period. Check daily.
 
 ### 5b. System health (same as 4b)
 
@@ -399,13 +420,79 @@ Architect must explicitly approve Phase 5b execution.
 ### Phase 5a rollback (trivial — rename back)
 
 ```sql
--- Reverse rename (58 statements, < 1 second each)
+-- Reverse rename (64 statements, < 1 second each)
+-- 28 ADOPT tables
 ALTER TABLE public._archive_20260523_daily_trends RENAME TO daily_trends;
 ALTER TABLE public._archive_20260523_ft_opportunity_signal RENAME TO ft_opportunity_signal;
--- ... (remaining 56 follow same pattern)
+ALTER TABLE public._archive_20260523_ft_signal_source RENAME TO ft_signal_source;
+ALTER TABLE public._archive_20260523_gda_action_items RENAME TO gda_action_items;
+ALTER TABLE public._archive_20260523_gda_active_contracts RENAME TO gda_active_contracts;
+ALTER TABLE public._archive_20260523_gda_capture_plans RENAME TO gda_capture_plans;
+ALTER TABLE public._archive_20260523_gda_competitor_cache RENAME TO gda_competitor_cache;
+ALTER TABLE public._archive_20260523_gda_competitor_watchlist RENAME TO gda_competitor_watchlist;
+ALTER TABLE public._archive_20260523_gda_contacts RENAME TO gda_contacts;
+ALTER TABLE public._archive_20260523_gda_dashboard_intel_cache RENAME TO gda_dashboard_intel_cache;
+ALTER TABLE public._archive_20260523_gda_embeddings RENAME TO gda_embeddings;
+ALTER TABLE public._archive_20260523_gda_error_log RENAME TO gda_error_log;
+ALTER TABLE public._archive_20260523_gda_intelligence_log RENAME TO gda_intelligence_log;
+ALTER TABLE public._archive_20260523_gda_learned_weights RENAME TO gda_learned_weights;
+ALTER TABLE public._archive_20260523_gda_morning_briefings RENAME TO gda_morning_briefings;
+ALTER TABLE public._archive_20260523_gda_opportunity_alerts RENAME TO gda_opportunity_alerts;
+ALTER TABLE public._archive_20260523_gda_opportunity_tracker RENAME TO gda_opportunity_tracker;
+ALTER TABLE public._archive_20260523_gda_relationships RENAME TO gda_relationships;
+ALTER TABLE public._archive_20260523_gda_risk_register RENAME TO gda_risk_register;
+ALTER TABLE public._archive_20260523_gda_saved_opportunities RENAME TO gda_saved_opportunities;
+ALTER TABLE public._archive_20260523_gda_teaming_partners RENAME TO gda_teaming_partners;
+ALTER TABLE public._archive_20260523_gda_touchpoints RENAME TO gda_touchpoints;
+ALTER TABLE public._archive_20260523_gda_trend_arrays RENAME TO gda_trend_arrays;
+ALTER TABLE public._archive_20260523_gda_wargames RENAME TO gda_wargames;
+ALTER TABLE public._archive_20260523_gda_win_loss RENAME TO gda_win_loss;
+ALTER TABLE public._archive_20260523_gda_win_loss_db RENAME TO gda_win_loss_db;
+ALTER TABLE public._archive_20260523_govtribe_cache RENAME TO govtribe_cache;
+ALTER TABLE public._archive_20260523_opportunity_alerts RENAME TO opportunity_alerts;
+
+-- 30 N8N-ONLY tables
+ALTER TABLE public._archive_20260523_gda_action_history RENAME TO gda_action_history;
+ALTER TABLE public._archive_20260523_gda_ai_feedback RENAME TO gda_ai_feedback;
+ALTER TABLE public._archive_20260523_gda_aop_tracker RENAME TO gda_aop_tracker;
+ALTER TABLE public._archive_20260523_gda_approval_queue RENAME TO gda_approval_queue;
+ALTER TABLE public._archive_20260523_gda_capture_lessons RENAME TO gda_capture_lessons;
+ALTER TABLE public._archive_20260523_gda_chat_history RENAME TO gda_chat_history;
+ALTER TABLE public._archive_20260523_gda_clause_library RENAME TO gda_clause_library;
+ALTER TABLE public._archive_20260523_gda_competitor_crawls RENAME TO gda_competitor_crawls;
+ALTER TABLE public._archive_20260523_gda_compliance_matrices RENAME TO gda_compliance_matrices;
+ALTER TABLE public._archive_20260523_gda_contract_vehicles RENAME TO gda_contract_vehicles;
+ALTER TABLE public._archive_20260523_gda_daily_briefings RENAME TO gda_daily_briefings;
+ALTER TABLE public._archive_20260523_gda_daily_briefs RENAME TO gda_daily_briefs;
+ALTER TABLE public._archive_20260523_gda_deep_research RENAME TO gda_deep_research;
+ALTER TABLE public._archive_20260523_gda_dept_market RENAME TO gda_dept_market;
+ALTER TABLE public._archive_20260523_gda_discussions RENAME TO gda_discussions;
+ALTER TABLE public._archive_20260523_gda_doc_inbox RENAME TO gda_doc_inbox;
+ALTER TABLE public._archive_20260523_gda_e2e_reports RENAME TO gda_e2e_reports;
+ALTER TABLE public._archive_20260523_gda_feedback RENAME TO gda_feedback;
+ALTER TABLE public._archive_20260523_gda_health_scans RENAME TO gda_health_scans;
+ALTER TABLE public._archive_20260523_gda_idiq_tracker RENAME TO gda_idiq_tracker;
+ALTER TABLE public._archive_20260523_gda_incumbent_analysis RENAME TO gda_incumbent_analysis;
+ALTER TABLE public._archive_20260523_gda_knowledge_base RENAME TO gda_knowledge_base;
+ALTER TABLE public._archive_20260523_gda_learning_log RENAME TO gda_learning_log;
+ALTER TABLE public._archive_20260523_gda_meeting_notes RENAME TO gda_meeting_notes;
+ALTER TABLE public._archive_20260523_gda_mega_cache RENAME TO gda_mega_cache;
+ALTER TABLE public._archive_20260523_gda_naics_tracking RENAME TO gda_naics_tracking;
+ALTER TABLE public._archive_20260523_gda_ndaa_intel RENAME TO gda_ndaa_intel;
+ALTER TABLE public._archive_20260523_gda_ooda_loops RENAME TO gda_ooda_loops;
+ALTER TABLE public._archive_20260523_gda_prompt_architect_memory RENAME TO gda_prompt_architect_memory;
+ALTER TABLE public._archive_20260523_gda_pwin_scores RENAME TO gda_pwin_scores;
+
+-- 6 orphan tables
+ALTER TABLE public._archive_20260523_gda_content_store RENAME TO gda_content_store;
+ALTER TABLE public._archive_20260523_gda_data_lake RENAME TO gda_data_lake;
+ALTER TABLE public._archive_20260523_gda_decision_memory RENAME TO gda_decision_memory;
+ALTER TABLE public._archive_20260523_gda_interaction_log RENAME TO gda_interaction_log;
+ALTER TABLE public._archive_20260523_gda_pattern_library RENAME TO gda_pattern_library;
+ALTER TABLE public._archive_20260523_gda_stage_audit RENAME TO gda_stage_audit;
 ```
 
-**Time to rollback:** < 1 minute for all 58 tables.  
+**Time to rollback:** < 1 minute for all 64 tables.  
 **Data loss:** None.
 
 ### Phase 5b rollback (backup restore required)
@@ -457,7 +544,9 @@ for TABLE in daily_trends ft_opportunity_signal ft_signal_source \
   gda_e2e_reports gda_feedback gda_health_scans gda_idiq_tracker \
   gda_incumbent_analysis gda_knowledge_base gda_learning_log \
   gda_meeting_notes gda_mega_cache gda_naics_tracking gda_ndaa_intel \
-  gda_ooda_loops gda_prompt_architect_memory gda_pwin_scores; do
+  gda_ooda_loops gda_prompt_architect_memory gda_pwin_scores \
+  gda_content_store gda_data_lake gda_decision_memory \
+  gda_interaction_log gda_pattern_library gda_stage_audit; do
   # Count workflow references (expected: many, but all via HwronxMmGY5XDGEt which now targets gda_command)
   echo "$TABLE: checking..."
 done
@@ -503,31 +592,76 @@ Five tables were identified in F-023 as auto-creating via `CREATE TABLE IF NOT E
 
 ---
 
-## 10. Open Questions for Architect
+## 10. Open Questions — RESOLVED
+
+All open questions from the initial plan have been resolved by architect decision.
 
 ### Q1: What to do with the 6 orphan GDA tables?
 
-Six GDA tables (`gda_content_store`, `gda_data_lake`, `gda_decision_memory`, `gda_interaction_log`, `gda_pattern_library`, `gda_stage_audit`) exist on n8n but NOT on gda_command. They contain 330 rows total and are referenced by active workflows.
+**RESOLVED — Option A: Migrate then rename.**
 
-**Options:**
-- **A. Migrate then rename:** Create migrations for these 6 tables on gda_command, copy data, then include them in Phase 5a rename. Requires a mini Step 3-style operation.
-- **B. Rename with the 58:** Rename them alongside the 58 known tables. The referencing workflows (which mostly don't fire or use webhook auth) will error. Treat as tech debt.
-- **C. Keep on n8n:** Leave these 6 tables on n8n permanently. They're small, not in the migration scope, and referenced by low-traffic workflows.
-- **D. Drop the referencing workflows:** If these workflows are dead (4 of 5 have zero executions), deactivate/delete them and then rename the tables.
+All 6 orphan tables get migrated to gda_command via a new prerequisite operation: **Step 4b** (Section 11). Step 4b is inserted BEFORE Phase 5a in the timeline.
 
-**Architect decision needed.**
+Rationale: `gda_pattern_library` and `gda_stage_audit` are referenced by `HwronxMmGY5XDGEt` workflows that will error on next fire. The other 4 are cheap to migrate (~330 rows total) and reducing exceptions is better than tracking them forever.
+
+Step 4b follows the 4-PR discipline pattern (plan → script+rehearsal → schema → data) per project standard. Step 4b is its own work — this plan references it as a prerequisite, not includes the migration itself.
 
 ### Q2: Include the 6 orphan tables in Phase 5a backup?
 
-If Option A or B, the backup pg_dump should include these 6 tables. If Option C, no backup needed (they stay on n8n).
+**RESOLVED — YES.**
+
+Backup includes all 6 orphans on the n8n side, included in the Phase 5a pre-rename pg_dump. Even though Step 4b will migrate them, the orphan source-of-truth is on n8n until Step 4b completes, and Phase 5a backup is our only forensic record post-rename.
 
 ### Q3: Phase 5a timing
 
-Should Phase 5a execute immediately after the 24h soak, or wait for a specific low-traffic window?
+**RESOLVED — After BOTH conditions met:**
+
+1. Step 4b CLOSED (all 6 orphans migrated to gda_command, parity confirmed)
+2. 24h soak from Step 4 cutover (12:24 PM EST 2026-05-23) elapsed
+
+Step 4b can run in parallel with the 24h soak — Step 4b doesn't touch n8n shadow tables, only adds to gda_command. Phase 5a executes when both gates are met.
 
 ### Q4: Phase 5b approval process
 
-After the 7-day observation window, should Phase 5b (DROP) require a separate PR, or can it be a commit on the same PR as Phase 5a?
+**RESOLVED — Separate PR.**
+
+Phase 5b (DROP) requires a separate PR. Irreversible operations get discrete architect-read moments. No bundling.
+
+---
+
+## 11. Step 4b — Orphan Migration (PREREQUISITE)
+
+### Operation
+
+Migrate 6 orphan GDA tables from n8n-envision-postgres-1/n8n to gda-postgres/gda_command:
+
+| Table | n8n Rows | Notes |
+|-------|----------|-------|
+| `gda_content_store` | 13 | Referenced by GDA.auto.learning-capture |
+| `gda_data_lake` | 54 | Referenced by GDA.cron.competitor-auto-enrichment |
+| `gda_decision_memory` | 2 | Referenced by GDA.auto.learning-capture |
+| `gda_interaction_log` | 30 | Referenced by GDA.auto.learning-capture |
+| `gda_pattern_library` | 219 | Referenced by GDA.auto.pattern-extractor + GDA.event.bidirectional-sync (uses HwronxMmGY5XDGEt) |
+| `gda_stage_audit` | 12 | Referenced by GDA.event.bidirectional-sync + GDA.cron.amendment-monitor (uses HwronxMmGY5XDGEt) |
+
+**Total rows:** ~330
+
+### Pattern
+
+Same 4-PR discipline as Step 3b:
+
+1. **Plan PR** — schema analysis, migration strategy, staging rehearsal plan
+2. **Script + staging rehearsal PR** — migration script, schema migrations, 3-pass staging rehearsal proof
+3. **Schema apply PR** — apply migrations to prod gda_command (creates empty tables)
+4. **Data execution PR** — copy data, verify parity, update sequences
+
+### Urgency
+
+**`gda_pattern_library`** and **`gda_stage_audit`** are referenced by workflows using credential `HwronxMmGY5XDGEt`, which was pivoted to gda-postgres/gda_command in Step 4. These workflows will ERROR on next execution because the tables don't exist on gda_command yet. Step 4b should be prioritized before either table is queried.
+
+### Scope note
+
+Step 4b is its own work and will be drafted as a separate PR sequence after this plan PR merges. This plan (Step 5) references Step 4b as a prerequisite — Phase 5a will not execute until Step 4b is CLOSED.
 
 ---
 
@@ -536,20 +670,24 @@ After the 7-day observation window, should Phase 5b (DROP) require a separate PR
 | Phase | When | Duration | Reversible? |
 |-------|------|----------|-------------|
 | Step 4 cutover complete | 2026-05-23 12:00 EDT | — | — |
-| 24h soak | 2026-05-23 → 2026-05-24 12:00 EDT | 24h | — |
-| Phase 5a (rename) | After soak + architect approval | ~5 min | YES (rename back) |
-| 7-day observation | Phase 5a + 7 days | 7 days | — |
-| Phase 5b (drop) | After observation + architect approval | ~2 min | NO (backup restore only) |
+| 24h soak from Step 4 cutover | through 2026-05-24 12:00 EDT | 24h | — |
+| Step 4b plan PR | TBD (after this PR merges) | — | — |
+| Step 4b execution (4 PRs) | TBD | — | — |
+| Phase 5a (rename, all 64 tables) | After BOTH 24h soak elapsed AND Step 4b CLOSED | ~5 min | YES (rename back) |
+| 7-day observation window | Phase 5a + 7 days | 7 days | — |
+| Phase 5b (drop, separate PR) | After observation + architect approval | ~2 min | NO (backup restore only) |
 
 ---
 
 ## Summary
 
-- **58 tables** in scope for two-phase drop (rename → observe → drop)
-- **6 orphan tables** discovered — need architect decision (Section 10, Q1)
+- **64 tables** in Phase 5a scope for two-phase drop (58 known + 6 orphans migrated via Step 4b)
+- **Step 4b** is a prerequisite — migrates 6 orphan tables (~330 rows) to gda_command before Phase 5a
 - **92 n8n internal tables** out of scope
 - **5 self-creating tables** don't exist anywhere yet — no action needed
 - **No schema_migrations** on n8n DB — nothing to clean
-- **Backup before any operation** — 30-day retention
-- **Rollback for Phase 5a:** trivial rename-back
+- **Backup before any operation** — 64 tables, 30-day retention
+- **Rollback for Phase 5a:** trivial rename-back (64 statements, < 1 min)
 - **Rollback for Phase 5b:** backup restore (irreversible without it)
+- **Phase 5b** is a separate PR — irreversible operations get discrete architect-read moments
+- **All open questions resolved** (Section 10)
