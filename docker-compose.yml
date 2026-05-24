@@ -8,13 +8,13 @@ services:
     environment:
       POSTGRES_USER: gda
       POSTGRES_PASSWORD: gda_dev_password
-      POSTGRES_DB: gda_command
+      POSTGRES_DB: gda
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gda -d gda_command"]
+      test: ["CMD-SHELL", "pg_isready -U gda -d gda"]
       interval: 5s
       timeout: 3s
       retries: 5

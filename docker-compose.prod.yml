@@ -8,11 +8,11 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-gda}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-gda_command}
+      POSTGRES_DB: ${POSTGRES_DB:-gda}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gda} -d ${POSTGRES_DB:-gda_command}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gda} -d ${POSTGRES_DB:-gda}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -60,7 +60,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://${POSTGRES_USER:-gda}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gda_command}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gda}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gda}
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
       AUTH_REQUIRED: "true"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
@@ -92,6 +92,7 @@ services:
       - gda-uploads:/var/uploads/gda
     networks:
       - gda
+      - traefik
 
   frontend:
     build:
