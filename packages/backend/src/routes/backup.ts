@@ -81,7 +81,7 @@ router.get("/status", async (_req, res) => {
 router.post("/create", requireRole("admin"), async (_req, res) => {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const filename = `gda_command_${timestamp}_manual.sql.gz`;
+    const filename = `gda_${timestamp}_manual.sql.gz`;
 
     if (!fs.existsSync(DAILY_DIR)) {
       fs.mkdirSync(DAILY_DIR, { recursive: true });

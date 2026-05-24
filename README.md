@@ -128,7 +128,7 @@ cd packages/backend && npm run db:reset
 
 **Important**: The VM may have a system-level `DATABASE_URL` pointing elsewhere. Always start the backend with explicit override:
 ```bash
-DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda_command npm run dev
+DATABASE_URL=postgresql://gda:gda_dev_password@localhost:5432/gda npm run dev
 ```
 
 ## Production Deployment
@@ -161,7 +161,7 @@ Auto-migration runs on container startup. Set `AUTO_MIGRATE=false` to disable.
 | `POSTGRES_PASSWORD` | Yes | — | PostgreSQL password |
 | `JWT_SECRET` | Yes | — | JWT signing secret (`openssl rand -hex 32`) |
 | `POSTGRES_USER` | No | `gda` | PostgreSQL username |
-| `POSTGRES_DB` | No | `gda_command` | PostgreSQL database name |
+| `POSTGRES_DB` | No | `gda` | PostgreSQL database name |
 | `APP_PORT` | No | `80` | Port the frontend is exposed on |
 | `N8N_BASE_URL` | No | — | n8n instance URL for webhook integration |
 | `N8N_API_BASE` | No | — | n8n REST API base URL |
@@ -200,7 +200,7 @@ cd packages/backend && npm run db:backup
 cd packages/backend && npm run db:backup-status
 
 # Restore from a backup
-cd packages/backend && npm run db:restore /var/backups/gda/daily/gda_command_20250510.sql.gz
+cd packages/backend && npm run db:restore /var/backups/gda/daily/gda_20250510.sql.gz
 ```
 
 ### API-Based Backup

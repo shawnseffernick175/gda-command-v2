@@ -24,7 +24,7 @@ import path from "path";
 
 const DATABASE_URL =
   process.env.DATABASE_URL ??
-  "postgresql://gda:gda_dev_password@localhost:5432/gda_command";
+  "postgresql://gda:gda_dev_password@localhost:5432/gda";
 
 const OLD_NAMES = [
   "036_vehicle_classification.sql",

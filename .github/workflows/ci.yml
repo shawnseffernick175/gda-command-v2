@@ -42,11 +42,11 @@ jobs:
         env:
           POSTGRES_USER: gda
           POSTGRES_PASSWORD: gda_ci_password
-          POSTGRES_DB: gda_command
+          POSTGRES_DB: gda
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U gda -d gda_command"
+          --health-cmd "pg_isready -U gda -d gda"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
@@ -59,31 +59,31 @@ jobs:
       - run: npm ci
       - name: Run all migrations from scratch
         env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda
         run: npx tsx packages/backend/src/db/migrate.ts
       - name: Regression test — migration 044 non-UUID IDs
         env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda
         run: npx tsx packages/backend/src/db/test-migration-044.ts
       - name: Regression test — no duplicate migration numbers (F-010)
         run: npx tsx packages/backend/src/db/test-unique-migration-numbers.ts
       - name: Regression test — migration 045 state-dependent rename (F-010)
         env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda
         run: npx tsx packages/backend/src/db/test-migration-045.ts
       - name: Regression test — no missing migration numbers (F-011)
         run: npx tsx packages/backend/src/db/test-migration-completeness.ts
       - name: Regression test — migration 048 DIBBS cleanup (F-005)
         env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda
         run: npx tsx packages/backend/src/db/test-migration-048.ts
       - name: Regression test — migration 049 reverse GovTribe deprecation (F-005)
         env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda
         run: npx tsx packages/backend/src/db/test-migration-049.ts
       - name: Paired migration tests (F-017 harness)
         env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda
         working-directory: packages/backend
         run: npx vitest run --config vitest.migration.config.ts
 

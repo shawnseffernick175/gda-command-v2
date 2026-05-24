@@ -8,13 +8,13 @@
 # Environment variables (with defaults):
 #   POSTGRES_CONTAINER  — Docker container name (default: gda-v2-postgres)
 #   POSTGRES_USER       — Database user (default: gda)
-#   POSTGRES_DB         — Database name (default: gda_command)
+#   POSTGRES_DB         — Database name (default: gda)
 
 set -euo pipefail
 
 CONTAINER="${POSTGRES_CONTAINER:-gda-v2-postgres}"
 PG_USER="${POSTGRES_USER:-gda}"
-PG_DB="${POSTGRES_DB:-gda_command}"
+PG_DB="${POSTGRES_DB:-gda}"
 
 if [ $# -lt 1 ]; then
   echo "Usage: $0 <backup_file.sql.gz>" >&2

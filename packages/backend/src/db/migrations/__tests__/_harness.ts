@@ -55,7 +55,7 @@ export async function createSeededTestDb(
 ): Promise<pg.Pool> {
   const dbUrl =
     process.env.DATABASE_URL ??
-    "postgresql://gda:gda_dev_password@localhost:5432/gda_command";
+    "postgresql://gda:gda_dev_password@localhost:5432/gda";
 
   // Connect to the default database to create/drop the test db
   const adminPool = new pg.Pool({ connectionString: dbUrl });

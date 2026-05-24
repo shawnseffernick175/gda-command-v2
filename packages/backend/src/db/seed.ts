@@ -35,7 +35,7 @@ import { MOCK_FPDS_AWARDS } from "../data/fpds-mock";
 
 const DATABASE_URL =
   process.env.DATABASE_URL ??
-  "postgresql://gda:gda_dev_password@localhost:5432/gda_command";
+  "postgresql://gda:gda_dev_password@localhost:5432/gda";
 
 function esc(v: unknown): string | null {
   if (v === null || v === undefined) return null;

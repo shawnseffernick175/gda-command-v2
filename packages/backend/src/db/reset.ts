@@ -9,7 +9,7 @@ import path from "path";
 
 const DATABASE_URL =
   process.env.DATABASE_URL ??
-  "postgresql://gda:gda_dev_password@localhost:5432/gda_command";
+  "postgresql://gda:gda_dev_password@localhost:5432/gda";
 
 async function reset() {
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
