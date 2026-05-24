@@ -107,7 +107,7 @@ describe("F-019 Deploy Guard", () => {
 
     it("falls back to DATABASE_URL in dev", () => {
       const migrationUrl = undefined;
-      const appUrl = "postgresql://gda:pass@localhost/gda_command";
+      const appUrl = "postgresql://gda:pass@localhost/gda";
       const isProduction = false;
       const resolved = migrationUrl || appUrl;
       expect(resolved).toBe(appUrl);
@@ -118,7 +118,7 @@ describe("F-019 Deploy Guard", () => {
       // Until F-020 role separation lands, MIGRATION_DATABASE_URL is unset.
       // The runner falls back to DATABASE_URL without warning.
       const migrationUrl = undefined;
-      const appUrl = "postgresql://gda:pass@localhost/gda_command";
+      const appUrl = "postgresql://gda:pass@localhost/gda";
       const resolved = migrationUrl || appUrl;
       expect(resolved).toBe(appUrl);
     });

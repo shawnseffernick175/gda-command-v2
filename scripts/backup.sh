@@ -2,13 +2,13 @@
 # GDA Command v2 — PostgreSQL backup script
 # Usage: ./scripts/backup.sh [backup_dir]
 #
-# Creates a compressed pg_dump of the gda_command database.
+# Creates a compressed pg_dump of the gda database.
 # Rotates old backups: keeps last 7 daily + last 4 weekly.
 #
 # Environment variables (with defaults):
 #   POSTGRES_CONTAINER  — Docker container name (default: gda-v2-postgres)
 #   POSTGRES_USER       — Database user (default: gda)
-#   POSTGRES_DB         — Database name (default: gda_command)
+#   POSTGRES_DB         — Database name (default: gda)
 #   BACKUP_RETAIN_DAILY — Number of daily backups to keep (default: 7)
 #   BACKUP_RETAIN_WEEKLY — Number of weekly backups to keep (default: 4)
 
@@ -16,7 +16,7 @@ set -euo pipefail
 
 CONTAINER="${POSTGRES_CONTAINER:-gda-v2-postgres}"
 PG_USER="${POSTGRES_USER:-gda}"
-PG_DB="${POSTGRES_DB:-gda_command}"
+PG_DB="${POSTGRES_DB:-gda}"
 BACKUP_DIR="${1:-/var/backups/gda}"
 RETAIN_DAILY="${BACKUP_RETAIN_DAILY:-7}"
 RETAIN_WEEKLY="${BACKUP_RETAIN_WEEKLY:-4}"
@@ -25,7 +25,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 DAY_OF_WEEK=$(date +%u)  # 1=Monday, 7=Sunday
 DAILY_DIR="${BACKUP_DIR}/daily"
 WEEKLY_DIR="${BACKUP_DIR}/weekly"
-FILENAME="gda_command_${TIMESTAMP}.sql.gz"
+FILENAME="gda_${TIMESTAMP}.sql.gz"
 
 mkdir -p "${DAILY_DIR}" "${WEEKLY_DIR}"
 
@@ -53,18 +53,18 @@ if [ "${DAY_OF_WEEK}" = "7" ]; then
 fi
 
 # Rotate daily backups — keep last N
-DAILY_COUNT=$(ls -1 "${DAILY_DIR}"/gda_command_*.sql.gz 2>/dev/null | wc -l)
+DAILY_COUNT=$(ls -1 "${DAILY_DIR}"/gda_*.sql.gz "${DAILY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u | wc -l)
 if [ "${DAILY_COUNT}" -gt "${RETAIN_DAILY}" ]; then
   REMOVE_COUNT=$((DAILY_COUNT - RETAIN_DAILY))
-  ls -1t "${DAILY_DIR}"/gda_command_*.sql.gz | tail -n "${REMOVE_COUNT}" | xargs rm -f
+  ls -1t "${DAILY_DIR}"/gda_*.sql.gz "${DAILY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u -k1,1 | tail -n "${REMOVE_COUNT}" | xargs rm -f
   echo "[backup] Rotated ${REMOVE_COUNT} old daily backup(s), keeping ${RETAIN_DAILY}"
 fi
 
 # Rotate weekly backups — keep last N
-WEEKLY_COUNT=$(ls -1 "${WEEKLY_DIR}"/gda_command_*.sql.gz 2>/dev/null | wc -l)
+WEEKLY_COUNT=$(ls -1 "${WEEKLY_DIR}"/gda_*.sql.gz "${WEEKLY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u | wc -l)
 if [ "${WEEKLY_COUNT}" -gt "${RETAIN_WEEKLY}" ]; then
   REMOVE_COUNT=$((WEEKLY_COUNT - RETAIN_WEEKLY))
-  ls -1t "${WEEKLY_DIR}"/gda_command_*.sql.gz | tail -n "${REMOVE_COUNT}" | xargs rm -f
+  ls -1t "${WEEKLY_DIR}"/gda_*.sql.gz "${WEEKLY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u -k1,1 | tail -n "${REMOVE_COUNT}" | xargs rm -f
   echo "[backup] Rotated ${REMOVE_COUNT} old weekly backup(s), keeping ${RETAIN_WEEKLY}"
 fi
 

@@ -555,7 +555,7 @@ export const MOCK_SOURCES: BookOfTruthsDataSource[] = [
     name: "PostgreSQL Database",
     type: "database",
     description: "Primary data store for all GDA Command entities. Uses pgvector extension for semantic search capabilities.",
-    endpoint: "postgresql://gda:***@localhost:5432/gda_command",
+    endpoint: "postgresql://gda:***@localhost:5432/gda",
     entities_served: ["Opportunity", "Capture Plan", "Approval", "Doctrine Draft"],
     status: "active",
     refresh_frequency: "Real-time",

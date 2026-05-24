@@ -9,7 +9,7 @@ set -euo pipefail
 
 CONTAINER="${POSTGRES_CONTAINER:-gda-v2-postgres}"
 PG_USER="${POSTGRES_USER:-gda}"
-PG_DB="${POSTGRES_DB:-gda_command}"
+PG_DB="${POSTGRES_DB:-gda}"
 BACKUP_CONTAINER="${BACKUP_CONTAINER:-gda-v2-backend}"
 
 # Cron expression: daily at 2:00 AM server time

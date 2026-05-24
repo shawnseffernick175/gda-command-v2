@@ -24,7 +24,7 @@ function resolveConnectionUrl(): string {
   const migrationUrl = process.env.MIGRATION_DATABASE_URL?.trim() || null;
   const appUrl =
     process.env.DATABASE_URL ??
-    "postgresql://gda:gda_dev_password@localhost:5432/gda_command";
+    "postgresql://gda:gda_dev_password@localhost:5432/gda";
 
   if (migrationUrl) return migrationUrl;
 
