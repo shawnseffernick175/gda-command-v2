@@ -10,6 +10,7 @@ import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
 import { generateStorageKey, saveFile, deleteFile, isAllowedMimeType, getMaxFileSize, resolveMimeType } from "../lib/storage";
+import { extractText, EXTRACTABLE_MIME_TYPES } from "../lib/extract-text";
 import {
   isEmbeddingAvailable,
   vectorSearch,
@@ -522,30 +523,81 @@ router.post(
         });
       }
 
-      // Auto-vectorize: extract text and embed in background (non-blocking)
+      // Auto-vectorize: extract text and embed in background (non-blocking).
+      // Path A: plain text formats — read buffer directly.
+      // Path B: binary formats (PDF/DOCX/XLSX/PPTX/etc.) — run extractText() first.
       let vectorizationStarted = false;
       if (isEmbeddingAvailable() && pool) {
         const textMimes = ["text/plain", "text/markdown", "text/csv", "application/json"];
-        const isText = textMimes.includes(resolvedMime) || file.originalname.match(/\.(txt|md|csv|json|log)$/i);
-        if (isText) {
-          const rawText = file.buffer.toString("utf-8");
-          if (rawText.trim().length > 0) {
-            vectorizationStarted = true;
-            // Fire and forget — update status as it processes
-            embedDocument(docId, rawText).then((result) => {
-              pool.query(
+        const isPlainText =
+          textMimes.includes(resolvedMime) ||
+          !!file.originalname.match(/\.(txt|md|csv|json|log)$/i);
+        const isExtractable = EXTRACTABLE_MIME_TYPES.has(resolvedMime);
+
+        if (isPlainText || isExtractable) {
+          vectorizationStarted = true;
+
+          // Mark processing immediately so the UI sees state movement.
+          pool.query(
+            `UPDATE knowledge_documents SET status = 'processing', updated_at = NOW() WHERE id = $1`,
+            [docId],
+          ).catch(() => {});
+
+          // Capture what we need before going async (req/file may be GC'd).
+          const bufferCopy = Buffer.from(file.buffer);
+          const mimeForExtract = resolvedMime;
+          const fileNameForLog = file.originalname;
+
+          // Fire and forget.
+          (async () => {
+            try {
+              let rawText: string;
+              if (isPlainText) {
+                rawText = bufferCopy.toString("utf-8");
+              } else {
+                rawText = await extractText(bufferCopy, mimeForExtract);
+              }
+
+              if (!rawText || rawText.trim().length === 0) {
+                await pool.query(
+                  `UPDATE knowledge_documents SET status = 'skipped', updated_at = NOW() WHERE id = $1`,
+                  [docId],
+                );
+                log.warn("knowledge_auto_vectorize_empty", {
+                  docId,
+                  fileName: fileNameForLog,
+                  mime: mimeForExtract,
+                });
+                return;
+              }
+
+              const result = await embedDocument(docId, rawText);
+              await pool.query(
                 `UPDATE knowledge_documents SET status = 'indexed', chunk_count = $2, updated_at = NOW() WHERE id = $1`,
                 [docId, result.chunksCreated],
-              ).catch(() => {});
-              log.info("knowledge_auto_vectorized", { docId, chunks: result.chunksCreated, tokens: result.tokensUsed, ms: result.durationMs });
-            }).catch((embErr) => {
-              pool.query(
+              );
+              log.info("knowledge_auto_vectorized", {
+                docId,
+                fileName: fileNameForLog,
+                mime: mimeForExtract,
+                chunks: result.chunksCreated,
+                tokens: result.tokensUsed,
+                ms: result.durationMs,
+                path: isPlainText ? "plain" : "extracted",
+              });
+            } catch (embErr) {
+              await pool.query(
                 `UPDATE knowledge_documents SET status = 'error', updated_at = NOW() WHERE id = $1`,
                 [docId],
               ).catch(() => {});
-              log.error("knowledge_vectorize_error", { docId, error: (embErr as Error).message });
-            });
-          }
+              log.error("knowledge_vectorize_error", {
+                docId,
+                fileName: fileNameForLog,
+                mime: mimeForExtract,
+                error: (embErr as Error).message,
+              });
+            }
+          })();
         }
       }
 
