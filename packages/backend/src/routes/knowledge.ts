@@ -575,7 +575,7 @@ router.post(
               await pool.query(
                 `UPDATE knowledge_documents SET status = 'indexed', chunk_count = $2, updated_at = NOW() WHERE id = $1`,
                 [docId, result.chunksCreated],
-              );
+              ).catch(() => {});
               log.info("knowledge_auto_vectorized", {
                 docId,
                 fileName: fileNameForLog,
