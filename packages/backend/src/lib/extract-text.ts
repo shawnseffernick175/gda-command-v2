@@ -39,11 +39,18 @@ async function extractPdf(buffer: Buffer): Promise<string> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfMod = require("pdf-parse") as {
-      PDFParse: new (opts: { data: Buffer | Uint8Array }) => { getText: () => Promise<{ text: string }> };
+      PDFParse: new (opts: { data: Buffer | Uint8Array }) => {
+        getText: () => Promise<{ text: string }>;
+        destroy: () => Promise<void>;
+      };
     };
     const parser = new pdfMod.PDFParse({ data: buffer });
-    const result = await parser.getText();
-    return result.text;
+    try {
+      const result = await parser.getText();
+      return result.text;
+    } finally {
+      await parser.destroy();
+    }
   } catch (err) {
     log.error("pdf_parse_error", { error: String(err) });
     return "";
