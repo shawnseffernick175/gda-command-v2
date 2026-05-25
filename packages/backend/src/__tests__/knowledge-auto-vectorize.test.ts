@@ -25,7 +25,7 @@ interface AutoVectorizeInput {
 
 interface AutoVectorizeResult {
   started: boolean;
-  finalStatus: "processing" | "indexed" | "skipped" | "error" | "pending";
+  finalStatus: "processing" | "indexed" | "skipped" | "failed" | "pending";
   chunkCount?: number;
   error?: string;
   path?: "plain" | "extracted";
@@ -96,7 +96,7 @@ async function runAutoVectorize(
   } catch (err) {
     return {
       started: true,
-      finalStatus: "error",
+      finalStatus: "failed",
       error: (err as Error).message,
       path: isPlainText ? "plain" : "extracted",
     };
@@ -236,7 +236,7 @@ describe("F-038: Knowledge auto-vectorize on upload", () => {
     expect(embedder).not.toHaveBeenCalled();
   });
 
-  it("6. extractText throws → status=error", async () => {
+  it("6. extractText throws → status=failed", async () => {
     const embedder = successEmbedder();
     const result = await runAutoVectorize(
       {
@@ -251,7 +251,7 @@ describe("F-038: Knowledge auto-vectorize on upload", () => {
     );
 
     expect(result.started).toBe(true);
-    expect(result.finalStatus).toBe("error");
+    expect(result.finalStatus).toBe("failed");
     expect(result.error).toBe("parse failed");
     expect(embedder).not.toHaveBeenCalled();
   });

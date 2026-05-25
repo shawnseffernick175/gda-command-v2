@@ -587,7 +587,7 @@ router.post(
               });
             } catch (embErr) {
               await pool.query(
-                `UPDATE knowledge_documents SET status = 'error', updated_at = NOW() WHERE id = $1`,
+                `UPDATE knowledge_documents SET status = 'failed', updated_at = NOW() WHERE id = $1`,
                 [docId],
               ).catch(() => {});
               log.error("knowledge_vectorize_error", {
