@@ -122,7 +122,7 @@ app.use("/api/auth", (req, _res, next) => {
 app.use("/api/ingest", ingestLimiter, ingestRouter);
 
 // --- Sentinel routes (mixed auth: /current public, /history JWT, /run x-gda-key) ---
-app.use("/api/sentinel", sentinelRouter);
+app.use("/api/sentinel", apiLimiter, sentinelRouter);
 
 // --- Webhook registry (auth-protected) ---
 app.get("/api/webhooks/registry", apiLimiter, authMiddleware, (_req, res) => {

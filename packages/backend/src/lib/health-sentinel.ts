@@ -45,10 +45,16 @@ async function withTimeout<T>(
   fn: (signal: AbortSignal) => Promise<T>,
 ): Promise<{ value: T; ms: number }> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   const start = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new DOMException(`Probe '${label}' timed out after ${PROBE_TIMEOUT_MS}ms`, "AbortError"));
+    }, PROBE_TIMEOUT_MS);
+  });
   try {
-    const value = await fn(controller.signal);
+    const value = await Promise.race([fn(controller.signal), timeoutPromise]);
     return { value, ms: Date.now() - start };
   } finally {
     clearTimeout(timer);
