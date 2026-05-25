@@ -1,0 +1,61 @@
+{
+  "name": "GDA.ops.sentinel",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      },
+      "id": "sentinel-cron",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GDA_BASE_URL }}/api/sentinel/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "sentinel-call",
+      "name": "POST Sentinel Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [{ "node": "POST Sentinel Run", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Health Sentinel — probes 8 system components every 5 minutes and writes a snapshot to system_health_snapshots. Calls POST /api/sentinel/run with x-gda-key header via GDA Webhook Auth v2 credential."
+  }
+}
