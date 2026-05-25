@@ -39,9 +39,9 @@ async function extractPdf(buffer: Buffer): Promise<string> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfMod = require("pdf-parse") as {
-      PDFParse: new (data: Uint8Array) => { getText: () => Promise<{ text: string }> };
+      PDFParse: new (opts: { data: Buffer | Uint8Array }) => { getText: () => Promise<{ text: string }> };
     };
-    const parser = new pdfMod.PDFParse(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength));
+    const parser = new pdfMod.PDFParse({ data: buffer });
     const result = await parser.getText();
     return result.text;
   } catch (err) {
