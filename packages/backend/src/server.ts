@@ -58,6 +58,7 @@ import sourcesRouter from "./routes/sources";
 import mergersRouter from "./routes/mergers";
 import aiGatewayRouter from "./routes/ai-gateway";
 import captureDisciplineRouter from "./routes/capture-discipline";
+import sentinelRouter from "./routes/sentinel";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck, waitForDB } from "./lib/db";
@@ -119,6 +120,9 @@ app.use("/api/auth", (req, _res, next) => {
 
 // --- Ingest routes (key-based auth, no JWT, rate-limited) ---
 app.use("/api/ingest", ingestLimiter, ingestRouter);
+
+// --- Sentinel routes (mixed auth: /current public, /history JWT, /run x-gda-key) ---
+app.use("/api/sentinel", sentinelRouter);
 
 // --- Webhook registry (auth-protected) ---
 app.get("/api/webhooks/registry", apiLimiter, authMiddleware, (_req, res) => {

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ExportButton from "../components/ExportButton";
 import InfoBadge from "../components/InfoBadge";
 import SourceBadge from "../components/SourceBadge";
+import SystemStatusStrip from "../components/SystemStatusStrip";
 import {
   fetchOpportunities,
   qualifyOpportunity,
@@ -260,6 +261,9 @@ export default function OpsTracker() {
 
   return (
     <div>
+      <div style={{ marginBottom: 8 }}>
+        <SystemStatusStrip />
+      </div>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Ops Tracker</h1>

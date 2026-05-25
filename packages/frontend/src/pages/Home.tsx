@@ -18,6 +18,7 @@ import {
 } from "../api/client";
 import { useToast } from "../components/Toast";
 import InfoBadge from "../components/InfoBadge";
+import SystemStatusStrip from "../components/SystemStatusStrip";
 
 function formatCurrency(v: number | null): string {
   if (v === null || v === undefined || v === 0) return "$0";
@@ -206,6 +207,9 @@ export default function Home() {
 
   return (
     <div>
+      <div style={{ marginBottom: 8 }}>
+        <SystemStatusStrip />
+      </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700 }}>
           GDA Command Center
