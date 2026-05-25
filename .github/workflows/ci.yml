@@ -117,7 +117,7 @@ jobs:
       - name: Run migrations against staging
         if: env.staging_unreachable != 'true'
         env:
-          DATABASE_URL: postgresql://gda_staging:staging_only_not_prod@localhost:15432/gda_command_staging
+          DATABASE_URL: postgresql://gda_staging:staging_only_not_prod@localhost:15432/gda_staging
         run: |
           npx tsx packages/backend/src/db/migrate.ts
           echo "All migrations passed against staging"

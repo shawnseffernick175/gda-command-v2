@@ -53,18 +53,18 @@ if [ "${DAY_OF_WEEK}" = "7" ]; then
 fi
 
 # Rotate daily backups — keep last N
-DAILY_COUNT=$(ls -1 "${DAILY_DIR}"/gda_*.sql.gz "${DAILY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u | wc -l)
+DAILY_COUNT=$(ls -1 "${DAILY_DIR}"/gda_*.sql.gz 2>/dev/null | wc -l)
 if [ "${DAILY_COUNT}" -gt "${RETAIN_DAILY}" ]; then
   REMOVE_COUNT=$((DAILY_COUNT - RETAIN_DAILY))
-  ls -1t "${DAILY_DIR}"/gda_*.sql.gz "${DAILY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u -k1,1 | tail -n "${REMOVE_COUNT}" | xargs rm -f
+  ls -1t "${DAILY_DIR}"/gda_*.sql.gz 2>/dev/null | tail -n "${REMOVE_COUNT}" | xargs rm -f
   echo "[backup] Rotated ${REMOVE_COUNT} old daily backup(s), keeping ${RETAIN_DAILY}"
 fi
 
 # Rotate weekly backups — keep last N
-WEEKLY_COUNT=$(ls -1 "${WEEKLY_DIR}"/gda_*.sql.gz "${WEEKLY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u | wc -l)
+WEEKLY_COUNT=$(ls -1 "${WEEKLY_DIR}"/gda_*.sql.gz 2>/dev/null | wc -l)
 if [ "${WEEKLY_COUNT}" -gt "${RETAIN_WEEKLY}" ]; then
   REMOVE_COUNT=$((WEEKLY_COUNT - RETAIN_WEEKLY))
-  ls -1t "${WEEKLY_DIR}"/gda_*.sql.gz "${WEEKLY_DIR}"/gda_command_*.sql.gz 2>/dev/null | sort -u -k1,1 | tail -n "${REMOVE_COUNT}" | xargs rm -f
+  ls -1t "${WEEKLY_DIR}"/gda_*.sql.gz 2>/dev/null | tail -n "${REMOVE_COUNT}" | xargs rm -f
   echo "[backup] Rotated ${REMOVE_COUNT} old weekly backup(s), keeping ${RETAIN_WEEKLY}"
 fi
 
