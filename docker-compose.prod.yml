@@ -27,7 +27,7 @@ services:
     environment:
       POSTGRES_USER: ${STAGING_POSTGRES_USER:-gda_staging}
       POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:-staging_only_not_prod}
-      POSTGRES_DB: gda_command_staging
+      POSTGRES_DB: ${STAGING_POSTGRES_DB:-gda_staging}
     volumes:
       - pgdata-staging:/var/lib/postgresql/data
     ports:
