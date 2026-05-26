@@ -295,6 +295,15 @@ describe("computeSourceHealthStatus", () => {
     expect(result.status).toBe("down");
   });
 
+  it("missing_key treated as down (consistent with QA dashboard 'critical')", () => {
+    const result = computeSourceHealthStatus([
+      { source: "sam", status: "healthy" },
+      { source: "govwin", status: "missing_key" },
+      { source: "govtribe", status: "healthy" },
+    ]);
+    expect(result.status).toBe("down");
+  });
+
   it("detail string contains all sources", () => {
     const result = computeSourceHealthStatus([
       { source: "sam", status: "healthy" },

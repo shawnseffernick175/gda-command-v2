@@ -183,7 +183,7 @@ export function computeSourceHealthStatus(
   }
   const summary = rows.map((r) => `${r.source}=${r.status}`).join(", ");
   let status: ComponentStatus;
-  if (rows.some((r) => r.status === "error")) {
+  if (rows.some((r) => r.status === "error" || r.status === "missing_key")) {
     status = "down";
   } else if (rows.some((r) => r.status === "degraded")) {
     status = "degraded";
