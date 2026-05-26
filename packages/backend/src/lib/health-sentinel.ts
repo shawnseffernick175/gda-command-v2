@@ -135,6 +135,64 @@ async function probeN8nWorkflow(
   }
 }
 
+// Workflows excluded from writers_24h error-rate calculation.
+// GDA.error.handler is a meta workflow that fires when OTHER workflows fail —
+// counting its executions double-counts errors and inflates the rate.
+export const WRITERS_24H_EXCLUDED_NAMES: RegExp[] = [
+  /\.error\.handler$/i,
+  /error[_-]handler/i,
+];
+
+/** Pure logic for writers_24h: filter out excluded workflows, compute error rate & status. */
+export function computeWriters24hStatus(
+  rows: { wf_name: string; errors: number; total: number }[],
+  excludedPatterns: RegExp[] = WRITERS_24H_EXCLUDED_NAMES,
+): { status: ComponentStatus; detail: string; excludedNames: string[] } {
+  let totalAll = 0;
+  let errorsAll = 0;
+  const excludedNames: string[] = [];
+
+  for (const row of rows) {
+    const isExcluded = excludedPatterns.some((re) => re.test(row.wf_name));
+    if (isExcluded) {
+      excludedNames.push(row.wf_name);
+    } else {
+      totalAll += row.total;
+      errorsAll += row.errors;
+    }
+  }
+
+  const rate = totalAll > 0 ? (errorsAll / totalAll) * 100 : 0;
+  let status: ComponentStatus;
+  if (rate >= 5) {
+    status = "down";
+  } else if (rate >= 1) {
+    status = "degraded";
+  } else {
+    status = "healthy";
+  }
+  return { status, detail: `${rate.toFixed(1)}% error rate (${errorsAll}/${totalAll})`, excludedNames };
+}
+
+/** Pure logic for source_health: aggregate per-source rows into overall status. */
+export function computeSourceHealthStatus(
+  rows: { source: string; status: string }[],
+): { status: ComponentStatus; detail: string } {
+  if (rows.length === 0) {
+    return { status: "degraded", detail: "no source health snapshots recorded yet" };
+  }
+  const summary = rows.map((r) => `${r.source}=${r.status}`).join(", ");
+  let status: ComponentStatus;
+  if (rows.some((r) => r.status === "error" || r.status === "missing_key")) {
+    status = "down";
+  } else if (rows.some((r) => r.status === "degraded")) {
+    status = "degraded";
+  } else {
+    status = "healthy";
+  }
+  return { status, detail: summary };
+}
+
 async function probeWriters24h(): Promise<ProbeResult> {
   const start = Date.now();
   try {
@@ -143,29 +201,29 @@ async function probeWriters24h(): Promise<ProbeResult> {
       return { name: "writers_24h", status: "degraded", latency_ms: 0, detail: "N8N_DATABASE_URL not set" };
     }
     try {
-      const { value: row, ms } = await withTimeout("writers_24h", async () => {
+      const { value: rows, ms } = await withTimeout("writers_24h", async () => {
         const result = await n8nPool.query(
           `SELECT
-             COUNT(*) FILTER (WHERE status = 'error') AS errors,
+             w.name AS wf_name,
+             COUNT(*) FILTER (WHERE e.status = 'error') AS errors,
              COUNT(*) AS total
-           FROM execution_entity
-           WHERE "startedAt" > NOW() - INTERVAL '24 hours'
-             AND "workflowId" NOT IN ('LPUSYd4Vpph1Qg7n')`,
+           FROM execution_entity e
+           JOIN workflow_entity w ON e."workflowId" = w.id
+           WHERE e."startedAt" > NOW() - INTERVAL '24 hours'
+             AND e."workflowId" NOT IN ('LPUSYd4Vpph1Qg7n')
+           GROUP BY w.name`,
         );
-        return result.rows[0];
+        return result.rows as { wf_name: string; errors: string; total: string }[];
       });
 
-      const total = Number(row.total);
-      const errors = Number(row.errors);
-      const rate = total > 0 ? (errors / total) * 100 : 0;
+      const parsed = rows.map((r) => ({ wf_name: r.wf_name, errors: Number(r.errors), total: Number(r.total) }));
+      const { status, detail, excludedNames } = computeWriters24hStatus(parsed);
 
-      if (rate >= 5) {
-        return { name: "writers_24h", status: "down", latency_ms: ms, detail: `${rate.toFixed(1)}% error rate (${errors}/${total})` };
+      if (excludedNames.length > 0) {
+        log.info("writers_24h_excluded", { excluded: excludedNames });
       }
-      if (rate >= 1) {
-        return { name: "writers_24h", status: "degraded", latency_ms: ms, detail: `${rate.toFixed(1)}% error rate (${errors}/${total})` };
-      }
-      return { name: "writers_24h", status: "healthy", latency_ms: ms, detail: `${rate.toFixed(1)}% error rate (${errors}/${total})` };
+
+      return { name: "writers_24h", status, latency_ms: ms, detail };
     } finally {
       await n8nPool.end();
     }
@@ -248,14 +306,13 @@ async function probeSourceHealth(): Promise<ProbeResult> {
       return { name: "source_health", status: "degraded", latency_ms: 0, detail: "DB pool not available" };
     }
     const result = await pool.query(
-      `SELECT overall_status, snapshot_at FROM source_health_snapshots ORDER BY snapshot_at DESC LIMIT 1`,
+      `SELECT DISTINCT ON (source) source, status, snapshot_at
+       FROM source_health_snapshots
+       ORDER BY source, snapshot_at DESC`,
     );
-    if (result.rows.length === 0) {
-      return { name: "source_health", status: "degraded", latency_ms: Date.now() - start, detail: "no snapshots found" };
-    }
-    const row = result.rows[0];
-    const status: ComponentStatus = row.overall_status === "healthy" ? "healthy" : "degraded";
-    return { name: "source_health", status, latency_ms: Date.now() - start, detail: `overall=${row.overall_status}` };
+    const rows = result.rows as { source: string; status: string }[];
+    const { status, detail } = computeSourceHealthStatus(rows);
+    return { name: "source_health", status, latency_ms: Date.now() - start, detail };
   } catch (err) {
     return { name: "source_health", status: "degraded", latency_ms: Date.now() - start, detail: String((err as Error).message) };
   }

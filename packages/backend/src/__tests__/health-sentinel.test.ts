@@ -1,11 +1,16 @@
 /**
- * F-039: Health Sentinel tests.
+ * F-039 / F-042: Health Sentinel tests.
  *
- * Tests the rollup logic, probe handling, reason formatting, and snapshot
- * shape in isolation. All probes are mocked — no real DB, n8n, or SAM.gov.
+ * Tests the rollup logic, probe handling, reason formatting, snapshot shape,
+ * source_health aggregation, and writers_24h exclusion logic.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  computeSourceHealthStatus,
+  computeWriters24hStatus,
+  WRITERS_24H_EXCLUDED_NAMES,
+} from "../lib/health-sentinel";
 
 // ---------------------------------------------------------------------------
 // Types mirrored from health-sentinel.ts for isolated testing
@@ -249,5 +254,131 @@ describe("Health Sentinel", () => {
     const snapshot = simulateSentinel(probes, priorSnapshot);
     expect(snapshot.components).toHaveLength(8);
     expect(snapshot.overall_status).toBe("healthy");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-042: source_health probe aggregation
+// ---------------------------------------------------------------------------
+
+describe("computeSourceHealthStatus", () => {
+  it("empty table → degraded with appropriate detail", () => {
+    const result = computeSourceHealthStatus([]);
+    expect(result.status).toBe("degraded");
+    expect(result.detail).toBe("no source health snapshots recorded yet");
+  });
+
+  it("all sources healthy → healthy", () => {
+    const result = computeSourceHealthStatus([
+      { source: "sam", status: "healthy" },
+      { source: "govwin", status: "healthy" },
+      { source: "govtribe", status: "healthy" },
+    ]);
+    expect(result.status).toBe("healthy");
+  });
+
+  it("one source degraded, rest healthy → degraded", () => {
+    const result = computeSourceHealthStatus([
+      { source: "sam", status: "healthy" },
+      { source: "govwin", status: "degraded" },
+      { source: "govtribe", status: "healthy" },
+    ]);
+    expect(result.status).toBe("degraded");
+  });
+
+  it("one source error → down", () => {
+    const result = computeSourceHealthStatus([
+      { source: "sam", status: "healthy" },
+      { source: "govwin", status: "error" },
+      { source: "govtribe", status: "healthy" },
+    ]);
+    expect(result.status).toBe("down");
+  });
+
+  it("missing_key treated as down (consistent with QA dashboard 'critical')", () => {
+    const result = computeSourceHealthStatus([
+      { source: "sam", status: "healthy" },
+      { source: "govwin", status: "missing_key" },
+      { source: "govtribe", status: "healthy" },
+    ]);
+    expect(result.status).toBe("down");
+  });
+
+  it("detail string contains all sources", () => {
+    const result = computeSourceHealthStatus([
+      { source: "sam", status: "healthy" },
+      { source: "govwin", status: "degraded" },
+      { source: "govtribe", status: "healthy" },
+    ]);
+    expect(result.detail).toContain("sam=healthy");
+    expect(result.detail).toContain("govwin=degraded");
+    expect(result.detail).toContain("govtribe=healthy");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-042: writers_24h exclusion + rate computation
+// ---------------------------------------------------------------------------
+
+describe("computeWriters24hStatus", () => {
+  it("only error.handler executions (all errored) → excluded → healthy (no other writers)", () => {
+    const result = computeWriters24hStatus([
+      { wf_name: "GDA.error.handler", errors: 20, total: 20 },
+    ]);
+    expect(result.status).toBe("healthy");
+    expect(result.excludedNames).toContain("GDA.error.handler");
+    expect(result.detail).toContain("0/0");
+  });
+
+  it("1000 executions, 10 errors (1%), no meta → degraded", () => {
+    const result = computeWriters24hStatus([
+      { wf_name: "GDA.cron.change-detector", errors: 10, total: 1000 },
+    ]);
+    expect(result.status).toBe("degraded");
+    expect(result.detail).toContain("1.0%");
+  });
+
+  it("1000 executions, 50 errors (5%), no meta → down", () => {
+    const result = computeWriters24hStatus([
+      { wf_name: "GDA.cron.change-detector", errors: 50, total: 1000 },
+    ]);
+    expect(result.status).toBe("down");
+    expect(result.detail).toContain("5.0%");
+  });
+
+  it("1000 execs, 20 real errors + 30 from GDA.error.handler → meta excluded → 2% → degraded", () => {
+    const result = computeWriters24hStatus([
+      { wf_name: "GDA.cron.change-detector", errors: 10, total: 500 },
+      { wf_name: "GDA.cron.data-sync", errors: 10, total: 500 },
+      { wf_name: "GDA.error.handler", errors: 30, total: 30 },
+    ]);
+    expect(result.status).toBe("degraded");
+    expect(result.excludedNames).toContain("GDA.error.handler");
+    expect(result.detail).toContain("20/1000");
+  });
+
+  it("excluded names match regex variants", () => {
+    const names = [
+      "GDA.error.handler",
+      "My.Error.Handler",
+      "some-error-handler-thing",
+      "error_handler_v2",
+    ];
+    for (const name of names) {
+      expect(
+        WRITERS_24H_EXCLUDED_NAMES.some((re) => re.test(name)),
+      ).toBe(true);
+    }
+
+    const nonMatching = [
+      "GDA.cron.change-detector",
+      "GDA.api.intel-feed",
+      "GDA.cron.data-sync",
+    ];
+    for (const name of nonMatching) {
+      expect(
+        WRITERS_24H_EXCLUDED_NAMES.some((re) => re.test(name)),
+      ).toBe(false);
+    }
   });
 });
