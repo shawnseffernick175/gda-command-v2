@@ -42,7 +42,7 @@
         688
       ],
       "parameters": {
-        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [\"gda-deploy-2026-secure\", \"gda-api-2026-secure\", \"gda-webhook-secret-2026\"];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [\"<REDACTED_DEPLOY_KEY_2026>\", \"<REDACTED_AUTH_KEY_2026>\", \"<REDACTED_WEBHOOK_SECRET_2026>\"];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
       },
       "typeVersion": 2
     },
@@ -285,7 +285,7 @@
         "options": {
           "timeout": 15000
         },
-        "jsonBody": "={{ JSON.stringify({ api_key: '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', query: $fromAI('query', 'Search query', 'string'), max_results: 7, search_depth: 'basic' }) }}",
+        "jsonBody": "={{ JSON.stringify({ api_key: '<REDACTED_TAVILY_API_KEY>', query: $fromAI('query', 'Search query', 'string'), max_results: 7, search_depth: 'basic' }) }}",
         "sendBody": true,
         "sendHeaders": true,
         "specifyBody": "json",

@@ -305,7 +305,7 @@
             },
             {
               "name": "X-GDA-Key",
-              "value": "gda-api-2026-secure"
+              "value": "<REDACTED_AUTH_KEY_2026>"
             }
           ]
         }
@@ -374,7 +374,7 @@
           "parameters": [
             {
               "name": "api_key",
-              "value": "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"
+              "value": "<REDACTED_TAVILY_API_KEY>"
             },
             {
               "name": "query",
@@ -413,7 +413,7 @@
           "parameters": [
             {
               "name": "api_key",
-              "value": "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"
+              "value": "<REDACTED_TAVILY_API_KEY>"
             },
             {
               "name": "query",
@@ -452,7 +452,7 @@
           "parameters": [
             {
               "name": "api_key",
-              "value": "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"
+              "value": "<REDACTED_TAVILY_API_KEY>"
             },
             {
               "name": "query",
@@ -896,7 +896,7 @@
             },
             {
               "name": "X-GDA-Key",
-              "value": "gda-api-2026-secure"
+              "value": "<REDACTED_AUTH_KEY_2026>"
             }
           ]
         }
@@ -913,7 +913,7 @@
         -48
       ],
       "parameters": {
-        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (auth !== 'gda-deploy-2026-secure' && auth !== 'gda-api-2026-secure' && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (auth !== '<REDACTED_DEPLOY_KEY_2026>' && auth !== '<REDACTED_AUTH_KEY_2026>' && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
       },
       "typeVersion": 2
     },

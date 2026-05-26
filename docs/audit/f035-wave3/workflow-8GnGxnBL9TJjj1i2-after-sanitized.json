@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst bodyKey = body.deploy_key;\nconst validKey = 'gda-deploy-2027-AWqjhbxDYNcyV1mr';\n\nif (bodyKey !== validKey) {\n  throw new Error('Unauthorized: Missing or invalid deploy_key');\n}\n\nreturn $input.all();"
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst bodyKey = body.deploy_key;\nconst validKey = '<REDACTED_DEPLOY_KEY_2027>';\n\nif (bodyKey !== validKey) {\n  throw new Error('Unauthorized: Missing or invalid deploy_key');\n}\n\nreturn $input.all();"
       },
       "id": "auth-deploy",
       "name": "Auth Guard",

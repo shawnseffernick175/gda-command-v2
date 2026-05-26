@@ -37,7 +37,7 @@
       "id": "ft-guard",
       "name": "Auth Guard",
       "parameters": {
-        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst ok = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (!ok && auth !== $env.GDA_WEBHOOK_HEADER_VALUE_V2 && auth !== 'gda-api-2026-secure') {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst ok = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (!ok && auth !== $env.GDA_WEBHOOK_HEADER_VALUE_V2 && auth !== '<REDACTED_AUTH_KEY_2026>') {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
       },
       "position": [
         460,

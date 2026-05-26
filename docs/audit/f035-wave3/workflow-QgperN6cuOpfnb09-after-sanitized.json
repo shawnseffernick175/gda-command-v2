@@ -37,7 +37,7 @@
       "id": "cp-02-v2",
       "name": "Auth Check",
       "parameters": {
-        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\n\nfunction env(name, fallback) {\n  try { if (typeof $env !== 'undefined' && $env[name]) return $env[name]; } catch (e) {}\n  return fallback || '';\n}\nconst webhookHeaderValue = env('GDA_WEBHOOK_HEADER_VALUE');\nif (!webhookHeaderValue) throw new Error('GDA_WEBHOOK_HEADER_VALUE env var not set');\n\nif (auth !== 'gda-webhook-secret-2026' && auth !== 'gda-deploy-2027-a4zslQ79hn9A9UIi' && auth !== webhookHeaderValue && auth !== 'gda-api-2026-secure' && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\n\nfunction env(name, fallback) {\n  try { if (typeof $env !== 'undefined' && $env[name]) return $env[name]; } catch (e) {}\n  return fallback || '';\n}\nconst webhookHeaderValue = env('GDA_WEBHOOK_HEADER_VALUE');\nif (!webhookHeaderValue) throw new Error('GDA_WEBHOOK_HEADER_VALUE env var not set');\n\nif (auth !== '<REDACTED_WEBHOOK_SECRET_2026>' && auth !== '<REDACTED_DEPLOY_KEY_2027_V2>' && auth !== webhookHeaderValue && auth !== '<REDACTED_AUTH_KEY_2026>' && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
       },
       "position": [
         432,
@@ -509,7 +509,7 @@
             },
             {
               "name": "X-GDA-Key",
-              "value": "gda-webhook-secret-2026"
+              "value": "<REDACTED_WEBHOOK_SECRET_2026>"
             }
           ]
         },
@@ -631,7 +631,7 @@
         640
       ],
       "parameters": {
-        "jsCode": "const plan = $input.first().json;\nconst planId = plan.id || plan.rows?.[0]?.id;\nconst oppTitle = plan.opp_title || '';\nconst agency = plan.agency || '';\nconst naics = plan.naics_code || '';\nconst key = 'gda-webhook-secret-2026';\n\nlet compIntelResult = {};\nlet teamingResult = {};\n\ntry {\n  const ci = await fetch('https://n8n.csr-llc.tech/webhook/gda-comp-intel-2', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  compIntelResult = await ci.json();\n} catch(e) { compIntelResult = { error: e.message }; }\n\ntry {\n  const tm = await fetch('https://n8n.csr-llc.tech/webhook/gda-teaming-scorer', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  teamingResult = await tm.json();\n} catch(e) { teamingResult = { error: e.message }; }\n\nreturn [{ json: { plan_id: planId, opp_title: oppTitle, agency, comp_intel: compIntelResult, teaming: teamingResult } }];"
+        "jsCode": "const plan = $input.first().json;\nconst planId = plan.id || plan.rows?.[0]?.id;\nconst oppTitle = plan.opp_title || '';\nconst agency = plan.agency || '';\nconst naics = plan.naics_code || '';\nconst key = '<REDACTED_WEBHOOK_SECRET_2026>';\n\nlet compIntelResult = {};\nlet teamingResult = {};\n\ntry {\n  const ci = await fetch('https://n8n.csr-llc.tech/webhook/gda-comp-intel-2', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  compIntelResult = await ci.json();\n} catch(e) { compIntelResult = { error: e.message }; }\n\ntry {\n  const tm = await fetch('https://n8n.csr-llc.tech/webhook/gda-teaming-scorer', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  teamingResult = await tm.json();\n} catch(e) { teamingResult = { error: e.message }; }\n\nreturn [{ json: { plan_id: planId, opp_title: oppTitle, agency, comp_intel: compIntelResult, teaming: teamingResult } }];"
       },
       "continueOnFail": true
     },
