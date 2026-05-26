@@ -1,0 +1,112 @@
+name: Deploy to Prod
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — git pull only, no docker compose up"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy backend to prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only deploy when CI succeeded (workflow_run) or on manual trigger
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve deploy SHA
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy
+        id: deploy
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
+            scripts/deploy-prod.sh "${SSH_USER}@${SSH_HOST}:/tmp/deploy-prod.sh"
+          ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
+            "${SSH_USER}@${SSH_HOST}" "bash /tmp/deploy-prod.sh ${DRY_RUN}" | tee /tmp/deploy-output.txt
+          # Capture last line for status
+          tail -1 /tmp/deploy-output.txt >> "$GITHUB_OUTPUT"
+
+      - name: Set commit status — success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ steps.sha.outputs.sha }}',
+              state: 'success',
+              context: 'deploy/prod',
+              description: `Deployed to prod at ${new Date().toISOString()}`,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Set commit status — failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let detail = 'Deploy failed';
+            try {
+              const output = fs.readFileSync('/tmp/deploy-output.txt', 'utf8');
+              const lastLine = output.trim().split('\n').pop();
+              if (lastLine) detail = lastLine.substring(0, 140);
+            } catch {}
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ steps.sha.outputs.sha }}',
+              state: 'failure',
+              context: 'deploy/prod',
+              description: detail,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+      - name: Skip — CI not green
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion != 'success'
+        run: |
+          echo "::warning::CI workflow did not succeed (conclusion: ${{ github.event.workflow_run.conclusion }}). Skipping deploy."
