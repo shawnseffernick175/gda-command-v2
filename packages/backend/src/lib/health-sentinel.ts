@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Health Sentinel — single source of truth for system status.
-// Probes 8 components, writes a snapshot row, returns overall status.
+// Probes 9 components, writes a snapshot row, returns overall status.
 // Cron-driven only (no setInterval). Called by n8n every 5 minutes.
 // ---------------------------------------------------------------------------
 
@@ -8,6 +8,8 @@ import { getPool } from "./db";
 import { isEmbeddingAvailable } from "./embeddings";
 import { log } from "./logger";
 import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
 import pg from "pg";
 
 // ---------------------------------------------------------------------------
@@ -319,6 +321,123 @@ async function probeSourceHealth(): Promise<ProbeResult> {
 }
 
 // ---------------------------------------------------------------------------
+// Secret expiry probe — checks n8n API key JWTs + manual inventory
+// ---------------------------------------------------------------------------
+
+export interface SecretExpiryEntry {
+  name: string;
+  days_remaining: number | null; // null = unknown
+  source: "n8n_db" | "inventory";
+}
+
+/** Decode a JWT's exp claim without a library. Returns epoch seconds or null. */
+function decodeJwtExp(jwt: string): number | null {
+  try {
+    const parts = jwt.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Parse expiry_date annotations from the inventory markdown file. */
+export function parseInventoryExpiries(content: string): { name: string; expiry: Date | null }[] {
+  const results: { name: string; expiry: Date | null }[] = [];
+  const regex = /<!--\s*expiry_date:\s*(\S+)\s+(\S+)\s*-->/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(content)) !== null) {
+    const name = match[1];
+    const dateStr = match[2];
+    if (dateStr === "unknown" || dateStr === "never") {
+      results.push({ name, expiry: null });
+    } else {
+      const d = new Date(dateStr + "T00:00:00Z");
+      results.push({ name, expiry: isNaN(d.getTime()) ? null : d });
+    }
+  }
+  return results;
+}
+
+export function computeSecretExpiryStatus(
+  entries: SecretExpiryEntry[],
+): { status: ComponentStatus; detail: string } {
+  const expiring = entries.filter((e) => e.days_remaining !== null && e.days_remaining < 30);
+  const critical = entries.filter((e) => e.days_remaining !== null && e.days_remaining < 7);
+
+  if (critical.length > 0) {
+    const names = critical.map((e) => `${e.name}(${e.days_remaining}d)`).join(", ");
+    return { status: "down", detail: `critical <7d: ${names}` };
+  }
+  if (expiring.length > 0) {
+    const names = expiring.map((e) => `${e.name}(${e.days_remaining}d)`).join(", ");
+    return { status: "degraded", detail: `expiring <30d: ${names}` };
+  }
+  if (entries.length === 0) {
+    return { status: "degraded", detail: "no secret expiry data available" };
+  }
+  return { status: "healthy", detail: `${entries.length} secrets checked, all ok` };
+}
+
+async function probeSecretExpiry(): Promise<ProbeResult> {
+  const start = Date.now();
+  const entries: SecretExpiryEntry[] = [];
+
+  // 1. Query n8n DB for API key JWT expiries
+  try {
+    const n8nPool = getN8nPool();
+    if (n8nPool) {
+      try {
+        const { value: rows } = await withTimeout("secret_expiry_n8n", async () => {
+          const result = await n8nPool.query(
+            `SELECT id, label, "apiKey" FROM user_api_keys`,
+          );
+          return result.rows as { id: string; label: string; apiKey: string }[];
+        });
+        const nowEpoch = Date.now() / 1000;
+        for (const row of rows) {
+          const exp = decodeJwtExp(row.apiKey);
+          if (exp !== null) {
+            const daysRemaining = Math.floor((exp - nowEpoch) / 86400);
+            entries.push({ name: `n8n_api_key:${row.label}`, days_remaining: daysRemaining, source: "n8n_db" });
+          } else {
+            entries.push({ name: `n8n_api_key:${row.label}`, days_remaining: null, source: "n8n_db" });
+          }
+        }
+      } finally {
+        await n8nPool.end();
+      }
+    }
+  } catch (err) {
+    log.warn("secret_expiry_n8n_error", { error: String((err as Error).message) });
+  }
+
+  // 2. Read inventory file for manually-tracked expiries
+  try {
+    const inventoryPath = path.resolve(__dirname, "../../../../docs/audit/secret-expiry-inventory.md");
+    if (fs.existsSync(inventoryPath)) {
+      const content = fs.readFileSync(inventoryPath, "utf-8");
+      const manualEntries = parseInventoryExpiries(content);
+      const nowMs = Date.now();
+      for (const entry of manualEntries) {
+        if (entry.expiry) {
+          const daysRemaining = Math.floor((entry.expiry.getTime() - nowMs) / 86400000);
+          entries.push({ name: entry.name, days_remaining: daysRemaining, source: "inventory" });
+        } else {
+          entries.push({ name: entry.name, days_remaining: null, source: "inventory" });
+        }
+      }
+    }
+  } catch (err) {
+    log.warn("secret_expiry_inventory_error", { error: String((err as Error).message) });
+  }
+
+  const { status, detail } = computeSecretExpiryStatus(entries);
+  return { name: "secret_expiry", status, latency_ms: Date.now() - start, detail };
+}
+
+// ---------------------------------------------------------------------------
 // Rollup + reason
 // ---------------------------------------------------------------------------
 
@@ -364,11 +483,12 @@ export async function runSentinel(): Promise<Snapshot> {
     probeEmbeddings(),
     probeDisk(),
     probeSourceHealth(),
+    probeSecretExpiry(),
   ]);
 
   const components: ProbeResult[] = probes.map((p, i) => {
     if (p.status === "fulfilled") return p.value;
-    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health"];
+    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health", "secret_expiry"];
     return {
       name: names[i],
       status: "degraded" as ComponentStatus,
