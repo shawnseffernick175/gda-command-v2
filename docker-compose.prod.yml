@@ -64,6 +64,7 @@ services:
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
       AUTH_REQUIRED: "true"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      N8N_DATABASE_URL: ${N8N_DATABASE_URL:-}
       N8N_BASE_URL: ${N8N_BASE_URL:-}
       N8N_API_BASE: ${N8N_API_BASE:-}
       N8N_API_KEY: ${N8N_API_KEY:-}
@@ -93,6 +94,7 @@ services:
     networks:
       - gda
       - traefik
+      - n8n-internal
 
   frontend:
     build:
@@ -119,6 +121,9 @@ networks:
   traefik:
     external: true
     name: n8n_default
+  n8n-internal:
+    external: true
+    name: n8n-envision_envision-internal
 
 volumes:
   pgdata:

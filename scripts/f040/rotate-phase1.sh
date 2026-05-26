@@ -77,6 +77,13 @@ gen_hex() {
   openssl rand -hex "$((len / 2))"
 }
 
+url_encode() {
+  # URL-encode a string for safe use in postgresql:// connection strings.
+  # Hex passwords ([0-9a-f]) pass through unchanged; this guards against
+  # future changes to the generator (e.g. base64, user-supplied values).
+  python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"
+}
+
 update_env_var() {
   # Updates a variable in an .env file. If the var exists, replaces its value.
   # If not, appends it.
@@ -284,7 +291,8 @@ echo "  Step 1: done"
 # Step 2: Update .env — construct full MIGRATION_DATABASE_URL
 echo "  Step 2: Updating .env..."
 backup_env "$ENV_FILE"
-NEW_MIGRATION_URL="postgresql://gda_app:${NEW_APP_PASS}@localhost:5432/gda"
+ENCODED_APP_PASS=$(url_encode "$NEW_APP_PASS")
+NEW_MIGRATION_URL="postgresql://gda_app:${ENCODED_APP_PASS}@localhost:5432/gda"
 update_env_var "$ENV_FILE" "MIGRATION_DATABASE_URL" "$NEW_MIGRATION_URL"
 echo "  Step 2: done"
 
@@ -501,7 +509,8 @@ else
   # Step 3: Update N8N_DATABASE_URL in gda-backend .env
   echo "  Step 3: Updating N8N_DATABASE_URL in gda-backend .env..."
   backup_env "$ENV_FILE"
-  NEW_N8N_DB_URL="postgresql://n8n:${NEW_N8N_PG_PASS}@n8n-envision-postgres-1:5432/n8n"
+  ENCODED_N8N_PG_PASS=$(url_encode "$NEW_N8N_PG_PASS")
+  NEW_N8N_DB_URL="postgresql://n8n:${ENCODED_N8N_PG_PASS}@n8n-envision-postgres-1:5432/n8n"
   update_env_var "$ENV_FILE" "N8N_DATABASE_URL" "$NEW_N8N_DB_URL"
   echo "  Step 3: done"
 
