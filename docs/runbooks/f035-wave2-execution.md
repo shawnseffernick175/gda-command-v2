@@ -79,7 +79,7 @@ successful auth and returns only:
 
 **Before:**
 ```js
-const FIX_AGENT_KEY = 'gda-fix-agent-2026-private';
+const FIX_AGENT_KEY = '<REDACTED>';
 ```
 
 **After:**
@@ -136,7 +136,7 @@ const HEADERS = { 'Authorization': `token ${PAT}`, ... };
 - Replaced `this.helpers.httpRequest()` with `this.helpers.httpRequestWithAuthentication('httpHeaderAuth', opts)`
 - Authorization header now injected automatically by the credential
 
-Grep for `ghp_grzU` in workflow JSON: **0 matches**.
+Grep for `ghp_<REDACTED>` in workflow JSON: **0 matches**.
 
 ## Post-State
 
@@ -158,9 +158,9 @@ After Wave 2, the following patterns were scanned across all 158 workflows:
 
 | Pattern | Matches | Status |
 |---------|---------|--------|
-| `gda-fix-agent-2026-private` | 0 | Migrated |
-| `qa-agent-test-2026-adlkjfn7987-...` | 0 | Migrated |
-| `gda-api-2026-f584dae2` | 0 | Migrated |
-| `ghp_grzU` | 0 | Migrated |
-| `gda-api-2027-AWqjhbx...` (newer webhook value) | 10 workflows | **Wave 3** |
+| `<REDACTED_FIX_AGENT_KEY>` | 0 | Migrated |
+| `<REDACTED_QA_AGENT_KEY>` | 0 | Migrated |
+| `<REDACTED_WEBHOOK_HEADER_VALUE>` | 0 | Migrated |
+| `ghp_<REDACTED>` | 0 | Migrated |
+| `<REDACTED_WEBHOOK_HEADER_VALUE_V2>` (newer webhook value) | 10 workflows | **Wave 3** |
 | `eyJhbGci` (n8n JWT) | 0 in scoped workflows | Migrated in Wave 1 |
