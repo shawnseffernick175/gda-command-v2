@@ -1,0 +1,766 @@
+{
+  "updatedAt": "2026-05-26T21:28:49.235Z",
+  "createdAt": "2026-03-07T21:04:21.506Z",
+  "id": "8GnGxnBL9TJjj1i2",
+  "name": "GDA.dev.deploy",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gda-deploy",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        208,
+        304
+      ],
+      "webhookId": "4293742b-8263-4052-8298-85bfbee21fe8",
+      "typeVersion": 2.1,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1pNPY36DDz49OtKL",
+          "name": "GDA Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('Auth Guard').first().json;\nconst body = item.body || item;\nconst mode = body.mode || 'patch_script';\nconst msg = body.msg || 'deploy';\nlet script = '';\nif (mode === 'patch_script') {\n  const ps = body.patch_script;\n  if (!ps) throw new Error('patch_script is missing from body');\n  const b64 = Buffer.from(ps, 'utf-8').toString('base64');\n  script = 'echo ' + b64 + ' | base64 -d > /tmp/gda_patch.py && python3 /tmp/gda_patch.py && rm /tmp/gda_patch.py';\n} else if (mode === 'b64_file') {\n  const b64 = body.b64_content;\n  const dest = body.dest || '/opt/gda-command/src/App.jsx';\n  script = 'echo ' + b64 + ' | base64 -d > ' + dest + ' && echo WROTE: ' + dest;\n} else if (mode === 'build_only') {\n  script = 'echo WROTE: build_only_trigger';\n}\nreturn [{ json: { script, msg } }];"
+      },
+      "id": "code",
+      "name": "Build Script",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        656,
+        304
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "={{ $json.script }}"
+      },
+      "id": "ssh-write",
+      "name": "SSH Write Files",
+      "type": "n8n-nodes-base.ssh",
+      "position": [
+        880,
+        304
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "NKOxLo5F81sRNPua",
+          "name": "GDA VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "export PATH=/root/.nvm/versions/node/v20.20.0/bin:$PATH && cd /opt/gda-command && node_modules/.bin/vite build 2>&1 && cp -r dist/. /root/gda-frontend/dist/ && docker restart n8n-envision-gda-frontend-1 2>&1 && echo DEPLOY_COMPLETE_$(date +%s)"
+      },
+      "id": "ssh",
+      "name": "SSH Build",
+      "type": "n8n-nodes-base.ssh",
+      "position": [
+        1104,
+        304
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "NKOxLo5F81sRNPua",
+          "name": "GDA VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!$env.GDA_DEPLOY_KEY_V2) throw new Error('GDA_DEPLOY_KEY_V2 env var not set');\nconst body = $input.first().json.body || $input.first().json;\nconst bodyKey = body.deploy_key;\nconst validKey = $env.GDA_DEPLOY_KEY_V2;\n\nif (bodyKey !== validKey) {\n  throw new Error('Unauthorized: Missing or invalid deploy_key');\n}\n\nreturn $input.all();"
+      },
+      "id": "auth-deploy",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        432,
+        304
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "path": "gda-read-2",
+        "options": {}
+      },
+      "id": "wh-read",
+      "name": "Read Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        208,
+        512
+      ],
+      "webhookId": "gda-read-webhook-001",
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey"
+      },
+      "id": "ssh-read",
+      "name": "SSH Read File",
+      "type": "n8n-nodes-base.ssh",
+      "position": [
+        512,
+        512
+      ],
+      "typeVersion": 1,
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "NKOxLo5F81sRNPua",
+          "name": "GDA VPS SSH Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ content: $json.stdout, file: $('Read Webhook').first().json.body.file || 'App.jsx' }) }}",
+        "options": {}
+      },
+      "id": "resp-read",
+      "name": "Read Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        784,
+        512
+      ],
+      "typeVersion": 1.5
+    },
+    {
+      "parameters": {
+        "jsCode": "const buildOut = $('SSH Build').first().json.stdout || '';\nconst buildErr = $('SSH Build').first().json.stderr || '';\nconst isSuccess = buildOut.includes('DEPLOY_COMPLETE');\nconst deployMsg = $('Build Script').first().json.msg || 'deploy';\n\n// Extract git commit short hash\nconst commitMatch = buildOut.match(/\\[main ([a-f0-9]+)\\]/);\nconst headCommit = commitMatch ? commitMatch[1] : 'unknown';\n\n// Extract line count from wc -l output\nconst lineMatch = buildOut.match(/(\\d+)\\s+\\/opt\\/gda-command/);\nconst lineCount = lineMatch ? lineMatch[1] : 'N/A';\n\n// Extract deploy count from timestamp in DEPLOY_COMPLETE_<epoch>\nconst tsMatch = buildOut.match(/DEPLOY_COMPLETE_(\\d+)/);\nconst deployTs = tsMatch ? tsMatch[1] : String(Math.floor(Date.now()/1000));\n\nconst statusLine = isSuccess\n  ? `\u2705 Deploy succeeded: ${deployMsg}`\n  : `\u274c Deploy failed: ${deployMsg}`;\n\nconst brokenSection = isSuccess\n  ? 'None'\n  : (buildErr || buildOut).slice(-600);\n\nreturn [{ json: {\n  session: new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC',\n  completed: statusLine,\n  broken: brokenSection,\n  next_steps: isSuccess ? 'Monitor live dashboard' : 'Investigate build output above',\n  head_commit: headCommit,\n  line_count: lineCount,\n  deploy_count: deployTs\n} }];"
+      },
+      "id": "format-deploy-status",
+      "name": "Format Deploy Status",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1328,
+        304
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.csr-llc.tech/webhook/gda-gist-update-v2",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-GDA-Key",
+              "value": "={{ $env.GDA_WEBHOOK_HEADER_VALUE_V2 }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "notify-gist",
+      "name": "Notify Gist",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1552,
+        304
+      ],
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', deploy: $('Format Deploy Status').first().json }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "resp-deploy",
+      "name": "Deploy Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1552,
+        512
+      ],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.csr-llc.tech/webhook/gda-tg-notify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-GDA-Key",
+              "value": "={{ $env.GDA_WEBHOOK_HEADER_VALUE_V2 }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({type:'deploy', success: $('Format Deploy Status').first().json.completed.includes('succeeded'), message: $('Format Deploy Status').first().json.completed, lines: $('Format Deploy Status').first().json.line_count}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "tg-deploy",
+      "name": "Notify TG Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1552,
+        144
+      ],
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Build Script": {
+      "main": [
+        [
+          {
+            "node": "SSH Write Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Write Files": {
+      "main": [
+        [
+          {
+            "node": "SSH Build",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Build Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Webhook": {
+      "main": [
+        [
+          {
+            "node": "SSH Read File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Read File": {
+      "main": [
+        [
+          {
+            "node": "Read Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH Build": {
+      "main": [
+        [
+          {
+            "node": "Format Deploy Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Deploy Status": {
+      "main": [
+        [
+          {
+            "node": "Notify Gist",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Deploy Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify TG Deploy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "errorWorkflow": "2Swf6LP9AzFjHFYU",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "12e3e2fa-a641-4886-ac78-9cb68ff0711b",
+  "activeVersionId": "12e3e2fa-a641-4886-ac78-9cb68ff0711b",
+  "versionCounter": 1021,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-03-07T21:04:21.506Z",
+      "createdAt": "2026-03-07T21:04:21.506Z",
+      "role": "workflow:owner",
+      "workflowId": "8GnGxnBL9TJjj1i2",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T21:28:49.236Z",
+    "createdAt": "2026-05-26T21:28:49.236Z",
+    "versionId": "12e3e2fa-a641-4886-ac78-9cb68ff0711b",
+    "workflowId": "8GnGxnBL9TJjj1i2",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "gda-deploy",
+          "authentication": "headerAuth",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "wh",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          208,
+          304
+        ],
+        "webhookId": "4293742b-8263-4052-8298-85bfbee21fe8",
+        "typeVersion": 2.1,
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "1pNPY36DDz49OtKL",
+            "name": "GDA Webhook Auth"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const item = $('Auth Guard').first().json;\nconst body = item.body || item;\nconst mode = body.mode || 'patch_script';\nconst msg = body.msg || 'deploy';\nlet script = '';\nif (mode === 'patch_script') {\n  const ps = body.patch_script;\n  if (!ps) throw new Error('patch_script is missing from body');\n  const b64 = Buffer.from(ps, 'utf-8').toString('base64');\n  script = 'echo ' + b64 + ' | base64 -d > /tmp/gda_patch.py && python3 /tmp/gda_patch.py && rm /tmp/gda_patch.py';\n} else if (mode === 'b64_file') {\n  const b64 = body.b64_content;\n  const dest = body.dest || '/opt/gda-command/src/App.jsx';\n  script = 'echo ' + b64 + ' | base64 -d > ' + dest + ' && echo WROTE: ' + dest;\n} else if (mode === 'build_only') {\n  script = 'echo WROTE: build_only_trigger';\n}\nreturn [{ json: { script, msg } }];"
+        },
+        "id": "code",
+        "name": "Build Script",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          656,
+          304
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "authentication": "privateKey",
+          "command": "={{ $json.script }}"
+        },
+        "id": "ssh-write",
+        "name": "SSH Write Files",
+        "type": "n8n-nodes-base.ssh",
+        "position": [
+          880,
+          304
+        ],
+        "typeVersion": 1,
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "NKOxLo5F81sRNPua",
+            "name": "GDA VPS SSH Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "authentication": "privateKey",
+          "command": "export PATH=/root/.nvm/versions/node/v20.20.0/bin:$PATH && cd /opt/gda-command && node_modules/.bin/vite build 2>&1 && cp -r dist/. /root/gda-frontend/dist/ && docker restart n8n-envision-gda-frontend-1 2>&1 && echo DEPLOY_COMPLETE_$(date +%s)"
+        },
+        "id": "ssh",
+        "name": "SSH Build",
+        "type": "n8n-nodes-base.ssh",
+        "position": [
+          1104,
+          304
+        ],
+        "typeVersion": 1,
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "NKOxLo5F81sRNPua",
+            "name": "GDA VPS SSH Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "if (!$env.GDA_DEPLOY_KEY_V2) throw new Error('GDA_DEPLOY_KEY_V2 env var not set');\nconst body = $input.first().json.body || $input.first().json;\nconst bodyKey = body.deploy_key;\nconst validKey = $env.GDA_DEPLOY_KEY_V2;\n\nif (bodyKey !== validKey) {\n  throw new Error('Unauthorized: Missing or invalid deploy_key');\n}\n\nreturn $input.all();"
+        },
+        "id": "auth-deploy",
+        "name": "Auth Guard",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          432,
+          304
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "path": "gda-read-2",
+          "options": {}
+        },
+        "id": "wh-read",
+        "name": "Read Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          208,
+          512
+        ],
+        "webhookId": "gda-read-webhook-001",
+        "typeVersion": 2.1
+      },
+      {
+        "parameters": {
+          "authentication": "privateKey"
+        },
+        "id": "ssh-read",
+        "name": "SSH Read File",
+        "type": "n8n-nodes-base.ssh",
+        "position": [
+          512,
+          512
+        ],
+        "typeVersion": 1,
+        "credentials": {
+          "sshPrivateKey": {
+            "id": "NKOxLo5F81sRNPua",
+            "name": "GDA VPS SSH Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ content: $json.stdout, file: $('Read Webhook').first().json.body.file || 'App.jsx' }) }}",
+          "options": {}
+        },
+        "id": "resp-read",
+        "name": "Read Response",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          784,
+          512
+        ],
+        "typeVersion": 1.5
+      },
+      {
+        "parameters": {
+          "jsCode": "const buildOut = $('SSH Build').first().json.stdout || '';\nconst buildErr = $('SSH Build').first().json.stderr || '';\nconst isSuccess = buildOut.includes('DEPLOY_COMPLETE');\nconst deployMsg = $('Build Script').first().json.msg || 'deploy';\n\n// Extract git commit short hash\nconst commitMatch = buildOut.match(/\\[main ([a-f0-9]+)\\]/);\nconst headCommit = commitMatch ? commitMatch[1] : 'unknown';\n\n// Extract line count from wc -l output\nconst lineMatch = buildOut.match(/(\\d+)\\s+\\/opt\\/gda-command/);\nconst lineCount = lineMatch ? lineMatch[1] : 'N/A';\n\n// Extract deploy count from timestamp in DEPLOY_COMPLETE_<epoch>\nconst tsMatch = buildOut.match(/DEPLOY_COMPLETE_(\\d+)/);\nconst deployTs = tsMatch ? tsMatch[1] : String(Math.floor(Date.now()/1000));\n\nconst statusLine = isSuccess\n  ? `\u2705 Deploy succeeded: ${deployMsg}`\n  : `\u274c Deploy failed: ${deployMsg}`;\n\nconst brokenSection = isSuccess\n  ? 'None'\n  : (buildErr || buildOut).slice(-600);\n\nreturn [{ json: {\n  session: new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC',\n  completed: statusLine,\n  broken: brokenSection,\n  next_steps: isSuccess ? 'Monitor live dashboard' : 'Investigate build output above',\n  head_commit: headCommit,\n  line_count: lineCount,\n  deploy_count: deployTs\n} }];"
+        },
+        "id": "format-deploy-status",
+        "name": "Format Deploy Status",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1328,
+          304
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://n8n.csr-llc.tech/webhook/gda-gist-update-v2",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-GDA-Key",
+                "value": "={{ $env.GDA_WEBHOOK_HEADER_VALUE_V2 }}"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json) }}",
+          "options": {
+            "timeout": 15000
+          }
+        },
+        "id": "notify-gist",
+        "name": "Notify Gist",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1552,
+          304
+        ],
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ status: 'ok', deploy: $('Format Deploy Status').first().json }) }}",
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          }
+        },
+        "id": "resp-deploy",
+        "name": "Deploy Response",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          1552,
+          512
+        ],
+        "typeVersion": 1.1
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://n8n.csr-llc.tech/webhook/gda-tg-notify",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "X-GDA-Key",
+                "value": "={{ $env.GDA_WEBHOOK_HEADER_VALUE_V2 }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({type:'deploy', success: $('Format Deploy Status').first().json.completed.includes('succeeded'), message: $('Format Deploy Status').first().json.completed, lines: $('Format Deploy Status').first().json.line_count}) }}",
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "tg-deploy",
+        "name": "Notify TG Deploy",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1552,
+          144
+        ],
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      }
+    ],
+    "connections": {
+      "Build Script": {
+        "main": [
+          [
+            {
+              "node": "SSH Write Files",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH Write Files": {
+        "main": [
+          [
+            {
+              "node": "SSH Build",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth Guard": {
+        "main": [
+          [
+            {
+              "node": "Build Script",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Webhook": {
+        "main": [
+          [
+            {
+              "node": "SSH Read File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH Read File": {
+        "main": [
+          [
+            {
+              "node": "Read Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SSH Build": {
+        "main": [
+          [
+            {
+              "node": "Format Deploy Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Deploy Status": {
+        "main": [
+          [
+            {
+              "node": "Notify Gist",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Deploy Response",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Notify TG Deploy",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T21:28:49.283Z",
+        "id": 13506,
+        "workflowId": "8GnGxnBL9TJjj1i2",
+        "versionId": "12e3e2fa-a641-4886-ac78-9cb68ff0711b",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T21:28:49.302Z",
+        "id": 13507,
+        "workflowId": "8GnGxnBL9TJjj1i2",
+        "versionId": "12e3e2fa-a641-4886-ac78-9cb68ff0711b",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}
