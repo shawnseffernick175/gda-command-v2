@@ -1,0 +1,378 @@
+{
+  "updatedAt": "2026-05-26T21:28:42.983Z",
+  "createdAt": "2026-03-16T03:33:50.454Z",
+  "id": "djgOV2vX3PIv9cvm",
+  "name": "GDA.auto.gist-update",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "webhook-1",
+      "name": "Webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "options": {},
+        "path": "gda-gist-update",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "d40d098b-9f6b-4fc0-9e44-f610f2be6dcc",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
+    },
+    {
+      "id": "auth-1",
+      "name": "Auth Check",
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+      },
+      "position": [
+        220,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "code-1",
+      "name": "Format Gist",
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst now = new Date().toISOString().split('T')[0] + ' ' + new Date().toISOString().split('T')[1].substring(0,8) + ' UTC';\nconst session = body.session || 'UNKNOWN';\n\n// Normalize any field into a markdown-ready string.\n// Accepts: string, array of strings/objects, object, null, undefined, empty.\n// Returns: 'N/A' (for completed/next_steps) or 'None' (for broken_blocked) by default,\n// or a properly bulleted list if an array, or stringified object, or the raw string.\nfunction normalize(raw, emptyDefault) {\n  if (raw === undefined || raw === null || raw === '') return emptyDefault;\n  if (Array.isArray(raw)) {\n    if (raw.length === 0) return emptyDefault;\n    return raw.map(i => typeof i === 'string' ? '- ' + i : '- ' + JSON.stringify(i)).join('\\n');\n  }\n  if (typeof raw === 'object') return JSON.stringify(raw, null, 2);\n  return String(raw);\n}\n\nconst completed = normalize(body.completed, 'N/A');\n// broken_blocked is the preferred field name; broken is the legacy field name.\nconst brokenRaw = body.broken_blocked !== undefined ? body.broken_blocked : body.broken;\nconst broken = normalize(brokenRaw, 'None');\nconst next_steps = normalize(body.next_steps, 'N/A');\n\nconst head_commit = body.head_commit || 'N/A';\nconst line_count = body.line_count || 'N/A';\nconst deploy_count = body.deploy_count || 'N/A';\nconst summary = body.summary || '';\nconst markdown = `# GDA Command \\u2014 Master Status\\n\\n**Last Updated:** ${now}\\n**Session:** ${session}\\n**HEAD Commit:** \\`${head_commit}\\`\\n**Line Count:** ${line_count}\\n**Deploy Count:** ${deploy_count}\\n\\n---\\n\\n## Summary\\n${summary}\\n\\n## Completed\\n${completed}\\n\\n## Broken / Blocked\\n${broken}\\n\\n## Next Steps\\n${next_steps}\\n\\n---\\n*Auto-updated via gda-gist-update webhook*\\n`;\nreturn [{ json: { content: markdown } }];"
+      },
+      "position": [
+        440,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "sKJFLNzetK86JnvO",
+          "name": "GitHub Gist PAT"
+        }
+      },
+      "id": "http-1",
+      "name": "PATCH Gist",
+      "onError": "stopWorkflow",
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+v3+json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "GDA-Command-Bot"
+            }
+          ]
+        },
+        "jsonBody": "={{ JSON.stringify({ files: { \"GDA_Master.md\": { content: $json.content } } }) }}",
+        "method": "PATCH",
+        "options": {},
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://api.github.com/gists/dd562918f676affd62153a5f06e7d7d9"
+      },
+      "position": [
+        660,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4
+    },
+    {
+      "id": "respond-1",
+      "name": "Success Response",
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', gist_url: 'https://gist.github.com/shawnseffernick175/dd562918f676affd62153a5f06e7d7d9' }) }}"
+      },
+      "position": [
+        880,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5
+    }
+  ],
+  "connections": {
+    "Auth Check": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Format Gist",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Format Gist": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "PATCH Gist",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "PATCH Gist": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Success Response",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Auth Check",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "4fbce7b0-1117-4e45-a982-517935064fdf",
+  "activeVersionId": "4fbce7b0-1117-4e45-a982-517935064fdf",
+  "versionCounter": 298,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-16T03:33:50.454Z",
+      "createdAt": "2026-03-16T03:33:50.454Z",
+      "role": "workflow:owner",
+      "workflowId": "djgOV2vX3PIv9cvm",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T21:28:42.985Z",
+    "createdAt": "2026-05-26T21:28:42.985Z",
+    "versionId": "4fbce7b0-1117-4e45-a982-517935064fdf",
+    "workflowId": "djgOV2vX3PIv9cvm",
+    "nodes": [
+      {
+        "id": "webhook-1",
+        "name": "Webhook",
+        "parameters": {
+          "httpMethod": "POST",
+          "options": {},
+          "path": "gda-gist-update",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "position": [
+          0,
+          0
+        ],
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "webhookId": "d40d098b-9f6b-4fc0-9e44-f610f2be6dcc",
+        "onError": "continueRegularOutput",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        }
+      },
+      {
+        "id": "auth-1",
+        "name": "Auth Check",
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+        },
+        "position": [
+          220,
+          0
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2
+      },
+      {
+        "id": "code-1",
+        "name": "Format Gist",
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body;\nconst now = new Date().toISOString().split('T')[0] + ' ' + new Date().toISOString().split('T')[1].substring(0,8) + ' UTC';\nconst session = body.session || 'UNKNOWN';\n\n// Normalize any field into a markdown-ready string.\n// Accepts: string, array of strings/objects, object, null, undefined, empty.\n// Returns: 'N/A' (for completed/next_steps) or 'None' (for broken_blocked) by default,\n// or a properly bulleted list if an array, or stringified object, or the raw string.\nfunction normalize(raw, emptyDefault) {\n  if (raw === undefined || raw === null || raw === '') return emptyDefault;\n  if (Array.isArray(raw)) {\n    if (raw.length === 0) return emptyDefault;\n    return raw.map(i => typeof i === 'string' ? '- ' + i : '- ' + JSON.stringify(i)).join('\\n');\n  }\n  if (typeof raw === 'object') return JSON.stringify(raw, null, 2);\n  return String(raw);\n}\n\nconst completed = normalize(body.completed, 'N/A');\n// broken_blocked is the preferred field name; broken is the legacy field name.\nconst brokenRaw = body.broken_blocked !== undefined ? body.broken_blocked : body.broken;\nconst broken = normalize(brokenRaw, 'None');\nconst next_steps = normalize(body.next_steps, 'N/A');\n\nconst head_commit = body.head_commit || 'N/A';\nconst line_count = body.line_count || 'N/A';\nconst deploy_count = body.deploy_count || 'N/A';\nconst summary = body.summary || '';\nconst markdown = `# GDA Command \\u2014 Master Status\\n\\n**Last Updated:** ${now}\\n**Session:** ${session}\\n**HEAD Commit:** \\`${head_commit}\\`\\n**Line Count:** ${line_count}\\n**Deploy Count:** ${deploy_count}\\n\\n---\\n\\n## Summary\\n${summary}\\n\\n## Completed\\n${completed}\\n\\n## Broken / Blocked\\n${broken}\\n\\n## Next Steps\\n${next_steps}\\n\\n---\\n*Auto-updated via gda-gist-update webhook*\\n`;\nreturn [{ json: { content: markdown } }];"
+        },
+        "position": [
+          440,
+          0
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2
+      },
+      {
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "sKJFLNzetK86JnvO",
+            "name": "GitHub Gist PAT"
+          }
+        },
+        "id": "http-1",
+        "name": "PATCH Gist",
+        "onError": "stopWorkflow",
+        "parameters": {
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Accept",
+                "value": "application/vnd.github+v3+json"
+              },
+              {
+                "name": "User-Agent",
+                "value": "GDA-Command-Bot"
+              }
+            ]
+          },
+          "jsonBody": "={{ JSON.stringify({ files: { \"GDA_Master.md\": { content: $json.content } } }) }}",
+          "method": "PATCH",
+          "options": {},
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "url": "https://api.github.com/gists/dd562918f676affd62153a5f06e7d7d9"
+        },
+        "position": [
+          660,
+          0
+        ],
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4
+      },
+      {
+        "id": "respond-1",
+        "name": "Success Response",
+        "parameters": {
+          "options": {},
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ status: 'ok', gist_url: 'https://gist.github.com/shawnseffernick175/dd562918f676affd62153a5f06e7d7d9' }) }}"
+        },
+        "position": [
+          880,
+          0
+        ],
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5
+      }
+    ],
+    "connections": {
+      "Auth Check": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Format Gist",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Format Gist": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "PATCH Gist",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "PATCH Gist": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Success Response",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Auth Check",
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T21:28:43.035Z",
+        "id": 13436,
+        "workflowId": "djgOV2vX3PIv9cvm",
+        "versionId": "4fbce7b0-1117-4e45-a982-517935064fdf",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T21:28:43.059Z",
+        "id": 13437,
+        "workflowId": "djgOV2vX3PIv9cvm",
+        "versionId": "4fbce7b0-1117-4e45-a982-517935064fdf",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}

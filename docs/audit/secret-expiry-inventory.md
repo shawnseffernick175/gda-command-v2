@@ -1,6 +1,6 @@
 # Secret Expiry Inventory
 
-> Last updated: 2026-05-26
+> Last updated: 2026-05-27
 > Purpose: Single source of truth for all GDA secret expirations.
 > Auto-monitored secrets are checked by the `secret_expiry_check` Sentinel probe every 6 hours.
 
@@ -35,6 +35,11 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 | GDA_QA_AGENT_KEY | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | GDA_WEBHOOK_HEADER_VALUE | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | GDA_WEBHOOK_HEADER_VALUE_V2 | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
+| GDA_API_KEY_2026 | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
+| GDA_DEPLOY_KEY_2026 | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
+| GDA_WEBHOOK_SECRET_2026 | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
+| GDA_DEPLOY_KEY_V2 | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
+| GDA_DEPLOY_KEY_V2_CP | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | N8N_API_KEY | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | POSTGRES_PASSWORD | `/root/n8n-envision/.env` | Never (self-managed) | ∞ | Shawn | No (static) |
 | DB_POSTGRESDB_PASSWORD | `/root/n8n-envision/.env` | Never (self-managed) | ∞ | Shawn | No (static) |
@@ -48,6 +53,7 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 | OPENAI_API_KEY | `/root/n8n-envision/.env` | Never (OpenAI API keys do not expire) | ∞ | Shawn | Yes (inventory) |
 | ANTHROPIC_API_KEY | `/root/n8n-envision/.env` | Never (Anthropic keys do not expire) | ∞ | Shawn | Yes (inventory) |
 | TAVILY_API_KEY | `/root/n8n-envision/.env` | Never (Tavily keys do not expire) | ∞ | Shawn | Yes (inventory) |
+| GDA_TAVILY_API_KEY | `/root/n8n-envision/.env` | Never (alias, used in n8n workflows) | ∞ | Shawn | Yes (inventory) |
 | PINECONE_API_KEY | `/root/n8n-envision/.env` | Never (Pinecone keys do not expire) | ∞ | Shawn | Yes (inventory) |
 
 ## n8n Credentials (stored encrypted in n8n DB)
