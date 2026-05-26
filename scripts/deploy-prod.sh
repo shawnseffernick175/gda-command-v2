@@ -51,8 +51,8 @@ for i in $(seq 1 20); do
     break
   fi
   if [ "$i" -eq 20 ]; then
-    echo "DEPLOY_FAILED container not healthy after 60s (status: ${status})"
     echo "prev_image=$(cat /tmp/prev_image.txt)"
+    echo "DEPLOY_FAILED container not healthy after 60s (status: ${status})"
     exit 1
   fi
   sleep 3
@@ -73,6 +73,6 @@ for i in $(seq 1 "$HEALTH_MAX_ATTEMPTS"); do
   sleep "$HEALTH_INTERVAL"
 done
 
-echo "DEPLOY_FAILED health check failed after ${HEALTH_MAX_ATTEMPTS} attempts — manual rollback required"
 echo "prev_image=$(cat /tmp/prev_image.txt)"
+echo "DEPLOY_FAILED health check failed after ${HEALTH_MAX_ATTEMPTS} attempts — manual rollback required"
 exit 1
