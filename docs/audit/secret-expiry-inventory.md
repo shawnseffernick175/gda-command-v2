@@ -1,6 +1,6 @@
 # Secret Expiry Inventory
 
-> Last updated: 2026-05-27
+> Last updated: 2026-05-19 (F-029 Bundled Wave)
 > Purpose: Single source of truth for all GDA secret expirations.
 > Auto-monitored secrets are checked by the `secret_expiry_check` Sentinel probe every 6 hours.
 
@@ -66,13 +66,11 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 | GDA Postgres (HwronxMmGY5XDGEt) | n8n credentials_entity | Never (self-managed) | ∞ | Shawn | No |
 | GDA Telegram Bot (Jr8OOsZqc9DarQE6) | n8n credentials_entity | Never (Telegram bot tokens do not expire) | ∞ | Shawn | No |
 | GDA VPS SSH Key (NKOxLo5F81sRNPua) | n8n credentials_entity | Never (SSH keys do not expire) | ∞ | Shawn | No |
-| GDA Webhook Auth (1pNPY36DDz49OtKL) | n8n credentials_entity | Never (app-defined) | ∞ | Shawn | No |
 | GDA Webhook Auth v2 (F4J3vYsPrJrYiO49) | n8n credentials_entity | Never (app-defined) | ∞ | Shawn | No |
 | GitHub Gist PAT (sKJFLNzetK86JnvO) | n8n credentials_entity | Unknown — check github.com/settings/tokens | ? | Shawn | Yes (inventory) |
 | OpenAi account (unLYjAN4H9MFrJ0u) | n8n credentials_entity | Never | ∞ | Shawn | No |
 | PineconeApi account 2 (wRjQmgKElTHbBf5J) | n8n credentials_entity | Never | ∞ | Shawn | No |
 | Postgres account (yK1VVsSN3tn0baVm) | n8n credentials_entity | Never (self-managed) | ∞ | Shawn | No |
-| Redis account (F6aCGUnktFFSwjS8) | n8n credentials_entity | Never | ∞ | Shawn | No |
 | Tavily account (M6lh2vbM59NsCJ0A) | n8n credentials_entity | Never | ∞ | Shawn | No |
 
 ## GitHub Actions Secrets
