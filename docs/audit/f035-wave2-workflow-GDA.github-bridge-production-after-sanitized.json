@@ -1,0 +1,541 @@
+{
+  "updatedAt": "2026-05-26T08:21:51.649Z",
+  "createdAt": "2026-05-06T21:33:01.582Z",
+  "id": "MqRUg1UglZqjAym1",
+  "name": "GDA GitHub Bridge \u2014 Production",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        180,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gda-github-bridge",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "webhookId": "2d609d02-79ce-4553-bd16-eceb0ef80dc3",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
+    },
+    {
+      "id": "node-auth",
+      "name": "Validate Auth",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || $input.first().json;\nconst providedKey = (headers['x-api-key'] || headers['X-Api-Key'] || '').trim();\nconst expectedKey = 'gda-bridge-k9x2mq7r4n8v';\nconst requestId = 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);\nif (providedKey !== expectedKey) {\n  return [{ json: { __auth_failed: true, requestId, error: 'Unauthorized: invalid or missing x-api-key header' } }];\n}\nconst required = ['owner','repo','baseBranch','newBranch','commitMessage','prTitle','files'];\nconst missing = required.filter(k => !body[k]);\nif (missing.length > 0) {\n  return [{ json: { __auth_failed: true, requestId, error: 'Missing required fields: ' + missing.join(', ') } }];\n}\nif (!Array.isArray(body.files) || body.files.length === 0) {\n  return [{ json: { __auth_failed: true, requestId, error: 'files must be a non-empty array' } }];\n}\nfor (const f of body.files) {\n  if (!f.path || f.content === undefined) {\n    return [{ json: { __auth_failed: true, requestId, error: 'Each file must have path and content' } }];\n  }\n}\nreturn [{ json: { __auth_failed: false, requestId, owner: body.owner, repo: body.repo, baseBranch: body.baseBranch, newBranch: body.newBranch, commitMessage: body.commitMessage, prTitle: body.prTitle, prBody: body.prBody || '', files: body.files, receivedAt: new Date().toISOString() } }];"
+      }
+    },
+    {
+      "id": "node-auth-check",
+      "name": "Auth OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.__auth_failed }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "rightValue": false
+            }
+          ],
+          "options": {}
+        }
+      }
+    },
+    {
+      "id": "node-401",
+      "name": "401 Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        900,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={{ JSON.stringify({ success: false, workflow: 'GDA GitHub Bridge', error: $json.error, requestId: $json.requestId }) }}"
+      }
+    },
+    {
+      "id": "node-github-all",
+      "name": "GitHub Operations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\nconst BASE = 'https://api.github.com';\nconst HEADERS = {\n  'Accept': 'application/vnd.github+json',\n  'X-GitHub-Api-Version': '2022-11-28',\n  'Content-Type': 'application/json'\n};\n\nasync function ghGet(path) {\n  const r = await this.helpers.httpRequestWithAuthentication('httpHeaderAuth', { method: 'GET', url: BASE + path, headers: HEADERS });\n  return r;\n}\nasync function ghPost(path, body) {\n  const r = await this.helpers.httpRequestWithAuthentication('httpHeaderAuth', { method: 'POST', url: BASE + path, headers: HEADERS, body: JSON.stringify(body) });\n  return r;\n}\nasync function ghPut(path, body) {\n  const r = await this.helpers.httpRequestWithAuthentication('httpHeaderAuth', { method: 'PUT', url: BASE + path, headers: HEADERS, body: JSON.stringify(body) });\n  return r;\n}\n\n// 1. Get base branch SHA\nlet refData;\ntry {\n  refData = await ghGet.call(this, `/repos/${ctx.owner}/${ctx.repo}/git/ref/heads/${ctx.baseBranch}`);\n} catch(e) {\n  return [{ json: { __error: true, step: 'get_sha', message: `Could not find base branch '${ctx.baseBranch}'. Check repo and branch name. Detail: ${e.message}` } }];\n}\nconst baseSha = refData?.object?.sha;\nif (!baseSha) {\n  return [{ json: { __error: true, step: 'get_sha', message: `Base branch '${ctx.baseBranch}' exists but SHA could not be read.` } }];\n}\n\n// 2. Create new branch\ntry {\n  await ghPost.call(this, `/repos/${ctx.owner}/${ctx.repo}/git/refs`, {\n    ref: `refs/heads/${ctx.newBranch}`,\n    sha: baseSha\n  });\n} catch(e) {\n  const msg = e.message || '';\n  if (msg.includes('already exists') || msg.includes('422')) {\n    // Branch already exists \u2014 continue, we'll write to it\n  } else {\n    return [{ json: { __error: true, step: 'create_branch', message: `Branch creation failed: ${msg}` } }];\n  }\n}\n\n// 3. Commit each file\nconst commitUrls = [];\nfor (const file of ctx.files) {\n  const encoding = file.encoding || 'utf-8';\n  let b64;\n  if (encoding === 'base64') {\n    b64 = file.content;\n  } else {\n    b64 = Buffer.from(file.content, 'utf-8').toString('base64');\n  }\n\n  // Check if file exists on the new branch (to get SHA for update)\n  let existingSha = null;\n  try {\n    const existing = await ghGet.call(this, `/repos/${ctx.owner}/${ctx.repo}/contents/${file.path}?ref=${ctx.newBranch}`);\n    existingSha = existing?.sha || null;\n  } catch(e) { /* file doesn't exist yet, that's fine */ }\n\n  const putBody = { message: ctx.commitMessage, content: b64, branch: ctx.newBranch };\n  if (existingSha) putBody.sha = existingSha;\n\n  let commitResult;\n  try {\n    commitResult = await ghPut.call(this, `/repos/${ctx.owner}/${ctx.repo}/contents/${file.path}`, putBody);\n  } catch(e) {\n    return [{ json: { __error: true, step: 'commit_file', message: `Failed to commit ${file.path}: ${e.message}` } }];\n  }\n  if (commitResult?.commit?.html_url) commitUrls.push(commitResult.commit.html_url);\n}\n\n// 4. Open PR\nlet prResult;\ntry {\n  prResult = await ghPost.call(this, `/repos/${ctx.owner}/${ctx.repo}/pulls`, {\n    title: ctx.prTitle,\n    body: ctx.prBody,\n    head: ctx.newBranch,\n    base: ctx.baseBranch\n  });\n} catch(e) {\n  return [{ json: { __error: true, step: 'open_pr', message: `Files committed to branch '${ctx.newBranch}' but PR failed: ${e.message}`, branch: ctx.newBranch, commitUrls } }];\n}\n\nif (!prResult?.html_url) {\n  return [{ json: { __error: true, step: 'open_pr', message: `PR response missing html_url. Branch '${ctx.newBranch}' was created and files committed.`, branch: ctx.newBranch, commitUrls } }];\n}\n\nreturn [{ json: {\n  __error: false,\n  owner: ctx.owner,\n  repo: ctx.repo,\n  branch: ctx.newBranch,\n  baseBranch: ctx.baseBranch,\n  commitUrls,\n  pullRequestUrl: prResult.html_url,\n  pullRequestNumber: prResult.number,\n  requestId: ctx.requestId,\n  receivedAt: ctx.receivedAt,\n  completedAt: new Date().toISOString()\n}}];"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TBzQR4MBiWOGoJmV",
+          "name": "GDA GitHub Bridge PAT"
+        }
+      }
+    },
+    {
+      "id": "node-result-check",
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.__error }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "rightValue": false
+            }
+          ],
+          "options": {}
+        }
+      }
+    },
+    {
+      "id": "node-success",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        180
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "={{ JSON.stringify({ success: true, workflow: 'GDA GitHub Bridge', action: 'commit_and_pr', dryRun: false, data: { owner: $json.owner, repo: $json.repo, branch: $json.branch, baseBranch: $json.baseBranch, pullRequestUrl: $json.pullRequestUrl, pullRequestNumber: $json.pullRequestNumber, commitUrls: $json.commitUrls }, meta: { requestId: $json.requestId, receivedAt: $json.receivedAt, completedAt: $json.completedAt }, error: null }) }}"
+      }
+    },
+    {
+      "id": "node-error",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        420
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 422,
+        "responseBody": "={{ JSON.stringify({ success: false, workflow: 'GDA GitHub Bridge', error: $json.message, step: $json.step, branch: $json.branch || null, commitUrls: $json.commitUrls || [], requestId: $('Validate Auth').item.json.requestId }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Auth": {
+      "main": [
+        [
+          {
+            "node": "Auth OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth OK?": {
+      "main": [
+        [
+          {
+            "node": "GitHub Operations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "401 Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Operations": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "ac0cda0b-244e-44b3-abd6-ade1d3f11a92",
+  "activeVersionId": "ac0cda0b-244e-44b3-abd6-ade1d3f11a92",
+  "versionCounter": 61,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-05-06T21:33:01.582Z",
+      "createdAt": "2026-05-06T21:33:01.582Z",
+      "role": "workflow:owner",
+      "workflowId": "MqRUg1UglZqjAym1",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T08:21:51.650Z",
+    "createdAt": "2026-05-26T08:21:51.650Z",
+    "versionId": "ac0cda0b-244e-44b3-abd6-ade1d3f11a92",
+    "workflowId": "MqRUg1UglZqjAym1",
+    "nodes": [
+      {
+        "id": "node-webhook",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          180,
+          300
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "gda-github-bridge",
+          "responseMode": "responseNode",
+          "options": {},
+          "authentication": "headerAuth"
+        },
+        "webhookId": "2d609d02-79ce-4553-bd16-eceb0ef80dc3",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        }
+      },
+      {
+        "id": "node-auth",
+        "name": "Validate Auth",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || $input.first().json;\nconst providedKey = (headers['x-api-key'] || headers['X-Api-Key'] || '').trim();\nconst expectedKey = 'gda-bridge-k9x2mq7r4n8v';\nconst requestId = 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2,8);\nif (providedKey !== expectedKey) {\n  return [{ json: { __auth_failed: true, requestId, error: 'Unauthorized: invalid or missing x-api-key header' } }];\n}\nconst required = ['owner','repo','baseBranch','newBranch','commitMessage','prTitle','files'];\nconst missing = required.filter(k => !body[k]);\nif (missing.length > 0) {\n  return [{ json: { __auth_failed: true, requestId, error: 'Missing required fields: ' + missing.join(', ') } }];\n}\nif (!Array.isArray(body.files) || body.files.length === 0) {\n  return [{ json: { __auth_failed: true, requestId, error: 'files must be a non-empty array' } }];\n}\nfor (const f of body.files) {\n  if (!f.path || f.content === undefined) {\n    return [{ json: { __auth_failed: true, requestId, error: 'Each file must have path and content' } }];\n  }\n}\nreturn [{ json: { __auth_failed: false, requestId, owner: body.owner, repo: body.repo, baseBranch: body.baseBranch, newBranch: body.newBranch, commitMessage: body.commitMessage, prTitle: body.prTitle, prBody: body.prBody || '', files: body.files, receivedAt: new Date().toISOString() } }];"
+        }
+      },
+      {
+        "id": "node-auth-check",
+        "name": "Auth OK?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          660,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "c1",
+                "leftValue": "={{ $json.__auth_failed }}",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                },
+                "rightValue": false
+              }
+            ],
+            "options": {}
+          }
+        }
+      },
+      {
+        "id": "node-401",
+        "name": "401 Unauthorized",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          900,
+          480
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseCode": 401,
+          "responseBody": "={{ JSON.stringify({ success: false, workflow: 'GDA GitHub Bridge', error: $json.error, requestId: $json.requestId }) }}"
+        }
+      },
+      {
+        "id": "node-github-all",
+        "name": "GitHub Operations",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          900,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const ctx = $input.first().json;\nconst BASE = 'https://api.github.com';\nconst HEADERS = {\n  'Accept': 'application/vnd.github+json',\n  'X-GitHub-Api-Version': '2022-11-28',\n  'Content-Type': 'application/json'\n};\n\nasync function ghGet(path) {\n  const r = await this.helpers.httpRequestWithAuthentication('httpHeaderAuth', { method: 'GET', url: BASE + path, headers: HEADERS });\n  return r;\n}\nasync function ghPost(path, body) {\n  const r = await this.helpers.httpRequestWithAuthentication('httpHeaderAuth', { method: 'POST', url: BASE + path, headers: HEADERS, body: JSON.stringify(body) });\n  return r;\n}\nasync function ghPut(path, body) {\n  const r = await this.helpers.httpRequestWithAuthentication('httpHeaderAuth', { method: 'PUT', url: BASE + path, headers: HEADERS, body: JSON.stringify(body) });\n  return r;\n}\n\n// 1. Get base branch SHA\nlet refData;\ntry {\n  refData = await ghGet.call(this, `/repos/${ctx.owner}/${ctx.repo}/git/ref/heads/${ctx.baseBranch}`);\n} catch(e) {\n  return [{ json: { __error: true, step: 'get_sha', message: `Could not find base branch '${ctx.baseBranch}'. Check repo and branch name. Detail: ${e.message}` } }];\n}\nconst baseSha = refData?.object?.sha;\nif (!baseSha) {\n  return [{ json: { __error: true, step: 'get_sha', message: `Base branch '${ctx.baseBranch}' exists but SHA could not be read.` } }];\n}\n\n// 2. Create new branch\ntry {\n  await ghPost.call(this, `/repos/${ctx.owner}/${ctx.repo}/git/refs`, {\n    ref: `refs/heads/${ctx.newBranch}`,\n    sha: baseSha\n  });\n} catch(e) {\n  const msg = e.message || '';\n  if (msg.includes('already exists') || msg.includes('422')) {\n    // Branch already exists \u2014 continue, we'll write to it\n  } else {\n    return [{ json: { __error: true, step: 'create_branch', message: `Branch creation failed: ${msg}` } }];\n  }\n}\n\n// 3. Commit each file\nconst commitUrls = [];\nfor (const file of ctx.files) {\n  const encoding = file.encoding || 'utf-8';\n  let b64;\n  if (encoding === 'base64') {\n    b64 = file.content;\n  } else {\n    b64 = Buffer.from(file.content, 'utf-8').toString('base64');\n  }\n\n  // Check if file exists on the new branch (to get SHA for update)\n  let existingSha = null;\n  try {\n    const existing = await ghGet.call(this, `/repos/${ctx.owner}/${ctx.repo}/contents/${file.path}?ref=${ctx.newBranch}`);\n    existingSha = existing?.sha || null;\n  } catch(e) { /* file doesn't exist yet, that's fine */ }\n\n  const putBody = { message: ctx.commitMessage, content: b64, branch: ctx.newBranch };\n  if (existingSha) putBody.sha = existingSha;\n\n  let commitResult;\n  try {\n    commitResult = await ghPut.call(this, `/repos/${ctx.owner}/${ctx.repo}/contents/${file.path}`, putBody);\n  } catch(e) {\n    return [{ json: { __error: true, step: 'commit_file', message: `Failed to commit ${file.path}: ${e.message}` } }];\n  }\n  if (commitResult?.commit?.html_url) commitUrls.push(commitResult.commit.html_url);\n}\n\n// 4. Open PR\nlet prResult;\ntry {\n  prResult = await ghPost.call(this, `/repos/${ctx.owner}/${ctx.repo}/pulls`, {\n    title: ctx.prTitle,\n    body: ctx.prBody,\n    head: ctx.newBranch,\n    base: ctx.baseBranch\n  });\n} catch(e) {\n  return [{ json: { __error: true, step: 'open_pr', message: `Files committed to branch '${ctx.newBranch}' but PR failed: ${e.message}`, branch: ctx.newBranch, commitUrls } }];\n}\n\nif (!prResult?.html_url) {\n  return [{ json: { __error: true, step: 'open_pr', message: `PR response missing html_url. Branch '${ctx.newBranch}' was created and files committed.`, branch: ctx.newBranch, commitUrls } }];\n}\n\nreturn [{ json: {\n  __error: false,\n  owner: ctx.owner,\n  repo: ctx.repo,\n  branch: ctx.newBranch,\n  baseBranch: ctx.baseBranch,\n  commitUrls,\n  pullRequestUrl: prResult.html_url,\n  pullRequestNumber: prResult.number,\n  requestId: ctx.requestId,\n  receivedAt: ctx.receivedAt,\n  completedAt: new Date().toISOString()\n}}];"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "TBzQR4MBiWOGoJmV",
+            "name": "GDA GitHub Bridge PAT"
+          }
+        }
+      },
+      {
+        "id": "node-result-check",
+        "name": "Success?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1140,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "c2",
+                "leftValue": "={{ $json.__error }}",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                },
+                "rightValue": false
+              }
+            ],
+            "options": {}
+          }
+        }
+      },
+      {
+        "id": "node-success",
+        "name": "Success Response",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1380,
+          180
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseCode": 200,
+          "responseBody": "={{ JSON.stringify({ success: true, workflow: 'GDA GitHub Bridge', action: 'commit_and_pr', dryRun: false, data: { owner: $json.owner, repo: $json.repo, branch: $json.branch, baseBranch: $json.baseBranch, pullRequestUrl: $json.pullRequestUrl, pullRequestNumber: $json.pullRequestNumber, commitUrls: $json.commitUrls }, meta: { requestId: $json.requestId, receivedAt: $json.receivedAt, completedAt: $json.completedAt }, error: null }) }}"
+        }
+      },
+      {
+        "id": "node-error",
+        "name": "Error Response",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1380,
+          420
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseCode": 422,
+          "responseBody": "={{ JSON.stringify({ success: false, workflow: 'GDA GitHub Bridge', error: $json.message, step: $json.step, branch: $json.branch || null, commitUrls: $json.commitUrls || [], requestId: $('Validate Auth').item.json.requestId }) }}"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Validate Auth",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Auth": {
+        "main": [
+          [
+            {
+              "node": "Auth OK?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth OK?": {
+        "main": [
+          [
+            {
+              "node": "GitHub Operations",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "401 Unauthorized",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GitHub Operations": {
+        "main": [
+          [
+            {
+              "node": "Success?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Success?": {
+        "main": [
+          [
+            {
+              "node": "Success Response",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Error Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T08:21:51.679Z",
+        "id": 13396,
+        "workflowId": "MqRUg1UglZqjAym1",
+        "versionId": "ac0cda0b-244e-44b3-abd6-ade1d3f11a92",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T08:21:51.698Z",
+        "id": 13397,
+        "workflowId": "MqRUg1UglZqjAym1",
+        "versionId": "ac0cda0b-244e-44b3-abd6-ade1d3f11a92",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T08:21:51.746Z",
+        "id": 13398,
+        "workflowId": "MqRUg1UglZqjAym1",
+        "versionId": "ac0cda0b-244e-44b3-abd6-ade1d3f11a92",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T08:21:51.761Z",
+        "id": 13399,
+        "workflowId": "MqRUg1UglZqjAym1",
+        "versionId": "ac0cda0b-244e-44b3-abd6-ade1d3f11a92",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}
