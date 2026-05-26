@@ -32,6 +32,19 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
+# ---------- Drift check: n8n compose ----------
+N8N_COMPOSE="/root/n8n-envision/docker-compose.yml"
+REPO_N8N_COMPOSE="docker-compose.n8n.yml"
+if [ -f "$N8N_COMPOSE" ] && [ -f "$REPO_N8N_COMPOSE" ]; then
+  VPS_HASH=$(sha256sum "$N8N_COMPOSE" | awk '{print $1}')
+  REPO_HASH=$(sha256sum "$REPO_N8N_COMPOSE" | awk '{print $1}')
+  if [ "$VPS_HASH" != "$REPO_HASH" ]; then
+    echo "::warning::COMPOSE DRIFT: VPS $N8N_COMPOSE hash ($VPS_HASH) != repo $REPO_N8N_COMPOSE hash ($REPO_HASH). Reconcile before next n8n restart."
+  else
+    echo "n8n compose: no drift (hash match)"
+  fi
+fi
+
 # ---------- Record previous image for rollback ----------
 echo "--- recording previous image ---"
 docker inspect "$CONTAINER_NAME" --format '{{.Image}}' > /tmp/prev_image.txt 2>/dev/null \

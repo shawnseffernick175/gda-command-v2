@@ -132,6 +132,43 @@ jobs:
         run: |
           echo "::warning::Staging DB unreachable (environmental). Skipping staging migration test. This does NOT indicate a migration problem."
 
+  compose-drift:
+    name: Compose Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify compose file hashes match expected
+        run: |
+          HASH_FILE=".github/expected-compose-hashes.txt"
+          if [ ! -f "$HASH_FILE" ]; then
+            echo "::error::Missing $HASH_FILE — run: sha256sum docker-compose*.yml | awk '{print \$2, \$1}' > .github/expected-compose-hashes.txt"
+            exit 1
+          fi
+          DRIFT=0
+          while IFS=' ' read -r file expected; do
+            # Skip comments and blank lines
+            [[ "$file" =~ ^#.*$ || -z "$file" ]] && continue
+            if [ ! -f "$file" ]; then
+              echo "::error::Compose file $file listed in hash file but does not exist"
+              DRIFT=1
+              continue
+            fi
+            actual=$(sha256sum "$file" | awk '{print $1}')
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::DRIFT DETECTED in $file — expected $expected, got $actual. Update .github/expected-compose-hashes.txt if this change is intentional."
+              DRIFT=1
+            else
+              echo "OK: $file hash matches"
+            fi
+          done < "$HASH_FILE"
+          if [ "$DRIFT" -ne 0 ]; then
+            echo ""
+            echo "To fix: update .github/expected-compose-hashes.txt with current hashes:"
+            echo "  sha256sum docker-compose.prod.yml docker-compose.n8n.yml | awk '{print \$2, \$1}' > .github/expected-compose-hashes.txt"
+            exit 1
+          fi
+          echo "All compose file hashes match — no drift detected"
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
