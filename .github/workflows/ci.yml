@@ -101,9 +101,15 @@ jobs:
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          STAGING_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
         run: |
           if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_HOST" ]; then
             echo "::error::ENVIRONMENTAL FAILURE: VPS_SSH_KEY or VPS_HOST secret not configured. This is an infrastructure issue, not a migration failure."
+            echo "staging_unreachable=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if [ -z "$STAGING_DB_PASSWORD" ]; then
+            echo "::error::ENVIRONMENTAL FAILURE: STAGING_DB_PASSWORD secret not configured. Set it via: gh secret set STAGING_DB_PASSWORD --repo shawnseffernick175/gda-command-v2"
             echo "staging_unreachable=true" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -117,7 +123,7 @@ jobs:
       - name: Run migrations against staging
         if: env.staging_unreachable != 'true'
         env:
-          DATABASE_URL: postgresql://gda_staging:staging_only_not_prod@localhost:15432/gda_staging
+          DATABASE_URL: postgresql://gda_staging:${{ secrets.STAGING_DB_PASSWORD }}@localhost:15432/gda_staging
         run: |
           npx tsx packages/backend/src/db/migrate.ts
           echo "All migrations passed against staging"

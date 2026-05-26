@@ -58,7 +58,7 @@ if [ "$TARGET" = "staging" ]; then
   NEW_PORT="5432"
   NEW_DB="gda_command_staging"
   NEW_USER="gda_staging"
-  NEW_PASS="${GDA_STAGING_DB_PASSWORD:-staging_only_not_prod}"
+  NEW_PASS="${GDA_STAGING_DB_PASSWORD:?Set GDA_STAGING_DB_PASSWORD}"
   # Backend
   BACKEND_CONTAINER="gda-backend-staging"
   BACKEND_IMAGE="gda-backend:f026-step4-rehearsal"
