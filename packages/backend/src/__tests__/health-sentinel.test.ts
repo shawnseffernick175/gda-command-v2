@@ -9,8 +9,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   computeSourceHealthStatus,
   computeWriters24hStatus,
+  computeSecretExpiryStatus,
+  parseInventoryExpiries,
   WRITERS_24H_EXCLUDED_NAMES,
 } from "../lib/health-sentinel";
+import type { SecretExpiryEntry } from "../lib/health-sentinel";
 
 // ---------------------------------------------------------------------------
 // Types mirrored from health-sentinel.ts for isolated testing
@@ -112,7 +115,7 @@ function makeProbe(name: string, status: ComponentStatus, detail = "ok"): ProbeR
 
 const ALL_PROBE_NAMES = [
   "postgres", "n8n_canary", "amendment_monitor", "writers_24h",
-  "sam_api", "embeddings", "disk", "source_health",
+  "sam_api", "embeddings", "disk", "source_health", "secret_expiry",
 ];
 
 function allHealthy(): ProbeResult[] {
@@ -132,8 +135,8 @@ describe("Health Sentinel", () => {
     const snapshot = simulateSentinel(allHealthy());
     expect(snapshot.overall_status).toBe("healthy");
     expect(snapshot.failing_count).toBe(0);
-    expect(snapshot.reason).toContain("all 8 components green");
-    expect(snapshot.components).toHaveLength(8);
+    expect(snapshot.reason).toContain("all 9 components green");
+    expect(snapshot.components).toHaveLength(9);
   });
 
   it("one down → down regardless of others", () => {
@@ -226,7 +229,7 @@ describe("Health Sentinel", () => {
       overall_status: "healthy",
     };
     const snapshot = simulateSentinel(probes, priorSnapshot);
-    expect(snapshot.components).toHaveLength(9); // 8 + sentinel_freshness
+    expect(snapshot.components).toHaveLength(10); // 9 + sentinel_freshness
     const freshness = snapshot.components.find((c) => c.name === "sentinel_freshness");
     expect(freshness).toBeDefined();
     expect(freshness!.status).toBe("degraded");
@@ -241,7 +244,7 @@ describe("Health Sentinel", () => {
       overall_status: "healthy",
     };
     const snapshot = simulateSentinel(probes, priorSnapshot);
-    expect(snapshot.components).toHaveLength(8);
+    expect(snapshot.components).toHaveLength(9);
     expect(snapshot.components.find((c) => c.name === "sentinel_freshness")).toBeUndefined();
   });
 
@@ -252,7 +255,7 @@ describe("Health Sentinel", () => {
       overall_status: "degraded",
     };
     const snapshot = simulateSentinel(probes, priorSnapshot);
-    expect(snapshot.components).toHaveLength(8);
+    expect(snapshot.components).toHaveLength(9);
     expect(snapshot.overall_status).toBe("healthy");
   });
 });
@@ -380,5 +383,97 @@ describe("computeWriters24hStatus", () => {
         WRITERS_24H_EXCLUDED_NAMES.some((re) => re.test(name)),
       ).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-035 Wave 2.5: secret expiry probe
+// ---------------------------------------------------------------------------
+
+describe("computeSecretExpiryStatus", () => {
+  it("empty entries → degraded (no data)", () => {
+    const result = computeSecretExpiryStatus([]);
+    expect(result.status).toBe("degraded");
+    expect(result.detail).toContain("no secret expiry data");
+  });
+
+  it("all secrets with null days_remaining (never-expiring) → healthy", () => {
+    const entries: SecretExpiryEntry[] = [
+      { name: "key1", days_remaining: null, source: "n8n_db" },
+      { name: "key2", days_remaining: null, source: "inventory" },
+    ];
+    const result = computeSecretExpiryStatus(entries);
+    expect(result.status).toBe("healthy");
+    expect(result.detail).toContain("2 secrets checked");
+  });
+
+  it("secret <30d from expiry → degraded", () => {
+    const entries: SecretExpiryEntry[] = [
+      { name: "n8n_api_key:Devin-Rotated", days_remaining: 21, source: "n8n_db" },
+      { name: "key2", days_remaining: null, source: "inventory" },
+    ];
+    const result = computeSecretExpiryStatus(entries);
+    expect(result.status).toBe("degraded");
+    expect(result.detail).toContain("Devin-Rotated");
+    expect(result.detail).toContain("21d");
+  });
+
+  it("secret <7d from expiry → down (critical)", () => {
+    const entries: SecretExpiryEntry[] = [
+      { name: "n8n_api_key:expired-soon", days_remaining: 3, source: "n8n_db" },
+      { name: "other", days_remaining: 60, source: "inventory" },
+    ];
+    const result = computeSecretExpiryStatus(entries);
+    expect(result.status).toBe("down");
+    expect(result.detail).toContain("critical <7d");
+    expect(result.detail).toContain("3d");
+  });
+
+  it("already-expired secret (negative days) → down", () => {
+    const entries: SecretExpiryEntry[] = [
+      { name: "n8n_api_key:old-key", days_remaining: -5, source: "n8n_db" },
+    ];
+    const result = computeSecretExpiryStatus(entries);
+    expect(result.status).toBe("down");
+    expect(result.detail).toContain("-5d");
+  });
+
+  it("secrets >30d from expiry → healthy", () => {
+    const entries: SecretExpiryEntry[] = [
+      { name: "key1", days_remaining: 90, source: "n8n_db" },
+      { name: "key2", days_remaining: 365, source: "inventory" },
+    ];
+    const result = computeSecretExpiryStatus(entries);
+    expect(result.status).toBe("healthy");
+  });
+});
+
+describe("parseInventoryExpiries", () => {
+  it("parses expiry_date annotations from markdown", () => {
+    const content = `
+# Inventory
+<!-- expiry_date: MY_KEY 2026-12-31 -->
+<!-- expiry_date: OTHER_KEY unknown -->
+<!-- expiry_date: THIRD_KEY 2026-06-09 -->
+`;
+    const results = parseInventoryExpiries(content);
+    expect(results).toHaveLength(3);
+    expect(results[0].name).toBe("MY_KEY");
+    expect(results[0].expiry).toEqual(new Date("2026-12-31T00:00:00Z"));
+    expect(results[1].name).toBe("OTHER_KEY");
+    expect(results[1].expiry).toBeNull();
+    expect(results[2].name).toBe("THIRD_KEY");
+    expect(results[2].expiry).toEqual(new Date("2026-06-09T00:00:00Z"));
+  });
+
+  it("returns empty array for content with no annotations", () => {
+    const results = parseInventoryExpiries("# Just a heading\nSome text");
+    expect(results).toEqual([]);
+  });
+
+  it("handles never keyword", () => {
+    const results = parseInventoryExpiries("<!-- expiry_date: MY_KEY never -->");
+    expect(results).toHaveLength(1);
+    expect(results[0].expiry).toBeNull();
   });
 });
