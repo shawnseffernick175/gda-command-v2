@@ -1,0 +1,1564 @@
+{
+  "updatedAt": "2026-05-21T01:18:28.826Z",
+  "createdAt": "2026-03-15T20:54:05.127Z",
+  "id": "PeLGDqgLAsEh5Gsd",
+  "name": "GDA.sched.opp-refresh",
+  "description": "",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "sched1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        256,
+        128
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "onError": "continueRegularOutput",
+      "position": [
+        256,
+        1032
+      ],
+      "webhookId": "5d143837-2925-459c-b99e-99399877266d",
+      "parameters": {
+        "path": "gda-opp-refresh",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "auth1",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        480,
+        1032
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "auth-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.body.auth_key }}",
+              "rightValue": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "unauth1",
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        704,
+        1160
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 401
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Unauthorized', status: 401 }) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "sched_cleanup",
+      "name": "Schedule Cleanup",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        480,
+        128
+      ],
+      "parameters": {
+        "query": "DELETE FROM opportunity_alerts WHERE due_date IS NOT NULL AND due_date < NOW();",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "switch1",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        704,
+        840
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "ingest"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "cleanup"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "status"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "setup"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "govtribe"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "rescore"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "score1",
+      "name": "Score Opportunities",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        928,
+        424
+      ],
+      "parameters": {
+        "jsCode": "// GDA UNIFIED SCORE + AUTO COMPETITIVE INTEL (S-095)\nconst items = $input.all();\nconst EIS_NAICS = ['541330','541511','541512','541513','541519','541611','541690','541715','541990','611430','561210','561110'];\nconst TARGET_AGENCIES = ['socom','tradoc','peo stri','inscom','cybercom','disa','indopacom','mda','missile defense','faa'];\n\nfunction calculateGDAScore(opp) {\n  let score = 0;\n  const title = ((opp.title || opp.name || opp.opp_title || '') + ' ' + (opp.description || '')).toLowerCase();\n  const naics = opp.naics_code || opp.naics || '';\n  const setAside = (opp.set_aside || opp.set_aside_type || '').toLowerCase();\n  const agency = (opp.agency || opp.federal_agency || opp.department || '').toLowerCase();\n  const value = parseFloat(opp.value || opp.estimated_value || 0);\n  const daysLeft = opp.due_date ? Math.ceil((new Date(opp.due_date) - new Date()) / 86400000) : 90;\n\n  // TIER 1: MISSION FIT (40)\n  let naicsPts = EIS_NAICS.includes(naics) ? 15 : naics?.startsWith('5415') ? 8 : naics?.startsWith('541') ? 5 : 0;\n  score += naicsPts;\n  let mp = 0;\n  if (/seta|systems engineering/.test(title)) mp = Math.max(mp, 15);\n  if (/simulat|training|virtual/.test(title)) mp = Math.max(mp, 12);\n  if (/missile|defense|shield|golden dome/.test(title)) mp = Math.max(mp, 12);\n  if (/cyber|information security|c5isr/.test(title)) mp = Math.max(mp, 10);\n  if (/intel|intelligence|sigint|geoint/.test(title)) mp = Math.max(mp, 10);\n  if (/air traffic|atc|faa|bnatcs/.test(title)) mp = Math.max(mp, 8);\n  if (/it support|help desk|network|cloud/.test(title)) mp = Math.max(mp, 8);\n  score += Math.min(mp, 15);\n  let ouPts = 2;\n  if (/seta|training|simulat|peo stri|tradoc/.test(title)) ouPts = 10;\n  else if (/cyber|protect|security|disa/.test(title)) ouPts = 10;\n  else if (/software|engineer|develop|integrat/.test(title)) ouPts = 10;\n  else if (/socom|inscom|army|navy/.test(title)) ouPts = 7;\n  else if (/support|manage|consult/.test(title)) ouPts = 5;\n  score += ouPts;\n\n  // TIER 2: WINNABILITY (35)\n  let saPts = 3;\n  if (/sdvosb|service.disabled/.test(setAside)) saPts = 10;\n  else if (/8\\(a\\)|8a/.test(setAside)) saPts = 10;\n  else if (/hubzone/.test(setAside)) saPts = 9;\n  else if (/small business/.test(setAside) && !/no set/.test(setAside)) saPts = 8;\n  score += saPts;\n  let ppPts = 2;\n  for (const ta of TARGET_AGENCIES) { if (agency.includes(ta)) { ppPts = 15; break; } }\n  if (ppPts < 15 && /army|war/.test(agency)) ppPts = 10;\n  if (ppPts < 10 && /navy|air force|defense|dod/.test(agency)) ppPts = 7;\n  score += ppPts;\n  let compPts = /sole.source|j&a|limited/.test(setAside + ' ' + title) ? 10 : /small business/.test(setAside) ? 7 : 3;\n  score += compPts;\n\n  // TIER 3: STRATEGIC VALUE (25)\n  let valPts = value >= 500000 && value <= 10000000 ? 10 : value > 10000000 && value <= 50000000 ? 8 : value > 50000000 ? 5 : value > 100000 ? 4 : 3;\n  score += valPts;\n  let rwPts = 2;\n  if (/iews|recompete/.test(title)) rwPts = 10;\n  if (/shield|mda/.test(title + ' ' + agency)) rwPts = Math.max(rwPts, 8);\n  if (/idiq|task order|delivery order/.test(title)) rwPts = Math.max(rwPts, 6);\n  score += rwPts;\n  score += daysLeft > 45 ? 5 : daysLeft > 30 ? 4 : daysLeft > 14 ? 2 : 1;\n\n  return Math.min(Math.max(Math.round(score), 0), 100);\n}\n\n// Build competitive intel summary for high-scoring opps\nfunction buildCompetitiveContext(opp, gdaScore) {\n  if (gdaScore < 60) return { competitors: 'Score too low for auto-enrichment', incumbent: 'N/A', vehicles: 'N/A' };\n  const agency = (opp.agency || opp.federal_agency || opp.department || '').toLowerCase();\n  const naics = opp.naics_code || opp.naics || '';\n  const setAside = (opp.set_aside || opp.set_aside_type || '').toLowerCase();\n  const title = (opp.title || opp.name || '').toLowerCase();\n  \n  // Agency-specific incumbent knowledge (from GovTribe analysis)\n  const incumbentMap = {\n    'socom': 'CACI NSS ($1.2B/859 awards), Amentum/Jacobs ($1.8B), iGov ($771M), Blue TECH ($382M)',\n    'mda': 'Lockheed Martin ($10B+), Northrop Grumman ($5.3B), JHU APL ($985M/76 awards), Boeing ($951M)',\n    'missile defense': 'Lockheed Martin ($10B+), Northrop Grumman ($5.3B), JHU APL ($985M)',\n    'tradoc': 'CACI, Leidos, Booz Allen Hamilton - SETA/training dominant',\n    'peo stri': 'Cole Engineering, Leidos, CACI - simulation/training SETA',\n    'inscom': 'Leidos, SAIC, Booz Allen - intel/SIGINT dominant',\n    'cybercom': 'Leidos, ManTech, Booz Allen - cyber operations',\n    'disa': 'Leidos, SAIC, General Dynamics IT - enterprise IT',\n    'faa': 'Leidos, SAIC, Raytheon - ATC modernization'\n  };\n  \n  let incumbent = 'Unknown - needs GovTribe enrichment';\n  for (const [key, val] of Object.entries(incumbentMap)) {\n    if (agency.includes(key)) { incumbent = val; break; }\n  }\n  \n  // Vehicle eligibility\n  const vehicles = [];\n  if (/shield/.test(title + ' ' + agency)) vehicles.push('MDA SHIELD (EIS ON)');\n  if (/small business|sdvosb|8\\(a\\)/.test(setAside)) vehicles.push('8(a) STARS III', 'VETS 2');\n  if (naics.startsWith('5415')) vehicles.push('CIO-SP4', 'ITES-4S', 'Alliant 3');\n  if (/training|simulat/.test(title)) vehicles.push('JETS 2', 'SeaPort-NxG');\n  if (vehicles.length === 0) vehicles.push('GSA MAS', 'CIO-SP4');\n  \n  // SB competitors in EIS space\n  const sbCompetitors = /sdvosb|service.disabled/.test(setAside)\n    ? 'iGov, Blue TECH, Arma Global, Spathe Systems, FITT'\n    : /small business/.test(setAside)\n    ? 'iGov, Blue TECH, Novetta, Altamira, DLT Solutions'\n    : 'Full & open - primes: Leidos, SAIC, CACI, BAH, L3Harris';\n  \n  return {\n    incumbent,\n    competitors: sbCompetitors,\n    vehicles: vehicles.join(', '),\n    enrichment_date: new Date().toISOString(),\n    auto_enriched: true\n  };\n}\n\nconst opps = items[0]?.json?.body?.opportunities || items[0]?.json?.opportunities || [];\nif (!opps.length) return [{ json: { _hasData: false, message: 'No opportunities to score' } }];\n\nconst scored = opps.map(o => {\n  const gda_score = calculateGDAScore(o);\n  const label = gda_score >= 80 ? 'PURSUE' : gda_score >= 60 ? 'EVALUATE' : gda_score >= 40 ? 'MONITOR' : 'PASS';\n  const compIntel = buildCompetitiveContext(o, gda_score);\n  return { json: { \n    ...o, \n    gda_score, \n    gda_label: label, \n    eis_fit_score: gda_score, \n    fit_score: gda_score,\n    incumbent_analysis: compIntel.incumbent,\n    likely_competitors: compIntel.competitors,\n    eligible_vehicles: compIntel.vehicles,\n    enrichment_date: compIntel.enrichment_date,\n    auto_enriched: compIntel.auto_enriched || false\n  }};\n});\nreturn scored;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "pg_upsert",
+      "name": "PG Upsert Opps",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1376,
+        352
+      ],
+      "parameters": {
+        "query": "INSERT INTO opportunity_alerts (solicitation_number, name, opportunity_type, set_aside_type, posted_date, due_date, agency, naics_code, source_url, fit_score, capability_matches, source, govtribe_id, updated_at) VALUES ('{{ $json.solicitation_number }}', '{{ $json.name }}', '{{ $json.opportunity_type }}', '{{ $json.set_aside_type }}', {{ $json.posted_date ? \"'\" + $json.posted_date + \"'\" : 'NULL' }}, {{ $json.due_date ? \"'\" + $json.due_date + \"'\" : 'NULL' }}, '{{ $json.agency }}', '{{ $json.naics_code }}', '{{ $json.source_url }}', {{ $json.fit_score }}, '{{ $json.capability_matches }}', '{{ $json.source }}', '{{ $json.govtribe_id }}', NOW()) ON CONFLICT (solicitation_number) DO UPDATE SET name = EXCLUDED.name, fit_score = EXCLUDED.fit_score, capability_matches = EXCLUDED.capability_matches, due_date = EXCLUDED.due_date, updated_at = NOW();",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6,
+      "continueOnFail": true
+    },
+    {
+      "id": "resp_ingest",
+      "name": "Respond Ingest",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1600,
+        424
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', action: 'ingest', ingested: $json._ingested || 0 }) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "pg_cleanup",
+      "name": "PG Cleanup",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        928,
+        616
+      ],
+      "parameters": {
+        "query": "DELETE FROM opportunity_alerts WHERE due_date IS NOT NULL AND due_date < NOW(); SELECT 'cleanup_done' AS status, (SELECT COUNT(*) FROM opportunity_alerts) AS remaining;",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "resp_cleanup",
+      "name": "Respond Cleanup",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1152,
+        616
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "allIncomingItems"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "pg_status",
+      "name": "PG Status",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        928,
+        808
+      ],
+      "parameters": {
+        "query": "SELECT COUNT(*) as total, COUNT(CASE WHEN fit_score >= 50 THEN 1 END) as high_fit, COUNT(CASE WHEN due_date > NOW() THEN 1 END) as open_opps, COUNT(CASE WHEN source = 'govtribe' THEN 1 END) as govtribe_count FROM opportunity_alerts;",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "resp_status",
+      "name": "Respond Status",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1152,
+        808
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "allIncomingItems"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "pg_setup",
+      "name": "PG Setup Table",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        928,
+        1000
+      ],
+      "parameters": {
+        "query": "CREATE TABLE IF NOT EXISTS opportunity_alerts (id SERIAL PRIMARY KEY, solicitation_number VARCHAR(100) UNIQUE NOT NULL, name TEXT, opportunity_type VARCHAR(50), set_aside_type VARCHAR(100), posted_date TIMESTAMPTZ, due_date TIMESTAMPTZ, agency TEXT, naics_code VARCHAR(20), source_url TEXT, fit_score INTEGER DEFAULT 0, capability_matches TEXT, source VARCHAR(50) DEFAULT 'govtribe', govtribe_id VARCHAR(100), created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_opp_sol ON opportunity_alerts(solicitation_number); CREATE INDEX IF NOT EXISTS idx_opp_score ON opportunity_alerts(fit_score DESC); SELECT 'table_ready' AS status;",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "resp_setup",
+      "name": "Respond Setup",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1152,
+        1000
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "allIncomingItems"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "gt-score",
+      "name": "Score GovTribe",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        928,
+        1192
+      ],
+      "parameters": {
+        "jsCode": "// GDA UNIFIED SCORE for GovTribe opps (S-095)\nconst items = $input.all();\nconst EIS_NAICS = ['541330','541511','541512','541513','541519','541611','541690','541715','541990','611430','561210','561110'];\nconst TARGET_AGENCIES = ['socom','tradoc','peo stri','inscom','cybercom','disa','indopacom','mda','missile defense','faa'];\n\nfunction calculateGDAScore(opp) {\n  let score = 0;\n  const title = ((opp.title || opp.name || '') + ' ' + (opp.description || '')).toLowerCase();\n  const naics = opp.naics_code || opp.naics || '';\n  const setAside = (opp.set_aside || opp.set_aside_type || '').toLowerCase();\n  const agency = (opp.agency || opp.federal_agency || opp.department || '').toLowerCase();\n  const value = parseFloat(opp.value || opp.estimated_value || 0);\n  const daysLeft = opp.due_date ? Math.ceil((new Date(opp.due_date) - new Date()) / 86400000) : 90;\n  let naicsPts = EIS_NAICS.includes(naics) ? 15 : naics?.startsWith('5415') ? 8 : naics?.startsWith('541') ? 5 : 0;\n  score += naicsPts;\n  let mp = 0;\n  if (/seta|systems engineering/.test(title)) mp = 15;\n  if (/simulat|training|virtual/.test(title)) mp = Math.max(mp, 12);\n  if (/missile|defense|shield/.test(title)) mp = Math.max(mp, 12);\n  if (/cyber|c5isr/.test(title)) mp = Math.max(mp, 10);\n  if (/intel|intelligence/.test(title)) mp = Math.max(mp, 10);\n  if (/air traffic|atc|faa/.test(title)) mp = Math.max(mp, 8);\n  if (/it support|cloud|network/.test(title)) mp = Math.max(mp, 8);\n  score += Math.min(mp, 15);\n  let ouPts = /seta|training|simulat|tradoc/.test(title) ? 10 : /cyber|protect|security/.test(title) ? 10 : /software|engineer|develop/.test(title) ? 10 : /socom|inscom|army/.test(title) ? 7 : 5;\n  score += ouPts;\n  let saPts = /sdvosb|service.disabled/.test(setAside) ? 10 : /8\\(a\\)|8a/.test(setAside) ? 10 : /hubzone/.test(setAside) ? 9 : /small business/.test(setAside) ? 8 : 3;\n  score += saPts;\n  let ppPts = 2;\n  for (const ta of TARGET_AGENCIES) { if (agency.includes(ta)) { ppPts = 15; break; } }\n  if (ppPts < 15 && /army|war/.test(agency)) ppPts = 10;\n  if (ppPts < 10 && /navy|air force|defense/.test(agency)) ppPts = 7;\n  score += ppPts;\n  score += /sole.source|limited/.test(setAside + ' ' + title) ? 10 : /small business/.test(setAside) ? 7 : 3;\n  score += value >= 500000 && value <= 10000000 ? 10 : value > 10000000 ? 8 : value > 100000 ? 4 : 3;\n  let rwPts = /iews|recompete/.test(title) ? 10 : /shield|mda/.test(title + ' ' + agency) ? 8 : /idiq|task order/.test(title) ? 6 : 2;\n  score += rwPts;\n  score += daysLeft > 45 ? 5 : daysLeft > 30 ? 4 : daysLeft > 14 ? 2 : 1;\n  return Math.min(Math.max(Math.round(score), 0), 100);\n}\n\nconst opps = items[0]?.json?.body?.opportunities || items[0]?.json?.opportunities || [];\nif (!opps.length) return [{ json: { _hasData: false } }];\nreturn opps.map(o => {\n  const gda_score = calculateGDAScore(o);\n  return { json: { ...o, gda_score, gda_label: gda_score >= 80 ? 'PURSUE' : gda_score >= 60 ? 'EVALUATE' : gda_score >= 40 ? 'MONITOR' : 'PASS', eis_fit_score: gda_score, fit_score: gda_score } };\n});"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "resp_govtribe",
+      "name": "Respond GovTribe",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1600,
+        1192
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', action: 'govtribe', ingested: $json._ingested || 0 }) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "resp_default",
+      "name": "Respond Default",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        928,
+        1384
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 400
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Invalid action. Use: ingest, cleanup, status, setup, govtribe' }) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "skip-if-empty",
+      "name": "Skip If Empty",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1152,
+        424
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-data",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json._hasData }}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gt-skip-empty",
+      "name": "GT Skip If Empty",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1152,
+        1192
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "gt-has-data",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json._hasData }}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gt-upsert",
+      "name": "GT Upsert Opps",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1376,
+        880
+      ],
+      "parameters": {
+        "query": "INSERT INTO opportunity_alerts (solicitation_number, name, opportunity_type, set_aside_type, posted_date, due_date, agency, naics_code, source_url, fit_score, capability_matches, source, govtribe_id, updated_at) VALUES ('{{ $json.solicitation_number }}', '{{ $json.name }}', '{{ $json.opportunity_type }}', '{{ $json.set_aside_type }}', {{ $json.posted_date ? \"'\" + $json.posted_date + \"'\" : 'NULL' }}, {{ $json.due_date ? \"'\" + $json.due_date + \"'\" : 'NULL' }}, '{{ $json.agency }}', '{{ $json.naics_code }}', '{{ $json.source_url }}', {{ $json.fit_score }}, '{{ $json.capability_matches }}', '{{ $json.source }}', '{{ $json.govtribe_id }}', NOW()) ON CONFLICT (solicitation_number) DO UPDATE SET name = EXCLUDED.name, fit_score = GREATEST(EXCLUDED.fit_score, opportunity_alerts.fit_score), capability_matches = EXCLUDED.capability_matches, due_date = COALESCE(EXCLUDED.due_date, opportunity_alerts.due_date), source_url = COALESCE(EXCLUDED.source_url, opportunity_alerts.source_url), govtribe_id = COALESCE(EXCLUDED.govtribe_id, opportunity_alerts.govtribe_id), updated_at = NOW();",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6,
+      "continueOnFail": true
+    },
+    {
+      "id": "cron-naics",
+      "name": "Build NAICS List",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        704,
+        128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const codes = ['541330','541511','541512','541513','541519','541611','541690','541715','541990','611430','561210','561110'];\nreturn codes.map(function(c){ return {json:{naics:c}}; });"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cron-sam-fetch",
+      "name": "SAM Fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        928,
+        128
+      ],
+      "parameters": {
+        "url": "https://api.sam.gov/opportunities/v2/search",
+        "method": "GET",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.GDA_SAM_API_KEY }}"
+            },
+            {
+              "name": "postedFrom",
+              "value": "={{ (() => { const d = new Date(Date.now() - 90*24*60*60*1000); return (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0') + '/' + d.getFullYear(); })() }}"
+            },
+            {
+              "name": "postedTo",
+              "value": "={{ (() => { const d = new Date(); return (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0') + '/' + d.getFullYear(); })() }}"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "naicsCode",
+              "value": "={{ $json.naics }}"
+            },
+            {
+              "name": "ptype",
+              "value": "o,p,k"
+            },
+            {
+              "name": "responseDeadLineFrom",
+              "value": "={{ $now.format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "responseDeadLineTo",
+              "value": "={{ $now.plus({years: 1}).format('MM/dd/yyyy') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4,
+      "continueOnFail": true
+    },
+    {
+      "id": "cron-normalize",
+      "name": "Normalize SAM Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1152,
+        128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const allItems = $input.all();\nconst results = [];\nconst seen = new Set();\n\nfor (const item of allItems) {\n  if (item.json.error) continue;\n  const body = item.json;\n  const opps = body.opportunitiesData || [];\n  for (const opp of opps) {\n    const id = opp.solicitationNumber || opp.noticeId || '';\n    if (!id || seen.has(id)) continue;\n    seen.add(id);\n    const agencyHierarchy = opp.organizationHierarchy || [];\n    const topAgency = agencyHierarchy.length > 0 ? agencyHierarchy[0].name : '';\n    const agency = topAgency || opp.fullParentPathName || opp.organizationName || '';\n    results.push({\n      json: {\n        solicitation_number: (opp.solicitationNumber || opp.noticeId || '').substring(0, 255),\n        name: (opp.title || '').trim().substring(0, 500),\n        opportunity_type: opp.type || '',\n        set_aside_type: opp.typeOfSetAsideDescription || opp.typeOfSetAside || '',\n        posted_date: opp.postedDate || null,\n        due_date: opp.responseDeadLine || opp.archiveDate || null,\n        agency: agency.substring(0, 500),\n        naics_code: (opp.naicsCode || '').substring(0, 20),\n        source_url: opp.uiLink || ('https://sam.gov/opp/' + (opp.noticeId || '') + '/view'),\n        source: 'SAM.gov',\n        govtribe_id: opp.noticeId || '',\n        description: (opp.description || '').substring(0, 2000),\n        _raw_name: opp.title || '',\n        _raw_agency: opp.fullParentPathName || opp.organizationName || '',\n        _hasData: true\n      }\n    });\n  }\n}\n\nconst totalFetched = allItems.reduce(function(s, i) {\n  return s + (i.json.totalRecords || 0);\n}, 0);\n\nif (results.length === 0) {\n  return [{ json: { _hasData: false, _fetched: totalFetched, _ingested: 0, _skipped: 0 } }];\n}\n\nresults.forEach(function(r) { r.json._fetched = totalFetched; });\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cron-score",
+      "name": "Score SAM Cron",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1376,
+        128
+      ],
+      "parameters": {
+        "jsCode": "// GDA UNIFIED SCORE for SAM.gov cron (S-095)\nconst items = $input.all();\nconst EIS_NAICS = ['541330','541511','541512','541513','541519','541611','541690','541715','541990','611430','561210','561110'];\nconst TARGET_AGENCIES = ['socom','tradoc','peo stri','inscom','cybercom','disa','indopacom','mda','missile defense','faa'];\n\nfunction calculateGDAScore(opp) {\n  let score = 0;\n  const title = ((opp.title || opp.name || '') + ' ' + (opp.description || '')).toLowerCase();\n  const naics = opp.naics_code || '';\n  const setAside = (opp.set_aside || '').toLowerCase();\n  const agency = (opp.agency || opp.department || '').toLowerCase();\n  const value = parseFloat(opp.estimated_value || 0);\n  const daysLeft = opp.due_date ? Math.ceil((new Date(opp.due_date) - new Date()) / 86400000) : 90;\n  score += EIS_NAICS.includes(naics) ? 15 : naics?.startsWith('5415') ? 8 : naics?.startsWith('541') ? 5 : 0;\n  let mp = 0;\n  if (/seta|systems engineering/.test(title)) mp = 15;\n  if (/simulat|training/.test(title)) mp = Math.max(mp, 12);\n  if (/missile|defense|shield/.test(title)) mp = Math.max(mp, 12);\n  if (/cyber|c5isr/.test(title)) mp = Math.max(mp, 10);\n  if (/intel|intelligence/.test(title)) mp = Math.max(mp, 10);\n  if (/air traffic|atc|faa/.test(title)) mp = Math.max(mp, 8);\n  if (/it support|cloud/.test(title)) mp = Math.max(mp, 8);\n  score += Math.min(mp, 15);\n  score += /seta|training|simulat/.test(title) ? 10 : /cyber|protect/.test(title) ? 10 : /software|engineer/.test(title) ? 10 : /socom|army/.test(title) ? 7 : 5;\n  score += /sdvosb|service.disabled/.test(setAside) ? 10 : /8\\(a\\)/.test(setAside) ? 10 : /small business/.test(setAside) ? 8 : 3;\n  let ppPts = 2;\n  for (const ta of TARGET_AGENCIES) { if (agency.includes(ta)) { ppPts = 15; break; } }\n  if (ppPts < 15 && /army|war/.test(agency)) ppPts = 10;\n  if (ppPts < 10 && /navy|air force|defense/.test(agency)) ppPts = 7;\n  score += ppPts;\n  score += /sole.source|limited/.test(setAside + ' ' + title) ? 10 : /small business/.test(setAside) ? 7 : 3;\n  score += value >= 500000 && value <= 10000000 ? 10 : value > 10000000 ? 8 : value > 100000 ? 4 : 3;\n  score += /iews|recompete/.test(title) ? 10 : /shield|mda/.test(title + ' ' + agency) ? 8 : /idiq|task order/.test(title) ? 6 : 2;\n  score += daysLeft > 45 ? 5 : daysLeft > 30 ? 4 : daysLeft > 14 ? 2 : 1;\n  return Math.min(Math.max(Math.round(score), 0), 100);\n}\n\nconst opps = items.map(i => i.json);\nif (!opps.length) return [{ json: { _hasData: false } }];\nreturn opps.map(o => {\n  const gda_score = calculateGDAScore(o);\n  return { json: { ...o, gda_score, gda_label: gda_score >= 80 ? 'PURSUE' : gda_score >= 60 ? 'EVALUATE' : gda_score >= 40 ? 'MONITOR' : 'PASS', eis_fit_score: gda_score } };\n});"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cron-skip",
+      "name": "Skip If Empty Cron",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1600,
+        128
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-empty",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json._hasData === false }}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cron-upsert",
+      "name": "PG Upsert Cron",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1824,
+        128
+      ],
+      "parameters": {
+        "query": "INSERT INTO opportunity_alerts (solicitation_number, name, opportunity_type, set_aside_type, posted_date, due_date, agency, naics_code, source_url, fit_score, capability_matches, source, govtribe_id, updated_at) VALUES ('{{ ($json.solicitation_number || \"\").substring(0,255) }}', '{{ ($json.name || \"\").replace(/'/g, \"''\").substring(0,500) }}', '{{ $json.opportunity_type || \"\" }}', '{{ $json.set_aside_type || \"\" }}', NULLIF('{{ $json.posted_date || \"\" }}','')::timestamptz, NULLIF('{{ $json.due_date || \"\" }}','')::timestamptz, '{{ ($json.agency || \"\").replace(/'/g, \"''\").substring(0,500) }}', '{{ $json.naics_code || \"\" }}', '{{ $json.source_url || \"\" }}', {{ $json.gda_score || 0 }}, '{{ ($json.description || \"\").replace(/'/g, \"''\").substring(0,500) }}', '{{ $json.source || \"SAM.gov\" }}', '{{ $json.govtribe_id || \"\" }}', NOW()) ON CONFLICT (solicitation_number) DO UPDATE SET name=EXCLUDED.name, opportunity_type=EXCLUDED.opportunity_type, set_aside_type=EXCLUDED.set_aside_type, due_date=COALESCE(EXCLUDED.due_date, opportunity_alerts.due_date), agency=EXCLUDED.agency, fit_score=GREATEST(EXCLUDED.fit_score, opportunity_alerts.fit_score), capability_matches=EXCLUDED.capability_matches, source_url=COALESCE(EXCLUDED.source_url, opportunity_alerts.source_url), updated_at=NOW() RETURNING solicitation_number, fit_score",
+        "operation": "executeQuery",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2,
+      "continueOnFail": true
+    },
+    {
+      "id": "cron-summary",
+      "name": "Cron Summary Log",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2048,
+        128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const allItems = $input.all();\nconst first = (allItems[0] || {}).json || {};\nconst isNoData = first._hasData === false;\nlet upsertErrors = 0;\n\nif (!isNoData) {\n  for (const item of allItems) {\n    if (item.json.error || item.json.code === 'ERROR') upsertErrors++;\n  }\n}\n\nconst summary = {\n  timestamp: new Date().toISOString(),\n  workflow: 'GDA.sched.opp-refresh',\n  sam_fetched: first._fetched || 0,\n  scored_upserted: isNoData ? 0 : (allItems.length - upsertErrors),\n  upsert_errors: upsertErrors,\n  skipped_low_score: first._skipped || 0,\n  status: isNoData ? 'no_data' : (upsertErrors < allItems.length ? 'ok' : 'all_errors')\n};\n\nconsole.log('[CRON SUMMARY]', JSON.stringify(summary));\nreturn [{ json: summary }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "pg-read-all",
+      "name": "Read All Opps",
+      "type": "n8n-nodes-base.postgres",
+      "onError": "continueRegularOutput",
+      "position": [
+        928,
+        1576
+      ],
+      "parameters": {
+        "query": "SELECT id, agency, dept, level_1, level_2, level_3, opp_title, naics_code, set_aside, estimated_value, response_deadline::text as due_date, data_source, solicitation_number, govtribe_id, source_url, place_of_performance, ai_analysis FROM gda_opportunity_tracker ORDER BY id",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rescore-code",
+      "name": "Rescore All",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1152,
+        1576
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst EIS_NAICS = ['541330','541511','541512','541513','541519','541611','541690','541715','541990','611430','561210','561110'];\nconst TARGET_AGENCIES = ['socom','tradoc','peo stri','inscom','cybercom','disa','indopacom','mda','missile defense','faa'];\nconst incumbentMap = {'socom':'CACI NSS ($1.2B/859), Amentum ($1.8B), iGov ($771M), Blue TECH ($382M)','mda':'Lockheed ($10B+), Northrop ($5.3B), JHU APL ($985M), Boeing ($951M)','missile defense':'Lockheed ($10B+), Northrop ($5.3B), JHU APL ($985M)','tradoc':'CACI, Leidos, BAH - SETA/training','peo stri':'Cole Engineering, Leidos, CACI - sim SETA','inscom':'Leidos, SAIC, BAH - intel/SIGINT','cybercom':'Leidos, ManTech, BAH - cyber','disa':'Leidos, SAIC, GDIT - enterprise IT','faa':'Leidos, SAIC, Raytheon - ATC','navy':'Leidos, SAIC, BAH, Serco','air force':'Leidos, SAIC, L3Harris, Raytheon'};\nfunction calc(o){let s=0;const t=((o.opp_title||'')+(o.ai_analysis||'')+(o.agency||'')).toLowerCase(),n=o.naics_code||'',sa=(o.set_aside||'').toLowerCase(),ag=(o.agency||'').toLowerCase(),v=parseFloat(o.estimated_value||0),dl=o.due_date?Math.ceil((new Date(o.due_date)-new Date())/864e5):90;s+=EIS_NAICS.includes(n)?15:n.startsWith('5415')?8:n.startsWith('541')?5:0;let mp=0;if(/seta|systems engineering/.test(t))mp=15;if(/simulat|training|virtual/.test(t))mp=Math.max(mp,12);if(/missile|defense|shield|golden dome/.test(t))mp=Math.max(mp,12);if(/cyber|c5isr/.test(t))mp=Math.max(mp,10);if(/intel|intelligence|sigint/.test(t))mp=Math.max(mp,10);if(/air traffic|atc|faa/.test(t))mp=Math.max(mp,8);if(/it support|cloud|network/.test(t))mp=Math.max(mp,8);s+=Math.min(mp,15);if(/seta|training|simulat|peo stri|tradoc/.test(t))s+=10;else if(/cyber|protect|security|disa/.test(t))s+=10;else if(/software|engineer|develop/.test(t))s+=10;else if(/socom|inscom|army|navy/.test(t))s+=7;else s+=5;if(/sdvosb|service.disabled/.test(sa))s+=10;else if(/8\\(a\\)|8a|competitive 8/.test(sa))s+=10;else if(/hubzone/.test(sa))s+=9;else if(/small business/.test(sa)&&!/no set/.test(sa))s+=8;else s+=3;let pp=2;for(const ta of TARGET_AGENCIES){if(ag.includes(ta)){pp=15;break;}}if(pp<15&&/army|war/.test(ag))pp=10;if(pp<10&&/navy|air force|defense/.test(ag))pp=7;s+=pp;s+=/sole.source|j&a|limited/.test(sa+t)?10:/small business/.test(sa)?7:3;s+=v>=5e5&&v<=1e7?10:v>1e7&&v<=5e7?8:v>5e7?5:v>1e5?4:3;if(/iews|recompete|must.win/.test(t))s+=10;else if(/shield|mda/.test(t))s+=8;else if(/idiq|task order/.test(t))s+=6;else s+=2;s+=dl>45?5:dl>30?4:dl>14?2:1;return Math.min(Math.max(Math.round(s),0),100);}\nreturn items.map(i=>{const o=i.json;if(!o.id)return null;const gs=calc(o),gl=gs>=80?'PURSUE':gs>=60?'EVALUATE':gs>=40?'MONITOR':'PASS';const ag=(o.agency||'').toLowerCase();let inc='Leidos, SAIC, CACI, BAH';for(const[k,v]of Object.entries(incumbentMap)){if(ag.includes(k)){inc=v;break;}}const sa=(o.set_aside||'').toLowerCase(),tt=(o.opp_title||'').toLowerCase();const comp=/sdvosb/.test(sa)?'iGov, Blue TECH, Arma Global, Spathe':/small business|8\\(a\\)/.test(sa)?'iGov, Blue TECH, Novetta, DLT':'ManTech, L3Harris, Perspecta';const vh=[];if(/shield/.test(tt+ag))vh.push('MDA SHIELD (EIS ON)');if(/small business|sdvosb|8\\(a\\)/.test(sa))vh.push('STARS III','VETS 2');if((o.naics_code||'').startsWith('5415'))vh.push('CIO-SP4','ITES-4S');if(/training|simulat/.test(tt))vh.push('JETS 2','SeaPort-NxG');if(!vh.length)vh.push('CIO-SP4','GSA MAS');return{json:{id:o.id,gda_score:gs,gda_label:gl,incumbent_analysis:inc,likely_competitors:comp,eligible_vehicles:vh.join(', ')}};}).filter(Boolean);"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "pg-update-scores",
+      "name": "PG Update Scores",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1376,
+        1576
+      ],
+      "parameters": {
+        "query": "UPDATE gda_opportunity_tracker SET gda_score = {{ $json.gda_score }}, gda_label = '{{ $json.gda_label }}', eis_fit_score = {{ $json.gda_score }}, incumbent_analysis = '{{ ($json.incumbent_analysis || \"\").replace(/'/g, \"''\") }}', likely_competitors = '{{ ($json.likely_competitors || \"\").replace(/'/g, \"''\") }}', eligible_vehicles = '{{ ($json.eligible_vehicles || \"\").replace(/'/g, \"''\") }}' WHERE id = {{ $json.id }}",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.6,
+      "continueOnFail": true
+    },
+    {
+      "id": "resp-rescore",
+      "name": "Respond Rescore",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1600,
+        1576
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok', action: 'rescore', updated: $input.all().length }) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "agency-fix",
+      "name": "Fix Agencies Post-Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        2272,
+        128
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-fix-agencies",
+        "method": "POST",
+        "options": {
+          "timeout": 15000
+        },
+        "jsonBody": "{}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "id": "delta-detect",
+      "name": "Detect Deltas",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1500,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "var scored = $('Score SAM Cron').all().map(function(i) { return i.json; });\nvar existing = new Map();\ntry {\n  var dbRows = $('Read Existing Sols').all();\n  dbRows.forEach(function(r) {\n    if (r.json && r.json.solicitation_number) {\n      existing.set(r.json.solicitation_number, { id: r.json.id, opp_title: r.json.opp_title, estimated_value: r.json.estimated_value, response_deadline: r.json.response_deadline });\n    }\n  });\n} catch(e) {}\nvar newOpps = []; var updatedOpps = []; var unchangedCount = 0;\nscored.forEach(function(opp) {\n  var sol = opp.solicitation_number || '';\n  if (!sol || !existing.has(sol)) { newOpps.push(opp); }\n  else {\n    var ex = existing.get(sol); var changed = false;\n    if (opp.opp_title && ex.opp_title && opp.opp_title !== ex.opp_title) changed = true;\n    if (opp.estimated_value && ex.estimated_value && String(opp.estimated_value) !== String(ex.estimated_value)) changed = true;\n    if (changed) updatedOpps.push(opp); else unchangedCount++;\n  }\n});\nvar allToUpsert = newOpps.concat(updatedOpps);\nreturn [{ json: { delta_summary: { total_scored: scored.length, new_opps: newOpps.length, updated_opps: updatedOpps.length, unchanged: unchangedCount, upsert_count: allToUpsert.length }, opps: allToUpsert }}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "read-existing",
+      "name": "Read Existing Sols",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1376,
+        -100
+      ],
+      "parameters": {
+        "query": "SELECT id, solicitation_number, opp_title, estimated_value, response_deadline FROM gda_opportunity_tracker WHERE solicitation_number IS NOT NULL AND solicitation_number != '' LIMIT 5000",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.5
+    },
+    {
+      "id": "trigger-classify",
+      "name": "Trigger Classify + Capture",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        2500,
+        128
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-opp-classify",
+        "method": "POST",
+        "options": {
+          "timeout": 30000
+        },
+        "jsonBody": "={{ JSON.stringify({ action: 'classify_new', source: 'opp-refresh-cron', limit: 100 }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4
+    },
+    {
+      "id": "trigger-autocap",
+      "name": "Trigger Auto Capture",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        2720,
+        128
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-auto-capture",
+        "method": "POST",
+        "options": {
+          "timeout": 60000
+        },
+        "jsonBody": "={{ JSON.stringify({ source: 'opp-refresh-cron' }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4
+    },
+    {
+      "id": "chain-dept-sweep",
+      "name": "Chain: Dept Sweep",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        2940,
+        128
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-dept-sweep",
+        "method": "POST",
+        "options": {
+          "timeout": 120000
+        },
+        "jsonBody": "{\"auth_key\": \"<REDACTED_AUTH_KEY_2026>\"}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4
+    },
+    {
+      "id": "chain-onramp-scan",
+      "name": "Chain: On-Ramp Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        3160,
+        128
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-onramp-scan",
+        "method": "POST",
+        "options": {
+          "timeout": 120000
+        },
+        "jsonBody": "{\"auth_key\": \"<REDACTED_AUTH_KEY_2026>\"}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4
+    },
+    {
+      "id": "chain-comp-enrich",
+      "name": "Chain: Comp Enrichment",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        3380,
+        128
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-competitor-enrichment",
+        "method": "POST",
+        "options": {
+          "timeout": 120000
+        },
+        "jsonBody": "{\"auth_key\": \"<REDACTED_AUTH_KEY_2026>\"}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4
+    },
+    {
+      "id": "chain-morning-brief",
+      "name": "Chain: Morning Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        3600,
+        128
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-morning-brief",
+        "method": "POST",
+        "options": {
+          "timeout": 180000
+        },
+        "jsonBody": "{\"auth_key\": \"<REDACTED_AUTH_KEY_2026>\"}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_AUTH_KEY_2026>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4
+    },
+    {
+      "id": "fpds-incumbent",
+      "name": "FPDS Incumbent Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2050,
+        128
+      ],
+      "parameters": {
+        "jsCode": "// After cron upsert, stamp each new opp with FPDS incumbent data from our local cache\n// gda_fpds_cache holds award history keyed by solicitation_number / naics / agency\nconst items = $input.all();\nconst enriched = items.map(i => i.json);\n// Pass through \u2014 actual FPDS join happens in the DB query below via continueOnFail\nreturn enriched.map(r => ({json: r}));"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "manual-trigger-01",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        256,
+        300
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Schedule Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Score Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PG Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PG Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PG Setup Table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Score GovTribe",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Default",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read All Opps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Skip If Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip If Empty": {
+      "main": [
+        [
+          {
+            "node": "PG Upsert Opps",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Upsert Opps": {
+      "main": [
+        [
+          {
+            "node": "Respond Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Respond Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Status": {
+      "main": [
+        [
+          {
+            "node": "Respond Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Setup Table": {
+      "main": [
+        [
+          {
+            "node": "Respond Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score GovTribe": {
+      "main": [
+        [
+          {
+            "node": "GT Skip If Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GT Skip If Empty": {
+      "main": [
+        [
+          {
+            "node": "GT Upsert Opps",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond GovTribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GT Upsert Opps": {
+      "main": [
+        [
+          {
+            "node": "Respond GovTribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Cleanup": {
+      "main": [
+        [
+          {
+            "node": "Build NAICS List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build NAICS List": {
+      "main": [
+        [
+          {
+            "node": "SAM Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAM Fetch": {
+      "main": [
+        [
+          {
+            "node": "Normalize SAM Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize SAM Results": {
+      "main": [
+        [
+          {
+            "node": "Score SAM Cron",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score SAM Cron": {
+      "main": [
+        [
+          {
+            "node": "Skip If Empty Cron",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Existing Sols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip If Empty Cron": {
+      "main": [
+        [
+          {
+            "node": "PG Upsert Cron",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cron Summary Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Upsert Cron": {
+      "main": [
+        [
+          {
+            "node": "Cron Summary Log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "FPDS Incumbent Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Opps": {
+      "main": [
+        [
+          {
+            "node": "Rescore All",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rescore All": {
+      "main": [
+        [
+          {
+            "node": "PG Update Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG Update Scores": {
+      "main": [
+        [
+          {
+            "node": "Respond Rescore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fix Agencies Post-Ingest": {
+      "main": [
+        [
+          {
+            "node": "Trigger Classify + Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Classify + Capture": {
+      "main": [
+        [
+          {
+            "node": "Trigger Auto Capture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Sols": {
+      "main": [
+        [
+          {
+            "node": "Detect Deltas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Auto Capture": {
+      "main": [
+        [
+          {
+            "node": "Chain: Dept Sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chain: Dept Sweep": {
+      "main": [
+        [
+          {
+            "node": "Chain: On-Ramp Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chain: On-Ramp Scan": {
+      "main": [
+        [
+          {
+            "node": "Chain: Comp Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chain: Comp Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Chain: Morning Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FPDS Incumbent Lookup": {
+      "main": [
+        [
+          {
+            "node": "Cron Summary Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Schedule Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": false,
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "b6360639-0b36-4c86-9f83-d80a84599217",
+  "activeVersionId": "b6360639-0b36-4c86-9f83-d80a84599217",
+  "versionCounter": 393,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T20:54:05.127Z",
+      "createdAt": "2026-03-15T20:54:05.127Z",
+      "role": "workflow:owner",
+      "workflowId": "PeLGDqgLAsEh5Gsd",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": []
+}

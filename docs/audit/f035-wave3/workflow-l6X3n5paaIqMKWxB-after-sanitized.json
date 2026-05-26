@@ -1,0 +1,488 @@
+{
+  "updatedAt": "2026-05-21T15:30:18.338Z",
+  "createdAt": "2026-05-04T15:51:21.122Z",
+  "id": "l6X3n5paaIqMKWxB",
+  "name": "GDA.api.fast-track-needs",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "id": "ft-wh",
+      "name": "Webhook",
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "options": {
+          "allowedOrigins": "*"
+        },
+        "path": "gda-fast-track",
+        "responseMode": "responseNode"
+      },
+      "position": [
+        240,
+        400
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "ca785531-2da4-4458-b38c-6ac4ecd7390d"
+    },
+    {
+      "id": "ft-guard",
+      "name": "Auth Guard",
+      "parameters": {
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst ok = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (!ok && auth !== $env.GDA_WEBHOOK_HEADER_VALUE_V2 && auth !== '<REDACTED_AUTH_KEY_2026>') {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+      },
+      "position": [
+        460,
+        400
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "ft-route",
+      "name": "Route",
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst action = body.action || 'list';\nreturn [{ json: { ...$input.first().json, _action: action } }];"
+      },
+      "position": [
+        680,
+        400
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "ft-check-action",
+      "name": "Check Action",
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json._action }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "get"
+            },
+            {
+              "leftValue": "={{ $json._action }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "detail"
+            }
+          ],
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        }
+      },
+      "position": [
+        900,
+        400
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "ft-get-db",
+      "name": "Get Signal",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT * FROM ft_need_view WHERE signal_id = '{{ $json.body.id }}' LIMIT 1"
+      },
+      "position": [
+        1120,
+        300
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "id": "ft-check-sources",
+      "name": "Check Sources",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json._action }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "sources"
+            }
+          ],
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        }
+      },
+      "position": [
+        1120,
+        520
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "ft-sources-db",
+      "name": "List Sources",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT * FROM ft_signal_source WHERE active = true ORDER BY band, name"
+      },
+      "position": [
+        1340,
+        400
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "ft-list-db",
+      "name": "List Signals",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT signal_id, title, agency, unit_org, horizon, naics, estimated_value, due_date, posted_date, signal_strength, confidence, tags, recommended_action, solution_path, source_name, source_type, band, reviewed, active, created_at FROM ft_need_view WHERE active = true ORDER BY signal_strength DESC, confidence DESC, created_at DESC LIMIT 100"
+      },
+      "position": [
+        1340,
+        640
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "id": "ft-agg-get",
+      "name": "Aggregate Get",
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nif (!rows.length) {\n  return [{ json: { status: 'error', error: { code: 'NOT_FOUND', message: 'Signal not found' } } }];\n}\nreturn [{ json: { status: 'ok', action: 'get', data: rows[0], meta: { generatedAt: new Date().toISOString() } } }];"
+      },
+      "position": [
+        1560,
+        300
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "ft-agg-sources",
+      "name": "Aggregate Sources",
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nreturn [{ json: {\n  status: 'ok',\n  action: 'sources',\n  count: rows.length,\n  data: rows,\n  meta: { generatedAt: new Date().toISOString(), source: 'fast-track' }\n} }];"
+      },
+      "position": [
+        1560,
+        400
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "ft-agg-list",
+      "name": "Aggregate List",
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nreturn [{ json: {\n  status: 'ok',\n  action: 'list',\n  count: rows.length,\n  data: rows,\n  meta: { generatedAt: new Date().toISOString(), source: 'fast-track' }\n} }];"
+      },
+      "position": [
+        1560,
+        640
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "ft-resp-get",
+      "name": "Respond Get",
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Aggregate Get').first().json) }}"
+      },
+      "position": [
+        1780,
+        300
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5
+    },
+    {
+      "id": "ft-resp-sources",
+      "name": "Respond Sources",
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Aggregate Sources').first().json) }}"
+      },
+      "position": [
+        1780,
+        400
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5
+    },
+    {
+      "id": "ft-resp-list",
+      "name": "Respond List",
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Aggregate List').first().json) }}"
+      },
+      "position": [
+        1780,
+        640
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5
+    }
+  ],
+  "connections": {
+    "Aggregate Get": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond Get",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Aggregate List": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond List",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Aggregate Sources": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond Sources",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Route",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Action": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Get Signal",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Check Sources",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Sources": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "List Sources",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "List Signals",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Get Signal": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Aggregate Get",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "List Signals": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Aggregate List",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "List Sources": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Aggregate Sources",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Route": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Check Action",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Auth Guard",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "errorWorkflow": "2Swf6LP9AzFjHFYU",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "fa7a1828-c669-4384-a295-f5def169af61",
+  "activeVersionId": "fa7a1828-c669-4384-a295-f5def169af61",
+  "versionCounter": 58,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-05-04T15:51:21.122Z",
+      "createdAt": "2026-05-04T15:51:21.122Z",
+      "role": "workflow:owner",
+      "workflowId": "l6X3n5paaIqMKWxB",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-05-22T14:49:50.115Z",
+      "createdAt": "2026-05-22T14:49:50.115Z",
+      "id": "PkubFFEFYFq0NjWN",
+      "name": "deferred-f023a"
+    }
+  ]
+}
