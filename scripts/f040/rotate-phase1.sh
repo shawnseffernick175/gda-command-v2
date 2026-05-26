@@ -220,11 +220,48 @@ if ! docker inspect gda-backend --format '{{json .NetworkSettings.Networks}}' 2>
   docker network connect n8n_default gda-backend 2>/dev/null || true
 fi
 
+# Step 5: Update n8n credential HwronxMmGY5XDGEt (GDA Postgres) with new gda password.
+# The canary, amendment-monitor, and writer workflows use this credential to connect
+# to the GDA database. Without this update they break immediately.
+echo "  Step 5: Updating n8n credential HwronxMmGY5XDGEt (GDA Postgres)..."
+N8N_BASE=$(read_env_var "$ENV_FILE" "N8N_BASE_URL")
+N8N_API_KEY_VAL=$(read_env_var "$ENV_FILE" "N8N_API_KEY")
+
+if [[ -z "$N8N_BASE" || -z "$N8N_API_KEY_VAL" ]]; then
+  echo "  WARNING: N8N_BASE_URL or N8N_API_KEY not set in .env"
+  echo "  You must manually update credential HwronxMmGY5XDGEt in n8n UI"
+  echo "  Set 'password' field to the new POSTGRES_PASSWORD from .env"
+else
+  RESP_BODY=$(mktemp)
+  HTTP_CODE=$(curl -s -o "$RESP_BODY" -w '%{http_code}' \
+    -X PATCH "${N8N_BASE}/api/v1/credentials/HwronxMmGY5XDGEt" \
+    -H "X-N8N-API-KEY: ${N8N_API_KEY_VAL}" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"GDA Postgres\",\"type\":\"postgres\",\"data\":{\"host\":\"gda-postgres\",\"database\":\"gda\",\"user\":\"gda\",\"password\":\"${NEW_PG_PASS}\",\"port\":5432,\"ssl\":\"disable\",\"sshAuthenticateWith\":\"password\",\"sshHost\":\"\",\"sshPort\":22,\"sshUser\":\"\",\"sshPassword\":\"\",\"privateKey\":\"\",\"passphrase\":\"\"}}")
+
+  if [[ "$HTTP_CODE" == "200" ]]; then
+    echo "  Step 5: n8n GDA Postgres credential updated (HTTP 200)"
+  else
+    echo "  WARNING: n8n credential PATCH returned HTTP $HTTP_CODE"
+    python3 -c "
+import json,sys
+try:
+  d=json.load(open('$RESP_BODY'))
+  msg=d.get('message','')
+  if msg: print(f'  n8n error: {msg}')
+except: pass
+" 2>/dev/null || true
+    echo "  Manually update credential HwronxMmGY5XDGEt in n8n UI"
+  fi
+  rm -f "$RESP_BODY"
+fi
+
 echo ">>> Secret #1 rotated — verified"
 echo ""
 
 # =============================================================================
 # SECRET #2: MIGRATION_DATABASE_URL password (Postgres user "gda_app")
+# No n8n credential uses gda_app — only gda-backend's MIGRATION_DATABASE_URL.
 # =============================================================================
 echo "=== Secret #2: MIGRATION_DATABASE_URL password (Postgres user gda_app) ==="
 
