@@ -401,8 +401,9 @@ async function probeSecretExpiry(): Promise<ProbeResult> {
           if (exp !== null) {
             const daysRemaining = Math.floor((exp - nowEpoch) / 86400);
             entries.push({ name: `n8n_api_key:${row.label}`, days_remaining: daysRemaining, source: "n8n_db" });
+          } else {
+            entries.push({ name: `n8n_api_key:${row.label}`, days_remaining: null, source: "n8n_db" });
           }
-          // Keys with no exp claim are "never" — don't add them as expiring
         }
       } finally {
         await n8nPool.end();
@@ -423,8 +424,9 @@ async function probeSecretExpiry(): Promise<ProbeResult> {
         if (entry.expiry) {
           const daysRemaining = Math.floor((entry.expiry.getTime() - nowMs) / 86400000);
           entries.push({ name: entry.name, days_remaining: daysRemaining, source: "inventory" });
+        } else {
+          entries.push({ name: entry.name, days_remaining: null, source: "inventory" });
         }
-        // unknown expiry entries are not added — they can't trigger alerts
       }
     }
   } catch (err) {

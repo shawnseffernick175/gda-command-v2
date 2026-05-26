@@ -101,8 +101,8 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 The `secret_expiry_check` probe reads entries from this file using `expiry_date:` annotations.
 To add a manually-tracked expiry, append a comment line after the table row:
 
-```
-<!-- expiry_date: SECRET_NAME 2026-12-31 -->
+```text
+&lt;!-- expiry_date: SECRET_NAME 2026-12-31 --&gt;
 ```
 
 ### Active Expiry Annotations
