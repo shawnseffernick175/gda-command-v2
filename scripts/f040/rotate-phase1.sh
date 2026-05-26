@@ -302,18 +302,31 @@ if [[ -z "$N8N_BASE" || -z "$N8N_API_KEY_VAL" ]]; then
   echo "  You must manually update credential F4J3vYsPrJrYiO49 in n8n UI"
   echo "  Set 'value' field to the new GDA_WEBHOOK_KEY from .env"
 else
-  HTTP_CODE=$(curl -sf -o /dev/null -w '%{http_code}' \
+  # n8n PATCH /credentials requires: name, type, and full data object.
+  # "GDA Webhook Auth v2" is httpHeaderAuth; data = {name: header-name, value: secret}.
+  RESP_BODY=$(mktemp)
+  HTTP_CODE=$(curl -s -o "$RESP_BODY" -w '%{http_code}' \
     -X PATCH "${N8N_BASE}/api/v1/credentials/F4J3vYsPrJrYiO49" \
     -H "X-N8N-API-KEY: ${N8N_API_KEY_VAL}" \
     -H "Content-Type: application/json" \
-    -d "{\"data\":{\"value\":\"${NEW_WEBHOOK_KEY}\"}}" 2>/dev/null || echo "000")
+    -d "{\"name\":\"GDA Webhook Auth v2\",\"type\":\"httpHeaderAuth\",\"data\":{\"name\":\"x-gda-key\",\"value\":\"${NEW_WEBHOOK_KEY}\"}}" 2>/dev/null || echo "000")
 
   if [[ "$HTTP_CODE" == "200" ]]; then
-    echo "  Step 2: n8n credential updated"
+    echo "  Step 2: n8n credential updated (HTTP 200)"
   else
-    echo "  WARNING: n8n credential update returned HTTP $HTTP_CODE"
+    echo "  WARNING: n8n credential PATCH returned HTTP $HTTP_CODE"
+    # Show error message (not the secret) for debugging
+    python3 -c "
+import json,sys
+try:
+  d=json.load(open('$RESP_BODY'))
+  msg=d.get('message','')
+  if msg: print(f'  n8n error: {msg}')
+except: pass
+" 2>/dev/null || true
     echo "  Manually update credential F4J3vYsPrJrYiO49 in n8n UI"
   fi
+  rm -f "$RESP_BODY"
 fi
 
 # Step 3: Restart backend
