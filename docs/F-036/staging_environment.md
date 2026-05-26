@@ -91,7 +91,7 @@ docker exec gda-postgres-staging psql -U gda_staging -d n8n_staging
 
 ```bash
 psql -h 127.0.0.1 -p 5433 -U gda_staging -d gda_command_staging
-# Password: staging_only_not_prod
+# Password: <stored in VPS .env as STAGING_POSTGRES_PASSWORD and in GitHub Actions as STAGING_DB_PASSWORD>
 ```
 
 ### From Devin / CI (SSH tunnel)
@@ -104,12 +104,12 @@ ssh -f -N -L 15432:127.0.0.1:5433 root@187.77.206.105
 psql -h localhost -p 15432 -U gda_staging -d gda_command_staging
 
 # Connection string for applications
-DATABASE_URL=postgresql://gda_staging:staging_only_not_prod@localhost:15432/gda_command_staging
+DATABASE_URL=postgresql://gda_staging:$STAGING_DB_PASSWORD@localhost:15432/gda_command_staging
 ```
 
 ### From GitHub Actions CI
 
-The `Migration Smoke Test (Staging)` job automatically establishes an SSH tunnel using `VPS_SSH_KEY` and `VPS_HOST` secrets. If secrets are not configured, the job reports an environmental warning and exits without failing the PR.
+The `Migration Smoke Test (Staging)` job automatically establishes an SSH tunnel using `VPS_SSH_KEY`, `VPS_HOST`, and `STAGING_DB_PASSWORD` secrets. If any secret is not configured, the job reports an environmental warning and exits without failing the PR.
 
 ---
 
@@ -161,7 +161,7 @@ docker volume rm gda-pgdata-staging
 # Recreate
 docker run -d --name gda-postgres-staging --restart unless-stopped \
   -e POSTGRES_USER=gda_staging \
-  -e POSTGRES_PASSWORD=staging_only_not_prod \
+  -e POSTGRES_PASSWORD="$STAGING_POSTGRES_PASSWORD" \
   -e POSTGRES_DB=gda_command_staging \
   --memory=256m --cpus=0.5 \
   --network n8n_default \
@@ -205,7 +205,7 @@ docker system df -v | grep pgdata-staging
 | PostgreSQL | 16.14 |
 | pgvector | v0.8.2 |
 | Staging user | `gda_staging` |
-| Staging password | `staging_only_not_prod` |
+| Staging password | `<REDACTED — stored in VPS .env as STAGING_POSTGRES_PASSWORD>` |
 | n8n staging DB | `n8n_staging` |
 | gda staging DB | `gda_command_staging` |
 | Port (VPS localhost) | `127.0.0.1:5433` |

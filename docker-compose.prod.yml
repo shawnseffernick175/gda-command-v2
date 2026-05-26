@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${STAGING_POSTGRES_USER:-gda_staging}
-      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:-staging_only_not_prod}
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?Set STAGING_POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${STAGING_POSTGRES_DB:-gda_staging}
     volumes:
       - pgdata-staging:/var/lib/postgresql/data

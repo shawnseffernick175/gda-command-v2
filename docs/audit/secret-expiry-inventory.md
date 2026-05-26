@@ -82,6 +82,9 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 | PROD_SSH_PRIVATE_KEY | GitHub Actions secrets | Never (SSH keys do not expire) | ∞ | Shawn | No |
 | PROD_SSH_HOST | GitHub Actions secrets | N/A (not a secret with expiry) | ∞ | Shawn | No |
 | PROD_SSH_USER | GitHub Actions secrets | N/A (not a secret with expiry) | ∞ | Shawn | No |
+| VPS_SSH_KEY | GitHub Actions secrets | Never (SSH keys do not expire) | ∞ | Shawn | No |
+| VPS_HOST | GitHub Actions secrets | N/A (not a secret with expiry) | ∞ | Shawn | No |
+| STAGING_DB_PASSWORD | GitHub Actions secrets | Never (Postgres password) | ∞ | Shawn | No |
 
 ## GitHub PATs
 
