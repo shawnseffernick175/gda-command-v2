@@ -1,6 +1,6 @@
 # Secret Expiry Inventory
 
-> Last updated: 2026-05-19
+> Last updated: 2026-05-26
 > Purpose: Single source of truth for all GDA secret expirations.
 > Auto-monitored secrets are checked by the `secret_expiry_check` Sentinel probe every 6 hours.
 
@@ -34,6 +34,7 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 | GDA_FIX_AGENT_KEY | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | GDA_QA_AGENT_KEY | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | GDA_WEBHOOK_HEADER_VALUE | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
+| GDA_WEBHOOK_HEADER_VALUE_V2 | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | N8N_API_KEY | `/root/n8n-envision/.env` | Never (app-defined) | ∞ | Shawn | Yes (inventory) |
 | POSTGRES_PASSWORD | `/root/n8n-envision/.env` | Never (self-managed) | ∞ | Shawn | No (static) |
 | DB_POSTGRESDB_PASSWORD | `/root/n8n-envision/.env` | Never (self-managed) | ∞ | Shawn | No (static) |
@@ -43,6 +44,7 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 | Secret Name | Location | Expiry | Days Remaining | Rotation Owner | Auto-Monitored |
 |---|---|---|---|---|---|
 | SAM_GOV_API_KEY | `/root/n8n-envision/.env` | Never (SAM.gov keys do not expire) | ∞ | Shawn | Yes (inventory) |
+| GDA_SAM_API_KEY | `/root/n8n-envision/.env` | Never (alias of SAM_GOV_API_KEY) | ∞ | Shawn | Yes (inventory) |
 | OPENAI_API_KEY | `/root/n8n-envision/.env` | Never (OpenAI API keys do not expire) | ∞ | Shawn | Yes (inventory) |
 | ANTHROPIC_API_KEY | `/root/n8n-envision/.env` | Never (Anthropic keys do not expire) | ∞ | Shawn | Yes (inventory) |
 | TAVILY_API_KEY | `/root/n8n-envision/.env` | Never (Tavily keys do not expire) | ∞ | Shawn | Yes (inventory) |

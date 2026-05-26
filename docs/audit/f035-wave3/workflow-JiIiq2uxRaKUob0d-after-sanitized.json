@@ -1,0 +1,814 @@
+{
+  "updatedAt": "2026-05-13T22:46:11.158Z",
+  "createdAt": "2026-03-17T11:49:45.980Z",
+  "id": "JiIiq2uxRaKUob0d",
+  "name": "GDA.api.capture-intel",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "wh-cap",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        240,
+        688
+      ],
+      "webhookId": "ade14231-7b63-4338-bf69-58f3c1ae1a93",
+      "parameters": {
+        "path": "gda-capture-intel",
+        "options": {
+          "allowedOrigins": "*"
+        },
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "auth-cap",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        464,
+        688
+      ],
+      "parameters": {
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [\"gda-deploy-2026-secure\", \"gda-api-2026-secure\", \"gda-webhook-secret-2026\"];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "route-cap",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        688,
+        624
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "incumbent"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "contacts"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "vehicles"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "teaming"
+                  }
+                ]
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "forecasts"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "build-incumbent",
+      "name": "Build Incumbent Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        912,
+        208
+      ],
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || {};\nconst target = body.target || body.solicitation || body.agency || 'Unknown';\nconst naics = body.naics || '';\nconst agency = body.agency || '';\n\nconst prompt = [\n  `INCUMBENT ANALYSIS for: ${target}`,\n  agency ? `Agency: ${agency}` : '',\n  naics ? `NAICS: ${naics}` : '',\n  '',\n  'Execute these searches IN ORDER:',\n  `1. Search USASpending for awards to \"${agency || target}\" in relevant NAICS \u2014 find top 5 vendors by dollar value`,\n  `2. Search Tavily for \"${target} incumbent contract award recompete\" \u2014 find current holder, contract number, value, expiry`,\n  `3. Search SAM.gov for \"${target}\" \u2014 find related active solicitations`,\n  `4. Search Tavily for \"${target} contract transition protest\" \u2014 find any protest history or transition issues`,\n  '',\n  'Return ONLY this JSON:',\n  '{',\n  '  \"target\": \"string\",',\n  '  \"current_incumbent\": {\"vendor\": \"\", \"contract_number\": \"\", \"award_value\": \"\", \"award_date\": \"\", \"expiry_date\": \"\", \"period_of_performance\": \"\", \"contract_type\": \"\"},',\n  '  \"previous_incumbents\": [{\"vendor\": \"\", \"contract_number\": \"\", \"value\": \"\", \"period\": \"\"}],',\n  '  \"top_vendors_by_spend\": [{\"rank\": 1, \"vendor\": \"\", \"total_awards\": \"\", \"largest_contract\": \"\", \"naics_match\": true}],',\n  '  \"recompete_window\": {\"estimated_rfp_date\": \"\", \"estimated_award_date\": \"\", \"bridge_contract_risk\": \"\", \"protest_history\": \"\"},',\n  '  \"eis_assessment\": {\"incumbent_strength\": \"Strong/Medium/Weak\", \"displacement_difficulty\": \"High/Medium/Low\", \"recommended_strategy\": \"\", \"teaming_suggestion\": \"\", \"pwin_vs_incumbent\": \"\"},',\n  '  \"data_sources\": [{\"name\": \"\", \"url\": \"\"}],',\n  '  \"generated_at\": \"ISO timestamp\"',\n  '}'\n].join('\\n');\n\nreturn [{ json: { prompt, target, action: 'incumbent' } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "build-contacts",
+      "name": "Build Contacts Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        912,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || {};\nconst target = body.target || body.solicitation || body.agency || 'Unknown';\nconst agency = body.agency || '';\n\nconst prompt = [\n  `CONTACT DATABASE for: ${target}`,\n  agency ? `Agency: ${agency}` : '',\n  '',\n  'Execute these searches:',\n  `1. Search SAM.gov for \"${target}\" \u2014 extract all contracting officers, POCs with names, emails, phones`,\n  `2. Search Tavily for \"${agency || target} contracting officer program manager 2025 2026\" \u2014 find key decision makers`,\n  `3. Search Tavily for \"${agency || target} acquisition leadership OSDBU small business\" \u2014 find small business advocates`,\n  `4. Search Tavily for \"${target} industry day conference speaker\" \u2014 find engaged government leaders`,\n  '',\n  'Return ONLY this JSON:',\n  '{',\n  '  \"target\": \"string\",',\n  '  \"contracting_officers\": [{\"name\": \"\", \"title\": \"\", \"email\": \"\", \"phone\": \"\", \"office\": \"\", \"source\": \"\"}],',\n  '  \"program_managers\": [{\"name\": \"\", \"title\": \"\", \"email\": \"\", \"office\": \"\", \"programs_managed\": [], \"source\": \"\"}],',\n  '  \"key_decision_makers\": [{\"name\": \"\", \"title\": \"\", \"role_in_acquisition\": \"\", \"influence_level\": \"High/Medium/Low\", \"source\": \"\"}],',\n  '  \"small_business_advocates\": [{\"name\": \"\", \"title\": \"\", \"email\": \"\", \"source\": \"\"}],',\n  '  \"engagement_opportunities\": [{\"event\": \"\", \"date\": \"\", \"speakers\": [], \"registration_url\": \"\"}],',\n  '  \"recommended_outreach\": [{\"contact\": \"\", \"approach\": \"\", \"timing\": \"\", \"priority\": \"High/Medium/Low\"}],',\n  '  \"data_sources\": [{\"name\": \"\", \"url\": \"\"}],',\n  '  \"generated_at\": \"ISO timestamp\"',\n  '}'\n].join('\\n');\n\nreturn [{ json: { prompt, target, action: 'contacts' } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "build-vehicles",
+      "name": "Build Vehicles Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        912,
+        592
+      ],
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || {};\nconst target = body.target || body.solicitation || body.agency || 'Unknown';\nconst naics = body.naics || '';\nconst agency = body.agency || '';\n\nconst prompt = [\n  `VEHICLE TRACKER for: ${target}`,\n  agency ? `Agency: ${agency}` : '',\n  naics ? `NAICS: ${naics}` : '',\n  '',\n  'EIS/GDA is on or pursuing these vehicles: GSA MAS (Schedule 70/OASIS+), 8(a) STARS III, SEWP VI, CIO-SP4, Alliant 3 SB, ITES-4S.',\n  '',\n  'Execute these searches:',\n  `1. Search Tavily for \"${agency || target} IDIQ contract vehicle GWAC BPA task order 2025 2026\" \u2014 find all vehicles this agency uses`,\n  `2. Search Tavily for \"${target} GSA schedule OASIS CIO-SP4 Alliant ITES SEWP\" \u2014 find which GWACs cover this work`,\n  `3. Search SAM.gov for \"${target}\" \u2014 check if any active solicitations reference specific vehicles`,\n  `4. Search Tavily for \"${naics || '541511 541512'} IDIQ recompete new entrant 2026\" \u2014 find vehicles opening for new holders`,\n  '',\n  'Return ONLY this JSON:',\n  '{',\n  '  \"target\": \"string\",',\n  '  \"agency_preferred_vehicles\": [{\"name\": \"\", \"contract_number\": \"\", \"ceiling\": \"\", \"last_date_to_order\": \"\", \"managing_agency\": \"\", \"open_to_new_entrants\": true, \"small_business_only\": false, \"eis_on_vehicle\": false, \"url\": \"\"}],',\n  '  \"recommended_bid_path\": [{\"vehicle\": \"\", \"rationale\": \"\", \"competition_level\": \"High/Medium/Low\", \"eis_eligible\": true, \"action_needed\": \"\"}],',\n  '  \"upcoming_recompetes\": [{\"vehicle\": \"\", \"current_expiry\": \"\", \"expected_rfp\": \"\", \"changes_expected\": \"\"}],',\n  '  \"direct_bid_viable\": {\"answer\": true, \"rationale\": \"\"},',\n  '  \"eis_vehicle_gaps\": [\"Vehicles EIS should get on but isnt\"],',\n  '  \"data_sources\": [{\"name\": \"\", \"url\": \"\"}],',\n  '  \"generated_at\": \"ISO timestamp\"',\n  '}'\n].join('\\n');\n\nreturn [{ json: { prompt, target, action: 'vehicles' } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "build-teaming",
+      "name": "Build Teaming Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        912,
+        784
+      ],
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || {};\nconst target = body.target || body.solicitation || body.agency || 'Unknown';\nconst naics = body.naics || '';\nconst agency = body.agency || '';\nconst setAside = body.set_aside || '';\n\nconst prompt = [\n  `TEAMING PARTNER FINDER for: ${target}`,\n  agency ? `Agency: ${agency}` : '',\n  naics ? `NAICS: ${naics}` : '',\n  setAside ? `Set-Aside: ${setAside}` : '',\n  '',\n  'EIS (Envision Innovative Solutions) capabilities: XR/simulation/training (OU-03), C5ISR/AI/ML/logistics (OU-01 PD Systems), SIGINT/cyber/DevSecOps (OU-02 Riverstone). Small business, SDVOSB certified.',\n  '',\n  'Execute these searches:',\n  `1. Search USASpending for awards to \"${agency || target}\" \u2014 find top vendors who could be teaming primes`,\n  `2. Search Tavily for \"${target} small business subcontractor teaming partner ${naics}\" \u2014 find firms with complementary capabilities`,\n  `3. Search Tavily for \"${agency || target} mentor protege joint venture 8a SDVOSB\" \u2014 find teaming arrangements`,\n  `4. Search SAM.gov for \"${target}\" \u2014 check set-aside requirements that dictate teaming structure`,\n  '',\n  'Return ONLY this JSON:',\n  '{',\n  '  \"target\": \"string\",',\n  '  \"potential_primes\": [{\"vendor\": \"\", \"uei\": \"\", \"cage\": \"\", \"revenue\": \"\", \"relevant_contracts\": [], \"why_team\": \"\", \"eis_role\": \"sub/jv partner\", \"contact_approach\": \"\"}],',\n  '  \"potential_subs\": [{\"vendor\": \"\", \"capability\": \"\", \"certifications\": [], \"relevant_experience\": \"\", \"why_team\": \"\"}],',\n  '  \"mentor_protege_options\": [{\"mentor\": \"\", \"program\": \"SBA/DoD/Agency\", \"benefits\": \"\", \"eis_fit\": \"\"}],',\n  '  \"jv_candidates\": [{\"partner\": \"\", \"jv_type\": \"populated/unpopulated\", \"rationale\": \"\", \"complementary_capabilities\": []}],',\n  '  \"recommended_team\": {\"prime\": \"\", \"subs\": [], \"rationale\": \"\", \"set_aside_compliance\": \"\", \"pwin_impact\": \"\"},',\n  '  \"data_sources\": [{\"name\": \"\", \"url\": \"\"}],',\n  '  \"generated_at\": \"ISO timestamp\"',\n  '}'\n].join('\\n');\n\nreturn [{ json: { prompt, target, action: 'teaming' } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ai-cap",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "onError": "continueRegularOutput",
+      "disabled": true,
+      "maxTries": 2,
+      "position": [
+        1256,
+        592
+      ],
+      "parameters": {
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "maxIterations": 10,
+          "systemMessage": "You are a capture intelligence analyst for GDA Command. GDA operates three business units: EIS (XR/simulation/training), PD Systems (C5ISR/AI/ML), Riverstone (SIGINT/cyber). You provide actionable intelligence for federal BD pursuits.\n\nRules:\n- Name real companies and real people from search results. No placeholders.\n- Include real contract numbers, dollar values, and dates.\n- Every claim must cite a source URL.\n- Return ONLY valid JSON. No markdown fences. No explanatory text.\n- If data is unavailable, say 'data unavailable' not empty string."
+        },
+        "promptType": "define"
+      },
+      "retryOnFail": true,
+      "typeVersion": 3.1,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "llm-cap",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "disabled": true,
+      "maxTries": 2,
+      "position": [
+        1136,
+        816
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-20250514",
+          "cachedResultName": "Claude Sonnet 4"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "d92MU0tRK7bEGV83",
+          "name": "Anthropic account"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 1.3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "tavily-cap",
+      "name": "Tavily Search",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "onError": "continueRegularOutput",
+      "disabled": true,
+      "position": [
+        1264,
+        816
+      ],
+      "parameters": {
+        "url": "https://api.tavily.com/search",
+        "method": "POST",
+        "options": {
+          "timeout": 15000
+        },
+        "jsonBody": "={{ JSON.stringify({ api_key: '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', query: $fromAI('query', 'Search query', 'string'), max_results: 7, search_depth: 'basic' }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "toolDescription": "Search the web for defense contract intelligence, incumbents, vehicles, teaming partners, and government contacts.",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4,
+      "continueOnFail": true
+    },
+    {
+      "id": "sam-cap",
+      "name": "SAM.gov Search",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "onError": "continueRegularOutput",
+      "disabled": true,
+      "position": [
+        1392,
+        816
+      ],
+      "parameters": {
+        "url": "https://api.sam.gov/opportunities/v2/search",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.GDA_SAM_API_KEY }}"
+            },
+            {
+              "name": "postedFrom",
+              "value": "={{ $now.minus({days: 90}).format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "postedTo",
+              "value": "={{ $now.format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "limit",
+              "value": "15"
+            },
+            {
+              "name": "keyword",
+              "value": "={{ $fromAI('keyword', 'Search keyword', 'string') }}"
+            }
+          ]
+        },
+        "toolDescription": "Search SAM.gov for active federal contract opportunities. Returns solicitation data."
+      },
+      "typeVersion": 4.4,
+      "continueOnFail": true
+    },
+    {
+      "id": "usa-cap",
+      "name": "USASpending Search",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "onError": "continueRegularOutput",
+      "disabled": true,
+      "position": [
+        1520,
+        816
+      ],
+      "parameters": {
+        "url": "https://api.usaspending.gov/api/v2/search/spending_by_award/",
+        "method": "POST",
+        "options": {
+          "timeout": 30000
+        },
+        "jsonBody": "={{ JSON.stringify({filters:{keywords:[$fromAI('keywords','Agency or vendor keywords','string')],time_period:[{start_date:'2023-10-01',end_date:'2025-09-30'}]},fields:['Award ID','Recipient Name','Award Amount','Awarding Agency','Award Type','Description','Start Date','End Date','Awarding Sub Agency','NAICS Code'],limit:25,page:1,sort:'Award Amount',order:'desc'}) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "toolDescription": "Search USASpending.gov for federal award and spending data by agency or vendor.",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.4,
+      "continueOnFail": true
+    },
+    {
+      "id": "parse-cap",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1728,
+        592
+      ],
+      "parameters": {
+        "jsCode": "var item = $input.first().json;\nvar data = item.output || '';\nvar start = data.indexOf('{');\nvar end = data.lastIndexOf('}');\nif (start === -1 || end === -1) {\n  return [{ json: { error: 'No JSON found', raw_snippet: data.substring(0, 500), generated_at: new Date().toISOString() } }];\n}\ntry {\n  var parsed = JSON.parse(data.substring(start, end + 1));\n  if (!parsed.generated_at) parsed.generated_at = new Date().toISOString();\n  return [{ json: parsed }];\n} catch(e) {\n  try {\n    var repaired = data.substring(start, end + 1).replace(/[\\u2018\\u2019]/g, \"'\").replace(/[\\u201C\\u201D]/g, '\"').replace(/,\\s*}/g, '}').replace(/,\\s*]/g, ']');\n    var parsed2 = JSON.parse(repaired);\n    if (!parsed2.generated_at) parsed2.generated_at = new Date().toISOString();\n    return [{ json: parsed2 }];\n  } catch(e2) {\n    return [{ json: { error: 'Parse failed: ' + e2.message, raw_snippet: data.substring(0, 500), generated_at: new Date().toISOString() } }];\n  }\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "respond-cap",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1952,
+        496
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "cache-cap",
+      "name": "Cache Result",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1952,
+        688
+      ],
+      "parameters": {
+        "query": "INSERT INTO intelligence_log (workflow_name, session_id, target, summary, generated_at) VALUES ('Capture Intel', '={{ $('Webhook').first().json.body.action || \"unknown\" }}', '={{ $('Webhook').first().json.body.target || \"unknown\" }}', '={{ JSON.stringify($json).substring(0, 2000) }}', NOW())",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.5,
+      "continueOnFail": true
+    },
+    {
+      "id": "build-forecasts",
+      "name": "Build Forecasts Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        912,
+        976
+      ],
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body || {};\nconst target = body.target || body.agency || 'defense IT';\nconst naics = body.naics || '';\nconst agency = body.agency || '';\n\nconst prompt = [\n  `FEDERAL FORECAST INTELLIGENCE for: ${target}`,\n  agency ? `Agency: ${agency}` : '',\n  naics ? `NAICS: ${naics}` : '',\n  '',\n  'Find upcoming federal requirements that agencies plan to release but have NOT yet posted as solicitations.',\n  '',\n  'Execute these searches:',\n  `1. Search Tavily for \"${agency || target} acquisition forecast FY2026 FY2027 planned procurement\" -- find agency forecast documents`,\n  `2. Search Tavily for \"${target} recompete upcoming contract expiring 2026 2027\" -- find contracts about to expire`,\n  `3. Search SAM.gov for \"${target}\" -- check for pre-solicitation notices or sources sought`,\n  `4. Search Tavily for \"${agency || target} budget justification FY2027 new start program\" -- find budget docs signaling new requirements`,\n  '',\n  'Return ONLY this JSON:',\n  '{',\n  '  \"target\": \"string\",',\n  '  \"upcoming_forecasts\": [{\"name\": \"\", \"agency\": \"\", \"forecast_type\": \"Recompete|New Requirement\", \"estimated_release\": \"\", \"estimated_award\": \"\", \"estimated_value\": \"\", \"set_aside\": \"\", \"naics\": \"\", \"description\": \"\", \"contact\": {\"name\": \"\", \"email\": \"\"}, \"source_url\": \"\", \"eis_relevance\": \"High/Medium/Low\", \"eis_action\": \"\"}],',\n  '  \"expiring_contracts\": [{\"contract_number\": \"\", \"incumbent\": \"\", \"value\": \"\", \"expiry_date\": \"\", \"agency\": \"\", \"recompete_likely\": true, \"source_url\": \"\"}],',\n  '  \"pre_solicitation_signals\": [{\"notice_type\": \"Sources Sought|RFI|Pre-Sol|Draft RFP\", \"title\": \"\", \"agency\": \"\", \"posted_date\": \"\", \"response_deadline\": \"\", \"url\": \"\"}],',\n  '  \"budget_signals\": [{\"program\": \"\", \"fy\": \"\", \"amount\": \"\", \"change_from_prior\": \"\", \"new_start\": true, \"source_url\": \"\"}],',\n  '  \"eis_early_warning\": {\"immediate_actions\": [], \"30_day_deadlines\": [], \"90_day_targets\": [], \"strategic_positioning\": \"\"},',\n  '  \"data_sources\": [{\"name\": \"\", \"url\": \"\"}],',\n  '  \"generated_at\": \"ISO timestamp\"',\n  '}'\n].join('\\n');\n\nreturn [{ json: { prompt, target, action: 'forecasts' } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "claude-cap-direct",
+      "name": "Claude Direct",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1256,
+        496
+      ],
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "options": {
+          "timeout": 60000
+        },
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4096, system: 'You are a capture intelligence analyst for GDA Command. Return ONLY valid JSON. No markdown. Name real companies, real contract numbers, real dates. Cite source URLs for every claim. If data unavailable say so.', messages: [{ role: 'user', content: $json.prompt }] }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "extract-cap-direct",
+      "name": "Extract Claude Output",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1480,
+        496
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nlet text = '';\nif (data.content && data.content[0]) text = data.content[0].text || '';\nelse if (data.error) text = JSON.stringify(data.error);\nelse text = JSON.stringify(data);\nreturn [{ json: { output: text } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "resp-default-code",
+      "name": "Respond Default",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        912,
+        1168
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { error: 'Invalid action. Use: incumbent, contacts, vehicles, teaming, forecasts', available_actions: ['incumbent', 'contacts', 'vehicles', 'teaming', 'forecasts'] } }];"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Build Incumbent Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Contacts Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Vehicles Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Teaming Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Forecasts Prompt",
+            "type": "0",
+            "index": 0
+          },
+          {
+            "node": "Build Forecasts Prompt",
+            "type": "0",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Default",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Incumbent Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Contacts Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Vehicles Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Teaming Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAM.gov Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "USASpending Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Cache Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Forecasts Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "0",
+            "index": 0
+          },
+          {
+            "node": "AI Agent",
+            "type": "0",
+            "index": 0
+          },
+          {
+            "node": "Claude Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Direct": {
+      "main": [
+        [
+          {
+            "node": "Extract Claude Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Claude Output": {
+      "main": [
+        [
+          {
+            "node": "Parse Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Default": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "515cec5c-4d4d-44ed-a07e-a02c7c20b816",
+  "activeVersionId": "515cec5c-4d4d-44ed-a07e-a02c7c20b816",
+  "versionCounter": 307,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-17T11:49:45.980Z",
+      "createdAt": "2026-03-17T11:49:45.980Z",
+      "role": "workflow:owner",
+      "workflowId": "JiIiq2uxRaKUob0d",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": []
+}
