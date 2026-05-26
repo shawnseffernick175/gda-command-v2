@@ -1,0 +1,1942 @@
+{
+  "updatedAt": "2026-05-26T08:21:51.438Z",
+  "createdAt": "2026-03-17T17:24:16.093Z",
+  "id": "QgperN6cuOpfnb09",
+  "name": "GDA.api.capture-plan",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "id": "cp-01",
+      "name": "Webhook",
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "options": {
+          "allowedOrigins": "*"
+        },
+        "path": "gda-capture-plan",
+        "responseMode": "responseNode"
+      },
+      "position": [
+        208,
+        192
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "webhookId": "cc3fa556-8727-4f2a-a5d0-c6ae035b7edd"
+    },
+    {
+      "id": "cp-02-v2",
+      "name": "Auth Check",
+      "parameters": {
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\n\nfunction env(name, fallback) {\n  try { if (typeof $env !== 'undefined' && $env[name]) return $env[name]; } catch (e) {}\n  return fallback || '';\n}\nconst webhookHeaderValue = env('GDA_WEBHOOK_HEADER_VALUE');\nif (!webhookHeaderValue) throw new Error('GDA_WEBHOOK_HEADER_VALUE env var not set');\n\nif (auth !== '<REDACTED_WEBHOOK_SECRET>' && auth !== '<REDACTED_DEPLOY_KEY>' && auth !== webhookHeaderValue && auth !== '<REDACTED_API_KEY_SECURE>' && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+      },
+      "position": [
+        432,
+        192
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "cp-03",
+      "name": "Route Action",
+      "parameters": {
+        "options": {
+          "fallbackOutput": "extra"
+        },
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "generate"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "generate",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "list"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "list",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "save"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "save",
+              "renameOutput": true
+            },
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "operator": {
+                      "operation": "equals",
+                      "type": "string"
+                    },
+                    "rightValue": "analyze_phase"
+                  }
+                ],
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                }
+              },
+              "outputKey": "analyze",
+              "renameOutput": true
+            }
+          ]
+        }
+      },
+      "position": [
+        656,
+        48
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "cp-enrich-opps",
+      "name": "Enrich: Same Agency Opps",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "=SELECT opp_title, agency, estimated_value, naics_code, set_aside, eis_fit_score, response_deadline, stage, level_1, level_2 FROM gda_opportunity_tracker WHERE LOWER(agency) LIKE '%' || LOWER('{{ $('Webhook').first().json.body.agency || '' }}') || '%' OR LOWER(level_1) LIKE '%' || LOWER('{{ $('Webhook').first().json.body.agency || '' }}') || '%' ORDER BY eis_fit_score DESC NULLS LAST LIMIT 15"
+      },
+      "position": [
+        880,
+        176
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "cp-enrich-plans",
+      "name": "Enrich: Past Capture Plans",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT id, opportunity, agency, contract_value, plan_data->>'executive_summary' as exec_summary, created_at FROM gda_capture_plans ORDER BY created_at DESC LIMIT 5;"
+      },
+      "position": [
+        880,
+        -16
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "cp-enrich-risks",
+      "name": "Enrich: Risk Register",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT title, severity, category, description FROM gda_risk_register WHERE LOWER(COALESCE(status,'')) NOT IN ('dismissed','closed','resolved') ORDER BY CASE UPPER(severity) WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END LIMIT 5"
+      },
+      "position": [
+        880,
+        -208
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "cp-enrich-lessons",
+      "name": "Enrich: Capture Lessons",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "=SELECT opportunity, agency, outcome, lesson_text, stage_from, stage_to, created_at FROM gda_capture_lessons WHERE LOWER(agency) LIKE '%' || LOWER('{{ $('Webhook').first().json.body.agency || '' }}') || '%' OR LOWER(naics_code) = LOWER('{{ $('Webhook').first().json.body.naics || '' }}') ORDER BY created_at DESC LIMIT 10"
+      },
+      "position": [
+        880,
+        -400
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "id": "cp-04",
+      "name": "Build Capture Prompt",
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body;\nlet agencyOpps = []; try { agencyOpps = $('Enrich: Same Agency Opps').all().map(i => i.json).filter(i => i.opp_title); } catch(e) {}\nlet pastPlans = []; try { pastPlans = $('Enrich: Past Capture Plans').all().map(i => i.json).filter(i => i.opportunity); } catch(e) {}\nlet lessons = []; try { lessons = $('Enrich: Capture Lessons').all().map(i => i.json).filter(i => i.lesson_text); } catch(e) {}\n\n// EIS Win Themes\nconst EIS_WIN_THEMES = [\n  '1. Incumbency with mission continuity: EIS holds PM Mission Command product support (APG MD / Ft Bliss / Ft Hood / Ft Gordon) \u2014 proven SECRET FCL, cleared workforce, zero disruption risk',\n  '2. C5ISR / IEW&S domain depth: EIS technical staff have hands-on CP CE, MCE/JBC-P, FSC2/AFATDS, SMART, PdM CPI2 experience \u2014 not resume-matched generalists',\n  '3. Army-centric culture: OU3 leadership speaks Army acquisition language, understands ACAT programs, PM structure, and PdM relationships',\n  '4. Small business agility with enterprise reach: GDA OU3 can self-perform or team, price aggressively, and move fast without corporate bureaucracy',\n  '5. Intelligence community IT crossover: EIS bridges Army tactical comms and IC IT \u2014 dual-market credibility for hybrid programs',\n  '6. Shipley-disciplined capture: systematic phase-gate process, documented lessons learned, pwin-calibrated pipeline \u2014 evaluators see mature BD organization',\n  '7. Past performance on classified programs: SECRET FCL active, cleared staff on ground at program sites \u2014 reduces re-badging risk for government'\n];\n\n// Incumbent intel by segment\nconst INCUMBENT_INTEL = {\n  pm_mission_command: 'EIS IS the incumbent on TO# 47QFMA21K0015. Recompete strategy: emphasize zero defects on deliverables, staff retention, customer satisfaction scores.',\n  army_c5isr: 'Typical incumbents: Booz Allen, SAIC, Leidos, General Dynamics IT, DXC Technology. EIS differentiator: on-site cleared presence, mission continuity, lower price point than large primes.',\n  signals_intel: 'NSA/DIA contracts typically won by cleared SETA shops (CACI, Engility/SAIC, Booz). EIS entry strategy: team as sub to established prime, grow footprint.',\n  ic_it: 'IC IT dominated by large ODCs (Leidos, SAIC, PAE). EIS play: niche task orders under existing vehicles (ITES-3S, CHESS, SEWP VI), not open market.',\n  default: 'Research incumbent via USASpending.gov and GovTribe before capture kickoff. Key questions: incumbent performance record, prior award price (FOIA), set-aside history, small business goals.'\n};\n\nconst agencyLower = (b.agency || '').toLowerCase();\nconst segKey = agencyLower.includes('mission command') ? 'pm_mission_command'\n  : agencyLower.includes('signal') || agencyLower.includes('iew') ? 'signals_intel'\n  : agencyLower.includes('nsa') || agencyLower.includes('dia') || agencyLower.includes('ic ') ? 'ic_it'\n  : agencyLower.includes('army') || agencyLower.includes('c5isr') ? 'army_c5isr'\n  : 'default';\nconst incumbentContext = INCUMBENT_INTEL[segKey];\n\nconst winThemesText = EIS_WIN_THEMES.join('\\n');\nconst oppContextText = agencyOpps.length > 0\n  ? agencyOpps.map(o => '- ' + o.opp_title + ' ($' + (o.estimated_value || 'TBD') + ', fit:' + (o.eis_fit_score || '?') + ')').join('\\n')\n  : 'None found';\nconst lessonsText = lessons.length > 0\n  ? lessons.map(l => '- [' + (l.outcome || '?') + '] ' + l.lesson_text).join('\\n')\n  : 'None';\nconst pastPlansText = pastPlans.length > 0\n  ? pastPlans.map(p => '- ' + p.opportunity + ' (' + p.agency + '): ' + (p.exec_summary || 'no summary')).join('\\n')\n  : 'None';\n\nconst prompt = 'You are a Shipley-certified capture strategist for Envision Innovative Solutions (EIS), the defense analytics operating unit OU3 within Georgetown Defense Analytics (GDA). EIS focuses on Army C5ISR, IEW&S, signals intelligence, and intelligence community IT. EIS holds an active SECRET Facility Clearance (FCL).\\n\\nGENERATE A CAPTURE PLAN FOR:\\nOpportunity: ' + (b.opportunity || 'Unknown') + '\\nAgency/Customer: ' + (b.agency || 'Unknown') + '\\nEstimated Value: ' + (b.contract_value || 'TBD') + '\\n\\nEIS WIN THEMES (use these as the foundation for win strategy):\\n' + winThemesText + '\\n\\nINCUMBENT INTELLIGENCE FOR THIS MARKET SEGMENT:\\n' + incumbentContext + '\\n\\nRELATED AGENCY OPPORTUNITIES IN EIS PIPELINE:\\n' + oppContextText + '\\n\\nPAST CAPTURE PLAN CONTEXT:\\n' + pastPlansText + '\\n\\nLESSONS LEARNED FROM PRIOR CAPTURES:\\n' + lessonsText + '\\n\\nINSTRUCTIONS:\\n- Select 3-5 win themes most relevant to this specific opportunity\\n- Assess competitive position honestly \u2014 identify likely incumbent and how EIS beats them on price, past performance, or technical approach\\n- confidence_score = 0-100 based on EIS strategic fit, past performance relevance, and competitive landscape\\n- All action items must be time-bound with a specific owner role (e.g., Capture Manager, BD Lead, Technical Lead, Contracts)\\n- data_gaps should list specific unknowns that must be resolved before go/no-go\\n\\nRESPOND ONLY WITH VALID JSON \u2014 no markdown, no preamble:\\n{\"lead_company\": \"Envision Innovative Solutions (EIS)\", \"executive_summary\": \"\", \"confidence_score\": 0, \"win_themes\": [], \"competitive_assessment\": {\"likely_incumbent\": \"\", \"known_competitors\": [], \"eis_advantage\": \"\", \"price_position\": \"\"}, \"action_items\": [{\"action\": \"\", \"owner\": \"\", \"due\": \"\", \"priority\": \"\"}], \"risk_assessment\": [{\"risk\": \"\", \"likelihood\": \"\", \"impact\": \"\", \"mitigation\": \"\"}], \"data_gaps\": []}';\n\nreturn [{json: {prompt, opportunity: b.opportunity, agency: b.agency, contract_value: b.contract_value}}];"
+      },
+      "position": [
+        1104,
+        -224
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {},
+      "id": "cp-05",
+      "name": "Claude Generate Plan",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "authentication": "none",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{$env.ANTHROPIC_API_KEY}}"
+            }
+          ]
+        },
+        "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8192,messages:[{role:'user',content:$json.prompt}]}) }}",
+        "method": "POST",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://api.anthropic.com/v1/messages"
+      },
+      "position": [
+        1328,
+        -224
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4
+    },
+    {
+      "id": "cp-06",
+      "name": "Parse Plan",
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nconst ctx = $('Build Capture Prompt').first().json;\nlet text = '';\nif (raw.content && Array.isArray(raw.content)) { text = raw.content.map(c => c.text || '').join(''); } else { text = JSON.stringify(raw); }\nlet plan = {};\ntry { const clean = text.replace(/```json/g,'').replace(/```/g,'').trim(); plan = JSON.parse(clean); } catch(e) { const m = text.match(/\\{[\\s\\S]*\\}/); if (m) try { plan = JSON.parse(m[0]); } catch(e2) { plan = {error: 'Parse failed'}; } }\nreturn [{json: {status:'ok', opportunity:ctx.opportunity, agency:ctx.agency, contract_value:ctx.contract_value, plan:plan, generated_at:new Date().toISOString()}}];"
+      },
+      "position": [
+        1552,
+        -224
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "cp-07",
+      "name": "Respond Generate",
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "position": [
+        1776,
+        -224
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "cp-08",
+      "name": "List Plans",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT cp.id, cp.opportunity, cp.agency, cp.contract_value, cp.plan_data, cp.opp_title, cp.created_at, COALESCE(cp.updated_at, cp.created_at) as updated_at, CASE WHEN ot.gda_label = 'PASS' OR ot.stage = 'No-Bid' THEN true ELSE false END as no_bid FROM gda_capture_plans cp LEFT JOIN gda_opportunity_tracker ot ON ot.id = cp.opp_id ORDER BY COALESCE(cp.updated_at, cp.created_at) DESC LIMIT 100;"
+      },
+      "position": [
+        880,
+        368
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6
+    },
+    {
+      "id": "cp-09",
+      "name": "Respond List",
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ (function() { const plans = $input.all().map(i => i.json); const DONE = ['No-Bid','Cancelled','No-Go','Lost','Won']; const active = plans.filter(function(p) { const s = (p.plan_data && p.plan_data.stage) || 'Go/No-Go'; return !DONE.includes(s); }); const totalTCV = active.reduce(function(s, p) { const raw = String((p.plan_data && p.plan_data.total_contract_value) || '0').replace(/[$,]/g,''); const v = parseFloat(raw); return s + (isNaN(v) ? 0 : v); }, 0); const totalAlloc = active.reduce(function(s, p) { const raw = String((p.plan_data && p.plan_data.allocated_revenue_value) || '0').replace(/[$,]/g,''); const v = parseFloat(raw); return s + (isNaN(v) ? 0 : v); }, 0); const pursuing = active.filter(function(p) { const s = (p.plan_data && p.plan_data.stage) || ''; return ['Pursue','Proposal','Post-Submittal'].includes(s); }).length; return JSON.stringify({ status: 'ok', plans: plans, count: plans.length, kpis: { totalCapture: active.length, pursuing: pursuing, totalTCV: totalTCV, totalTCVM: (totalTCV/1000000).toFixed(1), totalAlloc: totalAlloc, totalAllocM: (totalAlloc/1000000).toFixed(1) } }); })() }}"
+      },
+      "position": [
+        1104,
+        368
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1
+    },
+    {
+      "id": "cp-10",
+      "name": "Save Plan",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "jsCode": "const b = $('Webhook').first().json.body;\nconst opp = b.opportunity || '';\nconst ag = b.agency || '';\nconst cv = b.contract_value || '';\nconst pd = JSON.stringify(b.plan || {});\nconst ot = b.opp_title || b.opportunity || '';\nconst planId = b.plan_id ? parseInt(b.plan_id) : null;\nreturn [{json: {opp, ag, cv, pd, ot, planId, isUpdate: !!planId}}];"
+      },
+      "position": [
+        880,
+        560
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      }
+    },
+    {
+      "id": "cp-save-route",
+      "name": "Insert or Update?",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "is-update-check",
+              "leftValue": "={{ $json.isUpdate }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "position": [
+        1060,
+        560
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "cp-save-update",
+      "name": "Update Plan PG",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "=UPDATE gda_capture_plans SET opportunity=COALESCE(NULLIF('{{ $json.opp }}',''), opportunity), agency=COALESCE(NULLIF('{{ $json.ag }}',''), agency), contract_value=COALESCE(NULLIF('{{ $json.cv }}',''), contract_value), plan_data = plan_data || '{{ $json.pd }}'::jsonb, opp_title=COALESCE(NULLIF('{{ $json.ot }}',''), opp_title), updated_at=NOW() WHERE id={{ $json.planId }} RETURNING id",
+        "resource": "database"
+      },
+      "position": [
+        1280,
+        480
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5
+    },
+    {
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "id": "cp-save-insert",
+      "name": "Insert Plan PG",
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "=INSERT INTO gda_capture_plans (opportunity, agency, contract_value, plan_data, opp_title) VALUES ('{{ $json.opp }}', '{{ $json.ag }}', '{{ $json.cv }}', '{{ $json.pd }}'::jsonb, '{{ $json.ot }}') RETURNING id",
+        "resource": "database"
+      },
+      "position": [
+        1280,
+        640
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5
+    },
+    {
+      "id": "cp-11",
+      "name": "Respond Save",
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({status:'ok', message:'Capture plan saved', id: $input.first().json.id || null}) }}"
+      },
+      "position": [
+        1500,
+        560
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1
+    },
+    {
+      "id": "bidi-trigger",
+      "name": "Bidi Sync",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-GDA-Key",
+              "value": "<REDACTED_WEBHOOK_SECRET>"
+            }
+          ]
+        },
+        "jsonBody": "={{ JSON.stringify({ auth_key: '<REDACTED_WEBHOOK_HEADER_VALUE_V2>', direction: 'cap_to_opp', source: 'capture-plan-save', plan_id: $json.id || $json.plan_id || null, changes: { opportunity: $json.opportunity || '', agency: $json.agency || '' } }) }}",
+        "method": "POST",
+        "options": {
+          "timeout": 15000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://n8n.csr-llc.tech/webhook/gda-bidi-sync"
+      },
+      "position": [
+        2300,
+        400
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4
+    },
+    {
+      "id": "cp-ap",
+      "name": "Build Phase Prompt",
+      "parameters": {
+        "jsCode": "const b=$('Webhook').first().json.body;const phase=b.phase||'Go/No-Go';const pd=b.plan_data||{};const F={'Go/No-Go':'Strategic alignment assessment','Interest':'Initial opportunity assessment','Qualify':'SWOT and competitive analysis','Pursue':'Capture strategy development','Solicitation':'Bid/no-bid decision','Proposal':'Proposal competitiveness review','Post-Submittal':'Evaluation preparation','Awaiting Approval':'Position assessment','Award':'Execution planning'};const EIS_WIN_THEMES_SHORT = ['Incumbency/mission continuity (PM Mission Command FCL active)','C5ISR/IEW&S domain depth (CP CE, MCE/JBC-P, FSC2/AFATDS, SMART, CPI2)','Army-centric culture and PM/PdM relationships','Small business agility \u2014 price competitive vs large primes','IC IT crossover credibility (Army tactical + IC hybrid programs)','Shipley-disciplined capture with calibrated pwin','Active SECRET FCL / cleared on-site workforce'];\nconst prompt='You are a Shipley-certified capture strategist for Envision Innovative Solutions (EIS) / GDA OU3, focused on Army C5ISR, IEW&S, signals intelligence, and IC IT. EIS holds an active SECRET FCL. Apply EIS win themes in every recommendation.\\nEIS WIN THEMES: '+EIS_WIN_THEMES_SHORT.join(' | ')+'\\n\\nOODA analysis for '+phase+' phase.\\nOpp: '+(pd.opportunity_name||pd.codename||b.opportunity||'Unknown')+'\\nAgency: '+(pd.agency||pd.division_owners||'Unknown')+'\\nValue: $'+Number(String(pd.total_contract_value||'0').replace(/[$,]/g,'')).toLocaleString()+'\\nType: '+(pd.contract_type||'TBD')+'\\nNAICS: '+(pd.naics||'TBD')+'\\nIncumbent: '+(pd.incumbent||'Unknown')+'\\nPwin: '+(pd.pwin||'TBD')+'%\\nStrengths: '+(pd.eis_strengths||'N/A')+'\\nWeaknesses: '+(pd.eis_weaknesses||'N/A')+'\\nCompetitors: '+(pd.known_competitors||'N/A')+'\\nFocus: '+(F[phase]||F['Go/No-Go'])+'\\n\\nRESPOND JSON ONLY:{\"phase\":\"...\",\"observe\":{\"title\":\"What We Know\",\"findings\":[],\"data_gaps\":[],\"sources\":[]},\"orient\":{\"title\":\"What It Means\",\"assessment\":\"...\",\"implications\":[],\"competitive_position\":\"...\"},\"decide\":{\"title\":\"Recommended Actions\",\"recommendation\":\"...\",\"actions\":[{\"action\":\"...\",\"owner\":\"...\",\"priority\":\"HIGH\",\"due\":\"...\"}],\"risks\":[{\"risk\":\"...\",\"mitigation\":\"...\"}]},\"act\":{\"title\":\"Execution Plan\",\"immediate\":[],\"short_term\":[],\"long_term\":[]},\"confidence\":0,\"next_phase_ready\":false,\"gate_criteria_met\":[],\"gate_criteria_not_met\":[]}';\\nreturn[{json:{prompt,phase,plan_id:b.plan_id}}];"
+      },
+      "position": [
+        880,
+        760
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "credentials": {},
+      "id": "cp-aa",
+      "name": "Claude Analyze",
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "authentication": "none",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{$env.ANTHROPIC_API_KEY}}"
+            }
+          ]
+        },
+        "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4096,messages:[{role:'user',content:$json.prompt}]}) }}",
+        "method": "POST",
+        "options": {
+          "timeout": 120000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "url": "https://api.anthropic.com/v1/messages"
+      },
+      "position": [
+        1104,
+        760
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4
+    },
+    {
+      "id": "cp-aparse",
+      "name": "Parse Analysis",
+      "parameters": {
+        "jsCode": "const raw=$input.first().json;const ctx=$('Build Phase Prompt').first().json;let text='';if(raw.content&&Array.isArray(raw.content))text=raw.content.map(c=>c.text||'').join('');else text=JSON.stringify(raw);let a={};try{a=JSON.parse(text.replace(/```json/g,'').replace(/```/g,'').trim());}catch(e){const m=text.match(/\\{[\\s\\S]*\\}/);if(m)try{a=JSON.parse(m[0]);}catch(e2){a={error:'Parse failed'};}}return[{json:{status:'ok',phase:ctx.phase,plan_id:ctx.plan_id,analysis:a,analyzed_at:new Date().toISOString()}}];"
+      },
+      "position": [
+        1328,
+        760
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "cp-aresp",
+      "name": "Respond Analyze",
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "position": [
+        1552,
+        760
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1
+    },
+    {
+      "id": "cp-ai-assist",
+      "name": "AI Assist: Comp Intel + Teaming",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        640
+      ],
+      "parameters": {
+        "jsCode": "const plan = $input.first().json;\nconst planId = plan.id || plan.rows?.[0]?.id;\nconst oppTitle = plan.opp_title || '';\nconst agency = plan.agency || '';\nconst naics = plan.naics_code || '';\nconst key = '<REDACTED_WEBHOOK_SECRET>';\n\nlet compIntelResult = {};\nlet teamingResult = {};\n\ntry {\n  const ci = await fetch('https://n8n.csr-llc.tech/webhook/gda-comp-intel-2', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  compIntelResult = await ci.json();\n} catch(e) { compIntelResult = { error: e.message }; }\n\ntry {\n  const tm = await fetch('https://n8n.csr-llc.tech/webhook/gda-teaming-scorer', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  teamingResult = await tm.json();\n} catch(e) { teamingResult = { error: e.message }; }\n\nreturn [{ json: { plan_id: planId, opp_title: oppTitle, agency, comp_intel: compIntelResult, teaming: teamingResult } }];"
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "cp-ai-update",
+      "name": "Update Plan AI Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1940,
+        640
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "UPDATE gda_capture_plans SET plan_data = plan_data || jsonb_build_object('comp_intel', '{{ JSON.stringify($json.comp_intel).replace(/'/g, \"''\") }}'::jsonb, 'teaming_recommendations', '{{ JSON.stringify($json.teaming).replace(/'/g, \"''\") }}'::jsonb, 'ai_assist_generated_at', '{{ new Date().toISOString() }}') WHERE id = {{ $json.plan_id }}"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Auth Check": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Route Action",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build Capture Prompt": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Claude Generate Plan",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Build Phase Prompt": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Claude Analyze",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Claude Analyze": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Parse Analysis",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Claude Generate Plan": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Parse Plan",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Enrich: Capture Lessons": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build Capture Prompt",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Enrich: Past Capture Plans": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build Capture Prompt",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Enrich: Risk Register": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build Capture Prompt",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Enrich: Same Agency Opps": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Build Capture Prompt",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Insert Plan PG": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond Save",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Bidi Sync",
+            "type": "main"
+          },
+          {
+            "node": "AI Assist: Comp Intel + Teaming",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert or Update?": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Update Plan PG",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Insert Plan PG",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "List Plans": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond List",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Parse Analysis": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond Analyze",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Parse Plan": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond Generate",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Enrich: Same Agency Opps",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Enrich: Past Capture Plans",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Enrich: Risk Register",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Enrich: Capture Lessons",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "List Plans",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Save Plan",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Build Phase Prompt",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Save Plan": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Insert or Update?",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Update Plan PG": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Respond Save",
+            "type": "main"
+          },
+          {
+            "index": 0,
+            "node": "Bidi Sync",
+            "type": "main"
+          },
+          {
+            "node": "AI Assist: Comp Intel + Teaming",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Auth Check",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "AI Assist: Comp Intel + Teaming": {
+      "main": [
+        [
+          {
+            "node": "Update Plan AI Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "022ad41c-f61d-47ec-beca-0d4f9cc1d973",
+  "activeVersionId": "022ad41c-f61d-47ec-beca-0d4f9cc1d973",
+  "versionCounter": 482,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-17T17:24:16.093Z",
+      "createdAt": "2026-03-17T17:24:16.093Z",
+      "role": "workflow:owner",
+      "workflowId": "QgperN6cuOpfnb09",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T08:21:51.439Z",
+    "createdAt": "2026-05-26T08:21:51.439Z",
+    "versionId": "022ad41c-f61d-47ec-beca-0d4f9cc1d973",
+    "workflowId": "QgperN6cuOpfnb09",
+    "nodes": [
+      {
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "id": "cp-01",
+        "name": "Webhook",
+        "parameters": {
+          "authentication": "headerAuth",
+          "httpMethod": "POST",
+          "options": {
+            "allowedOrigins": "*"
+          },
+          "path": "gda-capture-plan",
+          "responseMode": "responseNode"
+        },
+        "position": [
+          208,
+          192
+        ],
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "webhookId": "cc3fa556-8727-4f2a-a5d0-c6ae035b7edd"
+      },
+      {
+        "id": "cp-02-v2",
+        "name": "Auth Check",
+        "parameters": {
+          "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\n\nfunction env(name, fallback) {\n  try { if (typeof $env !== 'undefined' && $env[name]) return $env[name]; } catch (e) {}\n  return fallback || '';\n}\nconst webhookHeaderValue = env('GDA_WEBHOOK_HEADER_VALUE');\nif (!webhookHeaderValue) throw new Error('GDA_WEBHOOK_HEADER_VALUE env var not set');\n\nif (auth !== '<REDACTED_WEBHOOK_SECRET>' && auth !== '<REDACTED_DEPLOY_KEY>' && auth !== webhookHeaderValue && auth !== '<REDACTED_API_KEY_SECURE>' && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+        },
+        "position": [
+          432,
+          192
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2
+      },
+      {
+        "id": "cp-03",
+        "name": "Route Action",
+        "parameters": {
+          "options": {
+            "fallbackOutput": "extra"
+          },
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.body.action }}",
+                      "operator": {
+                        "operation": "equals",
+                        "type": "string"
+                      },
+                      "rightValue": "generate"
+                    }
+                  ],
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "loose"
+                  }
+                },
+                "outputKey": "generate",
+                "renameOutput": true
+              },
+              {
+                "conditions": {
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.body.action }}",
+                      "operator": {
+                        "operation": "equals",
+                        "type": "string"
+                      },
+                      "rightValue": "list"
+                    }
+                  ],
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "loose"
+                  }
+                },
+                "outputKey": "list",
+                "renameOutput": true
+              },
+              {
+                "conditions": {
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.body.action }}",
+                      "operator": {
+                        "operation": "equals",
+                        "type": "string"
+                      },
+                      "rightValue": "save"
+                    }
+                  ],
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "loose"
+                  }
+                },
+                "outputKey": "save",
+                "renameOutput": true
+              },
+              {
+                "conditions": {
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.body.action }}",
+                      "operator": {
+                        "operation": "equals",
+                        "type": "string"
+                      },
+                      "rightValue": "analyze_phase"
+                    }
+                  ],
+                  "options": {
+                    "caseSensitive": false,
+                    "typeValidation": "loose"
+                  }
+                },
+                "outputKey": "analyze",
+                "renameOutput": true
+              }
+            ]
+          }
+        },
+        "position": [
+          656,
+          48
+        ],
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.2
+      },
+      {
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "id": "cp-enrich-opps",
+        "name": "Enrich: Same Agency Opps",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "=SELECT opp_title, agency, estimated_value, naics_code, set_aside, eis_fit_score, response_deadline, stage, level_1, level_2 FROM gda_opportunity_tracker WHERE LOWER(agency) LIKE '%' || LOWER('{{ $('Webhook').first().json.body.agency || '' }}') || '%' OR LOWER(level_1) LIKE '%' || LOWER('{{ $('Webhook').first().json.body.agency || '' }}') || '%' ORDER BY eis_fit_score DESC NULLS LAST LIMIT 15"
+        },
+        "position": [
+          880,
+          176
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6
+      },
+      {
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "id": "cp-enrich-plans",
+        "name": "Enrich: Past Capture Plans",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "SELECT id, opportunity, agency, contract_value, plan_data->>'executive_summary' as exec_summary, created_at FROM gda_capture_plans ORDER BY created_at DESC LIMIT 5;"
+        },
+        "position": [
+          880,
+          -16
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6
+      },
+      {
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "id": "cp-enrich-risks",
+        "name": "Enrich: Risk Register",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "SELECT title, severity, category, description FROM gda_risk_register WHERE LOWER(COALESCE(status,'')) NOT IN ('dismissed','closed','resolved') ORDER BY CASE UPPER(severity) WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END LIMIT 5"
+        },
+        "position": [
+          880,
+          -208
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6
+      },
+      {
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "id": "cp-enrich-lessons",
+        "name": "Enrich: Capture Lessons",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "=SELECT opportunity, agency, outcome, lesson_text, stage_from, stage_to, created_at FROM gda_capture_lessons WHERE LOWER(agency) LIKE '%' || LOWER('{{ $('Webhook').first().json.body.agency || '' }}') || '%' OR LOWER(naics_code) = LOWER('{{ $('Webhook').first().json.body.naics || '' }}') ORDER BY created_at DESC LIMIT 10"
+        },
+        "position": [
+          880,
+          -400
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6
+      },
+      {
+        "id": "cp-04",
+        "name": "Build Capture Prompt",
+        "parameters": {
+          "jsCode": "const b = $('Webhook').first().json.body;\nlet agencyOpps = []; try { agencyOpps = $('Enrich: Same Agency Opps').all().map(i => i.json).filter(i => i.opp_title); } catch(e) {}\nlet pastPlans = []; try { pastPlans = $('Enrich: Past Capture Plans').all().map(i => i.json).filter(i => i.opportunity); } catch(e) {}\nlet lessons = []; try { lessons = $('Enrich: Capture Lessons').all().map(i => i.json).filter(i => i.lesson_text); } catch(e) {}\n\n// EIS Win Themes\nconst EIS_WIN_THEMES = [\n  '1. Incumbency with mission continuity: EIS holds PM Mission Command product support (APG MD / Ft Bliss / Ft Hood / Ft Gordon) \u2014 proven SECRET FCL, cleared workforce, zero disruption risk',\n  '2. C5ISR / IEW&S domain depth: EIS technical staff have hands-on CP CE, MCE/JBC-P, FSC2/AFATDS, SMART, PdM CPI2 experience \u2014 not resume-matched generalists',\n  '3. Army-centric culture: OU3 leadership speaks Army acquisition language, understands ACAT programs, PM structure, and PdM relationships',\n  '4. Small business agility with enterprise reach: GDA OU3 can self-perform or team, price aggressively, and move fast without corporate bureaucracy',\n  '5. Intelligence community IT crossover: EIS bridges Army tactical comms and IC IT \u2014 dual-market credibility for hybrid programs',\n  '6. Shipley-disciplined capture: systematic phase-gate process, documented lessons learned, pwin-calibrated pipeline \u2014 evaluators see mature BD organization',\n  '7. Past performance on classified programs: SECRET FCL active, cleared staff on ground at program sites \u2014 reduces re-badging risk for government'\n];\n\n// Incumbent intel by segment\nconst INCUMBENT_INTEL = {\n  pm_mission_command: 'EIS IS the incumbent on TO# 47QFMA21K0015. Recompete strategy: emphasize zero defects on deliverables, staff retention, customer satisfaction scores.',\n  army_c5isr: 'Typical incumbents: Booz Allen, SAIC, Leidos, General Dynamics IT, DXC Technology. EIS differentiator: on-site cleared presence, mission continuity, lower price point than large primes.',\n  signals_intel: 'NSA/DIA contracts typically won by cleared SETA shops (CACI, Engility/SAIC, Booz). EIS entry strategy: team as sub to established prime, grow footprint.',\n  ic_it: 'IC IT dominated by large ODCs (Leidos, SAIC, PAE). EIS play: niche task orders under existing vehicles (ITES-3S, CHESS, SEWP VI), not open market.',\n  default: 'Research incumbent via USASpending.gov and GovTribe before capture kickoff. Key questions: incumbent performance record, prior award price (FOIA), set-aside history, small business goals.'\n};\n\nconst agencyLower = (b.agency || '').toLowerCase();\nconst segKey = agencyLower.includes('mission command') ? 'pm_mission_command'\n  : agencyLower.includes('signal') || agencyLower.includes('iew') ? 'signals_intel'\n  : agencyLower.includes('nsa') || agencyLower.includes('dia') || agencyLower.includes('ic ') ? 'ic_it'\n  : agencyLower.includes('army') || agencyLower.includes('c5isr') ? 'army_c5isr'\n  : 'default';\nconst incumbentContext = INCUMBENT_INTEL[segKey];\n\nconst winThemesText = EIS_WIN_THEMES.join('\\n');\nconst oppContextText = agencyOpps.length > 0\n  ? agencyOpps.map(o => '- ' + o.opp_title + ' ($' + (o.estimated_value || 'TBD') + ', fit:' + (o.eis_fit_score || '?') + ')').join('\\n')\n  : 'None found';\nconst lessonsText = lessons.length > 0\n  ? lessons.map(l => '- [' + (l.outcome || '?') + '] ' + l.lesson_text).join('\\n')\n  : 'None';\nconst pastPlansText = pastPlans.length > 0\n  ? pastPlans.map(p => '- ' + p.opportunity + ' (' + p.agency + '): ' + (p.exec_summary || 'no summary')).join('\\n')\n  : 'None';\n\nconst prompt = 'You are a Shipley-certified capture strategist for Envision Innovative Solutions (EIS), the defense analytics operating unit OU3 within Georgetown Defense Analytics (GDA). EIS focuses on Army C5ISR, IEW&S, signals intelligence, and intelligence community IT. EIS holds an active SECRET Facility Clearance (FCL).\\n\\nGENERATE A CAPTURE PLAN FOR:\\nOpportunity: ' + (b.opportunity || 'Unknown') + '\\nAgency/Customer: ' + (b.agency || 'Unknown') + '\\nEstimated Value: ' + (b.contract_value || 'TBD') + '\\n\\nEIS WIN THEMES (use these as the foundation for win strategy):\\n' + winThemesText + '\\n\\nINCUMBENT INTELLIGENCE FOR THIS MARKET SEGMENT:\\n' + incumbentContext + '\\n\\nRELATED AGENCY OPPORTUNITIES IN EIS PIPELINE:\\n' + oppContextText + '\\n\\nPAST CAPTURE PLAN CONTEXT:\\n' + pastPlansText + '\\n\\nLESSONS LEARNED FROM PRIOR CAPTURES:\\n' + lessonsText + '\\n\\nINSTRUCTIONS:\\n- Select 3-5 win themes most relevant to this specific opportunity\\n- Assess competitive position honestly \u2014 identify likely incumbent and how EIS beats them on price, past performance, or technical approach\\n- confidence_score = 0-100 based on EIS strategic fit, past performance relevance, and competitive landscape\\n- All action items must be time-bound with a specific owner role (e.g., Capture Manager, BD Lead, Technical Lead, Contracts)\\n- data_gaps should list specific unknowns that must be resolved before go/no-go\\n\\nRESPOND ONLY WITH VALID JSON \u2014 no markdown, no preamble:\\n{\"lead_company\": \"Envision Innovative Solutions (EIS)\", \"executive_summary\": \"\", \"confidence_score\": 0, \"win_themes\": [], \"competitive_assessment\": {\"likely_incumbent\": \"\", \"known_competitors\": [], \"eis_advantage\": \"\", \"price_position\": \"\"}, \"action_items\": [{\"action\": \"\", \"owner\": \"\", \"due\": \"\", \"priority\": \"\"}], \"risk_assessment\": [{\"risk\": \"\", \"likelihood\": \"\", \"impact\": \"\", \"mitigation\": \"\"}], \"data_gaps\": []}';\n\nreturn [{json: {prompt, opportunity: b.opportunity, agency: b.agency, contract_value: b.contract_value}}];"
+        },
+        "position": [
+          1104,
+          -224
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2
+      },
+      {
+        "credentials": {},
+        "id": "cp-05",
+        "name": "Claude Generate Plan",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "authentication": "none",
+          "genericAuthType": "httpHeaderAuth",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              },
+              {
+                "name": "x-api-key",
+                "value": "={{$env.ANTHROPIC_API_KEY}}"
+              }
+            ]
+          },
+          "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:8192,messages:[{role:'user',content:$json.prompt}]}) }}",
+          "method": "POST",
+          "options": {
+            "timeout": 120000
+          },
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "url": "https://api.anthropic.com/v1/messages"
+        },
+        "position": [
+          1328,
+          -224
+        ],
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4
+      },
+      {
+        "id": "cp-06",
+        "name": "Parse Plan",
+        "parameters": {
+          "jsCode": "const raw = $input.first().json;\nconst ctx = $('Build Capture Prompt').first().json;\nlet text = '';\nif (raw.content && Array.isArray(raw.content)) { text = raw.content.map(c => c.text || '').join(''); } else { text = JSON.stringify(raw); }\nlet plan = {};\ntry { const clean = text.replace(/```json/g,'').replace(/```/g,'').trim(); plan = JSON.parse(clean); } catch(e) { const m = text.match(/\\{[\\s\\S]*\\}/); if (m) try { plan = JSON.parse(m[0]); } catch(e2) { plan = {error: 'Parse failed'}; } }\nreturn [{json: {status:'ok', opportunity:ctx.opportunity, agency:ctx.agency, contract_value:ctx.contract_value, plan:plan, generated_at:new Date().toISOString()}}];"
+        },
+        "position": [
+          1552,
+          -224
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2
+      },
+      {
+        "id": "cp-07",
+        "name": "Respond Generate",
+        "parameters": {
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($json) }}"
+        },
+        "position": [
+          1776,
+          -224
+        ],
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1
+      },
+      {
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "id": "cp-08",
+        "name": "List Plans",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "SELECT cp.id, cp.opportunity, cp.agency, cp.contract_value, cp.plan_data, cp.opp_title, cp.created_at, COALESCE(cp.updated_at, cp.created_at) as updated_at, CASE WHEN ot.gda_label = 'PASS' OR ot.stage = 'No-Bid' THEN true ELSE false END as no_bid FROM gda_capture_plans cp LEFT JOIN gda_opportunity_tracker ot ON ot.id = cp.opp_id ORDER BY COALESCE(cp.updated_at, cp.created_at) DESC LIMIT 100;"
+        },
+        "position": [
+          880,
+          368
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6
+      },
+      {
+        "id": "cp-09",
+        "name": "Respond List",
+        "parameters": {
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          "respondWith": "json",
+          "responseBody": "={{ (function() { const plans = $input.all().map(i => i.json); const DONE = ['No-Bid','Cancelled','No-Go','Lost','Won']; const active = plans.filter(function(p) { const s = (p.plan_data && p.plan_data.stage) || 'Go/No-Go'; return !DONE.includes(s); }); const totalTCV = active.reduce(function(s, p) { const raw = String((p.plan_data && p.plan_data.total_contract_value) || '0').replace(/[$,]/g,''); const v = parseFloat(raw); return s + (isNaN(v) ? 0 : v); }, 0); const totalAlloc = active.reduce(function(s, p) { const raw = String((p.plan_data && p.plan_data.allocated_revenue_value) || '0').replace(/[$,]/g,''); const v = parseFloat(raw); return s + (isNaN(v) ? 0 : v); }, 0); const pursuing = active.filter(function(p) { const s = (p.plan_data && p.plan_data.stage) || ''; return ['Pursue','Proposal','Post-Submittal'].includes(s); }).length; return JSON.stringify({ status: 'ok', plans: plans, count: plans.length, kpis: { totalCapture: active.length, pursuing: pursuing, totalTCV: totalTCV, totalTCVM: (totalTCV/1000000).toFixed(1), totalAlloc: totalAlloc, totalAllocM: (totalAlloc/1000000).toFixed(1) } }); })() }}"
+        },
+        "position": [
+          1104,
+          368
+        ],
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1
+      },
+      {
+        "id": "cp-10",
+        "name": "Save Plan",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "jsCode": "const b = $('Webhook').first().json.body;\nconst opp = b.opportunity || '';\nconst ag = b.agency || '';\nconst cv = b.contract_value || '';\nconst pd = JSON.stringify(b.plan || {});\nconst ot = b.opp_title || b.opportunity || '';\nconst planId = b.plan_id ? parseInt(b.plan_id) : null;\nreturn [{json: {opp, ag, cv, pd, ot, planId, isUpdate: !!planId}}];"
+        },
+        "position": [
+          880,
+          560
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        }
+      },
+      {
+        "id": "cp-save-route",
+        "name": "Insert or Update?",
+        "parameters": {
+          "conditions": {
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "is-update-check",
+                "leftValue": "={{ $json.isUpdate }}",
+                "operator": {
+                  "operation": "true",
+                  "singleValue": true,
+                  "type": "boolean"
+                },
+                "rightValue": ""
+              }
+            ],
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "loose",
+              "version": 2
+            }
+          },
+          "options": {}
+        },
+        "position": [
+          1060,
+          560
+        ],
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2
+      },
+      {
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "id": "cp-save-update",
+        "name": "Update Plan PG",
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "=UPDATE gda_capture_plans SET opportunity=COALESCE(NULLIF('{{ $json.opp }}',''), opportunity), agency=COALESCE(NULLIF('{{ $json.ag }}',''), agency), contract_value=COALESCE(NULLIF('{{ $json.cv }}',''), contract_value), plan_data = plan_data || '{{ $json.pd }}'::jsonb, opp_title=COALESCE(NULLIF('{{ $json.ot }}',''), opp_title), updated_at=NOW() WHERE id={{ $json.planId }} RETURNING id",
+          "resource": "database"
+        },
+        "position": [
+          1280,
+          480
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5
+      },
+      {
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "id": "cp-save-insert",
+        "name": "Insert Plan PG",
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "=INSERT INTO gda_capture_plans (opportunity, agency, contract_value, plan_data, opp_title) VALUES ('{{ $json.opp }}', '{{ $json.ag }}', '{{ $json.cv }}', '{{ $json.pd }}'::jsonb, '{{ $json.ot }}') RETURNING id",
+          "resource": "database"
+        },
+        "position": [
+          1280,
+          640
+        ],
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5
+      },
+      {
+        "id": "cp-11",
+        "name": "Respond Save",
+        "parameters": {
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({status:'ok', message:'Capture plan saved', id: $input.first().json.id || null}) }}"
+        },
+        "position": [
+          1500,
+          560
+        ],
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1
+      },
+      {
+        "id": "bidi-trigger",
+        "name": "Bidi Sync",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-GDA-Key",
+                "value": "<REDACTED_WEBHOOK_SECRET>"
+              }
+            ]
+          },
+          "jsonBody": "={{ JSON.stringify({ auth_key: '<REDACTED_WEBHOOK_HEADER_VALUE_V2>', direction: 'cap_to_opp', source: 'capture-plan-save', plan_id: $json.id || $json.plan_id || null, changes: { opportunity: $json.opportunity || '', agency: $json.agency || '' } }) }}",
+          "method": "POST",
+          "options": {
+            "timeout": 15000
+          },
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "url": "https://n8n.csr-llc.tech/webhook/gda-bidi-sync"
+        },
+        "position": [
+          2300,
+          400
+        ],
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4
+      },
+      {
+        "id": "cp-ap",
+        "name": "Build Phase Prompt",
+        "parameters": {
+          "jsCode": "const b=$('Webhook').first().json.body;const phase=b.phase||'Go/No-Go';const pd=b.plan_data||{};const F={'Go/No-Go':'Strategic alignment assessment','Interest':'Initial opportunity assessment','Qualify':'SWOT and competitive analysis','Pursue':'Capture strategy development','Solicitation':'Bid/no-bid decision','Proposal':'Proposal competitiveness review','Post-Submittal':'Evaluation preparation','Awaiting Approval':'Position assessment','Award':'Execution planning'};const EIS_WIN_THEMES_SHORT = ['Incumbency/mission continuity (PM Mission Command FCL active)','C5ISR/IEW&S domain depth (CP CE, MCE/JBC-P, FSC2/AFATDS, SMART, CPI2)','Army-centric culture and PM/PdM relationships','Small business agility \u2014 price competitive vs large primes','IC IT crossover credibility (Army tactical + IC hybrid programs)','Shipley-disciplined capture with calibrated pwin','Active SECRET FCL / cleared on-site workforce'];\nconst prompt='You are a Shipley-certified capture strategist for Envision Innovative Solutions (EIS) / GDA OU3, focused on Army C5ISR, IEW&S, signals intelligence, and IC IT. EIS holds an active SECRET FCL. Apply EIS win themes in every recommendation.\\nEIS WIN THEMES: '+EIS_WIN_THEMES_SHORT.join(' | ')+'\\n\\nOODA analysis for '+phase+' phase.\\nOpp: '+(pd.opportunity_name||pd.codename||b.opportunity||'Unknown')+'\\nAgency: '+(pd.agency||pd.division_owners||'Unknown')+'\\nValue: $'+Number(String(pd.total_contract_value||'0').replace(/[$,]/g,'')).toLocaleString()+'\\nType: '+(pd.contract_type||'TBD')+'\\nNAICS: '+(pd.naics||'TBD')+'\\nIncumbent: '+(pd.incumbent||'Unknown')+'\\nPwin: '+(pd.pwin||'TBD')+'%\\nStrengths: '+(pd.eis_strengths||'N/A')+'\\nWeaknesses: '+(pd.eis_weaknesses||'N/A')+'\\nCompetitors: '+(pd.known_competitors||'N/A')+'\\nFocus: '+(F[phase]||F['Go/No-Go'])+'\\n\\nRESPOND JSON ONLY:{\"phase\":\"...\",\"observe\":{\"title\":\"What We Know\",\"findings\":[],\"data_gaps\":[],\"sources\":[]},\"orient\":{\"title\":\"What It Means\",\"assessment\":\"...\",\"implications\":[],\"competitive_position\":\"...\"},\"decide\":{\"title\":\"Recommended Actions\",\"recommendation\":\"...\",\"actions\":[{\"action\":\"...\",\"owner\":\"...\",\"priority\":\"HIGH\",\"due\":\"...\"}],\"risks\":[{\"risk\":\"...\",\"mitigation\":\"...\"}]},\"act\":{\"title\":\"Execution Plan\",\"immediate\":[],\"short_term\":[],\"long_term\":[]},\"confidence\":0,\"next_phase_ready\":false,\"gate_criteria_met\":[],\"gate_criteria_not_met\":[]}';\\nreturn[{json:{prompt,phase,plan_id:b.plan_id}}];"
+        },
+        "position": [
+          880,
+          760
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2
+      },
+      {
+        "credentials": {},
+        "id": "cp-aa",
+        "name": "Claude Analyze",
+        "onError": "continueRegularOutput",
+        "parameters": {
+          "authentication": "none",
+          "genericAuthType": "httpHeaderAuth",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              },
+              {
+                "name": "x-api-key",
+                "value": "={{$env.ANTHROPIC_API_KEY}}"
+              }
+            ]
+          },
+          "jsonBody": "={{ JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4096,messages:[{role:'user',content:$json.prompt}]}) }}",
+          "method": "POST",
+          "options": {
+            "timeout": 120000
+          },
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "url": "https://api.anthropic.com/v1/messages"
+        },
+        "position": [
+          1104,
+          760
+        ],
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4
+      },
+      {
+        "id": "cp-aparse",
+        "name": "Parse Analysis",
+        "parameters": {
+          "jsCode": "const raw=$input.first().json;const ctx=$('Build Phase Prompt').first().json;let text='';if(raw.content&&Array.isArray(raw.content))text=raw.content.map(c=>c.text||'').join('');else text=JSON.stringify(raw);let a={};try{a=JSON.parse(text.replace(/```json/g,'').replace(/```/g,'').trim());}catch(e){const m=text.match(/\\{[\\s\\S]*\\}/);if(m)try{a=JSON.parse(m[0]);}catch(e2){a={error:'Parse failed'};}}return[{json:{status:'ok',phase:ctx.phase,plan_id:ctx.plan_id,analysis:a,analyzed_at:new Date().toISOString()}}];"
+        },
+        "position": [
+          1328,
+          760
+        ],
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2
+      },
+      {
+        "id": "cp-aresp",
+        "name": "Respond Analyze",
+        "parameters": {
+          "options": {
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($json) }}"
+        },
+        "position": [
+          1552,
+          760
+        ],
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1
+      },
+      {
+        "id": "cp-ai-assist",
+        "name": "AI Assist: Comp Intel + Teaming",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1720,
+          640
+        ],
+        "parameters": {
+          "jsCode": "const plan = $input.first().json;\nconst planId = plan.id || plan.rows?.[0]?.id;\nconst oppTitle = plan.opp_title || '';\nconst agency = plan.agency || '';\nconst naics = plan.naics_code || '';\nconst key = '<REDACTED_WEBHOOK_SECRET>';\n\nlet compIntelResult = {};\nlet teamingResult = {};\n\ntry {\n  const ci = await fetch('https://n8n.csr-llc.tech/webhook/gda-comp-intel-2', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  compIntelResult = await ci.json();\n} catch(e) { compIntelResult = { error: e.message }; }\n\ntry {\n  const tm = await fetch('https://n8n.csr-llc.tech/webhook/gda-teaming-scorer', {\n    method: 'POST',\n    headers: { 'x-gda-key': key, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ opportunity: oppTitle, agency, naics, auto_trigger: true })\n  });\n  teamingResult = await tm.json();\n} catch(e) { teamingResult = { error: e.message }; }\n\nreturn [{ json: { plan_id: planId, opp_title: oppTitle, agency, comp_intel: compIntelResult, teaming: teamingResult } }];"
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "cp-ai-update",
+        "name": "Update Plan AI Data",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          1940,
+          640
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "UPDATE gda_capture_plans SET plan_data = plan_data || jsonb_build_object('comp_intel', '{{ JSON.stringify($json.comp_intel).replace(/'/g, \"''\") }}'::jsonb, 'teaming_recommendations', '{{ JSON.stringify($json.teaming).replace(/'/g, \"''\") }}'::jsonb, 'ai_assist_generated_at', '{{ new Date().toISOString() }}') WHERE id = {{ $json.plan_id }}"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "continueOnFail": true
+      }
+    ],
+    "connections": {
+      "Auth Check": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Route Action",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Build Capture Prompt": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Claude Generate Plan",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Build Phase Prompt": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Claude Analyze",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Claude Analyze": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Parse Analysis",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Claude Generate Plan": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Parse Plan",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Enrich: Capture Lessons": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Build Capture Prompt",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Enrich: Past Capture Plans": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Build Capture Prompt",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Enrich: Risk Register": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Build Capture Prompt",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Enrich: Same Agency Opps": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Build Capture Prompt",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Insert Plan PG": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Respond Save",
+              "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "Bidi Sync",
+              "type": "main"
+            },
+            {
+              "node": "AI Assist: Comp Intel + Teaming",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert or Update?": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Update Plan PG",
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "node": "Insert Plan PG",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "List Plans": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Respond List",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Parse Analysis": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Respond Analyze",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Parse Plan": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Respond Generate",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Route Action": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Enrich: Same Agency Opps",
+              "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "Enrich: Past Capture Plans",
+              "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "Enrich: Risk Register",
+              "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "Enrich: Capture Lessons",
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "node": "List Plans",
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "node": "Save Plan",
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "index": 0,
+              "node": "Build Phase Prompt",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Save Plan": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Insert or Update?",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "Update Plan PG": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Respond Save",
+              "type": "main"
+            },
+            {
+              "index": 0,
+              "node": "Bidi Sync",
+              "type": "main"
+            },
+            {
+              "node": "AI Assist: Comp Intel + Teaming",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "index": 0,
+              "node": "Auth Check",
+              "type": "main"
+            }
+          ]
+        ]
+      },
+      "AI Assist: Comp Intel + Teaming": {
+        "main": [
+          [
+            {
+              "node": "Update Plan AI Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T08:21:51.564Z",
+        "id": 13394,
+        "workflowId": "QgperN6cuOpfnb09",
+        "versionId": "022ad41c-f61d-47ec-beca-0d4f9cc1d973",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T08:21:51.578Z",
+        "id": 13395,
+        "workflowId": "QgperN6cuOpfnb09",
+        "versionId": "022ad41c-f61d-47ec-beca-0d4f9cc1d973",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T08:21:51.483Z",
+        "id": 13392,
+        "workflowId": "QgperN6cuOpfnb09",
+        "versionId": "022ad41c-f61d-47ec-beca-0d4f9cc1d973",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T08:21:51.500Z",
+        "id": 13393,
+        "workflowId": "QgperN6cuOpfnb09",
+        "versionId": "022ad41c-f61d-47ec-beca-0d4f9cc1d973",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}
