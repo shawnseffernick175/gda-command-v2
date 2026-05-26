@@ -21,6 +21,9 @@ jobs:
     name: Deploy backend to prod
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      statuses: write
     # Only deploy when CI succeeded (workflow_run) or on manual trigger
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -64,8 +67,9 @@ jobs:
             scripts/deploy-prod.sh "${SSH_USER}@${SSH_HOST}:/tmp/deploy-prod.sh"
           ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
             "${SSH_USER}@${SSH_HOST}" "bash /tmp/deploy-prod.sh ${DRY_RUN}" | tee /tmp/deploy-output.txt
-          # Capture last line for status
-          tail -1 /tmp/deploy-output.txt >> "$GITHUB_OUTPUT"
+          # Capture last line for status (KEY=VALUE format required by GITHUB_OUTPUT)
+          LAST_LINE=$(tail -1 /tmp/deploy-output.txt | tr -d '\n')
+          echo "last_line=${LAST_LINE}" >> "$GITHUB_OUTPUT"
 
       - name: Set commit status — success
         if: success()
@@ -78,7 +82,7 @@ jobs:
               sha: '${{ steps.sha.outputs.sha }}',
               state: 'success',
               context: 'deploy/prod',
-              description: `Deployed to prod at ${new Date().toISOString()}`,
+              description: `Deployed ${{ steps.sha.outputs.sha }} at ${new Date().toISOString()}`,
               target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
 
@@ -93,7 +97,10 @@ jobs:
               const output = fs.readFileSync('/tmp/deploy-output.txt', 'utf8');
               const lastLine = output.trim().split('\n').pop();
               if (lastLine) detail = lastLine.substring(0, 140);
-            } catch {}
+            } catch {
+              const stepOutput = '${{ steps.deploy.outputs.last_line }}';
+              if (stepOutput) detail = stepOutput.substring(0, 140);
+            }
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
