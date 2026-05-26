@@ -237,7 +237,7 @@ else
     -X PATCH "${N8N_BASE}/api/v1/credentials/HwronxMmGY5XDGEt" \
     -H "X-N8N-API-KEY: ${N8N_API_KEY_VAL}" \
     -H "Content-Type: application/json" \
-    -d "{\"name\":\"GDA Postgres\",\"type\":\"postgres\",\"data\":{\"host\":\"gda-postgres\",\"database\":\"gda\",\"user\":\"gda\",\"password\":\"${NEW_PG_PASS}\",\"port\":5432,\"ssl\":\"disable\",\"sshAuthenticateWith\":\"password\",\"sshHost\":\"\",\"sshPort\":22,\"sshUser\":\"\",\"sshPassword\":\"\",\"privateKey\":\"\",\"passphrase\":\"\"}}")
+    -d "{\"name\":\"GDA Postgres\",\"type\":\"postgres\",\"data\":{\"host\":\"gda-postgres\",\"database\":\"gda\",\"user\":\"gda\",\"password\":\"${NEW_PG_PASS}\",\"port\":5432,\"ssl\":\"disable\",\"sshAuthenticateWith\":\"password\",\"sshHost\":\"\",\"sshPort\":22,\"sshUser\":\"\",\"sshPassword\":\"\",\"privateKey\":\"\",\"passphrase\":\"\"}}" 2>/dev/null || echo "000")
 
   if [[ "$HTTP_CODE" == "200" ]]; then
     echo "  Step 5: n8n GDA Postgres credential updated (HTTP 200)"
