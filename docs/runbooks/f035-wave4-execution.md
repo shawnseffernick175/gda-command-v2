@@ -131,7 +131,7 @@ Post-migration scan of all 158 workflows using 17 regex patterns:
 
 ### D6: Inventory Update
 
-Added 7 new entries to `docs/audit/secret-expiry-inventory.md`:
+Added 6 new entries to `docs/audit/secret-expiry-inventory.md`:
 - GDA_API_KEY_2026, GDA_DEPLOY_KEY_2026, GDA_WEBHOOK_SECRET_2026
 - GDA_DEPLOY_KEY_V2, GDA_DEPLOY_KEY_V2_CP
 - GDA_TAVILY_API_KEY
