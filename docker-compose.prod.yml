@@ -60,7 +60,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://${POSTGRES_USER:-gda}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gda}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-gda}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gda}}
       MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
       AUTH_REQUIRED: "true"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
