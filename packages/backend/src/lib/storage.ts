@@ -19,12 +19,13 @@ const ALLOWED_MIME_TYPES = new Set([
   "text/plain",
   "text/csv",
   "text/markdown",
+  "application/json",
   "image/png",
   "image/jpeg",
   "image/gif",
 ]);
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
 
 export function getUploadDir(): string {
   return UPLOAD_DIR;
@@ -51,6 +52,7 @@ const EXT_MIME_MAP: Record<string, string> = {
   ".txt": "text/plain",
   ".csv": "text/csv",
   ".md": "text/markdown",
+  ".json": "application/json",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
