@@ -23,6 +23,7 @@ const extractorMap: Record<string, () => Promise<Extractor>> = {
   "text/xml": () => import("./html"),
 
   // PR 2 — JSON/YAML (structured extraction with flattening)
+  "application/json": () => import("./json-yaml"),
   "text/yaml": () => import("./json-yaml"),
   "application/yaml": () => import("./json-yaml"),
   "application/x-yaml": () => import("./json-yaml"),
@@ -36,7 +37,6 @@ export const PLAIN_TEXT_MIMES = new Set([
   "text/plain",
   "text/markdown",
   "text/csv",
-  "application/json",
 ]);
 
 /** Returns true if we can extract text from this MIME type. */

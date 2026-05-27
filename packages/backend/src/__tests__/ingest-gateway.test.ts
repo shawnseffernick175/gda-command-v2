@@ -38,6 +38,9 @@ describe("Extractors: isExtractable", () => {
     expect(isExtractable("text/plain")).toBe(true);
     expect(isExtractable("text/markdown")).toBe(true);
     expect(isExtractable("text/csv")).toBe(true);
+  });
+
+  it("returns true for JSON (via json-yaml extractor)", () => {
     expect(isExtractable("application/json")).toBe(true);
   });
 
@@ -60,7 +63,10 @@ describe("Extractors: isExtractable", () => {
     expect(PLAIN_TEXT_MIMES.has("text/plain")).toBe(true);
     expect(PLAIN_TEXT_MIMES.has("text/markdown")).toBe(true);
     expect(PLAIN_TEXT_MIMES.has("text/csv")).toBe(true);
-    expect(PLAIN_TEXT_MIMES.has("application/json")).toBe(true);
+  });
+
+  it("application/json is in EXTRACTABLE_MIMES (json-yaml extractor)", () => {
+    expect(EXTRACTABLE_MIMES.has("application/json")).toBe(true);
   });
 });
 
@@ -83,11 +89,11 @@ describe("Extractors: runExtractor (plain text)", () => {
     expect(result.metadata.extractionPath).toBe("plain");
   });
 
-  it("reads application/json buffer as UTF-8", async () => {
+  it("flattens application/json via json-yaml extractor", async () => {
     const buf = Buffer.from(JSON.stringify({ key: "value" }));
     const result = await runExtractor(buf, "application/json");
-    expect(result.text).toContain("key");
-    expect(result.metadata.extractionPath).toBe("plain");
+    expect(result.text).toContain("key: value");
+    expect(result.metadata.extractionPath).toBe("json-yaml-json");
   });
 
   it("returns empty for unsupported MIME", async () => {
