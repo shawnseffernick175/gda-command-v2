@@ -71,6 +71,7 @@ services:
       - GDA_TAVILY_API_KEY
       - GDA_DEPLOY_KEY_V2
       - GDA_DEPLOY_KEY_V2_CP
+      - GDA_WEBHOOK_KEY
     ports:
       - "5678:5678"
     volumes:

@@ -2,4 +2,4 @@
 # Updated automatically when compose files change.
 # Used by CI (compose-drift check) and deploy-prod.sh to detect silent drift.
 docker-compose.prod.yml 1179b470a497a5777ab0083c137f25f5b5db58b31abafbefdcf5f65ffa10d529
-docker-compose.n8n.yml 37cd22583842f05e645de948a0911d7c9a877b60fed95ef13439d23df4751fde
+docker-compose.n8n.yml 22ea41a382e0a4b14fb1accce1cd49594de6de6634165cbe51dc943751303bc5
