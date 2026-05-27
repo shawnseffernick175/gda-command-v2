@@ -383,6 +383,26 @@ describe("computePerSourceStatus", () => {
     expect(result).not.toBeNull();
     expect(result!.status).toBe("healthy");
   });
+
+  it("primary never synced + missing key → null (not missing_key)", () => {
+    const neverSynced = { ...baseFeed, source: "govwin", last_sync_at: null };
+    const result = computePerSourceStatus(neverSynced, { ...envKeys, govwin: false });
+    expect(result).toBeNull();
+  });
+
+  it("primary synced + missing key → missing_key (real issue)", () => {
+    const synced = { ...baseFeed, source: "govwin", last_sync_at: new Date(Date.now() - 3600000).toISOString() };
+    const result = computePerSourceStatus(synced, { ...envKeys, govwin: false });
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe("missing_key");
+  });
+
+  it("enrichment source with missing key → missing_key", () => {
+    const enrichment = { ...baseFeed, source: "govtribe", role: "enrichment" };
+    const result = computePerSourceStatus(enrichment, { ...envKeys, govtribe: false });
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe("missing_key");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -213,14 +213,15 @@ export function computePerSourceStatus(
 
   const src = feed.source;
 
-  // Missing API key
-  if (src in envKeys && !envKeys[src]) {
-    return { source: src, status: "missing_key", reason: `API key not configured for ${src}` };
-  }
-
   if (feed.role === "primary") {
-    // Never synced — not yet operational, skip
+    // Never synced — not yet operational, skip entirely
+    // (no point flagging missing_key for a source that was never configured)
     if (!feed.last_sync_at) return null;
+
+    // Missing API key on an active primary source is a real issue
+    if (src in envKeys && !envKeys[src]) {
+      return { source: src, status: "missing_key", reason: `API key not configured for ${src}` };
+    }
 
     const hoursSince = (Date.now() - new Date(feed.last_sync_at).getTime()) / 3600000;
     const threshold = feed.sync_freshness_hours || 36;
@@ -237,7 +238,10 @@ export function computePerSourceStatus(
     return { source: src, status: "healthy", reason: null };
   }
 
-  // Enrichment sources — healthy by default (checked via enrichment_call_log separately)
+  // Enrichment sources — check key, otherwise healthy (call log checked separately)
+  if (src in envKeys && !envKeys[src]) {
+    return { source: src, status: "missing_key", reason: `API key not configured for ${src}` };
+  }
   return { source: src, status: "healthy", reason: null };
 }
 
