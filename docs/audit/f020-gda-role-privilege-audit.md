@@ -153,28 +153,34 @@ DROP ROLE IF EXISTS gda_staging_rt;  -- staging
 
 ---
 
-## Post-Merge Steps
+## Deployment — Option A (Bootstrap + Auto-Deploy)
 
-After merging and before deploying to prod:
+Migration 123 is auto-deploy safe (F-041f compatible). Two paths:
 
-1. **Set runtime role password on prod:**
-   ```bash
-   # Generate password
-   NEW_PW=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 32)
-   # Set on Postgres
-   ssh root@100.100.80.78 "docker exec gda-postgres psql -U gda -d gda -c \"ALTER ROLE gda_runtime PASSWORD '\$NEW_PW'\""
-   # Write to handoff file
-   ssh root@100.100.80.78 "echo \$NEW_PW > /tmp/gda-runtime-pw && chmod 400 /tmp/gda-runtime-pw"
-   ```
+- **Bootstrap path** (runs as `gda`/`gda_staging`): Creates the runtime role and
+  applies all grants. Used in CI and one-time admin setup.
+- **Auto-deploy path** (runs as `gda_app`): Verifies the runtime role already exists
+  with correct grants. RAISE EXCEPTION if role is missing.
 
-2. **Update VPS `.env` with runtime role DATABASE_URL:**
-   ```bash
-   # Add to /root/gda-command-v2/.env:
-   DATABASE_URL=postgresql://gda_runtime:<password>@postgres:5432/gda
-   ```
+### Pre-Deploy (one-time, on VPS)
 
-3. **Update n8n GDA Postgres credential** (`HwronxMmGY5XDGEt`) to use `gda_runtime`.
+```bash
+# 1. Bootstrap the runtime role (creates role + generates password):
+ssh root@100.100.80.78 'bash /root/gda-command-v2/scripts/bootstrap-gda-runtime.sh prod'
 
-4. **Restart backend:** `docker compose up -d backend`
+# 2. Wire up DATABASE_URL + restart backend:
+ssh root@100.100.80.78 'bash /root/gda-command-v2/scripts/rotate-gda-runtime-credential.sh prod'
+```
 
-5. **Verify:** App + canaries green for 30+ minutes.
+### Shawn's Manual Steps (after scripts run)
+
+1. Copy password to n8n credential `HwronxMmGY5XDGEt`: `ssh root@VPS 'cat /tmp/gda-runtime-pw-shawn-readonly'`
+2. Copy password to GitHub Actions secret (if needed)
+3. Delete handoff file: `ssh root@VPS 'rm /tmp/gda-runtime-pw-shawn-readonly'`
+4. Verify: App + canaries green for 30+ minutes
+
+### Auto-Deploy (after bootstrap)
+
+Once the runtime role exists, auto-deploy works normally:
+- Migration 123 runs as `gda_app`, verifies role exists + grants correct → succeeds
+- No manual intervention needed for future deploys
