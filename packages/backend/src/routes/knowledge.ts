@@ -9,7 +9,7 @@ interface ChatMessage { role: string; content: string; [key: string]: unknown }
 import { isLLMAvailable, chatCompletion, SYSTEM_PROMPTS } from "../lib/llm";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
-import { generateStorageKey, saveFile, deleteFile, isAllowedMimeType, getMaxFileSize, resolveMimeType } from "../lib/storage";
+import { generateStorageKey, saveFile, deleteFile, readFile, isAllowedMimeType, getMaxFileSize, resolveMimeType } from "../lib/storage";
 import { extractText, EXTRACTABLE_MIME_TYPES } from "../lib/extract-text";
 import {
   isEmbeddingAvailable,
@@ -19,6 +19,8 @@ import {
   getEmbeddingStats,
   type VectorSearchResult,
 } from "../lib/embeddings";
+import { ingestDocument } from "../lib/ingest";
+import { isExtractable } from "../lib/extractors";
 
 const router = Router();
 
@@ -523,82 +525,21 @@ router.post(
         });
       }
 
-      // Auto-vectorize: extract text and embed in background (non-blocking).
-      // Path A: plain text formats — read buffer directly.
-      // Path B: binary formats (PDF/DOCX/XLSX/PPTX/etc.) — run extractText() first.
+      // Auto-vectorize via universal ingestion gateway (fire-and-forget).
       let vectorizationStarted = false;
-      if (isEmbeddingAvailable() && pool) {
-        const textMimes = ["text/plain", "text/markdown", "text/csv", "application/json"];
-        const isPlainText =
-          textMimes.includes(resolvedMime) ||
-          !!file.originalname.match(/\.(txt|md|csv|json|log)$/i);
-        const isExtractable = EXTRACTABLE_MIME_TYPES.has(resolvedMime);
-
-        if (isPlainText || isExtractable) {
-          vectorizationStarted = true;
-
-          // Mark processing immediately so the UI sees state movement.
-          pool.query(
-            `UPDATE knowledge_documents SET status = 'processing', updated_at = NOW() WHERE id = $1`,
-            [docId],
-          ).catch(() => {});
-
-          // Capture what we need before going async (req/file may be GC'd).
-          const bufferCopy = Buffer.from(file.buffer);
-          const mimeForExtract = resolvedMime;
-          const fileNameForLog = file.originalname;
-
-          // Fire and forget.
-          (async () => {
-            try {
-              let rawText: string;
-              if (isPlainText) {
-                rawText = bufferCopy.toString("utf-8");
-              } else {
-                rawText = await extractText(bufferCopy, mimeForExtract);
-              }
-
-              if (!rawText || rawText.trim().length === 0) {
-                await pool.query(
-                  `UPDATE knowledge_documents SET status = 'skipped', updated_at = NOW() WHERE id = $1`,
-                  [docId],
-                );
-                log.warn("knowledge_auto_vectorize_empty", {
-                  docId,
-                  fileName: fileNameForLog,
-                  mime: mimeForExtract,
-                });
-                return;
-              }
-
-              const result = await embedDocument(docId, rawText);
-              await pool.query(
-                `UPDATE knowledge_documents SET status = 'indexed', chunk_count = $2, updated_at = NOW() WHERE id = $1`,
-                [docId, result.chunksCreated],
-              ).catch(() => {});
-              log.info("knowledge_auto_vectorized", {
-                docId,
-                fileName: fileNameForLog,
-                mime: mimeForExtract,
-                chunks: result.chunksCreated,
-                tokens: result.tokensUsed,
-                ms: result.durationMs,
-                path: isPlainText ? "plain" : "extracted",
-              });
-            } catch (embErr) {
-              await pool.query(
-                `UPDATE knowledge_documents SET status = 'failed', updated_at = NOW() WHERE id = $1`,
-                [docId],
-              ).catch(() => {});
-              log.error("knowledge_vectorize_error", {
-                docId,
-                fileName: fileNameForLog,
-                mime: mimeForExtract,
-                error: (embErr as Error).message,
-              });
-            }
-          })();
-        }
+      if (isEmbeddingAvailable() && pool && isExtractable(resolvedMime)) {
+        vectorizationStarted = true;
+        const bufferCopy = Buffer.from(file.buffer);
+        const nameForIngest = file.originalname;
+        ingestDocument(bufferCopy, nameForIngest, {
+          documentId: docId,
+          userId: req.user?.userId,
+        }).catch((err) => {
+          log.error("knowledge_ingest_fire_forget_error", {
+            docId,
+            error: (err as Error).message,
+          });
+        });
       }
 
       res.json(
@@ -756,7 +697,8 @@ router.post("/embeddings/document/:id", requireRole("admin"), async (req, res) =
 
 // ---------------------------------------------------------------------------
 // POST /api/knowledge/reprocess-pending — reprocess all pending documents
-// When embeddings are available: embed. Otherwise: mark as indexed (text-only search).
+// Uses the universal ingestion gateway for file-backed documents.
+// Falls back to metadata-only embedding for non-file documents.
 // ---------------------------------------------------------------------------
 router.post("/reprocess-pending", requireRole("admin"), async (_req, res) => {
   const pool = getPool();
@@ -768,15 +710,35 @@ router.post("/reprocess-pending", requireRole("admin"), async (_req, res) => {
 
   try {
     const { rows } = await pool.query(
-      "SELECT id, title, doc_type, tags, metadata, file_id FROM knowledge_documents WHERE status = 'pending'"
+      `SELECT kd.id, kd.title, kd.doc_type, kd.tags, kd.metadata, kd.file_id, kd.file_name,
+              uf.storage_key, uf.mime_type
+       FROM knowledge_documents kd
+       LEFT JOIN uploaded_files uf ON uf.id = kd.file_id
+       WHERE kd.status = 'pending'
+       ORDER BY kd.created_at ASC`,
     );
 
     let processed = 0;
-    let embedded = 0;
+    let ingested = 0;
+    let metadataOnly = 0;
     const useEmbeddings = isEmbeddingAvailable();
 
     for (const doc of rows) {
       try {
+        // File-backed documents: use the ingestion gateway
+        if (doc.storage_key && useEmbeddings) {
+          const fileBuffer = readFile(doc.storage_key);
+          if (fileBuffer) {
+            await ingestDocument(fileBuffer, doc.file_name ?? "unknown", {
+              documentId: doc.id,
+            });
+            ingested++;
+            processed++;
+            continue;
+          }
+        }
+
+        // Metadata-only fallback (no file or embeddings unavailable)
         if (useEmbeddings) {
           const textParts: string[] = [doc.title];
           if (doc.doc_type) textParts.push(`Document type: ${doc.doc_type}`);
@@ -793,10 +755,9 @@ router.post("/reprocess-pending", requireRole("admin"), async (_req, res) => {
               "UPDATE knowledge_documents SET status = 'indexed', chunk_count = $2, updated_at = NOW() WHERE id = $1",
               [doc.id, result.chunksCreated],
             );
-            embedded++;
+            metadataOnly++;
           }
         } else {
-          // Without embeddings, mark as indexed so they show up in text search
           await pool.query(
             "UPDATE knowledge_documents SET status = 'indexed', chunk_count = 1, updated_at = NOW() WHERE id = $1",
             [doc.id],
@@ -804,19 +765,17 @@ router.post("/reprocess-pending", requireRole("admin"), async (_req, res) => {
         }
         processed++;
       } catch (err) {
-        log.warn("knowledge_fallback", { error: String(err) });
-        // Skip individual failures
+        log.warn("knowledge_reprocess_error", { docId: doc.id, error: String(err) });
       }
     }
 
     return res.json(successEnvelope("gda-knowledge", "reprocess", {
       total_pending: rows.length,
       processed,
-      embedded,
+      ingested,
+      metadata_only: metadataOnly,
       embeddings_available: useEmbeddings,
-      message: useEmbeddings
-        ? `Processed ${processed} documents (${embedded} embedded)`
-        : `Processed ${processed} documents (text-only indexing — pgvector not available)`,
+      message: `Processed ${processed} documents (${ingested} ingested, ${metadataOnly} metadata-only)`,
     }));
   } catch (err) {
     return res.status(500).json(
