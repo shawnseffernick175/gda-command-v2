@@ -11,7 +11,7 @@
 | GDA CMF_0519'26 (I0WVrleWWSljclfX) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
 | GDA Command_05/17/26 (EF2kYdqZwPjyMugO) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
 | Devin-Rotated-2026-05-27 (DvRt2605270000AB) | n8n DB `user_api_keys` | 2027-05-27 | ~365 | Devin | Yes (DB query) |
-|| ~~Devin-Rotated (WoNIFcP3nyJnC8v5)~~ | ~~n8n DB~~ | ~~2026-06-09~~ | **REVOKED** | Devin | N/A — revoked 2026-05-27 |
+| ~~Devin-Rotated (WoNIFcP3nyJnC8v5)~~ | ~~n8n DB~~ | ~~2026-06-09~~ | **REVOKED** | Devin | N/A — revoked 2026-05-27 |
 | 050724_MCP API (Q9U4Ihh32PMoAKU2) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
 | MCP Server API Key (339O6NNJ5ZuM4NbZ) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
 
