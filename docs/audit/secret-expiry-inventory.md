@@ -1,6 +1,6 @@
 # Secret Expiry Inventory
 
-> Last updated: 2026-05-19 (F-029 Bundled Wave)
+> Last updated: 2026-05-26 (F-036a-followup: staging DB password rotation)
 > Purpose: Single source of truth for all GDA secret expirations.
 > Auto-monitored secrets are checked by the `secret_expiry_check` Sentinel probe every 6 hours.
 
@@ -85,6 +85,10 @@ n8n encryption keys do not expire. Rotation requires re-encrypting all credentia
 | VPS_SSH_KEY | GitHub Actions secrets | Never (SSH keys do not expire) | ∞ | Shawn | No |
 | VPS_HOST | GitHub Actions secrets | N/A (not a secret with expiry) | ∞ | Shawn | No |
 | STAGING_DB_PASSWORD | GitHub Actions secrets | Never (Postgres password) | ∞ | Shawn | No |
+
+> **Rotation record:** STAGING_DB_PASSWORD / STAGING_POSTGRES_PASSWORD rotated 2026-05-26.
+> Previous value (`staging_only_not_prod`) was in git history (22+ commits). New value is a
+> 32-char random string. Update GitHub Actions secret to match VPS `.env` value.
 
 ## GitHub PATs
 
