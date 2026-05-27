@@ -19,6 +19,7 @@ const ALLOWED_MIME_TYPES = new Set([
   "text/plain",
   "text/csv",
   "text/markdown",
+  "application/json",
   "image/png",
   "image/jpeg",
   "image/gif",
