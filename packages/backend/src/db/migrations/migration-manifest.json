@@ -125,5 +125,5 @@
   "120_step4b_gda_interaction_log.sql": "a7ead9572add590baa4f0784d5eea7aa4ddacc7db013879ac3a24441a55d3dc3",
   "121_knowledge_status_add_skipped.sql": "574e3f59e30cdfd6980c8e378a56da3b6cfab5f62f0aff7ec6b7dbcf6e355836",
   "122_system_health_snapshots.sql": "2439e5857be87d12c0e9693408a05542cee3f4303afa675e3d569746f0d62f42",
-  "123_demote_gda_role.sql": "c7fb53ab3a78800fc66894cd7522e957c82ea7697f1b5e26cb90ae2b93989c5f"
+  "123_demote_gda_role.sql": "479232fb2fcbd0893cc6e207bed1acd1bf1edd71ebf495814fafdb374709a198"
 }

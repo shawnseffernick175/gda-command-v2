@@ -33,9 +33,16 @@ BEGIN
   ELSIF bootstrap = 'gda_staging' THEN
     runtime := 'gda_staging_rt';
   ELSE
-    -- CI or unknown — skip role creation, just run as the connecting user
-    RAISE NOTICE 'F-020: bootstrap user is "%", skipping runtime role creation (CI/dev)', bootstrap;
-    RETURN;
+    -- Fail-fast: this migration must run as the bootstrap superuser (gda / gda_staging).
+    -- If connected as gda_app or any other role, abort so the migration runner does NOT
+    -- record it as applied.  Re-run with MIGRATION_DATABASE_URL unset or pointing to
+    -- the bootstrap superuser.
+    --
+    -- Exception: in CI the bootstrap user IS 'gda' (POSTGRES_USER), so CI hits the
+    -- IF branch above, not this one.
+    RAISE EXCEPTION 'F-020: must run as bootstrap superuser (gda or gda_staging), not "%". '
+      'Unset MIGRATION_DATABASE_URL or point it to the bootstrap superuser, then re-deploy.',
+      bootstrap;
   END IF;
 
   -- ── 1. Create runtime role ────────────────────────────────────────────
