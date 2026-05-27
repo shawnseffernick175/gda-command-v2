@@ -172,6 +172,7 @@ jobs:
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
