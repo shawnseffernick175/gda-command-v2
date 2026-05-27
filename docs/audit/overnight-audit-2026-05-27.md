@@ -90,10 +90,38 @@ The "32 components failing" report is **not a real overnight incident**. It is a
 
 1. **No action needed for the "32 components" alert** — it is a test infrastructure problem, not a production incident. The AI report generator (`GDA.auto.e2e-gemini-report`) amplifies test failures into alarming-sounding incident reports without distinguishing test infra issues from real outages.
 
-2. **Fix E2E test workflow** (follow-up issue): `GDA.auto.e2e-test` needs its authentication token/header updated. It has been broken since May 8 (19 days). Either:
-   - Update the webhook header value used by the E2E workflow to match the current `GDA_WEBHOOK_HEADER_VALUE_V2` (likely broken by F-035 Wave 2 key rotation)
-   - Or disable the workflow until it can be fixed properly
+2. ~~**Fix E2E test workflow**~~ — **FIXED** (see below).
 
 3. **Consider adding context to AI reports**: The `GDA.auto.e2e-gemini-report` workflow should include historical context (e.g., "this is the 19th consecutive 0% run") and distinguish between "all endpoints return the same error code" (likely test infra) vs. "mixed failures across different endpoints" (likely real issue).
 
 4. **writers_24h degraded**: 2.4% error rate (16/677) is within normal variance but worth monitoring. Not related to F-020.
+
+---
+
+## Fix Applied: E2E Test Auth (2026-05-27 ~17:30 UTC)
+
+### Root Cause
+
+The `GDA.auto.e2e-test` workflow sent `auth_key` as a **body parameter** in HTTP requests to n8n webhook endpoints. However, all target webhooks use n8n's built-in `headerAuth` with credential `GDA Webhook Auth v2` (ID `F4J3vYsPrJrYiO49`), which checks for the `x-gda-key` HTTP header.
+
+The n8n platform rejects requests at the webhook level (HTTP 401) before any code node runs if the correct header is missing. The body-based `auth_key` was never checked.
+
+This likely worked before May 8 because the target webhooks had `authentication: "none"` and checked auth in a code node (which accepted body params). When F-035 Wave 2 migrated them to `headerAuth`, the E2E test broke.
+
+### Changes Made
+
+1. **n8n environment**: Added `GDA_WEBHOOK_KEY` passthrough to n8n docker-compose and `/root/n8n-envision/.env` (same 64-char value used by gda-backend)
+2. **E2E workflow code**: Updated `GDA.auto.e2e-test` to send `x-gda-key: $env.GDA_WEBHOOK_KEY` header on all outbound HTTP requests
+3. **n8n restarted**: Container recreated to pick up new env var
+
+### Verification
+
+Manual trigger after fix: **2 PASS, 10 WARN, 8 FAIL (0 auth failures)**
+
+| Status | Count | Detail |
+|---|---|---|
+| PASS | 2 | Trends (9 records), Knowledge Base |
+| WARN | 10 | Endpoints return empty data (no 401s — auth works, just no data populated) |
+| FAIL | 8 | 4x 404 (webhooks removed), 2x timeout (slow LLM), 1x 500, 1x 404 |
+
+**Key result**: Zero HTTP 401 errors. Previous 19-day 401 streak is broken. The remaining failures are functional (missing webhooks, empty data, timeouts) — not auth-related.
