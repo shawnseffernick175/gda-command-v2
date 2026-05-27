@@ -10,6 +10,7 @@ import {
   computeSourceHealthStatus,
   computeWriters24hStatus,
   computeSecretExpiryStatus,
+  computePerSourceStatus,
   parseInventoryExpiries,
   WRITERS_24H_EXCLUDED_NAMES,
 } from "../lib/health-sentinel";
@@ -265,10 +266,10 @@ describe("Health Sentinel", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeSourceHealthStatus", () => {
-  it("empty table → degraded with appropriate detail", () => {
+  it("no active sources → healthy (not degraded)", () => {
     const result = computeSourceHealthStatus([]);
-    expect(result.status).toBe("degraded");
-    expect(result.detail).toBe("no source health snapshots recorded yet");
+    expect(result.status).toBe("healthy");
+    expect(result.detail).toBe("no active sources to monitor");
   });
 
   it("all sources healthy → healthy", () => {
@@ -316,6 +317,71 @@ describe("computeSourceHealthStatus", () => {
     expect(result.detail).toContain("sam=healthy");
     expect(result.detail).toContain("govwin=degraded");
     expect(result.detail).toContain("govtribe=healthy");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-2A: computePerSourceStatus — per-source health logic
+// ---------------------------------------------------------------------------
+
+describe("computePerSourceStatus", () => {
+  const baseFeed = {
+    source: "sam_gov",
+    role: "primary",
+    enabled: true,
+    deprecated_at: null,
+    last_sync_at: new Date(Date.now() - 2 * 3600000).toISOString(), // 2h ago
+    sync_freshness_hours: 36,
+    error_count: 0,
+  };
+  const envKeys = { sam_gov: true, govwin: true, govtribe: true, govtribe_zapier: true };
+
+  it("deprecated source → null (skipped)", () => {
+    expect(computePerSourceStatus({ ...baseFeed, deprecated_at: "2026-01-01" }, envKeys)).toBeNull();
+  });
+
+  it("disabled source → null (skipped)", () => {
+    expect(computePerSourceStatus({ ...baseFeed, enabled: false }, envKeys)).toBeNull();
+  });
+
+  it("primary never synced → null (not yet operational)", () => {
+    expect(computePerSourceStatus({ ...baseFeed, last_sync_at: null }, envKeys)).toBeNull();
+  });
+
+  it("missing API key → missing_key", () => {
+    const result = computePerSourceStatus(baseFeed, { ...envKeys, sam_gov: false });
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe("missing_key");
+  });
+
+  it("primary synced recently, 0 errors → healthy", () => {
+    const result = computePerSourceStatus(baseFeed, envKeys);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe("healthy");
+  });
+
+  it("primary stale beyond threshold → error", () => {
+    const stale = { ...baseFeed, last_sync_at: new Date(Date.now() - 48 * 3600000).toISOString() };
+    const result = computePerSourceStatus(stale, envKeys);
+    expect(result!.status).toBe("error");
+    expect(result!.reason).toContain("no sync in");
+  });
+
+  it("primary with >3 errors → error", () => {
+    const result = computePerSourceStatus({ ...baseFeed, error_count: 5 }, envKeys);
+    expect(result!.status).toBe("error");
+  });
+
+  it("primary with 1-3 errors → degraded", () => {
+    const result = computePerSourceStatus({ ...baseFeed, error_count: 2 }, envKeys);
+    expect(result!.status).toBe("degraded");
+  });
+
+  it("enrichment source → healthy by default", () => {
+    const enrichment = { ...baseFeed, source: "fpds", role: "enrichment" };
+    const result = computePerSourceStatus(enrichment, envKeys);
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe("healthy");
   });
 });
 
