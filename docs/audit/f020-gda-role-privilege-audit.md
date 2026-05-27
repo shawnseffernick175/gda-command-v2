@@ -162,15 +162,43 @@ Migration 123 is auto-deploy safe (F-041f compatible). Two paths:
 - **Auto-deploy path** (runs as `gda_app`): Verifies the runtime role already exists
   with correct grants. RAISE EXCEPTION if role is missing.
 
-### Pre-Deploy (one-time, on VPS)
+### Pre-Deploy — Production (one-time, on VPS)
+
+Both scripts support `--dry-run` (print what would change) and `--force` (skip
+confirmation prompts). Always run `--dry-run` first.
 
 ```bash
-# 1. Bootstrap the runtime role (creates role + generates password):
+# 1. Dry-run bootstrap to verify:
+ssh root@100.100.80.78 'bash /root/gda-command-v2/scripts/bootstrap-gda-runtime.sh prod --dry-run'
+
+# 2. Bootstrap the runtime role (creates role + generates password):
 ssh root@100.100.80.78 'bash /root/gda-command-v2/scripts/bootstrap-gda-runtime.sh prod'
 
-# 2. Wire up DATABASE_URL + restart backend:
+# 3. Dry-run rotate to verify:
+ssh root@100.100.80.78 'bash /root/gda-command-v2/scripts/rotate-gda-runtime-credential.sh prod --dry-run'
+
+# 4. Wire up DATABASE_URL + restart backend:
 ssh root@100.100.80.78 'bash /root/gda-command-v2/scripts/rotate-gda-runtime-credential.sh prod'
 ```
+
+### Pre-Deploy — Staging (bootstrap only, for CI)
+
+Staging has no separate backend service — `postgres-staging` exists only for CI
+migration smoke testing. The rotate script exits early for staging (after
+setting the password and writing the handoff file) and does NOT touch
+`DATABASE_URL` or restart the backend.
+
+```bash
+# Bootstrap staging role (creates gda_staging_rt + generates password):
+ssh root@100.100.80.78 'bash /root/gda-command-v2/scripts/bootstrap-gda-runtime.sh staging'
+```
+
+### Environment Variable Separation
+
+- `prod` rotate writes `DATABASE_URL` in `.env` → used by the `backend` service
+- `staging` rotate writes `STAGING_DATABASE_URL` in `.env` → NOT consumed by any
+  running service (reserved for future use or CI). Staging rotate does NOT touch
+  `DATABASE_URL` and does NOT restart any container.
 
 ### Shawn's Manual Steps (after scripts run)
 
