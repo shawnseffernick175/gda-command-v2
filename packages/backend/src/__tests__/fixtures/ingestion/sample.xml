@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<procurement-report>
+  <header>
+    <title>Federal Procurement Summary</title>
+    <date>2026-05-15</date>
+    <agency>Department of Defense</agency>
+  </header>
+  <contracts>
+    <contract id="FA8721-26-C-0001">
+      <vendor>Acme Defense Corp</vendor>
+      <value>2450000</value>
+      <status>awarded</status>
+      <description>Cybersecurity assessment services for perimeter defense systems</description>
+    </contract>
+    <contract id="W912DY-26-D-0042">
+      <vendor>Global Tech Solutions</vendor>
+      <value>1875000</value>
+      <status>pending</status>
+      <description>IT infrastructure modernization for field operations</description>
+    </contract>
+  </contracts>
+</procurement-report>
