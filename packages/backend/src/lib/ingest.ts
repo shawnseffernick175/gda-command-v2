@@ -9,7 +9,7 @@ import { getPool } from "./db";
 import { log } from "./logger";
 import { isExtractable, runExtractor, PLAIN_TEXT_MIMES } from "./extractors";
 import { embedDocument } from "./embeddings";
-import { resolveMimeType, saveFile, generateStorageKey } from "./storage";
+import { resolveMimeType, saveFile, generateStorageKey, deleteFile } from "./storage";
 
 const MAX_RECURSION_DEPTH = 3;
 
@@ -250,39 +250,52 @@ async function processChildren(
   const tags = parentOpts.tags ?? [];
 
   for (const child of children) {
-    try {
-      const childDocId = `doc-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-      const childFileId = `file-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-      const storageKey = generateStorageKey(child.name);
+    const childDocId = `doc-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const childFileId = `file-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const storageKey = generateStorageKey(child.name);
+    let fileSaved = false;
 
+    try {
       // Persist child file to disk
       saveFile(storageKey, child.buffer);
+      fileSaved = true;
 
-      // Insert uploaded_files record
-      await pool.query(
-        `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [childFileId, child.name, storageKey, child.mimeType, child.buffer.length, parentOpts.userId ?? null],
-      );
+      // Transactional insert: uploaded_files + knowledge_documents
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
 
-      // Insert knowledge_documents record with parent link
-      await pool.query(
-        `INSERT INTO knowledge_documents
-           (id, collection_id, title, doc_type, file_name, file_size_bytes, page_count, chunk_count,
-            status, tags, metadata, file_id, parent_document_id, created_at, updated_at)
-         VALUES ($1, $2, $3, 'attachment', $4, $5, 0, 0, 'pending', $6, $7, $8, $9, NOW(), NOW())`,
-        [
-          childDocId,
-          collectionId,
-          child.name.replace(/\.[^.]+$/, ""),
-          child.name,
-          child.buffer.length,
-          tags,
-          JSON.stringify({ mime_type: child.mimeType, storage_key: storageKey, parent_file: parentDocumentId }),
-          childFileId,
-          parentDocumentId,
-        ],
-      );
+        await client.query(
+          `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [childFileId, child.name, storageKey, child.mimeType, child.buffer.length, parentOpts.userId ?? null],
+        );
+
+        await client.query(
+          `INSERT INTO knowledge_documents
+             (id, collection_id, title, doc_type, file_name, file_size_bytes, page_count, chunk_count,
+              status, tags, metadata, file_id, parent_document_id, created_at, updated_at)
+           VALUES ($1, $2, $3, 'attachment', $4, $5, 0, 0, 'pending', $6, $7, $8, $9, NOW(), NOW())`,
+          [
+            childDocId,
+            collectionId,
+            child.name.replace(/\.[^.]+$/, ""),
+            child.name,
+            child.buffer.length,
+            tags,
+            JSON.stringify({ mime_type: child.mimeType, storage_key: storageKey, parent_file: parentDocumentId }),
+            childFileId,
+            parentDocumentId,
+          ],
+        );
+
+        await client.query("COMMIT");
+      } catch (txErr) {
+        await client.query("ROLLBACK");
+        throw txErr;
+      } finally {
+        client.release();
+      }
 
       created++;
 
@@ -305,11 +318,13 @@ async function processChildren(
       log.info("ingest_child_created", {
         parentId: parentDocumentId,
         childId: childDocId,
-        fileName: child.name,
-        mimeType: child.mimeType,
         depth: parentDepth + 1,
       });
     } catch (err) {
+      // Clean up orphaned file on disk if DB transaction failed
+      if (fileSaved) {
+        try { deleteFile(storageKey); } catch (delErr) { log.warn("ingest_child_cleanup_error", { error: String(delErr) }); }
+      }
       log.error("ingest_child_create_error", {
         parentId: parentDocumentId,
         childName: child.name,
