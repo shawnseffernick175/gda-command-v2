@@ -20,6 +20,19 @@ const ALLOWED_MIME_TYPES = new Set([
   "text/csv",
   "text/markdown",
   "application/json",
+  // PR 2 — Email
+  "message/rfc822",
+  "application/vnd.ms-outlook",
+  // PR 2 — HTML/XML
+  "text/html",
+  "application/xhtml+xml",
+  "application/xml",
+  "text/xml",
+  // PR 2 — YAML
+  "text/yaml",
+  "application/yaml",
+  "application/x-yaml",
+  // Images (allowed for upload, not extractable until PR 4)
   "image/png",
   "image/jpeg",
   "image/gif",
@@ -53,6 +66,18 @@ const EXT_MIME_MAP: Record<string, string> = {
   ".csv": "text/csv",
   ".md": "text/markdown",
   ".json": "application/json",
+  // PR 2 — Email
+  ".eml": "message/rfc822",
+  ".msg": "application/vnd.ms-outlook",
+  // PR 2 — HTML/XML
+  ".html": "text/html",
+  ".htm": "text/html",
+  ".xhtml": "application/xhtml+xml",
+  ".xml": "application/xml",
+  // PR 2 — YAML
+  ".yaml": "text/yaml",
+  ".yml": "text/yaml",
+  // Images
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",

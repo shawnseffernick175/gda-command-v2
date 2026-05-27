@@ -4,11 +4,14 @@
 // extraction dispatch, chunking, embedding, status tracking.
 // ---------------------------------------------------------------------------
 
+import crypto from "crypto";
 import { getPool } from "./db";
 import { log } from "./logger";
 import { isExtractable, runExtractor, PLAIN_TEXT_MIMES } from "./extractors";
 import { embedDocument } from "./embeddings";
-import { resolveMimeType } from "./storage";
+import { resolveMimeType, saveFile, generateStorageKey, deleteFile } from "./storage";
+
+const MAX_RECURSION_DEPTH = 3;
 
 // ---------------------------------------------------------------------------
 // Magic-byte MIME detection
@@ -42,6 +45,9 @@ export interface IngestOptions {
   documentId: string;
   userId?: string;
   parentDocumentId?: string;
+  depth?: number;
+  collectionId?: string;
+  tags?: string[];
 }
 
 export interface IngestResult {
@@ -53,6 +59,7 @@ export interface IngestResult {
   chunksCreated: number;
   textLength: number;
   durationMs: number;
+  childrenCreated?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +74,31 @@ export async function ingestDocument(
   const start = Date.now();
   const pool = getPool();
   const { documentId } = opts;
+  const depth = opts.depth ?? 0;
+
+  // Depth guard
+  if (depth > MAX_RECURSION_DEPTH) {
+    const reason = "recursion depth exceeded";
+    if (pool) {
+      await pool.query(
+        `UPDATE knowledge_documents
+         SET status = 'skipped', status_reason = $2, extraction_method = NULL, updated_at = NOW()
+         WHERE id = $1`,
+        [documentId, reason],
+      ).catch(() => {});
+    }
+    log.warn("ingest_depth_exceeded", { documentId, depth });
+    return {
+      documentId,
+      detectedMime: "unknown",
+      extractionMethod: "none",
+      status: "skipped",
+      statusReason: reason,
+      chunksCreated: 0,
+      textLength: 0,
+      durationMs: Date.now() - start,
+    };
+  }
 
   // 1. Magic-byte detection
   const detectedMime = await detectMime(buffer, originalName);
@@ -145,11 +177,23 @@ export async function ingestDocument(
       ).catch(() => {});
     }
 
+    // 6. Process children (email attachments, etc.) — fire-and-forget
+    let childrenCreated = 0;
+    if (result.children && result.children.length > 0 && pool) {
+      childrenCreated = await processChildren(
+        result.children,
+        documentId,
+        opts,
+        depth,
+      );
+    }
+
     log.info("ingest_complete", {
       documentId,
       mime: detectedMime,
       textLen: text.length,
       chunks: embedResult.chunksCreated,
+      childrenCreated,
       ms: Date.now() - start,
     });
 
@@ -162,6 +206,7 @@ export async function ingestDocument(
       chunksCreated: embedResult.chunksCreated,
       textLength: text.length,
       durationMs: Date.now() - start,
+      childrenCreated,
     };
   } catch (err) {
     const reason = (err as Error).message || "extraction failed";
@@ -185,4 +230,108 @@ export async function ingestDocument(
       durationMs: Date.now() - start,
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Child document processing (email attachments, archive members)
+// ---------------------------------------------------------------------------
+
+async function processChildren(
+  children: { name: string; buffer: Buffer; mimeType: string }[],
+  parentDocumentId: string,
+  parentOpts: IngestOptions,
+  parentDepth: number,
+): Promise<number> {
+  const pool = getPool();
+  if (!pool) return 0;
+
+  let created = 0;
+  const collectionId = parentOpts.collectionId ?? "col-contracts";
+  const tags = parentOpts.tags ?? [];
+
+  for (const child of children) {
+    const childDocId = `doc-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const childFileId = `file-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const storageKey = generateStorageKey(child.name);
+    let fileSaved = false;
+
+    try {
+      // Persist child file to disk
+      saveFile(storageKey, child.buffer);
+      fileSaved = true;
+
+      // Transactional insert: uploaded_files + knowledge_documents
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        await client.query(
+          `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [childFileId, child.name, storageKey, child.mimeType, child.buffer.length, parentOpts.userId ?? null],
+        );
+
+        await client.query(
+          `INSERT INTO knowledge_documents
+             (id, collection_id, title, doc_type, file_name, file_size_bytes, page_count, chunk_count,
+              status, tags, metadata, file_id, parent_document_id, created_at, updated_at)
+           VALUES ($1, $2, $3, 'attachment', $4, $5, 0, 0, 'pending', $6, $7, $8, $9, NOW(), NOW())`,
+          [
+            childDocId,
+            collectionId,
+            child.name.replace(/\.[^.]+$/, ""),
+            child.name,
+            child.buffer.length,
+            tags,
+            JSON.stringify({ mime_type: child.mimeType, storage_key: storageKey, parent_file: parentDocumentId }),
+            childFileId,
+            parentDocumentId,
+          ],
+        );
+
+        await client.query("COMMIT");
+      } catch (txErr) {
+        await client.query("ROLLBACK");
+        throw txErr;
+      } finally {
+        client.release();
+      }
+
+      created++;
+
+      // Fire-and-forget: ingest the child document
+      ingestDocument(child.buffer, child.name, {
+        documentId: childDocId,
+        userId: parentOpts.userId,
+        parentDocumentId,
+        depth: parentDepth + 1,
+        collectionId,
+        tags,
+      }).catch((err) => {
+        log.error("ingest_child_error", {
+          parentId: parentDocumentId,
+          childId: childDocId,
+          error: (err as Error).message,
+        });
+      });
+
+      log.info("ingest_child_created", {
+        parentId: parentDocumentId,
+        childId: childDocId,
+        depth: parentDepth + 1,
+      });
+    } catch (err) {
+      // Clean up orphaned file on disk if DB transaction failed
+      if (fileSaved) {
+        try { deleteFile(storageKey); } catch (delErr) { log.warn("ingest_child_cleanup_error", { error: String(delErr) }); }
+      }
+      log.error("ingest_child_create_error", {
+        parentId: parentDocumentId,
+        childName: child.name,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  return created;
 }

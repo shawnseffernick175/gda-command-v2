@@ -534,6 +534,8 @@ router.post(
         ingestDocument(bufferCopy, nameForIngest, {
           documentId: docId,
           userId: req.user?.userId,
+          collectionId,
+          tags: parsedTags,
         }).catch((err) => {
           log.error("knowledge_ingest_fire_forget_error", {
             docId,

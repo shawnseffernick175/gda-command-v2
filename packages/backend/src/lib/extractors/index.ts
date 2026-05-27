@@ -4,12 +4,29 @@ export type { ExtractResult } from "./types";
 type Extractor = { extract: (buffer: Buffer) => Promise<ExtractResult> };
 
 const extractorMap: Record<string, () => Promise<Extractor>> = {
+  // Tier 1 — Office (PR 1)
   "application/pdf": () => import("./pdf"),
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": () => import("./docx"),
   "application/msword": () => import("./pptx"), // officeparser handles DOC
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": () => import("./xlsx"),
   "application/vnd.ms-excel": () => import("./xlsx"),
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": () => import("./pptx"),
+
+  // PR 2 — Email
+  "message/rfc822": () => import("./email"),
+  "application/vnd.ms-outlook": () => import("./email"),
+
+  // PR 2 — HTML/XML
+  "text/html": () => import("./html"),
+  "application/xhtml+xml": () => import("./html"),
+  "application/xml": () => import("./html"),
+  "text/xml": () => import("./html"),
+
+  // PR 2 — JSON/YAML (structured extraction with flattening)
+  "application/json": () => import("./json-yaml"),
+  "text/yaml": () => import("./json-yaml"),
+  "application/yaml": () => import("./json-yaml"),
+  "application/x-yaml": () => import("./json-yaml"),
 };
 
 /** MIME types that have a wired extractor. */
@@ -20,7 +37,6 @@ export const PLAIN_TEXT_MIMES = new Set([
   "text/plain",
   "text/markdown",
   "text/csv",
-  "application/json",
 ]);
 
 /** Returns true if we can extract text from this MIME type. */
