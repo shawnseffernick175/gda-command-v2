@@ -1,6 +1,6 @@
 # Secret Expiry Inventory
 
-> Last updated: 2026-05-26 (F-036a-followup: staging DB password rotation)
+> Last updated: 2026-05-27 (F-2A: rotate n8n API key — Devin-Rotated → Devin-Rotated-2026-05-27)
 > Purpose: Single source of truth for all GDA secret expirations.
 > Auto-monitored secrets are checked by the `secret_expiry_check` Sentinel probe every 6 hours.
 
@@ -10,13 +10,14 @@
 |---|---|---|---|---|---|
 | GDA CMF_0519'26 (I0WVrleWWSljclfX) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
 | GDA Command_05/17/26 (EF2kYdqZwPjyMugO) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
-| Devin-Rotated (WoNIFcP3nyJnC8v5) | n8n DB `user_api_keys` | 2026-06-09 | ~21 | Devin | Yes (DB query) |
+| Devin-Rotated-2026-05-27 (DvRt2605270000AB) | n8n DB `user_api_keys` | 2027-05-27 | ~365 | Devin | Yes (DB query) |
+|| ~~Devin-Rotated (WoNIFcP3nyJnC8v5)~~ | ~~n8n DB~~ | ~~2026-06-09~~ | **REVOKED** | Devin | N/A — revoked 2026-05-27 |
 | 050724_MCP API (Q9U4Ihh32PMoAKU2) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
 | MCP Server API Key (339O6NNJ5ZuM4NbZ) | n8n DB `user_api_keys` | Never | ∞ | Shawn | Yes (DB query) |
 
-**Active key in `.env`:** GDA CMF_0519'26 (never expires). Rotated 2026-05-19.
+**Active key in gda-backend `.env`:** Devin-Rotated-2026-05-27 (expires 2027-05-27). Rotated 2026-05-27.
 
-> **REROTATE_RECOMMENDED:** Devin-Rotated (WoNIFcP3nyJnC8v5) expires 2026-06-09 (~21 days). Consider revoking since it is not in active use.
+> **Rotation record 2026-05-27:** Replaced N8N_API_KEY in gda-backend `.env` with Devin-Rotated-2026-05-27 (1-year expiry). Revoked old Devin-Rotated (WoNIFcP3nyJnC8v5) which was expiring 2026-06-09.
 
 ## n8n Encryption Key
 
@@ -120,7 +121,7 @@ To add a manually-tracked expiry, append a comment line after the table row:
 
 ### Active Expiry Annotations
 
-<!-- expiry_date: DEVIN_ROTATED_API_KEY 2026-06-09 -->
+<!-- expiry_date: DEVIN_ROTATED_2026_05_27_API_KEY 2027-05-27 -->
 <!-- expiry_date: GDA_GITHUB_BRIDGE_PAT unknown -->
 <!-- expiry_date: GITHUB_GIST_PAT unknown -->
 <!-- expiry_date: TS_OAUTH_CLIENT unknown -->
