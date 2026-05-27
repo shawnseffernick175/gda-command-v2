@@ -181,7 +181,7 @@ export function computeSourceHealthStatus(
   rows: { source: string; status: string }[],
 ): { status: ComponentStatus; detail: string } {
   if (rows.length === 0) {
-    return { status: "degraded", detail: "no source health snapshots recorded yet" };
+    return { status: "healthy", detail: "no active sources to monitor" };
   }
   const summary = rows.map((r) => `${r.source}=${r.status}`).join(", ");
   let status: ComponentStatus;
@@ -193,6 +193,52 @@ export function computeSourceHealthStatus(
     status = "healthy";
   }
   return { status, detail: summary };
+}
+
+/** Compute per-source health status from gov_source_feeds (inline, no external caller needed). */
+export function computePerSourceStatus(
+  feed: {
+    source: string;
+    role: string;
+    enabled: boolean;
+    deprecated_at: string | null;
+    last_sync_at: string | null;
+    sync_freshness_hours: number;
+    error_count: number;
+  },
+  envKeys: Record<string, boolean>,
+): { source: string; status: string; reason: string | null } | null {
+  // Skip deprecated/disabled
+  if (feed.deprecated_at || !feed.enabled) return null;
+
+  const src = feed.source;
+
+  // Missing API key
+  if (src in envKeys && !envKeys[src]) {
+    return { source: src, status: "missing_key", reason: `API key not configured for ${src}` };
+  }
+
+  if (feed.role === "primary") {
+    // Never synced — not yet operational, skip
+    if (!feed.last_sync_at) return null;
+
+    const hoursSince = (Date.now() - new Date(feed.last_sync_at).getTime()) / 3600000;
+    const threshold = feed.sync_freshness_hours || 36;
+
+    if (hoursSince > threshold) {
+      return { source: src, status: "error", reason: `no sync in ${Math.round(hoursSince)}h (threshold ${threshold}h)` };
+    }
+    if (feed.error_count > 3) {
+      return { source: src, status: "error", reason: `${feed.error_count} cumulative errors` };
+    }
+    if (feed.error_count > 0) {
+      return { source: src, status: "degraded", reason: `${feed.error_count} errors (below threshold)` };
+    }
+    return { source: src, status: "healthy", reason: null };
+  }
+
+  // Enrichment sources — healthy by default (checked via enrichment_call_log separately)
+  return { source: src, status: "healthy", reason: null };
 }
 
 async function probeWriters24h(): Promise<ProbeResult> {
@@ -307,13 +353,79 @@ async function probeSourceHealth(): Promise<ProbeResult> {
     if (!pool) {
       return { name: "source_health", status: "degraded", latency_ms: 0, detail: "DB pool not available" };
     }
-    const result = await pool.query(
-      `SELECT DISTINCT ON (source) source, status, snapshot_at
-       FROM source_health_snapshots
-       ORDER BY source, snapshot_at DESC`,
+
+    // Compute source health directly from gov_source_feeds
+    const feedResult = await pool.query(
+      `SELECT source, COALESCE(role, 'primary') AS role, enabled,
+              deprecated_at, last_sync_at,
+              COALESCE(sync_freshness_hours, 36) AS sync_freshness_hours,
+              COALESCE(error_count, 0) AS error_count
+       FROM gov_source_feeds ORDER BY source`,
     );
-    const rows = result.rows as { source: string; status: string }[];
-    const { status, detail } = computeSourceHealthStatus(rows);
+
+    const envKeys: Record<string, boolean> = {
+      sam_gov: !!process.env.SAM_API_KEY,
+      govwin: !!(process.env.GOVWIN_CLIENT_ID && process.env.GOVWIN_CLIENT_SECRET &&
+                 process.env.GOVWIN_USERNAME && process.env.GOVWIN_PASSWORD),
+      govtribe: !!process.env.GOVTRIBE_API_KEY,
+      govtribe_zapier: !!process.env.GOVTRIBE_API_KEY,
+    };
+
+    const sourceStatuses: { source: string; status: string }[] = [];
+    const snapshotAt = new Date().toISOString();
+
+    for (const feed of feedResult.rows) {
+      const result = computePerSourceStatus(
+        {
+          source: feed.source as string,
+          role: feed.role as string,
+          enabled: feed.enabled as boolean,
+          deprecated_at: feed.deprecated_at as string | null,
+          last_sync_at: feed.last_sync_at as string | null,
+          sync_freshness_hours: parseInt(String(feed.sync_freshness_hours), 10) || 36,
+          error_count: parseInt(String(feed.error_count), 10) || 0,
+        },
+        envKeys,
+      );
+      if (!result) continue; // skipped (deprecated, disabled, never synced primary)
+
+      sourceStatuses.push({ source: result.source, status: result.status });
+
+      // Side-effect: write snapshot row for QA dashboard history
+      try {
+        await pool.query(
+          `INSERT INTO source_health_snapshots
+             (id, snapshot_at, source, role, status, status_reason)
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5)`,
+          [snapshotAt, result.source, feed.role, result.status, result.reason],
+        );
+      } catch { /* non-fatal */ }
+    }
+
+    // Check enrichment call logs for active enrichment sources
+    for (const ss of sourceStatuses) {
+      const feed = feedResult.rows.find((f: Record<string, unknown>) => f.source === ss.source);
+      if (feed && feed.role === "enrichment") {
+        try {
+          const callResult = await pool.query(
+            `SELECT COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE success = false) AS errors
+             FROM enrichment_call_log
+             WHERE source = $1 AND called_at > NOW() - INTERVAL '7 days'`,
+            [ss.source],
+          );
+          const total = parseInt(callResult.rows[0]?.total ?? "0", 10);
+          const errors = parseInt(callResult.rows[0]?.errors ?? "0", 10);
+          if (total > 0 && errors / total > 0.25) {
+            ss.status = "error";
+          } else if (total > 0 && errors / total > 0.05) {
+            ss.status = "degraded";
+          }
+        } catch { /* table may not exist */ }
+      }
+    }
+
+    const { status, detail } = computeSourceHealthStatus(sourceStatuses);
     return { name: "source_health", status, latency_ms: Date.now() - start, detail };
   } catch (err) {
     return { name: "source_health", status: "degraded", latency_ms: Date.now() - start, detail: String((err as Error).message) };
