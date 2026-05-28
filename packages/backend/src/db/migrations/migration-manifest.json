@@ -127,5 +127,5 @@
   "122_system_health_snapshots.sql": "2439e5857be87d12c0e9693408a05542cee3f4303afa675e3d569746f0d62f42",
   "123_demote_gda_role.sql": "199df930dcdaa76f421066f11ca592d0c56b74a9ec55cc2e1ee213fcc9a1e121",
   "124_universal_ingestion.sql": "1c0785ead534b7aa40744207f9fc240ecc02ee88e87841496c859f80f1e695af",
-  "125_vector_embeddings_dual_write.sql": "f405ee153a5a412fa8d8f1dd105edc5a1a623b8034b474a64e0edad2f88fc235"
+  "125_vector_embeddings_dual_write.sql": "9a884c79bb4158f7ec50902d0540ac6bd1358642b7cae7835e55869ed386f354"
 }
