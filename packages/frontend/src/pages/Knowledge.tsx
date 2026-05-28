@@ -1,5 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import InfoBadge from "../components/InfoBadge";
+import DocFormatIcon from "../components/icons/DocFormatIcon";
+import { ChevronRight, ChevronDown, RotateCcw, X, AlertCircle } from "lucide-react";
 import {
   fetchKnowledgeSummary,
   fetchKnowledgeCollections,
@@ -10,6 +12,8 @@ import {
   fetchChatSession,
   sendChatMessage,
   uploadDocument,
+  bulkUploadDocuments,
+  retryDocument,
   type KnowledgeSummaryData,
   type KnowledgeCollection,
   type KnowledgeDocument,
@@ -17,6 +21,7 @@ import {
   type ChatMessage,
   type ChatSessionSummary,
   type ChatSessionDetail,
+  type BulkUploadResultRow,
 } from "../api/client";
 
 // ---------------------------------------------------------------------------
@@ -44,7 +49,13 @@ const STATUS_COLORS: Record<string, string> = {
   processing: "#f59e0b",
   failed: "#ef4444",
   pending: "#6b7280",
+  skipped: "#a855f7",
+  partial: "#f97316",
 };
+
+const RETRYABLE_REASONS = new Set(["timeout", "transient_error", "ocr_timeout", "OCR timeout"]);
+const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
+const MAX_BATCH_FILES = 50;
 
 const TYPE_LABELS: Record<string, string> = {
   financials: "Financials",
@@ -159,6 +170,135 @@ function SummaryStrip({ summary }: { summary: KnowledgeSummaryData }) {
 // Documents Tab
 // ---------------------------------------------------------------------------
 
+function DocumentRow({
+  doc,
+  selectedDocId,
+  onSelect,
+  children: childDocs,
+  depth = 0,
+  onRetry,
+}: {
+  doc: KnowledgeDocument;
+  selectedDocId: string | null;
+  onSelect: (doc: KnowledgeDocument) => void;
+  children: KnowledgeDocument[];
+  depth?: number;
+  onRetry: (docId: string) => void;
+}) {
+  const isSelected = selectedDocId === doc.id;
+  const [expanded, setExpanded] = useState(false);
+  const hasChildren = childDocs.length > 0;
+  const maxVisibleDepth = 3;
+  const isRetryable = doc.status === "failed" && doc.status_reason !== null && RETRYABLE_REASONS.has(doc.status_reason);
+
+  return (
+    <>
+      <div
+        onClick={() => onSelect(doc)}
+        style={{
+          padding: "10px 12px",
+          paddingLeft: 12 + depth * 24,
+          borderRadius: 8,
+          border: `1px solid ${isSelected ? "#3b82f6" : "var(--color-border)"}`,
+          background: isSelected ? "rgba(59,130,246,0.08)" : "var(--color-surface)",
+          marginBottom: 4,
+          cursor: "pointer",
+          transition: "border-color 0.15s",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, marginRight: 8 }}>
+            {hasChildren && depth < maxVisibleDepth && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--color-text-muted)", display: "flex" }}
+              >
+                {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+            )}
+            <DocFormatIcon mimeType={doc.metadata?.mime_type} fileName={doc.file_name} size={16} color="var(--color-text-muted)" />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>{doc.title}</span>
+            {hasChildren && (
+              <span style={{ fontSize: 10, padding: "1px 5px", borderRadius: 8, background: "rgba(99,102,241,0.15)", color: "#6366f1", fontWeight: 600 }}>
+                {childDocs.length} {childDocs.length === 1 ? "child" : "children"}
+              </span>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span
+              style={{
+                fontSize: 10,
+                padding: "2px 6px",
+                borderRadius: 4,
+                background: `${STATUS_COLORS[doc.status] ?? "#6b7280"}22`,
+                color: STATUS_COLORS[doc.status] ?? "#6b7280",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
+              }}
+              title={doc.status_reason ?? undefined}
+            >
+              {doc.status}
+            </span>
+            {isRetryable && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetry(doc.id); }}
+                title="Retry ingestion"
+                style={{ background: "none", border: "none", padding: 2, cursor: "pointer", color: "#f59e0b", display: "flex" }}
+              >
+                <RotateCcw size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+        {doc.status !== "indexed" && doc.status_reason && (
+          <div style={{ fontSize: 11, color: "#ef4444", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }} title={doc.status_reason}>
+            <AlertCircle size={11} />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300 }}>
+              {doc.status_reason.length > 60 ? doc.status_reason.slice(0, 57) + "..." : doc.status_reason}
+            </span>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, marginTop: 6, fontSize: 11, color: "var(--color-text-muted)" }}>
+          <span
+            style={{
+              padding: "1px 6px",
+              borderRadius: 3,
+              background: `${TYPE_COLORS[doc.type] ?? "#6b7280"}18`,
+              color: TYPE_COLORS[doc.type] ?? "#6b7280",
+              fontWeight: 500,
+            }}
+          >
+            {TYPE_LABELS[doc.type] ?? doc.type}
+          </span>
+          {doc.extraction_method && doc.extraction_method !== "native" && (
+            <span style={{ padding: "1px 5px", borderRadius: 3, background: "rgba(168,85,247,0.12)", color: "#a855f7", fontWeight: 500 }}>
+              {doc.extraction_method}
+            </span>
+          )}
+          <span>{doc.pages ? `${doc.pages}pg` : "\u2014"}</span>
+          <span>{formatBytes(doc.file_size_bytes)}</span>
+          <span>{doc.chunks_indexed} chunks</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 4, fontSize: 11, color: "var(--color-text-muted)" }}>
+          <span>Uploaded {timeAgo(doc.uploaded_at)}</span>
+          {doc.access_count > 0 && <span>| {doc.access_count} lookups</span>}
+        </div>
+      </div>
+      {expanded && depth < maxVisibleDepth && childDocs.map((child) => (
+        <DocumentRow
+          key={child.id}
+          doc={child}
+          selectedDocId={selectedDocId}
+          onSelect={onSelect}
+          children={[]}
+          depth={depth + 1}
+          onRetry={onRetry}
+        />
+      ))}
+    </>
+  );
+}
+
 function DocumentsTab() {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [collections, setCollections] = useState<KnowledgeCollection[]>([]);
@@ -172,7 +312,8 @@ function DocumentsTab() {
   const [sortBy, setSortBy] = useState("recent");
   const [showUpload, setShowUpload] = useState(false);
 
-  useEffect(() => {
+  const refreshDocs = useCallback(() => {
+    setLoading(true);
     Promise.all([
       fetchKnowledgeDocuments({ search: search || undefined, collection: collectionFilter || undefined, type: typeFilter || undefined, sort: sortBy }),
       fetchKnowledgeCollections(),
@@ -184,6 +325,8 @@ function DocumentsTab() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [search, collectionFilter, typeFilter, sortBy]);
+
+  useEffect(() => { refreshDocs(); }, [refreshDocs]);
 
   useEffect(() => {
     if (!selectedDocId) return;
@@ -197,6 +340,21 @@ function DocumentsTab() {
       .finally(() => { if (!stale) setDetailLoading(false); });
     return () => { stale = true; };
   }, [selectedDocId]);
+
+  const handleRetry = useCallback((docId: string) => {
+    retryDocument(docId).then(() => refreshDocs()).catch(() => {});
+  }, [refreshDocs]);
+
+  // Build parent/child tree
+  const parentDocs = documents.filter((d) => !d.parent_document_id);
+  const childrenByParent = new Map<string, KnowledgeDocument[]>();
+  for (const doc of documents) {
+    if (doc.parent_document_id) {
+      const existing = childrenByParent.get(doc.parent_document_id) ?? [];
+      existing.push(doc);
+      childrenByParent.set(doc.parent_document_id, existing);
+    }
+  }
 
   if (loading) return <p style={{ color: "var(--color-text-muted)" }}>Loading documents...</p>;
 
@@ -274,58 +432,16 @@ function DocumentsTab() {
           </button>
         </div>
 
-        {/* Document Cards */}
-        {documents.map((doc) => (
-          <div
+        {/* Document Cards — parent/child tree */}
+        {parentDocs.map((doc) => (
+          <DocumentRow
             key={doc.id}
-            onClick={() => { setSelectedDocId(doc.id); setSelectedDoc(doc); }}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 8,
-              border: `1px solid ${selectedDoc?.id === doc.id ? "#3b82f6" : "var(--color-border)"}`,
-              background: selectedDoc?.id === doc.id ? "rgba(59,130,246,0.08)" : "var(--color-surface)",
-              marginBottom: 8,
-              cursor: "pointer",
-              transition: "border-color 0.15s",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, flex: 1, marginRight: 8 }}>{doc.title}</div>
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                  background: `${STATUS_COLORS[doc.status]}22`,
-                  color: STATUS_COLORS[doc.status],
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {doc.status}
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6, fontSize: 11, color: "var(--color-text-muted)" }}>
-              <span
-                style={{
-                  padding: "1px 6px",
-                  borderRadius: 3,
-                  background: `${TYPE_COLORS[doc.type] ?? "#6b7280"}18`,
-                  color: TYPE_COLORS[doc.type] ?? "#6b7280",
-                  fontWeight: 500,
-                }}
-              >
-                {TYPE_LABELS[doc.type] ?? doc.type}
-              </span>
-              <span>{doc.pages ? `${doc.pages}pg` : "—"}</span>
-              <span>{formatBytes(doc.file_size_bytes)}</span>
-              <span>{doc.chunks_indexed} chunks</span>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 4, fontSize: 11, color: "var(--color-text-muted)" }}>
-              <span>Uploaded {timeAgo(doc.uploaded_at)}</span>
-              {doc.access_count > 0 && <span>| {doc.access_count} lookups</span>}
-            </div>
-          </div>
+            doc={doc}
+            selectedDocId={selectedDocId}
+            onSelect={(d) => { setSelectedDocId(d.id); setSelectedDoc(d); }}
+            children={childrenByParent.get(doc.id) ?? []}
+            onRetry={handleRetry}
+          />
         ))}
       </div>
 
@@ -343,7 +459,7 @@ function DocumentsTab() {
       </div>
 
       {/* Upload Modal */}
-      {showUpload && <UploadModal collections={collections} onClose={() => setShowUpload(false)} />}
+      {showUpload && <UploadModal collections={collections} onClose={() => { setShowUpload(false); refreshDocs(); }} />}
     </div>
   );
 }
@@ -434,68 +550,96 @@ function formatFileSize(bytes: number): string {
 }
 
 function UploadModal({ collections, onClose }: { collections: KnowledgeCollection[]; onClose: () => void }) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [docType, setDocType] = useState("memo");
   const [action, setAction] = useState("store");
   const [collection, setCollection] = useState("col-contracts");
   const [tagsInput, setTagsInput] = useState("");
-  const [result, setResult] = useState<string | null>(null);
+  const [uploadResults, setUploadResults] = useState<BulkUploadResultRow[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [oversizeWarning, setOversizeWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const addFiles = (newFiles: FileList | File[]) => {
+    const arr = Array.from(newFiles);
+    setSelectedFiles((prev) => {
+      const combined = [...prev, ...arr];
+      // Check for oversize files
+      const oversize = combined.filter((f) => f.size > MAX_FILE_SIZE);
+      if (oversize.length > 0 || combined.length > MAX_BATCH_FILES) {
+        const msgs: string[] = [];
+        if (oversize.length > 0) msgs.push(`${oversize.length} file(s) exceed 200 MB`);
+        if (combined.length > MAX_BATCH_FILES) msgs.push(`batch exceeds ${MAX_BATCH_FILES} files`);
+        setOversizeWarning(msgs.join("; ") + ". Eligible files will still be uploaded.");
+      } else {
+        setOversizeWarning(null);
+      }
+      return combined;
+    });
+  };
+
+  const removeFile = (idx: number) => {
+    setSelectedFiles((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      const oversize = next.filter((f) => f.size > MAX_FILE_SIZE);
+      if (oversize.length === 0 && next.length <= MAX_BATCH_FILES) setOversizeWarning(null);
+      return next;
+    });
+  };
+
   const handleUpload = () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
     setUploading(true);
-    const tags = tagsInput
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-    uploadDocument(selectedFile, docType, collection, tags, action)
-      .then((env) => {
-        if (env.success && env.data) {
-          setResult(`Uploaded: ${env.data.message}${env.data.download_url ? `\nDownload: ${env.data.download_url}` : ""}`);
-        } else {
-          setResult(`Upload failed: ${env.error?.message ?? "Unknown error"}`);
-        }
-      })
-      .catch((err: Error) => setResult(`Upload failed: ${err.message}`))
-      .finally(() => setUploading(false));
+    const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    const eligible = selectedFiles.filter((f) => f.size <= MAX_FILE_SIZE).slice(0, MAX_BATCH_FILES);
+
+    if (eligible.length === 1) {
+      uploadDocument(eligible[0], docType, collection, tags, action)
+        .then((env) => {
+          setUploadResults([{
+            filename: eligible[0].name,
+            document_id: env.data?.id ?? null,
+            status: env.success ? (env.data?.status ?? "pending") : "failed",
+            status_reason: null,
+            extraction_method: null,
+            children_count: 0,
+            error: env.success ? null : (env.error?.message ?? "Upload failed"),
+          }]);
+        })
+        .catch((err: Error) => setUploadResults([{ filename: eligible[0].name, document_id: null, status: "failed", status_reason: null, extraction_method: null, children_count: 0, error: err.message }]))
+        .finally(() => setUploading(false));
+    } else {
+      bulkUploadDocuments(eligible, docType, collection, tags)
+        .then((env) => {
+          if (env.success && env.data) {
+            setUploadResults(env.data.results);
+          } else {
+            setUploadResults(eligible.map((f) => ({ filename: f.name, document_id: null, status: "failed", status_reason: null, extraction_method: null, children_count: 0, error: env.error?.message ?? "Upload failed" })));
+          }
+        })
+        .catch((err: Error) => setUploadResults(eligible.map((f) => ({ filename: f.name, document_id: null, status: "failed", status_reason: null, extraction_method: null, children_count: 0, error: err.message }))))
+        .finally(() => setUploading(false));
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) setSelectedFile(file);
+    if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
   };
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-      }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--color-bg, #1a1a2e)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 12,
-          padding: 24,
-          width: 480,
-          maxWidth: "90vw",
-        }}
+        style={{ background: "var(--color-bg, #1a1a2e)", border: "1px solid var(--color-border)", borderRadius: 12, padding: 24, width: 560, maxWidth: "90vw", maxHeight: "80vh", overflowY: "auto" }}
       >
-        <h3 style={{ margin: "0 0 16px" }}>Upload Document</h3>
-        {!result ? (
+        <h3 style={{ margin: "0 0 16px" }}>Upload Documents</h3>
+        {!uploadResults ? (
           <>
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -504,38 +648,45 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               onClick={() => fileInputRef.current?.click()}
               style={{
                 border: `2px dashed ${dragOver ? "#3b82f6" : "var(--color-border)"}`,
-                borderRadius: 8,
-                padding: 24,
-                textAlign: "center",
-                cursor: "pointer",
-                marginBottom: 12,
-                background: dragOver ? "rgba(59,130,246,0.05)" : "transparent",
-                transition: "all 0.2s",
+                borderRadius: 8, padding: 24, textAlign: "center", cursor: "pointer", marginBottom: 12,
+                background: dragOver ? "rgba(59,130,246,0.05)" : "transparent", transition: "all 0.2s",
               }}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.pptx,.md,.png,.jpg,.jpeg,.gif"
+                multiple
+                accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.pptx,.md,.png,.jpg,.jpeg,.gif,.eml,.msg,.html,.htm,.xml,.json,.yaml,.yml,.zip,.tar,.gz,.7z,.tif,.tiff,.heic,.webp"
                 style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) setSelectedFile(file);
-                }}
+                onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }}
               />
-              {selectedFile ? (
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>{selectedFile.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 4 }}>{formatFileSize(selectedFile.size)} &middot; {selectedFile.type || "unknown type"}</div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>📄</div>
-                  <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Drop a file here or click to browse</div>
-                  <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>PDF, DOC, DOCX, TXT, CSV, XLSX, MD, images (max 50 MB)</div>
-                </div>
-              )}
+              <div style={{ fontSize: 24, marginBottom: 8 }}>📄</div>
+              <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Drop files here or click to browse</div>
+              <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>Up to {MAX_BATCH_FILES} files, 200 MB each</div>
             </div>
+
+            {selectedFiles.length > 0 && (
+              <div style={{ marginBottom: 12, maxHeight: 200, overflowY: "auto" }}>
+                <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 6 }}>{selectedFiles.length} file(s) selected</div>
+                {selectedFiles.map((f, idx) => (
+                  <div key={`${f.name}-${idx}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", borderRadius: 6, background: f.size > MAX_FILE_SIZE ? "rgba(239,68,68,0.08)" : "var(--color-surface)", marginBottom: 2, fontSize: 12 }}>
+                    <DocFormatIcon fileName={f.name} size={14} color="var(--color-text-muted)" />
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                    <span style={{ color: f.size > MAX_FILE_SIZE ? "#ef4444" : "var(--color-text-muted)", fontSize: 11 }}>{formatFileSize(f.size)}</span>
+                    <button onClick={() => removeFile(idx)} style={{ background: "none", border: "none", padding: 2, cursor: "pointer", color: "var(--color-text-muted)", display: "flex" }}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {oversizeWarning && (
+              <div style={{ fontSize: 12, color: "#f59e0b", padding: "8px 12px", borderRadius: 6, background: "rgba(245,158,11,0.08)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                <AlertCircle size={14} /> {oversizeWarning}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>Type</label>
@@ -555,7 +706,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               </div>
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>What should GDA do with this file?</label>
+              <label style={{ fontSize: 12, color: "var(--color-text-muted)", display: "block", marginBottom: 4 }}>What should GDA do with these files?</label>
               <select value={action} onChange={(e) => setAction(e.target.value)} style={{ width: "100%", padding: "8px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13 }}>
                 {Object.entries(ACTION_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
@@ -579,19 +730,30 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid var(--color-border)", background: "transparent", color: "var(--color-text)", cursor: "pointer", fontSize: 13 }}>Cancel</button>
               <button
                 onClick={handleUpload}
-                disabled={!selectedFile || uploading}
-                style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: !selectedFile || uploading ? 0.5 : 1 }}
+                disabled={selectedFiles.length === 0 || uploading}
+                style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: selectedFiles.length === 0 || uploading ? 0.5 : 1 }}
               >
-                {uploading ? "Uploading..." : ACTION_LABELS[action]?.label ?? "Upload"}
+                {uploading ? "Uploading..." : `Upload ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""}`}
               </button>
             </div>
           </>
         ) : (
           <div>
-            <pre style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, padding: 16, fontSize: 12, whiteSpace: "pre-wrap", color: "#22c55e" }}>
-              {result}
-            </pre>
-            <div style={{ marginTop: 12, textAlign: "right" }}>
+            <div style={{ fontSize: 13, marginBottom: 12, fontWeight: 600 }}>
+              Upload Results: {uploadResults.filter((r) => !r.error).length}/{uploadResults.length} succeeded
+            </div>
+            <div style={{ maxHeight: 300, overflowY: "auto", marginBottom: 12 }}>
+              {uploadResults.map((r, idx) => (
+                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, background: r.error ? "rgba(239,68,68,0.06)" : "rgba(34,197,94,0.06)", marginBottom: 2, fontSize: 12 }}>
+                  <DocFormatIcon fileName={r.filename} size={14} color={r.error ? "#ef4444" : "#22c55e"} />
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.filename}</span>
+                  <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: r.error ? "rgba(239,68,68,0.15)" : "rgba(34,197,94,0.15)", color: r.error ? "#ef4444" : "#22c55e", fontWeight: 600 }}>
+                    {r.error ? "failed" : r.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign: "right" }}>
               <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Close</button>
             </div>
           </div>
