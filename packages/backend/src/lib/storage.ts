@@ -32,6 +32,12 @@ const ALLOWED_MIME_TYPES = new Set([
   "text/yaml",
   "application/yaml",
   "application/x-yaml",
+  // PR 3 — Archives
+  "application/zip",
+  "application/x-tar",
+  "application/gzip",
+  "application/x-gzip",
+  "application/x-7z-compressed",
   // Images (allowed for upload, not extractable until PR 4)
   "image/png",
   "image/jpeg",
@@ -77,6 +83,12 @@ const EXT_MIME_MAP: Record<string, string> = {
   // PR 2 — YAML
   ".yaml": "text/yaml",
   ".yml": "text/yaml",
+  // PR 3 — Archives
+  ".zip": "application/zip",
+  ".tar": "application/x-tar",
+  ".gz": "application/gzip",
+  ".tgz": "application/gzip",
+  ".7z": "application/x-7z-compressed",
   // Images
   ".png": "image/png",
   ".jpg": "image/jpeg",
