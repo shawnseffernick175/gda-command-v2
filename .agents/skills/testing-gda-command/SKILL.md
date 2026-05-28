@@ -34,8 +34,100 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 ## Devin Secrets Needed
 - `PROD_SSH_KEY` — SSH key for production server access
 - `OPENAI_API_KEY` — for AI analysis features (OODA, Capture Coach, AI Gateway summarizer)
+- `N8N_API_KEY` — for n8n workflow management API (GET/PUT workflows, check executions)
+- `GDA_WEBHOOK_KEY` — for n8n webhook-level auth and internal API endpoints
 
 ## Key Testing Flows
+
+### n8n Workflow Dual-Write (Phase 2C)
+
+**Architecture:** Workflows 3 (ai-agent-upload) and 5 (doc-ingest) write to BOTH Pinecone AND `document_embeddings` table via `/api/internal/vector-upsert`.
+
+**Dual-layer auth pattern for n8n webhooks:**
+n8n webhooks have TWO auth layers:
+1. **Webhook-level auth** (n8n credential "GDA Webhook Auth v2"): Header `x-gda-key` with value = `GDA_WEBHOOK_KEY` env var
+2. **Workflow Auth Guard code node**: Checks `x-gda-auth` header (or `x-gda-key`, or `body.auth_key`) against workflow-specific valid keys
+
+You must send BOTH headers simultaneously:
+```bash
+curl -X POST "http://<VPS_IP>:5678/webhook/<path>" \
+  -H "Content-Type: application/json" \
+  -H "x-gda-key: <GDA_WEBHOOK_KEY>" \
+  -H "x-gda-auth: <WORKFLOW_AUTH_KEY>" \
+  -d '{...}'
+```
+
+**IMPORTANT — Different workflows accept different Auth Guard keys:**
+- Workflow 5 (doc-ingest, path: `gda-ingest-direct`): Accepts `GDA_WEBHOOK_SECRET_2026` in `x-gda-auth`
+- Workflow 3 (ai-agent-upload, path: `upload`): Only accepts `GDA_DEPLOY_KEY_2026` or `GDA_API_KEY_2026` (NOT `GDA_WEBHOOK_SECRET_2026`)
+- Always read the Auth Guard code node to confirm which keys are valid before triggering
+
+**Workflow 5 (doc-ingest) test payload:**
+```json
+{
+  "file_url": "https://example.com/test.txt",
+  "file_type": "txt",
+  "document_id": "test-dual-write-001",
+  "metadata": {"source": "devin-test"}
+}
+```
+
+**Workflow 3 (ai-agent-upload) test payload:**
+```json
+{
+  "attachments": [{
+    "url": "https://example.com/test.txt",
+    "name": "test-file.txt"
+  }]
+}
+```
+
+**Verifying dual-write results:**
+```sql
+-- Check new rows landed in document_embeddings
+SELECT id, collection, document_id, embedding IS NOT NULL as has_embedding, created_at
+FROM document_embeddings
+WHERE collection IN ('gda-documents','general','financial','competitive_intel','default')
+ORDER BY created_at DESC LIMIT 10;
+
+-- Collection mapping:
+-- Workflow 5 writes to: 'gda-documents' (matches Pinecone namespace)
+-- Workflow 3 writes to: 'default'
+```
+
+**Checking execution status:**
+```bash
+curl -s -H "X-N8N-API-KEY: $N8N_API_KEY" \
+  "http://<VPS_IP>:5678/api/v1/executions?workflowId=<ID>&limit=5"
+```
+
+**Common dual-write issues:**
+- Empty curl response with responseMode="responseNode": Workflow errored before reaching Respond node. Check executions API for error status.
+- Auth Guard "Unauthorized" error: Wrong key for that specific workflow. Check Auth Guard jsCode.
+- 403 at webhook level: Wrong value in `x-gda-key` header (needs GDA_WEBHOOK_KEY, not a 2026 key).
+- pgvector write failure doesn't block Pinecone: Both dual-write nodes have `onError: "continueRegularOutput"`.
+
+### Sentinel Health Check
+**Endpoint:** `GET /api/sentinel/current` (no auth required)
+**Access from VPS:**
+```bash
+ssh root@<VPS_IP> "docker exec gda-backend node -e \"
+  const http = require('http');
+  const opts = { hostname: 'localhost', port: 3001, path: '/api/sentinel/current', method: 'GET' };
+  const req = http.request(opts, (res) => {
+    let d = ''; res.on('data', c => d+=c); res.on('end', () => console.log(d));
+  });
+  req.end();
+\""
+```
+**Expected:** 9 components, at least 8 healthy. `writers_24h` may show degraded during testing due to auth failures in test executions.
+
+### Knowledge Reembed Sweep
+**Workflow ID:** Check via n8n API (name: `GDA.maint.knowledge-reembed-sweep`)
+**Verify configuration:**
+- Active = true
+- Fetch Documents node: NO `authentication`/`genericAuthType` params (these cause silent failure). Manual `x-gda-key` header in `headerParameters` instead.
+- Schedule Trigger: 24-hour interval
 
 ### W6: Capture Discipline Dashboard
 **Test procedure:**
@@ -213,3 +305,6 @@ Install Playwright first: `mkdir -p /home/ubuntu/pw-test && cd /home/ubuntu/pw-t
 - **Backend won't start:** Ensure all required env vars are exported: DATABASE_URL, AUTH_REQUIRED, JWT_SECRET, OPENAI_API_KEY, GDA_WEBHOOK_KEY
 - **Port 3001 in use:** Use `ss -tlnp | grep 3001` to find PID, then kill it. `lsof` might not be available.
 - **Session expiration during testing:** Log in once and use sidebar navigation to stay in the SPA. Direct URL navigation may trigger session expiry.
+- **n8n webhook 403:** Wrong value in `x-gda-key` header. Needs GDA_WEBHOOK_KEY (the long hex hash), not a 2026 deploy/api key.
+- **n8n Auth Guard "Unauthorized":** The `x-gda-auth` value doesn't match the workflow's valid keys. Read the Auth Guard code node to see which env vars it checks — they differ per workflow.
+- **Dual-write rows missing:** Check n8n execution status. If pgvector node errored, it won't block Pinecone but no row appears. Check backend logs for the internal endpoint error.
