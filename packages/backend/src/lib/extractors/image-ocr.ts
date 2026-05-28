@@ -55,6 +55,7 @@ export async function runOcr(buffer: Buffer): Promise<string> {
         [tmpFile, "stdout", "-l", "eng"],
         { timeout: OCR_TIMEOUT_MS, maxBuffer: 50 * 1024 * 1024 },
         (err, stdout, stderr) => {
+          clearTimeout(safetyTimer);
           if (err) {
             const errAny = err as Error & { killed?: boolean };
             if (errAny.killed || err.message.includes("ETIMEDOUT")) {
@@ -69,7 +70,7 @@ export async function runOcr(buffer: Buffer): Promise<string> {
         },
       );
       // Safety: kill if still running after timeout
-      setTimeout(() => {
+      const safetyTimer = setTimeout(() => {
         if (!proc.killed) {
           proc.kill("SIGKILL");
         }

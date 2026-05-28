@@ -41,6 +41,7 @@ const ALLOWED_MIME_TYPES = new Set([
   // PR 4 — Images (OCR)
   "image/png",
   "image/jpeg",
+  "image/gif",
   "image/tiff",
   "image/heic",
   "image/webp",
@@ -95,6 +96,7 @@ const EXT_MIME_MAP: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
   ".tif": "image/tiff",
   ".tiff": "image/tiff",
   ".heic": "image/heic",
