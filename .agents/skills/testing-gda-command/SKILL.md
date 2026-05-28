@@ -300,46 +300,6 @@ Install Playwright first: `mkdir -p /home/ubuntu/pw-test && cd /home/ubuntu/pw-t
 **VPS testing setup:**
 ```bash
 # Get the auth key from the backend container
-export VPS_KEY=$(ssh root@100.100.80.78 "docker exec gda-backend printenv GDA_WEBHOOK_KEY")
-# All curl commands must go through SSH since port 3001 is not exposed on host
-ssh root@100.100.80.78 "curl -s -X POST http://172.22.0.3:3001/api/internal/vector-query ..."
-```
-
-**Critical: Keep VPS_KEY in the same shell session.** If you run tests across multiple shell sessions, re-export the key in each one or you'll get 401 errors.
-
-**Test procedure (insert → query → verify → cleanup):**
-1. Insert test vector via `/vector-upsert` with known embedding (e.g., all 0.1 values, 1536 dims)
-2. Query with same embedding → expect top result with `similarity: 1.0`
-3. Query different collection → expect test vector NOT present (collection isolation)
-4. Validation checks: missing collection→400, wrong dim→400, topK=0→400
-5. Auth checks: no key→401, wrong key→401
-6. `vector-query-compare` for knowledge collection → 200 (proves namespace mapping works)
-7. `vector-fetch` with known IDs → returns full vector records
-8. `vector-list-document` → returns `{id, chunk_index}` only (NOT document_id in response)
-9. Cleanup: delete test vector via `/vector-delete`
-
-**Collection→namespace mapping (Pinecone):**
-- `knowledge` → empty string `""` (Pinecone default namespace)
-- `ai-agent-attachments` → empty string `""` (Pinecone ai-assistant index, no namespace)
-- `gda-documents` → `"gda-documents"`
-
-**Common pitfalls:**
-- `vector-list-document` returns `{id, chunk_index}` — do NOT expect `document_id` in the response
-- Pinecone comparison may return 0 results if `PINECONE_API_KEY` env var is stale/invalid — this is a known issue, not a test failure
-- Backend container IP might change — verify with: `docker inspect gda-backend --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}'`
-- Embedding arrays must be exactly 1536 dimensions — anything else returns 400 `INVALID_EMBEDDING`
-
-### Vector Read Endpoints (Phase 2C PR 2)
-
-**Endpoints:** All require `x-gda-key` header matching `GDA_WEBHOOK_KEY` env var.
-- `POST /api/internal/vector-query` — cosine similarity search
-- `POST /api/internal/vector-query-compare` — queries both pgvector AND Pinecone, returns overlap
-- `POST /api/internal/vector-fetch` — fetch vectors by ID array
-- `POST /api/internal/vector-list-document` — list vector IDs for a document
-
-**VPS testing setup:**
-```bash
-# Get the auth key from the backend container
 export VPS_KEY=$(ssh root@<VPS_IP> "docker exec gda-backend printenv GDA_WEBHOOK_KEY")
 # All curl commands must go through SSH since port 3001 is not exposed on host
 ssh root@<VPS_IP> "curl -s -X POST http://172.22.0.3:3001/api/internal/vector-query ..."
