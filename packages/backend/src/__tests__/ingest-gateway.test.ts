@@ -44,8 +44,13 @@ describe("Extractors: isExtractable", () => {
     expect(isExtractable("application/json")).toBe(true);
   });
 
+  it("returns true for OCR image formats (PR 4)", () => {
+    expect(isExtractable("image/png")).toBe(true);
+    expect(isExtractable("image/jpeg")).toBe(true);
+    expect(isExtractable("image/tiff")).toBe(true);
+  });
+
   it("returns false for unsupported formats", () => {
-    expect(isExtractable("image/png")).toBe(false);
     expect(isExtractable("video/mp4")).toBe(false);
     expect(isExtractable("application/octet-stream")).toBe(false);
   });

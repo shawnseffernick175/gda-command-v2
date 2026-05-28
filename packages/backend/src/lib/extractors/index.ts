@@ -28,6 +28,13 @@ const extractorMap: Record<string, () => Promise<Extractor>> = {
   "application/yaml": () => import("./json-yaml"),
   "application/x-yaml": () => import("./json-yaml"),
 
+  // PR 4 — Image OCR
+  "image/png": () => import("./image-ocr"),
+  "image/jpeg": () => import("./image-ocr"),
+  "image/tiff": () => import("./image-ocr"),
+  "image/heic": () => import("./image-ocr"),
+  "image/webp": () => import("./image-ocr"),
+
   // PR 3 — Archives
   "application/zip": () => import("./archive"),
   "application/x-tar": () => import("./archive"),

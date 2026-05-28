@@ -48,7 +48,10 @@ COPY packages/backend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 # pg_dump for in-app backup API; p7zip for .7z archive extraction
-RUN apk add --no-cache postgresql16-client p7zip
+# tesseract-ocr + eng data for image/scanned-PDF OCR; poppler-utils for pdftoppm
+RUN apk add --no-cache postgresql16-client p7zip \
+    tesseract-ocr tesseract-ocr-data-eng \
+    poppler-utils
 
 # Backup and upload directories
 RUN mkdir -p /var/backups/gda/daily /var/backups/gda/weekly /var/uploads/gda
