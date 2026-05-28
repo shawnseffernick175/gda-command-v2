@@ -36,8 +36,6 @@
       "parameters": {
         "url": "http://gda-backend:3001/api/knowledge/documents",
         "method": "GET",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
         "options": {
           "response": {
             "response": {
@@ -251,8 +249,6 @@
         "parameters": {
           "url": "http://gda-backend:3001/api/knowledge/documents",
           "method": "GET",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "httpHeaderAuth",
           "options": {
             "response": {
               "response": {
