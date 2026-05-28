@@ -4,12 +4,37 @@ import os from "os";
 import { log } from "../logger";
 import type { ExtractResult } from "./types";
 
+// ---------------------------------------------------------------------------
+// Limits — all enforced fail-closed (stop entirely, no partial salvage)
+// ---------------------------------------------------------------------------
+
 const MAX_FILES = 500;
-const MAX_EXTRACTED_BYTES = 1024 * 1024 * 1024; // 1 GB
+const MAX_EXTRACTED_BYTES = 1024 * 1024 * 1024; // 1 GB total
+const MAX_MEMBER_SIZE = 200 * 1024 * 1024; // 200 MB per member
+const MAX_COMPRESSION_RATIO = 100; // compressed:uncompressed
 
 interface ArchiveEntry {
   name: string;
   buffer: Buffer;
+}
+
+class ArchivePolicyError extends Error {
+  constructor(public readonly reason: string) {
+    super(reason);
+    this.name = "ArchivePolicyError";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Path traversal guard
+// ---------------------------------------------------------------------------
+
+function isPathSafe(memberPath: string): boolean {
+  if (path.isAbsolute(memberPath)) return false;
+  const normalized = path.normalize(memberPath);
+  if (normalized.startsWith("..") || normalized.includes(`${path.sep}..`)) return false;
+  if (memberPath.includes("..")) return false;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -20,7 +45,6 @@ async function extractZip(buffer: Buffer): Promise<ArchiveEntry[]> {
   const StreamZip = await import("node-stream-zip");
   const AsyncZip = StreamZip.async;
 
-  // Write buffer to temp file (node-stream-zip requires file path)
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "gda-zip-"));
   const tmpFile = path.join(tmpDir, "archive.zip");
   fs.writeFileSync(tmpFile, buffer);
@@ -31,18 +55,50 @@ async function extractZip(buffer: Buffer): Promise<ArchiveEntry[]> {
     let totalBytes = 0;
 
     const zipEntries = await zip.entries();
+
+    // Check for encryption (any encrypted entry → fail)
+    for (const entry of Object.values(zipEntries)) {
+      if (entry.encrypted) {
+        await zip.close();
+        throw new ArchivePolicyError("archive is encrypted");
+      }
+    }
+
+    // Check for path traversal (any traversal → fail, 0 files extracted)
+    for (const entry of Object.values(zipEntries)) {
+      if (entry.isDirectory) continue;
+      if (!isPathSafe(entry.name)) {
+        await zip.close();
+        throw new ArchivePolicyError("path traversal detected in archive member");
+      }
+    }
+
     for (const entry of Object.values(zipEntries)) {
       if (entry.isDirectory) continue;
       if (entry.name.startsWith("__MACOSX/") || entry.name.startsWith(".")) continue;
 
+      // Fail-closed: file count limit
       if (entries.length >= MAX_FILES) {
-        log.warn("archive_max_files", { limit: MAX_FILES, archive: "zip" });
-        break;
+        await zip.close();
+        throw new ArchivePolicyError("archive file count limit exceeded");
       }
 
+      // Per-member size limit
+      if (entry.size > MAX_MEMBER_SIZE) {
+        await zip.close();
+        throw new ArchivePolicyError("archive member exceeds 200MB size limit");
+      }
+
+      // Per-member compression ratio guard
+      if (entry.compressedSize > 0 && entry.size / entry.compressedSize > MAX_COMPRESSION_RATIO) {
+        await zip.close();
+        throw new ArchivePolicyError("archive member compression ratio exceeds 100x (zip bomb suspected)");
+      }
+
+      // Fail-closed: total extracted size limit
       if (totalBytes + entry.size > MAX_EXTRACTED_BYTES) {
-        log.warn("archive_max_bytes", { limit: MAX_EXTRACTED_BYTES, archive: "zip" });
-        break;
+        await zip.close();
+        throw new ArchivePolicyError("archive extracted size limit exceeded");
       }
 
       const data = await zip.entryData(entry.name);
@@ -68,7 +124,7 @@ async function extractTar(buffer: Buffer): Promise<ArchiveEntry[]> {
 
   const entries: ArchiveEntry[] = [];
   let totalBytes = 0;
-  let limitReached = false;
+  let policyError: ArchivePolicyError | null = null;
 
   const isGzip = buffer[0] === 0x1f && buffer[1] === 0x8b;
 
@@ -79,7 +135,20 @@ async function extractTar(buffer: Buffer): Promise<ArchiveEntry[]> {
 
     const parser = new tar.Parser({
       onReadEntry: (entry) => {
-        if (limitReached || entry.type !== "File") {
+        // Skip symlinks, links, directories — only process regular files
+        if (entry.type !== "File") {
+          entry.resume();
+          return;
+        }
+
+        if (policyError) {
+          entry.resume();
+          return;
+        }
+
+        // Path traversal check
+        if (!isPathSafe(entry.path)) {
+          policyError = new ArchivePolicyError("path traversal detected in archive member");
           entry.resume();
           return;
         }
@@ -89,9 +158,9 @@ async function extractTar(buffer: Buffer): Promise<ArchiveEntry[]> {
           return;
         }
 
+        // Fail-closed: file count limit
         if (entries.length >= MAX_FILES) {
-          log.warn("archive_max_files", { limit: MAX_FILES, archive: "tar" });
-          limitReached = true;
+          policyError = new ArchivePolicyError("archive file count limit exceeded");
           entry.resume();
           return;
         }
@@ -100,18 +169,28 @@ async function extractTar(buffer: Buffer): Promise<ArchiveEntry[]> {
         let entryBytes = 0;
 
         entry.on("data", (chunk: Buffer) => {
+          if (policyError) return;
           entryBytes += chunk.length;
-          if (totalBytes + entryBytes > MAX_EXTRACTED_BYTES) {
-            log.warn("archive_max_bytes", { limit: MAX_EXTRACTED_BYTES, archive: "tar" });
-            limitReached = true;
+
+          // Per-member size limit
+          if (entryBytes > MAX_MEMBER_SIZE) {
+            policyError = new ArchivePolicyError("archive member exceeds 200MB size limit");
             entry.resume();
             return;
           }
+
+          // Fail-closed: total extracted size limit
+          if (totalBytes + entryBytes > MAX_EXTRACTED_BYTES) {
+            policyError = new ArchivePolicyError("archive extracted size limit exceeded");
+            entry.resume();
+            return;
+          }
+
           chunks.push(chunk);
         });
 
         entry.on("end", () => {
-          if (!limitReached && chunks.length > 0) {
+          if (!policyError && chunks.length > 0) {
             const data = Buffer.concat(chunks);
             entries.push({ name: entry.path, buffer: data });
             totalBytes += data.length;
@@ -121,7 +200,13 @@ async function extractTar(buffer: Buffer): Promise<ArchiveEntry[]> {
     });
 
     source.pipe(parser);
-    parser.on("end", () => resolve(entries));
+    parser.on("end", () => {
+      if (policyError) {
+        reject(policyError);
+      } else {
+        resolve(entries);
+      }
+    });
     parser.on("error", (err) => reject(err));
     source.on("error", (err: Error) => reject(err));
   });
@@ -149,6 +234,18 @@ async function extract7z(buffer: Buffer): Promise<ArchiveEntry[]> {
   fs.writeFileSync(tmpFile, buffer);
 
   try {
+    // Check for encryption: 7z l -slt lists headers; encrypted archives
+    // fail to extract with "Wrong password" or require -p flag
+    try {
+      await execFileAsync("7z", ["t", tmpFile, "-p-"], { timeout: 30_000 });
+    } catch (testErr) {
+      const msg = (testErr as Error).message || "";
+      if (msg.includes("Wrong password") || msg.includes("encrypted") || msg.includes("password")) {
+        throw new ArchivePolicyError("archive is encrypted");
+      }
+      // Other test failures fall through to actual extraction
+    }
+
     await execFileAsync("7z", ["x", tmpFile, `-o${extractDir}`, "-y"], {
       timeout: 120_000,
     });
@@ -159,18 +256,36 @@ async function extract7z(buffer: Buffer): Promise<ArchiveEntry[]> {
     function walkDir(dir: string, prefix: string): void {
       const items = fs.readdirSync(dir);
       for (const item of items) {
-        if (entries.length >= MAX_FILES) break;
         const fullPath = path.join(dir, item);
         const relPath = prefix ? `${prefix}/${item}` : item;
-        const stat = fs.statSync(fullPath);
+        const stat = fs.lstatSync(fullPath);
+
+        // Skip symlinks explicitly
+        if (stat.isSymbolicLink()) continue;
+
+        // Path traversal check
+        if (!isPathSafe(relPath)) {
+          throw new ArchivePolicyError("path traversal detected in archive member");
+        }
 
         if (stat.isDirectory()) {
           walkDir(fullPath, relPath);
         } else {
-          if (totalBytes + stat.size > MAX_EXTRACTED_BYTES) {
-            log.warn("archive_max_bytes", { limit: MAX_EXTRACTED_BYTES, archive: "7z" });
-            return;
+          // Fail-closed: file count
+          if (entries.length >= MAX_FILES) {
+            throw new ArchivePolicyError("archive file count limit exceeded");
           }
+
+          // Per-member size limit
+          if (stat.size > MAX_MEMBER_SIZE) {
+            throw new ArchivePolicyError("archive member exceeds 200MB size limit");
+          }
+
+          // Fail-closed: total size
+          if (totalBytes + stat.size > MAX_EXTRACTED_BYTES) {
+            throw new ArchivePolicyError("archive extracted size limit exceeded");
+          }
+
           entries.push({ name: relPath, buffer: fs.readFileSync(fullPath) });
           totalBytes += stat.size;
         }
