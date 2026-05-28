@@ -1,21 +1,24 @@
 /**
- * Phase 2C PR 1: Dual-write scaffolding tests.
+ * Phase 2C PR 1: Unified vector store tests.
  *
  * Tests:
- * - pgvector.ts: upsertEmbeddings, deleteEmbeddings, deleteByDocumentId (happy + error paths)
- * - embeddings.ts: dual-write env gate (DUAL_WRITE_PGVECTOR)
- * - Failure isolation: pgvector failure does not break the primary write
- * - dual_write_errors logging
+ * - pgvector.ts: upsertEmbeddings into document_embeddings (happy + error paths)
+ * - pgvector.ts: deleteEmbeddings by ids
+ * - pgvector.ts: deleteByDocumentId
+ * - Field mapping: chunk_index, page_number, section_title extracted from metadata
+ * - Idempotent upsert (ON CONFLICT id DO UPDATE)
  * - Internal vector-upsert endpoint: validation, auth, happy path
- * - Migration 125 schema verification
+ * - Migration 125 schema verification (ALTER TABLE, not CREATE TABLE)
+ * - Workflow inventory completeness
+ * - README documentation
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import fs from "fs";
 import path from "path";
 
 // ---------------------------------------------------------------------------
-// 1. pgvector.ts unit tests (mocked DB)
+// 1. pgvector.ts: upsertEmbeddings
 // ---------------------------------------------------------------------------
 
 describe("pgvector.ts: upsertEmbeddings", () => {
@@ -23,7 +26,7 @@ describe("pgvector.ts: upsertEmbeddings", () => {
     vi.resetModules();
   });
 
-  it("calls INSERT ... ON CONFLICT for each item", async () => {
+  it("inserts into document_embeddings with ON CONFLICT DO UPDATE", async () => {
     const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 });
     vi.doMock("../lib/db", () => ({
       getPool: () => ({ query: mockQuery }),
@@ -31,29 +34,137 @@ describe("pgvector.ts: upsertEmbeddings", () => {
 
     const { upsertEmbeddings } = await import("../lib/vector-stores/pgvector");
 
-    await upsertEmbeddings("test-collection", [
+    await upsertEmbeddings("gda-documents", [
       {
         id: "vec-1",
         content: "hello world",
         embedding: [0.1, 0.2, 0.3],
         metadata: { document_id: "doc-1", source: "test" },
       },
+    ]);
+
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    const sql = mockQuery.mock.calls[0][0];
+    expect(sql).toContain("INSERT INTO document_embeddings");
+    expect(sql).toContain("ON CONFLICT (id) DO UPDATE");
+    expect(sql).not.toContain("vector_embeddings");
+  });
+
+  it("extracts chunk_index from metadata into dedicated column", async () => {
+    const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 });
+    vi.doMock("../lib/db", () => ({
+      getPool: () => ({ query: mockQuery }),
+    }));
+
+    const { upsertEmbeddings } = await import("../lib/vector-stores/pgvector");
+
+    await upsertEmbeddings("knowledge", [
       {
-        id: "vec-2",
-        content: "foo bar",
-        embedding: [0.4, 0.5, 0.6],
-        metadata: { document_id: "doc-2" },
+        id: "emb-1",
+        content: "chunk text",
+        embedding: [0.1],
+        metadata: { document_id: "doc-1", chunk_index: 3 },
       },
     ]);
 
-    expect(mockQuery).toHaveBeenCalledTimes(2);
-    const firstCall = mockQuery.mock.calls[0];
-    expect(firstCall[0]).toContain("INSERT INTO vector_embeddings");
-    expect(firstCall[0]).toContain("ON CONFLICT (id) DO UPDATE");
-    expect(firstCall[1][0]).toBe("vec-1");
-    expect(firstCall[1][1]).toBe("test-collection");
-    expect(firstCall[1][2]).toBe("doc-1"); // document_id from metadata
-    expect(firstCall[1][3]).toBe("hello world");
+    const params = mockQuery.mock.calls[0][1];
+    expect(params[0]).toBe("emb-1");       // id
+    expect(params[1]).toBe("doc-1");       // document_id
+    expect(params[2]).toBe(3);             // chunk_index
+    expect(params[3]).toBe("chunk text");  // chunk_text
+  });
+
+  it("extracts page_number and section_title from metadata", async () => {
+    const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 });
+    vi.doMock("../lib/db", () => ({
+      getPool: () => ({ query: mockQuery }),
+    }));
+
+    const { upsertEmbeddings } = await import("../lib/vector-stores/pgvector");
+
+    await upsertEmbeddings("knowledge", [
+      {
+        id: "emb-2",
+        content: "page content",
+        embedding: [0.5],
+        metadata: {
+          document_id: "doc-2",
+          chunk_index: 0,
+          page_number: 7,
+          section_title: "Executive Summary",
+          token_count: 150,
+        },
+      },
+    ]);
+
+    const params = mockQuery.mock.calls[0][1];
+    expect(params[4]).toBe(7);                     // page_number
+    expect(params[5]).toBe("Executive Summary");   // section_title
+    expect(params[7]).toBe(150);                   // token_count
+    expect(params[8]).toBe("knowledge");           // collection
+  });
+
+  it("defaults chunk_index to 0 when not in metadata", async () => {
+    const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 });
+    vi.doMock("../lib/db", () => ({
+      getPool: () => ({ query: mockQuery }),
+    }));
+
+    const { upsertEmbeddings } = await import("../lib/vector-stores/pgvector");
+
+    await upsertEmbeddings("knowledge", [
+      { id: "emb-3", content: "text", embedding: [0.1] },
+    ]);
+
+    const params = mockQuery.mock.calls[0][1];
+    expect(params[2]).toBe(0); // chunk_index defaults to 0
+  });
+
+  it("stores remaining metadata in JSONB column (strips dedicated fields)", async () => {
+    const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 });
+    vi.doMock("../lib/db", () => ({
+      getPool: () => ({ query: mockQuery }),
+    }));
+
+    const { upsertEmbeddings } = await import("../lib/vector-stores/pgvector");
+
+    await upsertEmbeddings("gda-documents", [
+      {
+        id: "emb-4",
+        content: "text",
+        embedding: [0.1],
+        metadata: {
+          document_id: "doc-1",
+          chunk_index: 0,
+          source: "uploaded.pdf",
+          file_type: "pdf",
+        },
+      },
+    ]);
+
+    const metadataJson = mockQuery.mock.calls[0][1][9]; // metadata param
+    const parsed = JSON.parse(metadataJson);
+    expect(parsed.source).toBe("uploaded.pdf");
+    expect(parsed.file_type).toBe("pdf");
+    expect(parsed.document_id).toBeUndefined();
+    expect(parsed.chunk_index).toBeUndefined();
+  });
+
+  it("handles multiple items in a single call", async () => {
+    const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 });
+    vi.doMock("../lib/db", () => ({
+      getPool: () => ({ query: mockQuery }),
+    }));
+
+    const { upsertEmbeddings } = await import("../lib/vector-stores/pgvector");
+
+    await upsertEmbeddings("knowledge", [
+      { id: "a", content: "first", embedding: [0.1] },
+      { id: "b", content: "second", embedding: [0.2] },
+      { id: "c", content: "third", embedding: [0.3] },
+    ]);
+
+    expect(mockQuery).toHaveBeenCalledTimes(3);
   });
 
   it("throws when pool is null", async () => {
@@ -64,30 +175,34 @@ describe("pgvector.ts: upsertEmbeddings", () => {
     const { upsertEmbeddings } = await import("../lib/vector-stores/pgvector");
 
     await expect(
-      upsertEmbeddings("coll", [
-        { id: "x", embedding: [1], content: "test" },
-      ]),
+      upsertEmbeddings("coll", [{ id: "x", embedding: [1], content: "t" }]),
     ).rejects.toThrow("Database not available");
   });
 });
+
+// ---------------------------------------------------------------------------
+// 2. pgvector.ts: deleteEmbeddings
+// ---------------------------------------------------------------------------
 
 describe("pgvector.ts: deleteEmbeddings", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  it("deletes by collection + ids", async () => {
+  it("deletes by ids from document_embeddings", async () => {
     const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 2 });
     vi.doMock("../lib/db", () => ({
       getPool: () => ({ query: mockQuery }),
     }));
 
     const { deleteEmbeddings } = await import("../lib/vector-stores/pgvector");
-    await deleteEmbeddings("my-coll", ["id-1", "id-2"]);
+    await deleteEmbeddings(["id-1", "id-2"]);
 
     expect(mockQuery).toHaveBeenCalledTimes(1);
-    expect(mockQuery.mock.calls[0][0]).toContain("DELETE FROM vector_embeddings");
-    expect(mockQuery.mock.calls[0][1]).toEqual(["my-coll", ["id-1", "id-2"]]);
+    const sql = mockQuery.mock.calls[0][0];
+    expect(sql).toContain("DELETE FROM document_embeddings");
+    expect(sql).toContain("id = ANY($1)");
+    expect(mockQuery.mock.calls[0][1]).toEqual([["id-1", "id-2"]]);
   });
 
   it("skips query for empty ids array", async () => {
@@ -97,116 +212,46 @@ describe("pgvector.ts: deleteEmbeddings", () => {
     }));
 
     const { deleteEmbeddings } = await import("../lib/vector-stores/pgvector");
-    await deleteEmbeddings("coll", []);
+    await deleteEmbeddings([]);
 
     expect(mockQuery).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 3. pgvector.ts: deleteByDocumentId
+// ---------------------------------------------------------------------------
 
 describe("pgvector.ts: deleteByDocumentId", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  it("deletes all vectors for a document in a collection", async () => {
+  it("deletes all vectors for a document", async () => {
     const mockQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 5 });
     vi.doMock("../lib/db", () => ({
       getPool: () => ({ query: mockQuery }),
     }));
 
     const { deleteByDocumentId } = await import("../lib/vector-stores/pgvector");
-    await deleteByDocumentId("knowledge", "doc-42");
+    await deleteByDocumentId("doc-42");
 
     expect(mockQuery).toHaveBeenCalledTimes(1);
-    expect(mockQuery.mock.calls[0][1]).toEqual(["knowledge", "doc-42"]);
-  });
-});
-
-describe("pgvector.ts: logDualWriteError", () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-
-  it("inserts error row into dual_write_errors", async () => {
-    const mockQuery = vi.fn().mockResolvedValue({ rows: [] });
-    vi.doMock("../lib/db", () => ({
-      getPool: () => ({ query: mockQuery }),
-    }));
-
-    const { logDualWriteError } = await import("../lib/vector-stores/pgvector");
-    await logDualWriteError("coll", "doc-1", "connection refused");
-
-    expect(mockQuery).toHaveBeenCalledTimes(1);
-    expect(mockQuery.mock.calls[0][0]).toContain("INSERT INTO dual_write_errors");
-    expect(mockQuery.mock.calls[0][1]).toEqual([
-      "coll",
-      "doc-1",
-      "connection refused",
-    ]);
-  });
-
-  it("does not throw when error table itself fails", async () => {
-    vi.doMock("../lib/db", () => ({
-      getPool: () => ({
-        query: vi.fn().mockRejectedValue(new Error("table missing")),
-      }),
-    }));
-
-    const { logDualWriteError } = await import("../lib/vector-stores/pgvector");
-
-    // Should not throw
-    await logDualWriteError("coll", "doc-1", "original error");
+    const sql = mockQuery.mock.calls[0][0];
+    expect(sql).toContain("DELETE FROM document_embeddings");
+    expect(sql).toContain("document_id = $1");
+    expect(mockQuery.mock.calls[0][1]).toEqual(["doc-42"]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// 2. Dual-write env gate
-// ---------------------------------------------------------------------------
-
-describe("embeddings.ts: DUAL_WRITE_PGVECTOR env gate", () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    delete process.env.DUAL_WRITE_PGVECTOR;
-  });
-
-  it("isDualWriteEnabled returns true by default", async () => {
-    delete process.env.DUAL_WRITE_PGVECTOR;
-    const { isDualWriteEnabled } = await import("../lib/embeddings");
-    expect(isDualWriteEnabled()).toBe(true);
-  });
-
-  it("isDualWriteEnabled returns false when DUAL_WRITE_PGVECTOR=false", async () => {
-    process.env.DUAL_WRITE_PGVECTOR = "false";
-    const { isDualWriteEnabled } = await import("../lib/embeddings");
-    expect(isDualWriteEnabled()).toBe(false);
-  });
-
-  it("isDualWriteEnabled returns true when DUAL_WRITE_PGVECTOR=true", async () => {
-    process.env.DUAL_WRITE_PGVECTOR = "true";
-    const { isDualWriteEnabled } = await import("../lib/embeddings");
-    expect(isDualWriteEnabled()).toBe(true);
-  });
-
-  it("isDualWriteEnabled returns true for DUAL_WRITE_PGVECTOR=TRUE (case insensitive)", async () => {
-    process.env.DUAL_WRITE_PGVECTOR = "TRUE";
-    const { isDualWriteEnabled } = await import("../lib/embeddings");
-    expect(isDualWriteEnabled()).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 3. Internal vector-upsert endpoint validation
+// 4. Internal endpoint validation (unit-level)
 // ---------------------------------------------------------------------------
 
 describe("vector-internal endpoint: validation", () => {
   it("rejects missing collection", () => {
     const body = { items: [{ id: "x", embedding: [1] }] } as Record<string, unknown>;
-    expect(
-      !body.collection || typeof body.collection !== "string",
-    ).toBe(true);
+    expect(!body.collection || typeof body.collection !== "string").toBe(true);
   });
 
   it("rejects empty items array", () => {
@@ -226,20 +271,19 @@ describe("vector-internal endpoint: validation", () => {
 
   it("accepts valid upsert payload", () => {
     const body = {
-      collection: "ai-assistant",
+      collection: "gda-documents",
       items: [
         {
-          id: "vec-1",
+          id: "doc-123_chunk_0",
           content: "test content",
           embedding: [0.1, 0.2, 0.3],
-          metadata: { document_id: "doc-1" },
+          metadata: { document_id: "doc-123", chunk_index: 0 },
         },
       ],
     };
-    expect(body.collection).toBe("ai-assistant");
+    expect(body.collection).toBe("gda-documents");
     expect(body.items.length).toBe(1);
-    expect(body.items[0].id).toBe("vec-1");
-    expect(body.items[0].embedding.length).toBe(3);
+    expect(body.items[0].id).toBe("doc-123_chunk_0");
   });
 });
 
@@ -263,7 +307,7 @@ describe("vector-internal endpoint: auth", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Migration 125 schema verification (reads the actual SQL file)
+// 5. Migration 125 schema verification
 // ---------------------------------------------------------------------------
 
 describe("Migration 125: schema", () => {
@@ -281,103 +325,69 @@ describe("Migration 125: schema", () => {
     sql = fs.readFileSync(migrationPath, "utf-8");
   });
 
-  it("creates vector_embeddings table", () => {
-    expect(sql).toContain("CREATE TABLE IF NOT EXISTS vector_embeddings");
+  it("ALTERs document_embeddings (does NOT create vector_embeddings)", () => {
+    expect(sql).toContain("ALTER TABLE document_embeddings");
+    expect(sql).not.toContain("CREATE TABLE");
+    expect(sql).not.toContain("vector_embeddings");
   });
 
-  it("uses vector(1536) for embedding column", () => {
-    expect(sql).toContain("embedding vector(1536) NOT NULL");
+  it("adds collection column with NOT NULL DEFAULT 'knowledge'", () => {
+    expect(sql).toContain("collection TEXT NOT NULL DEFAULT 'knowledge'");
   });
 
-  it("has collection, document_id, content, metadata columns", () => {
-    expect(sql).toContain("collection TEXT NOT NULL");
-    expect(sql).toContain("document_id TEXT");
-    expect(sql).toContain("content TEXT");
-    expect(sql).toContain("metadata JSONB");
+  it("adds metadata JSONB column", () => {
+    expect(sql).toContain("metadata JSONB NOT NULL DEFAULT");
   });
 
-  it("creates HNSW index (not IVFFlat)", () => {
-    expect(sql).toContain("USING hnsw (embedding vector_cosine_ops)");
-    expect(sql).not.toContain("ivfflat");
+  it("creates collection index", () => {
+    expect(sql).toContain("document_embeddings_collection_idx");
+    expect(sql).toContain("ON document_embeddings(collection)");
   });
 
-  it("creates collection and document_id indexes", () => {
-    expect(sql).toContain("vector_embeddings_collection_idx ON vector_embeddings(collection)");
-    expect(sql).toContain("vector_embeddings_document_id_idx ON vector_embeddings(document_id)");
+  it("does NOT create dual_write_errors table", () => {
+    expect(sql).not.toContain("dual_write_errors");
   });
 
-  it("creates dual_write_errors table", () => {
-    expect(sql).toContain("CREATE TABLE IF NOT EXISTS dual_write_errors");
-    expect(sql).toContain("error_message TEXT NOT NULL");
-    expect(sql).toContain("occurred_at TIMESTAMPTZ");
-  });
-
-  it("grants DML to gda_runtime", () => {
-    expect(sql).toContain("GRANT SELECT, INSERT, UPDATE, DELETE ON vector_embeddings TO");
-    expect(sql).toContain("GRANT SELECT, INSERT, UPDATE, DELETE ON dual_write_errors TO");
-  });
-
-  it("grants ALL to gda_app", () => {
-    expect(sql).toContain("GRANT ALL ON vector_embeddings TO");
-    expect(sql).toContain("GRANT ALL ON dual_write_errors TO");
-  });
-
-  it("grants sequence usage for dual_write_errors", () => {
-    expect(sql).toContain("GRANT USAGE, SELECT ON SEQUENCE dual_write_errors_id_seq TO");
+  it("uses IF NOT EXISTS for all DDL", () => {
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS collection");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS metadata");
+    expect(sql).toContain("CREATE INDEX IF NOT EXISTS");
   });
 });
 
 // ---------------------------------------------------------------------------
-// 5. Failure isolation: pgvector failure does not break primary write
+// 6. Embeddings.ts: no dual-write code remains
 // ---------------------------------------------------------------------------
 
-describe("Failure isolation", () => {
-  it("dualWriteToPgvector catches errors and does not throw", () => {
-    // The dual-write function in embeddings.ts uses .catch() on the promise chain.
-    // This means an unhandled rejection is impossible — verified by code review:
-    //   pgvectorDeleteByDoc(...)
-    //     .then(() => pgvectorUpsert(...))
-    //     .then(...)
-    //     .catch((err) => { logDualWriteError(...).catch(() => {}); });
-    //
-    // The .catch() at the end handles both deleteByDoc and upsert failures.
-    // The nested .catch(() => {}) on logDualWriteError means even error logging
-    // failures are swallowed silently.
-    expect(true).toBe(true);
+describe("embeddings.ts: dual-write removed", () => {
+  it("does not export isDualWriteEnabled", async () => {
+    const embeddings = await import("../lib/embeddings");
+    expect("isDualWriteEnabled" in embeddings).toBe(false);
   });
 
-  it("logDualWriteError swallows its own failures", async () => {
-    vi.resetModules();
-    vi.doMock("../lib/db", () => ({
-      getPool: () => ({
-        query: vi.fn().mockRejectedValue(new Error("table missing")),
-      }),
-    }));
-
-    const { logDualWriteError } = await import("../lib/vector-stores/pgvector");
-    // Should not throw — best-effort logging
-    await expect(
-      logDualWriteError("coll", "doc-1", "original error"),
-    ).resolves.toBeUndefined();
-
-    vi.resetModules();
+  it("does not import from vector-stores/pgvector", () => {
+    const embeddingsPath = path.join(__dirname, "..", "lib", "embeddings.ts");
+    const source = fs.readFileSync(embeddingsPath, "utf-8");
+    expect(source).not.toContain("vector-stores/pgvector");
+    expect(source).not.toContain("DUAL_WRITE");
+    expect(source).not.toContain("dualWriteToPgvector");
   });
 });
 
 // ---------------------------------------------------------------------------
-// 6. VectorItem type contract
+// 7. VectorItem type contract
 // ---------------------------------------------------------------------------
 
 describe("VectorItem type contract", () => {
   it("requires id and embedding", () => {
-    interface VectorItem {
+    interface TestVectorItem {
       id: string;
       content?: string;
       embedding: number[];
       metadata?: Record<string, unknown>;
     }
 
-    const item: VectorItem = {
+    const item: TestVectorItem = {
       id: "test-1",
       embedding: [0.1, 0.2, 0.3],
     };
@@ -388,14 +398,14 @@ describe("VectorItem type contract", () => {
   });
 
   it("accepts optional content and metadata", () => {
-    interface VectorItem {
+    interface TestVectorItem {
       id: string;
       content?: string;
       embedding: number[];
       metadata?: Record<string, unknown>;
     }
 
-    const item: VectorItem = {
+    const item: TestVectorItem = {
       id: "test-2",
       content: "hello",
       embedding: [0.1],
@@ -407,7 +417,7 @@ describe("VectorItem type contract", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Workflow inventory completeness
+// 8. Workflow inventory completeness
 // ---------------------------------------------------------------------------
 
 describe("n8n workflow inventory", () => {
@@ -425,7 +435,7 @@ describe("n8n workflow inventory", () => {
     expect(PINECONE_WORKFLOWS.length).toBe(7);
   });
 
-  it("identifies 2 write workflows needing dual-write nodes", () => {
+  it("identifies 2 write workflows needing parallel pgvector writes", () => {
     const writers = PINECONE_WORKFLOWS.filter((w) => w.mode === "write");
     expect(writers.length).toBe(2);
     expect(writers.map((w) => w.name).sort()).toEqual([
@@ -441,51 +451,51 @@ describe("n8n workflow inventory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 8. n8n workflow README exists
+// 9. README documentation
 // ---------------------------------------------------------------------------
 
 describe("n8n workflow documentation", () => {
   it("README.md exists in n8n/workflows/", () => {
     const readmePath = path.join(
-      __dirname,
-      "..",
-      "..",
-      "..",
-      "..",
-      "n8n",
-      "workflows",
-      "README.md",
+      __dirname, "..", "..", "..", "..", "n8n", "workflows", "README.md",
     );
     expect(fs.existsSync(readmePath)).toBe(true);
   });
 
   it("README documents the internal vector-upsert endpoint", () => {
     const readmePath = path.join(
-      __dirname,
-      "..",
-      "..",
-      "..",
-      "..",
-      "n8n",
-      "workflows",
-      "README.md",
+      __dirname, "..", "..", "..", "..", "n8n", "workflows", "README.md",
     );
     const content = fs.readFileSync(readmePath, "utf-8");
     expect(content).toContain("/api/internal/vector-upsert");
     expect(content).toContain("x-gda-key");
-    expect(content).toContain("ai-assistant");
+  });
+
+  it("README documents unified architecture (no vector_embeddings table)", () => {
+    const readmePath = path.join(
+      __dirname, "..", "..", "..", "..", "n8n", "workflows", "README.md",
+    );
+    const content = fs.readFileSync(readmePath, "utf-8");
+    expect(content).toContain("document_embeddings");
+    expect(content).toContain("No parallel");
+    expect(content).toContain("collection");
+  });
+
+  it("README documents collection→namespace mapping", () => {
+    const readmePath = path.join(
+      __dirname, "..", "..", "..", "..", "n8n", "workflows", "README.md",
+    );
+    const content = fs.readFileSync(readmePath, "utf-8");
+    expect(content).toContain("gda-documents");
+    expect(content).toContain("general");
+    expect(content).toContain("financial");
+    expect(content).toContain("competitive_intel");
+    expect(content).toContain("knowledge");
   });
 
   it("README lists all 7 workflows", () => {
     const readmePath = path.join(
-      __dirname,
-      "..",
-      "..",
-      "..",
-      "..",
-      "n8n",
-      "workflows",
-      "README.md",
+      __dirname, "..", "..", "..", "..", "n8n", "workflows", "README.md",
     );
     const content = fs.readFileSync(readmePath, "utf-8");
     expect(content).toContain("rii6IYWRxh9TMNjd");

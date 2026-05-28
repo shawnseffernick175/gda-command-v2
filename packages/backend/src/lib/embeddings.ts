@@ -7,12 +7,6 @@
 import OpenAI from "openai";
 import { getPool } from "./db";
 import { log } from "./logger";
-import {
-  upsertEmbeddings as pgvectorUpsert,
-  deleteByDocumentId as pgvectorDeleteByDoc,
-  logDualWriteError,
-} from "./vector-stores/pgvector";
-import type { VectorItem } from "./vector-stores/pgvector";
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
@@ -20,42 +14,6 @@ const MAX_CHUNK_TOKENS = 500; // ~2000 chars per chunk
 const CHUNK_OVERLAP_CHARS = 200;
 const MAX_CHARS_PER_CHUNK = 2000;
 const BATCH_SIZE = 20; // OpenAI supports up to 2048 inputs per call
-const DUAL_WRITE_COLLECTION = "knowledge";
-const DUAL_WRITE_ENABLED =
-  (process.env.DUAL_WRITE_PGVECTOR ?? "true").toLowerCase() !== "false";
-
-export function isDualWriteEnabled(): boolean {
-  return DUAL_WRITE_ENABLED;
-}
-
-// ---------------------------------------------------------------------------
-// Dual-write helper — fire-and-forget pgvector mirror write
-// ---------------------------------------------------------------------------
-
-function dualWriteToPgvector(
-  collection: string,
-  documentId: string,
-  items: VectorItem[],
-): void {
-  // Delete existing + upsert new, all in background
-  pgvectorDeleteByDoc(collection, documentId)
-    .then(() => pgvectorUpsert(collection, items))
-    .then(() => {
-      log.info("dual_write_pgvector_ok", {
-        collection,
-        documentId,
-        count: items.length,
-      });
-    })
-    .catch((err: Error) => {
-      log.warn("dual_write_pgvector_failed", {
-        collection,
-        documentId,
-        error: err.message,
-      });
-      logDualWriteError(collection, documentId, err.message).catch(() => {});
-    });
-}
 
 // ---------------------------------------------------------------------------
 // OpenAI client (reuses the same key as LLM service)
@@ -225,9 +183,8 @@ export async function embedDocument(
     // Delete any existing embeddings for this document (re-embed support)
     await pool.query(`DELETE FROM document_embeddings WHERE document_id = $1`, [documentId]);
 
-    // Insert embeddings into document_embeddings (primary store)
+    // Insert embeddings into document_embeddings
     let tokensUsed = 0;
-    const dualWriteItems: VectorItem[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -252,23 +209,6 @@ export async function embedDocument(
         ],
       );
 
-      dualWriteItems.push({
-        id: embId,
-        content: chunk.text,
-        embedding,
-        metadata: {
-          document_id: documentId,
-          chunk_index: chunk.chunkIndex,
-          page_number: chunk.page ?? null,
-          section_title: chunk.section ?? null,
-          token_count: tokenCount,
-        },
-      });
-    }
-
-    // Dual-write to vector_embeddings (pgvector mirror) — fire-and-forget
-    if (DUAL_WRITE_ENABLED && dualWriteItems.length > 0) {
-      dualWriteToPgvector(DUAL_WRITE_COLLECTION, documentId, dualWriteItems);
     }
 
     // Update document status

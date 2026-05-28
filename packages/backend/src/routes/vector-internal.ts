@@ -1,10 +1,11 @@
 // ---------------------------------------------------------------------------
-// Internal vector-upsert endpoint for n8n workflow dual-write.
+// Internal vector endpoints for n8n workflow writes.
 // POST /api/internal/vector-upsert
 // POST /api/internal/vector-delete
 // POST /api/internal/vector-delete-by-document
 //
 // Auth: x-gda-key header (same as ingest endpoints).
+// Writes land in the existing document_embeddings table — no parallel table.
 // ---------------------------------------------------------------------------
 
 import { Router } from "express";
@@ -124,27 +125,14 @@ router.post("/vector-upsert", async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/internal/vector-delete
-// Body: { collection: string, ids: string[] }
+// Body: { ids: string[] }
 // ---------------------------------------------------------------------------
 
 router.post("/vector-delete", async (req, res) => {
   if (!verifyInternalKey(req, res)) return;
 
   try {
-    const { collection, ids } = req.body as {
-      collection?: string;
-      ids?: string[];
-    };
-
-    if (!collection || typeof collection !== "string") {
-      return res.status(400).json(
-        errorEnvelope("vector-internal", "delete", {
-          code: "INVALID_COLLECTION",
-          message: "collection is required",
-          detail: null,
-        }),
-      );
-    }
+    const { ids } = req.body as { ids?: string[] };
 
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json(
@@ -156,12 +144,11 @@ router.post("/vector-delete", async (req, res) => {
       );
     }
 
-    await deleteEmbeddings(collection, ids);
+    await deleteEmbeddings(ids);
 
     return res.json(
       successEnvelope("vector-internal", "delete", {
         deleted: ids.length,
-        collection,
       }),
     );
   } catch (e) {
@@ -177,27 +164,14 @@ router.post("/vector-delete", async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/internal/vector-delete-by-document
-// Body: { collection: string, documentId: string }
+// Body: { documentId: string }
 // ---------------------------------------------------------------------------
 
 router.post("/vector-delete-by-document", async (req, res) => {
   if (!verifyInternalKey(req, res)) return;
 
   try {
-    const { collection, documentId } = req.body as {
-      collection?: string;
-      documentId?: string;
-    };
-
-    if (!collection || typeof collection !== "string") {
-      return res.status(400).json(
-        errorEnvelope("vector-internal", "delete-by-document", {
-          code: "INVALID_COLLECTION",
-          message: "collection is required",
-          detail: null,
-        }),
-      );
-    }
+    const { documentId } = req.body as { documentId?: string };
 
     if (!documentId || typeof documentId !== "string") {
       return res.status(400).json(
@@ -209,11 +183,10 @@ router.post("/vector-delete-by-document", async (req, res) => {
       );
     }
 
-    await deleteByDocumentId(collection, documentId);
+    await deleteByDocumentId(documentId);
 
     return res.json(
       successEnvelope("vector-internal", "delete-by-document", {
-        collection,
         documentId,
       }),
     );

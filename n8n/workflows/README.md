@@ -12,10 +12,27 @@ is the source of truth for workflow definitions.
 4. Review the imported workflow — verify credentials are mapped correctly
 5. Activate the workflow
 
-## Dual-Write Configuration (Phase 2C)
+## Phase 2C: Unified pgvector Migration
 
-Seven workflows write vectors to Pinecone. Each needs a parallel HTTP Request
-node that writes the same vector to pgvector via the internal API:
+### Architecture
+
+All vectors live in one table: `document_embeddings` (extended with
+`collection` and `metadata` columns in migration 125). No parallel
+`vector_embeddings` table — the backend already writes here via
+`embedDocument()`, and n8n writer workflows now write here too via
+`POST /api/internal/vector-upsert`.
+
+### Collection → Pinecone Namespace Mapping
+
+| Pinecone Namespace | `collection` Column |
+|--------------------|---------------------|
+| *(default)* | `knowledge` |
+| `gda-documents` | `gda-documents` |
+| `general` | `general` |
+| `financial` | `financial` |
+| `competitive_intel` | `competitive_intel` |
+
+Existing rows default to `collection = 'knowledge'` (backend writes).
 
 ### Endpoint
 
@@ -31,41 +48,51 @@ Header: `x-gda-key: <GDA_WEBHOOK_KEY value>`
 
 ```json
 {
-  "collection": "ai-assistant",
+  "collection": "gda-documents",
   "items": [
     {
-      "id": "unique-vector-id",
+      "id": "doc-123_chunk_0",
       "content": "The text that was embedded",
       "embedding": [0.123, -0.456, ...],
       "metadata": {
-        "document_id": "source-doc-id",
-        "source_type": "proposal",
-        "title": "Example Document"
+        "document_id": "doc-123",
+        "chunk_index": 0,
+        "source": "uploaded-file.pdf",
+        "file_type": "pdf"
       }
     }
   ]
 }
 ```
 
-### Workflows Requiring Dual-Write Nodes
+Fields in `metadata` that have dedicated columns (`document_id`,
+`chunk_index`, `page_number`, `section_title`, `token_count`) are
+extracted into those columns automatically. Remaining metadata is
+stored in the `metadata` JSONB column.
 
-| # | Workflow | ID | Pinecone Usage |
-|---|----------|----|----------------|
-| 1 | GDA.api.rag-query | rii6IYWRxh9TMNjd | Read (query) |
-| 2 | GDA.api.doc-compare | dKibEwHO773kehFg | Read (query) |
-| 3 | GDA.api.ai-agent-upload | qFKuS53JnToOjnZD | Write (upsert) |
-| 4 | GDA.api.export-engine | VxK95EhAJW1o48cS | Read (query) |
-| 5 | GDA.api.doc-ingest | 8UPZHbcTwJstPKAS | Write (upsert) |
-| 6 | GDA.api.report-builder | RqtftSynjqEKbs9Q | Read (query) |
-| 7 | GDA.api.sitrep 2 | G9US1e01oY1cgJIF | Read (query) |
+### Workflow Inventory
 
-**Write workflows (3, 5)** need a parallel HTTP Request node after the
-Pinecone upsert node that calls `/api/internal/vector-upsert`.
+| # | Workflow | ID | Pinecone Usage | PR 1 Action |
+|---|----------|----|----------------|-------------|
+| 1 | GDA.api.rag-query | rii6IYWRxh9TMNjd | Read (query) | No change (PR 2) |
+| 2 | GDA.api.doc-compare | dKibEwHO773kehFg | Read (query) | No change (PR 2) |
+| 3 | GDA.api.ai-agent-upload | qFKuS53JnToOjnZD | Write (upsert) | Add parallel pgvector write |
+| 4 | GDA.api.export-engine | VxK95EhAJW1o48cS | Read (query) | No change (PR 2) |
+| 5 | GDA.api.doc-ingest | 8UPZHbcTwJstPKAS | Write (upsert) | Add parallel pgvector write |
+| 6 | GDA.api.report-builder | RqtftSynjqEKbs9Q | Read (query) | No change (PR 2) |
+| 7 | GDA.api.sitrep 2 | G9US1e01oY1cgJIF | Read (query) | No change (PR 2) |
 
-**Read-only workflows (1, 2, 4, 6, 7)** do NOT need changes in PR 1.
-They will be updated in PR 2 when reads switch from Pinecone to pgvector.
+**PR 1**: Workflows 3 and 5 keep their existing Pinecone write nodes
+and add a parallel HTTP Request node calling `/api/internal/vector-upsert`.
+Both stores receive writes; Pinecone remains source of truth.
 
-### HTTP Request Node Configuration
+**PR 2**: Cut 5 read workflows from Pinecone to pgvector via
+`/api/internal/vector-query`.
+
+**PR 3**: Remove Pinecone write nodes from workflows 3 and 5, revoke
+Pinecone API key, cancel subscription.
+
+### HTTP Request Node Configuration (for workflows 3 & 5)
 
 - **Method**: POST
 - **URL**: `{{ $env.GDA_BACKEND_URL }}/api/internal/vector-upsert`
@@ -76,14 +103,12 @@ They will be updated in PR 2 when reads switch from Pinecone to pgvector.
 - **Continue On Fail**: `true` (pgvector failure must not break the workflow)
 - **Timeout**: 10000 (10s)
 
-### Delete Endpoint
-
-For workflows that delete vectors:
+### Delete Endpoints
 
 ```
 POST /api/internal/vector-delete
-Body: { "collection": "ai-assistant", "ids": ["id1", "id2"] }
+Body: { "ids": ["id1", "id2"] }
 
 POST /api/internal/vector-delete-by-document
-Body: { "collection": "ai-assistant", "documentId": "doc-123" }
+Body: { "documentId": "doc-123" }
 ```
