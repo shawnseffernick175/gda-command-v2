@@ -1045,6 +1045,14 @@ router.post("/documents/:id/retry", requireRole("admin", "bd_manager", "capture_
       );
     }
 
+    // Read file first, before changing status
+    const fileBuffer = readFile(doc.storage_key);
+    if (!fileBuffer) {
+      return res.status(422).json(
+        errorEnvelope("gda-knowledge", "retry", { code: "FILE_MISSING", message: "File exists in DB but not on disk", detail: null }),
+      );
+    }
+
     // Reset status to pending
     await pool.query(
       `UPDATE knowledge_documents SET status = 'pending', status_reason = NULL, updated_at = NOW() WHERE id = $1`,
@@ -1052,17 +1060,14 @@ router.post("/documents/:id/retry", requireRole("admin", "bd_manager", "capture_
     );
 
     // Re-ingest (fire-and-forget)
-    const fileBuffer = readFile(doc.storage_key);
-    if (fileBuffer) {
-      ingestDocument(fileBuffer, doc.file_name ?? "unknown", {
-        documentId: docId,
-        userId: req.user?.userId,
-        collectionId: doc.collection_id,
-        tags: doc.tags ?? [],
-      }).catch((err) => {
-        log.error("retry_ingest_error", { docId, error: (err as Error).message });
-      });
-    }
+    ingestDocument(fileBuffer, doc.file_name ?? "unknown", {
+      documentId: docId,
+      userId: req.user?.userId,
+      collectionId: doc.collection_id,
+      tags: doc.tags ?? [],
+    }).catch((err) => {
+      log.error("retry_ingest_error", { docId, error: (err as Error).message });
+    });
 
     return res.json(
       successEnvelope("gda-knowledge", "retry", { document_id: docId, status: "processing", message: "Retry initiated" }),

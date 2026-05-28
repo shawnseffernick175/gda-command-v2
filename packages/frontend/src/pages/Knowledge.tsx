@@ -172,19 +172,20 @@ function SummaryStrip({ summary }: { summary: KnowledgeSummaryData }) {
 
 function DocumentRow({
   doc,
-  isSelected,
+  selectedDocId,
   onSelect,
   children: childDocs,
   depth = 0,
   onRetry,
 }: {
   doc: KnowledgeDocument;
-  isSelected: boolean;
+  selectedDocId: string | null;
   onSelect: (doc: KnowledgeDocument) => void;
   children: KnowledgeDocument[];
   depth?: number;
   onRetry: (docId: string) => void;
 }) {
+  const isSelected = selectedDocId === doc.id;
   const [expanded, setExpanded] = useState(false);
   const hasChildren = childDocs.length > 0;
   const maxVisibleDepth = 3;
@@ -287,7 +288,7 @@ function DocumentRow({
         <DocumentRow
           key={child.id}
           doc={child}
-          isSelected={isSelected}
+          selectedDocId={selectedDocId}
           onSelect={onSelect}
           children={[]}
           depth={depth + 1}
@@ -436,7 +437,7 @@ function DocumentsTab() {
           <DocumentRow
             key={doc.id}
             doc={doc}
-            isSelected={selectedDoc?.id === doc.id}
+            selectedDocId={selectedDocId}
             onSelect={(d) => { setSelectedDocId(d.id); setSelectedDoc(d); }}
             children={childrenByParent.get(doc.id) ?? []}
             onRetry={handleRetry}
