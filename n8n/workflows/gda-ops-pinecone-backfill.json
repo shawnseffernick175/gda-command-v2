@@ -1,0 +1,76 @@
+{
+  "name": "GDA.ops.pinecone-backfill",
+  "description": "One-shot backfill: export all vectors from Pinecone → pgvector via /api/internal/vector-upsert. Safe to re-run (UPSERT deduplicates). See also scripts/pinecone-backfill.py for the CLI version used in production.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "backfill-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [0, 0],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "backfill-describe",
+      "name": "Describe Index Stats",
+      "type": "n8n-nodes-base.code",
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// Fetch Pinecone index stats and build namespace list\nconst PINECONE_HOST = '{{ $env.PINECONE_HOST }}';\nconst PINECONE_KEY = '{{ $env.PINECONE_API_KEY }}';\n\nconst resp = await fetch(`${PINECONE_HOST}/describe_index_stats`, {\n  method: 'POST',\n  headers: { 'Api-Key': PINECONE_KEY, 'Content-Type': 'application/json' },\n  body: '{}',\n});\nif (!resp.ok) throw new Error(`describe_index_stats failed: ${resp.status}`);\nconst stats = await resp.json();\n\nconst namespaceMap = { 'gda-documents': 'gda-documents', '': 'ai-agent-attachments' };\nconst items = [];\nfor (const [ns, info] of Object.entries(stats.namespaces || {})) {\n  const collection = namespaceMap[ns] !== undefined ? namespaceMap[ns] : ns;\n  items.push({ json: { namespace: ns, collection, expected_count: info.vectorCount } });\n}\nreturn items;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "backfill-split",
+      "name": "Iterate Namespaces",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [440, 0],
+      "parameters": { "batchSize": 1, "options": {} },
+      "typeVersion": 3
+    },
+    {
+      "id": "backfill-process",
+      "name": "Backfill Namespace",
+      "type": "n8n-nodes-base.code",
+      "position": [660, 0],
+      "parameters": {
+        "jsCode": "// Backfill one Pinecone namespace → pgvector collection.\n// VectorItem interface: { id, content, embedding, metadata }\n// Backend reads document_id from metadata.document_id (NOT NULL in schema).\n// Backend reads chunk_text from item.content.\nconst PINECONE_HOST = '{{ $env.PINECONE_HOST }}';\nconst PINECONE_KEY = '{{ $env.PINECONE_API_KEY }}';\nconst GDA_KEY = '{{ $env.GDA_WEBHOOK_KEY }}';\nconst BACKEND = 'http://gda-backend:3001';\nconst UPSERT_CHUNK = 10;\n\nconst { namespace: ns, collection, expected_count } = $input.first().json;\nlet fetched = 0, upserted = 0, batchNum = 0, token = null, errors = [];\n\nfunction stripNull(s) { return typeof s === 'string' ? s.replace(/\\0/g, '') : s; }\n\ndo {\n  let url = `${PINECONE_HOST}/vectors/list?namespace=${encodeURIComponent(ns)}&limit=100`;\n  if (token) url += `&paginationToken=${encodeURIComponent(token)}`;\n  const listResp = await fetch(url, { headers: { 'Api-Key': PINECONE_KEY } });\n  if (!listResp.ok) { errors.push(`list ${listResp.status}`); break; }\n  const listData = await listResp.json();\n  const ids = (listData.vectors || []).map(v => v.id);\n  token = listData.pagination?.next || null;\n  if (!ids.length) break;\n\n  // Fetch vectors via GET with query params\n  const params = ids.map(id => `ids=${encodeURIComponent(id)}`).join('&');\n  const nsParam = ns ? `&namespace=${encodeURIComponent(ns)}` : '';\n  const fetchResp = await fetch(`${PINECONE_HOST}/vectors/fetch?${params}${nsParam}`, {\n    headers: { 'Api-Key': PINECONE_KEY },\n  });\n  if (!fetchResp.ok) { errors.push(`fetch ${fetchResp.status}`); break; }\n  const fetchData = await fetchResp.json();\n  const vectors = fetchData.vectors || {};\n\n  // Transform to VectorItem shape\n  const items = Object.entries(vectors).map(([id, vec]) => {\n    const meta = vec.metadata || {};\n    const docId = meta.document_id || meta.source || id.split('_chunk_')[0];\n    const text = stripNull(meta.text || meta.chunk_text || '(no text)');\n    const enriched = {};\n    for (const [k, v] of Object.entries(meta)) enriched[k] = stripNull(v);\n    enriched.document_id = docId;\n    if (enriched.chunk_index === undefined) enriched.chunk_index = 0;\n    return { id, content: text, embedding: vec.values, metadata: enriched };\n  });\n\n  // Upsert in sub-batches of UPSERT_CHUNK\n  for (let i = 0; i < items.length; i += UPSERT_CHUNK) {\n    const chunk = items.slice(i, i + UPSERT_CHUNK);\n    const resp = await fetch(`${BACKEND}/api/internal/vector-upsert`, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'x-gda-key': GDA_KEY },\n      body: JSON.stringify({ collection, items: chunk }),\n    });\n    if (resp.ok) upserted += chunk.length;\n    else errors.push(`upsert batch ${batchNum} chunk ${i}: ${resp.status}`);\n  }\n  fetched += ids.length;\n  batchNum++;\n} while (token);\n\nreturn [{ json: { namespace: ns, collection, expected_count, fetched, upserted, batches: batchNum, errors, status: errors.length ? 'partial' : 'success' } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "backfill-verify",
+      "name": "Verify Counts",
+      "type": "n8n-nodes-base.code",
+      "position": [880, 0],
+      "parameters": {
+        "jsCode": "// Quick sanity check: query pgvector with a dummy vector to verify data is queryable.\nconst GDA_KEY = '{{ $env.GDA_WEBHOOK_KEY }}';\nconst BACKEND = 'http://gda-backend:3001';\nconst item = $input.first().json;\nconst embedding = new Array(1536).fill(0.01);\nconst resp = await fetch(`${BACKEND}/api/internal/vector-query`, {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json', 'x-gda-key': GDA_KEY },\n  body: JSON.stringify({ collection: item.collection, embedding, topK: 1 }),\n});\nconst data = resp.ok ? await resp.json() : { error: await resp.text() };\nreturn [{ json: { ...item, pgvector_check: resp.ok ? 'ok' : 'error', sample_id: data?.data?.results?.[0]?.id || 'none' } }];"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Describe Index Stats", "type": "main", "index": 0 }]]
+    },
+    "Describe Index Stats": {
+      "main": [[{ "node": "Iterate Namespaces", "type": "main", "index": 0 }]]
+    },
+    "Iterate Namespaces": {
+      "main": [
+        [{ "node": "Backfill Namespace", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Backfill Namespace": {
+      "main": [[{ "node": "Verify Counts", "type": "main", "index": 0 }]]
+    },
+    "Verify Counts": {
+      "main": [[{ "node": "Iterate Namespaces", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}

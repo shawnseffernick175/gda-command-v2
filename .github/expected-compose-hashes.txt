@@ -1,5 +1,2 @@
-# Expected SHA-256 hashes for docker-compose files.
-# Updated automatically when compose files change.
-# Used by CI (compose-drift check) and deploy-prod.sh to detect silent drift.
-docker-compose.prod.yml 1179b470a497a5777ab0083c137f25f5b5db58b31abafbefdcf5f65ffa10d529
+docker-compose.prod.yml 0cdda4420f1c68e2eae12e64bd780939450d3766fa4280d91bfc44bf6fdf7434
 docker-compose.n8n.yml 22ea41a382e0a4b14fb1accce1cd49594de6de6634165cbe51dc943751303bc5

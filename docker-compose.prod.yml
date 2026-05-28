@@ -88,6 +88,8 @@ services:
       APP_URL: ${APP_URL:-https://gda.csr-llc.tech}
       BACKUP_DIR: /var/backups/gda
       UPLOAD_DIR: /var/uploads/gda
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_HOST: ${PINECONE_HOST:-}
     volumes:
       - gda-backups:/var/backups/gda
       - gda-uploads:/var/uploads/gda
