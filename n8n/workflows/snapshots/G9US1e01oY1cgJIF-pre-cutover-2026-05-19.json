@@ -1,0 +1,3140 @@
+{
+  "updatedAt": "2026-05-26T22:55:08.042Z",
+  "createdAt": "2026-03-15T04:48:37.998Z",
+  "id": "G9US1e01oY1cgJIF",
+  "name": "GDA.api.sitrep 2",
+  "description": "",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "33f34e61-2687-4051-9289-db709108020d",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        576,
+        192
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "f6a19e9f-4f41-4e0d-8f86-f652c164f4bf",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        128,
+        -48
+      ],
+      "webhookId": "76d75678-6457-4adc-aad3-a6910c2838aa",
+      "parameters": {
+        "path": "gda-daily-sitrep",
+        "options": {
+          "allowedOrigins": "*"
+        },
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "c4f33508-f1ac-4ec1-a230-f78496896f7d",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "disabled": true,
+      "position": [
+        2752,
+        144
+      ],
+      "parameters": {
+        "text": "={{ $('Build SITREP Prompt').item.json.prompt }}",
+        "options": {
+          "systemMessage": "Act as the Chief Strategy Officer (CSO) for Georgetown Defense Analytics (GDA). All external data (Tavily news, SAM.gov opportunities, dashboard intelligence) has been PRE-FETCHED and is already in the user prompt. DO NOT use the Tavily or SAM.gov tools \u2014 that data is already provided. Your ONLY tool to use is Pinecone Tasks (call it once for company tasks context). After getting Pinecone results, immediately output the complete SITREP JSON. Portfolio: Envision (Training/XR, OU-03), PD Systems (Logistics/C5ISR, OU-01), Riverstone (Cyber/Intel, OU-02). Targets: SOCOM, TRADOC, Fort Bragg/Fort Liberty, USASOC, $100M FY26 run rate. Tone: direct, stoic, no hedging. Return ONLY valid JSON."
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 3.1
+    },
+    {
+      "id": "66ed0614-c548-4737-aef6-d5f260850d97",
+      "name": "Search in Tavily",
+      "type": "@tavily/n8n-nodes-tavily.tavilyTool",
+      "disabled": true,
+      "position": [
+        2720,
+        368
+      ],
+      "parameters": {
+        "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Query', ``, 'string') }}",
+        "options": {
+          "max_results": 10,
+          "search_depth": "basic"
+        }
+      },
+      "credentials": {
+        "tavilyApi": {
+          "id": "M6lh2vbM59NsCJ0A",
+          "name": "Tavily account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "91373124-4f9b-49cd-8c34-71ec8119736c",
+      "name": "Pinecone Tasks",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "disabled": true,
+      "position": [
+        2848,
+        368
+      ],
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "topK": 5,
+        "options": {},
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ai-assistant",
+          "cachedResultName": "ai-assistant"
+        },
+        "toolDescription": "Search Envision's knowledge base for current tasks, active projects, strategic priorities, and company context. Use this to retrieve what Shawn is working on."
+      },
+      "credentials": {
+        "pineconeApi": {
+          "id": "wRjQmgKElTHbBf5J",
+          "name": "PineconeApi account 2"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "1e2c2e19-594f-4924-8d6f-3d8f02e9aba1",
+      "name": "Embeddings OpenAI (SITREP)",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "disabled": true,
+      "position": [
+        2928,
+        576
+      ],
+      "parameters": {
+        "model": "text-embedding-ada-002",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "unLYjAN4H9MFrJ0u",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "85cd4745-2943-4151-8fe1-c50e9f5516e4",
+      "name": "SAM.gov Opportunities",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "onError": "continueRegularOutput",
+      "disabled": true,
+      "position": [
+        3136,
+        368
+      ],
+      "parameters": {
+        "url": "https://api.sam.gov/opportunities/v2/search",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.GDA_SAM_API_KEY }}"
+            },
+            {
+              "name": "postedFrom",
+              "value": "={{ $now.minus({days: 7}).format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "postedTo",
+              "value": "={{ $now.format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "limit",
+              "value": "10"
+            },
+            {
+              "name": "keyword",
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('keyword', 'Search keyword for SAM.gov opportunities', 'string') }}"
+            }
+          ]
+        },
+        "toolDescription": "Search SAM.gov for live federal contract opportunities. If the request fails or is throttled, return an empty result and continue. Returns JSON with opportunitiesData array."
+      },
+      "typeVersion": 4.4,
+      "continueOnFail": true
+    },
+    {
+      "id": "b41e264c-2793-430a-a928-b643bfe67caa",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3344,
+        144
+      ],
+      "parameters": {
+        "jsCode": "var item = $input.first().json;\nvar data = item.output || '';\n\n// Step 1: Extract JSON from ```json...``` code blocks or raw text\nvar jsonStr;\nvar fenceMatch = data.match(/```(?:json)?\\s*\\n?([\\s\\S]*?)\\n?\\s*```/);\nif (fenceMatch) {\n  jsonStr = fenceMatch[1].trim();\n} else {\n  var start = data.indexOf('{');\n  var end = data.lastIndexOf('}');\n  if (start >= 0 && end > start) {\n    jsonStr = data.substring(start, end + 1);\n  } else {\n    jsonStr = data;\n  }\n}\n\n// Step 2: Clean common LLM JSON issues\njsonStr = jsonStr\n  .replace(/\\]\\s*\\],/g, '],')   // duplicate ] before ,\n  .replace(/\\}\\s*\\},/g, '},')   // duplicate } before ,\n  .replace(/\\]\\s*\\]\\s*\\}/g, ']}') // duplicate ] before }\n  .replace(/,\\s*\\]/g, ']')       // trailing comma before ]\n  .replace(/,\\s*\\}/g, '}');      // trailing comma before }\n\n// Step 3: Parse with fallback\nvar parsed;\ntry {\n  parsed = JSON.parse(jsonStr);\n} catch(e1) {\n  // Try extracting just the outermost { to }\n  var s2 = jsonStr.indexOf('{');\n  var e2 = jsonStr.lastIndexOf('}');\n  if (s2 >= 0 && e2 > s2) {\n    try {\n      parsed = JSON.parse(jsonStr.substring(s2, e2 + 1));\n    } catch(e3) {\n      parsed = { sitrep: {\n        generated_at: new Date().toISOString(),\n        bluf: ['SITREP generation produced invalid JSON. Error: ' + e1.message + '. Raw length: ' + data.length + ' chars.'],\n        strategic_landscape: {doge_watch:'Unavailable - JSON parse error',indopacom:'Unavailable - JSON parse error'},\n        defensive_watch: {incumbency_threat:'Unavailable',market_pressure:'Unavailable'},\n        strategic_synthesis: 'Re-run SITREP to regenerate.',\n        threat_opportunity_matrix: [],\n        recommendations: [{action:'Re-run Daily SITREP',owner:'System',deadline:'Today',why:'Previous generation produced malformed JSON'}],\n        red_team: [],\n        command_control: {title:'SITREP Parse Error',takeaway:'Re-run required',source:''},\n        sam_gov_opportunities: [],\n        top_news: []\n      }};\n    }\n  } else {\n    parsed = { sitrep: {\n      generated_at: new Date().toISOString(),\n      bluf: ['SITREP generation returned no JSON object. Raw length: ' + data.length],\n      strategic_landscape: {doge_watch:'Unavailable',indopacom:'Unavailable'},\n      defensive_watch: {incumbency_threat:'Unavailable',market_pressure:'Unavailable'},\n      strategic_synthesis: 'Re-run SITREP.',\n      threat_opportunity_matrix: [],\n      recommendations: [],\n      red_team: [],\n      command_control: {title:'Error',takeaway:'Re-run',source:''},\n      sam_gov_opportunities: [],\n      top_news: []\n    }};\n  }\n}\nvar s = parsed.sitrep || parsed;\n\nvar today = new Date().toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});\n\nfunction renderWithSource(text) {\n  if (!text) return 'Data Unavailable';\n  var srcIdx = text.indexOf('| Source:');\n  if (srcIdx === -1) srcIdx = text.indexOf('| source:');\n  if (srcIdx !== -1) {\n    var body = text.substring(0, srcIdx).trim();\n    var url = text.substring(srcIdx + 9).trim().split(' ')[0];\n    return body + ' <a href=\"' + url + '\" style=\"color:#1a3c6e;font-size:12px;\" target=\"_blank\">[Source]</a>';\n  }\n  return text;\n}\n\nvar html = '<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;font-size:15px;max-width:750px;margin:auto;padding:24px;color:#1a1a1a;\">';\n\nhtml += '<div style=\"background:#1a3c6e;color:#fff;padding:20px;border-radius:6px;margin-bottom:20px;\">';\nhtml += '<h1 style=\"margin:0;font-size:22px;letter-spacing:1px;\">GDA EXECUTIVE SITREP</h1>';\nhtml += '<p style=\"margin:6px 0 0;font-size:13px;opacity:0.85;\">Shawn M. Seffernick, President \u2014 Envision Innovative Solutions | ' + today + '</p>';\nhtml += '</div>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">BLUF \u2014 Bottom Line Up Front</h2>';\nhtml += '<ul style=\"padding-left:20px;\">';\nvar blufItems = Array.isArray(s.bluf) ? s.bluf : (typeof s.bluf === 'string' ? [s.bluf] : []);\nblufItems.forEach(function(b) {\n  html += '<li style=\"margin-bottom:10px;\">' + renderWithSource(b) + '</li>';\n});\nhtml += '</ul>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">The 2026 Strategic Landscape</h2>';\nhtml += '<p><strong>DOGE &amp; Budget Watch:</strong> ' + renderWithSource((s.strategic_landscape && s.strategic_landscape.doge_watch) || 'Data Unavailable') + '</p>';\nhtml += '<p><strong>INDOPACOM &amp; Global Posture:</strong> ' + renderWithSource((s.strategic_landscape && s.strategic_landscape.indopacom) || 'Data Unavailable') + '</p>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Defensive Portfolio Watch</h2>';\nhtml += '<p><strong>Incumbency Threat:</strong> ' + renderWithSource((s.defensive_watch && s.defensive_watch.incumbency_threat) || 'Data Unavailable') + '</p>';\nhtml += '<p><strong>Market Pressure:</strong> ' + renderWithSource((s.defensive_watch && s.defensive_watch.market_pressure) || 'Data Unavailable') + '</p>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Strategic Synthesis \u2014 The \\\"So What?\\\"</h2>';\nhtml += '<p>' + renderWithSource(s.strategic_synthesis || 'Data Unavailable') + '</p>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Threat &amp; Opportunity Matrix</h2>';\nhtml += '<table style=\"width:100%;border-collapse:collapse;font-size:13px;\">';\nhtml += '<tr style=\"background:#1a3c6e;color:#fff;\"><th style=\"padding:8px;text-align:left;\">Type</th><th style=\"padding:8px;text-align:left;\">Event</th><th style=\"padding:8px;text-align:left;\">Impact</th><th style=\"padding:8px;text-align:left;\">Action</th></tr>';\n(s.threat_opportunity_matrix || []).forEach(function(row, i) {\n  var bg = i % 2 === 0 ? '#f5f5f5' : '#ffffff';\n  html += '<tr style=\"background:' + bg + ';\">';\n  html += '<td style=\"padding:8px;font-weight:bold;white-space:nowrap;\">' + (row.type || '') + '</td>';\n  html += '<td style=\"padding:8px;\">' + (row.event || '') + '</td>';\n  html += '<td style=\"padding:8px;\">' + (row.impact || '') + '</td>';\n  html += '<td style=\"padding:8px;\">' + (row.action || '') + '</td>';\n  html += '</tr>';\n});\nhtml += '</table>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Actionable Recommendations</h2>';\nhtml += '<ol style=\"padding-left:20px;\">';\n(s.recommendations || []).forEach(function(r) {\n  if (typeof r === 'string') {\n    html += '<li style=\"margin-bottom:8px;\">' + r + '</li>';\n  } else if (typeof r === 'object' && r !== null) {\n    html += '<li style=\"margin-bottom:10px;\">';\n    html += '<strong>' + (r.action || '') + '</strong>';\n    if (r.owner) html += ' <span style=\"color:#666;font-size:13px;\">\u2014 ' + r.owner + '</span>';\n    if (r.deadline) html += ' <span style=\"background:#e8f0fe;color:#1a3c6e;padding:1px 6px;border-radius:3px;font-size:12px;\">' + r.deadline + '</span>';\n    if (r.why) html += '<br><span style=\"font-size:13px;color:#444;\">' + r.why + '</span>';\n    html += '</li>';\n  }\n});\nhtml += '</ol>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Red Team Analysis</h2>';\n(s.red_team || []).forEach(function(rt, i) {\n  html += '<div style=\"background:#fff8f0;border-left:4px solid #c0392b;padding:10px;margin-bottom:10px;\">';\n  html += '<p style=\"margin:0;\"><strong>Risk ' + (i+1) + ':</strong> ' + (rt.risk || '') + '</p>';\n  html += '<p style=\"margin:4px 0 0;color:#666;\"><em>Mitigation:</em> ' + (rt.mitigation || '') + '</p>';\n  html += '</div>';\n});\n\nif (s.sam_gov_opportunities && s.sam_gov_opportunities.length > 0 && !s.sam_gov_opportunities[0].note) {\n  html += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">SAM.gov Live Opportunities</h2>';\n  html += '<table style=\"width:100%;border-collapse:collapse;font-size:13px;\">';\n  html += '<tr style=\"background:#1a3c6e;color:#fff;\"><th style=\"padding:8px;text-align:left;\">Title</th><th style=\"padding:8px;\">Agency</th><th style=\"padding:8px;\">NAICS</th><th style=\"padding:8px;\">Deadline</th></tr>';\n  s.sam_gov_opportunities.forEach(function(opp, i) {\n    var bg = i % 2 === 0 ? '#f5f5f5' : '#ffffff';\n    html += '<tr style=\"background:' + bg + ';\">';\n    html += '<td style=\"padding:8px;\">' + (opp.title || '') + '</td>';\n    html += '<td style=\"padding:8px;\">' + (opp.agency || '') + '</td>';\n    html += '<td style=\"padding:8px;\">' + (opp.naics || '') + '</td>';\n    html += '<td style=\"padding:8px;\">' + (opp.deadline || 'TBD') + '</td>';\n    html += '</tr>';\n  });\n  html += '</table>';\n}\n\nif (s.top_news && s.top_news.length > 0) {\n  html += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;margin-top:24px;\">Top News</h2>';\n  html += '<div style=\"display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:20px;\">';\n  s.top_news.slice(0,6).forEach(function(news) {\n    if (typeof news !== 'object' || !news.title) return;\n    html += '<div style=\"border:1px solid #ddd;border-radius:6px;overflow:hidden;background:#fff;\">';\n    if (news.image_url && news.image_url !== 'null') {\n      html += '<img src=\"' + news.image_url + '\" style=\"width:100%;height:120px;object-fit:cover;\" onerror=\"this.style.display=\\'none\\'\">';\n    }\n    html += '<div style=\"padding:10px;\">';\n    html += '<p style=\"margin:0;font-weight:bold;font-size:13px;\"><a href=\"' + (news.url||'#') + '\" style=\"color:#1a3c6e;text-decoration:none;\" target=\"_blank\">' + (news.title||'') + '</a></p>';\n    if (news.summary) html += '<p style=\"margin:6px 0 0;font-size:12px;color:#555;\">' + news.summary + '</p>';\n    html += '</div></div>';\n  });\n  html += '</div>';\n}\n\nvar cc = s.command_control || {};\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Command &amp; Control \u2014 Professional Development</h2>';\nhtml += '<div style=\"background:#f0f4ff;border-left:4px solid #1a3c6e;padding:12px;\">';\nhtml += '<p style=\"margin:0;\"><strong>' + (cc.title || 'Data Unavailable') + '</strong></p>';\nif (cc.takeaway) html += '<p style=\"margin:6px 0 0;\">' + cc.takeaway + '</p>';\nif (cc.source) html += '<p style=\"margin:4px 0 0;font-size:13px;\"><a href=\"' + cc.source + '\" style=\"color:#1a3c6e;\" target=\"_blank\">' + cc.source + '</a></p>';\nhtml += '</div>';\n\nhtml += '<hr style=\"margin-top:30px;border:none;border-top:1px solid #ddd;\"/>';\nhtml += '<p style=\"font-size:12px;color:#999;text-align:center;\">GDA Intelligence | Generated by Envision AI Platform | ' + today + '</p>';\nhtml += '</body></html>';\n\nreturn [{ json: { html_body: html, sitrep: s, full_output: parsed } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "94321e38-5ebc-4a73-8d6b-f02e49130c99",
+      "name": "IF Webhook Triggered",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        4016,
+        48
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-webhook-check",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $('Webhook').isExecuted }}",
+              "rightValue": true
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "c0f6bb75-3929-4b11-9bc0-df8f690a1374",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        4240,
+        -48
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Code in JavaScript').item.json) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "6058dfc6-384c-4f41-b6db-274d31093623",
+      "name": "Send an Email",
+      "type": "n8n-nodes-base.emailSend",
+      "disabled": true,
+      "position": [
+        4240,
+        144
+      ],
+      "webhookId": "69bdb9fc-bdc2-4da1-b655-7522714167f5",
+      "parameters": {
+        "html": "={{ $json.html_body }}",
+        "options": {},
+        "subject": "=GDA Executive SITREP \u2014 {{ $now.format('MMMM D, YYYY') }}",
+        "toEmail": "shawn.seffernick@envision-is.com",
+        "fromEmail": "shawn.seffernick175@gmail.com"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "Vum8hlqyqjpqds7y",
+          "name": "SMTP account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "fb248a29-e4ea-4a25-a6ef-bc0aa72d3592",
+      "name": "Get Dashboard Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        800,
+        144
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-dashboard",
+        "method": "POST",
+        "options": {
+          "timeout": 300000
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-GDA-Key",
+              "value": "={{ $env.GDA_API_KEY_2026 }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "id": "2a94cc1c-7463-4ac2-919a-277c16fe7ac3",
+      "name": "Build SITREP Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2368,
+        144
+      ],
+      "parameters": {
+        "jsCode": "var dash = {};\nvar extracted = {};\nvar t1 = {}, t2 = {}, t3 = {}, sam = {};\nvar platformData = {};\n\ntry { dash = $('Get Dashboard Intelligence').first().json; } catch(e) {}\ntry { extracted = $('Extract Dashboard Targets').first().json.extracted_targets || {}; } catch(e) {}\ntry { t1 = $('Tavily Fetch 1').first().json; } catch(e) {}\ntry { t2 = $('Tavily Fetch 2').first().json; } catch(e) {}\ntry { t3 = $('Tavily Fetch 3').first().json; } catch(e) {}\ntry { sam = $('SAM.gov Fetch').first().json; } catch(e) {}\ntry {\n  var pgRow = $('Query Platform State').first().json;\n  platformData = pgRow.platform_data || pgRow;\n  if (typeof platformData === 'string') platformData = JSON.parse(platformData);\n} catch(e) { platformData = {}; }\n\nfunction fmtTavily(t, label) {\n  var results = Array.isArray(t.results) ? t.results : [];\n  if (results.length === 0) return label + ': No results\\n';\n  return label + ':\\n' + results.slice(0,8).map(function(r) {\n    return '- ' + r.title + ' | ' + (r.content||'').slice(0,200) + ' [' + (r.url||'') + ']';\n  }).join('\\n') + '\\n';\n}\n\nvar samOpps = [];\ntry {\n  var items = sam.opportunitiesData || sam.data || [];\n  samOpps = items.slice(0,5).map(function(o) {\n    return {title: o.title, agency: o.fullParentPathName||o.organizationCode, naics: (o.naicsCode||[]).join(','), sol: o.solicitationNumber, posted: o.postedDate, deadline: o.responseDeadLine};\n  });\n} catch(e) {}\n\n// Build live platform state section from Postgres\nvar platformSection = '';\nif (platformData && platformData.opp_total !== undefined) {\n  var deadlines = platformData.upcoming_deadlines || [];\n  var actionItems = platformData.open_action_items || [];\n  var topByValue = platformData.top_by_value || [];\n  platformSection = '=== LIVE EIS GDA PLATFORM STATE (Postgres, real-time) ===\\n';\n  platformSection += 'PIPELINE: ' + platformData.opp_total + ' active opportunities | Total: $' + platformData.total_value_m + 'M\\n';\n  platformSection += 'STAGES: Proposal=' + platformData.proposal_count + ' ($' + platformData.proposal_value_m + 'M) | Capture=' + platformData.capture_count + ' ($' + platformData.capture_value_m + 'M) | Qualified=' + platformData.qualified_count + ' ($' + platformData.qualified_value_m + 'M)\\n';\n  if (deadlines && deadlines.length > 0) {\n    platformSection += 'URGENT DEADLINES (next 14 days):\\n';\n    deadlines.forEach(function(d) { platformSection += '  - ' + d.agency + ' | $' + Math.round((d.estimated_value||0)/1e6) + 'M | ' + d.stage + ' | Due: ' + d.deadline + ' | Fit: ' + d.eis_fit_score + '/100\\n'; });\n  }\n  platformSection += 'ACTIONS: ' + platformData.open_actions + ' open, ' + platformData.overdue_actions + ' OVERDUE\\n';\n  if (actionItems && actionItems.length > 0) {\n    actionItems.slice(0,5).forEach(function(a) { platformSection += '  - [' + a.status + '] ' + a.item + ' (Due: ' + (a.deadline||'TBD') + ')\\n'; });\n  }\n  if (topByValue && topByValue.length > 0) {\n    platformSection += 'TOP OPPS BY VALUE:\\n';\n    topByValue.slice(0,5).forEach(function(o) { platformSection += '  - ' + o.agency + ' | $' + Math.round((o.estimated_value||0)/1e6) + 'M | ' + o.stage + '\\n'; });\n  }\n  platformSection += '=== END PLATFORM STATE ===\\n\\n';\n}\n\nvar liveTargets = Array.isArray(extracted.top_programs) ? extracted.top_programs : [];\nvar dashSummaryText = liveTargets.length > 0\n  ? 'LIVE TARGETS:\\n' + liveTargets.slice(0,5).map(function(p){return '- ' + p.agency + ' - ' + p.program + ': ' + (p.annual_spend_fmt||'N/A') + '/yr';}).join('\\n') + '\\n\\n'\n  : 'DASHBOARD: Unavailable\\n\\n';\n\nvar tavilySection = fmtTavily(t1,'INTEL-DOGE/Agencies') + fmtTavily(t2,'INTEL-INDOPACOM') + fmtTavily(t3,'INTEL-EIS/GDA');\nvar samSection = samOpps.length > 0 ? 'SAM.GOV:\\n' + JSON.stringify(samOpps) + '\\n\\n' : 'SAM.GOV: No results\\n\\n';\n\nvar oppTotal = platformData.opp_total || 0;\nvar totalValueM = platformData.total_value_m || 0;\nvar proposalCount = platformData.proposal_count || 0;\nvar captureCount = platformData.capture_count || 0;\nvar qualifiedCount = platformData.qualified_count || 0;\nvar openActions = platformData.open_actions || 0;\nvar overdueActions = platformData.overdue_actions || 0;\n\nvar topAgenciesJson = JSON.stringify(extracted.top_agencies || []);\nvar totalSpendFmt = extracted.total_addressable_spend_fmt || 'N/A';\nvar top3ProgsJson = JSON.stringify(liveTargets.slice(0,3).map(function(p){return {agency:p.agency,program:p.program,spend:p.annual_spend_fmt};}));\nvar samOppsJson = JSON.stringify(samOpps.length > 0 ? samOpps : [{note:'no SAM results'}]);\n\nvar prompt = platformSection + dashSummaryText + tavilySection + samSection +\n  'TASK: You are the GDA Command daily intelligence briefer for Shawn Seffernick, President of EIS. FY26 target: $100M.\\n\\nBased on ALL data above, generate this EXACT JSON structure:\\n\\n{\\n  \"sitrep\": {\\n    \"generated_at\": \"[ISO datetime]\",\\n    \"bluf\": [\"[Finding 1 \u2014 MUST use numbers from LIVE PLATFORM STATE: cite opp count, dollar amounts, stage]\", \"[Finding 2 \u2014 market intel with source URL]\", \"[Finding 3 \u2014 competitive threat with source URL]\"],\\n    \"pipeline_status\": {\"total_opps\": ' + oppTotal + ', \"total_value_m\": ' + totalValueM + ', \"proposal_count\": ' + proposalCount + ', \"capture_count\": ' + captureCount + ', \"qualified_count\": ' + qualifiedCount + ', \"summary\": \"[1-2 sentences on pipeline health based on the ' + oppTotal + ' opps and $' + totalValueM + 'M total value]\"},\\n    \"critical_actions\": [\"[Most urgent action based on platform deadlines/overdue items]\", \"[Second priority action]\", \"[Third priority action]\"],\\n    \"risk_summary\": {\"count\": ' + overdueActions + ', \"top_risks\": [\"[Primary risk to revenue/pipeline]\", \"[Secondary risk]\"]},\\n    \"department_coverage\": {\"active_departments\": [\"[list DoD dept names that have active opps in our pipeline]\"], \"gaps\": [\"[DoD/federal depts not in our pipeline]\"], \"recommendation\": \"[which dept gap to close first and why]\"},\\n    \"trading\": {\"status\": \"monitoring\", \"summary\": \"No active positions. Engine monitoring markets.\"},\\n    \"strategic_landscape\": {\"doge_watch\": \"[Specific budget impact]\", \"indopacom\": \"[Specific awards/exercises]\"},\\n    \"defensive_watch\": {\"incumbency_threat\": \"[Named programs at risk]\", \"market_pressure\": \"[Pricing pressures]\"},\\n    \"strategic_synthesis\": \"[2-3 sentences: connect platform pipeline ($' + totalValueM + 'M across ' + oppTotal + ' opps) to market intel and $100M target]\",\\n    \"dashboard_summary\": {\"top_agencies\": ' + topAgenciesJson + ', \"total_addressable_spend\": \"' + totalSpendFmt + '\", \"top_programs\": ' + top3ProgsJson + '},\\n    \"threat_opportunity_matrix\": [{\"type\": \"Opportunity\", \"event\": \"[specific program]\", \"impact\": \"High\", \"action\": \"[action with role]\"}, {\"type\": \"Risk\", \"event\": \"[specific threat]\", \"impact\": \"High\", \"action\": \"[mitigation]\"}],\\n    \"recommendations\": [{\"action\": \"[specific action]\", \"owner\": \"[BD Lead|Capture Manager|President|CTO]\", \"deadline\": \"[date]\", \"why\": \"[dollar impact]\"}, {\"action\": \"[action2]\", \"owner\": \"[role]\", \"deadline\": \"[date]\", \"why\": \"[reason]\"}, {\"action\": \"[action3]\", \"owner\": \"[role]\", \"deadline\": \"[date]\", \"why\": \"[reason]\"}],\\n    \"red_team\": [{\"risk\": \"[competitor/program]\", \"mitigation\": \"[countermove]\"}, {\"risk\": \"[r2]\", \"mitigation\": \"[m2]\"}, {\"risk\": \"[r3]\", \"mitigation\": \"[m3]\"}],\\n    \"command_control\": {\"title\": \"[Most important headline today]\", \"takeaway\": \"[One sentence CEO acts on immediately]\", \"source\": \"[URL]\"},\\n    \"sam_gov_opportunities\": ' + samOppsJson + ',\\n    \"top_news\": [{\"title\": \"[headline]\", \"summary\": \"[1-2 sentences]\", \"url\": \"[URL]\", \"image_url\": null}]\\n  }\\n}\\n\\nCRITICAL: pipeline_status numbers MUST be ' + oppTotal + ' opps and $' + totalValueM + 'M from LIVE PLATFORM STATE. Do NOT estimate \u2014 use exact numbers.';\n\nreturn [{ json: { prompt: prompt } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "eac7f185-7449-4919-b0d8-5a8f45343ef9",
+      "name": "Anthropic Chat Model (SITREP)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "disabled": true,
+      "maxTries": 3,
+      "position": [
+        2592,
+        368
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-20250514",
+          "cachedResultName": "Claude Sonnet 4"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "d92MU0tRK7bEGV83",
+          "name": "Anthropic account"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 1.3,
+      "waitBetweenTries": 70000
+    },
+    {
+      "id": "8020c55f-1d30-40ce-b0c9-2529da6bf180",
+      "name": "Tavily Fetch 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1248,
+        144
+      ],
+      "parameters": {
+        "url": "https://api.tavily.com/search",
+        "method": "POST",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.GDA_TAVILY_API_KEY }}"
+            },
+            {
+              "name": "query",
+              "value": "={{ $('Extract Dashboard Targets').first().json.tavily_query_1 || 'SOCOM TRADOC training simulation contract award 2026 DOGE budget cut' }}"
+            },
+            {
+              "name": "search_depth",
+              "value": "basic"
+            },
+            {
+              "name": "max_results",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "id": "da08e921-9273-4bd7-8883-b369bd87d785",
+      "name": "Tavily Fetch 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1472,
+        144
+      ],
+      "parameters": {
+        "url": "https://api.tavily.com/search",
+        "method": "POST",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.GDA_TAVILY_API_KEY }}"
+            },
+            {
+              "name": "query",
+              "value": "INDOPACOM \"first island chain\" defense logistics training simulation contract 2026"
+            },
+            {
+              "name": "search_depth",
+              "value": "basic"
+            },
+            {
+              "name": "max_results",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "id": "286f4f4b-5340-4a76-b1bf-33aa6fec6a1e",
+      "name": "Tavily Fetch 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1696,
+        144
+      ],
+      "parameters": {
+        "url": "https://api.tavily.com/search",
+        "method": "POST",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.GDA_TAVILY_API_KEY }}"
+            },
+            {
+              "name": "query",
+              "value": "={{ $('Extract Dashboard Targets').first().json.tavily_query_3 || '\"Envision Innovative Solutions\" OR \"PD Systems\" OR \"Riverstone\" defense contract training simulation XR digital readiness 2026' }}"
+            },
+            {
+              "name": "search_depth",
+              "value": "basic"
+            },
+            {
+              "name": "max_results",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "id": "06387459-11b9-49c1-8e09-929a3bbe246d",
+      "name": "SAM.gov Fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1920,
+        144
+      ],
+      "parameters": {
+        "url": "https://api.sam.gov/opportunities/v2/search",
+        "options": {
+          "timeout": 30000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $env.GDA_SAM_API_KEY }}"
+            },
+            {
+              "name": "postedFrom",
+              "value": "={{ $now.minus({days: 90}).format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "postedTo",
+              "value": "={{ $now.format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "responseDeadLineFrom",
+              "value": "={{ $now.format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "responseDeadLineTo",
+              "value": "={{ $now.plus({years: 1}).format('MM/dd/yyyy') }}"
+            },
+            {
+              "name": "ncode",
+              "value": "541715,541330,541512,541519,541611,541690,518210,561210"
+            },
+            {
+              "name": "keyword",
+              "value": "SETA systems engineering technical assistance training simulation C5ISR cyber intelligence"
+            },
+            {
+              "name": "limit",
+              "value": "10"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "id": "3a6e8395-1ded-4c59-8d74-9288e0891403",
+      "name": "Extract Dashboard Targets",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1024,
+        144
+      ],
+      "parameters": {
+        "jsCode": "// Read dashboard response\nvar dashData = {};\ntry { dashData = $('Get Dashboard Intelligence').first().json; } catch(e) {}\n\n// Extract all programs from nested or flat structure\nvar allPrograms = [];\nvar agencies = Array.isArray(dashData.agencies) ? dashData.agencies\n             : Array.isArray(dashData.agency_programs) ? dashData.agency_programs : [];\n\nfor (var ag of agencies) {\n  var agencyName = ag.agency || ag.name || 'Unknown';\n  if (Array.isArray(ag.commands)) {\n    for (var cmd of ag.commands) {\n      var cmdName = cmd.command || cmd.name || '';\n      if (Array.isArray(cmd.programs)) {\n        for (var prog of cmd.programs) {\n          allPrograms.push({ agency: agencyName, command: cmdName,\n            program: prog.program_office || prog.name || 'Unknown',\n            annual_spend: Number(prog.annual_spend) || 0,\n            need_score: Number(prog.need_score) || 0,\n            eis_fit_score: Number(prog.eis_fit_score) || 0,\n            capability_need: prog.capability_need || '', eis_fit: prog.eis_fit || '' });\n        }\n      }\n    }\n  } else if (Array.isArray(ag.programs)) {\n    for (var prog of ag.programs) {\n      allPrograms.push({ agency: agencyName, command: '',\n        program: prog.program_office || prog.name || 'Unknown',\n        annual_spend: Number(prog.annual_spend) || 0,\n        need_score: Number(prog.need_score) || 0,\n        eis_fit_score: Number(prog.eis_fit_score) || 0,\n        capability_need: prog.capability_need || '', eis_fit: prog.eis_fit || '' });\n    }\n  }\n}\n\n// Sort by combined priority score\nallPrograms.sort((a, b) => (b.need_score + b.eis_fit_score) - (a.need_score + a.eis_fit_score));\n\nvar top5 = allPrograms.slice(0, 5);\nvar top3Agencies = [...new Set(top5.map(p => p.agency))].slice(0, 3);\nvar topCapabilities = [...new Set(top5.flatMap(p => (p.capability_need || '').split(/[,\\/]/).map(c => c.trim()).filter(c => c.length > 2)))].slice(0, 4);\n\nvar agencyStr = top3Agencies.length > 0 ? top3Agencies.join(' ') : 'SOCOM TRADOC PEO STRI';\nvar capStr = topCapabilities.length > 0 ? topCapabilities.join(' ') : 'training simulation XR digital readiness';\n\n// Build dynamic queries scoped to GDA market\nvar dynamicQuery1 = '(' + agencyStr + ') ' + capStr + ' contract award budget 2026 DOGE defense spending';\nvar dynamicQuery2 = 'INDOPACOM \"first island chain\" defense logistics training simulation contract technology 2026';\nvar dynamicQuery3 = '\"Envision Innovative Solutions\" OR \"PD Systems\" OR \"Riverstone\" defense contract training simulation XR digital readiness 2026';\n\nvar totalSpend = top5.reduce((sum, p) => sum + p.annual_spend, 0);\n\nvar dashboardSummary = {\n  top_agencies: top3Agencies,\n  top_programs: top5.map(p => ({\n    agency: p.agency, command: p.command, program: p.program,\n    annual_spend_usd: p.annual_spend,\n    annual_spend_fmt: p.annual_spend >= 1e9 ? '$' + (p.annual_spend/1e9).toFixed(1) + 'B'\n                     : p.annual_spend >= 1e6 ? '$' + (p.annual_spend/1e6).toFixed(0) + 'M' : '$' + p.annual_spend,\n    need_score: p.need_score, eis_fit_score: p.eis_fit_score,\n    capability: p.capability_need\n  })),\n  total_addressable_spend_usd: totalSpend,\n  total_addressable_spend_fmt: totalSpend >= 1e9 ? '$' + (totalSpend/1e9).toFixed(1) + 'B'\n                               : '$' + (totalSpend/1e6).toFixed(0) + 'M'\n};\n\nreturn [{\n  json: {\n    ...dashData,\n    extracted_targets: dashboardSummary,\n    tavily_query_1: dynamicQuery1,\n    tavily_query_2: dynamicQuery2,\n    tavily_query_3: dynamicQuery3\n  }\n}];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6c1db1e5-6763-470e-950f-6fee193a0f3e",
+      "name": "Extract Intel Findings",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3568,
+        336
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.first()?.json || {};\nconst s = input.sitrep || {};\nconst now = new Date().toISOString();\nconst findings = [];\n\nfunction cleanFinding(text) {\n  if (!text) return null;\n  var t = String(text);\n  t = t.replace(/\\|\\s*[Ss]ource:[^|\\n]*/g, '');\n  t = t.replace(/<[^>]+>/g, ' ');\n  t = t.replace(/[\\u0080-\\uFFFF]/g, '');\n  t = t.replace(/[\"'\\\\]/g, '');\n  t = t.replace(/\\s+/g, ' ').trim();\n  var dot = t.search(/[.!?]/);\n  if (dot > 20 && dot < 180) t = t.substring(0, dot + 1);\n  else t = t.substring(0, 180);\n  return t.trim() || null;\n}\n\nvar blufItems = Array.isArray(s.bluf) ? s.bluf : typeof s.bluf === 'string' ? [s.bluf] : [];\nblufItems.slice(0, 3).forEach(function(b) {\n  var f = cleanFinding(b);\n  if (f) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'SOCOM/TRADOC', finding: f, category: 'intelligence', priority: 'HIGH' });\n});\n\nvar synthesis = cleanFinding(s.strategic_synthesis);\nif (synthesis) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: synthesis, category: 'intelligence', priority: 'HIGH' });\n\n(s.threat_opportunity_matrix || []).slice(0, 3).forEach(function(row) {\n  var f = cleanFinding((row.event || '') + ' - ' + (row.action || ''));\n  if (f) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: f, category: row.type === 'Opportunity' ? 'opportunity' : 'threat', priority: row.impact === 'High' ? 'HIGH' : 'MED' });\n});\n\nvar incThreat = cleanFinding(s.defensive_watch && s.defensive_watch.incumbency_threat);\nif (incThreat) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: incThreat, category: 'threat', priority: 'HIGH' });\n\n(s.recommendations || []).slice(0, 2).forEach(function(r) {\n  var text = typeof r === 'string' ? r : ((r.action || '') + (r.deadline ? ' by ' + r.deadline : ''));\n  var f = cleanFinding(text);\n  if (f) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: f, category: 'intelligence', priority: 'MED' });\n});\n\nif (findings.length === 0) {\n  findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: 'SITREP generated successfully', category: 'intelligence', priority: 'MED' });\n}\n\nreturn findings.map(function(f) { return { json: f }; });\n"
+      },
+      "typeVersion": 2,
+      "continueOnFail": true
+    },
+    {
+      "id": "6afdefa0-0f9c-454f-94db-fb22f21d617a",
+      "name": "Save to Intelligence Log",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        3792,
+        336
+      ],
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gda_intelligence_log",
+          "__regex": false
+        },
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "__regex": false
+        },
+        "columns": {
+          "value": {
+            "id": 0,
+            "agency": "={{ $json.agency }}",
+            "source": "={{ $json.source }}",
+            "finding": "={{ $json.finding }}",
+            "category": "={{ $json.category }}",
+            "priority": "={{ $json.priority }}",
+            "timestamp": "={{ $json.timestamp }}"
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "number",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "type": "dateTime",
+              "display": true,
+              "required": false,
+              "displayName": "timestamp",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "type": "string",
+              "display": true,
+              "required": true,
+              "displayName": "source",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "agency",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "agency",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "finding",
+              "type": "string",
+              "display": true,
+              "required": true,
+              "displayName": "finding",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "category",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "priority",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "priority",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "type": "dateTime",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "created_at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.5,
+      "continueOnFail": true
+    },
+    {
+      "id": "abd739f1-6bef-4f8a-830e-d0bb4c9f2745",
+      "name": "Extract Opportunity Alerts",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4016,
+        336
+      ],
+      "parameters": {
+        "jsCode": "\nconst sitrep = $input.first()?.json || {};\nconst output = sitrep.full_output || sitrep;\nconst htmlBody = (sitrep.html_body || output.html_body || '').replace(/<[^>]+>/g, ' ');\nconst sections = output.sections || output.section_list || [];\nconst alerts = [];\nconst now = new Date().toISOString();\nconst expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();\nconst today = now.substring(0, 10);\n\nconst recompeteSignals = ['recompete', 'upcoming solicitation', 'sources sought', 'rfp expected', 'pre-solicitation', 'award expected', 'expiring contract'];\nconst fullText = (htmlBody + ' ' + JSON.stringify(sections)).toLowerCase();\nconst seen = new Set();\n\nrecompeteSignals.forEach(signal => {\n  const idx = fullText.indexOf(signal);\n  if (idx >= 0) {\n    const snippet = fullText.substring(Math.max(0, idx - 50), Math.min(fullText.length, idx + 200));\n    const agencyMatch = snippet.match(/\\b(SOCOM|TRADOC|PEO STRI|AFC|INSCOM|CYBERCOM|DIA|NSA)\\b/i);\n    const agency = agencyMatch ? agencyMatch[0].toUpperCase() : 'General';\n    const title = signal.charAt(0).toUpperCase() + signal.slice(1) + ' Signal Detected';\n    const dedupeKey = today + '|' + title + '|' + agency;\n    if (!seen.has(dedupeKey)) {\n      seen.add(dedupeKey);\n      alerts.push({\n        timestamp: now,\n        title: title,\n        agency: agency,\n        urgency: ['rfp expected', 'sources sought', 'recompete'].includes(signal) ? 'HIGH' : 'MED',\n        detail: snippet.replace(/\\s+/g, ' ').trim().substring(0, 400),\n        source_url: null,\n        expires_at: expiry\n      });\n    }\n  }\n});\n\nreturn alerts.length > 0 ? alerts.map(a => ({ json: a })) : [];\n"
+      },
+      "typeVersion": 2,
+      "continueOnFail": true
+    },
+    {
+      "id": "9b668f7e-0bc8-4540-951e-e484614aef59",
+      "name": "Save Opportunity Alerts",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        4240,
+        336
+      ],
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gda_opportunity_alerts",
+          "__regex": false
+        },
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public",
+          "__regex": false
+        },
+        "columns": {
+          "value": {
+            "id": 0,
+            "title": "={{ $json.title }}",
+            "agency": "={{ $json.agency }}",
+            "detail": "={{ $json.detail }}",
+            "urgency": "={{ $json.urgency }}",
+            "timestamp": "={{ $json.timestamp }}",
+            "expires_at": "={{ $json.expires_at }}",
+            "source_url": "={{ $json.source_url }}"
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "number",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "type": "dateTime",
+              "display": true,
+              "required": false,
+              "displayName": "timestamp",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "required": true,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "agency",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "agency",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "urgency",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "detail",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "detail",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source_url",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "source_url",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "expires_at",
+              "type": "dateTime",
+              "display": true,
+              "required": false,
+              "displayName": "expires_at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "type": "dateTime",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "created_at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.5,
+      "continueOnFail": true
+    },
+    {
+      "id": "9e633d09-ff60-4091-a97d-215d66600283",
+      "name": "Health Check Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        128,
+        -320
+      ],
+      "webhookId": "17860ae8-dfef-4419-bb32-eb2211805c69",
+      "parameters": {
+        "path": "17860ae8-dfef-4419-bb32-eb2211805c69",
+        "options": {},
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "8d92958c-2857-40f8-83ea-34ac99ec8b15",
+      "name": "Health Check Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        352,
+        -320
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"ok\",\"module\":\"daily-sitrep\"}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "53aa4dda-e467-4736-b4f9-4a5945545168",
+      "name": "Push SITREP Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        4464,
+        336
+      ],
+      "parameters": {
+        "url": "https://n8n.csr-llc.tech/webhook/gda-action-items",
+        "body": "={{ (() => { const alerts = $('Extract Opportunity Alerts').all().map(i => i.json).filter(i => i && i.title); const count = alerts.length; const topAlerts = alerts.slice(0,3).map(a => (a.urgency || 'INFO') + ': ' + (a.title || 'Alert')).join(' | '); const today = new Date().toISOString().split('T')[0]; return JSON.stringify({ action: 'create', item: '[SITREP ' + today + '] ' + count + ' new alerts. ' + (topAlerts || 'Review daily SITREP'), owner: 'Shawn', status: 'Open', source_meeting: 'Daily SITREP - ' + today }); })() }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "raw",
+        "sendHeaders": true,
+        "rawContentType": "application/json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-GDA-Key",
+              "value": "={{ $env.GDA_API_KEY_2026 }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "id": "857fbecb-3997-427c-8049-b10a4fcc0905",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        352,
+        -48
+      ],
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (auth !== $env.GDA_DEPLOY_KEY_2026 && auth !== $env.GDA_API_KEY_2026 && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "78f8e1d8-2015-4ad7-9f73-ac3cc2cb28f1",
+      "name": "Route Latest",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        576,
+        -48
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "route-latest-check",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "latest"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a7bf53d0-3173-40b5-9c96-25a0a68b4d3c",
+      "name": "Read Latest SITREP",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        800,
+        -96
+      ],
+      "parameters": {
+        "query": "SELECT briefing_json, created_at FROM gda_daily_briefings ORDER BY created_at DESC LIMIT 1",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.5,
+      "continueOnFail": true
+    },
+    {
+      "id": "786a6fb5-680a-4ae6-82d2-ed7dafb0e035",
+      "name": "Format Latest",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1024,
+        -96
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst row = items && items[0] && items[0].json;\nif (!row || !row.briefing_json) {\n  return [{ json: { status: 'no_cache', sitrep: null, message: 'SITREP not yet generated. Check back after 07:00 EST scheduled run.' } }];\n}\nconst data = typeof row.briefing_json === 'object' ? row.briefing_json : JSON.parse(row.briefing_json || '{}');\nreturn [{ json: Object.assign({}, data, { cached: true, cache_date: row.created_at }) }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ff20e730-f840-4347-a186-2ef175614715",
+      "name": "Latest Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1248,
+        -96
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "fa791b6a-8aec-4b0d-af25-62540199a20e",
+      "name": "Prep Save SITREP",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3568,
+        48
+      ],
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst s = item.sitrep || {};\nconst bluf = Array.isArray(s.bluf) ? s.bluf.join(' ') : (s.bluf || '');\n\n// GUARD: Do not save failed SITREPs\nif (bluf.includes('Raw length: 0') || bluf.includes('no JSON object') || bluf.includes('generation returned no')) {\n  // Return empty to skip the save\n  return [];\n}\n\nconst data = { sitrep: s, html_body: item.html_body || '', generated_at: new Date().toISOString() };\nconst jsonStr = JSON.stringify(data).replace(/'/g, \"''\");\nreturn [{ json: { insert_query: `INSERT INTO gda_daily_briefings (briefing_date, briefing_json, created_at) VALUES (CURRENT_DATE, '${jsonStr}'::jsonb, NOW())`, original: item } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6fdbee40-af6a-401a-8077-b7a90e3562a9",
+      "name": "Save SITREP PG",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        3792,
+        48
+      ],
+      "parameters": {
+        "query": "={{ $json.insert_query }}",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.5,
+      "continueOnFail": true
+    },
+    {
+      "id": "qps-postgres-node-001",
+      "name": "Query Platform State",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        2144,
+        144
+      ],
+      "parameters": {
+        "query": "SELECT json_build_object('opp_total', (SELECT count(*)::int FROM gda_opportunity_tracker), 'total_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker) / 1000000.0), 'proposal_count', (SELECT count(*)::int FROM gda_opportunity_tracker WHERE stage='Proposal'), 'proposal_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker WHERE stage='Proposal') / 1000000.0), 'capture_count', (SELECT count(*)::int FROM gda_opportunity_tracker WHERE stage='Capture'), 'capture_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker WHERE stage='Capture') / 1000000.0), 'qualified_count', (SELECT count(*)::int FROM gda_opportunity_tracker WHERE stage='Qualified'), 'qualified_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker WHERE stage='Qualified') / 1000000.0), 'open_actions', (SELECT count(*)::int FROM gda_action_items WHERE status='Open'), 'overdue_actions', (SELECT count(*)::int FROM gda_action_items WHERE deadline < CURRENT_DATE::text AND status != 'Complete'), 'upcoming_deadlines', (SELECT json_agg(d) FROM (SELECT agency, estimated_value, stage, TO_CHAR(response_deadline, 'YYYY-MM-DD') as deadline, eis_fit_score FROM gda_opportunity_tracker WHERE response_deadline IS NOT NULL AND response_deadline <= NOW() + INTERVAL '14 days' ORDER BY response_deadline ASC LIMIT 5) d), 'open_action_items', (SELECT json_agg(a) FROM (SELECT item, status, deadline, owner FROM gda_action_items WHERE status != 'Complete' ORDER BY deadline ASC LIMIT 5) a), 'top_by_value', (SELECT json_agg(o) FROM (SELECT agency, estimated_value, stage, eis_fit_score FROM gda_opportunity_tracker ORDER BY estimated_value DESC NULLS LAST LIMIT 5) o)) AS platform_data",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "HwronxMmGY5XDGEt",
+          "name": "GDA Postgres"
+        }
+      },
+      "typeVersion": 2.5
+    },
+    {
+      "id": "claude-sitrep-direct",
+      "name": "Claude SITREP Direct",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2752,
+        144
+      ],
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "options": {
+          "timeout": 90000
+        },
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8192, system: 'You are a defense intelligence analyst producing a daily SITREP for Georgetown Defense Analytics. Return ONLY valid JSON matching the requested schema. No markdown fences, no explanatory text.', messages: [{ role: 'user', content: $('Build SITREP Prompt').first().json.prompt || $json.prompt || '' }] }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "extract-sitrep",
+      "name": "Extract SITREP Output",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2976,
+        144
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nlet text = '';\nif (data.content && data.content[0]) text = data.content[0].text || '';\nelse if (data.error) text = JSON.stringify(data.error);\nelse text = JSON.stringify(data);\n\n// Build structured output \u2014 downstream always gets consistent shape\nlet structured = {\n  status: 'ok',\n  generated_at: new Date().toISOString(),\n  executive_summary: '',\n  pipeline_health: { total_opps: 0, pursue_count: 0, pipeline_value: 0, deadlines_14d: 0 },\n  top_threats: [],\n  top_opportunities: [],\n  recommended_actions: [],\n  raw: text\n};\n\ntry {\n  // Try to extract JSON block if Claude returned one\n  const jsonMatch = text.match(/```json([\\s\\S]*?)```/) || text.match(/(\\{[\\s\\S]*\\})/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    structured = Object.assign(structured, parsed);\n  } else {\n    // Plain text \u2014 extract executive summary as first paragraph\n    structured.executive_summary = text.split('\\n\\n')[0].replace(/^#+\\s*/,'').trim().slice(0, 500);\n    // Extract bullet lists as threats/opps/actions heuristically\n    const lines = text.split('\\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('\u2022'));\n    structured.recommended_actions = lines.slice(0, 5).map(l => l.replace(/^[-\u2022]\\s*/,'').trim());\n  }\n} catch(e) {\n  structured.executive_summary = text.slice(0, 500);\n}\n\nreturn [{ json: structured }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "hitl-tg-approve",
+      "name": "HITL Approve SITREP",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        3900,
+        48
+      ],
+      "webhookId": "63a24524-2ab2-417d-9db3-c80bf5722a3b",
+      "parameters": {
+        "text": "=\ud83d\udd34 SITREP APPROVAL REQUIRED\n\n{{ $json.sitrep_summary || $json.summary || 'New SITREP generated' }}\n\nGenerated: {{ new Date().toISOString().split('T')[0] }}",
+        "chatId": "8631035943",
+        "message": "=\ud83d\udd34 SITREP APPROVAL REQUIRED\n\nApprove to distribute or suppress.\n\nGenerated: {{ new Date().toISOString().split('T')[0] }}",
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeUnit": "hours",
+              "resumeAmount": 4
+            }
+          },
+          "appendAttribution": false
+        },
+        "resource": "message",
+        "operation": "sendAndWait",
+        "responseType": "approval",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "\u2705 Approve SITREP",
+            "disapproveLabel": "\u274c Suppress"
+          }
+        },
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "Jr8OOsZqc9DarQE6",
+          "name": "GDA Telegram Bot"
+        }
+      },
+      "typeVersion": 1.2
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Dashboard Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search in Tavily": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Tasks": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI (SITREP)": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Tasks",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAM.gov Opportunities": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Extract Intel Findings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prep Save SITREP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Webhook Triggered": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SITREP Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Claude SITREP Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model (SITREP)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily Fetch 1": {
+      "main": [
+        [
+          {
+            "node": "Tavily Fetch 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily Fetch 2": {
+      "main": [
+        [
+          {
+            "node": "Tavily Fetch 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily Fetch 3": {
+      "main": [
+        [
+          {
+            "node": "SAM.gov Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAM.gov Fetch": {
+      "main": [
+        [
+          {
+            "node": "Query Platform State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Dashboard Intelligence": {
+      "main": [
+        [
+          {
+            "node": "Extract Dashboard Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Dashboard Targets": {
+      "main": [
+        [
+          {
+            "node": "Tavily Fetch 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Intel Findings": {
+      "main": [
+        [
+          {
+            "node": "Save to Intelligence Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Intelligence Log": {
+      "main": [
+        [
+          {
+            "node": "Extract Opportunity Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Opportunity Alerts": {
+      "main": [
+        [
+          {
+            "node": "Save Opportunity Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Check Webhook": {
+      "main": [
+        [
+          {
+            "node": "Health Check Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Opportunity Alerts": {
+      "main": [
+        [
+          {
+            "node": "Push SITREP Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Route Latest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Latest": {
+      "main": [
+        [
+          {
+            "node": "Read Latest SITREP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Dashboard Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Latest SITREP": {
+      "main": [
+        [
+          {
+            "node": "Format Latest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Latest": {
+      "main": [
+        [
+          {
+            "node": "Latest Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Save SITREP": {
+      "main": [
+        [
+          {
+            "node": "Save SITREP PG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Platform State": {
+      "main": [
+        [
+          {
+            "node": "Build SITREP Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude SITREP Direct": {
+      "main": [
+        [
+          {
+            "node": "Extract SITREP Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract SITREP Output": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save SITREP PG": {
+      "main": [
+        [
+          {
+            "node": "HITL Approve SITREP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HITL Approve SITREP": {
+      "main": [
+        [
+          {
+            "node": "IF Webhook Triggered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "all"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "5181bfe2-22ec-4a3e-8e8c-80f12dd85e45",
+  "activeVersionId": "5181bfe2-22ec-4a3e-8e8c-80f12dd85e45",
+  "versionCounter": 345,
+  "triggerCount": 3,
+  "shared": [
+    {
+      "updatedAt": "2026-03-15T04:48:37.998Z",
+      "createdAt": "2026-03-15T04:48:37.998Z",
+      "role": "workflow:owner",
+      "workflowId": "G9US1e01oY1cgJIF",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T22:55:08.045Z",
+    "createdAt": "2026-05-26T22:55:08.045Z",
+    "versionId": "5181bfe2-22ec-4a3e-8e8c-80f12dd85e45",
+    "workflowId": "G9US1e01oY1cgJIF",
+    "nodes": [
+      {
+        "id": "33f34e61-2687-4051-9289-db709108020d",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [
+          576,
+          192
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 7
+              }
+            ]
+          }
+        },
+        "typeVersion": 1.3
+      },
+      {
+        "id": "f6a19e9f-4f41-4e0d-8f86-f652c164f4bf",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          128,
+          -48
+        ],
+        "webhookId": "76d75678-6457-4adc-aad3-a6910c2838aa",
+        "parameters": {
+          "path": "gda-daily-sitrep",
+          "options": {
+            "allowedOrigins": "*"
+          },
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2.1
+      },
+      {
+        "id": "c4f33508-f1ac-4ec1-a230-f78496896f7d",
+        "name": "AI Agent",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "disabled": true,
+        "position": [
+          2752,
+          144
+        ],
+        "parameters": {
+          "text": "={{ $('Build SITREP Prompt').item.json.prompt }}",
+          "options": {
+            "systemMessage": "Act as the Chief Strategy Officer (CSO) for Georgetown Defense Analytics (GDA). All external data (Tavily news, SAM.gov opportunities, dashboard intelligence) has been PRE-FETCHED and is already in the user prompt. DO NOT use the Tavily or SAM.gov tools \u2014 that data is already provided. Your ONLY tool to use is Pinecone Tasks (call it once for company tasks context). After getting Pinecone results, immediately output the complete SITREP JSON. Portfolio: Envision (Training/XR, OU-03), PD Systems (Logistics/C5ISR, OU-01), Riverstone (Cyber/Intel, OU-02). Targets: SOCOM, TRADOC, Fort Bragg/Fort Liberty, USASOC, $100M FY26 run rate. Tone: direct, stoic, no hedging. Return ONLY valid JSON."
+          },
+          "promptType": "define"
+        },
+        "typeVersion": 3.1
+      },
+      {
+        "id": "66ed0614-c548-4737-aef6-d5f260850d97",
+        "name": "Search in Tavily",
+        "type": "@tavily/n8n-nodes-tavily.tavilyTool",
+        "disabled": true,
+        "position": [
+          2720,
+          368
+        ],
+        "parameters": {
+          "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Query', ``, 'string') }}",
+          "options": {
+            "max_results": 10,
+            "search_depth": "basic"
+          }
+        },
+        "credentials": {
+          "tavilyApi": {
+            "id": "M6lh2vbM59NsCJ0A",
+            "name": "Tavily account"
+          }
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "91373124-4f9b-49cd-8c34-71ec8119736c",
+        "name": "Pinecone Tasks",
+        "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+        "disabled": true,
+        "position": [
+          2848,
+          368
+        ],
+        "parameters": {
+          "mode": "retrieve-as-tool",
+          "topK": 5,
+          "options": {},
+          "pineconeIndex": {
+            "__rl": true,
+            "mode": "list",
+            "value": "ai-assistant",
+            "cachedResultName": "ai-assistant"
+          },
+          "toolDescription": "Search Envision's knowledge base for current tasks, active projects, strategic priorities, and company context. Use this to retrieve what Shawn is working on."
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "wRjQmgKElTHbBf5J",
+            "name": "PineconeApi account 2"
+          }
+        },
+        "typeVersion": 1.3
+      },
+      {
+        "id": "1e2c2e19-594f-4924-8d6f-3d8f02e9aba1",
+        "name": "Embeddings OpenAI (SITREP)",
+        "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+        "disabled": true,
+        "position": [
+          2928,
+          576
+        ],
+        "parameters": {
+          "model": "text-embedding-ada-002",
+          "options": {}
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "unLYjAN4H9MFrJ0u",
+            "name": "OpenAi account"
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "85cd4745-2943-4151-8fe1-c50e9f5516e4",
+        "name": "SAM.gov Opportunities",
+        "type": "n8n-nodes-base.httpRequestTool",
+        "onError": "continueRegularOutput",
+        "disabled": true,
+        "position": [
+          3136,
+          368
+        ],
+        "parameters": {
+          "url": "https://api.sam.gov/opportunities/v2/search",
+          "options": {},
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "api_key",
+                "value": "={{ $env.GDA_SAM_API_KEY }}"
+              },
+              {
+                "name": "postedFrom",
+                "value": "={{ $now.minus({days: 7}).format('MM/dd/yyyy') }}"
+              },
+              {
+                "name": "postedTo",
+                "value": "={{ $now.format('MM/dd/yyyy') }}"
+              },
+              {
+                "name": "limit",
+                "value": "10"
+              },
+              {
+                "name": "keyword",
+                "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('keyword', 'Search keyword for SAM.gov opportunities', 'string') }}"
+              }
+            ]
+          },
+          "toolDescription": "Search SAM.gov for live federal contract opportunities. If the request fails or is throttled, return an empty result and continue. Returns JSON with opportunitiesData array."
+        },
+        "typeVersion": 4.4,
+        "continueOnFail": true
+      },
+      {
+        "id": "b41e264c-2793-430a-a928-b643bfe67caa",
+        "name": "Code in JavaScript",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          3344,
+          144
+        ],
+        "parameters": {
+          "jsCode": "var item = $input.first().json;\nvar data = item.output || '';\n\n// Step 1: Extract JSON from ```json...``` code blocks or raw text\nvar jsonStr;\nvar fenceMatch = data.match(/```(?:json)?\\s*\\n?([\\s\\S]*?)\\n?\\s*```/);\nif (fenceMatch) {\n  jsonStr = fenceMatch[1].trim();\n} else {\n  var start = data.indexOf('{');\n  var end = data.lastIndexOf('}');\n  if (start >= 0 && end > start) {\n    jsonStr = data.substring(start, end + 1);\n  } else {\n    jsonStr = data;\n  }\n}\n\n// Step 2: Clean common LLM JSON issues\njsonStr = jsonStr\n  .replace(/\\]\\s*\\],/g, '],')   // duplicate ] before ,\n  .replace(/\\}\\s*\\},/g, '},')   // duplicate } before ,\n  .replace(/\\]\\s*\\]\\s*\\}/g, ']}') // duplicate ] before }\n  .replace(/,\\s*\\]/g, ']')       // trailing comma before ]\n  .replace(/,\\s*\\}/g, '}');      // trailing comma before }\n\n// Step 3: Parse with fallback\nvar parsed;\ntry {\n  parsed = JSON.parse(jsonStr);\n} catch(e1) {\n  // Try extracting just the outermost { to }\n  var s2 = jsonStr.indexOf('{');\n  var e2 = jsonStr.lastIndexOf('}');\n  if (s2 >= 0 && e2 > s2) {\n    try {\n      parsed = JSON.parse(jsonStr.substring(s2, e2 + 1));\n    } catch(e3) {\n      parsed = { sitrep: {\n        generated_at: new Date().toISOString(),\n        bluf: ['SITREP generation produced invalid JSON. Error: ' + e1.message + '. Raw length: ' + data.length + ' chars.'],\n        strategic_landscape: {doge_watch:'Unavailable - JSON parse error',indopacom:'Unavailable - JSON parse error'},\n        defensive_watch: {incumbency_threat:'Unavailable',market_pressure:'Unavailable'},\n        strategic_synthesis: 'Re-run SITREP to regenerate.',\n        threat_opportunity_matrix: [],\n        recommendations: [{action:'Re-run Daily SITREP',owner:'System',deadline:'Today',why:'Previous generation produced malformed JSON'}],\n        red_team: [],\n        command_control: {title:'SITREP Parse Error',takeaway:'Re-run required',source:''},\n        sam_gov_opportunities: [],\n        top_news: []\n      }};\n    }\n  } else {\n    parsed = { sitrep: {\n      generated_at: new Date().toISOString(),\n      bluf: ['SITREP generation returned no JSON object. Raw length: ' + data.length],\n      strategic_landscape: {doge_watch:'Unavailable',indopacom:'Unavailable'},\n      defensive_watch: {incumbency_threat:'Unavailable',market_pressure:'Unavailable'},\n      strategic_synthesis: 'Re-run SITREP.',\n      threat_opportunity_matrix: [],\n      recommendations: [],\n      red_team: [],\n      command_control: {title:'Error',takeaway:'Re-run',source:''},\n      sam_gov_opportunities: [],\n      top_news: []\n    }};\n  }\n}\nvar s = parsed.sitrep || parsed;\n\nvar today = new Date().toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'});\n\nfunction renderWithSource(text) {\n  if (!text) return 'Data Unavailable';\n  var srcIdx = text.indexOf('| Source:');\n  if (srcIdx === -1) srcIdx = text.indexOf('| source:');\n  if (srcIdx !== -1) {\n    var body = text.substring(0, srcIdx).trim();\n    var url = text.substring(srcIdx + 9).trim().split(' ')[0];\n    return body + ' <a href=\"' + url + '\" style=\"color:#1a3c6e;font-size:12px;\" target=\"_blank\">[Source]</a>';\n  }\n  return text;\n}\n\nvar html = '<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;font-size:15px;max-width:750px;margin:auto;padding:24px;color:#1a1a1a;\">';\n\nhtml += '<div style=\"background:#1a3c6e;color:#fff;padding:20px;border-radius:6px;margin-bottom:20px;\">';\nhtml += '<h1 style=\"margin:0;font-size:22px;letter-spacing:1px;\">GDA EXECUTIVE SITREP</h1>';\nhtml += '<p style=\"margin:6px 0 0;font-size:13px;opacity:0.85;\">Shawn M. Seffernick, President \u2014 Envision Innovative Solutions | ' + today + '</p>';\nhtml += '</div>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">BLUF \u2014 Bottom Line Up Front</h2>';\nhtml += '<ul style=\"padding-left:20px;\">';\nvar blufItems = Array.isArray(s.bluf) ? s.bluf : (typeof s.bluf === 'string' ? [s.bluf] : []);\nblufItems.forEach(function(b) {\n  html += '<li style=\"margin-bottom:10px;\">' + renderWithSource(b) + '</li>';\n});\nhtml += '</ul>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">The 2026 Strategic Landscape</h2>';\nhtml += '<p><strong>DOGE &amp; Budget Watch:</strong> ' + renderWithSource((s.strategic_landscape && s.strategic_landscape.doge_watch) || 'Data Unavailable') + '</p>';\nhtml += '<p><strong>INDOPACOM &amp; Global Posture:</strong> ' + renderWithSource((s.strategic_landscape && s.strategic_landscape.indopacom) || 'Data Unavailable') + '</p>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Defensive Portfolio Watch</h2>';\nhtml += '<p><strong>Incumbency Threat:</strong> ' + renderWithSource((s.defensive_watch && s.defensive_watch.incumbency_threat) || 'Data Unavailable') + '</p>';\nhtml += '<p><strong>Market Pressure:</strong> ' + renderWithSource((s.defensive_watch && s.defensive_watch.market_pressure) || 'Data Unavailable') + '</p>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Strategic Synthesis \u2014 The \\\"So What?\\\"</h2>';\nhtml += '<p>' + renderWithSource(s.strategic_synthesis || 'Data Unavailable') + '</p>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Threat &amp; Opportunity Matrix</h2>';\nhtml += '<table style=\"width:100%;border-collapse:collapse;font-size:13px;\">';\nhtml += '<tr style=\"background:#1a3c6e;color:#fff;\"><th style=\"padding:8px;text-align:left;\">Type</th><th style=\"padding:8px;text-align:left;\">Event</th><th style=\"padding:8px;text-align:left;\">Impact</th><th style=\"padding:8px;text-align:left;\">Action</th></tr>';\n(s.threat_opportunity_matrix || []).forEach(function(row, i) {\n  var bg = i % 2 === 0 ? '#f5f5f5' : '#ffffff';\n  html += '<tr style=\"background:' + bg + ';\">';\n  html += '<td style=\"padding:8px;font-weight:bold;white-space:nowrap;\">' + (row.type || '') + '</td>';\n  html += '<td style=\"padding:8px;\">' + (row.event || '') + '</td>';\n  html += '<td style=\"padding:8px;\">' + (row.impact || '') + '</td>';\n  html += '<td style=\"padding:8px;\">' + (row.action || '') + '</td>';\n  html += '</tr>';\n});\nhtml += '</table>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Actionable Recommendations</h2>';\nhtml += '<ol style=\"padding-left:20px;\">';\n(s.recommendations || []).forEach(function(r) {\n  if (typeof r === 'string') {\n    html += '<li style=\"margin-bottom:8px;\">' + r + '</li>';\n  } else if (typeof r === 'object' && r !== null) {\n    html += '<li style=\"margin-bottom:10px;\">';\n    html += '<strong>' + (r.action || '') + '</strong>';\n    if (r.owner) html += ' <span style=\"color:#666;font-size:13px;\">\u2014 ' + r.owner + '</span>';\n    if (r.deadline) html += ' <span style=\"background:#e8f0fe;color:#1a3c6e;padding:1px 6px;border-radius:3px;font-size:12px;\">' + r.deadline + '</span>';\n    if (r.why) html += '<br><span style=\"font-size:13px;color:#444;\">' + r.why + '</span>';\n    html += '</li>';\n  }\n});\nhtml += '</ol>';\n\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Red Team Analysis</h2>';\n(s.red_team || []).forEach(function(rt, i) {\n  html += '<div style=\"background:#fff8f0;border-left:4px solid #c0392b;padding:10px;margin-bottom:10px;\">';\n  html += '<p style=\"margin:0;\"><strong>Risk ' + (i+1) + ':</strong> ' + (rt.risk || '') + '</p>';\n  html += '<p style=\"margin:4px 0 0;color:#666;\"><em>Mitigation:</em> ' + (rt.mitigation || '') + '</p>';\n  html += '</div>';\n});\n\nif (s.sam_gov_opportunities && s.sam_gov_opportunities.length > 0 && !s.sam_gov_opportunities[0].note) {\n  html += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">SAM.gov Live Opportunities</h2>';\n  html += '<table style=\"width:100%;border-collapse:collapse;font-size:13px;\">';\n  html += '<tr style=\"background:#1a3c6e;color:#fff;\"><th style=\"padding:8px;text-align:left;\">Title</th><th style=\"padding:8px;\">Agency</th><th style=\"padding:8px;\">NAICS</th><th style=\"padding:8px;\">Deadline</th></tr>';\n  s.sam_gov_opportunities.forEach(function(opp, i) {\n    var bg = i % 2 === 0 ? '#f5f5f5' : '#ffffff';\n    html += '<tr style=\"background:' + bg + ';\">';\n    html += '<td style=\"padding:8px;\">' + (opp.title || '') + '</td>';\n    html += '<td style=\"padding:8px;\">' + (opp.agency || '') + '</td>';\n    html += '<td style=\"padding:8px;\">' + (opp.naics || '') + '</td>';\n    html += '<td style=\"padding:8px;\">' + (opp.deadline || 'TBD') + '</td>';\n    html += '</tr>';\n  });\n  html += '</table>';\n}\n\nif (s.top_news && s.top_news.length > 0) {\n  html += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;margin-top:24px;\">Top News</h2>';\n  html += '<div style=\"display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:20px;\">';\n  s.top_news.slice(0,6).forEach(function(news) {\n    if (typeof news !== 'object' || !news.title) return;\n    html += '<div style=\"border:1px solid #ddd;border-radius:6px;overflow:hidden;background:#fff;\">';\n    if (news.image_url && news.image_url !== 'null') {\n      html += '<img src=\"' + news.image_url + '\" style=\"width:100%;height:120px;object-fit:cover;\" onerror=\"this.style.display=\\'none\\'\">';\n    }\n    html += '<div style=\"padding:10px;\">';\n    html += '<p style=\"margin:0;font-weight:bold;font-size:13px;\"><a href=\"' + (news.url||'#') + '\" style=\"color:#1a3c6e;text-decoration:none;\" target=\"_blank\">' + (news.title||'') + '</a></p>';\n    if (news.summary) html += '<p style=\"margin:6px 0 0;font-size:12px;color:#555;\">' + news.summary + '</p>';\n    html += '</div></div>';\n  });\n  html += '</div>';\n}\n\nvar cc = s.command_control || {};\nhtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:4px;\">Command &amp; Control \u2014 Professional Development</h2>';\nhtml += '<div style=\"background:#f0f4ff;border-left:4px solid #1a3c6e;padding:12px;\">';\nhtml += '<p style=\"margin:0;\"><strong>' + (cc.title || 'Data Unavailable') + '</strong></p>';\nif (cc.takeaway) html += '<p style=\"margin:6px 0 0;\">' + cc.takeaway + '</p>';\nif (cc.source) html += '<p style=\"margin:4px 0 0;font-size:13px;\"><a href=\"' + cc.source + '\" style=\"color:#1a3c6e;\" target=\"_blank\">' + cc.source + '</a></p>';\nhtml += '</div>';\n\nhtml += '<hr style=\"margin-top:30px;border:none;border-top:1px solid #ddd;\"/>';\nhtml += '<p style=\"font-size:12px;color:#999;text-align:center;\">GDA Intelligence | Generated by Envision AI Platform | ' + today + '</p>';\nhtml += '</body></html>';\n\nreturn [{ json: { html_body: html, sitrep: s, full_output: parsed } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "94321e38-5ebc-4a73-8d6b-f02e49130c99",
+        "name": "IF Webhook Triggered",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          4016,
+          48
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "cond-webhook-check",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                },
+                "leftValue": "={{ $('Webhook').isExecuted }}",
+                "rightValue": true
+              }
+            ]
+          },
+          "looseTypeValidation": true
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "c0f6bb75-3929-4b11-9bc0-df8f690a1374",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          4240,
+          -48
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($('Code in JavaScript').item.json) }}"
+        },
+        "typeVersion": 1.5
+      },
+      {
+        "id": "6058dfc6-384c-4f41-b6db-274d31093623",
+        "name": "Send an Email",
+        "type": "n8n-nodes-base.emailSend",
+        "disabled": true,
+        "position": [
+          4240,
+          144
+        ],
+        "webhookId": "69bdb9fc-bdc2-4da1-b655-7522714167f5",
+        "parameters": {
+          "html": "={{ $json.html_body }}",
+          "options": {},
+          "subject": "=GDA Executive SITREP \u2014 {{ $now.format('MMMM D, YYYY') }}",
+          "toEmail": "shawn.seffernick@envision-is.com",
+          "fromEmail": "shawn.seffernick175@gmail.com"
+        },
+        "credentials": {
+          "smtp": {
+            "id": "Vum8hlqyqjpqds7y",
+            "name": "SMTP account"
+          }
+        },
+        "typeVersion": 2.1
+      },
+      {
+        "id": "fb248a29-e4ea-4a25-a6ef-bc0aa72d3592",
+        "name": "Get Dashboard Intelligence",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          800,
+          144
+        ],
+        "parameters": {
+          "url": "https://n8n.csr-llc.tech/webhook/gda-dashboard",
+          "method": "POST",
+          "options": {
+            "timeout": 300000
+          },
+          "sendBody": true,
+          "sendHeaders": true,
+          "bodyParameters": {
+            "parameters": [
+              {}
+            ]
+          },
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-GDA-Key",
+                "value": "={{ $env.GDA_API_KEY_2026 }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "id": "2a94cc1c-7463-4ac2-919a-277c16fe7ac3",
+        "name": "Build SITREP Prompt",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2368,
+          144
+        ],
+        "parameters": {
+          "jsCode": "var dash = {};\nvar extracted = {};\nvar t1 = {}, t2 = {}, t3 = {}, sam = {};\nvar platformData = {};\n\ntry { dash = $('Get Dashboard Intelligence').first().json; } catch(e) {}\ntry { extracted = $('Extract Dashboard Targets').first().json.extracted_targets || {}; } catch(e) {}\ntry { t1 = $('Tavily Fetch 1').first().json; } catch(e) {}\ntry { t2 = $('Tavily Fetch 2').first().json; } catch(e) {}\ntry { t3 = $('Tavily Fetch 3').first().json; } catch(e) {}\ntry { sam = $('SAM.gov Fetch').first().json; } catch(e) {}\ntry {\n  var pgRow = $('Query Platform State').first().json;\n  platformData = pgRow.platform_data || pgRow;\n  if (typeof platformData === 'string') platformData = JSON.parse(platformData);\n} catch(e) { platformData = {}; }\n\nfunction fmtTavily(t, label) {\n  var results = Array.isArray(t.results) ? t.results : [];\n  if (results.length === 0) return label + ': No results\\n';\n  return label + ':\\n' + results.slice(0,8).map(function(r) {\n    return '- ' + r.title + ' | ' + (r.content||'').slice(0,200) + ' [' + (r.url||'') + ']';\n  }).join('\\n') + '\\n';\n}\n\nvar samOpps = [];\ntry {\n  var items = sam.opportunitiesData || sam.data || [];\n  samOpps = items.slice(0,5).map(function(o) {\n    return {title: o.title, agency: o.fullParentPathName||o.organizationCode, naics: (o.naicsCode||[]).join(','), sol: o.solicitationNumber, posted: o.postedDate, deadline: o.responseDeadLine};\n  });\n} catch(e) {}\n\n// Build live platform state section from Postgres\nvar platformSection = '';\nif (platformData && platformData.opp_total !== undefined) {\n  var deadlines = platformData.upcoming_deadlines || [];\n  var actionItems = platformData.open_action_items || [];\n  var topByValue = platformData.top_by_value || [];\n  platformSection = '=== LIVE EIS GDA PLATFORM STATE (Postgres, real-time) ===\\n';\n  platformSection += 'PIPELINE: ' + platformData.opp_total + ' active opportunities | Total: $' + platformData.total_value_m + 'M\\n';\n  platformSection += 'STAGES: Proposal=' + platformData.proposal_count + ' ($' + platformData.proposal_value_m + 'M) | Capture=' + platformData.capture_count + ' ($' + platformData.capture_value_m + 'M) | Qualified=' + platformData.qualified_count + ' ($' + platformData.qualified_value_m + 'M)\\n';\n  if (deadlines && deadlines.length > 0) {\n    platformSection += 'URGENT DEADLINES (next 14 days):\\n';\n    deadlines.forEach(function(d) { platformSection += '  - ' + d.agency + ' | $' + Math.round((d.estimated_value||0)/1e6) + 'M | ' + d.stage + ' | Due: ' + d.deadline + ' | Fit: ' + d.eis_fit_score + '/100\\n'; });\n  }\n  platformSection += 'ACTIONS: ' + platformData.open_actions + ' open, ' + platformData.overdue_actions + ' OVERDUE\\n';\n  if (actionItems && actionItems.length > 0) {\n    actionItems.slice(0,5).forEach(function(a) { platformSection += '  - [' + a.status + '] ' + a.item + ' (Due: ' + (a.deadline||'TBD') + ')\\n'; });\n  }\n  if (topByValue && topByValue.length > 0) {\n    platformSection += 'TOP OPPS BY VALUE:\\n';\n    topByValue.slice(0,5).forEach(function(o) { platformSection += '  - ' + o.agency + ' | $' + Math.round((o.estimated_value||0)/1e6) + 'M | ' + o.stage + '\\n'; });\n  }\n  platformSection += '=== END PLATFORM STATE ===\\n\\n';\n}\n\nvar liveTargets = Array.isArray(extracted.top_programs) ? extracted.top_programs : [];\nvar dashSummaryText = liveTargets.length > 0\n  ? 'LIVE TARGETS:\\n' + liveTargets.slice(0,5).map(function(p){return '- ' + p.agency + ' - ' + p.program + ': ' + (p.annual_spend_fmt||'N/A') + '/yr';}).join('\\n') + '\\n\\n'\n  : 'DASHBOARD: Unavailable\\n\\n';\n\nvar tavilySection = fmtTavily(t1,'INTEL-DOGE/Agencies') + fmtTavily(t2,'INTEL-INDOPACOM') + fmtTavily(t3,'INTEL-EIS/GDA');\nvar samSection = samOpps.length > 0 ? 'SAM.GOV:\\n' + JSON.stringify(samOpps) + '\\n\\n' : 'SAM.GOV: No results\\n\\n';\n\nvar oppTotal = platformData.opp_total || 0;\nvar totalValueM = platformData.total_value_m || 0;\nvar proposalCount = platformData.proposal_count || 0;\nvar captureCount = platformData.capture_count || 0;\nvar qualifiedCount = platformData.qualified_count || 0;\nvar openActions = platformData.open_actions || 0;\nvar overdueActions = platformData.overdue_actions || 0;\n\nvar topAgenciesJson = JSON.stringify(extracted.top_agencies || []);\nvar totalSpendFmt = extracted.total_addressable_spend_fmt || 'N/A';\nvar top3ProgsJson = JSON.stringify(liveTargets.slice(0,3).map(function(p){return {agency:p.agency,program:p.program,spend:p.annual_spend_fmt};}));\nvar samOppsJson = JSON.stringify(samOpps.length > 0 ? samOpps : [{note:'no SAM results'}]);\n\nvar prompt = platformSection + dashSummaryText + tavilySection + samSection +\n  'TASK: You are the GDA Command daily intelligence briefer for Shawn Seffernick, President of EIS. FY26 target: $100M.\\n\\nBased on ALL data above, generate this EXACT JSON structure:\\n\\n{\\n  \"sitrep\": {\\n    \"generated_at\": \"[ISO datetime]\",\\n    \"bluf\": [\"[Finding 1 \u2014 MUST use numbers from LIVE PLATFORM STATE: cite opp count, dollar amounts, stage]\", \"[Finding 2 \u2014 market intel with source URL]\", \"[Finding 3 \u2014 competitive threat with source URL]\"],\\n    \"pipeline_status\": {\"total_opps\": ' + oppTotal + ', \"total_value_m\": ' + totalValueM + ', \"proposal_count\": ' + proposalCount + ', \"capture_count\": ' + captureCount + ', \"qualified_count\": ' + qualifiedCount + ', \"summary\": \"[1-2 sentences on pipeline health based on the ' + oppTotal + ' opps and $' + totalValueM + 'M total value]\"},\\n    \"critical_actions\": [\"[Most urgent action based on platform deadlines/overdue items]\", \"[Second priority action]\", \"[Third priority action]\"],\\n    \"risk_summary\": {\"count\": ' + overdueActions + ', \"top_risks\": [\"[Primary risk to revenue/pipeline]\", \"[Secondary risk]\"]},\\n    \"department_coverage\": {\"active_departments\": [\"[list DoD dept names that have active opps in our pipeline]\"], \"gaps\": [\"[DoD/federal depts not in our pipeline]\"], \"recommendation\": \"[which dept gap to close first and why]\"},\\n    \"trading\": {\"status\": \"monitoring\", \"summary\": \"No active positions. Engine monitoring markets.\"},\\n    \"strategic_landscape\": {\"doge_watch\": \"[Specific budget impact]\", \"indopacom\": \"[Specific awards/exercises]\"},\\n    \"defensive_watch\": {\"incumbency_threat\": \"[Named programs at risk]\", \"market_pressure\": \"[Pricing pressures]\"},\\n    \"strategic_synthesis\": \"[2-3 sentences: connect platform pipeline ($' + totalValueM + 'M across ' + oppTotal + ' opps) to market intel and $100M target]\",\\n    \"dashboard_summary\": {\"top_agencies\": ' + topAgenciesJson + ', \"total_addressable_spend\": \"' + totalSpendFmt + '\", \"top_programs\": ' + top3ProgsJson + '},\\n    \"threat_opportunity_matrix\": [{\"type\": \"Opportunity\", \"event\": \"[specific program]\", \"impact\": \"High\", \"action\": \"[action with role]\"}, {\"type\": \"Risk\", \"event\": \"[specific threat]\", \"impact\": \"High\", \"action\": \"[mitigation]\"}],\\n    \"recommendations\": [{\"action\": \"[specific action]\", \"owner\": \"[BD Lead|Capture Manager|President|CTO]\", \"deadline\": \"[date]\", \"why\": \"[dollar impact]\"}, {\"action\": \"[action2]\", \"owner\": \"[role]\", \"deadline\": \"[date]\", \"why\": \"[reason]\"}, {\"action\": \"[action3]\", \"owner\": \"[role]\", \"deadline\": \"[date]\", \"why\": \"[reason]\"}],\\n    \"red_team\": [{\"risk\": \"[competitor/program]\", \"mitigation\": \"[countermove]\"}, {\"risk\": \"[r2]\", \"mitigation\": \"[m2]\"}, {\"risk\": \"[r3]\", \"mitigation\": \"[m3]\"}],\\n    \"command_control\": {\"title\": \"[Most important headline today]\", \"takeaway\": \"[One sentence CEO acts on immediately]\", \"source\": \"[URL]\"},\\n    \"sam_gov_opportunities\": ' + samOppsJson + ',\\n    \"top_news\": [{\"title\": \"[headline]\", \"summary\": \"[1-2 sentences]\", \"url\": \"[URL]\", \"image_url\": null}]\\n  }\\n}\\n\\nCRITICAL: pipeline_status numbers MUST be ' + oppTotal + ' opps and $' + totalValueM + 'M from LIVE PLATFORM STATE. Do NOT estimate \u2014 use exact numbers.';\n\nreturn [{ json: { prompt: prompt } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "eac7f185-7449-4919-b0d8-5a8f45343ef9",
+        "name": "Anthropic Chat Model (SITREP)",
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "disabled": true,
+        "maxTries": 3,
+        "position": [
+          2592,
+          368
+        ],
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "mode": "list",
+            "value": "claude-sonnet-4-20250514",
+            "cachedResultName": "Claude Sonnet 4"
+          },
+          "options": {}
+        },
+        "credentials": {
+          "anthropicApi": {
+            "id": "d92MU0tRK7bEGV83",
+            "name": "Anthropic account"
+          }
+        },
+        "retryOnFail": true,
+        "typeVersion": 1.3,
+        "waitBetweenTries": 70000
+      },
+      {
+        "id": "8020c55f-1d30-40ce-b0c9-2529da6bf180",
+        "name": "Tavily Fetch 1",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1248,
+          144
+        ],
+        "parameters": {
+          "url": "https://api.tavily.com/search",
+          "method": "POST",
+          "options": {
+            "timeout": 30000
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "api_key",
+                "value": "={{ $env.GDA_TAVILY_API_KEY }}"
+              },
+              {
+                "name": "query",
+                "value": "={{ $('Extract Dashboard Targets').first().json.tavily_query_1 || 'SOCOM TRADOC training simulation contract award 2026 DOGE budget cut' }}"
+              },
+              {
+                "name": "search_depth",
+                "value": "basic"
+              },
+              {
+                "name": "max_results",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "id": "da08e921-9273-4bd7-8883-b369bd87d785",
+        "name": "Tavily Fetch 2",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1472,
+          144
+        ],
+        "parameters": {
+          "url": "https://api.tavily.com/search",
+          "method": "POST",
+          "options": {
+            "timeout": 30000
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "api_key",
+                "value": "={{ $env.GDA_TAVILY_API_KEY }}"
+              },
+              {
+                "name": "query",
+                "value": "INDOPACOM \"first island chain\" defense logistics training simulation contract 2026"
+              },
+              {
+                "name": "search_depth",
+                "value": "basic"
+              },
+              {
+                "name": "max_results",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "id": "286f4f4b-5340-4a76-b1bf-33aa6fec6a1e",
+        "name": "Tavily Fetch 3",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1696,
+          144
+        ],
+        "parameters": {
+          "url": "https://api.tavily.com/search",
+          "method": "POST",
+          "options": {
+            "timeout": 30000
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "api_key",
+                "value": "={{ $env.GDA_TAVILY_API_KEY }}"
+              },
+              {
+                "name": "query",
+                "value": "={{ $('Extract Dashboard Targets').first().json.tavily_query_3 || '\"Envision Innovative Solutions\" OR \"PD Systems\" OR \"Riverstone\" defense contract training simulation XR digital readiness 2026' }}"
+              },
+              {
+                "name": "search_depth",
+                "value": "basic"
+              },
+              {
+                "name": "max_results",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "id": "06387459-11b9-49c1-8e09-929a3bbe246d",
+        "name": "SAM.gov Fetch",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1920,
+          144
+        ],
+        "parameters": {
+          "url": "https://api.sam.gov/opportunities/v2/search",
+          "options": {
+            "timeout": 30000
+          },
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "api_key",
+                "value": "={{ $env.GDA_SAM_API_KEY }}"
+              },
+              {
+                "name": "postedFrom",
+                "value": "={{ $now.minus({days: 90}).format('MM/dd/yyyy') }}"
+              },
+              {
+                "name": "postedTo",
+                "value": "={{ $now.format('MM/dd/yyyy') }}"
+              },
+              {
+                "name": "responseDeadLineFrom",
+                "value": "={{ $now.format('MM/dd/yyyy') }}"
+              },
+              {
+                "name": "responseDeadLineTo",
+                "value": "={{ $now.plus({years: 1}).format('MM/dd/yyyy') }}"
+              },
+              {
+                "name": "ncode",
+                "value": "541715,541330,541512,541519,541611,541690,518210,561210"
+              },
+              {
+                "name": "keyword",
+                "value": "SETA systems engineering technical assistance training simulation C5ISR cyber intelligence"
+              },
+              {
+                "name": "limit",
+                "value": "10"
+              },
+              {
+                "name": "offset",
+                "value": "0"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "id": "3a6e8395-1ded-4c59-8d74-9288e0891403",
+        "name": "Extract Dashboard Targets",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1024,
+          144
+        ],
+        "parameters": {
+          "jsCode": "// Read dashboard response\nvar dashData = {};\ntry { dashData = $('Get Dashboard Intelligence').first().json; } catch(e) {}\n\n// Extract all programs from nested or flat structure\nvar allPrograms = [];\nvar agencies = Array.isArray(dashData.agencies) ? dashData.agencies\n             : Array.isArray(dashData.agency_programs) ? dashData.agency_programs : [];\n\nfor (var ag of agencies) {\n  var agencyName = ag.agency || ag.name || 'Unknown';\n  if (Array.isArray(ag.commands)) {\n    for (var cmd of ag.commands) {\n      var cmdName = cmd.command || cmd.name || '';\n      if (Array.isArray(cmd.programs)) {\n        for (var prog of cmd.programs) {\n          allPrograms.push({ agency: agencyName, command: cmdName,\n            program: prog.program_office || prog.name || 'Unknown',\n            annual_spend: Number(prog.annual_spend) || 0,\n            need_score: Number(prog.need_score) || 0,\n            eis_fit_score: Number(prog.eis_fit_score) || 0,\n            capability_need: prog.capability_need || '', eis_fit: prog.eis_fit || '' });\n        }\n      }\n    }\n  } else if (Array.isArray(ag.programs)) {\n    for (var prog of ag.programs) {\n      allPrograms.push({ agency: agencyName, command: '',\n        program: prog.program_office || prog.name || 'Unknown',\n        annual_spend: Number(prog.annual_spend) || 0,\n        need_score: Number(prog.need_score) || 0,\n        eis_fit_score: Number(prog.eis_fit_score) || 0,\n        capability_need: prog.capability_need || '', eis_fit: prog.eis_fit || '' });\n    }\n  }\n}\n\n// Sort by combined priority score\nallPrograms.sort((a, b) => (b.need_score + b.eis_fit_score) - (a.need_score + a.eis_fit_score));\n\nvar top5 = allPrograms.slice(0, 5);\nvar top3Agencies = [...new Set(top5.map(p => p.agency))].slice(0, 3);\nvar topCapabilities = [...new Set(top5.flatMap(p => (p.capability_need || '').split(/[,\\/]/).map(c => c.trim()).filter(c => c.length > 2)))].slice(0, 4);\n\nvar agencyStr = top3Agencies.length > 0 ? top3Agencies.join(' ') : 'SOCOM TRADOC PEO STRI';\nvar capStr = topCapabilities.length > 0 ? topCapabilities.join(' ') : 'training simulation XR digital readiness';\n\n// Build dynamic queries scoped to GDA market\nvar dynamicQuery1 = '(' + agencyStr + ') ' + capStr + ' contract award budget 2026 DOGE defense spending';\nvar dynamicQuery2 = 'INDOPACOM \"first island chain\" defense logistics training simulation contract technology 2026';\nvar dynamicQuery3 = '\"Envision Innovative Solutions\" OR \"PD Systems\" OR \"Riverstone\" defense contract training simulation XR digital readiness 2026';\n\nvar totalSpend = top5.reduce((sum, p) => sum + p.annual_spend, 0);\n\nvar dashboardSummary = {\n  top_agencies: top3Agencies,\n  top_programs: top5.map(p => ({\n    agency: p.agency, command: p.command, program: p.program,\n    annual_spend_usd: p.annual_spend,\n    annual_spend_fmt: p.annual_spend >= 1e9 ? '$' + (p.annual_spend/1e9).toFixed(1) + 'B'\n                     : p.annual_spend >= 1e6 ? '$' + (p.annual_spend/1e6).toFixed(0) + 'M' : '$' + p.annual_spend,\n    need_score: p.need_score, eis_fit_score: p.eis_fit_score,\n    capability: p.capability_need\n  })),\n  total_addressable_spend_usd: totalSpend,\n  total_addressable_spend_fmt: totalSpend >= 1e9 ? '$' + (totalSpend/1e9).toFixed(1) + 'B'\n                               : '$' + (totalSpend/1e6).toFixed(0) + 'M'\n};\n\nreturn [{\n  json: {\n    ...dashData,\n    extracted_targets: dashboardSummary,\n    tavily_query_1: dynamicQuery1,\n    tavily_query_2: dynamicQuery2,\n    tavily_query_3: dynamicQuery3\n  }\n}];"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "6c1db1e5-6763-470e-950f-6fee193a0f3e",
+        "name": "Extract Intel Findings",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          3568,
+          336
+        ],
+        "parameters": {
+          "jsCode": "const input = $input.first()?.json || {};\nconst s = input.sitrep || {};\nconst now = new Date().toISOString();\nconst findings = [];\n\nfunction cleanFinding(text) {\n  if (!text) return null;\n  var t = String(text);\n  t = t.replace(/\\|\\s*[Ss]ource:[^|\\n]*/g, '');\n  t = t.replace(/<[^>]+>/g, ' ');\n  t = t.replace(/[\\u0080-\\uFFFF]/g, '');\n  t = t.replace(/[\"'\\\\]/g, '');\n  t = t.replace(/\\s+/g, ' ').trim();\n  var dot = t.search(/[.!?]/);\n  if (dot > 20 && dot < 180) t = t.substring(0, dot + 1);\n  else t = t.substring(0, 180);\n  return t.trim() || null;\n}\n\nvar blufItems = Array.isArray(s.bluf) ? s.bluf : typeof s.bluf === 'string' ? [s.bluf] : [];\nblufItems.slice(0, 3).forEach(function(b) {\n  var f = cleanFinding(b);\n  if (f) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'SOCOM/TRADOC', finding: f, category: 'intelligence', priority: 'HIGH' });\n});\n\nvar synthesis = cleanFinding(s.strategic_synthesis);\nif (synthesis) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: synthesis, category: 'intelligence', priority: 'HIGH' });\n\n(s.threat_opportunity_matrix || []).slice(0, 3).forEach(function(row) {\n  var f = cleanFinding((row.event || '') + ' - ' + (row.action || ''));\n  if (f) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: f, category: row.type === 'Opportunity' ? 'opportunity' : 'threat', priority: row.impact === 'High' ? 'HIGH' : 'MED' });\n});\n\nvar incThreat = cleanFinding(s.defensive_watch && s.defensive_watch.incumbency_threat);\nif (incThreat) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: incThreat, category: 'threat', priority: 'HIGH' });\n\n(s.recommendations || []).slice(0, 2).forEach(function(r) {\n  var text = typeof r === 'string' ? r : ((r.action || '') + (r.deadline ? ' by ' + r.deadline : ''));\n  var f = cleanFinding(text);\n  if (f) findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: f, category: 'intelligence', priority: 'MED' });\n});\n\nif (findings.length === 0) {\n  findings.push({ timestamp: now, source: 'daily-sitrep', agency: 'General', finding: 'SITREP generated successfully', category: 'intelligence', priority: 'MED' });\n}\n\nreturn findings.map(function(f) { return { json: f }; });\n"
+        },
+        "typeVersion": 2,
+        "continueOnFail": true
+      },
+      {
+        "id": "6afdefa0-0f9c-454f-94db-fb22f21d617a",
+        "name": "Save to Intelligence Log",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          3792,
+          336
+        ],
+        "parameters": {
+          "table": {
+            "__rl": true,
+            "mode": "list",
+            "value": "gda_intelligence_log",
+            "__regex": false
+          },
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public",
+            "__regex": false
+          },
+          "columns": {
+            "value": {
+              "id": 0,
+              "agency": "={{ $json.agency }}",
+              "source": "={{ $json.source }}",
+              "finding": "={{ $json.finding }}",
+              "category": "={{ $json.category }}",
+              "priority": "={{ $json.priority }}",
+              "timestamp": "={{ $json.timestamp }}"
+            },
+            "schema": [
+              {
+                "id": "id",
+                "type": "number",
+                "display": true,
+                "removed": false,
+                "required": false,
+                "displayName": "id",
+                "defaultMatch": true,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "timestamp",
+                "type": "dateTime",
+                "display": true,
+                "required": false,
+                "displayName": "timestamp",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "source",
+                "type": "string",
+                "display": true,
+                "required": true,
+                "displayName": "source",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "agency",
+                "type": "string",
+                "display": true,
+                "required": false,
+                "displayName": "agency",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "finding",
+                "type": "string",
+                "display": true,
+                "required": true,
+                "displayName": "finding",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "category",
+                "type": "string",
+                "display": true,
+                "required": false,
+                "displayName": "category",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "priority",
+                "type": "string",
+                "display": true,
+                "required": false,
+                "displayName": "priority",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "created_at",
+                "type": "dateTime",
+                "display": true,
+                "removed": false,
+                "required": false,
+                "displayName": "created_at",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              }
+            ],
+            "mappingMode": "defineBelow",
+            "matchingColumns": [
+              "id"
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "typeVersion": 2.5,
+        "continueOnFail": true
+      },
+      {
+        "id": "abd739f1-6bef-4f8a-830e-d0bb4c9f2745",
+        "name": "Extract Opportunity Alerts",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          4016,
+          336
+        ],
+        "parameters": {
+          "jsCode": "\nconst sitrep = $input.first()?.json || {};\nconst output = sitrep.full_output || sitrep;\nconst htmlBody = (sitrep.html_body || output.html_body || '').replace(/<[^>]+>/g, ' ');\nconst sections = output.sections || output.section_list || [];\nconst alerts = [];\nconst now = new Date().toISOString();\nconst expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();\nconst today = now.substring(0, 10);\n\nconst recompeteSignals = ['recompete', 'upcoming solicitation', 'sources sought', 'rfp expected', 'pre-solicitation', 'award expected', 'expiring contract'];\nconst fullText = (htmlBody + ' ' + JSON.stringify(sections)).toLowerCase();\nconst seen = new Set();\n\nrecompeteSignals.forEach(signal => {\n  const idx = fullText.indexOf(signal);\n  if (idx >= 0) {\n    const snippet = fullText.substring(Math.max(0, idx - 50), Math.min(fullText.length, idx + 200));\n    const agencyMatch = snippet.match(/\\b(SOCOM|TRADOC|PEO STRI|AFC|INSCOM|CYBERCOM|DIA|NSA)\\b/i);\n    const agency = agencyMatch ? agencyMatch[0].toUpperCase() : 'General';\n    const title = signal.charAt(0).toUpperCase() + signal.slice(1) + ' Signal Detected';\n    const dedupeKey = today + '|' + title + '|' + agency;\n    if (!seen.has(dedupeKey)) {\n      seen.add(dedupeKey);\n      alerts.push({\n        timestamp: now,\n        title: title,\n        agency: agency,\n        urgency: ['rfp expected', 'sources sought', 'recompete'].includes(signal) ? 'HIGH' : 'MED',\n        detail: snippet.replace(/\\s+/g, ' ').trim().substring(0, 400),\n        source_url: null,\n        expires_at: expiry\n      });\n    }\n  }\n});\n\nreturn alerts.length > 0 ? alerts.map(a => ({ json: a })) : [];\n"
+        },
+        "typeVersion": 2,
+        "continueOnFail": true
+      },
+      {
+        "id": "9b668f7e-0bc8-4540-951e-e484614aef59",
+        "name": "Save Opportunity Alerts",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          4240,
+          336
+        ],
+        "parameters": {
+          "table": {
+            "__rl": true,
+            "mode": "list",
+            "value": "gda_opportunity_alerts",
+            "__regex": false
+          },
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public",
+            "__regex": false
+          },
+          "columns": {
+            "value": {
+              "id": 0,
+              "title": "={{ $json.title }}",
+              "agency": "={{ $json.agency }}",
+              "detail": "={{ $json.detail }}",
+              "urgency": "={{ $json.urgency }}",
+              "timestamp": "={{ $json.timestamp }}",
+              "expires_at": "={{ $json.expires_at }}",
+              "source_url": "={{ $json.source_url }}"
+            },
+            "schema": [
+              {
+                "id": "id",
+                "type": "number",
+                "display": true,
+                "removed": false,
+                "required": false,
+                "displayName": "id",
+                "defaultMatch": true,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "timestamp",
+                "type": "dateTime",
+                "display": true,
+                "required": false,
+                "displayName": "timestamp",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "title",
+                "type": "string",
+                "display": true,
+                "required": true,
+                "displayName": "title",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "agency",
+                "type": "string",
+                "display": true,
+                "required": false,
+                "displayName": "agency",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "urgency",
+                "type": "string",
+                "display": true,
+                "required": false,
+                "displayName": "urgency",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "detail",
+                "type": "string",
+                "display": true,
+                "required": false,
+                "displayName": "detail",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "source_url",
+                "type": "string",
+                "display": true,
+                "required": false,
+                "displayName": "source_url",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "expires_at",
+                "type": "dateTime",
+                "display": true,
+                "required": false,
+                "displayName": "expires_at",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "created_at",
+                "type": "dateTime",
+                "display": true,
+                "removed": false,
+                "required": false,
+                "displayName": "created_at",
+                "defaultMatch": false,
+                "canBeUsedToMatch": true
+              }
+            ],
+            "mappingMode": "defineBelow",
+            "matchingColumns": [
+              "id"
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "typeVersion": 2.5,
+        "continueOnFail": true
+      },
+      {
+        "id": "9e633d09-ff60-4091-a97d-215d66600283",
+        "name": "Health Check Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          128,
+          -320
+        ],
+        "webhookId": "17860ae8-dfef-4419-bb32-eb2211805c69",
+        "parameters": {
+          "path": "17860ae8-dfef-4419-bb32-eb2211805c69",
+          "options": {},
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2.1
+      },
+      {
+        "id": "8d92958c-2857-40f8-83ea-34ac99ec8b15",
+        "name": "Health Check Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          352,
+          -320
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          },
+          "respondWith": "json",
+          "responseBody": "{\"status\":\"ok\",\"module\":\"daily-sitrep\"}"
+        },
+        "typeVersion": 1.5
+      },
+      {
+        "id": "53aa4dda-e467-4736-b4f9-4a5945545168",
+        "name": "Push SITREP Alert",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          4464,
+          336
+        ],
+        "parameters": {
+          "url": "https://n8n.csr-llc.tech/webhook/gda-action-items",
+          "body": "={{ (() => { const alerts = $('Extract Opportunity Alerts').all().map(i => i.json).filter(i => i && i.title); const count = alerts.length; const topAlerts = alerts.slice(0,3).map(a => (a.urgency || 'INFO') + ': ' + (a.title || 'Alert')).join(' | '); const today = new Date().toISOString().split('T')[0]; return JSON.stringify({ action: 'create', item: '[SITREP ' + today + '] ' + count + ' new alerts. ' + (topAlerts || 'Review daily SITREP'), owner: 'Shawn', status: 'Open', source_meeting: 'Daily SITREP - ' + today }); })() }}",
+          "method": "POST",
+          "options": {},
+          "sendBody": true,
+          "contentType": "raw",
+          "sendHeaders": true,
+          "rawContentType": "application/json",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-GDA-Key",
+                "value": "={{ $env.GDA_API_KEY_2026 }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2,
+        "continueOnFail": true
+      },
+      {
+        "id": "857fbecb-3997-427c-8049-b10a4fcc0905",
+        "name": "Auth Guard",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          352,
+          -48
+        ],
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (auth !== $env.GDA_DEPLOY_KEY_2026 && auth !== $env.GDA_API_KEY_2026 && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "78f8e1d8-2015-4ad7-9f73-ac3cc2cb28f1",
+        "name": "Route Latest",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          576,
+          -48
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "route-latest-check",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                },
+                "leftValue": "={{ $json.body.action }}",
+                "rightValue": "latest"
+              }
+            ]
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "a7bf53d0-3173-40b5-9c96-25a0a68b4d3c",
+        "name": "Read Latest SITREP",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          800,
+          -96
+        ],
+        "parameters": {
+          "query": "SELECT briefing_json, created_at FROM gda_daily_briefings ORDER BY created_at DESC LIMIT 1",
+          "options": {},
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "typeVersion": 2.5,
+        "continueOnFail": true
+      },
+      {
+        "id": "786a6fb5-680a-4ae6-82d2-ed7dafb0e035",
+        "name": "Format Latest",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1024,
+          -96
+        ],
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst row = items && items[0] && items[0].json;\nif (!row || !row.briefing_json) {\n  return [{ json: { status: 'no_cache', sitrep: null, message: 'SITREP not yet generated. Check back after 07:00 EST scheduled run.' } }];\n}\nconst data = typeof row.briefing_json === 'object' ? row.briefing_json : JSON.parse(row.briefing_json || '{}');\nreturn [{ json: Object.assign({}, data, { cached: true, cache_date: row.created_at }) }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "ff20e730-f840-4347-a186-2ef175614715",
+        "name": "Latest Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          1248,
+          -96
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200,
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          "respondWith": "json",
+          "responseBody": "={{ $json }}"
+        },
+        "typeVersion": 1.1
+      },
+      {
+        "id": "fa791b6a-8aec-4b0d-af25-62540199a20e",
+        "name": "Prep Save SITREP",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          3568,
+          48
+        ],
+        "parameters": {
+          "jsCode": "const item = $input.first().json;\nconst s = item.sitrep || {};\nconst bluf = Array.isArray(s.bluf) ? s.bluf.join(' ') : (s.bluf || '');\n\n// GUARD: Do not save failed SITREPs\nif (bluf.includes('Raw length: 0') || bluf.includes('no JSON object') || bluf.includes('generation returned no')) {\n  // Return empty to skip the save\n  return [];\n}\n\nconst data = { sitrep: s, html_body: item.html_body || '', generated_at: new Date().toISOString() };\nconst jsonStr = JSON.stringify(data).replace(/'/g, \"''\");\nreturn [{ json: { insert_query: `INSERT INTO gda_daily_briefings (briefing_date, briefing_json, created_at) VALUES (CURRENT_DATE, '${jsonStr}'::jsonb, NOW())`, original: item } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "6fdbee40-af6a-401a-8077-b7a90e3562a9",
+        "name": "Save SITREP PG",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          3792,
+          48
+        ],
+        "parameters": {
+          "query": "={{ $json.insert_query }}",
+          "options": {},
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "typeVersion": 2.5,
+        "continueOnFail": true
+      },
+      {
+        "id": "qps-postgres-node-001",
+        "name": "Query Platform State",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          2144,
+          144
+        ],
+        "parameters": {
+          "query": "SELECT json_build_object('opp_total', (SELECT count(*)::int FROM gda_opportunity_tracker), 'total_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker) / 1000000.0), 'proposal_count', (SELECT count(*)::int FROM gda_opportunity_tracker WHERE stage='Proposal'), 'proposal_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker WHERE stage='Proposal') / 1000000.0), 'capture_count', (SELECT count(*)::int FROM gda_opportunity_tracker WHERE stage='Capture'), 'capture_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker WHERE stage='Capture') / 1000000.0), 'qualified_count', (SELECT count(*)::int FROM gda_opportunity_tracker WHERE stage='Qualified'), 'qualified_value_m', ROUND((SELECT COALESCE(sum(estimated_value),0) FROM gda_opportunity_tracker WHERE stage='Qualified') / 1000000.0), 'open_actions', (SELECT count(*)::int FROM gda_action_items WHERE status='Open'), 'overdue_actions', (SELECT count(*)::int FROM gda_action_items WHERE deadline < CURRENT_DATE::text AND status != 'Complete'), 'upcoming_deadlines', (SELECT json_agg(d) FROM (SELECT agency, estimated_value, stage, TO_CHAR(response_deadline, 'YYYY-MM-DD') as deadline, eis_fit_score FROM gda_opportunity_tracker WHERE response_deadline IS NOT NULL AND response_deadline <= NOW() + INTERVAL '14 days' ORDER BY response_deadline ASC LIMIT 5) d), 'open_action_items', (SELECT json_agg(a) FROM (SELECT item, status, deadline, owner FROM gda_action_items WHERE status != 'Complete' ORDER BY deadline ASC LIMIT 5) a), 'top_by_value', (SELECT json_agg(o) FROM (SELECT agency, estimated_value, stage, eis_fit_score FROM gda_opportunity_tracker ORDER BY estimated_value DESC NULLS LAST LIMIT 5) o)) AS platform_data",
+          "options": {},
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "HwronxMmGY5XDGEt",
+            "name": "GDA Postgres"
+          }
+        },
+        "typeVersion": 2.5
+      },
+      {
+        "id": "claude-sitrep-direct",
+        "name": "Claude SITREP Direct",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          2752,
+          144
+        ],
+        "parameters": {
+          "url": "https://api.anthropic.com/v1/messages",
+          "method": "POST",
+          "options": {
+            "timeout": 90000
+          },
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8192, system: 'You are a defense intelligence analyst producing a daily SITREP for Georgetown Defense Analytics. Return ONLY valid JSON matching the requested schema. No markdown fences, no explanatory text.', messages: [{ role: 'user', content: $('Build SITREP Prompt').first().json.prompt || $json.prompt || '' }] }) }}",
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "={{ $env.ANTHROPIC_API_KEY }}"
+              },
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "extract-sitrep",
+        "name": "Extract SITREP Output",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2976,
+          144
+        ],
+        "parameters": {
+          "jsCode": "const data = $input.first().json;\nlet text = '';\nif (data.content && data.content[0]) text = data.content[0].text || '';\nelse if (data.error) text = JSON.stringify(data.error);\nelse text = JSON.stringify(data);\n\n// Build structured output \u2014 downstream always gets consistent shape\nlet structured = {\n  status: 'ok',\n  generated_at: new Date().toISOString(),\n  executive_summary: '',\n  pipeline_health: { total_opps: 0, pursue_count: 0, pipeline_value: 0, deadlines_14d: 0 },\n  top_threats: [],\n  top_opportunities: [],\n  recommended_actions: [],\n  raw: text\n};\n\ntry {\n  // Try to extract JSON block if Claude returned one\n  const jsonMatch = text.match(/```json([\\s\\S]*?)```/) || text.match(/(\\{[\\s\\S]*\\})/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n    structured = Object.assign(structured, parsed);\n  } else {\n    // Plain text \u2014 extract executive summary as first paragraph\n    structured.executive_summary = text.split('\\n\\n')[0].replace(/^#+\\s*/,'').trim().slice(0, 500);\n    // Extract bullet lists as threats/opps/actions heuristically\n    const lines = text.split('\\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('\u2022'));\n    structured.recommended_actions = lines.slice(0, 5).map(l => l.replace(/^[-\u2022]\\s*/,'').trim());\n  }\n} catch(e) {\n  structured.executive_summary = text.slice(0, 500);\n}\n\nreturn [{ json: structured }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "hitl-tg-approve",
+        "name": "HITL Approve SITREP",
+        "type": "n8n-nodes-base.telegram",
+        "position": [
+          3900,
+          48
+        ],
+        "webhookId": "63a24524-2ab2-417d-9db3-c80bf5722a3b",
+        "parameters": {
+          "text": "=\ud83d\udd34 SITREP APPROVAL REQUIRED\n\n{{ $json.sitrep_summary || $json.summary || 'New SITREP generated' }}\n\nGenerated: {{ new Date().toISOString().split('T')[0] }}",
+          "chatId": "8631035943",
+          "message": "=\ud83d\udd34 SITREP APPROVAL REQUIRED\n\nApprove to distribute or suppress.\n\nGenerated: {{ new Date().toISOString().split('T')[0] }}",
+          "options": {
+            "limitWaitTime": {
+              "values": {
+                "limitType": "afterTimeInterval",
+                "resumeUnit": "hours",
+                "resumeAmount": 4
+              }
+            },
+            "appendAttribution": false
+          },
+          "resource": "message",
+          "operation": "sendAndWait",
+          "responseType": "approval",
+          "approvalOptions": {
+            "values": {
+              "approvalType": "double",
+              "approveLabel": "\u2705 Approve SITREP",
+              "disapproveLabel": "\u274c Suppress"
+            }
+          },
+          "additionalFields": {}
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "Jr8OOsZqc9DarQE6",
+            "name": "GDA Telegram Bot"
+          }
+        },
+        "typeVersion": 1.2
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Dashboard Intelligence",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Search in Tavily": {
+        "ai_tool": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Pinecone Tasks": {
+        "ai_tool": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Embeddings OpenAI (SITREP)": {
+        "ai_embedding": [
+          [
+            {
+              "node": "Pinecone Tasks",
+              "type": "ai_embedding",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SAM.gov Opportunities": {
+        "ai_tool": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Agent": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript": {
+        "main": [
+          [
+            {
+              "node": "Extract Intel Findings",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Prep Save SITREP",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Webhook Triggered": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Send an Email",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build SITREP Prompt": {
+        "main": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Claude SITREP Direct",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Anthropic Chat Model (SITREP)": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tavily Fetch 1": {
+        "main": [
+          [
+            {
+              "node": "Tavily Fetch 2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tavily Fetch 2": {
+        "main": [
+          [
+            {
+              "node": "Tavily Fetch 3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Tavily Fetch 3": {
+        "main": [
+          [
+            {
+              "node": "SAM.gov Fetch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SAM.gov Fetch": {
+        "main": [
+          [
+            {
+              "node": "Query Platform State",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Dashboard Intelligence": {
+        "main": [
+          [
+            {
+              "node": "Extract Dashboard Targets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Dashboard Targets": {
+        "main": [
+          [
+            {
+              "node": "Tavily Fetch 1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Intel Findings": {
+        "main": [
+          [
+            {
+              "node": "Save to Intelligence Log",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save to Intelligence Log": {
+        "main": [
+          [
+            {
+              "node": "Extract Opportunity Alerts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Opportunity Alerts": {
+        "main": [
+          [
+            {
+              "node": "Save Opportunity Alerts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Health Check Webhook": {
+        "main": [
+          [
+            {
+              "node": "Health Check Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Opportunity Alerts": {
+        "main": [
+          [
+            {
+              "node": "Push SITREP Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth Guard": {
+        "main": [
+          [
+            {
+              "node": "Route Latest",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route Latest": {
+        "main": [
+          [
+            {
+              "node": "Read Latest SITREP",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get Dashboard Intelligence",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Latest SITREP": {
+        "main": [
+          [
+            {
+              "node": "Format Latest",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Latest": {
+        "main": [
+          [
+            {
+              "node": "Latest Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prep Save SITREP": {
+        "main": [
+          [
+            {
+              "node": "Save SITREP PG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Query Platform State": {
+        "main": [
+          [
+            {
+              "node": "Build SITREP Prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude SITREP Direct": {
+        "main": [
+          [
+            {
+              "node": "Extract SITREP Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract SITREP Output": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save SITREP PG": {
+        "main": [
+          [
+            {
+              "node": "HITL Approve SITREP",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HITL Approve SITREP": {
+        "main": [
+          [
+            {
+              "node": "IF Webhook Triggered",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T22:55:08.114Z",
+        "id": 13624,
+        "workflowId": "G9US1e01oY1cgJIF",
+        "versionId": "5181bfe2-22ec-4a3e-8e8c-80f12dd85e45",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T22:55:08.153Z",
+        "id": 13625,
+        "workflowId": "G9US1e01oY1cgJIF",
+        "versionId": "5181bfe2-22ec-4a3e-8e8c-80f12dd85e45",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}

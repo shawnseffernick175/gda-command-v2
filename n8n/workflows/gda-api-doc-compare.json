@@ -1,0 +1,1270 @@
+{
+  "updatedAt": "2026-05-26T21:28:43.386Z",
+  "createdAt": "2026-03-16T18:54:31.237Z",
+  "id": "dKibEwHO773kehFg",
+  "name": "GDA.api.doc-compare",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "gda-doc-compare-001",
+      "parameters": {
+        "path": "gda-doc-compare",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "auth1",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "val1",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst doc_a_id = body.doc_a_id || body.docAId;\nconst doc_b_id = body.doc_b_id || body.docBId;\nif (!doc_a_id || !doc_b_id) {\n  throw new Error('doc_a_id and doc_b_id are required');\n}\nif (doc_a_id === doc_b_id) {\n  throw new Error('Cannot compare a document with itself');\n}\nreturn [{ json: { doc_a_id, doc_b_id } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "merge1",
+      "name": "Merge Docs",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1140,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const docAData = $('Fetch Doc A Chunks').first().json;\nconst docBData = $('Fetch Doc B Chunks').first().json;\nconst ids = $('Validate Input').first().json;\n\nfunction extractText(fetchResult) {\n  const vectors = fetchResult.vectors || {};\n  const sorted = Object.entries(vectors)\n    .sort((a, b) => {\n      const ai = parseInt((a[0].match(/_chunk_(\\d+)$/) || [0,0])[1]);\n      const bi = parseInt((b[0].match(/_chunk_(\\d+)$/) || [0,0])[1]);\n      return ai - bi;\n    });\n  return sorted.map(([id, v]) => (v.metadata || {}).text || '').join('\\n\\n');\n}\n\nconst textA = extractText(docAData);\nconst textB = extractText(docBData);\nconst chunksA = Object.keys(docAData.vectors || {}).length;\nconst chunksB = Object.keys(docBData.vectors || {}).length;\n\nif (chunksA === 0 && chunksB === 0) {\n  throw new Error('Neither document found in knowledge base');\n}\n\nreturn [{ json: {\n  doc_a_id: ids.doc_a_id,\n  doc_b_id: ids.doc_b_id,\n  text_a: textA.substring(0, 12000),\n  text_b: textB.substring(0, 12000),\n  chunks_a: chunksA,\n  chunks_b: chunksB,\n  chars_a: textA.length,\n  chars_b: textB.length\n}}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "claude1",
+      "name": "Claude Compare",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1380,
+        200
+      ],
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, messages: [{ role: 'user', content: 'You are analyzing two documents for a defense contractor. Compare them thoroughly.\\n\\n=== DOCUMENT A (ID: ' + $json.doc_a_id + ') ===\\n' + $json.text_a + '\\n\\n=== DOCUMENT B (ID: ' + $json.doc_b_id + ') ===\\n' + $json.text_b + '\\n\\nProvide a structured comparison as JSON with these exact keys:\\n{\\n  \"summary_a\": \"2-3 sentence summary of Document A\",\\n  \"summary_b\": \"2-3 sentence summary of Document B\",\\n  \"key_differences\": [{ \"category\": \"...\", \"doc_a\": \"...\", \"doc_b\": \"...\" }],\\n  \"similarities\": [\"...\"],\\n  \"additions_in_b\": [\"Items in Doc B not in Doc A\"],\\n  \"removals_from_a\": [\"Items in Doc A not in Doc B\"],\\n  \"risk_flags\": [\"Any concerning changes or discrepancies\"],\\n  \"recommendation\": \"Brief actionable recommendation\"\\n}\\nCategories for differences: scope, requirements, terms, dates, personnel, pricing, deliverables, compliance, performance_metrics, evaluation_criteria. Only include categories with actual differences. Respond ONLY with valid JSON, no markdown.' }] }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "none",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{$env.ANTHROPIC_API_KEY}}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "d92MU0tRK7bEGV83",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "fmt1",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1620,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const raw = $json.content?.[0]?.text || $json.content || '';\nconst meta = $('Merge Docs').first().json;\nlet comparison = {};\ntry {\n  const match = typeof raw === 'string' ? raw.match(/\\{[\\s\\S]*\\}/) : null;\n  if (match) comparison = JSON.parse(match[0]);\n  else comparison = { summary_a: 'Parse error', summary_b: 'Parse error', key_differences: [], similarities: [], additions_in_b: [], removals_from_a: [], risk_flags: [], recommendation: typeof raw === 'string' ? raw : 'No comparison generated' };\n} catch(e) {\n  comparison = { summary_a: 'Parse error', summary_b: 'Parse error', key_differences: [], similarities: [], additions_in_b: [], removals_from_a: [], risk_flags: [], recommendation: typeof raw === 'string' ? raw.substring(0, 500) : 'Parse failed: ' + e.message };\n}\nreturn [{ json: {\n  status: 'ok',\n  doc_a_id: meta.doc_a_id,\n  doc_b_id: meta.doc_b_id,\n  chunks_a: meta.chunks_a,\n  chunks_b: meta.chunks_b,\n  comparison,\n  timestamp: new Date().toISOString()\n}}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "resp1",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1860,
+        200
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "doc-list-wh",
+      "name": "Doc List Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        500
+      ],
+      "webhookId": "gda-doc-list-001",
+      "parameters": {
+        "path": "gda-doc-list",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "doc-list-auth",
+      "name": "Doc List Auth",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        500
+      ],
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || '';\nif (auth !== $env.GDA_API_KEY_2026) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "doc-list-extract",
+      "name": "Extract Unique Docs",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        660,
+        500
+      ],
+      "parameters": {
+        "jsCode": "const vectors = $json.vectors || [];\nconst docMap = {};\nfor (const v of vectors) {\n  const id = v.id || '';\n  const match = id.match(/^(.+)_chunk_(\\d+)$/);\n  if (match) {\n    const docId = match[1];\n    const chunkIdx = parseInt(match[2]);\n    if (!docMap[docId]) docMap[docId] = { id: docId, chunks: 0 };\n    docMap[docId].chunks = Math.max(docMap[docId].chunks, chunkIdx + 1);\n  }\n}\nconst docs = Object.values(docMap).sort((a,b) => b.chunks - a.chunks);\nreturn [{ json: { status: 'ok', documents: docs, total: docs.length } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "doc-list-resp",
+      "name": "Doc List Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        880,
+        500
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "332ecc28-3e2e-491b-90c8-44a3f9369b52",
+      "name": "List Vectors Doc A",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-list-document",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ documentId: $json.doc_a_id, collection: \"gda-documents\" }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "2fc59c1a-5fcb-4e82-a391-5aa36bb3c80d",
+      "name": "Reshape List A",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Reshape pgvector list-document to Pinecone vectors list shape\nconst pgResponse = $input.first().json;\nconst vecs = (pgResponse.data || {}).vectors || pgResponse.vectors || [];\nconst vectors = vecs.map(r => ({ id: r.id }));\nreturn [{ json: { vectors } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9916b169-accf-4df3-ba8a-d71b699368f1",
+      "name": "List Vectors Doc B",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-list-document",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ documentId: $(\"Validate Input\").first().json.doc_b_id, collection: \"gda-documents\" }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "7e3942d3-0577-4696-b3cd-56a6304356ca",
+      "name": "Reshape List B",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Reshape pgvector list-document to Pinecone vectors list shape\nconst pgResponse = $input.first().json;\nconst vecs = (pgResponse.data || {}).vectors || pgResponse.vectors || [];\nconst vectors = vecs.map(r => ({ id: r.id }));\nreturn [{ json: { vectors } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9500cfcb-8433-4105-9495-6b170c09a0b0",
+      "name": "Fetch Doc A Raw",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        900,
+        100
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-fetch",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ids: ($json.vectors || []).map(v => v.id) }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "da265460-c146-4c85-ac68-d10d69b119a4",
+      "name": "Fetch Doc A Chunks",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1120,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Reshape pgvector fetch to Pinecone vectors object shape\nconst pgResponse = $input.first().json;\nconst vecs = (pgResponse.data || {}).vectors || pgResponse.vectors || [];\nconst vectors = {};\nfor (const r of vecs) {\n  vectors[r.id] = {\n    id: r.id,\n    metadata: {\n      text: r.chunk_text || '',\n      document_id: r.document_id || '',\n      chunk_index: r.chunk_index || 0,\n      ...(r.metadata || {})\n    }\n  };\n}\nreturn [{ json: { vectors } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2a999aea-4625-4887-8d68-2363b7849e2e",
+      "name": "Fetch Doc B Raw",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-fetch",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ids: ($json.vectors || []).map(v => v.id) }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "278621bf-9267-4e00-bbcb-f00abc74d57b",
+      "name": "Fetch Doc B Chunks",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Reshape pgvector fetch to Pinecone vectors object shape\nconst pgResponse = $input.first().json;\nconst vecs = (pgResponse.data || {}).vectors || pgResponse.vectors || [];\nconst vectors = {};\nfor (const r of vecs) {\n  vectors[r.id] = {\n    id: r.id,\n    metadata: {\n      text: r.chunk_text || '',\n      document_id: r.document_id || '',\n      chunk_index: r.chunk_index || 0,\n      ...(r.metadata || {})\n    }\n  };\n}\nreturn [{ json: { vectors } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a090cbe3-6250-4788-a705-90d6d56b7675",
+      "name": "List All Doc IDs",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        440,
+        500
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-query",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ collection: \"gda-documents\", embedding: Array(1536).fill(0.01), topK: 50 }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput",
+      "typeVersion": 4.2
+    },
+    {
+      "id": "d2bf8325-0ff9-42d4-b3f1-cf4b90d1f400",
+      "name": "Reshape List All",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        660,
+        500
+      ],
+      "parameters": {
+        "jsCode": "// Reshape pgvector query results to Pinecone vector list shape\nconst pgResponse = $input.first().json;\nconst results = (pgResponse.data || {}).results || pgResponse.results || [];\nconst vectors = results.map(r => ({ id: r.id }));\nreturn [{ json: { vectors } }];"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "List Vectors Doc A",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "List Vectors Doc B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Docs": {
+      "main": [
+        [
+          {
+            "node": "Claude Compare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Compare": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doc List Webhook": {
+      "main": [
+        [
+          {
+            "node": "Doc List Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doc List Auth": {
+      "main": [
+        [
+          {
+            "node": "List All Doc IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Unique Docs": {
+      "main": [
+        [
+          {
+            "node": "Doc List Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Vectors Doc A": {
+      "main": [
+        [
+          {
+            "node": "Reshape List A",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reshape List A": {
+      "main": [
+        [
+          {
+            "node": "Fetch Doc A Raw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Doc A Raw": {
+      "main": [
+        [
+          {
+            "node": "Fetch Doc A Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Doc A Chunks": {
+      "main": [
+        [
+          {
+            "node": "Merge Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Vectors Doc B": {
+      "main": [
+        [
+          {
+            "node": "Reshape List B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reshape List B": {
+      "main": [
+        [
+          {
+            "node": "Fetch Doc B Raw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Doc B Raw": {
+      "main": [
+        [
+          {
+            "node": "Fetch Doc B Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Doc B Chunks": {
+      "main": [
+        [
+          {
+            "node": "Merge Docs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "List All Doc IDs": {
+      "main": [
+        [
+          {
+            "node": "Reshape List All",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reshape List All": {
+      "main": [
+        [
+          {
+            "node": "Extract Unique Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "e880863e-e15e-428f-9214-c88815821793",
+  "activeVersionId": "e880863e-e15e-428f-9214-c88815821793",
+  "versionCounter": 278,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-03-16T18:54:31.237Z",
+      "createdAt": "2026-03-16T18:54:31.237Z",
+      "role": "workflow:owner",
+      "workflowId": "dKibEwHO773kehFg",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T21:28:43.387Z",
+    "createdAt": "2026-05-26T21:28:43.387Z",
+    "versionId": "e880863e-e15e-428f-9214-c88815821793",
+    "workflowId": "dKibEwHO773kehFg",
+    "nodes": [
+      {
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          0,
+          200
+        ],
+        "webhookId": "gda-doc-compare-001",
+        "parameters": {
+          "path": "gda-doc-compare",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "auth1",
+        "name": "Auth Guard",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          220,
+          200
+        ],
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "val1",
+        "name": "Validate Input",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          440,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst doc_a_id = body.doc_a_id || body.docAId;\nconst doc_b_id = body.doc_b_id || body.docBId;\nif (!doc_a_id || !doc_b_id) {\n  throw new Error('doc_a_id and doc_b_id are required');\n}\nif (doc_a_id === doc_b_id) {\n  throw new Error('Cannot compare a document with itself');\n}\nreturn [{ json: { doc_a_id, doc_b_id } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "list-a",
+        "name": "List Vectors Doc A",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          660,
+          100
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/vectors/list",
+          "method": "GET",
+          "options": {},
+          "sendQuery": true,
+          "authentication": "predefinedCredentialType",
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "namespace",
+                "value": "gda-documents"
+              },
+              {
+                "name": "prefix",
+                "value": "={{ $json.doc_a_id + '_chunk_' }}"
+              },
+              {
+                "name": "limit",
+                "value": "100"
+              }
+            ]
+          },
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "cVqyKm27Ws9a1NJG",
+            "name": "PineconeApi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "list-b",
+        "name": "List Vectors Doc B",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          660,
+          300
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/vectors/list",
+          "method": "GET",
+          "options": {},
+          "sendQuery": true,
+          "authentication": "predefinedCredentialType",
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "namespace",
+                "value": "gda-documents"
+              },
+              {
+                "name": "prefix",
+                "value": "={{ $('Validate Input').first().json.doc_b_id + '_chunk_' }}"
+              },
+              {
+                "name": "limit",
+                "value": "100"
+              }
+            ]
+          },
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "cVqyKm27Ws9a1NJG",
+            "name": "PineconeApi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "fetch-a",
+        "name": "Fetch Doc A Chunks",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          900,
+          100
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/vectors/fetch",
+          "method": "GET",
+          "options": {},
+          "sendQuery": true,
+          "authentication": "predefinedCredentialType",
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "namespace",
+                "value": "gda-documents"
+              },
+              {
+                "name": "ids",
+                "value": "={{ ($json.vectors || []).map(v => v.id).join(',') }}"
+              }
+            ]
+          },
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "cVqyKm27Ws9a1NJG",
+            "name": "PineconeApi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "fetch-b",
+        "name": "Fetch Doc B Chunks",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          900,
+          300
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/vectors/fetch",
+          "method": "GET",
+          "options": {},
+          "sendQuery": true,
+          "authentication": "predefinedCredentialType",
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "namespace",
+                "value": "gda-documents"
+              },
+              {
+                "name": "ids",
+                "value": "={{ ($json.vectors || []).map(v => v.id).join(',') }}"
+              }
+            ]
+          },
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "cVqyKm27Ws9a1NJG",
+            "name": "PineconeApi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "merge1",
+        "name": "Merge Docs",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1140,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const docAData = $('Fetch Doc A Chunks').first().json;\nconst docBData = $('Fetch Doc B Chunks').first().json;\nconst ids = $('Validate Input').first().json;\n\nfunction extractText(fetchResult) {\n  const vectors = fetchResult.vectors || {};\n  const sorted = Object.entries(vectors)\n    .sort((a, b) => {\n      const ai = parseInt((a[0].match(/_chunk_(\\d+)$/) || [0,0])[1]);\n      const bi = parseInt((b[0].match(/_chunk_(\\d+)$/) || [0,0])[1]);\n      return ai - bi;\n    });\n  return sorted.map(([id, v]) => (v.metadata || {}).text || '').join('\\n\\n');\n}\n\nconst textA = extractText(docAData);\nconst textB = extractText(docBData);\nconst chunksA = Object.keys(docAData.vectors || {}).length;\nconst chunksB = Object.keys(docBData.vectors || {}).length;\n\nif (chunksA === 0 && chunksB === 0) {\n  throw new Error('Neither document found in knowledge base');\n}\n\nreturn [{ json: {\n  doc_a_id: ids.doc_a_id,\n  doc_b_id: ids.doc_b_id,\n  text_a: textA.substring(0, 12000),\n  text_b: textB.substring(0, 12000),\n  chunks_a: chunksA,\n  chunks_b: chunksB,\n  chars_a: textA.length,\n  chars_b: textB.length\n}}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "claude1",
+        "name": "Claude Compare",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1380,
+          200
+        ],
+        "parameters": {
+          "url": "https://api.anthropic.com/v1/messages",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2048, messages: [{ role: 'user', content: 'You are analyzing two documents for a defense contractor. Compare them thoroughly.\\n\\n=== DOCUMENT A (ID: ' + $json.doc_a_id + ') ===\\n' + $json.text_a + '\\n\\n=== DOCUMENT B (ID: ' + $json.doc_b_id + ') ===\\n' + $json.text_b + '\\n\\nProvide a structured comparison as JSON with these exact keys:\\n{\\n  \"summary_a\": \"2-3 sentence summary of Document A\",\\n  \"summary_b\": \"2-3 sentence summary of Document B\",\\n  \"key_differences\": [{ \"category\": \"...\", \"doc_a\": \"...\", \"doc_b\": \"...\" }],\\n  \"similarities\": [\"...\"],\\n  \"additions_in_b\": [\"Items in Doc B not in Doc A\"],\\n  \"removals_from_a\": [\"Items in Doc A not in Doc B\"],\\n  \"risk_flags\": [\"Any concerning changes or discrepancies\"],\\n  \"recommendation\": \"Brief actionable recommendation\"\\n}\\nCategories for differences: scope, requirements, terms, dates, personnel, pricing, deliverables, compliance, performance_metrics, evaluation_criteria. Only include categories with actual differences. Respond ONLY with valid JSON, no markdown.' }] }) }}",
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "authentication": "none",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "={{$env.ANTHROPIC_API_KEY}}"
+              },
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "credentials": {
+          "anthropicApi": {
+            "id": "d92MU0tRK7bEGV83",
+            "name": "Anthropic account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "fmt1",
+        "name": "Format Response",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1620,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const raw = $json.content?.[0]?.text || $json.content || '';\nconst meta = $('Merge Docs').first().json;\nlet comparison = {};\ntry {\n  const match = typeof raw === 'string' ? raw.match(/\\{[\\s\\S]*\\}/) : null;\n  if (match) comparison = JSON.parse(match[0]);\n  else comparison = { summary_a: 'Parse error', summary_b: 'Parse error', key_differences: [], similarities: [], additions_in_b: [], removals_from_a: [], risk_flags: [], recommendation: typeof raw === 'string' ? raw : 'No comparison generated' };\n} catch(e) {\n  comparison = { summary_a: 'Parse error', summary_b: 'Parse error', key_differences: [], similarities: [], additions_in_b: [], removals_from_a: [], risk_flags: [], recommendation: typeof raw === 'string' ? raw.substring(0, 500) : 'Parse failed: ' + e.message };\n}\nreturn [{ json: {\n  status: 'ok',\n  doc_a_id: meta.doc_a_id,\n  doc_b_id: meta.doc_b_id,\n  chunks_a: meta.chunks_a,\n  chunks_b: meta.chunks_b,\n  comparison,\n  timestamp: new Date().toISOString()\n}}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "resp1",
+        "name": "Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          1860,
+          200
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($input.first().json) }}"
+        },
+        "typeVersion": 1.5
+      },
+      {
+        "id": "doc-list-wh",
+        "name": "Doc List Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          0,
+          500
+        ],
+        "webhookId": "gda-doc-list-001",
+        "parameters": {
+          "path": "gda-doc-list",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "doc-list-auth",
+        "name": "Doc List Auth",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          220,
+          500
+        ],
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || '';\nif (auth !== $env.GDA_API_KEY_2026) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "doc-list-query",
+        "name": "List All Doc IDs",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          440,
+          500
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/vectors/list",
+          "method": "GET",
+          "options": {},
+          "sendQuery": true,
+          "authentication": "predefinedCredentialType",
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "namespace",
+                "value": "gda-documents"
+              },
+              {
+                "name": "limit",
+                "value": "100"
+              }
+            ]
+          },
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "cVqyKm27Ws9a1NJG",
+            "name": "PineconeApi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "doc-list-extract",
+        "name": "Extract Unique Docs",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          660,
+          500
+        ],
+        "parameters": {
+          "jsCode": "const vectors = $json.vectors || [];\nconst docMap = {};\nfor (const v of vectors) {\n  const id = v.id || '';\n  const match = id.match(/^(.+)_chunk_(\\d+)$/);\n  if (match) {\n    const docId = match[1];\n    const chunkIdx = parseInt(match[2]);\n    if (!docMap[docId]) docMap[docId] = { id: docId, chunks: 0 };\n    docMap[docId].chunks = Math.max(docMap[docId].chunks, chunkIdx + 1);\n  }\n}\nconst docs = Object.values(docMap).sort((a,b) => b.chunks - a.chunks);\nreturn [{ json: { status: 'ok', documents: docs, total: docs.length } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "doc-list-resp",
+        "name": "Doc List Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          880,
+          500
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($input.first().json) }}"
+        },
+        "typeVersion": 1.5
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth Guard": {
+        "main": [
+          [
+            {
+              "node": "Validate Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Input": {
+        "main": [
+          [
+            {
+              "node": "List Vectors Doc A",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "List Vectors Doc B",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List Vectors Doc A": {
+        "main": [
+          [
+            {
+              "node": "Fetch Doc A Chunks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List Vectors Doc B": {
+        "main": [
+          [
+            {
+              "node": "Fetch Doc B Chunks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Doc A Chunks": {
+        "main": [
+          [
+            {
+              "node": "Merge Docs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Doc B Chunks": {
+        "main": [
+          [
+            {
+              "node": "Merge Docs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge Docs": {
+        "main": [
+          [
+            {
+              "node": "Claude Compare",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude Compare": {
+        "main": [
+          [
+            {
+              "node": "Format Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Response": {
+        "main": [
+          [
+            {
+              "node": "Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Doc List Webhook": {
+        "main": [
+          [
+            {
+              "node": "Doc List Auth",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Doc List Auth": {
+        "main": [
+          [
+            {
+              "node": "List All Doc IDs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "List All Doc IDs": {
+        "main": [
+          [
+            {
+              "node": "Extract Unique Docs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Unique Docs": {
+        "main": [
+          [
+            {
+              "node": "Doc List Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T21:28:43.419Z",
+        "id": 13440,
+        "workflowId": "dKibEwHO773kehFg",
+        "versionId": "e880863e-e15e-428f-9214-c88815821793",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T21:28:43.434Z",
+        "id": 13441,
+        "workflowId": "dKibEwHO773kehFg",
+        "versionId": "e880863e-e15e-428f-9214-c88815821793",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}

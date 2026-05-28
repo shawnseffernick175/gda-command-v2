@@ -1,0 +1,986 @@
+{
+  "updatedAt": "2026-05-26T21:28:45.594Z",
+  "createdAt": "2026-03-11T22:45:31.514Z",
+  "id": "RqtftSynjqEKbs9Q",
+  "name": "GDA.api.report-builder",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "rb-wh-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "parameters": {
+        "path": "gda-report-builder",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "rb-auth-001",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "rb-validate-001",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst prompt = body.prompt || '';\nconst outputFormat = (body.outputFormat || 'pptx').toLowerCase();\nconst templateType = body.templateType || 'general';\nconst sources = body.sources || [];\n\nif (!prompt) {\n  throw new Error('Missing required field: prompt');\n}\n\nconst validFormats = ['pptx', 'pdf', 'docx'];\nif (!validFormats.includes(outputFormat)) {\n  throw new Error(`Invalid outputFormat: ${outputFormat}. Must be one of: ${validFormats.join(', ')}`);\n}\n\nreturn [{\n  json: {\n    prompt,\n    outputFormat,\n    templateType,\n    sources,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "rb-embed-001",
+      "name": "Embed Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/embeddings",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.prompt }) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "unLYjAN4H9MFrJ0u",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "rb-pinecone-001",
+      "name": "Query Pinecone",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/query",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ namespace: 'gda-documents', topK: 20, vector: $json.data[0].embedding, includeMetadata: true }) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "pineconeApi"
+      },
+      "credentials": {
+        "pineconeApi": {
+          "id": "cVqyKm27Ws9a1NJG",
+          "name": "PineconeApi account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "rb-context-001",
+      "name": "Build RAG Context",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const matches = $input.first().json.matches || [];\nconst prevData = $('Validate Input').first().json;\n\nconst contextChunks = matches\n  .filter(m => m.score > 0.7)\n  .map(m => {\n    const meta = m.metadata || {};\n    return `[Source: ${meta.filename || 'unknown'}, Page: ${meta.page || 'n/a'}]\\n${meta.text || ''}`;\n  });\n\nconst context = contextChunks.join('\\n\\n---\\n\\n');\n\nreturn [{\n  json: {\n    ...prevData,\n    ragContext: context,\n    sourceCount: contextChunks.length\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "rb-claude-001",
+      "name": "Claude Synthesize Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        200
+      ],
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: 'You are GDA Command Report Builder. Generate a structured ' + $json.outputFormat.toUpperCase() + ' report.\\n\\nUSER REQUEST: ' + $json.prompt + '\\n\\nSOURCE DOCUMENTS (from RAG):\\n' + $json.ragContext + '\\n\\nReturn structured JSON with title, subtitle, sections array (each with heading, type, content/items/rows/headers), footer. Quality: defense contractor professional level. Return ONLY valid JSON.' }] }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "nodeCredentialType": "anthropicApi"
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "d92MU0tRK7bEGV83",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "rb-parse-001",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1540,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst prevData = $('Build RAG Context').first().json;\nlet content;\n\ntry {\n  const text = response.content[0].text;\n  const cleaned = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  content = JSON.parse(cleaned);\n} catch (e) {\n  content = {\n    title: 'Generated Report',\n    subtitle: new Date().toLocaleDateString(),\n    sections: [{ heading: 'Content', type: 'text', content: response.content[0].text }],\n    footer: 'GDA Proprietary'\n  };\n}\n\nreturn [{\n  json: {\n    ...prevData,\n    reportContent: content\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "rb-route-001",
+      "name": "Route by Format",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1760,
+        200
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "pptx",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "combinator": "and"
+                },
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.outputFormat }}",
+                    "rightValue": "pptx"
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "docx",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "combinator": "and"
+                },
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.outputFormat }}",
+                    "rightValue": "docx"
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "pdf",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "combinator": "and"
+                },
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.outputFormat }}",
+                    "rightValue": "pdf"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "rb-pptx-001",
+      "name": "Generate PPTX",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2000,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const report = $json.reportContent;\nconst title = report.title || 'GDA Report';\nconst date = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});\nconst NAVY='#0B1D3A', ORANGE='#C65D21', GOLD='#C8A84B', WHITE='#FFFFFF', LIGHT='#F5F5F5', DARK='#1A1A1A';\nlet html = `<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>${title}</title><style>* { box-sizing:border-box; margin:0; padding:0; } body { font-family: Calibri, Arial, sans-serif; background:#1B3A6B; } .slide { width:1280px; min-height:720px; background:white; margin:10px auto; position:relative; box-shadow:0 4px 20px rgba(0,0,0,0.3); overflow:hidden; } .header-bar { position:absolute; top:0; left:0; right:0; height:65px; background:${NAVY}; } .accent-line { position:absolute; top:65px; left:0; right:0; height:4px; background:${ORANGE}; } .slide-content { padding:85px 50px 50px; } .slide-num { position:absolute; bottom:12px; right:20px; color:#999; font-size:11px; } .footer { position:absolute; bottom:12px; left:50px; color:#999; font-size:11px; } .title-slide { background:linear-gradient(135deg,${NAVY} 0%,#0d2247 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; } .title-slide .main-title { font-size:44px; font-weight:bold; color:${GOLD}; margin-bottom:16px; } .title-slide .subtitle { font-size:20px; color:#ccc; } .section-title { color:white; font-size:22px; font-weight:bold; position:absolute; top:16px; left:30px; z-index:2; } table { border-collapse:collapse; width:100%; margin:10px 0; } th { background:${NAVY}; color:white; padding:8px 12px; text-align:left; } td { padding:6px 12px; border:1px solid #e0e0e0; } tr:nth-child(even) td { background:${LIGHT}; } ul { list-style:none; } ul li { font-size:15px; padding:6px 0 6px 24px; position:relative; border-bottom:1px solid #f0f0f0; } ul li:before { content:'\u25b8'; color:${ORANGE}; position:absolute; left:0; } .kpi-grid { display:flex; gap:16px; flex-wrap:wrap; } .kpi-card { flex:1; min-width:150px; background:${LIGHT}; border-radius:6px; padding:16px; text-align:center; border-top:3px solid ${ORANGE}; } .kpi-label { font-size:11px; color:#666; } .kpi-value { font-size:28px; font-weight:bold; color:${NAVY}; margin-top:4px; } p.content { font-size:14px; line-height:1.7; }</style></head><body>`;\nhtml += `<div class=\"slide title-slide\"><div class=\"main-title\">${title}</div><div class=\"subtitle\">${report.subtitle || 'GDA Command'}</div><div style=\"font-size:14px;color:#8899aa;margin-top:12px\">Generated by Envision AI | ${date}</div></div>`;\nconst sections = report.sections || [];\nsections.forEach((section, i) => {\n  html += `<div class=\"slide\"><div class=\"header-bar\"></div><div class=\"accent-line\"></div><div class=\"section-title\">${section.heading || ''}</div><div class=\"slide-content\">`;\n  if (section.type === 'table' && section.rows) {\n    html += '<table><thead><tr>'; (section.headers || []).forEach(h => html += `<th>${h}</th>`); html += '</tr></thead><tbody>';\n    section.rows.forEach(row => { html += '<tr>'; row.forEach(cell => html += `<td>${cell}</td>`); html += '</tr>'; }); html += '</tbody></table>';\n  } else if (section.type === 'bullet_list' && section.items) {\n    html += '<ul>'; section.items.forEach(item => html += `<li>${typeof item === 'string' ? item : item.text || JSON.stringify(item)}</li>`); html += '</ul>';\n  } else if (section.type === 'kpi_banner' && section.items) {\n    html += '<div class=\"kpi-grid\">'; section.items.forEach(kpi => { html += `<div class=\"kpi-card\"><div class=\"kpi-label\">${kpi.label || ''}</div><div class=\"kpi-value\">${kpi.value || ''}</div></div>`; }); html += '</div>';\n  } else { html += `<p class=\"content\">${(section.content || '').replace(/\\n/g, '<br>')}</p>`; }\n  html += `</div><div class=\"footer\">${title} | GDA Proprietary</div><div class=\"slide-num\">${i + 2}</div></div>`;\n});\nhtml += '</body></html>';\nreturn [{ json: { fileName: title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\\s+/g, '_') + '.html', base64Data: Buffer.from(html).toString('base64'), mimeType: 'text/html', format: 'pptx', slideCount: sections.length + 1, title } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "rb-docx-001",
+      "name": "Generate DOCX",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2000,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const report = $json.reportContent;\nlet html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><style>body { font-family: Calibri; color: #1A1A1A; margin: 1in; } h1 { color: #0B1D3A; font-size: 28pt; border-bottom: 3px solid #C65D21; } h2 { color: #0B1D3A; font-size: 18pt; margin-top: 24px; border-left: 4px solid #C65D21; padding-left: 12px; } table { border-collapse: collapse; width: 100%; } th { background-color: #0B1D3A; color: white; padding: 8px; } td { padding: 6px; border: 1px solid #ddd; } tr:nth-child(even) { background: #f5f5f5; } .footer { color: #888; font-size: 9pt; margin-top: 40px; border-top: 1px solid #ddd; }</style></head><body>`;\nhtml += `<h1>${report.title || 'GDA Report'}</h1><p style='color:#4A6480;'>${report.subtitle || ''}</p>`;\nfor (const s of (report.sections || [])) {\n  html += `<h2>${s.heading || ''}</h2>`;\n  if (s.type === 'table' && s.rows) { html += '<table><tr>'; (s.headers||[]).forEach(h => html += `<th>${h}</th>`); html += '</tr>'; s.rows.forEach(r => { html += '<tr>'; r.forEach(c => html += `<td>${c}</td>`); html += '</tr>'; }); html += '</table>'; }\n  else if (s.type === 'bullet_list' && s.items) { html += '<ul>'; s.items.forEach(item => html += `<li>${item}</li>`); html += '</ul>'; }\n  else { html += `<p>${(s.content || '').replace(/\\n/g, '<br>')}</p>`; }\n}\nhtml += `<div class='footer'>${report.footer || 'GDA Proprietary'}</div></body></html>`;\nreturn [{ json: { fileName: `${(report.title || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.docx`, base64Data: Buffer.from(html).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', format: 'docx', title: report.title } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "rb-pdf-001",
+      "name": "Generate PDF (HTML)",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2000,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const report = $json.reportContent;\nlet html = `<!DOCTYPE html><html><head><style>body { font-family: Calibri; color: #1A1A1A; margin: 40px; } h1 { color: #0B1D3A; border-bottom: 3px solid #C65D21; } h2 { color: #0B1D3A; border-left: 4px solid #C65D21; padding-left: 10px; } table { border-collapse: collapse; width: 100%; } th { background: #0B1D3A; color: white; padding: 8px; } td { padding: 6px; border: 1px solid #ddd; } tr:nth-child(even) { background: #f5f5f5; }</style></head><body>`;\nhtml += `<h1>${report.title || 'GDA Report'}</h1><p style='color:#4A6480;'>${report.subtitle || ''}</p>`;\nfor (const s of (report.sections || [])) {\n  html += `<h2>${s.heading || ''}</h2>`;\n  if (s.type === 'table' && s.rows) { html += '<table><tr>'; (s.headers||[]).forEach(h => html += `<th>${h}</th>`); html += '</tr>'; s.rows.forEach(r => { html += '<tr>'; r.forEach(c => html += `<td>${c}</td>`); html += '</tr>'; }); html += '</table>'; }\n  else if (s.type === 'bullet_list' && s.items) { html += '<ul>'; s.items.forEach(i => html += `<li>${i}</li>`); html += '</ul>'; }\n  else { html += `<p>${(s.content || '').replace(/\\n/g, '<br>')}</p>`; }\n}\nhtml += `<div style='color:#888;font-size:9pt;margin-top:30px;border-top:1px solid #ddd;'>${report.footer || 'GDA Proprietary'}</div></body></html>`;\nreturn [{ json: { fileName: `${(report.title || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.html`, base64Data: Buffer.from(html).toString('base64'), mimeType: 'text/html', format: 'pdf', title: report.title } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "rb-respond-001",
+      "name": "Respond with File",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        2220,
+        200
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, fileName: $json.fileName, format: $json.format, mimeType: $json.mimeType, base64Data: $json.base64Data, title: $json.title, slideCount: $json.slideCount || null, downloadReady: true }) }}"
+      },
+      "typeVersion": 1.5
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Embed Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Query": {
+      "main": [
+        [
+          {
+            "node": "Query Pinecone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Pinecone": {
+      "main": [
+        [
+          {
+            "node": "Build RAG Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build RAG Context": {
+      "main": [
+        [
+          {
+            "node": "Claude Synthesize Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Synthesize Report": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [
+          {
+            "node": "Route by Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Format": {
+      "main": [
+        [
+          {
+            "node": "Generate PPTX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate DOCX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate PDF (HTML)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate PPTX": {
+      "main": [
+        [
+          {
+            "node": "Respond with File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate DOCX": {
+      "main": [
+        [
+          {
+            "node": "Respond with File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate PDF (HTML)": {
+      "main": [
+        [
+          {
+            "node": "Respond with File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "bcf7bd35-7c94-4577-873e-8cc919613674",
+  "activeVersionId": "bcf7bd35-7c94-4577-873e-8cc919613674",
+  "versionCounter": 353,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-11T22:45:31.514Z",
+      "createdAt": "2026-03-11T22:45:31.514Z",
+      "role": "workflow:owner",
+      "workflowId": "RqtftSynjqEKbs9Q",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T21:28:45.596Z",
+    "createdAt": "2026-05-26T21:28:45.596Z",
+    "versionId": "bcf7bd35-7c94-4577-873e-8cc919613674",
+    "workflowId": "RqtftSynjqEKbs9Q",
+    "nodes": [
+      {
+        "id": "rb-wh-001",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          0,
+          200
+        ],
+        "webhookId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "parameters": {
+          "path": "gda-report-builder",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2.1
+      },
+      {
+        "id": "rb-auth-001",
+        "name": "Auth Guard",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          220,
+          200
+        ],
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "rb-validate-001",
+        "name": "Validate Input",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          440,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || {};\nconst prompt = body.prompt || '';\nconst outputFormat = (body.outputFormat || 'pptx').toLowerCase();\nconst templateType = body.templateType || 'general';\nconst sources = body.sources || [];\n\nif (!prompt) {\n  throw new Error('Missing required field: prompt');\n}\n\nconst validFormats = ['pptx', 'pdf', 'docx'];\nif (!validFormats.includes(outputFormat)) {\n  throw new Error(`Invalid outputFormat: ${outputFormat}. Must be one of: ${validFormats.join(', ')}`);\n}\n\nreturn [{\n  json: {\n    prompt,\n    outputFormat,\n    templateType,\n    sources,\n    timestamp: new Date().toISOString()\n  }\n}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "rb-embed-001",
+        "name": "Embed Query",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          660,
+          200
+        ],
+        "parameters": {
+          "url": "https://api.openai.com/v1/embeddings",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.prompt }) }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "openAiApi"
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "unLYjAN4H9MFrJ0u",
+            "name": "OpenAi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "rb-pinecone-001",
+        "name": "Query Pinecone",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          880,
+          200
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/query",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ namespace: 'gda-documents', topK: 20, vector: $json.data[0].embedding, includeMetadata: true }) }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "cVqyKm27Ws9a1NJG",
+            "name": "PineconeApi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "rb-context-001",
+        "name": "Build RAG Context",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1100,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const matches = $input.first().json.matches || [];\nconst prevData = $('Validate Input').first().json;\n\nconst contextChunks = matches\n  .filter(m => m.score > 0.7)\n  .map(m => {\n    const meta = m.metadata || {};\n    return `[Source: ${meta.filename || 'unknown'}, Page: ${meta.page || 'n/a'}]\\n${meta.text || ''}`;\n  });\n\nconst context = contextChunks.join('\\n\\n---\\n\\n');\n\nreturn [{\n  json: {\n    ...prevData,\n    ragContext: context,\n    sourceCount: contextChunks.length\n  }\n}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "rb-claude-001",
+        "name": "Claude Synthesize Report",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1320,
+          200
+        ],
+        "parameters": {
+          "url": "https://api.anthropic.com/v1/messages",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 8000, messages: [{ role: 'user', content: 'You are GDA Command Report Builder. Generate a structured ' + $json.outputFormat.toUpperCase() + ' report.\\n\\nUSER REQUEST: ' + $json.prompt + '\\n\\nSOURCE DOCUMENTS (from RAG):\\n' + $json.ragContext + '\\n\\nReturn structured JSON with title, subtitle, sections array (each with heading, type, content/items/rows/headers), footer. Quality: defense contractor professional level. Return ONLY valid JSON.' }] }) }}",
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              },
+              {
+                "name": "content-type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "nodeCredentialType": "anthropicApi"
+        },
+        "credentials": {
+          "anthropicApi": {
+            "id": "d92MU0tRK7bEGV83",
+            "name": "Anthropic account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "rb-parse-001",
+        "name": "Parse Claude Response",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1540,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const response = $input.first().json;\nconst prevData = $('Build RAG Context').first().json;\nlet content;\n\ntry {\n  const text = response.content[0].text;\n  const cleaned = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  content = JSON.parse(cleaned);\n} catch (e) {\n  content = {\n    title: 'Generated Report',\n    subtitle: new Date().toLocaleDateString(),\n    sections: [{ heading: 'Content', type: 'text', content: response.content[0].text }],\n    footer: 'GDA Proprietary'\n  };\n}\n\nreturn [{\n  json: {\n    ...prevData,\n    reportContent: content\n  }\n}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "rb-route-001",
+        "name": "Route by Format",
+        "type": "n8n-nodes-base.switch",
+        "position": [
+          1760,
+          200
+        ],
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "outputKey": "pptx",
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "combinator": "and"
+                  },
+                  "conditions": [
+                    {
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "leftValue": "={{ $json.outputFormat }}",
+                      "rightValue": "pptx"
+                    }
+                  ]
+                }
+              },
+              {
+                "outputKey": "docx",
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "combinator": "and"
+                  },
+                  "conditions": [
+                    {
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "leftValue": "={{ $json.outputFormat }}",
+                      "rightValue": "docx"
+                    }
+                  ]
+                }
+              },
+              {
+                "outputKey": "pdf",
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "combinator": "and"
+                  },
+                  "conditions": [
+                    {
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      },
+                      "leftValue": "={{ $json.outputFormat }}",
+                      "rightValue": "pdf"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "extra"
+          }
+        },
+        "typeVersion": 3
+      },
+      {
+        "id": "rb-pptx-001",
+        "name": "Generate PPTX",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2000,
+          0
+        ],
+        "parameters": {
+          "jsCode": "const report = $json.reportContent;\nconst title = report.title || 'GDA Report';\nconst date = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});\nconst NAVY='#0B1D3A', ORANGE='#C65D21', GOLD='#C8A84B', WHITE='#FFFFFF', LIGHT='#F5F5F5', DARK='#1A1A1A';\nlet html = `<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>${title}</title><style>* { box-sizing:border-box; margin:0; padding:0; } body { font-family: Calibri, Arial, sans-serif; background:#1B3A6B; } .slide { width:1280px; min-height:720px; background:white; margin:10px auto; position:relative; box-shadow:0 4px 20px rgba(0,0,0,0.3); overflow:hidden; } .header-bar { position:absolute; top:0; left:0; right:0; height:65px; background:${NAVY}; } .accent-line { position:absolute; top:65px; left:0; right:0; height:4px; background:${ORANGE}; } .slide-content { padding:85px 50px 50px; } .slide-num { position:absolute; bottom:12px; right:20px; color:#999; font-size:11px; } .footer { position:absolute; bottom:12px; left:50px; color:#999; font-size:11px; } .title-slide { background:linear-gradient(135deg,${NAVY} 0%,#0d2247 100%); color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; } .title-slide .main-title { font-size:44px; font-weight:bold; color:${GOLD}; margin-bottom:16px; } .title-slide .subtitle { font-size:20px; color:#ccc; } .section-title { color:white; font-size:22px; font-weight:bold; position:absolute; top:16px; left:30px; z-index:2; } table { border-collapse:collapse; width:100%; margin:10px 0; } th { background:${NAVY}; color:white; padding:8px 12px; text-align:left; } td { padding:6px 12px; border:1px solid #e0e0e0; } tr:nth-child(even) td { background:${LIGHT}; } ul { list-style:none; } ul li { font-size:15px; padding:6px 0 6px 24px; position:relative; border-bottom:1px solid #f0f0f0; } ul li:before { content:'\u25b8'; color:${ORANGE}; position:absolute; left:0; } .kpi-grid { display:flex; gap:16px; flex-wrap:wrap; } .kpi-card { flex:1; min-width:150px; background:${LIGHT}; border-radius:6px; padding:16px; text-align:center; border-top:3px solid ${ORANGE}; } .kpi-label { font-size:11px; color:#666; } .kpi-value { font-size:28px; font-weight:bold; color:${NAVY}; margin-top:4px; } p.content { font-size:14px; line-height:1.7; }</style></head><body>`;\nhtml += `<div class=\"slide title-slide\"><div class=\"main-title\">${title}</div><div class=\"subtitle\">${report.subtitle || 'GDA Command'}</div><div style=\"font-size:14px;color:#8899aa;margin-top:12px\">Generated by Envision AI | ${date}</div></div>`;\nconst sections = report.sections || [];\nsections.forEach((section, i) => {\n  html += `<div class=\"slide\"><div class=\"header-bar\"></div><div class=\"accent-line\"></div><div class=\"section-title\">${section.heading || ''}</div><div class=\"slide-content\">`;\n  if (section.type === 'table' && section.rows) {\n    html += '<table><thead><tr>'; (section.headers || []).forEach(h => html += `<th>${h}</th>`); html += '</tr></thead><tbody>';\n    section.rows.forEach(row => { html += '<tr>'; row.forEach(cell => html += `<td>${cell}</td>`); html += '</tr>'; }); html += '</tbody></table>';\n  } else if (section.type === 'bullet_list' && section.items) {\n    html += '<ul>'; section.items.forEach(item => html += `<li>${typeof item === 'string' ? item : item.text || JSON.stringify(item)}</li>`); html += '</ul>';\n  } else if (section.type === 'kpi_banner' && section.items) {\n    html += '<div class=\"kpi-grid\">'; section.items.forEach(kpi => { html += `<div class=\"kpi-card\"><div class=\"kpi-label\">${kpi.label || ''}</div><div class=\"kpi-value\">${kpi.value || ''}</div></div>`; }); html += '</div>';\n  } else { html += `<p class=\"content\">${(section.content || '').replace(/\\n/g, '<br>')}</p>`; }\n  html += `</div><div class=\"footer\">${title} | GDA Proprietary</div><div class=\"slide-num\">${i + 2}</div></div>`;\n});\nhtml += '</body></html>';\nreturn [{ json: { fileName: title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\\s+/g, '_') + '.html', base64Data: Buffer.from(html).toString('base64'), mimeType: 'text/html', format: 'pptx', slideCount: sections.length + 1, title } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "rb-docx-001",
+        "name": "Generate DOCX",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2000,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const report = $json.reportContent;\nlet html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><style>body { font-family: Calibri; color: #1A1A1A; margin: 1in; } h1 { color: #0B1D3A; font-size: 28pt; border-bottom: 3px solid #C65D21; } h2 { color: #0B1D3A; font-size: 18pt; margin-top: 24px; border-left: 4px solid #C65D21; padding-left: 12px; } table { border-collapse: collapse; width: 100%; } th { background-color: #0B1D3A; color: white; padding: 8px; } td { padding: 6px; border: 1px solid #ddd; } tr:nth-child(even) { background: #f5f5f5; } .footer { color: #888; font-size: 9pt; margin-top: 40px; border-top: 1px solid #ddd; }</style></head><body>`;\nhtml += `<h1>${report.title || 'GDA Report'}</h1><p style='color:#4A6480;'>${report.subtitle || ''}</p>`;\nfor (const s of (report.sections || [])) {\n  html += `<h2>${s.heading || ''}</h2>`;\n  if (s.type === 'table' && s.rows) { html += '<table><tr>'; (s.headers||[]).forEach(h => html += `<th>${h}</th>`); html += '</tr>'; s.rows.forEach(r => { html += '<tr>'; r.forEach(c => html += `<td>${c}</td>`); html += '</tr>'; }); html += '</table>'; }\n  else if (s.type === 'bullet_list' && s.items) { html += '<ul>'; s.items.forEach(item => html += `<li>${item}</li>`); html += '</ul>'; }\n  else { html += `<p>${(s.content || '').replace(/\\n/g, '<br>')}</p>`; }\n}\nhtml += `<div class='footer'>${report.footer || 'GDA Proprietary'}</div></body></html>`;\nreturn [{ json: { fileName: `${(report.title || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.docx`, base64Data: Buffer.from(html).toString('base64'), mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', format: 'docx', title: report.title } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "rb-pdf-001",
+        "name": "Generate PDF (HTML)",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          2000,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const report = $json.reportContent;\nlet html = `<!DOCTYPE html><html><head><style>body { font-family: Calibri; color: #1A1A1A; margin: 40px; } h1 { color: #0B1D3A; border-bottom: 3px solid #C65D21; } h2 { color: #0B1D3A; border-left: 4px solid #C65D21; padding-left: 10px; } table { border-collapse: collapse; width: 100%; } th { background: #0B1D3A; color: white; padding: 8px; } td { padding: 6px; border: 1px solid #ddd; } tr:nth-child(even) { background: #f5f5f5; }</style></head><body>`;\nhtml += `<h1>${report.title || 'GDA Report'}</h1><p style='color:#4A6480;'>${report.subtitle || ''}</p>`;\nfor (const s of (report.sections || [])) {\n  html += `<h2>${s.heading || ''}</h2>`;\n  if (s.type === 'table' && s.rows) { html += '<table><tr>'; (s.headers||[]).forEach(h => html += `<th>${h}</th>`); html += '</tr>'; s.rows.forEach(r => { html += '<tr>'; r.forEach(c => html += `<td>${c}</td>`); html += '</tr>'; }); html += '</table>'; }\n  else if (s.type === 'bullet_list' && s.items) { html += '<ul>'; s.items.forEach(i => html += `<li>${i}</li>`); html += '</ul>'; }\n  else { html += `<p>${(s.content || '').replace(/\\n/g, '<br>')}</p>`; }\n}\nhtml += `<div style='color:#888;font-size:9pt;margin-top:30px;border-top:1px solid #ddd;'>${report.footer || 'GDA Proprietary'}</div></body></html>`;\nreturn [{ json: { fileName: `${(report.title || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.html`, base64Data: Buffer.from(html).toString('base64'), mimeType: 'text/html', format: 'pdf', title: report.title } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "rb-respond-001",
+        "name": "Respond with File",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          2220,
+          200
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200,
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Access-Control-Allow-Origin",
+                  "value": "*"
+                }
+              ]
+            }
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ success: true, fileName: $json.fileName, format: $json.format, mimeType: $json.mimeType, base64Data: $json.base64Data, title: $json.title, slideCount: $json.slideCount || null, downloadReady: true }) }}"
+        },
+        "typeVersion": 1.5
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth Guard": {
+        "main": [
+          [
+            {
+              "node": "Validate Input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Input": {
+        "main": [
+          [
+            {
+              "node": "Embed Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Embed Query": {
+        "main": [
+          [
+            {
+              "node": "Query Pinecone",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Query Pinecone": {
+        "main": [
+          [
+            {
+              "node": "Build RAG Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build RAG Context": {
+        "main": [
+          [
+            {
+              "node": "Claude Synthesize Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude Synthesize Report": {
+        "main": [
+          [
+            {
+              "node": "Parse Claude Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse Claude Response": {
+        "main": [
+          [
+            {
+              "node": "Route by Format",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Format": {
+        "main": [
+          [
+            {
+              "node": "Generate PPTX",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Generate DOCX",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Generate PDF (HTML)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Generate PPTX": {
+        "main": [
+          [
+            {
+              "node": "Respond with File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Generate DOCX": {
+        "main": [
+          [
+            {
+              "node": "Respond with File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Generate PDF (HTML)": {
+        "main": [
+          [
+            {
+              "node": "Respond with File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T21:28:45.631Z",
+        "id": 13464,
+        "workflowId": "RqtftSynjqEKbs9Q",
+        "versionId": "bcf7bd35-7c94-4577-873e-8cc919613674",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T21:28:45.646Z",
+        "id": 13465,
+        "workflowId": "RqtftSynjqEKbs9Q",
+        "versionId": "bcf7bd35-7c94-4577-873e-8cc919613674",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}

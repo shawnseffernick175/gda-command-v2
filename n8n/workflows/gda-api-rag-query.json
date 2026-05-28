@@ -1,0 +1,748 @@
+{
+  "updatedAt": "2026-05-26T21:28:43.202Z",
+  "createdAt": "2026-03-10T20:00:29.447Z",
+  "id": "rii6IYWRxh9TMNjd",
+  "name": "GDA.api.rag-query",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "rag-query-v3",
+      "parameters": {
+        "path": "gda-rag-query",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "auth1",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "validate1",
+      "name": "Validate Query",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst query = body.query || body.question || body.message;\nconst top_k = body.top_k || 5;\nif (!query) { throw new Error('query is required'); }\nreturn [{ json: { query, top_k } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "embed1",
+      "name": "Embed Query",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/embeddings",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.query }) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "unLYjAN4H9MFrJ0u",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "format1",
+      "name": "Build Context",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const query = $('Validate Query').first().json.query;\nconst matches = $json.matches || [];\nif (matches.length === 0) {\n  return [{ json: { query, context: '', sources: [], has_results: false } }];\n}\nconst sources = [];\nconst chunks = [];\nfor (const m of matches) {\n  const meta = m.metadata || {};\n  chunks.push(meta.text || '');\n  if (meta.document_id && !sources.includes(meta.document_id)) sources.push(meta.document_id);\n}\nreturn [{ json: { query, context: chunks.join('\\n\\n---\\n\\n'), sources, has_results: true } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ai1",
+      "name": "Ask Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        200
+      ],
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, messages: [{ role: 'user', content: $json.has_results ? 'Based on these documents:\\n\\n' + $json.context + '\\n\\nAnswer this question: ' + $json.query + '\\n\\nRespond as JSON: {\"answer\": \"...\", \"sources\": [...], \"confidence\": \"high|medium|low\"}' : 'No documents found for: ' + $json.query + '\\n\\nRespond as JSON: {\"answer\": \"No relevant documents found in the knowledge base.\", \"sources\": [], \"confidence\": \"low\"}' }] }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "nodeCredentialType": "anthropicApi"
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "d92MU0tRK7bEGV83",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "format2",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1540,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const query = $('Validate Query').first().json.query;\nconst sources = $('Build Context').first().json.sources;\nconst raw = $json.content?.[0]?.text || $json.content || '';\nlet parsed = {};\ntry {\n  const match = typeof raw === 'string' ? raw.match(/\\{[\\s\\S]*\\}/) : null;\n  if (match) parsed = JSON.parse(match[0]);\n  else parsed = { answer: typeof raw === 'string' ? raw : JSON.stringify(raw) };\n} catch(e) {\n  parsed = { answer: typeof raw === 'string' ? raw : JSON.stringify(raw) };\n}\nreturn [{ json: {\n  answer: parsed.answer || 'No answer generated',\n  sources: parsed.sources || sources,\n  confidence: parsed.confidence || 'medium',\n  query,\n  timestamp: new Date().toISOString()\n}}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "resp1",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1760,
+        200
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "health-wh",
+      "name": "Health Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        500
+      ],
+      "webhookId": "rag-health-v3",
+      "parameters": {
+        "path": "gda-rag-health",
+        "options": {},
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "health-resp",
+      "name": "Health Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        220,
+        500
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "{\"status\":\"ok\",\"module\":\"rag-query\",\"version\":\"v3-direct-http\"}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "ff942537-c253-4697-a55b-1cd9f9efebdb",
+      "name": "Query pgvector",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-query",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ collection: 'gda-documents', embedding: $json.data[0].embedding, topK: $('Validate Query').first().json.top_k }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "8fb46c9d-c5cc-44a9-b6b0-7d658ca792da",
+      "name": "Reshape to Pinecone Format",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1100,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Reshape pgvector response to Pinecone-compatible matches shape\nconst pgResponse = $input.first().json;\nconst results = (pgResponse.data || {}).results || pgResponse.results || [];\nconst matches = results.map(r => ({\n  id: r.id,\n  score: r.similarity,\n  metadata: {\n    text: r.chunk_text || '',\n    chunk_text: r.chunk_text || '',\n    document_id: r.document_id || '',\n    chunk_index: r.chunk_index || 0,\n    page_number: r.page_number || null,\n    page: r.page_number || null,\n    section_title: r.section_title || null,\n    source: (r.metadata || {}).source || 'unknown',\n    file_name: (r.metadata || {}).file_name || r.document_id || 'unknown',\n    filename: (r.metadata || {}).file_name || r.document_id || 'unknown',\n    file_type: (r.metadata || {}).file_type || 'unknown',\n    classification: (r.metadata || {}).classification || 'UNCLASSIFIED',\n    ...(r.metadata || {})\n  }\n}));\nreturn [{ json: { matches } }];"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Validate Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Query": {
+      "main": [
+        [
+          {
+            "node": "Embed Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Query": {
+      "main": [
+        [
+          {
+            "node": "Query pgvector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Context": {
+      "main": [
+        [
+          {
+            "node": "Ask Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Claude": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Webhook": {
+      "main": [
+        [
+          {
+            "node": "Health Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query pgvector": {
+      "main": [
+        [
+          {
+            "node": "Reshape to Pinecone Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reshape to Pinecone Format": {
+      "main": [
+        [
+          {
+            "node": "Build Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "73991830-7cfa-4623-b9f4-5c55f19b25fa",
+  "activeVersionId": "73991830-7cfa-4623-b9f4-5c55f19b25fa",
+  "versionCounter": 356,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-03-10T20:00:29.447Z",
+      "createdAt": "2026-03-10T20:00:29.447Z",
+      "role": "workflow:owner",
+      "workflowId": "rii6IYWRxh9TMNjd",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-26T21:28:43.205Z",
+    "createdAt": "2026-05-26T21:28:43.205Z",
+    "versionId": "73991830-7cfa-4623-b9f4-5c55f19b25fa",
+    "workflowId": "rii6IYWRxh9TMNjd",
+    "nodes": [
+      {
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          0,
+          200
+        ],
+        "webhookId": "rag-query-v3",
+        "parameters": {
+          "path": "gda-rag-query",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "auth1",
+        "name": "Auth Guard",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          220,
+          200
+        ],
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "validate1",
+        "name": "Validate Query",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          440,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst query = body.query || body.question || body.message;\nconst top_k = body.top_k || 5;\nif (!query) { throw new Error('query is required'); }\nreturn [{ json: { query, top_k } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "embed1",
+        "name": "Embed Query",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          660,
+          200
+        ],
+        "parameters": {
+          "url": "https://api.openai.com/v1/embeddings",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.query }) }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "openAiApi"
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "unLYjAN4H9MFrJ0u",
+            "name": "OpenAi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "pinecone1",
+        "name": "Query Pinecone",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          880,
+          200
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/query",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ namespace: 'gda-documents', topK: $('Validate Query').first().json.top_k, vector: $json.data[0].embedding, includeMetadata: true }) }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "cVqyKm27Ws9a1NJG",
+            "name": "PineconeApi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "format1",
+        "name": "Build Context",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1100,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const query = $('Validate Query').first().json.query;\nconst matches = $json.matches || [];\nif (matches.length === 0) {\n  return [{ json: { query, context: '', sources: [], has_results: false } }];\n}\nconst sources = [];\nconst chunks = [];\nfor (const m of matches) {\n  const meta = m.metadata || {};\n  chunks.push(meta.text || '');\n  if (meta.document_id && !sources.includes(meta.document_id)) sources.push(meta.document_id);\n}\nreturn [{ json: { query, context: chunks.join('\\n\\n---\\n\\n'), sources, has_results: true } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "ai1",
+        "name": "Ask Claude",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1320,
+          200
+        ],
+        "parameters": {
+          "url": "https://api.anthropic.com/v1/messages",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, messages: [{ role: 'user', content: $json.has_results ? 'Based on these documents:\\n\\n' + $json.context + '\\n\\nAnswer this question: ' + $json.query + '\\n\\nRespond as JSON: {\"answer\": \"...\", \"sources\": [...], \"confidence\": \"high|medium|low\"}' : 'No documents found for: ' + $json.query + '\\n\\nRespond as JSON: {\"answer\": \"No relevant documents found in the knowledge base.\", \"sources\": [], \"confidence\": \"low\"}' }] }) }}",
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              }
+            ]
+          },
+          "nodeCredentialType": "anthropicApi"
+        },
+        "credentials": {
+          "anthropicApi": {
+            "id": "d92MU0tRK7bEGV83",
+            "name": "Anthropic account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "format2",
+        "name": "Format Response",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1540,
+          200
+        ],
+        "parameters": {
+          "jsCode": "const query = $('Validate Query').first().json.query;\nconst sources = $('Build Context').first().json.sources;\nconst raw = $json.content?.[0]?.text || $json.content || '';\nlet parsed = {};\ntry {\n  const match = typeof raw === 'string' ? raw.match(/\\{[\\s\\S]*\\}/) : null;\n  if (match) parsed = JSON.parse(match[0]);\n  else parsed = { answer: typeof raw === 'string' ? raw : JSON.stringify(raw) };\n} catch(e) {\n  parsed = { answer: typeof raw === 'string' ? raw : JSON.stringify(raw) };\n}\nreturn [{ json: {\n  answer: parsed.answer || 'No answer generated',\n  sources: parsed.sources || sources,\n  confidence: parsed.confidence || 'medium',\n  query,\n  timestamp: new Date().toISOString()\n}}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "resp1",
+        "name": "Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          1760,
+          200
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          },
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($input.first().json) }}"
+        },
+        "typeVersion": 1.5
+      },
+      {
+        "id": "health-wh",
+        "name": "Health Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          0,
+          500
+        ],
+        "webhookId": "rag-health-v3",
+        "parameters": {
+          "path": "gda-rag-health",
+          "options": {},
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2.1
+      },
+      {
+        "id": "health-resp",
+        "name": "Health Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          220,
+          500
+        ],
+        "parameters": {
+          "options": {
+            "responseCode": 200
+          },
+          "respondWith": "json",
+          "responseBody": "{\"status\":\"ok\",\"module\":\"rag-query\",\"version\":\"v3-direct-http\"}"
+        },
+        "typeVersion": 1.5
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth Guard": {
+        "main": [
+          [
+            {
+              "node": "Validate Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Query": {
+        "main": [
+          [
+            {
+              "node": "Embed Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Embed Query": {
+        "main": [
+          [
+            {
+              "node": "Query Pinecone",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Query Pinecone": {
+        "main": [
+          [
+            {
+              "node": "Build Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Context": {
+        "main": [
+          [
+            {
+              "node": "Ask Claude",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ask Claude": {
+        "main": [
+          [
+            {
+              "node": "Format Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Response": {
+        "main": [
+          [
+            {
+              "node": "Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Health Webhook": {
+        "main": [
+          [
+            {
+              "node": "Health Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-26T21:28:43.240Z",
+        "id": 13438,
+        "workflowId": "rii6IYWRxh9TMNjd",
+        "versionId": "73991830-7cfa-4623-b9f4-5c55f19b25fa",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-26T21:28:43.258Z",
+        "id": 13439,
+        "workflowId": "rii6IYWRxh9TMNjd",
+        "versionId": "73991830-7cfa-4623-b9f4-5c55f19b25fa",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}
