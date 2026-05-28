@@ -34,8 +34,100 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 ## Devin Secrets Needed
 - `PROD_SSH_KEY` — SSH key for production server access
 - `OPENAI_API_KEY` — for AI analysis features (OODA, Capture Coach, AI Gateway summarizer)
+- `N8N_API_KEY` — for n8n workflow management API (GET/PUT workflows, check executions)
+- `GDA_WEBHOOK_KEY` — for n8n webhook-level auth and internal API endpoints
 
 ## Key Testing Flows
+
+### n8n Workflow Dual-Write (Phase 2C)
+
+**Architecture:** Workflows 3 (ai-agent-upload) and 5 (doc-ingest) write to BOTH Pinecone AND `document_embeddings` table via `/api/internal/vector-upsert`.
+
+**Dual-layer auth pattern for n8n webhooks:**
+n8n webhooks have TWO auth layers:
+1. **Webhook-level auth** (n8n credential "GDA Webhook Auth v2"): Header `x-gda-key` with value = `GDA_WEBHOOK_KEY` env var
+2. **Workflow Auth Guard code node**: Checks `x-gda-auth` header (or `x-gda-key`, or `body.auth_key`) against workflow-specific valid keys
+
+You must send BOTH headers simultaneously:
+```bash
+curl -X POST "http://<VPS_IP>:5678/webhook/<path>" \
+  -H "Content-Type: application/json" \
+  -H "x-gda-key: <GDA_WEBHOOK_KEY>" \
+  -H "x-gda-auth: <WORKFLOW_AUTH_KEY>" \
+  -d '{...}'
+```
+
+**IMPORTANT — Different workflows accept different Auth Guard keys:**
+- Workflow 5 (doc-ingest, path: `gda-ingest-direct`): Accepts `GDA_WEBHOOK_SECRET_2026` in `x-gda-auth`
+- Workflow 3 (ai-agent-upload, path: `upload`): Only accepts `GDA_DEPLOY_KEY_2026` or `GDA_API_KEY_2026` (NOT `GDA_WEBHOOK_SECRET_2026`)
+- Always read the Auth Guard code node to confirm which keys are valid before triggering
+
+**Workflow 5 (doc-ingest) test payload:**
+```json
+{
+  "file_url": "https://example.com/test.txt",
+  "file_type": "txt",
+  "document_id": "test-dual-write-001",
+  "metadata": {"source": "devin-test"}
+}
+```
+
+**Workflow 3 (ai-agent-upload) test payload:**
+```json
+{
+  "attachments": [{
+    "url": "https://example.com/test.txt",
+    "name": "test-file.txt"
+  }]
+}
+```
+
+**Verifying dual-write results:**
+```sql
+-- Check new rows landed in document_embeddings
+SELECT id, collection, document_id, embedding IS NOT NULL as has_embedding, created_at
+FROM document_embeddings
+WHERE collection IN ('gda-documents','general','financial','competitive_intel','default')
+ORDER BY created_at DESC LIMIT 10;
+
+-- Collection mapping:
+-- Workflow 5 writes to: 'gda-documents' (matches Pinecone namespace)
+-- Workflow 3 writes to: 'ai-agent-attachments' (maps to Pinecone ai-assistant index)
+```
+
+**Checking execution status:**
+```bash
+curl -s -H "X-N8N-API-KEY: $N8N_API_KEY" \
+  "http://<VPS_IP>:5678/api/v1/executions?workflowId=<ID>&limit=5"
+```
+
+**Common dual-write issues:**
+- Empty curl response with responseMode="responseNode": Workflow errored before reaching Respond node. Check executions API for error status.
+- Auth Guard "Unauthorized" error: Wrong key for that specific workflow. Check Auth Guard jsCode.
+- 403 at webhook level: Wrong value in `x-gda-key` header (needs GDA_WEBHOOK_KEY, not a 2026 key).
+- pgvector write failure doesn't block Pinecone: Both dual-write nodes have `onError: "continueRegularOutput"`.
+
+### Sentinel Health Check
+**Endpoint:** `GET /api/sentinel/current` (no auth required)
+**Access from VPS:**
+```bash
+ssh root@<VPS_IP> "docker exec gda-backend node -e \"
+  const http = require('http');
+  const opts = { hostname: 'localhost', port: 3001, path: '/api/sentinel/current', method: 'GET' };
+  const req = http.request(opts, (res) => {
+    let d = ''; res.on('data', c => d+=c); res.on('end', () => console.log(d));
+  });
+  req.end();
+\""
+```
+**Expected:** 9 components, at least 8 healthy. `writers_24h` may show degraded during testing due to auth failures in test executions.
+
+### Knowledge Reembed Sweep
+**Workflow ID:** Check via n8n API (name: `GDA.maint.knowledge-reembed-sweep`)
+**Verify configuration:**
+- Active = true
+- Fetch Documents node: NO `authentication`/`genericAuthType` params (these cause silent failure). Manual `x-gda-key` header in `headerParameters` instead.
+- Schedule Trigger: 24-hour interval
 
 ### W6: Capture Discipline Dashboard
 **Test procedure:**
@@ -197,6 +289,114 @@ Install Playwright first: `mkdir -p /home/ubuntu/pw-test && cd /home/ubuntu/pw-t
 - `chunk_count` in the list comes from a LEFT JOIN on `document_embeddings` — seeded docs without embeddings show "0 chunks"
 - Upload modal file count header says "N file(s) selected" — verify this matches the number of files set via Playwright
 
+### Vector Read Endpoints (Phase 2C PR 2)
+
+**Endpoints:** All require `x-gda-key` header matching `GDA_WEBHOOK_KEY` env var.
+- `POST /api/internal/vector-query` — cosine similarity search
+- `POST /api/internal/vector-query-compare` — queries both pgvector AND Pinecone, returns overlap
+- `POST /api/internal/vector-fetch` — fetch vectors by ID array
+- `POST /api/internal/vector-list-document` — list vector IDs for a document
+
+**VPS testing setup:**
+```bash
+# Get the auth key from the backend container
+export VPS_KEY=$(ssh root@100.100.80.78 "docker exec gda-backend printenv GDA_WEBHOOK_KEY")
+# All curl commands must go through SSH since port 3001 is not exposed on host
+ssh root@100.100.80.78 "curl -s -X POST http://172.22.0.3:3001/api/internal/vector-query ..."
+```
+
+**Critical: Keep VPS_KEY in the same shell session.** If you run tests across multiple shell sessions, re-export the key in each one or you'll get 401 errors.
+
+**Test procedure (insert → query → verify → cleanup):**
+1. Insert test vector via `/vector-upsert` with known embedding (e.g., all 0.1 values, 1536 dims)
+2. Query with same embedding → expect top result with `similarity: 1.0`
+3. Query different collection → expect test vector NOT present (collection isolation)
+4. Validation checks: missing collection→400, wrong dim→400, topK=0→400
+5. Auth checks: no key→401, wrong key→401
+6. `vector-query-compare` for knowledge collection → 200 (proves namespace mapping works)
+7. `vector-fetch` with known IDs → returns full vector records
+8. `vector-list-document` → returns `{id, chunk_index}` only (NOT document_id in response)
+9. Cleanup: delete test vector via `/vector-delete`
+
+**Collection→namespace mapping (Pinecone):**
+- `knowledge` → empty string `""` (Pinecone default namespace)
+- `ai-agent-attachments` → empty string `""` (Pinecone ai-assistant index, no namespace)
+- `gda-documents` → `"gda-documents"`
+
+**Common pitfalls:**
+- `vector-list-document` returns `{id, chunk_index}` — do NOT expect `document_id` in the response
+- Pinecone comparison may return 0 results if `PINECONE_API_KEY` env var is stale/invalid — this is a known issue, not a test failure
+- Backend container IP might change — verify with: `docker inspect gda-backend --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}'`
+- Embedding arrays must be exactly 1536 dimensions — anything else returns 400 `INVALID_EMBEDDING`
+
+### Vector Read Endpoints (Phase 2C PR 2)
+
+**Endpoints:** All require `x-gda-key` header matching `GDA_WEBHOOK_KEY` env var.
+- `POST /api/internal/vector-query` — cosine similarity search
+- `POST /api/internal/vector-query-compare` — queries both pgvector AND Pinecone, returns overlap
+- `POST /api/internal/vector-fetch` — fetch vectors by ID array
+- `POST /api/internal/vector-list-document` — list vector IDs for a document
+
+**VPS testing setup:**
+```bash
+# Get the auth key from the backend container
+export VPS_KEY=$(ssh root@<VPS_IP> "docker exec gda-backend printenv GDA_WEBHOOK_KEY")
+# All curl commands must go through SSH since port 3001 is not exposed on host
+ssh root@<VPS_IP> "curl -s -X POST http://172.22.0.3:3001/api/internal/vector-query ..."
+```
+
+**Critical: Keep VPS_KEY in the same shell session.** If you run tests across multiple shell sessions, re-export the key in each one or you'll get 401 errors.
+
+**Test procedure (insert → query → verify → cleanup):**
+1. Insert test vector via `/vector-upsert` with known embedding (e.g., all 0.1 values, 1536 dims)
+2. Query with same embedding → expect top result with `similarity: 1.0`
+3. Query different collection → expect test vector NOT present (collection isolation)
+4. Validation checks: missing collection→400, wrong dim→400, topK=0→400
+5. Auth checks: no key→401, wrong key→401
+6. `vector-query-compare` for knowledge collection → 200 (proves namespace mapping works)
+7. `vector-fetch` with known IDs → returns full vector records
+8. `vector-list-document` → returns `{id, chunk_index}` only (NOT document_id in response)
+9. Cleanup: delete test vector via `/vector-delete`
+
+**Collection→namespace mapping (Pinecone):**
+- `knowledge` → empty string `""` (Pinecone default namespace)
+- `ai-agent-attachments` → empty string `""` (Pinecone ai-assistant index, no namespace)
+- `gda-documents` → `"gda-documents"`
+
+**Common pitfalls:**
+- `vector-list-document` returns `{id, chunk_index}` — do NOT expect `document_id` in the response
+- Pinecone comparison may return 0 results if `PINECONE_API_KEY` env var is stale/invalid — this is a known issue, not a test failure
+- Backend container IP might change — verify with: `docker inspect gda-backend --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}'`
+- Embedding arrays must be exactly 1536 dimensions — anything else returns 400 `INVALID_EMBEDDING`
+
+### Postgres Role & Privilege Testing (F-020 pattern)
+
+**When to use:** After creating or modifying DB roles, running privilege grants, or testing least-privilege configurations.
+
+**Staging vs production access:**
+- Staging: `psql -h localhost -p 5432 -U gda -d gda` (from Devin dev environment, password in `DATABASE_URL`)
+- Production: `ssh root@<VPS_IP> "docker exec -i gda-postgres psql -U gda -d gda"` (via SSH + docker exec)
+
+**Dual-path migration testing:**
+1. Run migration on staging first: verify it applies cleanly
+2. Check privilege state after migration:
+   ```sql
+   -- List all roles
+   SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolcanlogin FROM pg_roles WHERE rolname NOT LIKE 'pg_%';
+   -- Check table privileges for a role
+   SELECT table_schema, table_name, privilege_type FROM information_schema.table_privileges WHERE grantee = 'gda_runtime';
+   -- Check default privileges
+   SELECT * FROM pg_default_acl WHERE defaclrole = (SELECT oid FROM pg_roles WHERE rolname = 'gda');
+   ```
+3. Verify the app still works with the restricted role: restart backend with `DATABASE_URL` pointing to the restricted user
+4. Run migrations on production only after staging passes
+
+**Common privilege issues:**
+- `permission denied for table X`: Role lacks SELECT/INSERT/UPDATE/DELETE on that table. Grant with: `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE X TO role_name;`
+- New tables created by migrations don't automatically inherit grants: Use `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ... TO role_name;` BEFORE creating tables, or grant explicitly after.
+- `GRANT ALL` is too broad: Use explicit privilege lists (SELECT, INSERT, UPDATE, DELETE) for least-privilege.
+- Sequences: If a table has serial/identity columns, the role also needs `USAGE, SELECT` on the associated sequence.
+
 ### Financial Bible
 - Monthly trend charts (Revenue, Orders, Profitability, Cost Breakdown)
 - YTD vs Annual Target progress bars with pace markers
@@ -213,3 +413,6 @@ Install Playwright first: `mkdir -p /home/ubuntu/pw-test && cd /home/ubuntu/pw-t
 - **Backend won't start:** Ensure all required env vars are exported: DATABASE_URL, AUTH_REQUIRED, JWT_SECRET, OPENAI_API_KEY, GDA_WEBHOOK_KEY
 - **Port 3001 in use:** Use `ss -tlnp | grep 3001` to find PID, then kill it. `lsof` might not be available.
 - **Session expiration during testing:** Log in once and use sidebar navigation to stay in the SPA. Direct URL navigation may trigger session expiry.
+- **n8n webhook 403:** Wrong value in `x-gda-key` header. Needs GDA_WEBHOOK_KEY (the long hex hash), not a 2026 deploy/api key.
+- **n8n Auth Guard "Unauthorized":** The `x-gda-auth` value doesn't match the workflow's valid keys. Read the Auth Guard code node to see which env vars it checks — they differ per workflow.
+- **Dual-write rows missing:** Check n8n execution status. If pgvector node errored, it won't block Pinecone but no row appears. Check backend logs for the internal endpoint error.
