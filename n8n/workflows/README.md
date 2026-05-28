@@ -31,6 +31,7 @@ All vectors live in one table: `document_embeddings` (extended with
 | `general` | `general` |
 | `financial` | `financial` |
 | `competitive_intel` | `competitive_intel` |
+| *(none — ai-assistant index)* | `ai-agent-attachments` |
 
 Existing rows default to `collection = 'knowledge'` (backend writes).
 
@@ -86,8 +87,13 @@ stored in the `metadata` JSONB column.
 and add a parallel HTTP Request node calling `/api/internal/vector-upsert`.
 Both stores receive writes; Pinecone remains source of truth.
 
-**PR 2**: Cut 5 read workflows from Pinecone to pgvector via
-`/api/internal/vector-query`.
+**PR 2** (this PR): Server-side read endpoints deployed. Read cutover
+for 5 workflows DEFERRED pending Pinecone→pgvector backfill (pgvector
+only has vectors from dual-write start date; historical vectors are
+Pinecone-only). Backfill plan documented below.
+
+**PR 2b** (follow-up): Execute backfill, verify parity ≥7/10, then cut
+over all 5 read workflows.
 
 **PR 3**: Remove Pinecone write nodes from workflows 3 and 5, revoke
 Pinecone API key, cancel subscription.
@@ -130,6 +136,26 @@ Pinecone API key, cancel subscription.
 - **Body**: JSON with `collection` and `items[]` array
 - **Continue On Fail**: `true` (pgvector failure must not break the workflow)
 
+### Read Endpoints (PR 2)
+
+```
+POST /api/internal/vector-query
+Body: { "collection": "gda-documents", "embedding": [...1536 floats...], "topK": 10, "filter": {} }
+Returns: { "data": { "results": [{ "id", "document_id", "chunk_text", "similarity", ... }] } }
+
+POST /api/internal/vector-query-compare (parity debugging only)
+Body: { "collection": "gda-documents", "embedding": [...], "topK": 10 }
+Returns: { "data": { "pgvector": [...], "pinecone": [...], "overlap": { "top1_match", "top5_overlap", "top10_overlap" } } }
+
+POST /api/internal/vector-fetch
+Body: { "ids": ["id1", "id2"] }
+Returns: { "data": { "vectors": [{ "id", "document_id", "chunk_text", "chunk_index", ... }] } }
+
+POST /api/internal/vector-list-document
+Body: { "collection": "gda-documents", "documentId": "doc-123" }
+Returns: { "data": { "vectors": [{ "id", "chunk_index" }] } }
+```
+
 ### Delete Endpoints
 
 ```
@@ -139,3 +165,43 @@ Body: { "ids": ["id1", "id2"] }
 POST /api/internal/vector-delete-by-document
 Body: { "documentId": "doc-123" }
 ```
+
+### Backfill Plan (prerequisite for PR 2b read cutover)
+
+**Problem**: pgvector only has vectors written since dual-write went live
+(PR #354 merge). Historical vectors uploaded via n8n before that date
+exist only in Pinecone. Read cutover cannot proceed until pgvector has
+parity with Pinecone.
+
+**Approach**:
+1. Create a one-time n8n export workflow using the existing PineconeApi
+   credential (ID `wRjQmgKElTHbBf5J`) to page through all vectors:
+   - `POST /vectors/list` (paginate with `paginationToken`) for namespace `gda-documents`
+   - `POST /vectors/fetch` in batches of 100 to get full vector data
+   - For each batch, POST to `/api/internal/vector-upsert` with `collection: 'gda-documents'`
+2. Repeat for namespace `` (default/empty → collection `ai-agent-attachments`)
+3. Verify: `SELECT count(*) FROM document_embeddings WHERE collection = 'gda-documents'`
+   should match Pinecone's `describe_index_stats` for that namespace
+4. Run parity comparison via `/api/internal/vector-query-compare` for 3+ queries
+5. If top10_overlap ≥ 7/10 across queries → proceed with workflow cutover
+
+**Blocker**: PINECONE_API_KEY env var (`01dedd34-...`) returns 401.
+The actual key is encrypted in n8n's credential store. Backfill must
+use n8n's credential (run as n8n workflow) OR obtain valid API key.
+
+### Reader Workflow Response Shape Mapping
+
+When read cutover is executed (PR 2b), each workflow will need a
+reshape Function node to convert pgvector response → Pinecone format:
+
+| pgvector field | Pinecone field |
+|---------------|----------------|
+| `id` | `matches[].id` |
+| `similarity` | `matches[].score` |
+| `chunk_text` | `matches[].metadata.text` |
+| `document_id` | `matches[].metadata.document_id` |
+| `chunk_index` | `matches[].metadata.chunk_index` |
+| `metadata.source` | `matches[].metadata.source` |
+| `metadata.file_type` | `matches[].metadata.file_type` |
+| `metadata.filename` | `matches[].metadata.filename` |
+| `page_number` | `matches[].metadata.page` |
