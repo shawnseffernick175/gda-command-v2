@@ -47,8 +47,8 @@ COPY --from=builder /app/packages/backend/src/db/migrations/migration-manifest.j
 COPY packages/backend/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# pg_dump for in-app backup API
-RUN apk add --no-cache postgresql16-client
+# pg_dump for in-app backup API; p7zip for .7z archive extraction
+RUN apk add --no-cache postgresql16-client p7zip
 
 # Backup and upload directories
 RUN mkdir -p /var/backups/gda/daily /var/backups/gda/weekly /var/uploads/gda

@@ -27,6 +27,13 @@ const extractorMap: Record<string, () => Promise<Extractor>> = {
   "text/yaml": () => import("./json-yaml"),
   "application/yaml": () => import("./json-yaml"),
   "application/x-yaml": () => import("./json-yaml"),
+
+  // PR 3 — Archives
+  "application/zip": () => import("./archive"),
+  "application/x-tar": () => import("./archive"),
+  "application/gzip": () => import("./archive"),
+  "application/x-gzip": () => import("./archive"),
+  "application/x-7z-compressed": () => import("./archive"),
 };
 
 /** MIME types that have a wired extractor. */
