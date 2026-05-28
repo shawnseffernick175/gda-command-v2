@@ -261,9 +261,20 @@ router.post("/vector-ingest-url", async (req, res) => {
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("pdf") || url.toLowerCase().endsWith(".pdf")) {
       try {
-        const PdfParse = (await import("pdf-parse")).default;
-        const pdfData = await PdfParse(buffer);
-        text = pdfData.text;
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdfMod = require("pdf-parse") as {
+          PDFParse: new (opts: { data: Buffer | Uint8Array }) => {
+            getText: () => Promise<{ text: string }>;
+            destroy: () => Promise<void>;
+          };
+        };
+        const parser = new pdfMod.PDFParse({ data: buffer });
+        try {
+          const result = await parser.getText();
+          text = result.text;
+        } finally {
+          await parser.destroy().catch(() => {});
+        }
       } catch (pdfErr) {
         // Fallback: try as plain text
         text = buffer.toString("utf-8");
