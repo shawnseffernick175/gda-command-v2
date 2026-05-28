@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------------
-// pgvector write operations for the document_embeddings table.
-// Phase 2C — n8n writer workflows call these via /api/internal/vector-upsert.
-// NO read functions (PR 2 adds those).
+// pgvector operations for the document_embeddings table.
+// Phase 2C — n8n workflows use these via /api/internal/vector-* endpoints.
 // ---------------------------------------------------------------------------
 
 import { getPool } from "../db";
@@ -16,6 +15,27 @@ export interface VectorItem {
   content?: string;
   embedding: number[];
   metadata?: Record<string, unknown>;
+}
+
+export interface VectorQueryResult {
+  id: string;
+  document_id: string | null;
+  chunk_index: number;
+  chunk_text: string;
+  page_number: number | null;
+  section_title: string | null;
+  similarity: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface VectorFetchResult {
+  id: string;
+  document_id: string | null;
+  chunk_index: number;
+  chunk_text: string;
+  page_number: number | null;
+  section_title: string | null;
+  metadata: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,4 +141,102 @@ export async function deleteByDocumentId(
     documentId,
     deleted: result.rowCount,
   });
+}
+
+// ---------------------------------------------------------------------------
+// queryEmbeddings — cosine similarity search
+// ---------------------------------------------------------------------------
+
+export async function queryEmbeddings(
+  collection: string,
+  queryEmbedding: number[],
+  topK: number,
+  filter?: Record<string, unknown>,
+): Promise<VectorQueryResult[]> {
+  const pool = getPool();
+  if (!pool) throw new Error("Database not available");
+
+  const clampedK = Math.max(1, Math.min(50, topK));
+  const embeddingStr = `[${queryEmbedding.join(",")}]`;
+
+  let sql = `SELECT id, document_id, chunk_index, chunk_text, page_number, section_title,
+       (1 - (embedding <=> $1::vector)) AS similarity, metadata
+     FROM document_embeddings
+     WHERE collection = $2`;
+  const params: unknown[] = [embeddingStr, collection];
+
+  if (filter && Object.keys(filter).length > 0) {
+    params.push(JSON.stringify(filter));
+    sql += ` AND metadata @> $${params.length}::jsonb`;
+  }
+
+  sql += ` ORDER BY embedding <=> $1::vector LIMIT $${params.length + 1}`;
+  params.push(clampedK);
+
+  const result = await pool.query(sql, params);
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    document_id: row.document_id,
+    chunk_index: row.chunk_index ?? 0,
+    chunk_text: row.chunk_text ?? "",
+    page_number: row.page_number,
+    section_title: row.section_title,
+    similarity: parseFloat(row.similarity),
+    metadata: row.metadata ?? {},
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// fetchEmbeddingsById — fetch specific vectors by id array
+// ---------------------------------------------------------------------------
+
+export async function fetchEmbeddingsById(
+  ids: string[],
+): Promise<VectorFetchResult[]> {
+  const pool = getPool();
+  if (!pool) throw new Error("Database not available");
+
+  if (ids.length === 0) return [];
+
+  const result = await pool.query(
+    `SELECT id, document_id, chunk_index, chunk_text, page_number, section_title, metadata
+     FROM document_embeddings WHERE id = ANY($1)
+     ORDER BY chunk_index ASC`,
+    [ids],
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    document_id: row.document_id,
+    chunk_index: row.chunk_index ?? 0,
+    chunk_text: row.chunk_text ?? "",
+    page_number: row.page_number,
+    section_title: row.section_title,
+    metadata: row.metadata ?? {},
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// listEmbeddingsByDocument — list all vector ids for a document in a collection
+// ---------------------------------------------------------------------------
+
+export async function listEmbeddingsByDocument(
+  collection: string,
+  documentId: string,
+): Promise<{ id: string; chunk_index: number }[]> {
+  const pool = getPool();
+  if (!pool) throw new Error("Database not available");
+
+  const result = await pool.query(
+    `SELECT id, chunk_index FROM document_embeddings
+     WHERE collection = $1 AND document_id = $2
+     ORDER BY chunk_index ASC`,
+    [collection, documentId],
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    chunk_index: row.chunk_index ?? 0,
+  }));
 }
