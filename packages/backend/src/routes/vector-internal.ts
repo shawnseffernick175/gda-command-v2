@@ -240,10 +240,60 @@ router.post("/vector-ingest-url", async (req, res) => {
       );
     }
 
+    // URL host allowlist validation
+    const allowedHostsRaw = process.env.URL_INGEST_ALLOWED_HOSTS;
+    if (allowedHostsRaw) {
+      const allowedHosts = allowedHostsRaw.split(",").map((h) => h.trim().toLowerCase());
+      let hostname: string;
+      try {
+        hostname = new URL(url).hostname.toLowerCase();
+      } catch {
+        return res.status(400).json(
+          errorEnvelope("vector-internal", "ingest-url", {
+            code: "INVALID_URL",
+            message: "url is not a valid URL",
+            detail: url,
+          }),
+        );
+      }
+      if (!allowedHosts.includes(hostname)) {
+        return res.status(403).json(
+          errorEnvelope("vector-internal", "ingest-url", {
+            code: "HOST_NOT_ALLOWED",
+            message: `Host '${hostname}' is not in URL_INGEST_ALLOWED_HOSTS`,
+            detail: null,
+          }),
+        );
+      }
+    }
+
+    const maxBytes = parseInt(process.env.MAX_INGEST_URL_BYTES || "209715200", 10);
+    const fetchTimeoutMs = 60_000;
+
     const docId = document_id || `ingest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    // Download file
-    const response = await fetch(url);
+    // Download file with timeout and size limit
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), fetchTimeoutMs);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } catch (fetchErr) {
+      clearTimeout(timeout);
+      const msg = (fetchErr as Error).name === "AbortError"
+        ? "Download timed out (60s)"
+        : `Download failed: ${(fetchErr as Error).message}`;
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "ingest-url", {
+          code: "DOWNLOAD_FAILED",
+          message: msg,
+          detail: url,
+        }),
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
     if (!response.ok) {
       return res.status(400).json(
         errorEnvelope("vector-internal", "ingest-url", {
@@ -254,7 +304,35 @@ router.post("/vector-ingest-url", async (req, res) => {
       );
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    // Check Content-Length header if available
+    const contentLength = parseInt(response.headers.get("content-length") || "0", 10);
+    if (contentLength > maxBytes) {
+      return res.status(413).json(
+        errorEnvelope("vector-internal", "ingest-url", {
+          code: "FILE_TOO_LARGE",
+          message: `File size ${contentLength} exceeds MAX_INGEST_URL_BYTES (${maxBytes})`,
+          detail: null,
+        }),
+      );
+    }
+
+    // Stream body and enforce size limit
+    const bufParts: Buffer[] = [];
+    let totalBytes = 0;
+    for await (const part of response.body as AsyncIterable<Uint8Array>) {
+      totalBytes += part.length;
+      if (totalBytes > maxBytes) {
+        return res.status(413).json(
+          errorEnvelope("vector-internal", "ingest-url", {
+            code: "FILE_TOO_LARGE",
+            message: `Download exceeded MAX_INGEST_URL_BYTES (${maxBytes})`,
+            detail: null,
+          }),
+        );
+      }
+      bufParts.push(Buffer.from(part));
+    }
+    const buffer = Buffer.concat(bufParts);
 
     // Extract text from PDF using pdf-parse (same lib as F-038 ingestion)
     let text = "";

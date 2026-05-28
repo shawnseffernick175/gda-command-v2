@@ -1,4 +1,6 @@
 {
+  "updatedAt": "2026-05-28T19:47:38.949Z",
+  "createdAt": "2026-02-24T21:17:59.948Z",
   "id": "qFKuS53JnToOjnZD",
   "name": "GDA.api.ai-agent-upload",
   "description": null,
@@ -264,7 +266,7 @@
         -70
       ],
       "parameters": {
-        "jsCode": "\n// Dual-write to pgvector \u2014 parallel path (Continue on Fail enabled)\nconst webhookData = $('Webhook').first().json;\nconst fileUrl = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0]) \n  ? webhookData.body.attachments[0].url \n  : '';\nconst fileName = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0])\n  ? webhookData.body.attachments[0].name \n  : 'unknown';\n\nif (!fileUrl) {\n  return [{ json: { error: 'No file URL in webhook payload', skipped: true } }];\n}\n\n// Download file using n8n's built-in HTTP helper\nlet text = '';\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: fileUrl,\n    encoding: 'utf-8',\n    returnFullResponse: false,\n  });\n  text = typeof response === 'string' ? response : JSON.stringify(response);\n  text = text.replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();\n} catch (e) {\n  return [{ json: { error: 'Download failed: ' + e.message, skipped: true } }];\n}\n\nif (!text || text.length < 10) {\n  return [{ json: { error: 'Extracted text too short (' + text.length + ' chars)', skipped: true } }];\n}\n\n// Chunk text (2000 char chunks with 200 overlap)\nconst MAX_CHUNK = 2000;\nconst OVERLAP = 200;\nconst chunks = [];\nfor (let i = 0; i < text.length; i += MAX_CHUNK - OVERLAP) {\n  const chunk = text.slice(i, i + MAX_CHUNK).trim();\n  if (chunk.length > 10) chunks.push(chunk);\n  if (chunks.length >= 50) break;\n}\n\nif (chunks.length === 0) {\n  return [{ json: { error: 'No chunks generated', skipped: true } }];\n}\n\n// Generate embeddings via OpenAI\nconst openaiKey = $env.OPENAI_API_KEY;\nif (!openaiKey) {\n  return [{ json: { error: 'OPENAI_API_KEY not set', skipped: true } }];\n}\n\nconst embResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/embeddings',\n  headers: {\n    'Authorization': 'Bearer ' + openaiKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'text-embedding-3-small',\n    input: chunks\n  }),\n  returnFullResponse: false,\n  json: true\n});\n\nif (!embResponse || !embResponse.data) {\n  return [{ json: { error: 'OpenAI embedding failed', skipped: true } }];\n}\n\nconst embeddings = embResponse.data.map(d => d.embedding);\n\n// Build items\nconst docId = 'ai-upload-' + Date.now().toString(36);\nconst items = chunks.map((chunk, i) => ({\n  id: docId + '_chunk_' + i,\n  content: chunk,\n  embedding: embeddings[i],\n  metadata: {\n    document_id: docId,\n    chunk_index: i,\n    source: fileUrl,\n    file_name: fileName\n  }\n}));\n\n// Call /vector-upsert\nconst upsertResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'http://gda-backend:3001/api/internal/vector-upsert',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-gda-key': $env.GDA_WEBHOOK_KEY\n  },\n  body: JSON.stringify({\n    collection: 'default',\n    items: items\n  }),\n  returnFullResponse: true,\n  json: true\n});\n\nreturn [{ json: { \n  success: upsertResponse.statusCode >= 200 && upsertResponse.statusCode < 300, \n  chunks: chunks.length, \n  document_id: docId,\n  status: upsertResponse.statusCode,\n  response: upsertResponse.body\n} }];\n",
+        "jsCode": "\n// Dual-write to pgvector \u2014 parallel path (Continue on Fail enabled)\nconst webhookData = $('Webhook').first().json;\nconst fileUrl = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0]) \n  ? webhookData.body.attachments[0].url \n  : '';\nconst fileName = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0])\n  ? webhookData.body.attachments[0].name \n  : 'unknown';\n\nif (!fileUrl) {\n  return [{ json: { error: 'No file URL in webhook payload', skipped: true } }];\n}\n\n// Download file using n8n's built-in HTTP helper\nlet text = '';\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: fileUrl,\n    encoding: 'utf-8',\n    returnFullResponse: false,\n  });\n  text = typeof response === 'string' ? response : JSON.stringify(response);\n  text = text.replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();\n} catch (e) {\n  return [{ json: { error: 'Download failed: ' + e.message, skipped: true } }];\n}\n\nif (!text || text.length < 10) {\n  return [{ json: { error: 'Extracted text too short (' + text.length + ' chars)', skipped: true } }];\n}\n\n// Chunk text (2000 char chunks with 200 overlap)\nconst MAX_CHUNK = 2000;\nconst OVERLAP = 200;\nconst chunks = [];\nfor (let i = 0; i < text.length; i += MAX_CHUNK - OVERLAP) {\n  const chunk = text.slice(i, i + MAX_CHUNK).trim();\n  if (chunk.length > 10) chunks.push(chunk);\n  if (chunks.length >= 50) break;\n}\n\nif (chunks.length === 0) {\n  return [{ json: { error: 'No chunks generated', skipped: true } }];\n}\n\n// Generate embeddings via OpenAI\nconst openaiKey = $env.OPENAI_API_KEY;\nif (!openaiKey) {\n  return [{ json: { error: 'OPENAI_API_KEY not set', skipped: true } }];\n}\n\nconst embResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/embeddings',\n  headers: {\n    'Authorization': 'Bearer ' + openaiKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'text-embedding-3-small',\n    input: chunks\n  }),\n  returnFullResponse: false,\n  json: true\n});\n\nif (!embResponse || !embResponse.data) {\n  return [{ json: { error: 'OpenAI embedding failed', skipped: true } }];\n}\n\nconst embeddings = embResponse.data.map(d => d.embedding);\n\n// Build items\nconst docId = 'ai-upload-' + Date.now().toString(36);\nconst items = chunks.map((chunk, i) => ({\n  id: docId + '_chunk_' + i,\n  content: chunk,\n  embedding: embeddings[i],\n  metadata: {\n    document_id: docId,\n    chunk_index: i,\n    source: fileUrl,\n    file_name: fileName\n  }\n}));\n\n// Call /vector-upsert\nconst upsertResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'http://gda-backend:3001/api/internal/vector-upsert',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-gda-key': $env.GDA_WEBHOOK_KEY\n  },\n  body: JSON.stringify({\n    collection: 'ai-agent-attachments',\n    items: items\n  }),\n  returnFullResponse: true,\n  json: true\n});\n\nreturn [{ json: { \n  success: upsertResponse.statusCode >= 200 && upsertResponse.statusCode < 300, \n  chunks: chunks.length, \n  document_id: docId,\n  status: upsertResponse.statusCode,\n  response: upsertResponse.body\n} }];\n",
         "mode": "runOnceForAllItems"
       },
       "onError": "continueRegularOutput",
@@ -417,12 +419,14 @@
     "executionOrder": "v1",
     "errorWorkflow": "2Swf6LP9AzFjHFYU"
   },
+  "staticData": null,
   "meta": {
     "templateCredsSetupCompleted": true
   },
   "pinData": {},
-  "activeVersionId": "35e50feb-6c0b-4777-b443-efd1a5487bf0",
-  "versionCounter": 640,
+  "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
+  "activeVersionId": "ad542186-3983-4169-b17f-491aa93395bc",
+  "versionCounter": 643,
   "triggerCount": 1,
   "shared": [
     {
@@ -445,9 +449,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-05-28T18:51:58.728Z",
-    "createdAt": "2026-05-28T18:51:58.728Z",
-    "versionId": "35e50feb-6c0b-4777-b443-efd1a5487bf0",
+    "updatedAt": "2026-05-28T19:47:38.952Z",
+    "createdAt": "2026-05-28T19:47:38.952Z",
+    "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
     "workflowId": "qFKuS53JnToOjnZD",
     "nodes": [
       {
@@ -709,7 +713,7 @@
           -70
         ],
         "parameters": {
-          "jsCode": "\n// Dual-write to pgvector \u2014 parallel path (Continue on Fail enabled)\nconst webhookData = $('Webhook').first().json;\nconst fileUrl = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0]) \n  ? webhookData.body.attachments[0].url \n  : '';\nconst fileName = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0])\n  ? webhookData.body.attachments[0].name \n  : 'unknown';\n\nif (!fileUrl) {\n  return [{ json: { error: 'No file URL in webhook payload', skipped: true } }];\n}\n\n// Download file using n8n's built-in HTTP helper\nlet text = '';\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: fileUrl,\n    encoding: 'utf-8',\n    returnFullResponse: false,\n  });\n  text = typeof response === 'string' ? response : JSON.stringify(response);\n  text = text.replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();\n} catch (e) {\n  return [{ json: { error: 'Download failed: ' + e.message, skipped: true } }];\n}\n\nif (!text || text.length < 10) {\n  return [{ json: { error: 'Extracted text too short (' + text.length + ' chars)', skipped: true } }];\n}\n\n// Chunk text (2000 char chunks with 200 overlap)\nconst MAX_CHUNK = 2000;\nconst OVERLAP = 200;\nconst chunks = [];\nfor (let i = 0; i < text.length; i += MAX_CHUNK - OVERLAP) {\n  const chunk = text.slice(i, i + MAX_CHUNK).trim();\n  if (chunk.length > 10) chunks.push(chunk);\n  if (chunks.length >= 50) break;\n}\n\nif (chunks.length === 0) {\n  return [{ json: { error: 'No chunks generated', skipped: true } }];\n}\n\n// Generate embeddings via OpenAI\nconst openaiKey = $env.OPENAI_API_KEY;\nif (!openaiKey) {\n  return [{ json: { error: 'OPENAI_API_KEY not set', skipped: true } }];\n}\n\nconst embResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/embeddings',\n  headers: {\n    'Authorization': 'Bearer ' + openaiKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'text-embedding-3-small',\n    input: chunks\n  }),\n  returnFullResponse: false,\n  json: true\n});\n\nif (!embResponse || !embResponse.data) {\n  return [{ json: { error: 'OpenAI embedding failed', skipped: true } }];\n}\n\nconst embeddings = embResponse.data.map(d => d.embedding);\n\n// Build items\nconst docId = 'ai-upload-' + Date.now().toString(36);\nconst items = chunks.map((chunk, i) => ({\n  id: docId + '_chunk_' + i,\n  content: chunk,\n  embedding: embeddings[i],\n  metadata: {\n    document_id: docId,\n    chunk_index: i,\n    source: fileUrl,\n    file_name: fileName\n  }\n}));\n\n// Call /vector-upsert\nconst upsertResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'http://gda-backend:3001/api/internal/vector-upsert',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-gda-key': $env.GDA_WEBHOOK_KEY\n  },\n  body: JSON.stringify({\n    collection: 'default',\n    items: items\n  }),\n  returnFullResponse: true,\n  json: true\n});\n\nreturn [{ json: { \n  success: upsertResponse.statusCode >= 200 && upsertResponse.statusCode < 300, \n  chunks: chunks.length, \n  document_id: docId,\n  status: upsertResponse.statusCode,\n  response: upsertResponse.body\n} }];\n",
+          "jsCode": "\n// Dual-write to pgvector \u2014 parallel path (Continue on Fail enabled)\nconst webhookData = $('Webhook').first().json;\nconst fileUrl = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0]) \n  ? webhookData.body.attachments[0].url \n  : '';\nconst fileName = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0])\n  ? webhookData.body.attachments[0].name \n  : 'unknown';\n\nif (!fileUrl) {\n  return [{ json: { error: 'No file URL in webhook payload', skipped: true } }];\n}\n\n// Download file using n8n's built-in HTTP helper\nlet text = '';\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: fileUrl,\n    encoding: 'utf-8',\n    returnFullResponse: false,\n  });\n  text = typeof response === 'string' ? response : JSON.stringify(response);\n  text = text.replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();\n} catch (e) {\n  return [{ json: { error: 'Download failed: ' + e.message, skipped: true } }];\n}\n\nif (!text || text.length < 10) {\n  return [{ json: { error: 'Extracted text too short (' + text.length + ' chars)', skipped: true } }];\n}\n\n// Chunk text (2000 char chunks with 200 overlap)\nconst MAX_CHUNK = 2000;\nconst OVERLAP = 200;\nconst chunks = [];\nfor (let i = 0; i < text.length; i += MAX_CHUNK - OVERLAP) {\n  const chunk = text.slice(i, i + MAX_CHUNK).trim();\n  if (chunk.length > 10) chunks.push(chunk);\n  if (chunks.length >= 50) break;\n}\n\nif (chunks.length === 0) {\n  return [{ json: { error: 'No chunks generated', skipped: true } }];\n}\n\n// Generate embeddings via OpenAI\nconst openaiKey = $env.OPENAI_API_KEY;\nif (!openaiKey) {\n  return [{ json: { error: 'OPENAI_API_KEY not set', skipped: true } }];\n}\n\nconst embResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/embeddings',\n  headers: {\n    'Authorization': 'Bearer ' + openaiKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'text-embedding-3-small',\n    input: chunks\n  }),\n  returnFullResponse: false,\n  json: true\n});\n\nif (!embResponse || !embResponse.data) {\n  return [{ json: { error: 'OpenAI embedding failed', skipped: true } }];\n}\n\nconst embeddings = embResponse.data.map(d => d.embedding);\n\n// Build items\nconst docId = 'ai-upload-' + Date.now().toString(36);\nconst items = chunks.map((chunk, i) => ({\n  id: docId + '_chunk_' + i,\n  content: chunk,\n  embedding: embeddings[i],\n  metadata: {\n    document_id: docId,\n    chunk_index: i,\n    source: fileUrl,\n    file_name: fileName\n  }\n}));\n\n// Call /vector-upsert\nconst upsertResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'http://gda-backend:3001/api/internal/vector-upsert',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-gda-key': $env.GDA_WEBHOOK_KEY\n  },\n  body: JSON.stringify({\n    collection: 'ai-agent-attachments',\n    items: items\n  }),\n  returnFullResponse: true,\n  json: true\n});\n\nreturn [{ json: { \n  success: upsertResponse.statusCode >= 200 && upsertResponse.statusCode < 300, \n  chunks: chunks.length, \n  document_id: docId,\n  status: upsertResponse.statusCode,\n  response: upsertResponse.body\n} }];\n",
           "mode": "runOnceForAllItems"
         },
         "onError": "continueRegularOutput",
@@ -861,18 +865,18 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-05-28T18:51:58.788Z",
-        "id": 13658,
+        "createdAt": "2026-05-28T19:47:39.028Z",
+        "id": 13663,
         "workflowId": "qFKuS53JnToOjnZD",
-        "versionId": "35e50feb-6c0b-4777-b443-efd1a5487bf0",
+        "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
         "event": "deactivated",
         "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
       },
       {
-        "createdAt": "2026-05-28T18:51:58.813Z",
-        "id": 13659,
+        "createdAt": "2026-05-28T19:47:39.057Z",
+        "id": 13664,
         "workflowId": "qFKuS53JnToOjnZD",
-        "versionId": "35e50feb-6c0b-4777-b443-efd1a5487bf0",
+        "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
         "event": "activated",
         "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
       }
