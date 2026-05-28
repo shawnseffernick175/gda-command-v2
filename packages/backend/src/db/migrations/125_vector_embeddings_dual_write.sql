@@ -15,3 +15,9 @@ ALTER TABLE document_embeddings
 
 CREATE INDEX IF NOT EXISTS document_embeddings_collection_idx
   ON document_embeddings(collection);
+
+-- Drop FK constraint on document_id: n8n workflows write embeddings for documents
+-- that may not exist in knowledge_documents (e.g. ai-agent-upload file attachments).
+-- The collection column provides semantic grouping instead.
+ALTER TABLE document_embeddings
+  DROP CONSTRAINT IF EXISTS document_embeddings_document_id_fkey;

@@ -1,0 +1,419 @@
+{
+  "id": "6Ej7ltEhOQU8vpvn",
+  "name": "GDA.maint.knowledge-reembed-sweep",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "reembed-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "reembed-fetch",
+      "name": "Fetch Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/knowledge/documents",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "reembed-filter",
+      "name": "Filter Unembedded",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "\n// Filter documents that need re-embedding\n// These are documents in knowledge_documents that either:\n// 1. Have no corresponding rows in document_embeddings with a non-'knowledge' collection\n// 2. Were last embedded before the dual-write was enabled\nconst items = $input.all();\nconst docs = items[0]?.json?.data || items[0]?.json || [];\n\nif (!Array.isArray(docs) || docs.length === 0) {\n  return [{ json: { message: 'No documents to process', count: 0 } }];\n}\n\n// Return first 10 documents for processing (batch to avoid overload)\nconst batch = docs.slice(0, 10);\nreturn batch.map(doc => ({ json: doc }));\n",
+        "mode": "runOnceForAllItems"
+      },
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "reembed-process",
+      "name": "Reembed to pgvector",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-ingest-url",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.file_url || $json.url || '' }}"
+            },
+            {
+              "name": "collection",
+              "value": "gda-documents"
+            },
+            {
+              "name": "document_id",
+              "value": "={{ $json.id || $json.document_id || '' }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "reembed-log",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst results = items.map(item => ({\n  document_id: item.json.data?.document_id || item.json.document_id || 'unknown',\n  chunks: item.json.data?.chunks || 0,\n  success: item.json.success !== false\n}));\nconst succeeded = results.filter(r => r.success).length;\nconst failed = results.filter(r => !r.success).length;\nreturn [{ json: { \n  message: 'Reembed sweep complete',\n  processed: results.length, \n  succeeded, \n  failed,\n  results \n} }];\n",
+        "mode": "runOnceForAllItems"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Documents": {
+      "main": [
+        [
+          {
+            "node": "Filter Unembedded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unembedded": {
+      "main": [
+        [
+          {
+            "node": "Reembed to pgvector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reembed to pgvector": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": null,
+  "pinData": null,
+  "activeVersionId": "c82e86a3-f187-454c-951e-9411b8f00090",
+  "versionCounter": 4,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-05-28T18:56:06.866Z",
+      "createdAt": "2026-05-28T18:56:06.866Z",
+      "role": "workflow:owner",
+      "workflowId": "6Ej7ltEhOQU8vpvn",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-28T18:56:06.866Z",
+    "createdAt": "2026-05-28T18:56:06.866Z",
+    "versionId": "c82e86a3-f187-454c-951e-9411b8f00090",
+    "workflowId": "6Ej7ltEhOQU8vpvn",
+    "nodes": [
+      {
+        "id": "reembed-trigger",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 24
+              }
+            ]
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "reembed-fetch",
+        "name": "Fetch Documents",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          220,
+          0
+        ],
+        "parameters": {
+          "url": "http://gda-backend:3001/api/knowledge/documents",
+          "method": "GET",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-gda-key",
+                "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4.2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "reembed-filter",
+        "name": "Filter Unembedded",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          440,
+          0
+        ],
+        "parameters": {
+          "jsCode": "\n// Filter documents that need re-embedding\n// These are documents in knowledge_documents that either:\n// 1. Have no corresponding rows in document_embeddings with a non-'knowledge' collection\n// 2. Were last embedded before the dual-write was enabled\nconst items = $input.all();\nconst docs = items[0]?.json?.data || items[0]?.json || [];\n\nif (!Array.isArray(docs) || docs.length === 0) {\n  return [{ json: { message: 'No documents to process', count: 0 } }];\n}\n\n// Return first 10 documents for processing (batch to avoid overload)\nconst batch = docs.slice(0, 10);\nreturn batch.map(doc => ({ json: doc }));\n",
+          "mode": "runOnceForAllItems"
+        },
+        "typeVersion": 2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "reembed-process",
+        "name": "Reembed to pgvector",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          660,
+          0
+        ],
+        "parameters": {
+          "url": "http://gda-backend:3001/api/internal/vector-ingest-url",
+          "method": "POST",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-gda-key",
+                "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "url",
+                "value": "={{ $json.file_url || $json.url || '' }}"
+              },
+              {
+                "name": "collection",
+                "value": "gda-documents"
+              },
+              {
+                "name": "document_id",
+                "value": "={{ $json.id || $json.document_id || '' }}"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "reembed-log",
+        "name": "Log Results",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          880,
+          0
+        ],
+        "parameters": {
+          "jsCode": "\nconst items = $input.all();\nconst results = items.map(item => ({\n  document_id: item.json.data?.document_id || item.json.document_id || 'unknown',\n  chunks: item.json.data?.chunks || 0,\n  success: item.json.success !== false\n}));\nconst succeeded = results.filter(r => r.success).length;\nconst failed = results.filter(r => !r.success).length;\nreturn [{ json: { \n  message: 'Reembed sweep complete',\n  processed: results.length, \n  succeeded, \n  failed,\n  results \n} }];\n",
+          "mode": "runOnceForAllItems"
+        },
+        "typeVersion": 2
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Fetch Documents",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Documents": {
+        "main": [
+          [
+            {
+              "node": "Filter Unembedded",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter Unembedded": {
+        "main": [
+          [
+            {
+              "node": "Reembed to pgvector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reembed to pgvector": {
+        "main": [
+          [
+            {
+              "node": "Log Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-28T18:56:19.311Z",
+        "id": 13660,
+        "workflowId": "6Ej7ltEhOQU8vpvn",
+        "versionId": "c82e86a3-f187-454c-951e-9411b8f00090",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}
