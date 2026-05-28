@@ -49,8 +49,9 @@ async function extractZip(buffer: Buffer): Promise<ArchiveEntry[]> {
   const tmpFile = path.join(tmpDir, "archive.zip");
   fs.writeFileSync(tmpFile, buffer);
 
+  let zip: InstanceType<typeof AsyncZip> | null = null;
   try {
-    const zip = new AsyncZip({ file: tmpFile });
+    zip = new AsyncZip({ file: tmpFile });
     const entries: ArchiveEntry[] = [];
     let totalBytes = 0;
 
@@ -59,7 +60,6 @@ async function extractZip(buffer: Buffer): Promise<ArchiveEntry[]> {
     // Check for encryption (any encrypted entry → fail)
     for (const entry of Object.values(zipEntries)) {
       if (entry.encrypted) {
-        await zip.close();
         throw new ArchivePolicyError("archive is encrypted");
       }
     }
@@ -68,36 +68,32 @@ async function extractZip(buffer: Buffer): Promise<ArchiveEntry[]> {
     for (const entry of Object.values(zipEntries)) {
       if (entry.isDirectory) continue;
       if (!isPathSafe(entry.name)) {
-        await zip.close();
         throw new ArchivePolicyError("path traversal detected in archive member");
       }
     }
 
     for (const entry of Object.values(zipEntries)) {
       if (entry.isDirectory) continue;
-      if (entry.name.startsWith("__MACOSX/") || entry.name.startsWith(".")) continue;
+      const baseName = path.basename(entry.name);
+      if (entry.name.includes("__MACOSX/") || baseName.startsWith(".")) continue;
 
       // Fail-closed: file count limit
       if (entries.length >= MAX_FILES) {
-        await zip.close();
         throw new ArchivePolicyError("archive file count limit exceeded");
       }
 
       // Per-member size limit
       if (entry.size > MAX_MEMBER_SIZE) {
-        await zip.close();
         throw new ArchivePolicyError("archive member exceeds 200MB size limit");
       }
 
       // Per-member compression ratio guard
       if (entry.compressedSize > 0 && entry.size / entry.compressedSize > MAX_COMPRESSION_RATIO) {
-        await zip.close();
         throw new ArchivePolicyError("archive member compression ratio exceeds 100x (zip bomb suspected)");
       }
 
       // Fail-closed: total extracted size limit
       if (totalBytes + entry.size > MAX_EXTRACTED_BYTES) {
-        await zip.close();
         throw new ArchivePolicyError("archive extracted size limit exceeded");
       }
 
@@ -106,9 +102,9 @@ async function extractZip(buffer: Buffer): Promise<ArchiveEntry[]> {
       totalBytes += data.length;
     }
 
-    await zip.close();
     return entries;
   } finally {
+    if (zip) await zip.close().catch(() => {});
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
@@ -153,7 +149,8 @@ async function extractTar(buffer: Buffer): Promise<ArchiveEntry[]> {
           return;
         }
 
-        if (entry.path.startsWith("__MACOSX/") || entry.path.startsWith(".")) {
+        const baseName = path.basename(entry.path);
+        if (entry.path.includes("__MACOSX/") || baseName.startsWith(".")) {
           entry.resume();
           return;
         }
