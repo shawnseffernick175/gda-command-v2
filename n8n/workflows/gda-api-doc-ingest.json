@@ -1,0 +1,1260 @@
+{
+  "id": "8UPZHbcTwJstPKAS",
+  "name": "GDA.api.doc-ingest",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "onError": "continueRegularOutput",
+      "position": [
+        240,
+        176
+      ],
+      "webhookId": "a35a29f9-9e03-437a-adf5-48cc2d106633",
+      "parameters": {
+        "path": "gda-ingest-direct",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gda-ingest-validate-001",
+      "name": "Validate & Extract",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        464,
+        176
+      ],
+      "parameters": {
+        "jsCode": "try {\n  const body = $input.first().json.body || $input.first().json;\n  const file_url = body.file_url || body.fileUrl;\n  const file_content = body.file_content || body.fileContent;\n  const file_type = (body.file_type || body.fileType || 'pdf').toLowerCase();\n  const document_id = body.document_id || body.documentId || ('gda-doc-' + Date.now());\n  const metadata = body.metadata || {};\n\n  if (!file_url && !file_content) {\n    return [{ json: {\n      error: true,\n      message: 'file_url or file_content is required. Send file_content (base64) with file_type, or file_url to download from.',\n      received_keys: Object.keys(body),\n      timestamp: new Date().toISOString()\n    }}];\n  }\n\n  const valid_namespaces = ['general', 'financial', 'competitive_intel', 'gda-documents'];\n  const requested_ns = body.namespace || 'gda-documents';\n  const namespace = valid_namespaces.includes(requested_ns) ? requested_ns : 'gda-documents';\n\n  const mimeMap = {\n    'pdf':  'application/pdf',\n    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',\n    'doc':  'application/msword',\n    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n    'xls':  'application/vnd.ms-excel',\n    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',\n    'txt':  'text/plain',\n    'csv':  'text/csv'\n  };\n\n  return [{ json: {\n    file_url: file_url || '',\n    file_content: file_content || '',\n    has_inline_content: !!file_content,\n    file_type,\n    document_id,\n    namespace,\n    mime_type: mimeMap[file_type] || 'application/pdf',\n    source: (metadata.source_url || file_url || document_id),\n    metadata\n  }}];\n} catch(e) {\n  return [{ json: {\n    error: true,\n    message: e.message,\n    timestamp: new Date().toISOString()\n  }}];\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gda-ingest-http-001",
+      "name": "Download File",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        912,
+        80
+      ],
+      "parameters": {
+        "url": "={{ $json.file_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "gda-ingest-mime-001",
+      "name": "Fix MIME Type",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1136,
+        176
+      ],
+      "parameters": {
+        "jsCode": "const item = $input.all()[0];\nconst validate = $('Validate & Extract').first().json;\nconst fileType = validate.file_type || 'txt';\n\nlet buf;\nif (item.binary && item.binary.data) {\n  buf = Buffer.from(item.binary.data.data, 'base64');\n} else {\n  buf = Buffer.from('');\n}\n\nlet text = '';\n\nif (fileType === 'txt' || fileType === 'csv' || fileType === 'md') {\n  text = buf.toString('utf-8');\n\n} else if (fileType === 'pdf') {\n  const raw = buf.toString('binary');\n  const blocks = [];\n  const parenRe = /\\(([^)\\\\]|\\\\[\\s\\S]){1,500}\\)/g;\n  let m;\n  while ((m = parenRe.exec(raw)) !== null) {\n    const s = m[0].slice(1,-1)\n      .replace(/\\\\n/g,'\\n').replace(/\\\\r/g,'\\n').replace(/\\\\t/g,' ')\n      .replace(/\\\\\\(/g,'(').replace(/\\\\\\)/g,')').replace(/\\\\\\\\/g,'\\\\')\n      .replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F-\\x9F]/g,' ').trim();\n    const r = (s.match(/[\\x20-\\x7E]/g)||[]).length / Math.max(s.length,1);\n    if (s.length > 3 && r > 0.6) blocks.push(s);\n  }\n  const hexRe = /<([0-9A-Fa-f]{2})+>/g;\n  while ((m = hexRe.exec(raw)) !== null) {\n    const hex = m[0].slice(1,-1);\n    let hs = '';\n    for (let i=0;i<hex.length;i+=2) {\n      const c = parseInt(hex.slice(i,i+2),16);\n      if (c>=32&&c<127) hs+=String.fromCharCode(c);\n      else if (c===10||c===13) hs+=' ';\n    }\n    if (hs.trim().length>3) blocks.push(hs.trim());\n  }\n  text = blocks.join(' ').replace(/\\s+/g,' ').trim();\n\n} else if (fileType === 'docx' || fileType === 'doc') {\n  const raw = buf.toString('binary');\n  const wt = /<w:t[^>]*>([^<]*)<\\/w:t>/g;\n  const parts = [];\n  let m;\n  while ((m = wt.exec(raw)) !== null) {\n    if (m[1].trim()) parts.push(m[1].trim());\n  }\n  if (parts.length > 0) {\n    text = parts.join(' ');\n  } else {\n    text = raw.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    text = text.split('').filter(c=>c.charCodeAt(0)>=32&&c.charCodeAt(0)<127||c==='\\n').join('');\n  }\n\n} else if (fileType === 'xlsx' || fileType === 'xls') {\n  const raw = buf.toString('binary');\n  const si = /<si[^>]*>[\\s\\S]*?<\\/si>/g;\n  const parts = [];\n  let s;\n  while ((s = si.exec(raw)) !== null) {\n    const t2 = /<t[^>]*>([^<]*)<\\/t>/g;\n    let t;\n    while ((t = t2.exec(s[0])) !== null) {\n      if (t[1].trim()) parts.push(t[1].trim());\n    }\n  }\n  const vr = /<v>([^<]+)<\\/v>/g;\n  let v;\n  while ((v = vr.exec(raw)) !== null) {\n    const val = v[1].trim();\n    if (val && isNaN(Number(val))) parts.push(val);\n  }\n  text = parts.join(' ');\n\n} else if (fileType === 'pptx') {\n  const raw = buf.toString('binary');\n  const ar = /<a:t[^>]*>([^<]*)<\\/a:t>/g;\n  const parts = [];\n  let m;\n  while ((m = ar.exec(raw)) !== null) {\n    if (m[1].trim()) parts.push(m[1].trim());\n  }\n  text = parts.join(' ');\n\n} else {\n  text = buf.toString('utf-8').replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g,' ');\n}\n\nif (!text || text.length < 20) {\n  text = buf.toString('latin1').replace(/[^\\x20-\\x7E\\n\\r\\t]/g,' ').replace(/\\s+/g,' ').trim();\n}\n\nconst chunkSize = 1500;\nconst overlap = 200;\nconst chunks = [];\nlet i = 0;\nwhile (i < text.length) {\n  const chunk = text.substring(i, i+chunkSize).trim();\n  if (chunk.length > 50) chunks.push(chunk);\n  i += chunkSize - overlap;\n  if (i + chunkSize > text.length && i < text.length) {\n    const last = text.substring(i).trim();\n    if (last.length > 50) chunks.push(last);\n    break;\n  }\n}\nif (chunks.length === 0 && text.length > 0) chunks.push(text.substring(0,chunkSize));\n\nconsole.log('text_len:'+text.length+' chunks:'+chunks.length+' type:'+fileType);\n\nreturn chunks.map((chunk,idx) => ({\n  json: {\n    text: chunk,\n    chunk_index: idx,\n    total_chunks: chunks.length,\n    document_id: validate.document_id,\n    namespace: validate.namespace,\n    file_type: fileType,\n    source: validate.source,\n    metadata: validate.metadata || {},\n    extracted_text_length: text.length\n  }\n}));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gda-ingest-pinecone-001",
+      "name": "Pinecone Insert GDA",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "disabled": true,
+      "position": [
+        1392,
+        176
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {
+          "pineconeNamespace": "={{ $('Validate & Extract').first().json.namespace }}"
+        },
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ai-assistant",
+          "cachedResultName": "ai-assistant"
+        }
+      },
+      "credentials": {
+        "pineconeApi": {
+          "id": "wRjQmgKElTHbBf5J",
+          "name": "PineconeApi account 2"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "gda-ingest-embed-001",
+      "name": "Embeddings OpenAI GDA",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "disabled": true,
+      "position": [
+        1360,
+        400
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "unLYjAN4H9MFrJ0u",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "gda-ingest-loader-001",
+      "name": "Default Data Loader GDA",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "disabled": true,
+      "position": [
+        1488,
+        400
+      ],
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "document_id",
+                "value": "={{ $('Validate & Extract').first().json.document_id }}"
+              },
+              {
+                "name": "file_type",
+                "value": "={{ $('Validate & Extract').first().json.file_type }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $('Validate & Extract').first().json.source }}"
+              }
+            ]
+          }
+        },
+        "dataType": "binary"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "gda-ingest-build-001",
+      "name": "Build Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1856,
+        176
+      ],
+      "parameters": {
+        "jsCode": "const validateResult = $('Validate & Extract').first().json;\nif (validateResult.error) {\n  return [{ json: {\n    success: false,\n    error: true,\n    message: validateResult.message,\n    received_keys: validateResult.received_keys || [],\n    timestamp: new Date().toISOString()\n  }}];\n}\nconst doc_id = validateResult.document_id;\nconst file_type = validateResult.file_type;\nconst namespace = validateResult.namespace;\nlet upsertItems = [];\ntry { upsertItems = $('Upsert to Pinecone').all() || []; } catch(e) { upsertItems = []; }\nconst chunks_succeeded = upsertItems.filter(i => (i.json?.upsertedCount || 0) > 0).length;\nconst chunks_failed = upsertItems.filter(i => !i.json?.upsertedCount).length;\nreturn [{ json: {\n  success: chunks_succeeded > 0,\n  document_id: doc_id,\n  file_type: file_type,\n  namespace: namespace,\n  chunks_succeeded: chunks_succeeded,\n  chunks_failed: chunks_failed,\n  message: chunks_succeeded > 0\n    ? 'Document ingested: ' + chunks_succeeded + ' chunks stored in Pinecone namespace ' + namespace\n    : 'WARNING: Document accepted but 0 chunks stored in Pinecone',\n  timestamp: new Date().toISOString()\n}}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        2080,
+        176
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "gda-ingest-route-src-001",
+      "name": "Route Source",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        760,
+        176
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "route-cond-1",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.has_inline_content }}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "gda-ingest-setbin-001",
+      "name": "Set Binary from Content",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        912,
+        272
+      ],
+      "parameters": {
+        "jsCode": "const validate = $('Validate & Extract').first().json;\nconst content_b64 = validate.file_content;\nlet buf;\ntry {\n  buf = Buffer.from(content_b64, 'base64');\n  if (buf.length < 10) buf = Buffer.from(content_b64, 'utf-8');\n} catch(e) {\n  buf = Buffer.from(content_b64, 'utf-8');\n}\nconst mimeType = validate.mime_type || 'text/plain';\nconst fileName = validate.document_id + '.' + (validate.file_type || 'txt');\nconst base64 = buf.toString('base64');\nreturn [{\n  json: validate,\n  binary: {\n    data: {\n      data: base64,\n      mimeType: mimeType,\n      fileName: fileName,\n      fileExtension: validate.file_type || 'txt'\n    }\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gda-ingest-splitter-001",
+      "name": "Text Splitter GDA",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "disabled": true,
+      "position": [
+        1568,
+        608
+      ],
+      "parameters": {
+        "options": {},
+        "chunkSize": 1500,
+        "chunkOverlap": 200
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "gda-ingest-embed-http-001",
+      "name": "Embed Chunks",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1392,
+        176
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/embeddings",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.text }) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "unLYjAN4H9MFrJ0u",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "gda-ingest-upsert-http-001",
+      "name": "Upsert to Pinecone",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1616,
+        176
+      ],
+      "parameters": {
+        "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/vectors/upsert",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ JSON.stringify({ namespace: $('Fix MIME Type').item.json.namespace, vectors: [{ id: $('Fix MIME Type').item.json.document_id + '_chunk_' + String($('Fix MIME Type').item.json.chunk_index), values: $json.data[0].embedding, metadata: { text: $('Fix MIME Type').item.json.text, document_id: $('Fix MIME Type').item.json.document_id, chunk_index: $('Fix MIME Type').item.json.chunk_index, source: $('Fix MIME Type').item.json.source, file_type: $('Fix MIME Type').item.json.file_type } }] }) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "nodeCredentialType": "pineconeApi"
+      },
+      "credentials": {
+        "pineconeApi": {
+          "id": "wRjQmgKElTHbBf5J",
+          "name": "PineconeApi account 2"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "d4961bc4-c262-4e3a-96e1-258bacfc6b2f",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        352,
+        176
+      ],
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gda-ingest-errcheck-001",
+      "name": "Error Check",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        576,
+        176
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "err-cond-1",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.error }}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "wh-alias-001",
+      "name": "Webhook Alias",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        240,
+        380
+      ],
+      "webhookId": "be55c829-f3fc-45a9-9c98-af6c8241c514",
+      "parameters": {
+        "path": "gda-doc-ingest",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gda-ingest-upsert-pgvector-001",
+      "name": "Upsert to pgvector",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1616,
+        376
+      ],
+      "parameters": {
+        "url": "http://gda-backend:3001/api/internal/vector-upsert",
+        "method": "POST",
+        "options": {
+          "timeout": 30000
+        },
+        "jsonBody": "={{ JSON.stringify({\n  collection: $('Fix MIME Type').item.json.namespace,\n  items: [{\n    id: $('Fix MIME Type').item.json.document_id + '_chunk_' + String($('Fix MIME Type').item.json.chunk_index),\n    content: $('Fix MIME Type').item.json.text,\n    embedding: $json.data[0].embedding,\n    metadata: {\n      document_id: $('Fix MIME Type').item.json.document_id,\n      chunk_index: $('Fix MIME Type').item.json.chunk_index,\n      source: $('Fix MIME Type').item.json.source,\n      file_type: $('Fix MIME Type').item.json.file_type\n    }\n  }]\n}) }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-gda-key",
+              "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput",
+      "typeVersion": 4.2
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Validate & Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Extract": {
+      "main": [
+        [
+          {
+            "node": "Error Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Check": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Source": {
+      "main": [
+        [
+          {
+            "node": "Set Binary from Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Fix MIME Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Binary from Content": {
+      "main": [
+        [
+          {
+            "node": "Fix MIME Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fix MIME Type": {
+      "main": [
+        [
+          {
+            "node": "Embed Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embed Chunks": {
+      "main": [
+        [
+          {
+            "node": "Upsert to Pinecone",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert to pgvector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert to Pinecone": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI GDA": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Insert GDA",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader GDA": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Insert GDA",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Splitter GDA": {
+      "ai_text_splitter": [
+        [
+          {
+            "node": "Default Data Loader GDA",
+            "type": "ai_text_splitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Alias": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "activeVersionId": "f5b96001-9dff-4d08-9c04-3745be305c2e",
+  "versionCounter": 554,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-02-28T20:15:34.971Z",
+      "createdAt": "2026-02-28T20:15:34.971Z",
+      "role": "workflow:owner",
+      "workflowId": "8UPZHbcTwJstPKAS",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-28T18:34:59.473Z",
+    "createdAt": "2026-05-28T18:34:59.473Z",
+    "versionId": "f5b96001-9dff-4d08-9c04-3745be305c2e",
+    "workflowId": "8UPZHbcTwJstPKAS",
+    "nodes": [
+      {
+        "id": "1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "onError": "continueRegularOutput",
+        "position": [
+          240,
+          176
+        ],
+        "webhookId": "a35a29f9-9e03-437a-adf5-48cc2d106633",
+        "parameters": {
+          "path": "gda-ingest-direct",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "gda-ingest-validate-001",
+        "name": "Validate & Extract",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          464,
+          176
+        ],
+        "parameters": {
+          "jsCode": "try {\n  const body = $input.first().json.body || $input.first().json;\n  const file_url = body.file_url || body.fileUrl;\n  const file_content = body.file_content || body.fileContent;\n  const file_type = (body.file_type || body.fileType || 'pdf').toLowerCase();\n  const document_id = body.document_id || body.documentId || ('gda-doc-' + Date.now());\n  const metadata = body.metadata || {};\n\n  if (!file_url && !file_content) {\n    return [{ json: {\n      error: true,\n      message: 'file_url or file_content is required. Send file_content (base64) with file_type, or file_url to download from.',\n      received_keys: Object.keys(body),\n      timestamp: new Date().toISOString()\n    }}];\n  }\n\n  const valid_namespaces = ['general', 'financial', 'competitive_intel', 'gda-documents'];\n  const requested_ns = body.namespace || 'gda-documents';\n  const namespace = valid_namespaces.includes(requested_ns) ? requested_ns : 'gda-documents';\n\n  const mimeMap = {\n    'pdf':  'application/pdf',\n    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',\n    'doc':  'application/msword',\n    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n    'xls':  'application/vnd.ms-excel',\n    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',\n    'txt':  'text/plain',\n    'csv':  'text/csv'\n  };\n\n  return [{ json: {\n    file_url: file_url || '',\n    file_content: file_content || '',\n    has_inline_content: !!file_content,\n    file_type,\n    document_id,\n    namespace,\n    mime_type: mimeMap[file_type] || 'application/pdf',\n    source: (metadata.source_url || file_url || document_id),\n    metadata\n  }}];\n} catch(e) {\n  return [{ json: {\n    error: true,\n    message: e.message,\n    timestamp: new Date().toISOString()\n  }}];\n}"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "gda-ingest-http-001",
+        "name": "Download File",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          912,
+          80
+        ],
+        "parameters": {
+          "url": "={{ $json.file_url }}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "file"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "gda-ingest-mime-001",
+        "name": "Fix MIME Type",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1136,
+          176
+        ],
+        "parameters": {
+          "jsCode": "const item = $input.all()[0];\nconst validate = $('Validate & Extract').first().json;\nconst fileType = validate.file_type || 'txt';\n\nlet buf;\nif (item.binary && item.binary.data) {\n  buf = Buffer.from(item.binary.data.data, 'base64');\n} else {\n  buf = Buffer.from('');\n}\n\nlet text = '';\n\nif (fileType === 'txt' || fileType === 'csv' || fileType === 'md') {\n  text = buf.toString('utf-8');\n\n} else if (fileType === 'pdf') {\n  const raw = buf.toString('binary');\n  const blocks = [];\n  const parenRe = /\\(([^)\\\\]|\\\\[\\s\\S]){1,500}\\)/g;\n  let m;\n  while ((m = parenRe.exec(raw)) !== null) {\n    const s = m[0].slice(1,-1)\n      .replace(/\\\\n/g,'\\n').replace(/\\\\r/g,'\\n').replace(/\\\\t/g,' ')\n      .replace(/\\\\\\(/g,'(').replace(/\\\\\\)/g,')').replace(/\\\\\\\\/g,'\\\\')\n      .replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F-\\x9F]/g,' ').trim();\n    const r = (s.match(/[\\x20-\\x7E]/g)||[]).length / Math.max(s.length,1);\n    if (s.length > 3 && r > 0.6) blocks.push(s);\n  }\n  const hexRe = /<([0-9A-Fa-f]{2})+>/g;\n  while ((m = hexRe.exec(raw)) !== null) {\n    const hex = m[0].slice(1,-1);\n    let hs = '';\n    for (let i=0;i<hex.length;i+=2) {\n      const c = parseInt(hex.slice(i,i+2),16);\n      if (c>=32&&c<127) hs+=String.fromCharCode(c);\n      else if (c===10||c===13) hs+=' ';\n    }\n    if (hs.trim().length>3) blocks.push(hs.trim());\n  }\n  text = blocks.join(' ').replace(/\\s+/g,' ').trim();\n\n} else if (fileType === 'docx' || fileType === 'doc') {\n  const raw = buf.toString('binary');\n  const wt = /<w:t[^>]*>([^<]*)<\\/w:t>/g;\n  const parts = [];\n  let m;\n  while ((m = wt.exec(raw)) !== null) {\n    if (m[1].trim()) parts.push(m[1].trim());\n  }\n  if (parts.length > 0) {\n    text = parts.join(' ');\n  } else {\n    text = raw.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();\n    text = text.split('').filter(c=>c.charCodeAt(0)>=32&&c.charCodeAt(0)<127||c==='\\n').join('');\n  }\n\n} else if (fileType === 'xlsx' || fileType === 'xls') {\n  const raw = buf.toString('binary');\n  const si = /<si[^>]*>[\\s\\S]*?<\\/si>/g;\n  const parts = [];\n  let s;\n  while ((s = si.exec(raw)) !== null) {\n    const t2 = /<t[^>]*>([^<]*)<\\/t>/g;\n    let t;\n    while ((t = t2.exec(s[0])) !== null) {\n      if (t[1].trim()) parts.push(t[1].trim());\n    }\n  }\n  const vr = /<v>([^<]+)<\\/v>/g;\n  let v;\n  while ((v = vr.exec(raw)) !== null) {\n    const val = v[1].trim();\n    if (val && isNaN(Number(val))) parts.push(val);\n  }\n  text = parts.join(' ');\n\n} else if (fileType === 'pptx') {\n  const raw = buf.toString('binary');\n  const ar = /<a:t[^>]*>([^<]*)<\\/a:t>/g;\n  const parts = [];\n  let m;\n  while ((m = ar.exec(raw)) !== null) {\n    if (m[1].trim()) parts.push(m[1].trim());\n  }\n  text = parts.join(' ');\n\n} else {\n  text = buf.toString('utf-8').replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g,' ');\n}\n\nif (!text || text.length < 20) {\n  text = buf.toString('latin1').replace(/[^\\x20-\\x7E\\n\\r\\t]/g,' ').replace(/\\s+/g,' ').trim();\n}\n\nconst chunkSize = 1500;\nconst overlap = 200;\nconst chunks = [];\nlet i = 0;\nwhile (i < text.length) {\n  const chunk = text.substring(i, i+chunkSize).trim();\n  if (chunk.length > 50) chunks.push(chunk);\n  i += chunkSize - overlap;\n  if (i + chunkSize > text.length && i < text.length) {\n    const last = text.substring(i).trim();\n    if (last.length > 50) chunks.push(last);\n    break;\n  }\n}\nif (chunks.length === 0 && text.length > 0) chunks.push(text.substring(0,chunkSize));\n\nconsole.log('text_len:'+text.length+' chunks:'+chunks.length+' type:'+fileType);\n\nreturn chunks.map((chunk,idx) => ({\n  json: {\n    text: chunk,\n    chunk_index: idx,\n    total_chunks: chunks.length,\n    document_id: validate.document_id,\n    namespace: validate.namespace,\n    file_type: fileType,\n    source: validate.source,\n    metadata: validate.metadata || {},\n    extracted_text_length: text.length\n  }\n}));\n"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "gda-ingest-pinecone-001",
+        "name": "Pinecone Insert GDA",
+        "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+        "disabled": true,
+        "position": [
+          1392,
+          176
+        ],
+        "parameters": {
+          "mode": "insert",
+          "options": {
+            "pineconeNamespace": "={{ $('Validate & Extract').first().json.namespace }}"
+          },
+          "pineconeIndex": {
+            "__rl": true,
+            "mode": "list",
+            "value": "ai-assistant",
+            "cachedResultName": "ai-assistant"
+          }
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "wRjQmgKElTHbBf5J",
+            "name": "PineconeApi account 2"
+          }
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "gda-ingest-embed-001",
+        "name": "Embeddings OpenAI GDA",
+        "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+        "disabled": true,
+        "position": [
+          1360,
+          400
+        ],
+        "parameters": {
+          "options": {}
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "unLYjAN4H9MFrJ0u",
+            "name": "OpenAi account"
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "gda-ingest-loader-001",
+        "name": "Default Data Loader GDA",
+        "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+        "disabled": true,
+        "position": [
+          1488,
+          400
+        ],
+        "parameters": {
+          "options": {
+            "metadata": {
+              "metadataValues": [
+                {
+                  "name": "document_id",
+                  "value": "={{ $('Validate & Extract').first().json.document_id }}"
+                },
+                {
+                  "name": "file_type",
+                  "value": "={{ $('Validate & Extract').first().json.file_type }}"
+                },
+                {
+                  "name": "source",
+                  "value": "={{ $('Validate & Extract').first().json.source }}"
+                }
+              ]
+            }
+          },
+          "dataType": "binary"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "gda-ingest-build-001",
+        "name": "Build Response",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          1856,
+          176
+        ],
+        "parameters": {
+          "jsCode": "const validateResult = $('Validate & Extract').first().json;\nif (validateResult.error) {\n  return [{ json: {\n    success: false,\n    error: true,\n    message: validateResult.message,\n    received_keys: validateResult.received_keys || [],\n    timestamp: new Date().toISOString()\n  }}];\n}\nconst doc_id = validateResult.document_id;\nconst file_type = validateResult.file_type;\nconst namespace = validateResult.namespace;\nlet upsertItems = [];\ntry { upsertItems = $('Upsert to Pinecone').all() || []; } catch(e) { upsertItems = []; }\nconst chunks_succeeded = upsertItems.filter(i => (i.json?.upsertedCount || 0) > 0).length;\nconst chunks_failed = upsertItems.filter(i => !i.json?.upsertedCount).length;\nreturn [{ json: {\n  success: chunks_succeeded > 0,\n  document_id: doc_id,\n  file_type: file_type,\n  namespace: namespace,\n  chunks_succeeded: chunks_succeeded,\n  chunks_failed: chunks_failed,\n  message: chunks_succeeded > 0\n    ? 'Document ingested: ' + chunks_succeeded + ' chunks stored in Pinecone namespace ' + namespace\n    : 'WARNING: Document accepted but 0 chunks stored in Pinecone',\n  timestamp: new Date().toISOString()\n}}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "3",
+        "name": "Respond",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          2080,
+          176
+        ],
+        "parameters": {
+          "options": {},
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($input.first().json) }}"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "gda-ingest-route-src-001",
+        "name": "Route Source",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          760,
+          176
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "route-cond-1",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                },
+                "leftValue": "={{ $json.has_inline_content }}",
+                "rightValue": true
+              }
+            ]
+          }
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "gda-ingest-setbin-001",
+        "name": "Set Binary from Content",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          912,
+          272
+        ],
+        "parameters": {
+          "jsCode": "const validate = $('Validate & Extract').first().json;\nconst content_b64 = validate.file_content;\nlet buf;\ntry {\n  buf = Buffer.from(content_b64, 'base64');\n  if (buf.length < 10) buf = Buffer.from(content_b64, 'utf-8');\n} catch(e) {\n  buf = Buffer.from(content_b64, 'utf-8');\n}\nconst mimeType = validate.mime_type || 'text/plain';\nconst fileName = validate.document_id + '.' + (validate.file_type || 'txt');\nconst base64 = buf.toString('base64');\nreturn [{\n  json: validate,\n  binary: {\n    data: {\n      data: base64,\n      mimeType: mimeType,\n      fileName: fileName,\n      fileExtension: validate.file_type || 'txt'\n    }\n  }\n}];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "gda-ingest-splitter-001",
+        "name": "Text Splitter GDA",
+        "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+        "disabled": true,
+        "position": [
+          1568,
+          608
+        ],
+        "parameters": {
+          "options": {},
+          "chunkSize": 1500,
+          "chunkOverlap": 200
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "gda-ingest-embed-http-001",
+        "name": "Embed Chunks",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1392,
+          176
+        ],
+        "parameters": {
+          "url": "https://api.openai.com/v1/embeddings",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.text }) }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "openAiApi"
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "unLYjAN4H9MFrJ0u",
+            "name": "OpenAi account"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "gda-ingest-upsert-http-001",
+        "name": "Upsert to Pinecone",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1616,
+          176
+        ],
+        "parameters": {
+          "url": "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io/vectors/upsert",
+          "method": "POST",
+          "options": {},
+          "jsonBody": "={{ JSON.stringify({ namespace: $('Fix MIME Type').item.json.namespace, vectors: [{ id: $('Fix MIME Type').item.json.document_id + '_chunk_' + String($('Fix MIME Type').item.json.chunk_index), values: $json.data[0].embedding, metadata: { text: $('Fix MIME Type').item.json.text, document_id: $('Fix MIME Type').item.json.document_id, chunk_index: $('Fix MIME Type').item.json.chunk_index, source: $('Fix MIME Type').item.json.source, file_type: $('Fix MIME Type').item.json.file_type } }] }) }}",
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "authentication": "predefinedCredentialType",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "nodeCredentialType": "pineconeApi"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "wRjQmgKElTHbBf5J",
+            "name": "PineconeApi account 2"
+          }
+        },
+        "typeVersion": 4.2
+      },
+      {
+        "id": "d4961bc4-c262-4e3a-96e1-258bacfc6b2f",
+        "name": "Auth Guard",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          352,
+          176
+        ],
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers[\"x-gda-auth\"] || headers[\"x-gda-key\"] || body.auth_key || body.deploy_key || \"\";\nconst validKeys = [$env.GDA_DEPLOY_KEY_2026, $env.GDA_API_KEY_2026, $env.GDA_WEBHOOK_SECRET_2026];\nif (!validKeys.includes(auth)) {\n  const origin = (headers.origin || headers.referer || \"\").toLowerCase();\n  const trusted = [\"gda.csr-llc.tech\",\"n8n.csr-llc.tech\",\"localhost\",\"gdacommand.retool.com\"];\n  if (!trusted.some(o => origin.includes(o))) throw new Error(\"Unauthorized\");\n}\nreturn [{ json: body }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "gda-ingest-errcheck-001",
+        "name": "Error Check",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          576,
+          176
+        ],
+        "parameters": {
+          "options": {},
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "err-cond-1",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                },
+                "leftValue": "={{ $json.error }}",
+                "rightValue": true
+              }
+            ]
+          }
+        },
+        "typeVersion": 2.2
+      },
+      {
+        "id": "wh-alias-001",
+        "name": "Webhook Alias",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          240,
+          380
+        ],
+        "webhookId": "be55c829-f3fc-45a9-9c98-af6c8241c514",
+        "parameters": {
+          "path": "gda-doc-ingest",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "gda-ingest-upsert-pgvector-001",
+        "name": "Upsert to pgvector",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1616,
+          376
+        ],
+        "parameters": {
+          "url": "http://gda-backend:3001/api/internal/vector-upsert",
+          "method": "POST",
+          "options": {
+            "timeout": 30000
+          },
+          "jsonBody": "={{ JSON.stringify({\n  collection: $('Fix MIME Type').item.json.namespace,\n  items: [{\n    id: $('Fix MIME Type').item.json.document_id + '_chunk_' + String($('Fix MIME Type').item.json.chunk_index),\n    content: $('Fix MIME Type').item.json.text,\n    embedding: $json.data[0].embedding,\n    metadata: {\n      document_id: $('Fix MIME Type').item.json.document_id,\n      chunk_index: $('Fix MIME Type').item.json.chunk_index,\n      source: $('Fix MIME Type').item.json.source,\n      file_type: $('Fix MIME Type').item.json.file_type\n    }\n  }]\n}) }}",
+          "sendBody": true,
+          "sendHeaders": true,
+          "specifyBody": "json",
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "x-gda-key",
+                "value": "={{ $env.GDA_WEBHOOK_KEY }}"
+              }
+            ]
+          }
+        },
+        "onError": "continueRegularOutput",
+        "typeVersion": 4.2
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth Guard": {
+        "main": [
+          [
+            {
+              "node": "Validate & Extract",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate & Extract": {
+        "main": [
+          [
+            {
+              "node": "Error Check",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Error Check": {
+        "main": [
+          [
+            {
+              "node": "Build Response",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Route Source",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route Source": {
+        "main": [
+          [
+            {
+              "node": "Set Binary from Content",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Download File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Download File": {
+        "main": [
+          [
+            {
+              "node": "Fix MIME Type",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Binary from Content": {
+        "main": [
+          [
+            {
+              "node": "Fix MIME Type",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fix MIME Type": {
+        "main": [
+          [
+            {
+              "node": "Embed Chunks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Embed Chunks": {
+        "main": [
+          [
+            {
+              "node": "Upsert to Pinecone",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Upsert to pgvector",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upsert to Pinecone": {
+        "main": [
+          [
+            {
+              "node": "Build Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Response": {
+        "main": [
+          [
+            {
+              "node": "Respond",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Embeddings OpenAI GDA": {
+        "ai_embedding": [
+          [
+            {
+              "node": "Pinecone Insert GDA",
+              "type": "ai_embedding",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Default Data Loader GDA": {
+        "ai_document": [
+          [
+            {
+              "node": "Pinecone Insert GDA",
+              "type": "ai_document",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Text Splitter GDA": {
+        "ai_text_splitter": [
+          [
+            {
+              "node": "Default Data Loader GDA",
+              "type": "ai_text_splitter",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook Alias": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-28T18:34:59.535Z",
+        "id": 13648,
+        "workflowId": "8UPZHbcTwJstPKAS",
+        "versionId": "f5b96001-9dff-4d08-9c04-3745be305c2e",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-28T18:34:59.566Z",
+        "id": 13649,
+        "workflowId": "8UPZHbcTwJstPKAS",
+        "versionId": "f5b96001-9dff-4d08-9c04-3745be305c2e",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}

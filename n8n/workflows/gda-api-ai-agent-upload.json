@@ -1,0 +1,885 @@
+{
+  "updatedAt": "2026-05-28T19:47:38.949Z",
+  "createdAt": "2026-02-24T21:17:59.948Z",
+  "id": "qFKuS53JnToOjnZD",
+  "name": "GDA.api.ai-agent-upload",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "887b3870-5475-4dd6-a074-d8e16aa7820a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -1008,
+        -320
+      ],
+      "webhookId": "ac629697-581a-4740-8e3d-3b228fa14e55",
+      "parameters": {
+        "path": "upload",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "1e5e3c93-7c98-40ff-bc1f-47bfac38cb3d",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -784,
+        -320
+      ],
+      "parameters": {
+        "url": "={{ $json.body.attachments[0].url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.4
+    },
+    {
+      "id": "31d8661b-cb6d-45d1-ade0-3c1f2a1520f6",
+      "name": "Code in JavaScript",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -560,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "const item = $input.all()[0];\nitem.binary.data.mimeType = 'application/pdf';\nreturn [item];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a00954d3-b079-4302-8502-8828767d7971",
+      "name": "Pinecone Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "position": [
+        -336,
+        -320
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {},
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ai-assistant",
+          "cachedResultName": "ai-assistant"
+        }
+      },
+      "credentials": {
+        "pineconeApi": {
+          "id": "wRjQmgKElTHbBf5J",
+          "name": "PineconeApi account 2"
+        }
+      },
+      "typeVersion": 1.3,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "889b445c-98fb-4c3d-ba0a-8f9f99df8de6",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        -416,
+        -96
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "unLYjAN4H9MFrJ0u",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "170242d7-c432-4d4f-98d5-a9b6a170a209",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        -200,
+        -96
+      ],
+      "parameters": {
+        "options": {},
+        "dataType": "binary"
+      },
+      "typeVersion": 1.1,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e3446dd6-a84b-4ca0-9ee6-bcabad62ee38",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        736,
+        -320
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ output: $json.output, status: 'success' }) }}"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "3e1dfeba-2ba1-4537-84e9-85d4b544dc5e",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        272,
+        -320
+      ],
+      "parameters": {
+        "text": "=A document named {{ $('Webhook').item.json.body.attachments[0].name }} has just been uploaded. Use the Pinecone retrieval tool to search and retrieve its content, then provide a complete intelligence analysis.",
+        "options": {
+          "systemMessage": "Executive Identity & Mission: You are the AI Assistant to Shawn M. Seffernick, President of Envision Innovative Solutions. Your objective is to support day-to-day operations, strategic planning, and operational execution. GDA is in the middle of a merger of the three companies listed below. Any task conflicting with long-term operational integration or market growth must be flagged as a 'Strategic Misalignment'.\n\nOperational Directives:\n1. For greetings or simple one-word inputs, provide a concise summary greeting in the Summary key and set all other keys to [\"N/A\"]. Do NOT call any tools.\n2. For any question or task, FIRST search the Pinecone vector store for relevant company context, strategy documents, SOPs, or CEO insights. Cross-reference vector store results with other tools to ensure absolute accuracy.\n3. If vector store content is returned, analyze it for operational efficiency, risk identification, and strategic alignment. If no content is returned, do not fabricate document existence.\n4. You are pre-authorized to use all available tools (web search, news, financial data, website fetching). Execute immediately without requesting permission.\n5. Never limit the depth of your response. For complex problems, retrieve and process as much data as necessary to fully answer the query.\n6. Common knowledge does not exist. Every finding must be backed by a vetted, primary source (URL, internal financial/SEC document, tool, Pinecone document, or named reference). Secondary or speculative data must be explicitly labeled as 'External/Non-Vetted.' If data is missing, state 'Data Unavailable.'\n7. CORPORATE ASSETS (Fetch only if explicitly asked about company capabilities, services, or the GDA merger):\n   - Envision Innovative Solutions: https://envision-is.com/\n   - PD Systems LLC: https://www.pd-sys.net/\n   - Riverstone Enterprise Solutions: https://rivsol.com/services-solutions/\n\nTone & Style: Candid but respectful, stoic, objective, neutral, and authoritative. Direct and economical. Use definitive directives and eliminate hedging language. Remove all emotional qualifiers and conversational filler.\n\nSTOP RULE: As soon as you have all data needed to answer the question, immediately output the final JSON response and stop. Do not make any additional tool calls after you have your answer.\n\nOUTPUT MANDATE:\nYou must output your final response STRICTLY as a JSON object. Do not include markdown formatting, backticks, or conversational text outside of this JSON structure.\nThe JSON object must contain exactly these keys:\n\n\"Summary\": A concise high-level summary of the answer and critical findings.\n\n\"Key_Points\": An array of strings formatted as 'KP0001: [finding]', 'KP0002: [finding]', etc. Include every fact, data point, and finding required to fully answer the prompt. Never artificially limit this list. For greetings output [\"N/A\"].\n\n\"Recommendations\": An array of strings formatted as 'R0001: [recommendation]', 'R0002: [recommendation]', etc. Include every actionable recommendation. Never artificially limit this list. For greetings output [\"N/A\"].\n\n\"Next_Steps\": An array of strings formatted as 'NS0001: [next step]', 'NS0002: [next step]', etc. Specific calls to action for the team or organization. For greetings output [\"N/A\"].\n\n\"Questions\": An array of strings formatted as 'Q0001: [question]', 'Q0002: [question]', etc. Any clarifying questions that would help generate better information. For greetings output [\"N/A\"].\n\n\"Risks\": An array of strings formatted as 'R0001: [if this...then that risk statement] | RM0001: [one-sentence mitigation]', etc. Identify significant strategic risks, points of failure, or skeptical board member objections. For greetings output [\"N/A\"].\n\n\"Sources\": An array of strings formatted as 'S0001: [URL, file name, tool, or Pinecone reference]', 'S0002: [source]', etc. Every response must have at least one source. Never omit sources.\n\n\"Active_Directives\": A string containing the complete text of these system prompt instructions printed in full."
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 3.1
+    },
+    {
+      "id": "177e6720-348c-4e23-8bf4-c8274ee6cbbe",
+      "name": "Pinecone Vector Store1",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "position": [
+        368,
+        -96
+      ],
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "topK": 20,
+        "options": {},
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "list",
+          "value": "ai-assistant",
+          "cachedResultName": "ai-assistant"
+        },
+        "toolDescription": "ai-assistant"
+      },
+      "credentials": {
+        "pineconeApi": {
+          "id": "wRjQmgKElTHbBf5J",
+          "name": "PineconeApi account 2"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "143e87af-1ad3-4c6c-a01a-d7b5c9335e80",
+      "name": "Embeddings OpenAI1",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        448,
+        112
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "unLYjAN4H9MFrJ0u",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "ffb09710-5192-4928-b519-33bb81c4f4bf",
+      "name": "Code in JavaScript1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        16,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { status: \"success\", message: \"Document uploaded and processing\" } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "df70bdec-eca3-448c-8b07-faa892dd375c",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [
+        240,
+        -96
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-20250514",
+          "cachedResultName": "Claude Sonnet 4"
+        },
+        "options": {
+          "maxTokensToSample": 8192
+        }
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "d92MU0tRK7bEGV83",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "20254bc7-6ea6-4a84-9333-79d1e3f5bbee",
+      "name": "Auth Guard",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -896,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (auth !== $env.GDA_DEPLOY_KEY_2026 && auth !== $env.GDA_API_KEY_2026 && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "gda-ai-upload-pgvector-embed-001",
+      "name": "Embed for pgvector",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -784,
+        -70
+      ],
+      "parameters": {
+        "jsCode": "\n// Dual-write to pgvector \u2014 parallel path (Continue on Fail enabled)\nconst webhookData = $('Webhook').first().json;\nconst fileUrl = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0]) \n  ? webhookData.body.attachments[0].url \n  : '';\nconst fileName = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0])\n  ? webhookData.body.attachments[0].name \n  : 'unknown';\n\nif (!fileUrl) {\n  return [{ json: { error: 'No file URL in webhook payload', skipped: true } }];\n}\n\n// Download file using n8n's built-in HTTP helper\nlet text = '';\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: fileUrl,\n    encoding: 'utf-8',\n    returnFullResponse: false,\n  });\n  text = typeof response === 'string' ? response : JSON.stringify(response);\n  text = text.replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();\n} catch (e) {\n  return [{ json: { error: 'Download failed: ' + e.message, skipped: true } }];\n}\n\nif (!text || text.length < 10) {\n  return [{ json: { error: 'Extracted text too short (' + text.length + ' chars)', skipped: true } }];\n}\n\n// Chunk text (2000 char chunks with 200 overlap)\nconst MAX_CHUNK = 2000;\nconst OVERLAP = 200;\nconst chunks = [];\nfor (let i = 0; i < text.length; i += MAX_CHUNK - OVERLAP) {\n  const chunk = text.slice(i, i + MAX_CHUNK).trim();\n  if (chunk.length > 10) chunks.push(chunk);\n  if (chunks.length >= 50) break;\n}\n\nif (chunks.length === 0) {\n  return [{ json: { error: 'No chunks generated', skipped: true } }];\n}\n\n// Generate embeddings via OpenAI\nconst openaiKey = $env.OPENAI_API_KEY;\nif (!openaiKey) {\n  return [{ json: { error: 'OPENAI_API_KEY not set', skipped: true } }];\n}\n\nconst embResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/embeddings',\n  headers: {\n    'Authorization': 'Bearer ' + openaiKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'text-embedding-3-small',\n    input: chunks\n  }),\n  returnFullResponse: false,\n  json: true\n});\n\nif (!embResponse || !embResponse.data) {\n  return [{ json: { error: 'OpenAI embedding failed', skipped: true } }];\n}\n\nconst embeddings = embResponse.data.map(d => d.embedding);\n\n// Build items\nconst docId = 'ai-upload-' + Date.now().toString(36);\nconst items = chunks.map((chunk, i) => ({\n  id: docId + '_chunk_' + i,\n  content: chunk,\n  embedding: embeddings[i],\n  metadata: {\n    document_id: docId,\n    chunk_index: i,\n    source: fileUrl,\n    file_name: fileName\n  }\n}));\n\n// Call /vector-upsert\nconst upsertResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'http://gda-backend:3001/api/internal/vector-upsert',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-gda-key': $env.GDA_WEBHOOK_KEY\n  },\n  body: JSON.stringify({\n    collection: 'ai-agent-attachments',\n    items: items\n  }),\n  returnFullResponse: true,\n  json: true\n});\n\nreturn [{ json: { \n  success: upsertResponse.statusCode >= 200 && upsertResponse.statusCode < 300, \n  chunks: chunks.length, \n  document_id: docId,\n  status: upsertResponse.statusCode,\n  response: upsertResponse.body\n} }];\n",
+        "mode": "runOnceForAllItems"
+      },
+      "onError": "continueRegularOutput",
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Auth Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Guard": {
+      "main": [
+        [
+          {
+            "node": "Embed for pgvector",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "errorWorkflow": "2Swf6LP9AzFjHFYU"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
+  "activeVersionId": "ad542186-3983-4169-b17f-491aa93395bc",
+  "versionCounter": 643,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-24T21:17:59.948Z",
+      "createdAt": "2026-02-24T21:17:59.948Z",
+      "role": "workflow:owner",
+      "workflowId": "qFKuS53JnToOjnZD",
+      "projectId": "DnecXJnFEDZdmft0",
+      "project": {
+        "updatedAt": "2026-02-24T17:59:30.639Z",
+        "createdAt": "2026-02-23T21:31:34.343Z",
+        "id": "DnecXJnFEDZdmft0",
+        "name": "Shawn Seffernick <shawn.seffernick175@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-28T19:47:38.952Z",
+    "createdAt": "2026-05-28T19:47:38.952Z",
+    "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
+    "workflowId": "qFKuS53JnToOjnZD",
+    "nodes": [
+      {
+        "id": "887b3870-5475-4dd6-a074-d8e16aa7820a",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          -1008,
+          -320
+        ],
+        "webhookId": "ac629697-581a-4740-8e3d-3b228fa14e55",
+        "parameters": {
+          "path": "upload",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth"
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "F4J3vYsPrJrYiO49",
+            "name": "GDA Webhook Auth v2"
+          }
+        },
+        "typeVersion": 2.1
+      },
+      {
+        "id": "1e5e3c93-7c98-40ff-bc1f-47bfac38cb3d",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          -784,
+          -320
+        ],
+        "parameters": {
+          "url": "={{ $json.body.attachments[0].url }}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "file"
+              }
+            }
+          }
+        },
+        "typeVersion": 4.4
+      },
+      {
+        "id": "31d8661b-cb6d-45d1-ade0-3c1f2a1520f6",
+        "name": "Code in JavaScript",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          -560,
+          -320
+        ],
+        "parameters": {
+          "jsCode": "const item = $input.all()[0];\nitem.binary.data.mimeType = 'application/pdf';\nreturn [item];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "a00954d3-b079-4302-8502-8828767d7971",
+        "name": "Pinecone Vector Store",
+        "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+        "position": [
+          -336,
+          -320
+        ],
+        "parameters": {
+          "mode": "insert",
+          "options": {},
+          "pineconeIndex": {
+            "__rl": true,
+            "mode": "list",
+            "value": "ai-assistant",
+            "cachedResultName": "ai-assistant"
+          }
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "wRjQmgKElTHbBf5J",
+            "name": "PineconeApi account 2"
+          }
+        },
+        "typeVersion": 1.3,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "889b445c-98fb-4c3d-ba0a-8f9f99df8de6",
+        "name": "Embeddings OpenAI",
+        "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+        "position": [
+          -416,
+          -96
+        ],
+        "parameters": {
+          "options": {}
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "unLYjAN4H9MFrJ0u",
+            "name": "OpenAi account"
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "170242d7-c432-4d4f-98d5-a9b6a170a209",
+        "name": "Default Data Loader",
+        "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+        "position": [
+          -200,
+          -96
+        ],
+        "parameters": {
+          "options": {},
+          "dataType": "binary"
+        },
+        "typeVersion": 1.1,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "e3446dd6-a84b-4ca0-9ee6-bcabad62ee38",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          736,
+          -320
+        ],
+        "parameters": {
+          "options": {},
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ output: $json.output, status: 'success' }) }}"
+        },
+        "typeVersion": 1.5
+      },
+      {
+        "id": "3e1dfeba-2ba1-4537-84e9-85d4b544dc5e",
+        "name": "AI Agent",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "position": [
+          272,
+          -320
+        ],
+        "parameters": {
+          "text": "=A document named {{ $('Webhook').item.json.body.attachments[0].name }} has just been uploaded. Use the Pinecone retrieval tool to search and retrieve its content, then provide a complete intelligence analysis.",
+          "options": {
+            "systemMessage": "Executive Identity & Mission: You are the AI Assistant to Shawn M. Seffernick, President of Envision Innovative Solutions. Your objective is to support day-to-day operations, strategic planning, and operational execution. GDA is in the middle of a merger of the three companies listed below. Any task conflicting with long-term operational integration or market growth must be flagged as a 'Strategic Misalignment'.\n\nOperational Directives:\n1. For greetings or simple one-word inputs, provide a concise summary greeting in the Summary key and set all other keys to [\"N/A\"]. Do NOT call any tools.\n2. For any question or task, FIRST search the Pinecone vector store for relevant company context, strategy documents, SOPs, or CEO insights. Cross-reference vector store results with other tools to ensure absolute accuracy.\n3. If vector store content is returned, analyze it for operational efficiency, risk identification, and strategic alignment. If no content is returned, do not fabricate document existence.\n4. You are pre-authorized to use all available tools (web search, news, financial data, website fetching). Execute immediately without requesting permission.\n5. Never limit the depth of your response. For complex problems, retrieve and process as much data as necessary to fully answer the query.\n6. Common knowledge does not exist. Every finding must be backed by a vetted, primary source (URL, internal financial/SEC document, tool, Pinecone document, or named reference). Secondary or speculative data must be explicitly labeled as 'External/Non-Vetted.' If data is missing, state 'Data Unavailable.'\n7. CORPORATE ASSETS (Fetch only if explicitly asked about company capabilities, services, or the GDA merger):\n   - Envision Innovative Solutions: https://envision-is.com/\n   - PD Systems LLC: https://www.pd-sys.net/\n   - Riverstone Enterprise Solutions: https://rivsol.com/services-solutions/\n\nTone & Style: Candid but respectful, stoic, objective, neutral, and authoritative. Direct and economical. Use definitive directives and eliminate hedging language. Remove all emotional qualifiers and conversational filler.\n\nSTOP RULE: As soon as you have all data needed to answer the question, immediately output the final JSON response and stop. Do not make any additional tool calls after you have your answer.\n\nOUTPUT MANDATE:\nYou must output your final response STRICTLY as a JSON object. Do not include markdown formatting, backticks, or conversational text outside of this JSON structure.\nThe JSON object must contain exactly these keys:\n\n\"Summary\": A concise high-level summary of the answer and critical findings.\n\n\"Key_Points\": An array of strings formatted as 'KP0001: [finding]', 'KP0002: [finding]', etc. Include every fact, data point, and finding required to fully answer the prompt. Never artificially limit this list. For greetings output [\"N/A\"].\n\n\"Recommendations\": An array of strings formatted as 'R0001: [recommendation]', 'R0002: [recommendation]', etc. Include every actionable recommendation. Never artificially limit this list. For greetings output [\"N/A\"].\n\n\"Next_Steps\": An array of strings formatted as 'NS0001: [next step]', 'NS0002: [next step]', etc. Specific calls to action for the team or organization. For greetings output [\"N/A\"].\n\n\"Questions\": An array of strings formatted as 'Q0001: [question]', 'Q0002: [question]', etc. Any clarifying questions that would help generate better information. For greetings output [\"N/A\"].\n\n\"Risks\": An array of strings formatted as 'R0001: [if this...then that risk statement] | RM0001: [one-sentence mitigation]', etc. Identify significant strategic risks, points of failure, or skeptical board member objections. For greetings output [\"N/A\"].\n\n\"Sources\": An array of strings formatted as 'S0001: [URL, file name, tool, or Pinecone reference]', 'S0002: [source]', etc. Every response must have at least one source. Never omit sources.\n\n\"Active_Directives\": A string containing the complete text of these system prompt instructions printed in full."
+          },
+          "promptType": "define"
+        },
+        "typeVersion": 3.1
+      },
+      {
+        "id": "177e6720-348c-4e23-8bf4-c8274ee6cbbe",
+        "name": "Pinecone Vector Store1",
+        "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+        "position": [
+          368,
+          -96
+        ],
+        "parameters": {
+          "mode": "retrieve-as-tool",
+          "topK": 20,
+          "options": {},
+          "pineconeIndex": {
+            "__rl": true,
+            "mode": "list",
+            "value": "ai-assistant",
+            "cachedResultName": "ai-assistant"
+          },
+          "toolDescription": "ai-assistant"
+        },
+        "credentials": {
+          "pineconeApi": {
+            "id": "wRjQmgKElTHbBf5J",
+            "name": "PineconeApi account 2"
+          }
+        },
+        "typeVersion": 1.3
+      },
+      {
+        "id": "143e87af-1ad3-4c6c-a01a-d7b5c9335e80",
+        "name": "Embeddings OpenAI1",
+        "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+        "position": [
+          448,
+          112
+        ],
+        "parameters": {
+          "options": {}
+        },
+        "credentials": {
+          "openAiApi": {
+            "id": "unLYjAN4H9MFrJ0u",
+            "name": "OpenAi account"
+          }
+        },
+        "typeVersion": 1.2
+      },
+      {
+        "id": "ffb09710-5192-4928-b519-33bb81c4f4bf",
+        "name": "Code in JavaScript1",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          16,
+          -320
+        ],
+        "parameters": {
+          "jsCode": "return [{ json: { status: \"success\", message: \"Document uploaded and processing\" } }];"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "df70bdec-eca3-448c-8b07-faa892dd375c",
+        "name": "Anthropic Chat Model",
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "position": [
+          240,
+          -96
+        ],
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "mode": "list",
+            "value": "claude-sonnet-4-20250514",
+            "cachedResultName": "Claude Sonnet 4"
+          },
+          "options": {
+            "maxTokensToSample": 8192
+          }
+        },
+        "credentials": {
+          "anthropicApi": {
+            "id": "d92MU0tRK7bEGV83",
+            "name": "Anthropic account"
+          }
+        },
+        "typeVersion": 1.3
+      },
+      {
+        "id": "20254bc7-6ea6-4a84-9333-79d1e3f5bbee",
+        "name": "Auth Guard",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          -896,
+          -320
+        ],
+        "parameters": {
+          "jsCode": "if (!$env.GDA_API_KEY_2026 || !$env.GDA_DEPLOY_KEY_2026 || !$env.GDA_WEBHOOK_SECRET_2026) throw new Error('2026 auth env vars not set');\nconst headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || {};\nconst auth = headers['x-gda-auth'] || headers['x-gda-key'] || body.auth_key || body.deploy_key || '';\nconst origin = (headers.origin || headers.referer || headers['x-forwarded-host'] || '').toLowerCase();\nconst trustedOrigins = ['gda.csr-llc.tech', 'n8n.csr-llc.tech', 'localhost'];\nconst fromTrustedOrigin = trustedOrigins.some(function(o) { return origin.includes(o); });\nif (auth !== $env.GDA_DEPLOY_KEY_2026 && auth !== $env.GDA_API_KEY_2026 && !fromTrustedOrigin) {\n  throw new Error('Unauthorized');\n}\nreturn $input.all();"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "gda-ai-upload-pgvector-embed-001",
+        "name": "Embed for pgvector",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          -784,
+          -70
+        ],
+        "parameters": {
+          "jsCode": "\n// Dual-write to pgvector \u2014 parallel path (Continue on Fail enabled)\nconst webhookData = $('Webhook').first().json;\nconst fileUrl = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0]) \n  ? webhookData.body.attachments[0].url \n  : '';\nconst fileName = (webhookData.body && webhookData.body.attachments && webhookData.body.attachments[0])\n  ? webhookData.body.attachments[0].name \n  : 'unknown';\n\nif (!fileUrl) {\n  return [{ json: { error: 'No file URL in webhook payload', skipped: true } }];\n}\n\n// Download file using n8n's built-in HTTP helper\nlet text = '';\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: fileUrl,\n    encoding: 'utf-8',\n    returnFullResponse: false,\n  });\n  text = typeof response === 'string' ? response : JSON.stringify(response);\n  text = text.replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();\n} catch (e) {\n  return [{ json: { error: 'Download failed: ' + e.message, skipped: true } }];\n}\n\nif (!text || text.length < 10) {\n  return [{ json: { error: 'Extracted text too short (' + text.length + ' chars)', skipped: true } }];\n}\n\n// Chunk text (2000 char chunks with 200 overlap)\nconst MAX_CHUNK = 2000;\nconst OVERLAP = 200;\nconst chunks = [];\nfor (let i = 0; i < text.length; i += MAX_CHUNK - OVERLAP) {\n  const chunk = text.slice(i, i + MAX_CHUNK).trim();\n  if (chunk.length > 10) chunks.push(chunk);\n  if (chunks.length >= 50) break;\n}\n\nif (chunks.length === 0) {\n  return [{ json: { error: 'No chunks generated', skipped: true } }];\n}\n\n// Generate embeddings via OpenAI\nconst openaiKey = $env.OPENAI_API_KEY;\nif (!openaiKey) {\n  return [{ json: { error: 'OPENAI_API_KEY not set', skipped: true } }];\n}\n\nconst embResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'https://api.openai.com/v1/embeddings',\n  headers: {\n    'Authorization': 'Bearer ' + openaiKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    model: 'text-embedding-3-small',\n    input: chunks\n  }),\n  returnFullResponse: false,\n  json: true\n});\n\nif (!embResponse || !embResponse.data) {\n  return [{ json: { error: 'OpenAI embedding failed', skipped: true } }];\n}\n\nconst embeddings = embResponse.data.map(d => d.embedding);\n\n// Build items\nconst docId = 'ai-upload-' + Date.now().toString(36);\nconst items = chunks.map((chunk, i) => ({\n  id: docId + '_chunk_' + i,\n  content: chunk,\n  embedding: embeddings[i],\n  metadata: {\n    document_id: docId,\n    chunk_index: i,\n    source: fileUrl,\n    file_name: fileName\n  }\n}));\n\n// Call /vector-upsert\nconst upsertResponse = await this.helpers.httpRequest({\n  method: 'POST',\n  url: 'http://gda-backend:3001/api/internal/vector-upsert',\n  headers: {\n    'Content-Type': 'application/json',\n    'x-gda-key': $env.GDA_WEBHOOK_KEY\n  },\n  body: JSON.stringify({\n    collection: 'ai-agent-attachments',\n    items: items\n  }),\n  returnFullResponse: true,\n  json: true\n});\n\nreturn [{ json: { \n  success: upsertResponse.statusCode >= 200 && upsertResponse.statusCode < 300, \n  chunks: chunks.length, \n  document_id: docId,\n  status: upsertResponse.statusCode,\n  response: upsertResponse.body\n} }];\n",
+          "mode": "runOnceForAllItems"
+        },
+        "onError": "continueRegularOutput",
+        "typeVersion": 2
+      }
+    ],
+    "connections": {
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript": {
+        "main": [
+          [
+            {
+              "node": "Pinecone Vector Store",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Embeddings OpenAI": {
+        "ai_embedding": [
+          [
+            {
+              "node": "Pinecone Vector Store",
+              "type": "ai_embedding",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Default Data Loader": {
+        "ai_document": [
+          [
+            {
+              "node": "Pinecone Vector Store",
+              "type": "ai_document",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Pinecone Vector Store": {
+        "main": [
+          [
+            {
+              "node": "Code in JavaScript1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Agent": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Pinecone Vector Store1": {
+        "ai_tool": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_tool",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Embeddings OpenAI1": {
+        "ai_embedding": [
+          [
+            {
+              "node": "Pinecone Vector Store1",
+              "type": "ai_embedding",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code in JavaScript1": {
+        "main": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Anthropic Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Auth Guard",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Auth Guard": {
+        "main": [
+          [
+            {
+              "node": "Embed for pgvector",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Shawn Seffernick",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-28T19:47:39.028Z",
+        "id": 13663,
+        "workflowId": "qFKuS53JnToOjnZD",
+        "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
+        "event": "deactivated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      },
+      {
+        "createdAt": "2026-05-28T19:47:39.057Z",
+        "id": 13664,
+        "workflowId": "qFKuS53JnToOjnZD",
+        "versionId": "ad542186-3983-4169-b17f-491aa93395bc",
+        "event": "activated",
+        "userId": "fc09115d-0a06-4ba7-beb9-fffc2e1f1f58"
+      }
+    ]
+  }
+}

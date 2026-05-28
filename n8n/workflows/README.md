@@ -92,16 +92,43 @@ Both stores receive writes; Pinecone remains source of truth.
 **PR 3**: Remove Pinecone write nodes from workflows 3 and 5, revoke
 Pinecone API key, cancel subscription.
 
+### Exported Workflow Files
+
+| File | Workflow | Status |
+|------|----------|--------|
+| `gda-api-doc-ingest.json` | GDA.api.doc-ingest | Dual-write active |
+| `gda-api-ai-agent-upload.json` | GDA.api.ai-agent-upload | Dual-write active |
+| `gda-maint-knowledge-reembed-sweep.json` | GDA.maint.knowledge-reembed-sweep | Active (24h schedule) |
+
+### Workflow 5 (doc-ingest) — Dual-Write Architecture
+
+- **"Embed Chunks"** → outputs to BOTH **"Upsert to Pinecone"** AND **"Upsert to pgvector"**
+- pgvector node: HTTP POST to `http://gda-backend:3001/api/internal/vector-upsert`
+- Error handling: `onError: "continueRegularOutput"` — Pinecone write is NOT affected by pgvector failures
+- Collection mapped from Pinecone namespace (e.g. `gda-documents`, `general`, `financial`)
+
+### Workflow 3 (ai-agent-upload) — Dual-Write Architecture
+
+- **"Auth Guard"** → outputs to BOTH **"Embed for pgvector"** (Code node) AND **"HTTP Request"** (Pinecone path)
+- pgvector Code node: Downloads file from URL, chunks text, generates embeddings via OpenAI, calls `/vector-upsert`
+- Collection: `default` (these are ad-hoc file uploads, not categorized into namespaces)
+- Error handling: `onError: "continueRegularOutput"` on pgvector node AND on Pinecone path nodes
+- Note: Pinecone path has a pre-existing pdf-parse v1 dependency issue (langchain loader)
+
+### Knowledge Reembed Sweep
+
+- Runs every 24 hours
+- Fetches knowledge documents and re-embeds them to pgvector
+- Uses `POST /api/internal/vector-ingest-url` (requires backend deployment of Phase 2C prep PR)
+- Collection: `gda-documents`
+
 ### HTTP Request Node Configuration (for workflows 3 & 5)
 
 - **Method**: POST
-- **URL**: `{{ $env.GDA_BACKEND_URL }}/api/internal/vector-upsert`
-- **Authentication**: Header Auth
-  - Header Name: `x-gda-key`
-  - Header Value: `{{ $env.GDA_WEBHOOK_KEY }}`
-- **Body**: JSON, map from the Pinecone upsert node's input
+- **URL**: `http://gda-backend:3001/api/internal/vector-upsert` (container-internal)
+- **Authentication**: Header `x-gda-key: {{ $env.GDA_WEBHOOK_KEY }}`
+- **Body**: JSON with `collection` and `items[]` array
 - **Continue On Fail**: `true` (pgvector failure must not break the workflow)
-- **Timeout**: 10000 (10s)
 
 ### Delete Endpoints
 
