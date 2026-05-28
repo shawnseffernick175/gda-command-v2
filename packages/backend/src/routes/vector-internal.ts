@@ -1,11 +1,15 @@
 // ---------------------------------------------------------------------------
-// Internal vector endpoints for n8n workflow writes.
+// Internal vector endpoints for n8n workflows.
 // POST /api/internal/vector-upsert
 // POST /api/internal/vector-delete
 // POST /api/internal/vector-delete-by-document
+// POST /api/internal/vector-ingest-url
+// POST /api/internal/vector-query          (Phase 2C PR 2)
+// POST /api/internal/vector-query-compare  (Phase 2C PR 2 — parity debugging)
+// POST /api/internal/vector-fetch          (Phase 2C PR 2 — fetch by ids)
+// POST /api/internal/vector-list-document  (Phase 2C PR 2 — list by doc)
 //
 // Auth: x-gda-key header (same as ingest endpoints).
-// Writes land in the existing document_embeddings table — no parallel table.
 // ---------------------------------------------------------------------------
 
 import { Router } from "express";
@@ -15,6 +19,9 @@ import {
   upsertEmbeddings,
   deleteEmbeddings,
   deleteByDocumentId,
+  queryEmbeddings,
+  fetchEmbeddingsById,
+  listEmbeddingsByDocument,
 } from "../lib/vector-stores/pgvector";
 import type { VectorItem } from "../lib/vector-stores/pgvector";
 import { chunkText, generateEmbeddings } from "../lib/embeddings";
@@ -422,6 +429,272 @@ router.post("/vector-ingest-url", async (req, res) => {
     });
     return res.status(500).json(
       errorEnvelope("vector-internal", "ingest-url", {
+        code: "INTERNAL_ERROR",
+        message: (e as Error).message,
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/vector-query
+// Body: { collection: string, embedding: number[], topK?: number, filter?: object }
+// ---------------------------------------------------------------------------
+
+router.post("/vector-query", async (req, res) => {
+  if (!verifyInternalKey(req, res)) return;
+
+  try {
+    const { collection, embedding, topK, filter } = req.body as {
+      collection?: string;
+      embedding?: number[];
+      topK?: number;
+      filter?: Record<string, unknown>;
+    };
+
+    if (!collection || typeof collection !== "string") {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "query", {
+          code: "INVALID_COLLECTION",
+          message: "collection is required and must be a string",
+          detail: null,
+        }),
+      );
+    }
+
+    if (!Array.isArray(embedding) || embedding.length !== 1536) {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "query", {
+          code: "INVALID_EMBEDDING",
+          message: "embedding must be a number[] of length 1536",
+          detail: null,
+        }),
+      );
+    }
+
+    const k = topK ?? 10;
+    if (typeof k !== "number" || k < 1 || k > 50) {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "query", {
+          code: "INVALID_TOPK",
+          message: "topK must be between 1 and 50",
+          detail: null,
+        }),
+      );
+    }
+
+    const results = await queryEmbeddings(collection, embedding, k, filter);
+
+    return res.json(
+      successEnvelope("vector-internal", "query", { results }),
+    );
+  } catch (e) {
+    log.error("vector_internal_query_failed", {
+      error: (e as Error).message,
+    });
+    return res.status(500).json(
+      errorEnvelope("vector-internal", "query", {
+        code: "INTERNAL_ERROR",
+        message: (e as Error).message,
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/vector-query-compare
+// Calls BOTH pgvector and Pinecone, returns overlap metrics.
+// Debugging surface only — not consumed by n8n workflows.
+// ---------------------------------------------------------------------------
+
+router.post("/vector-query-compare", async (req, res) => {
+  if (!verifyInternalKey(req, res)) return;
+
+  try {
+    const { collection, embedding, topK } = req.body as {
+      collection?: string;
+      embedding?: number[];
+      topK?: number;
+    };
+
+    if (!collection || typeof collection !== "string") {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "query-compare", {
+          code: "INVALID_COLLECTION",
+          message: "collection is required",
+          detail: null,
+        }),
+      );
+    }
+
+    if (!Array.isArray(embedding) || embedding.length !== 1536) {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "query-compare", {
+          code: "INVALID_EMBEDDING",
+          message: "embedding must be a number[] of length 1536",
+          detail: null,
+        }),
+      );
+    }
+
+    const k = Math.max(1, Math.min(50, topK ?? 10));
+
+    // pgvector query
+    const pgResults = await queryEmbeddings(collection, embedding, k);
+
+    // Pinecone query via HTTP (same pattern as n8n workflows)
+    const pineconeHost = process.env.PINECONE_HOST
+      || "https://ai-assistant-ezysp85.svc.aped-4627-b74a.pinecone.io";
+    const pineconeKey = process.env.PINECONE_API_KEY || "";
+
+    let pineconeResults: { id: string; score: number; metadata: Record<string, unknown> }[] = [];
+    if (pineconeKey) {
+      try {
+        const pineconeResp = await fetch(`${pineconeHost}/query`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Api-Key": pineconeKey,
+          },
+          body: JSON.stringify({
+            namespace: collection === "ai-agent-attachments" ? "" : collection,
+            topK: k,
+            vector: embedding,
+            includeMetadata: true,
+          }),
+        });
+        if (pineconeResp.ok) {
+          const pineconeData = await pineconeResp.json() as {
+            matches?: { id: string; score: number; metadata?: Record<string, unknown> }[];
+          };
+          pineconeResults = (pineconeData.matches || []).map((m) => ({
+            id: m.id,
+            score: m.score,
+            metadata: m.metadata || {},
+          }));
+        }
+      } catch (pineconeErr) {
+        log.warn("vector_query_compare_pinecone_failed", {
+          error: (pineconeErr as Error).message,
+        });
+      }
+    }
+
+    // Compute overlap
+    const pgIds = pgResults.slice(0, 10).map((r) => r.id);
+    const pcIds = pineconeResults.slice(0, 10).map((r) => r.id);
+    const top1Match = pgIds.length > 0 && pcIds.length > 0 && pgIds[0] === pcIds[0];
+    const top5Overlap = pgIds.slice(0, 5).filter((id) => pcIds.slice(0, 5).includes(id)).length;
+    const top10Overlap = pgIds.filter((id) => pcIds.includes(id)).length;
+
+    return res.json(
+      successEnvelope("vector-internal", "query-compare", {
+        pgvector: pgResults,
+        pinecone: pineconeResults,
+        overlap: {
+          top1_match: top1Match,
+          top5_overlap: top5Overlap,
+          top10_overlap: top10Overlap,
+        },
+      }),
+    );
+  } catch (e) {
+    log.error("vector_internal_query_compare_failed", {
+      error: (e as Error).message,
+    });
+    return res.status(500).json(
+      errorEnvelope("vector-internal", "query-compare", {
+        code: "INTERNAL_ERROR",
+        message: (e as Error).message,
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/vector-fetch
+// Body: { ids: string[] }
+// Returns full vector records by id (for doc-compare workflow)
+// ---------------------------------------------------------------------------
+
+router.post("/vector-fetch", async (req, res) => {
+  if (!verifyInternalKey(req, res)) return;
+
+  try {
+    const { ids } = req.body as { ids?: string[] };
+
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "fetch", {
+          code: "INVALID_IDS",
+          message: "ids must be a non-empty string array (max 100)",
+          detail: null,
+        }),
+      );
+    }
+
+    const results = await fetchEmbeddingsById(ids);
+
+    return res.json(
+      successEnvelope("vector-internal", "fetch", { vectors: results }),
+    );
+  } catch (e) {
+    return res.status(500).json(
+      errorEnvelope("vector-internal", "fetch", {
+        code: "INTERNAL_ERROR",
+        message: (e as Error).message,
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/vector-list-document
+// Body: { collection: string, documentId: string }
+// Lists vector ids for a given document (for doc-compare workflow)
+// ---------------------------------------------------------------------------
+
+router.post("/vector-list-document", async (req, res) => {
+  if (!verifyInternalKey(req, res)) return;
+
+  try {
+    const { collection, documentId } = req.body as {
+      collection?: string;
+      documentId?: string;
+    };
+
+    if (!collection || typeof collection !== "string") {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "list-document", {
+          code: "INVALID_COLLECTION",
+          message: "collection is required",
+          detail: null,
+        }),
+      );
+    }
+
+    if (!documentId || typeof documentId !== "string") {
+      return res.status(400).json(
+        errorEnvelope("vector-internal", "list-document", {
+          code: "INVALID_DOCUMENT_ID",
+          message: "documentId is required",
+          detail: null,
+        }),
+      );
+    }
+
+    const vectors = await listEmbeddingsByDocument(collection, documentId);
+
+    return res.json(
+      successEnvelope("vector-internal", "list-document", { vectors }),
+    );
+  } catch (e) {
+    return res.status(500).json(
+      errorEnvelope("vector-internal", "list-document", {
         code: "INTERNAL_ERROR",
         message: (e as Error).message,
         detail: null,
