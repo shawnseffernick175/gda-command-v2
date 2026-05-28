@@ -59,6 +59,7 @@ import mergersRouter from "./routes/mergers";
 import aiGatewayRouter from "./routes/ai-gateway";
 import captureDisciplineRouter from "./routes/capture-discipline";
 import sentinelRouter from "./routes/sentinel";
+import vectorInternalRouter from "./routes/vector-internal";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck, waitForDB } from "./lib/db";
@@ -123,6 +124,9 @@ app.use("/api/ingest", ingestLimiter, ingestRouter);
 
 // --- Sentinel routes (mixed auth: /current public, /history JWT, /run x-gda-key) ---
 app.use("/api/sentinel", apiLimiter, sentinelRouter);
+
+// --- Internal vector endpoints (key-based auth for n8n dual-write) ---
+app.use("/api/internal", ingestLimiter, vectorInternalRouter);
 
 // --- Webhook registry (auth-protected) ---
 app.get("/api/webhooks/registry", apiLimiter, authMiddleware, (_req, res) => {

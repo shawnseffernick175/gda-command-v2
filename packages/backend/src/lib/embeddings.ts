@@ -183,20 +183,22 @@ export async function embedDocument(
     // Delete any existing embeddings for this document (re-embed support)
     await pool.query(`DELETE FROM document_embeddings WHERE document_id = $1`, [documentId]);
 
-    // Insert embeddings
+    // Insert embeddings into document_embeddings
     let tokensUsed = 0;
+
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       const embedding = embeddings[i];
       const tokenCount = Math.ceil(chunk.text.length / 4); // rough estimate
       tokensUsed += tokenCount;
 
+      const embId = `emb-${documentId}-${i}`;
       const embeddingStr = `[${embedding.join(",")}]`;
       await pool.query(
         `INSERT INTO document_embeddings (id, document_id, chunk_index, chunk_text, page_number, section_title, embedding, token_count)
          VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8)`,
         [
-          `emb-${documentId}-${i}`,
+          embId,
           documentId,
           chunk.chunkIndex,
           chunk.text,
@@ -206,6 +208,7 @@ export async function embedDocument(
           tokenCount,
         ],
       );
+
     }
 
     // Update document status
