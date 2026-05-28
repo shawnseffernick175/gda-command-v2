@@ -108,12 +108,94 @@ description: Test GDA Command v2 end-to-end. Use when verifying UI pages, API en
 - "No Bid" filter option exists in the status dropdown for explicit viewing
 - Expired opportunities (past due date) should be "No Bid", not "Lost"
 
-### Knowledge Base Upload
-- Test with both PDF and XLSX files
-- XLSX files may arrive as `application/octet-stream` MIME type — the backend has extension-based fallback
+### Knowledge Base Upload & Auto-Vectorize (F-038)
+**Upload basics:**
 - 27 document types available in dropdown
 - 7 action options (Store & Index, Ingest into Financial Bible, etc.)
 - Selecting "Financials" type auto-sets action to "Ingest into Financial Bible"
+- XLSX files may arrive as `application/octet-stream` MIME type — the backend has extension-based fallback
+
+**Auto-vectorize test procedure:**
+1. Upload test files via API (faster than UI for batch testing):
+   ```bash
+   curl -s -X POST http://localhost:3001/api/knowledge/upload \
+     -F "file=@/tmp/test-fixtures/test-vectorize.pdf" \
+     -F "type=memo" -F "collection=col-contracts" -F "action=store" -F "tags=test,pdf"
+   ```
+2. Response should show `"status": "processing"` and `"message": "Document uploaded and vectorization started."`
+3. Wait ~15 seconds for async background vectorization to complete
+4. Verify in DB:
+   ```sql
+   SELECT file_name, status, chunk_count FROM knowledge_documents WHERE file_name LIKE 'test-%';
+   ```
+   All should show `status='indexed'` with `chunk_count >= 1`
+5. Navigate to Knowledge UI → Semantic Search tab → search for content from uploaded files
+
+**File types to test:** PDF, DOCX, XLSX, PPTX, TXT, HTML, JSON, YAML, EML, MSG
+
+**Test fixtures:** Create minimal test files at `/tmp/test-fixtures/` before testing. The backend expects real file content — empty files will get `status='skipped'`.
+
+**Common auto-vectorize issues:**
+- `pdf-parse` library API may change between versions — if PDFs get stuck in `processing`, check backend logs for `pdf_parse_error`
+- Status stuck at `processing` usually means the extraction threw silently — check backend logs
+- Requires `OPENAI_API_KEY` env var for embeddings — without it, `isEmbeddingAvailable()` returns false
+- Port 3001 is NOT exposed on VPS host — reach API via container IP. Get IP with: `docker inspect gda-backend --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}'`
+
+### Knowledge Base UI Testing (F-038 PR 5+)
+
+**Route:** `/knowledge` (sidebar: Intelligence > Knowledge Base)
+
+**What to verify:**
+1. **Status badges** — color-coded: indexed=green (#22c55e), processing=gold (#f59e0b), failed=red (#ef4444), skipped=purple (#a855f7). Non-indexed docs show AlertCircle icon + status_reason text inline.
+2. **Format icons** — MIME→lucide-react mapping: Mail (EML/MSG), Archive (ZIP/TAR/7Z), Image (PNG/JPG/TIFF), FileText (PDF/TXT/DOCX), FileSpreadsheet (XLSX), Presentation (PPTX), Braces (JSON), Globe (HTML), Code (XML/YAML). If all icons look the same, the DocFormatIcon component may not be wired into DocumentRow.
+3. **Child nesting** — Parent docs with children show ChevronRight + "N children" badge (#6366f1). Clicking chevron expands children with 24px indentation per depth level. Children inherit parent's collection/tags.
+4. **Retry button** — RotateCcw icon appears ONLY on `status='failed'` + `status_reason IN ('timeout','transient_error','ocr_timeout')`. Does NOT appear on non-retryable failures or skipped docs.
+5. **Bulk upload** — "+ Upload" button opens modal. Multi-file picker via drag-drop or click. Pre-upload list shows per-file size + format icon + remove button. Upload hits `POST /api/knowledge/bulk-upload` (207 Multi-Status). Per-file results show in modal. After close, new docs appear in list.
+6. **Child selection state** — Clicking a child row selects IT (blue border + tint), not the parent. Detail panel on right shows child's metadata. This was a Devin Review fix (changed `isSelected` boolean prop to `selectedDocId` string comparison).
+
+**Seeding test data for UI verification:**
+```sql
+-- Parent with children (email attachment pattern)
+INSERT INTO knowledge_documents (id, file_name, original_name, mime_type, file_size, status, collection_id, tags, created_at, updated_at)
+VALUES ('doc-parent-test', 'test-email.eml', 'test-email.eml', 'message/rfc822', 26000, 'indexed', 'col-contracts', '["test","eml"]', NOW(), NOW());
+
+INSERT INTO knowledge_documents (id, file_name, original_name, mime_type, file_size, status, parent_document_id, collection_id, tags, created_at, updated_at)
+VALUES ('doc-child-1', 'attachment.pdf', 'attachment.pdf', 'application/pdf', 102400, 'indexed', 'doc-parent-test', 'col-contracts', '["test"]', NOW(), NOW());
+
+-- Failed retryable
+INSERT INTO knowledge_documents (id, file_name, original_name, mime_type, file_size, status, status_reason, created_at, updated_at)
+VALUES ('doc-failed-retry', 'failed-doc.txt', 'failed-doc.txt', 'text/plain', 1024, 'failed', 'timeout', NOW(), NOW());
+
+-- Failed non-retryable
+INSERT INTO knowledge_documents (id, file_name, original_name, mime_type, file_size, status, status_reason, created_at, updated_at)
+VALUES ('doc-failed-noretry', 'encrypted.zip', 'encrypted.zip', 'application/zip', 51200, 'failed', 'archive is encrypted', NOW(), NOW());
+
+-- Skipped
+INSERT INTO knowledge_documents (id, file_name, original_name, mime_type, file_size, status, status_reason, created_at, updated_at)
+VALUES ('doc-skipped', 'noise.png', 'noise.png', 'image/png', 8192, 'skipped', 'OCR returned no meaningful text', NOW(), NOW());
+```
+
+**Bulk upload via Playwright CDP (workaround for native file picker):**
+The browser's native file picker dialog cannot be controlled via computer-use tools. Use Playwright CDP to set files on the hidden `<input type="file">` element:
+```javascript
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.connectOverCDP('http://localhost:29229');
+  const page = browser.contexts()[0].pages()[0];
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles(['/tmp/test-fixtures/file1.txt', '/tmp/test-fixtures/file2.json']);
+  await browser.close();
+})();
+```
+Install Playwright first: `mkdir -p /home/ubuntu/pw-test && cd /home/ubuntu/pw-test && npm init -y && npm i playwright`
+
+**Common Knowledge Base UI issues:**
+- Migration 124 columns (`status_reason`, `parent_document_id`, `extraction_method`) may not exist locally — apply manually via `ALTER TABLE knowledge_documents ADD COLUMN IF NOT EXISTS ...`
+- Document list is sorted by `created_at DESC` by default — newly seeded/uploaded docs appear at top
+- The document list container scrolls independently — if test data is offscreen, scroll within the list panel (not the page)
+- Stats cards at top (DOCUMENTS, INDEXED, etc.) count from DB — seeded test data with `status='indexed'` increments both DOCUMENTS and INDEXED counts
+- `chunk_count` in the list comes from a LEFT JOIN on `document_embeddings` — seeded docs without embeddings show "0 chunks"
+- Upload modal file count header says "N file(s) selected" — verify this matches the number of files set via Playwright
 
 ### Financial Bible
 - Monthly trend charts (Revenue, Orders, Profitability, Cost Breakdown)
