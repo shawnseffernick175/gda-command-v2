@@ -43,13 +43,13 @@ describe("Retry: Retryable Status Reasons", () => {
 
 describe("Retry: HTTP Status Codes", () => {
   it("returns 409 when document status is not failed", () => {
-    const status = "indexed";
+    const status: string = "indexed";
     const expected = status !== "failed" ? 409 : 200;
     expect(expected).toBe(409);
   });
 
   it("returns 409 when document status is processing", () => {
-    const status = "processing";
+    const status: string = "processing";
     const expected = status !== "failed" ? 409 : 200;
     expect(expected).toBe(409);
   });
