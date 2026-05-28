@@ -97,7 +97,7 @@ router.get("/documents", async (req, res) => {
     if (pool) {
       try {
         const { collection, type, status, search } = req.query;
-        let query = `SELECT id, collection_id as collection, title, doc_type, file_name, file_size_bytes, page_count as pages, chunk_count as chunks_indexed, status, tags, metadata, indexed_at, created_at as uploaded_at, updated_at FROM knowledge_documents WHERE 1=1`;
+        let query = `SELECT id, collection_id as collection, title, doc_type, file_name, file_size_bytes, page_count as pages, chunk_count as chunks_indexed, status, status_reason, extraction_method, parent_document_id, tags, metadata, indexed_at, created_at as uploaded_at, updated_at FROM knowledge_documents WHERE 1=1`;
         const params: unknown[] = [];
         let idx = 1;
         if (collection && typeof collection === "string") { query += ` AND collection_id = $${idx++}`; params.push(collection); }
@@ -112,6 +112,9 @@ router.get("/documents", async (req, res) => {
           chunks_indexed: (r.chunks_indexed as number) ?? 0, access_count: 0,
           created_at: r.uploaded_at as string, tags: (r.tags as string[]) ?? [],
           file_size_bytes: r.file_size_bytes as number, uploaded_at: r.uploaded_at as string,
+          file_name: r.file_name as string, status_reason: (r.status_reason as string) ?? null,
+          extraction_method: (r.extraction_method as string) ?? null,
+          parent_document_id: (r.parent_document_id as string) ?? null,
         })) as KnowledgeDocument[];
       } catch (err) { log.warn("knowledge_fallback", { error: String(err) }); }
     }
@@ -821,6 +824,252 @@ router.post("/quick-create", requireRole("admin", "bd_manager", "capture_lead", 
   } catch (e) {
     res.status(500).json(
       errorEnvelope("gda-knowledge", "quick-create", { code: "INTERNAL", message: (e as Error).message, detail: null }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/knowledge/bulk-upload — upload multiple files (up to 50)
+// Returns 207 Multi-Status with per-file result rows.
+// ---------------------------------------------------------------------------
+const MAX_BATCH_FILES = 50;
+const bulkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: getMaxFileSize() },
+  fileFilter: (_req, file, cb) => {
+    if (!isAllowedMimeType(file.mimetype, file.originalname)) {
+      cb(new Error(`File type ${file.mimetype} is not allowed`));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+router.post(
+  "/bulk-upload",
+  requireRole("admin", "bd_manager", "capture_lead"),
+  bulkUpload.array("files", MAX_BATCH_FILES),
+  async (req: Request, res: Response) => {
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        return res.status(400).json(
+          errorEnvelope("gda-knowledge", "bulk-upload", {
+            code: "BAD_REQUEST",
+            message: "No files provided. Send multipart form with field name 'files'.",
+            detail: null,
+          }),
+        );
+      }
+
+      if (files.length > MAX_BATCH_FILES) {
+        return res.status(400).json(
+          errorEnvelope("gda-knowledge", "bulk-upload", {
+            code: "BATCH_LIMIT",
+            message: `Maximum ${MAX_BATCH_FILES} files per batch. Received ${files.length}.`,
+            detail: null,
+          }),
+        );
+      }
+
+      const { document_type, collection, tags: rawTags } = req.body as {
+        document_type?: string;
+        collection?: string;
+        tags?: string;
+      };
+      const parsedTags = rawTags
+        ? (typeof rawTags === "string" ? rawTags.split(",").map((t: string) => t.trim()).filter(Boolean) : Array.isArray(rawTags) ? rawTags : [])
+        : [];
+      const docType = document_type ?? "memo";
+      const collectionId = collection ?? "col-contracts";
+
+      const pool = getPool();
+      const useEmbeddings = isEmbeddingAvailable();
+      const results: {
+        filename: string;
+        document_id: string | null;
+        status: string;
+        status_reason: string | null;
+        extraction_method: string | null;
+        children_count: number;
+        error: string | null;
+      }[] = [];
+
+      for (const file of files) {
+        let storageKey: string | undefined;
+        try {
+          const resolvedMime = resolveMimeType(file.mimetype, file.originalname);
+          storageKey = generateStorageKey(file.originalname);
+          saveFile(storageKey, file.buffer);
+
+          const docId = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          const fileId = `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+          if (pool) {
+            const client = await pool.connect();
+            try {
+              await client.query("BEGIN");
+              await client.query(
+                `INSERT INTO uploaded_files (id, original_name, storage_key, mime_type, size_bytes, uploaded_by)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [fileId, file.originalname, storageKey, resolvedMime, file.size, req.user?.userId ?? null],
+              );
+              await client.query(
+                `INSERT INTO knowledge_documents
+                   (id, collection_id, title, doc_type, file_name, file_size_bytes, page_count, chunk_count, status, tags, metadata, file_id, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, 0, 0, 'pending', $7, $8, $9, NOW(), NOW())`,
+                [docId, collectionId, file.originalname.replace(/\.[^.]+$/, ""), docType, file.originalname, file.size, parsedTags, JSON.stringify({ mime_type: resolvedMime, storage_key: storageKey }), fileId],
+              );
+              await client.query("COMMIT");
+            } catch (txErr) {
+              await client.query("ROLLBACK");
+              if (storageKey) { try { deleteFile(storageKey); } catch { /* ignore */ } }
+              throw txErr;
+            } finally {
+              client.release();
+            }
+          }
+
+          // Fire-and-forget ingestion
+          if (useEmbeddings && pool && isExtractable(resolvedMime)) {
+            const bufferCopy = Buffer.from(file.buffer);
+            ingestDocument(bufferCopy, file.originalname, {
+              documentId: docId,
+              userId: req.user?.userId,
+              collectionId,
+              tags: parsedTags,
+            }).catch((err) => {
+              log.error("bulk_ingest_error", { docId, error: (err as Error).message });
+            });
+          }
+
+          results.push({
+            filename: file.originalname,
+            document_id: docId,
+            status: useEmbeddings && isExtractable(resolvedMime) ? "processing" : "pending",
+            status_reason: null,
+            extraction_method: null,
+            children_count: 0,
+            error: null,
+          });
+        } catch (err) {
+          results.push({
+            filename: file.originalname,
+            document_id: null,
+            status: "failed",
+            status_reason: (err as Error).message,
+            extraction_method: null,
+            children_count: 0,
+            error: (err as Error).message,
+          });
+        }
+      }
+
+      log.info("bulk_upload_complete", {
+        total: files.length,
+        succeeded: results.filter((r) => r.error === null).length,
+        failed: results.filter((r) => r.error !== null).length,
+      });
+
+      return res.status(207).json(
+        successEnvelope("gda-knowledge", "bulk-upload", {
+          total: files.length,
+          succeeded: results.filter((r) => r.error === null).length,
+          failed: results.filter((r) => r.error !== null).length,
+          results,
+        }),
+      );
+    } catch (err) {
+      return res.status(500).json(
+        errorEnvelope("gda-knowledge", "bulk-upload", {
+          code: "INTERNAL",
+          message: (err as Error).message || "Bulk upload failed",
+          detail: null,
+        }),
+      );
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// POST /api/knowledge/documents/:id/retry — retry a failed document
+// Only allowed when status='failed' AND status_reason is retryable.
+// ---------------------------------------------------------------------------
+const RETRYABLE_REASONS = new Set(["timeout", "transient_error", "ocr_timeout", "OCR timeout"]);
+
+router.post("/documents/:id/retry", requireRole("admin", "bd_manager", "capture_lead"), async (req: Request, res: Response) => {
+  const pool = getPool();
+  if (!pool) {
+    return res.status(503).json(
+      errorEnvelope("gda-knowledge", "retry", { code: "DB_UNAVAILABLE", message: "Database not available", detail: null }),
+    );
+  }
+
+  try {
+    const docId = req.params.id;
+    const { rows } = await pool.query(
+      `SELECT kd.id, kd.status, kd.status_reason, kd.file_name, kd.collection_id, kd.tags,
+              uf.storage_key
+       FROM knowledge_documents kd
+       LEFT JOIN uploaded_files uf ON uf.id = kd.file_id
+       WHERE kd.id = $1`,
+      [docId],
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json(
+        errorEnvelope("gda-knowledge", "retry", { code: "NOT_FOUND", message: `Document ${docId} not found`, detail: null }),
+      );
+    }
+
+    const doc = rows[0];
+    if (doc.status !== "failed") {
+      return res.status(409).json(
+        errorEnvelope("gda-knowledge", "retry", { code: "CONFLICT", message: `Document status is '${doc.status}', not 'failed'`, detail: null }),
+      );
+    }
+
+    if (!doc.status_reason || !RETRYABLE_REASONS.has(doc.status_reason)) {
+      return res.status(422).json(
+        errorEnvelope("gda-knowledge", "retry", {
+          code: "NOT_RETRYABLE",
+          message: `Status reason '${doc.status_reason}' is not retryable. Retryable reasons: ${[...RETRYABLE_REASONS].join(", ")}`,
+          detail: null,
+        }),
+      );
+    }
+
+    if (!doc.storage_key) {
+      return res.status(422).json(
+        errorEnvelope("gda-knowledge", "retry", { code: "NO_FILE", message: "No file on disk to retry", detail: null }),
+      );
+    }
+
+    // Reset status to pending
+    await pool.query(
+      `UPDATE knowledge_documents SET status = 'pending', status_reason = NULL, updated_at = NOW() WHERE id = $1`,
+      [docId],
+    );
+
+    // Re-ingest (fire-and-forget)
+    const fileBuffer = readFile(doc.storage_key);
+    if (fileBuffer) {
+      ingestDocument(fileBuffer, doc.file_name ?? "unknown", {
+        documentId: docId,
+        userId: req.user?.userId,
+        collectionId: doc.collection_id,
+        tags: doc.tags ?? [],
+      }).catch((err) => {
+        log.error("retry_ingest_error", { docId, error: (err as Error).message });
+      });
+    }
+
+    return res.json(
+      successEnvelope("gda-knowledge", "retry", { document_id: docId, status: "processing", message: "Retry initiated" }),
+    );
+  } catch (err) {
+    return res.status(500).json(
+      errorEnvelope("gda-knowledge", "retry", { code: "INTERNAL", message: (err as Error).message, detail: null }),
     );
   }
 });

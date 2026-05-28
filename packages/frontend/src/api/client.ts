@@ -1981,8 +1981,12 @@ export interface KnowledgeDocument {
     period_of_performance?: string;
     solicitation_number?: string;
     author?: string;
+    mime_type?: string;
   };
   summary: string;
+  status_reason: string | null;
+  extraction_method: string | null;
+  parent_document_id: string | null;
 }
 
 export interface KnowledgeSearchResult {
@@ -2131,6 +2135,47 @@ export function uploadDocumentDryRun(fileName: string, documentType?: string, co
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_name: fileName, document_type: documentType, collection, tags }),
+  });
+}
+
+export interface BulkUploadResultRow {
+  filename: string;
+  document_id: string | null;
+  status: string;
+  status_reason: string | null;
+  extraction_method: string | null;
+  children_count: number;
+  error: string | null;
+}
+
+export interface BulkUploadResponseData {
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: BulkUploadResultRow[];
+}
+
+export function bulkUploadDocuments(files: File[], documentType?: string, collection?: string, tags?: string[]) {
+  const formData = new FormData();
+  files.forEach((f) => formData.append("files", f));
+  if (documentType) formData.append("document_type", documentType);
+  if (collection) formData.append("collection", collection);
+  if (tags && tags.length > 0) formData.append("tags", tags.join(","));
+  return request<BulkUploadResponseData>("/knowledge/bulk-upload", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export interface RetryResponseData {
+  document_id: string;
+  status: string;
+  message: string;
+}
+
+export function retryDocument(docId: string) {
+  return request<RetryResponseData>(`/knowledge/documents/${docId}/retry`, {
+    method: "POST",
   });
 }
 
