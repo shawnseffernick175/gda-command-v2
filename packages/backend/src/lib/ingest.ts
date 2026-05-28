@@ -128,7 +128,7 @@ export async function ingestDocument(
   }
 
   // 3. Mark as processing
-  const extractionMethod = PLAIN_TEXT_MIMES.has(detectedMime) ? "native" : "native";
+  let extractionMethod = "native";
   if (pool) {
     await pool.query(
       `UPDATE knowledge_documents
@@ -142,6 +142,17 @@ export async function ingestDocument(
   try {
     const result = await runExtractor(buffer, detectedMime);
     const text = result.text;
+
+    // Honor extractor-provided extraction_method (e.g. 'ocr' from pdf/image)
+    if (result.metadata.extraction_method && typeof result.metadata.extraction_method === "string") {
+      extractionMethod = result.metadata.extraction_method;
+      if (pool) {
+        await pool.query(
+          `UPDATE knowledge_documents SET extraction_method = $2, updated_at = NOW() WHERE id = $1`,
+          [documentId, extractionMethod],
+        ).catch(() => {});
+      }
+    }
 
     if (!text || text.trim().length === 0) {
       const reason = "extraction returned empty text";

@@ -231,8 +231,7 @@ async function extract7z(buffer: Buffer): Promise<ArchiveEntry[]> {
   fs.writeFileSync(tmpFile, buffer);
 
   try {
-    // Check for encryption: 7z l -slt lists headers; encrypted archives
-    // fail to extract with "Wrong password" or require -p flag
+    // Check for encryption first
     try {
       await execFileAsync("7z", ["t", tmpFile, "-p-"], { timeout: 30_000 });
     } catch (testErr) {
@@ -240,7 +239,52 @@ async function extract7z(buffer: Buffer): Promise<ArchiveEntry[]> {
       if (msg.includes("Wrong password") || msg.includes("encrypted") || msg.includes("password")) {
         throw new ArchivePolicyError("archive is encrypted");
       }
-      // Other test failures fall through to actual extraction
+    }
+
+    // Pre-extraction check: inspect declared sizes via 7z l -slt BEFORE extracting
+    try {
+      const { stdout } = await execFileAsync("7z", ["l", "-slt", tmpFile], { timeout: 30_000 });
+      let fileCount = 0;
+      let totalDeclaredSize = 0;
+      let totalPackedSize = 0;
+
+      for (const line of stdout.split("\n")) {
+        if (line.startsWith("Size = ")) {
+          const size = parseInt(line.slice(7).trim(), 10);
+          if (!isNaN(size)) {
+            totalDeclaredSize += size;
+            if (size > MAX_MEMBER_SIZE) {
+              throw new ArchivePolicyError("archive member exceeds 200MB size limit");
+            }
+          }
+        } else if (line.startsWith("Packed Size = ")) {
+          const packed = parseInt(line.slice(14).trim(), 10);
+          if (!isNaN(packed) && packed > 0) {
+            totalPackedSize += packed;
+          }
+        } else if (line.startsWith("Path = ") && fileCount > 0) {
+          // Each file entry starts with "Path ="; first one is the archive itself
+          fileCount++;
+        } else if (line.startsWith("Path = ")) {
+          fileCount++;
+        }
+      }
+
+      // Adjust: first Path entry is the archive name, actual files start after
+      const actualFiles = Math.max(0, fileCount - 1);
+
+      if (actualFiles > MAX_FILES) {
+        throw new ArchivePolicyError("archive file count limit exceeded");
+      }
+      if (totalDeclaredSize > MAX_EXTRACTED_BYTES) {
+        throw new ArchivePolicyError("archive extracted size limit exceeded");
+      }
+      if (totalPackedSize > 0 && totalDeclaredSize / totalPackedSize > MAX_COMPRESSION_RATIO) {
+        throw new ArchivePolicyError("archive member compression ratio exceeds 100x (zip bomb suspected)");
+      }
+    } catch (listErr) {
+      if (listErr instanceof ArchivePolicyError) throw listErr;
+      // If listing fails, fall through to extraction with post-extraction checks
     }
 
     await execFileAsync("7z", ["x", tmpFile, `-o${extractDir}`, "-y"], {
@@ -257,10 +301,8 @@ async function extract7z(buffer: Buffer): Promise<ArchiveEntry[]> {
         const relPath = prefix ? `${prefix}/${item}` : item;
         const stat = fs.lstatSync(fullPath);
 
-        // Skip symlinks explicitly
         if (stat.isSymbolicLink()) continue;
 
-        // Path traversal check
         if (!isPathSafe(relPath)) {
           throw new ArchivePolicyError("path traversal detected in archive member");
         }
@@ -268,17 +310,12 @@ async function extract7z(buffer: Buffer): Promise<ArchiveEntry[]> {
         if (stat.isDirectory()) {
           walkDir(fullPath, relPath);
         } else {
-          // Fail-closed: file count
           if (entries.length >= MAX_FILES) {
             throw new ArchivePolicyError("archive file count limit exceeded");
           }
-
-          // Per-member size limit
           if (stat.size > MAX_MEMBER_SIZE) {
             throw new ArchivePolicyError("archive member exceeds 200MB size limit");
           }
-
-          // Fail-closed: total size
           if (totalBytes + stat.size > MAX_EXTRACTED_BYTES) {
             throw new ArchivePolicyError("archive extracted size limit exceeded");
           }
@@ -362,6 +399,10 @@ function guessMimeFromExt(ext: string): string {
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     gif: "image/gif",
+    tif: "image/tiff",
+    tiff: "image/tiff",
+    heic: "image/heic",
+    webp: "image/webp",
     zip: "application/zip",
     tar: "application/x-tar",
     gz: "application/gzip",

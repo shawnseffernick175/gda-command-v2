@@ -38,10 +38,12 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/gzip",
   "application/x-gzip",
   "application/x-7z-compressed",
-  // Images (allowed for upload, not extractable until PR 4)
+  // PR 4 — Images (OCR)
   "image/png",
   "image/jpeg",
-  "image/gif",
+  "image/tiff",
+  "image/heic",
+  "image/webp",
 ]);
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
@@ -89,11 +91,14 @@ const EXT_MIME_MAP: Record<string, string> = {
   ".gz": "application/gzip",
   ".tgz": "application/gzip",
   ".7z": "application/x-7z-compressed",
-  // Images
+  // PR 4 — Images (OCR)
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+  ".heic": "image/heic",
+  ".webp": "image/webp",
 };
 
 /**
