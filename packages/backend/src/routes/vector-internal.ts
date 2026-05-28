@@ -559,7 +559,7 @@ router.post("/vector-query-compare", async (req, res) => {
             "Api-Key": pineconeKey,
           },
           body: JSON.stringify({
-            namespace: collection === "ai-agent-attachments" ? "" : collection,
+            namespace: (collection === "ai-agent-attachments" || collection === "knowledge") ? "" : collection,
             topK: k,
             vector: embedding,
             includeMetadata: true,
