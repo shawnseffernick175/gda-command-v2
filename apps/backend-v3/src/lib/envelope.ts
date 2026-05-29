@@ -7,6 +7,7 @@ export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
   | 'ANALYSIS_TIMEOUT'
+  | 'DRAFT_NOT_READY'
   | 'INTERNAL_ERROR'
   | 'WEBHOOK_AUTH_FAILED'
   | 'RATE_LIMITED';

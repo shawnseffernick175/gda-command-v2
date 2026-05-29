@@ -28,6 +28,13 @@ import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
 import { QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js';
 import type { SourceRef } from '../lib/sources.js';
+import {
+  buildStubDraftText,
+  buildDraftSources,
+  type DraftJobData,
+  type DraftKind,
+} from '../services/drafts/index.js';
+import type { ActionItemRow } from '../services/action-items/index.js';
 
 const { Pool } = pg;
 
@@ -573,7 +580,41 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
 
 async function handleIngestPostprocess(jobs: PgBoss.Job<Record<string, unknown>>[]): Promise<void> {
   for (const job of jobs) {
-    logger.info({ jobId: job.id }, 'Processing ingest postprocess');
+    const data = job.data as DraftJobData | Record<string, unknown>;
+
+    if ('draftId' in data && 'actionItemId' in data && 'kind' in data) {
+      const draftData = data as DraftJobData;
+      logger.info({ draftId: draftData.draftId, jobId: job.id }, 'Processing draft generation');
+
+      const aiRes = await pool.query<ActionItemRow>(
+        'SELECT * FROM action_items WHERE id = $1',
+        [draftData.actionItemId]
+      );
+      const actionItem = aiRes.rows[0];
+      if (!actionItem) {
+        logger.warn({ actionItemId: draftData.actionItemId }, 'Action item not found for draft');
+        await pool.query(
+          `UPDATE action_item_drafts SET status = 'failed', updated_at = $1 WHERE id = $2`,
+          [new Date().toISOString(), draftData.draftId]
+        );
+        continue;
+      }
+
+      const draftText = buildStubDraftText(draftData.kind as DraftKind, actionItem);
+      const sources = buildDraftSources(draftData.kind as DraftKind);
+      const now = new Date().toISOString();
+
+      await pool.query(
+        `UPDATE action_item_drafts
+         SET draft_text = $1, sources = $2, status = 'done', updated_at = $3
+         WHERE id = $4`,
+        [draftText, JSON.stringify(sources), now, draftData.draftId]
+      );
+
+      logger.info({ draftId: draftData.draftId }, 'Draft generation complete');
+    } else {
+      logger.info({ jobId: job.id }, 'Processing ingest postprocess');
+    }
   }
 }
 
