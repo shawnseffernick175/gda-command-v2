@@ -96,7 +96,7 @@ async function ensureTestSchema(): Promise<void> {
   }
 }
 
-async function insertTestOpportunity(title: string = 'Test Opportunity'): Promise<string> {
+async function insertTestOpportunity(title: string = 'Cap_Opportunity'): Promise<string> {
   const res = await pool.query<{ id: string }>(
     `INSERT INTO opportunities (title, agency, status, source_id)
      VALUES ($1, $2, 'discovery', 1) RETURNING id`,
@@ -172,7 +172,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await pool.query('DELETE FROM captures');
   await pool.query('DELETE FROM pipeline_items');
-  await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test%'");
+  await pool.query("DELETE FROM opportunities WHERE title LIKE 'Cap_%'");
 });
 
 interface SuccessBody {
@@ -189,7 +189,7 @@ interface ErrorBody {
 
 describe('Contract: GET /v3/captures', () => {
   it('returns paginated list with CaptureSummary fields', async () => {
-    const oppId = await insertTestOpportunity('Test Contract List Opp');
+    const oppId = await insertTestOpportunity('Cap_Contract List Opp');
     const piId = await insertTestPipelineItem(oppId);
     await insertTestCapture(piId, oppId);
 
@@ -220,7 +220,7 @@ describe('Contract: GET /v3/captures', () => {
   });
 
   it('filters by color_review_stage', async () => {
-    const oppId = await insertTestOpportunity('Test Filter Opp');
+    const oppId = await insertTestOpportunity('Cap_Filter Opp');
     const piId = await insertTestPipelineItem(oppId);
     await insertTestCapture(piId, oppId, { color_review_stage: 'pink' });
     await insertTestCapture(piId, oppId, { color_review_stage: 'red' });
@@ -262,7 +262,7 @@ describe('Contract: GET /v3/captures/:id', () => {
 
 describe('Contract: POST /v3/captures', () => {
   it('creates capture from pipeline item and returns 201', async () => {
-    const oppId = await insertTestOpportunity('Test Create Opp');
+    const oppId = await insertTestOpportunity('Cap_Create Opp');
     const piId = await insertTestPipelineItem(oppId);
 
     const res = await app.inject({
@@ -301,7 +301,7 @@ describe('Contract: POST /v3/captures', () => {
   });
 
   it('sets capture_kickoff_at on pipeline item if not already set', async () => {
-    const oppId = await insertTestOpportunity('Test Kickoff Opp');
+    const oppId = await insertTestOpportunity('Cap_Kickoff Opp');
     const piId = await insertTestPipelineItem(oppId);
 
     await app.inject({
@@ -331,7 +331,7 @@ describe('Contract: POST /v3/captures', () => {
 
 describe('Contract: PATCH /v3/captures/:id', () => {
   it('updates color_review_stage and returns 200', async () => {
-    const oppId = await insertTestOpportunity('Test Patch Opp');
+    const oppId = await insertTestOpportunity('Cap_Patch Opp');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -347,7 +347,7 @@ describe('Contract: PATCH /v3/captures/:id', () => {
   });
 
   it('returns pricing_guardrail when margin_pct is set', async () => {
-    const oppId = await insertTestOpportunity('Test Guardrail Opp');
+    const oppId = await insertTestOpportunity('Cap_Guardrail Opp');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -377,7 +377,7 @@ describe('Contract: PATCH /v3/captures/:id', () => {
   });
 
   it('returns 400 for invalid stage', async () => {
-    const oppId = await insertTestOpportunity('Test Invalid Stage Opp');
+    const oppId = await insertTestOpportunity('Cap_Invalid Stage Opp');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -403,7 +403,7 @@ describe('Contract: PATCH /v3/captures/:id', () => {
   });
 
   it('returns compliance_summary in response', async () => {
-    const oppId = await insertTestOpportunity('Test Compliance Opp');
+    const oppId = await insertTestOpportunity('Cap_Compliance Opp');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -430,7 +430,7 @@ describe('Contract: PATCH /v3/captures/:id', () => {
 
 describe('Contract: SuccessEnvelope on capture endpoints', () => {
   it('all capture responses include meta with generatedAt, source, requestId', async () => {
-    const oppId = await insertTestOpportunity('Test Envelope Opp');
+    const oppId = await insertTestOpportunity('Cap_Envelope Opp');
     const piId = await insertTestPipelineItem(oppId);
     await insertTestCapture(piId, oppId);
 

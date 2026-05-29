@@ -97,7 +97,7 @@ async function ensureTestSchema(): Promise<void> {
   }
 }
 
-async function insertTestOpportunity(title: string = 'Test Opportunity'): Promise<string> {
+async function insertTestOpportunity(title: string = 'Cap_Opportunity'): Promise<string> {
   const res = await pool.query<{ id: string }>(
     `INSERT INTO opportunities (title, agency, status, source_id)
      VALUES ($1, $2, 'discovery', 1) RETURNING id`,
@@ -179,13 +179,13 @@ afterAll(async () => {
 beforeEach(async () => {
   await pool.query('DELETE FROM captures');
   await pool.query('DELETE FROM pipeline_items');
-  await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test%'");
+  await pool.query("DELETE FROM opportunities WHERE title LIKE 'Cap_%'");
 });
 
 // Integration: 10s synchronous block (fresh / pre-warm / timeout)
 describe('Integration: capture detail with fresh cache', () => {
   it('returns 200 when capture analysis cache is fresh', async () => {
-    const oppId = await insertTestOpportunity('Test Fresh Capture');
+    const oppId = await insertTestOpportunity('Cap_Fresh Capture');
     const piId = await insertTestPipelineItem(oppId);
     const now = new Date().toISOString();
     const capId = await insertTestCapture(piId, oppId, {
@@ -217,7 +217,7 @@ describe('Integration: capture detail with fresh cache', () => {
 
 describe('Integration: capture detail pre-warm completes within timeout', () => {
   it('returns 200 after analysis worker completes', async () => {
-    const oppId = await insertTestOpportunity('Test PreWarm Capture');
+    const oppId = await insertTestOpportunity('Cap_PreWarm Capture');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -252,7 +252,7 @@ describe('Integration: capture detail ANALYSIS_TIMEOUT', () => {
     process.env['ANALYSIS_TIMEOUT_MS'] = '500';
     process.env['ANALYSIS_POLL_INTERVAL_MS'] = '50';
 
-    const oppId = await insertTestOpportunity('Test Timeout Capture');
+    const oppId = await insertTestOpportunity('Cap_Timeout Capture');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -273,7 +273,7 @@ describe('Integration: capture detail ANALYSIS_TIMEOUT', () => {
 // Integration: color review monotonic progression
 describe('Integration: color review monotonic progression', () => {
   it('allows forward progression: white → pink → red → gold → final', async () => {
-    const oppId = await insertTestOpportunity('Test Color Forward');
+    const oppId = await insertTestOpportunity('Cap_Color Forward');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -292,7 +292,7 @@ describe('Integration: color review monotonic progression', () => {
   });
 
   it('allows skipping forward: white → gold', async () => {
-    const oppId = await insertTestOpportunity('Test Color Skip');
+    const oppId = await insertTestOpportunity('Cap_Color Skip');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -308,7 +308,7 @@ describe('Integration: color review monotonic progression', () => {
   });
 
   it('blocks regression without force: true (red → pink fails)', async () => {
-    const oppId = await insertTestOpportunity('Test Color Block Regress');
+    const oppId = await insertTestOpportunity('Cap_Color Block Regress');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId, { color_review_stage: 'red' });
 
@@ -325,7 +325,7 @@ describe('Integration: color review monotonic progression', () => {
   });
 
   it('allows regression with force: true (red → pink succeeds)', async () => {
-    const oppId = await insertTestOpportunity('Test Color Force Regress');
+    const oppId = await insertTestOpportunity('Cap_Color Force Regress');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId, { color_review_stage: 'red' });
 
@@ -344,7 +344,7 @@ describe('Integration: color review monotonic progression', () => {
 // Integration: pricing guardrail thresholds
 describe('Integration: pricing guardrail thresholds', () => {
   it('returns warning when margin_pct between 5 and 8', async () => {
-    const oppId = await insertTestOpportunity('Test Margin Warn');
+    const oppId = await insertTestOpportunity('Cap_Margin Warn');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -363,7 +363,7 @@ describe('Integration: pricing guardrail thresholds', () => {
   });
 
   it('returns critical when margin_pct < 5', async () => {
-    const oppId = await insertTestOpportunity('Test Margin Critical');
+    const oppId = await insertTestOpportunity('Cap_Margin Critical');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -381,7 +381,7 @@ describe('Integration: pricing guardrail thresholds', () => {
   });
 
   it('returns labor rate warning when rate > $300/hr', async () => {
-    const oppId = await insertTestOpportunity('Test Labor Warn');
+    const oppId = await insertTestOpportunity('Cap_Labor Warn');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -402,7 +402,7 @@ describe('Integration: pricing guardrail thresholds', () => {
   });
 
   it('no warnings when margin is healthy and rates are normal', async () => {
-    const oppId = await insertTestOpportunity('Test Healthy Margin');
+    const oppId = await insertTestOpportunity('Cap_Healthy Margin');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -424,7 +424,7 @@ describe('Integration: pricing guardrail thresholds', () => {
 // Integration: capture analysis re-enqueues when opportunity analysis updates
 describe('Integration: capture re-analysis on opportunity update', () => {
   it('PATCH of analysis-affecting field on capture enqueues re-analysis', async () => {
-    const oppId = await insertTestOpportunity('Test Capture ReEnqueue');
+    const oppId = await insertTestOpportunity('Cap_Capture ReEnqueue');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -495,7 +495,7 @@ describe('Integration: capture re-analysis on opportunity update', () => {
 // Integration: teaming worksheet Envision-only enforcement
 describe('Integration: teaming worksheet validation', () => {
   it('accepts valid Envision partner', async () => {
-    const oppId = await insertTestOpportunity('Test Team Valid');
+    const oppId = await insertTestOpportunity('Cap_Team Valid');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -514,7 +514,7 @@ describe('Integration: teaming worksheet validation', () => {
   });
 
   it('rejects non-Envision partner', async () => {
-    const oppId = await insertTestOpportunity('Test Team Invalid');
+    const oppId = await insertTestOpportunity('Cap_Team Invalid');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -535,7 +535,7 @@ describe('Integration: teaming worksheet validation', () => {
   });
 
   it('requires rationale when partners are specified', async () => {
-    const oppId = await insertTestOpportunity('Test Team NoRationale');
+    const oppId = await insertTestOpportunity('Cap_Team NoRationale');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
@@ -559,7 +559,7 @@ describe('Integration: teaming worksheet validation', () => {
 // Integration: pre-warm coverage
 describe('Integration: pre-warm enqueue behavior', () => {
   it('POST /v3/captures enqueues analysis-capture', async () => {
-    const oppId = await insertTestOpportunity('Test PreWarm Create');
+    const oppId = await insertTestOpportunity('Cap_PreWarm Create');
     const piId = await insertTestPipelineItem(oppId);
 
     const res = await app.inject({
@@ -573,7 +573,7 @@ describe('Integration: pre-warm enqueue behavior', () => {
   });
 
   it('PATCH of notes-only does NOT enqueue analysis', async () => {
-    const oppId = await insertTestOpportunity('Test PreWarm Notes');
+    const oppId = await insertTestOpportunity('Cap_PreWarm Notes');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId, oppId);
 
