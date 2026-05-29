@@ -14,7 +14,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   capture: "#f59e0b",
   compliance: "#ef4444",
   proposal: "#8b5cf6",
-  research: "#3b82f6",
+  research: "#01696F",
   analysis: "#22c55e",
   general: "#6b7280",
 };
@@ -149,7 +149,7 @@ export default function PromptArchitect() {
           fontSize: 12,
           fontWeight: 600,
           background: "rgba(59,130,246,0.15)",
-          color: "#3b82f6",
+          color: "#01696F",
         }}>
           Live DB
         </span>
@@ -249,7 +249,7 @@ export default function PromptArchitect() {
           onClick={() => setShowCreateForm(true)}
           style={{
             padding: "8px 16px", borderRadius: 6, border: "none",
-            background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            background: "linear-gradient(135deg, #01696F, #8b5cf6)",
             color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer",
             marginLeft: "auto",
           }}
@@ -299,7 +299,7 @@ export default function PromptArchitect() {
             <textarea value={newTemplate} onChange={(e) => setNewTemplate(e.target.value)}
               placeholder="Enter prompt template text. Use {{variable}} for placeholders."
               rows={6}
-              style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13, fontFamily: "monospace", resize: "vertical" }} />
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", resize: "vertical" }} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleCreatePrompt} disabled={creating || !newName.trim() || !newTemplate.trim()}
@@ -575,7 +575,7 @@ function PromptDetail({
           background: "rgba(0,0,0,0.2)",
           borderRadius: 8,
           padding: 16,
-          fontFamily: "monospace",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
           fontSize: 13,
           lineHeight: 1.6,
           whiteSpace: "pre-wrap",

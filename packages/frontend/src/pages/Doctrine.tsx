@@ -19,13 +19,13 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 
 const DOC_TYPE_COLORS: Record<string, string> = {
   book_of_truths: "#8b5cf6",
-  sprint_notes: "#3b82f6",
+  sprint_notes: "#01696F",
   decision_log: "#f59e0b",
   master_build_note: "#06b6d4",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: "#3b82f6",
+  draft: "#01696F",
   finalized: "#22c55e",
   superseded: "#6b7280",
   blocked: "#ef4444",
@@ -124,7 +124,7 @@ export default function Doctrine() {
       <div style={{ padding: 24 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 24, color: "var(--color-text)" }}>Doctrine</h1>
         <p style={{ color: "#ef4444" }}>Error: {error}</p>
-        <button onClick={() => { setError(null); loadData(); }} style={{ marginTop: 12, padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Retry</button>
+        <button onClick={() => { setError(null); loadData(); }} style={{ marginTop: 12, padding: "8px 16px", background: "#01696F", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Retry</button>
       </div>
     );
   }
@@ -159,7 +159,7 @@ export default function Doctrine() {
         flexWrap: "wrap",
       }}>
         <SummaryCard label="Total Drafts" value={total} />
-        <SummaryCard label="Draft" value={statusCounts.draft} color="#3b82f6" />
+        <SummaryCard label="Draft" value={statusCounts.draft} color="#01696F" />
         <SummaryCard label="Finalized" value={statusCounts.finalized} color="#22c55e" />
         <SummaryCard label="Blocked" value={statusCounts.blocked} color="#ef4444" />
         <SummaryCard label="Sprints" value={sprints.length} />
@@ -550,7 +550,7 @@ function PublishRunCard({ run }: { run: DoctrinePublishRunRow }) {
         </div>
 
         {run.commit_sha && (
-          <code style={{ fontSize: 12, color: "#60a5fa", fontFamily: "monospace" }}>
+          <code style={{ fontSize: 12, color: "#60a5fa", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
             {run.commit_sha.slice(0, 7)}
           </code>
         )}
@@ -668,7 +668,7 @@ function FinalizeResultPanel({
           <span style={{ fontSize: 14, fontWeight: 600 }}>
             Finalize {result.sprintId}
           </span>
-          <code style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>
+          <code style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
             {result.correlationId}
           </code>
         </div>

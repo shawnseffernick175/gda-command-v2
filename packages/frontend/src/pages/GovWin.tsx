@@ -14,7 +14,7 @@ import {
 type Tab = "opportunities" | "syncs";
 
 const STATUS_COLORS: Record<string, string> = {
-  new: "#3b82f6",
+  new: "#01696F",
   tracking: "#d97706",
   qualified: "#16a34a",
   dismissed: "#6b7280",
@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STAGE_COLORS: Record<string, string> = {
   Forecast: "#8b5cf6",
-  "Pre-RFP": "#3b82f6",
+  "Pre-RFP": "#01696F",
   "Pre-Solicitation": "#0ea5e9",
   "RFP Released": "#f59e0b",
   Evaluation: "#ef4444",
@@ -192,7 +192,7 @@ export default function GovWin() {
           onClick={handleSync}
           disabled={syncing}
           style={{
-            background: syncing ? "#27272a" : "#3b82f6",
+            background: syncing ? "#27272a" : "#01696F",
             color: "#fff",
             border: "none",
             borderRadius: 6,
@@ -213,7 +213,7 @@ export default function GovWin() {
           <SummaryBox
             label="New"
             value={summary.new_count}
-            color="#3b82f6"
+            color="#01696F"
             onClick={() => setStatusFilter(statusFilter === "new" ? null : "new")}
           />
           <SummaryBox
@@ -250,8 +250,8 @@ export default function GovWin() {
               padding: "8px 20px",
               background: "transparent",
               border: "none",
-              borderBottom: tab === t ? "2px solid #3b82f6" : "2px solid transparent",
-              color: tab === t ? "#3b82f6" : "var(--color-text-muted, #9ca3af)",
+              borderBottom: tab === t ? "2px solid #01696F" : "2px solid transparent",
+              color: tab === t ? "#01696F" : "var(--color-text-muted, #9ca3af)",
               fontWeight: 600,
               fontSize: 13,
               cursor: "pointer",
@@ -326,7 +326,7 @@ export default function GovWin() {
                   onClick={() => setSelectedId(selectedId === o.id ? null : o.id)}
                   style={{
                     background: selectedId === o.id ? "var(--color-surface, #18181b)" : "transparent",
-                    border: `1px solid ${selectedId === o.id ? "#3b82f6" : "var(--color-border, #27272a)"}`,
+                    border: `1px solid ${selectedId === o.id ? "#01696F" : "var(--color-border, #27272a)"}`,
                     borderRadius: 8,
                     padding: "12px 14px",
                     cursor: "pointer",
@@ -525,7 +525,7 @@ export default function GovWin() {
                 <span>{s.new_matches} new</span>
                 <Pill
                   label={s.status}
-                  color={s.status === "completed" ? "#22c55e" : s.status === "running" ? "#3b82f6" : "#ef4444"}
+                  color={s.status === "completed" ? "#22c55e" : s.status === "running" ? "#01696F" : "#ef4444"}
                 />
               </div>
             </div>

@@ -15,7 +15,7 @@ interface CategoryGroup {
 }
 
 const CATEGORIES: CategoryGroup[] = [
-  { label: "API", prefix: "GDA.api.", color: "#3b82f6" },
+  { label: "API", prefix: "GDA.api.", color: "#01696F" },
   { label: "QA", prefix: "GDA.qa.", color: "#f59e0b" },
   { label: "Doctrine", prefix: "GDA.doctrine.", color: "#8b5cf6" },
   { label: "Cron", prefix: "GDA.cron.", color: "#22c55e" },
@@ -162,7 +162,7 @@ export default function Workflows() {
           Could not connect to the n8n workflow engine. This is expected in development if n8n is not running.
           All other GDA Command features work independently.
         </p>
-        <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 16, fontFamily: "monospace", background: "var(--color-surface)", padding: "8px 16px", borderRadius: 6, display: "inline-block" }}>
+        <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 16, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", background: "var(--color-surface)", padding: "8px 16px", borderRadius: 6, display: "inline-block" }}>
           {error}
         </div>
         <div>
@@ -170,7 +170,7 @@ export default function Workflows() {
             onClick={() => { setError(null); setLoading(true); fetchWorkflowRegistry().then((env) => { if (env.success && env.data) { setData(env.data); } else { setError(env.error?.message ?? "Failed to load workflows"); } }).catch((err) => setError(err.message)).finally(() => setLoading(false)); }}
             style={{
               padding: "8px 20px", borderRadius: 6, border: "none",
-              background: "#3b82f6", color: "#fff", fontSize: 14,
+              background: "#01696F", color: "#fff", fontSize: 14,
               fontWeight: 600, cursor: "pointer",
             }}
           >

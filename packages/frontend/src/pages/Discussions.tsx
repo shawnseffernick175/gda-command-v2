@@ -10,7 +10,7 @@ import {
 } from "../api/client";
 
 const ENTITY_COLORS: Record<string, string> = {
-  opportunity: "#3b82f6",
+  opportunity: "#01696F",
   proposal: "#8b5cf6",
   capture_plan: "#f97316",
   compliance: "#10b981",
@@ -105,11 +105,11 @@ export default function Discussions() {
       {summary && (
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <SummaryBox label="Threads" value={summary.total_threads} />
-          <SummaryBox label="Active" value={summary.active} color="#3b82f6" />
+          <SummaryBox label="Active" value={summary.active} color="#01696F" />
           <SummaryBox label="Resolved" value={summary.resolved} color="#16a34a" />
           <SummaryBox label="Messages" value={summary.total_messages} color="#8b5cf6" />
           <SummaryBox label="Participants" value={summary.participants} color="#f97316" />
-          <SummaryBox label="Opportunities" value={summary.by_entity.opportunity ?? 0} color="#3b82f6"
+          <SummaryBox label="Opportunities" value={summary.by_entity.opportunity ?? 0} color="#01696F"
             onClick={() => setEntityFilter(entityFilter === "opportunity" ? null : "opportunity")} />
           <SummaryBox label="Proposals" value={summary.by_entity.proposal ?? 0} color="#8b5cf6"
             onClick={() => setEntityFilter(entityFilter === "proposal" ? null : "proposal")} />
@@ -201,8 +201,8 @@ export default function Discussions() {
                       <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
                         {m.attachments.map((a, i) => (
                           <span key={i} style={{
-                            padding: "2px 8px", borderRadius: 4, background: "#3b82f610", border: "1px solid #3b82f630",
-                            fontSize: 11, color: "#3b82f6",
+                            padding: "2px 8px", borderRadius: 4, background: "#01696F10", border: "1px solid #01696F30",
+                            fontSize: 11, color: "#01696F",
                           }}>{a.name}</span>
                         ))}
                       </div>
@@ -232,8 +232,8 @@ export default function Discussions() {
                 <button
                   onClick={() => { postDiscussionMessage(sel.id, newMessage); setNewMessage(""); }}
                   style={{
-                    padding: "8px 16px", borderRadius: 6, border: "1px solid #3b82f6",
-                    background: "#3b82f618", color: "#3b82f6", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                    padding: "8px 16px", borderRadius: 6, border: "1px solid #01696F",
+                    background: "#01696F18", color: "#01696F", fontWeight: 600, fontSize: 12, cursor: "pointer",
                   }}
                 >
                   Send (dry-run)

@@ -42,7 +42,7 @@ function timeAgo(dateStr: string): string {
 
 const STATUS_COLORS: Record<string, string> = {
   completed: "#22c55e",
-  processing: "#3b82f6",
+  processing: "#01696F",
   failed: "#ef4444",
   queued: "#f59e0b",
 };
@@ -67,7 +67,7 @@ const COMPLEXITY_COLORS: Record<string, string> = {
 
 const OUTLINE_STATUS_COLORS: Record<string, string> = {
   reuse_available: "#22c55e",
-  draft_available: "#3b82f6",
+  draft_available: "#01696F",
   needs_new_content: "#ef4444",
 };
 
@@ -249,7 +249,7 @@ export default function RFPShredder() {
           {[
             { label: "Total Jobs", value: summary.total, color: "var(--color-text)" },
             { label: "Completed", value: summary.completed, color: "#22c55e" },
-            { label: "Processing", value: summary.processing, color: "#3b82f6" },
+            { label: "Processing", value: summary.processing, color: "#01696F" },
             { label: "Failed", value: summary.failed, color: summary.failed > 0 ? "#ef4444" : "var(--color-text)" },
             { label: "Requirements", value: summary.total_requirements, color: "#8b5cf6" },
             { label: "Pages Parsed", value: summary.total_pages, color: "var(--color-text)" },
@@ -555,7 +555,7 @@ function JobsTab({
             </div>
             <div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 11, marginBottom: 2 }}>Correlation ID</div>
-              <div style={{ fontFamily: "monospace", fontSize: 11 }}>{selectedJob.correlation_id}</div>
+              <div style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 11 }}>{selectedJob.correlation_id}</div>
             </div>
           </div>
 
@@ -728,7 +728,7 @@ function RequirementsTab({
           >
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--color-text-muted)" }}>{req.section}</span>
+                <span style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 11, color: "var(--color-text-muted)" }}>{req.section}</span>
                 <span style={{
                   padding: "1px 6px", borderRadius: 8, fontSize: 10, fontWeight: 600,
                   background: `${MATCH_COLORS[req.compliance_match]}20`,
@@ -745,7 +745,7 @@ function RequirementsTab({
                 }}>{req.requirement_type.replace(/_/g, " ")}</span>
               </div>
               <div style={{ fontSize: 13 }}>
-                <span style={{ fontWeight: 700, color: "#3b82f6" }}>{req.keyword}</span>{" "}
+                <span style={{ fontWeight: 700, color: "#01696F" }}>{req.keyword}</span>{" "}
                 {req.requirement_text.replace(/^.*?(SHALL|MUST|WILL)\s*/i, "")}
               </div>
             </div>
@@ -788,8 +788,8 @@ function RequirementsTab({
                   <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Source Document</div>
                   <div style={{
                     padding: 8, borderRadius: 6, fontSize: 12,
-                    background: "#3b82f610", border: "1px solid #3b82f630",
-                    color: "#3b82f6",
+                    background: "#01696F10", border: "1px solid #01696F30",
+                    color: "#01696F",
                   }}>{req.matched_document_title}</div>
                 </div>
               )}
@@ -898,7 +898,7 @@ function ComplianceMapTab({
               borderLeft: `4px solid ${MATCH_COLORS[entry.match_level]}`,
             }}
           >
-            <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--color-text-muted)", width: 40 }}>{entry.section}</span>
+            <span style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 11, color: "var(--color-text-muted)", width: 40 }}>{entry.section}</span>
             <span style={{
               padding: "1px 8px", borderRadius: 8, fontSize: 10, fontWeight: 600, flexShrink: 0,
               background: `${MATCH_COLORS[entry.match_level]}20`,
@@ -924,7 +924,7 @@ function ComplianceMapTab({
                       fontSize: 12,
                     }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, color: "#3b82f6" }}>{rec.document_title}</span>
+                        <span style={{ fontWeight: 600, color: "#01696F" }}>{rec.document_title}</span>
                         <span style={{ color: "#22c55e", fontWeight: 600 }}>{Math.round(rec.relevance * 100)}%</span>
                       </div>
                       <div style={{ color: "var(--color-text-muted)" }}>{rec.excerpt}</div>
@@ -949,7 +949,7 @@ function ComplianceMapTab({
                   <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Suggested Approach</div>
                   <div style={{
                     padding: 10, borderRadius: 6, fontSize: 12,
-                    background: "#3b82f610", border: "1px solid #3b82f630",
+                    background: "#01696F10", border: "1px solid #01696F30",
                   }}>{entry.suggested_approach}</div>
                 </div>
               )}
@@ -1011,7 +1011,7 @@ function ResponseOutlineTab({
             <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Reusable</div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#3b82f6" }}>{summary.draft_available}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#01696F" }}>{summary.draft_available}</div>
             <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Drafts</div>
           </div>
           <div style={{ textAlign: "center" }}>
@@ -1062,7 +1062,7 @@ function ResponseOutlineTab({
                 <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Recommended Approach</div>
                 <div style={{
                   padding: 10, borderRadius: 6, fontSize: 12,
-                  background: "#3b82f610", border: "1px solid #3b82f630",
+                  background: "#01696F10", border: "1px solid #01696F30",
                 }}>{sec.recommended_approach}</div>
               </div>
 
@@ -1073,7 +1073,7 @@ function ResponseOutlineTab({
                     {sec.requirements_covered.map((rid) => (
                       <span key={rid} style={{
                         padding: "2px 8px", borderRadius: 10, fontSize: 11,
-                        background: "#7c3aed15", color: "#7c3aed", fontFamily: "monospace",
+                        background: "#7c3aed15", color: "#7c3aed", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                       }}>{rid}</span>
                     ))}
                   </div>
@@ -1087,7 +1087,7 @@ function ResponseOutlineTab({
                     <div key={i} style={{
                       padding: 8, marginBottom: 4, borderRadius: 6, fontSize: 12,
                       background: "#22c55e08", border: "1px solid #22c55e30",
-                      color: "#3b82f6",
+                      color: "#01696F",
                     }}>{cite}</div>
                   ))}
                 </div>

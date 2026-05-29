@@ -86,7 +86,7 @@ interface CaptureCoachAnalysis {
 
 const STATUS_COLORS: Record<string, string> = {
   discovery: "#6b7280",
-  qualified: "#3b82f6",
+  qualified: "#01696F",
   pipeline: "#22c55e",
   lost: "#ef4444",
   won: "#eab308",
@@ -421,7 +421,7 @@ export default function OpportunityDetail() {
             style={{
               padding: "10px 20px",
               border: "none",
-              borderBottom: activeTab === tab.key ? "2px solid #3b82f6" : "2px solid transparent",
+              borderBottom: activeTab === tab.key ? "2px solid #01696F" : "2px solid transparent",
               background: "none",
               color: activeTab === tab.key ? "#f1f5f9" : "#64748b",
               fontWeight: activeTab === tab.key ? 700 : 400,
@@ -629,7 +629,7 @@ export default function OpportunityDetail() {
             disabled={analyzing}
             style={{
               padding: "8px 18px",
-              background: analyzing ? "#444" : "linear-gradient(135deg, #3b82f6, #06b6d4)",
+              background: analyzing ? "#444" : "linear-gradient(135deg, #01696F, #06b6d4)",
               color: "#fff",
               border: "none",
               borderRadius: 8,
@@ -899,7 +899,7 @@ export default function OpportunityDetail() {
       {blackHat && (
         <Section title="Black Hat Analysis">
           <div style={{ marginBottom: 12 }}>
-            <strong style={{ fontSize: 13, color: "#3b82f6" }}>Our Discriminators</strong>
+            <strong style={{ fontSize: 13, color: "#01696F" }}>Our Discriminators</strong>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
               {(blackHat.our_discriminators ?? []).map((d, i) => (
                 <span key={i} style={{ padding: "4px 10px", background: "rgba(59,130,246,0.1)", borderRadius: 12, fontSize: 12, color: "#60a5fa" }}>
@@ -927,7 +927,7 @@ export default function OpportunityDetail() {
                   </div>
                 </div>
                 <div style={{ marginTop: 8, padding: "8px 12px", background: "rgba(59,130,246,0.08)", borderRadius: 6 }}>
-                  <strong style={{ fontSize: 12, color: "#3b82f6" }}>Counter Strategy:</strong>
+                  <strong style={{ fontSize: 12, color: "#01696F" }}>Counter Strategy:</strong>
                   <p style={{ margin: "4px 0 0" }}>{s.counter_strategy}</p>
                 </div>
               </div>
@@ -960,7 +960,7 @@ export default function OpportunityDetail() {
               </div>
               <p style={{ margin: "0 0 8px", fontSize: 13, color: "#d1d5db" }}>{s.description}</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, fontSize: 12 }}>
-                <div><strong style={{ color: "#3b82f6" }}>Our Move:</strong><br />{s.our_move}</div>
+                <div><strong style={{ color: "#01696F" }}>Our Move:</strong><br />{s.our_move}</div>
                 <div><strong style={{ color: "#ef4444" }}>Competitor Response:</strong><br />{s.competitor_response}</div>
                 <div><strong style={{ color: "#f59e0b" }}>Outcome:</strong><br />{s.outcome}</div>
               </div>
@@ -1124,7 +1124,7 @@ export default function OpportunityDetail() {
 
             {/* Capture Strategy */}
             <details open style={{ marginBottom: 12, border: "1px solid var(--color-border)", borderRadius: 6, padding: "10px 14px" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#3b82f6" }}>Capture Strategy</summary>
+              <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14, color: "#01696F" }}>Capture Strategy</summary>
               <p style={{ margin: "8px 0", fontSize: 13, lineHeight: 1.6 }}>{coachAnalysis.capture_strategy?.approach ?? ""}</p>
               {(coachAnalysis.capture_strategy?.win_themes ?? []).length > 0 && (
                 <div style={{ marginBottom: 8 }}>
@@ -1245,7 +1245,7 @@ export default function OpportunityDetail() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {timeline.map((ev) => (
               <div key={ev.id} style={{ display: "flex", gap: 12, padding: "10px 14px", borderRadius: 6, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 6, flexShrink: 0, background: ev.type === "create" ? "#22c55e" : "#3b82f6" }} />
+                <div style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 6, flexShrink: 0, background: ev.type === "create" ? "#22c55e" : "#01696F" }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{ev.summary}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{formatDate(ev.timestamp)} · {ev.actor}</div>

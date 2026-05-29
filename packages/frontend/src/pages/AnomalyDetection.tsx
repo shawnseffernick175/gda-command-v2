@@ -47,11 +47,11 @@ const THREAT_COLORS: Record<string, string> = {
 const ESC_PRIORITY_COLORS: Record<string, string> = {
   critical: "#dc2626",
   warning: "#d97706",
-  info: "#3b82f6",
+  info: "#01696F",
 };
 
 const ESC_STATUS_COLORS: Record<string, string> = {
-  open: "#3b82f6",
+  open: "#01696F",
   in_progress: "#d97706",
   overdue: "#dc2626",
   resolved: "#16a34a",
@@ -265,10 +265,10 @@ function AnomaliesTab({ anomalies, selectedId, onSelect, onAcknowledge, onResolv
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {sel.recommended_actions.map((action, i) => (
                     <div key={i} style={{
-                      padding: "8px 12px", background: "#3b82f610", borderRadius: 8,
-                      border: "1px solid #3b82f630", fontSize: 13, display: "flex", gap: 8,
+                      padding: "8px 12px", background: "#01696F10", borderRadius: 8,
+                      border: "1px solid #01696F30", fontSize: 13, display: "flex", gap: 8,
                     }}>
-                      <span style={{ color: "#3b82f6", fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                      <span style={{ color: "#01696F", fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
                       <span>{action}</span>
                     </div>
                   ))}
@@ -380,7 +380,7 @@ function CompetitorsTab({ movements, selectedId, onSelect }: {
                 <span style={{ fontWeight: 600 }}>{sel.source}</span>
                 {sel.source_url && (
                   <a href={sel.source_url} target="_blank" rel="noopener noreferrer"
-                    style={{ marginLeft: 8, color: "#3b82f6", fontSize: 12 }}>[link]</a>
+                    style={{ marginLeft: 8, color: "#01696F", fontSize: 12 }}>[link]</a>
                 )}
               </div>
             </div>
@@ -391,7 +391,7 @@ function CompetitorsTab({ movements, selectedId, onSelect }: {
                 <h4 style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600 }}>Affected Opportunities</h4>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {sel.affected_opportunities.map((opp) => (
-                    <Pill key={opp} label={opp} color="#3b82f6" />
+                    <Pill key={opp} label={opp} color="#01696F" />
                   ))}
                 </div>
               </div>
@@ -552,7 +552,7 @@ function RulesTab({ rules, onRuleAdded }: { rules: EscalationRuleRow[]; onRuleAd
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <button onClick={() => setShowForm(!showForm)} style={{ padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+        <button onClick={() => setShowForm(!showForm)} style={{ padding: "8px 16px", background: "#01696F", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
           {showForm ? "Cancel" : "+ Add Rule"}
         </button>
       </div>
@@ -561,7 +561,7 @@ function RulesTab({ rules, onRuleAdded }: { rules: EscalationRuleRow[]; onRuleAd
         <div style={{ padding: 16, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, marginBottom: 16 }}>
           <div style={{ display: "grid", gap: 10 }}>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Rule name (e.g., Pwin Drop > 15%)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }} />
-            <input value={newCondition} onChange={(e) => setNewCondition(e.target.value)} placeholder="Condition (e.g., pwin_change < -0.15)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13, fontFamily: "monospace" }} />
+            <input value={newCondition} onChange={(e) => setNewCondition(e.target.value)} placeholder="Condition (e.g., pwin_change < -0.15)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }} />
             <select value={newPriority} onChange={(e) => setNewPriority(e.target.value)} style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }}>
               <option value="info">Info</option>
               <option value="warning">Warning</option>
@@ -591,7 +591,7 @@ function RulesTab({ rules, onRuleAdded }: { rules: EscalationRuleRow[]; onRuleAd
               </div>
             </div>
             <div style={{
-              fontFamily: "monospace", fontSize: 12, padding: "8px 12px",
+              fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 12, padding: "8px 12px",
               background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)",
               color: "var(--color-text-muted)",
             }}>
@@ -739,11 +739,11 @@ export default function AnomalyDetection() {
             style={{
               padding: "10px 20px",
               border: "none",
-              borderBottom: tab === t.key ? "2px solid #3b82f6" : "2px solid transparent",
+              borderBottom: tab === t.key ? "2px solid #01696F" : "2px solid transparent",
               background: "transparent",
               cursor: "pointer",
               fontWeight: tab === t.key ? 700 : 400,
-              color: tab === t.key ? "#3b82f6" : "var(--color-text-muted)",
+              color: tab === t.key ? "#01696F" : "var(--color-text-muted)",
               fontSize: 14,
               marginBottom: -2,
             }}
@@ -873,7 +873,7 @@ function SummaryBox({ label, value, color, onClick }: { label: string; value: st
         transition: "background 0.15s, border-color 0.15s",
         position: "relative",
       }}
-      onMouseEnter={(e) => { if (onClick) e.currentTarget.style.borderColor = color ?? "#3b82f6"; }}
+      onMouseEnter={(e) => { if (onClick) e.currentTarget.style.borderColor = color ?? "#01696F"; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--color-border)"; }}
     >
       <div style={{ fontSize: 10, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>

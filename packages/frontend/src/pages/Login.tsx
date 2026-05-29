@@ -163,7 +163,7 @@ export default function Login({ onAuth }: LoginProps) {
             style={{
               width: "100%",
               padding: "10px 0",
-              background: loading ? "#334155" : "#3b82f6",
+              background: loading ? "#334155" : "#01696F",
               color: "#fff",
               border: "none",
               borderRadius: 6,
@@ -194,7 +194,7 @@ export default function Login({ onAuth }: LoginProps) {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#3b82f6",
+                  color: "#01696F",
                   cursor: "pointer",
                   fontSize: 13,
                   padding: 0,
@@ -214,7 +214,7 @@ export default function Login({ onAuth }: LoginProps) {
                 style={{
                   background: "none",
                   border: "none",
-                  color: "#3b82f6",
+                  color: "#01696F",
                   cursor: "pointer",
                   fontSize: 13,
                   padding: 0,

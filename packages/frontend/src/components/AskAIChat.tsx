@@ -204,7 +204,7 @@ export default function AskAIChat({ opportunityId, opportunityTitle }: AskAIChat
             padding: "8px 16px",
             borderRadius: 6,
             border: "none",
-            background: loading || !input.trim() ? "rgba(59,130,246,0.3)" : "#3b82f6",
+            background: loading || !input.trim() ? "rgba(59,130,246,0.3)" : "#01696F",
             color: "#fff",
             cursor: loading || !input.trim() ? "default" : "pointer",
             fontSize: 13,

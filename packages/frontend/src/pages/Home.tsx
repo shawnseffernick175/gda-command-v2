@@ -38,7 +38,7 @@ function daysUntil(dateStr: string): number {
 
 const STAGE_COLORS: Record<string, string> = {
   discovery: "#f59e0b",
-  qualified: "#3b82f6",
+  qualified: "#01696F",
   pipeline: "#8b5cf6",
   won: "#22c55e",
   lost: "#ef4444",
@@ -345,7 +345,7 @@ export default function Home() {
               fontSize: 12,
               fontWeight: 600,
               background: kpis.source === "n8n" ? "rgba(168,85,247,0.15)" : kpis.source === "db" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
-              color: kpis.source === "n8n" ? "#a855f7" : kpis.source === "db" ? "#22c55e" : "#3b82f6",
+              color: kpis.source === "n8n" ? "#a855f7" : kpis.source === "db" ? "#22c55e" : "#01696F",
             }}>
               {kpis.source === "n8n" ? "Live API" : "Live DB"}
             </span>
@@ -450,7 +450,7 @@ export default function Home() {
 function KPISection({ kpis }: { kpis: DashboardKPIs }) {
   const navigate = useNavigate();
   return (
-    <div className="kpi-grid" style={{
+    <div  style={{
       display: "grid",
       gridTemplateColumns: "repeat(4, 1fr)",
       gap: 16,
@@ -483,7 +483,7 @@ function KPISection({ kpis }: { kpis: DashboardKPIs }) {
             whatItMeans: "Risk-adjusted forecast based on contract values and win probability.",
             howCalculated: "Sum of (contract value × Pwin) for all tracked opportunities.",
           }} />
-          <KPICard label="Avg Score" value={kpis.avgScore ? kpis.avgScore.toFixed(0) : "—"} accent="#3b82f6" onClick={() => navigate("/ops-tracker")} info={{
+          <KPICard label="Avg Score" value={kpis.avgScore ? kpis.avgScore.toFixed(0) : "—"} accent="#01696F" onClick={() => navigate("/ops-tracker")} info={{
             whatItIs: "Average opportunity quality score across all tracked opportunities.",
             whatItMeans: "Overall pipeline quality. Above 70 is strong, 50-70 moderate, below 50 needs review.",
           }} />
@@ -527,7 +527,7 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
   });
 
   return (
-    <div className="signal-grid" style={{
+    <div  style={{
       display: "grid",
       gridTemplateColumns: "repeat(4, 1fr)",
       gap: 16,
@@ -741,7 +741,7 @@ const QUICK_ACCESS_CARDS = [
   { title: "Proposal Review", description: "Track proposals, evaluate volumes, red team findings, scorecards, and submission timelines.", to: "/proposals", statusColor: "#8b5cf6" },
   { title: "Contacts & Relationships", description: "Contact directory, relationship tracking, meeting notes, and teaming partner management.", to: "/contacts", statusColor: "#14b8a6" },
   { title: "Reporting & Export", description: "Generate reports, schedule automated delivery, and export data across all GDA modules.", to: "/reports", statusColor: "#f97316" },
-  { title: "Financial Bible", description: "Drill-down behind every KPI — Orders, Sales, EBIT, Gross Profit, ROS, Funded Backlog, Contract Backlog.", to: "/financial-bible", statusColor: "#3b82f6" },
+  { title: "Financial Bible", description: "Drill-down behind every KPI — Orders, Sales, EBIT, Gross Profit, ROS, Funded Backlog, Contract Backlog.", to: "/financial-bible", statusColor: "#01696F" },
   { title: "Prompt Architect", description: "Versioned prompt library for capture, compliance, proposals, and research.", to: "/prompts", statusColor: "#8b5cf6" },
   { title: "Workflows", description: "Browse and manage all n8n automation workflows.", to: "/workflows", statusColor: "#06b6d4" },
   { title: "Settings", description: "System configuration, connectors, and feature flags.", to: "/settings", statusColor: "#6b7280" },
@@ -756,7 +756,7 @@ const QUICK_ACCESS_CARDS = [
 
 function QuickAccessSection() {
   return (
-    <div className="quick-access-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+    <div  style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
       {QUICK_ACCESS_CARDS.map((card) => (
         <Card key={card.to} {...card} />
       ))}

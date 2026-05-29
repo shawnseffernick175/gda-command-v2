@@ -552,7 +552,7 @@ const PAGE_SECTIONS: PageSection[] = [
 const GROUPS = ["Operations", "Capture", "Intelligence", "Reporting", "Admin"];
 
 const GROUP_COLORS: Record<string, string> = {
-  Operations: "#3b82f6",
+  Operations: "#01696F",
   Capture: "#8b5cf6",
   Intelligence: "#06b6d4",
   Reporting: "#f59e0b",
@@ -928,7 +928,7 @@ export default function UserManual() {
                       display: "inline-block",
                       padding: "2px 8px",
                       fontSize: 12,
-                      fontFamily: "monospace",
+                      fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                       background: "#0d1117",
                       border: "1px solid #30363d",
                       borderRadius: 4,

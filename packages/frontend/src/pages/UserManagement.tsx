@@ -17,7 +17,7 @@ import { timeAgo } from "../utils/format";
 const ROLE_COLORS: Record<string, string> = {
   admin: "#ef4444",
   bd_manager: "#f59e0b",
-  capture_lead: "#3b82f6",
+  capture_lead: "#01696F",
   analyst: "#8b5cf6",
   viewer: "#6b7280",
 };
@@ -220,7 +220,7 @@ export default function UserManagement() {
           </button>
           <button
             onClick={() => setShowCreate(!showCreate)}
-            style={{ ...btnStyle, background: showCreate ? "#475569" : "#3b82f6", color: "#fff" }}
+            style={{ ...btnStyle, background: showCreate ? "#475569" : "#01696F", color: "#fff" }}
           >
             {showCreate ? "Cancel" : "+ New User"}
           </button>

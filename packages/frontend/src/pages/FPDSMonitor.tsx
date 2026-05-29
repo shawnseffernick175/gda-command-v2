@@ -95,7 +95,7 @@ export default function FPDSMonitor() {
           <SummaryBox label="Competitor Wins" value={summary.competitor_awards} color="#dc2626"
             onClick={() => setCompetitorFilter(competitorFilter === true ? null : true)} />
           <SummaryBox label="Competitors" value={summary.unique_competitors} color="#ea580c" />
-          <SummaryBox label="Recompete" value={summary.recompete_candidates} color="#3b82f6"
+          <SummaryBox label="Recompete" value={summary.recompete_candidates} color="#01696F"
             onClick={() => setRecompeteFilter(recompeteFilter === true ? null : true)} />
           <SummaryBox label="Avg Relevance" value={`${summary.avg_relevance}%`} color="#8b5cf6" />
         </div>
@@ -134,14 +134,14 @@ export default function FPDSMonitor() {
             <div key={a.id} onClick={() => setSelectedId(a.id)} style={{
               padding: 14, background: selectedId === a.id ? "var(--color-surface-hover)" : "var(--color-surface)",
               border: "1px solid var(--color-border)",
-              borderLeft: `4px solid ${a.is_competitor ? "#dc2626" : a.is_recompete_candidate ? "#3b82f6" : "#16a34a"}`,
+              borderLeft: `4px solid ${a.is_competitor ? "#dc2626" : a.is_recompete_candidate ? "#01696F" : "#16a34a"}`,
               borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background 0.15s",
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>{a.piid}</span>
+                <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>{a.piid}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   {a.is_competitor && <Pill label="Competitor" color="#dc2626" />}
-                  {a.is_recompete_candidate && <Pill label="Recompete" color="#3b82f6" />}
+                  {a.is_recompete_candidate && <Pill label="Recompete" color="#01696F" />}
                   <span style={{ fontSize: 13, fontWeight: 700, color: a.relevance_score >= 85 ? "#16a34a" : a.relevance_score >= 70 ? "#d97706" : "#6b7280" }}>
                     {a.relevance_score}%
                   </span>
@@ -167,14 +167,14 @@ export default function FPDSMonitor() {
                   <h3 style={{ margin: 0, fontSize: 16 }}>{sel.title}</h3>
                   <div style={{ marginTop: 4, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {sel.is_competitor && <Pill label={`Competitor: ${sel.competitor_name}`} color="#dc2626" />}
-                    {sel.is_recompete_candidate && <Pill label="Recompete Candidate" color="#3b82f6" />}
+                    {sel.is_recompete_candidate && <Pill label="Recompete Candidate" color="#01696F" />}
                     <Pill label={AWARD_TYPE_LABELS[sel.award_type] ?? sel.award_type} color="#6366f1" />
                     <Pill label={COMPETITION_LABELS[sel.competition_type] ?? sel.competition_type} color="#0ea5e9" />
                   </div>
                 </div>
                 <a href={sel.fpds_url} target="_blank" rel="noopener noreferrer" style={{
-                  padding: "6px 14px", borderRadius: 6, border: "1px solid #3b82f6",
-                  background: "#3b82f618", color: "#3b82f6", textDecoration: "none", fontWeight: 600, fontSize: 12,
+                  padding: "6px 14px", borderRadius: 6, border: "1px solid #01696F",
+                  background: "#01696F18", color: "#01696F", textDecoration: "none", fontWeight: 600, fontSize: 12,
                 }}>View on FPDS</a>
               </div>
 
@@ -216,9 +216,9 @@ export default function FPDSMonitor() {
               {/* Recompete Alert */}
               {sel.is_recompete_candidate && !sel.is_competitor && (
                 <div style={{
-                  padding: 12, background: "#3b82f610", borderRadius: 8, border: "1px solid #3b82f630",
+                  padding: 12, background: "#01696F10", borderRadius: 8, border: "1px solid #01696F30",
                 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: "#3b82f6", marginBottom: 4 }}>Recompete Opportunity</div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: "#01696F", marginBottom: 4 }}>Recompete Opportunity</div>
                   <div style={{ fontSize: 13, lineHeight: 1.6 }}>
                     This contract is a recompete candidate. Estimated recompete date: {sel.recompete_date ? new Date(sel.recompete_date).toLocaleDateString() : "TBD"}.
                     Consider adding to capture pipeline for early positioning.

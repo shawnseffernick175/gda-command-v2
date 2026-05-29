@@ -49,7 +49,7 @@ const CLAUSE_TYPE_LABELS: Record<string, string> = {
 };
 
 const CLAUSE_TYPE_COLORS: Record<string, string> = {
-  far: "#3b82f6",
+  far: "#01696F",
   dfars: "#8b5cf6",
   agency: "#f59e0b",
   custom: "#6b7280",
@@ -395,7 +395,7 @@ function RequirementsTab({
                 </span>
 
                 {/* Section */}
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", fontFamily: "monospace" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
                   {req.section}
                 </span>
 
@@ -412,7 +412,7 @@ function RequirementsTab({
                     padding: "2px 8px",
                     borderRadius: 4,
                     background: "rgba(59,130,246,0.1)",
-                    color: "#3b82f6",
+                    color: "#01696F",
                     textAlign: "center",
                     whiteSpace: "nowrap",
                   }}
@@ -476,7 +476,7 @@ function RequirementsTab({
                               borderRadius: 4,
                               background: "rgba(139,92,246,0.1)",
                               color: "#8b5cf6",
-                              fontFamily: "monospace",
+                              fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                             }}
                           >
                             {cid}
@@ -620,7 +620,7 @@ function ClausesTab({
                     borderRadius: 4,
                     background: `${CLAUSE_TYPE_COLORS[clause.type]}15`,
                     color: CLAUSE_TYPE_COLORS[clause.type],
-                    fontFamily: "monospace",
+                    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -695,7 +695,7 @@ function ClausesTab({
                             padding: "2px 8px",
                             borderRadius: 4,
                             background: "rgba(59,130,246,0.1)",
-                            color: "#3b82f6",
+                            color: "#01696F",
                           }}
                         >
                           {a}
@@ -734,7 +734,7 @@ function ClausesTab({
                               borderRadius: 4,
                               background: "rgba(139,92,246,0.1)",
                               color: "#8b5cf6",
-                              fontFamily: "monospace",
+                              fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                             }}
                           >
                             {rc}

@@ -100,7 +100,7 @@ const ACTION_LABELS: Record<string, { label: string; description: string }> = {
 const TYPE_COLORS: Record<string, string> = {
   financials: "#10b981",
   past_performance: "#8b5cf6",
-  proposal: "#3b82f6",
+  proposal: "#01696F",
   compliance: "#f59e0b",
   capture_plan: "#22c55e",
   capability_statement: "#06b6d4",
@@ -114,7 +114,7 @@ const TYPE_COLORS: Record<string, string> = {
   org_chart: "#64748b",
   resume: "#0ea5e9",
   cost_volume: "#10b981",
-  tech_volume: "#3b82f6",
+  tech_volume: "#01696F",
   management_volume: "#8b5cf6",
   cpars: "#f59e0b",
   dd254: "#ef4444",
@@ -133,7 +133,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 function SummaryStrip({ summary }: { summary: KnowledgeSummaryData }) {
   const cards = [
-    { label: "Documents", value: summary.total_documents, color: "#3b82f6", info: { whatItIs: "Total documents uploaded to Knowledge Base.", whatItMeans: "More documents = smarter AI across all features." } },
+    { label: "Documents", value: summary.total_documents, color: "#01696F", info: { whatItIs: "Total documents uploaded to Knowledge Base.", whatItMeans: "More documents = smarter AI across all features." } },
     { label: "Indexed", value: summary.indexed_count, color: "#22c55e", info: { whatItIs: "Documents fully processed and searchable.", whatItMeans: "These documents are available for RAG queries and AI analysis." } },
     { label: "Processing", value: summary.processing_count, color: "#f59e0b", info: { whatItIs: "Documents being chunked and embedded.", whatItMeans: "Recently uploaded — will be searchable once processing completes." } },
     { label: "Chunks", value: (summary.total_chunks ?? 0).toLocaleString(), color: "#8b5cf6", info: { whatItIs: "Text segments created for semantic search.", whatItMeans: "Documents split into searchable passages for precise AI retrieval.", howCalculated: "Each document split into overlapping ~500-token segments." } },
@@ -199,7 +199,7 @@ function DocumentRow({
           padding: "10px 12px",
           paddingLeft: 12 + depth * 24,
           borderRadius: 8,
-          border: `1px solid ${isSelected ? "#3b82f6" : "var(--color-border)"}`,
+          border: `1px solid ${isSelected ? "#01696F" : "var(--color-border)"}`,
           background: isSelected ? "rgba(59,130,246,0.08)" : "var(--color-surface)",
           marginBottom: 4,
           cursor: "pointer",
@@ -418,7 +418,7 @@ function DocumentsTab() {
           <button
             onClick={() => setShowUpload(true)}
             style={{
-              background: "#3b82f6",
+              background: "#01696F",
               color: "#fff",
               border: "none",
               borderRadius: 6,
@@ -521,7 +521,7 @@ function DocumentDetail({ doc }: { doc: KnowledgeDocument }) {
                   padding: "2px 8px",
                   borderRadius: 10,
                   background: "rgba(59,130,246,0.1)",
-                  color: "#3b82f6",
+                  color: "#01696F",
                 }}
               >
                 {tag}
@@ -647,7 +647,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
               style={{
-                border: `2px dashed ${dragOver ? "#3b82f6" : "var(--color-border)"}`,
+                border: `2px dashed ${dragOver ? "#01696F" : "var(--color-border)"}`,
                 borderRadius: 8, padding: 24, textAlign: "center", cursor: "pointer", marginBottom: 12,
                 background: dragOver ? "rgba(59,130,246,0.05)" : "transparent", transition: "all 0.2s",
               }}
@@ -731,7 +731,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               <button
                 onClick={handleUpload}
                 disabled={selectedFiles.length === 0 || uploading}
-                style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: selectedFiles.length === 0 || uploading ? 0.5 : 1 }}
+                style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#01696F", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, opacity: selectedFiles.length === 0 || uploading ? 0.5 : 1 }}
               >
                 {uploading ? "Uploading..." : `Upload ${selectedFiles.length} file${selectedFiles.length !== 1 ? "s" : ""}`}
               </button>
@@ -754,7 +754,7 @@ function UploadModal({ collections, onClose }: { collections: KnowledgeCollectio
               ))}
             </div>
             <div style={{ textAlign: "right" }}>
-              <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#3b82f6", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Close</button>
+              <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#01696F", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Close</button>
             </div>
           </div>
         )}
@@ -807,7 +807,7 @@ function CollectionsTab() {
           <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
             <div>
               <span style={{ color: "var(--color-text-muted)" }}>Documents: </span>
-              <span style={{ fontWeight: 600, color: "#3b82f6" }}>{col.document_count}</span>
+              <span style={{ fontWeight: 600, color: "#01696F" }}>{col.document_count}</span>
             </div>
             <div>
               <span style={{ color: "var(--color-text-muted)" }}>Chunks: </span>
@@ -956,7 +956,7 @@ function SearchTab() {
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "#3b82f6",
+                  color: "#01696F",
                   cursor: "pointer",
                   fontSize: 12,
                   padding: 0,
@@ -1176,7 +1176,7 @@ function ChatTab() {
                     maxWidth: "80%",
                     padding: "10px 14px",
                     borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-                    background: msg.role === "user" ? "#3b82f6" : "rgba(139,92,246,0.1)",
+                    background: msg.role === "user" ? "#01696F" : "rgba(139,92,246,0.1)",
                     color: msg.role === "user" ? "#fff" : "var(--color-text)",
                     fontSize: 13,
                     lineHeight: 1.6,

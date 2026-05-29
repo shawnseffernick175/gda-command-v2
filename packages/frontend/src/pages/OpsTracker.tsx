@@ -28,7 +28,7 @@ type SortKey =
 
 const STATUS_COLORS: Record<string, string> = {
   discovery: "#f59e0b",
-  qualified: "#3b82f6",
+  qualified: "#01696F",
   pipeline: "#8b5cf6",
   won: "#22c55e",
   lost: "#ef4444",
@@ -290,7 +290,7 @@ export default function OpsTracker() {
             fontSize: 12,
             fontWeight: 600,
             background: source === "n8n" ? "rgba(168,85,247,0.15)" : source === "db" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
-            color: source === "n8n" ? "#a855f7" : source === "db" ? "#22c55e" : "#3b82f6",
+            color: source === "n8n" ? "#a855f7" : source === "db" ? "#22c55e" : "#01696F",
           }}
         >
           {source === "n8n" ? "Live API" : "Live DB"}
@@ -354,8 +354,8 @@ export default function OpsTracker() {
             style={{
               padding: "4px 12px",
               borderRadius: 16,
-              border: viewFilter === v ? "2px solid var(--color-accent, #3b82f6)" : "1px solid var(--color-border)",
-              background: viewFilter === v ? "var(--color-accent, #3b82f6)" : "var(--color-surface)",
+              border: viewFilter === v ? "2px solid var(--color-accent, #01696F)" : "1px solid var(--color-border)",
+              background: viewFilter === v ? "var(--color-accent, #01696F)" : "var(--color-surface)",
               color: viewFilter === v ? "#fff" : "var(--color-text)",
               fontSize: 13,
               fontWeight: viewFilter === v ? 600 : 400,
@@ -611,7 +611,7 @@ export default function OpsTracker() {
                   <td
                     style={{
                       ...tdStyle,
-                      fontFamily: "monospace",
+                      fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                       fontSize: 12,
                       color: "var(--color-text-muted)",
                     }}
@@ -697,7 +697,7 @@ export default function OpsTracker() {
                           fontSize: 12,
                           fontWeight: 600,
                           background: opp.naics_size === "small" ? "rgba(59,130,246,0.15)" : "rgba(245,158,11,0.15)",
-                          color: opp.naics_size === "small" ? "#3b82f6" : "#f59e0b",
+                          color: opp.naics_size === "small" ? "#01696F" : "#f59e0b",
                         }}
                       >
                         {opp.naics_size === "small" ? "Small" : "Large"}
@@ -838,7 +838,7 @@ export default function OpsTracker() {
                   padding: "10px 14px",
                   borderRadius: 6,
                   border: "1px solid var(--color-border)",
-                  borderLeft: `3px solid ${rec.type === "action" ? "#3b82f6" : rec.type === "risk" ? "#ef4444" : rec.type === "opportunity" ? "#22c55e" : "#8b5cf6"}`,
+                  borderLeft: `3px solid ${rec.type === "action" ? "#01696F" : rec.type === "risk" ? "#ef4444" : rec.type === "opportunity" ? "#22c55e" : "#8b5cf6"}`,
                   cursor: "pointer",
                 }}
                 onClick={() => navigate(`/opportunities/${rec.opp_id}`, { state: { from: "/ops-tracker" } })}
@@ -849,7 +849,7 @@ export default function OpsTracker() {
                       fontSize: 10,
                       fontWeight: 600,
                       textTransform: "uppercase",
-                      color: rec.type === "action" ? "#3b82f6" : rec.type === "risk" ? "#ef4444" : rec.type === "opportunity" ? "#22c55e" : "#8b5cf6",
+                      color: rec.type === "action" ? "#01696F" : rec.type === "risk" ? "#ef4444" : rec.type === "opportunity" ? "#22c55e" : "#8b5cf6",
                     }}>
                       {rec.type}
                     </span>
@@ -915,7 +915,7 @@ export default function OpsTracker() {
             <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--color-text-muted)" }}>
               Current status: <strong>{statusLabel(qualifyTarget.status)}</strong>
               {" → "}
-              <strong style={{ color: "#3b82f6" }}>Qualified</strong>
+              <strong style={{ color: "#01696F" }}>Qualified</strong>
             </p>
 
             {qualifyLoading && (

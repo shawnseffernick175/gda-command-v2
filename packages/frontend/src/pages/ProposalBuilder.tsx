@@ -40,7 +40,7 @@ const STATUS_COLORS: Record<string, string> = {
   draft: "#6b7280",
   in_review: "#f59e0b",
   red_team: "#ef4444",
-  final: "#3b82f6",
+  final: "#01696F",
   submitted: "#22c55e",
   archived: "#9ca3af",
 };
@@ -77,7 +77,7 @@ const VOLUME_ICONS: Record<string, string> = {
 const SECTION_STATUS_COLORS: Record<string, string> = {
   outline: "#6b7280",
   draft: "#f59e0b",
-  in_review: "#3b82f6",
+  in_review: "#01696F",
   final: "#22c55e",
 };
 
@@ -181,7 +181,7 @@ export default function ProposalBuilder() {
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         {[
           { label: "Total", value: String(data.total), color: "var(--color-text)" },
-          { label: "Active", value: String(active), color: "#3b82f6" },
+          { label: "Active", value: String(active), color: "#01696F" },
           { label: "Avg Compliance", value: `${summary.avgCompliance}%`, color: summary.avgCompliance >= 80 ? "#22c55e" : summary.avgCompliance >= 60 ? "#f59e0b" : "#ef4444" },
           { label: "Pipeline Value", value: formatCurrency(summary.totalValue), color: "#8b5cf6" },
           { label: "Red Team Findings", value: String(summary.totalRedTeamOpen), color: summary.totalRedTeamOpen > 0 ? "#ef4444" : "#22c55e" },
@@ -250,7 +250,7 @@ function ProposalListItem({ proposal: p, onClick }: { proposal: ProposalRow; onC
         gap: 16,
         transition: "border-color 0.15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#3b82f6")}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#01696F")}
       onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--color-border)")}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -597,7 +597,7 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
       {(aiLoading || aiStatus) && (
         <div style={{
           background: aiLoading ? "rgba(59,130,246,0.1)" : (aiStatus.startsWith("Error") ? "rgba(239,68,68,0.1)" : "rgba(34,197,94,0.1)"),
-          border: `1px solid ${aiLoading ? "#3b82f6" : (aiStatus.startsWith("Error") ? "#ef4444" : "#22c55e")}`,
+          border: `1px solid ${aiLoading ? "#01696F" : (aiStatus.startsWith("Error") ? "#ef4444" : "#22c55e")}`,
           borderRadius: 8,
           padding: "8px 16px",
           marginBottom: 16,
@@ -621,9 +621,9 @@ function ProposalWorkspace({ proposalId, onBack }: { proposalId: string; onBack:
               padding: "10px 20px",
               background: "transparent",
               border: "none",
-              borderBottom: tab === t.key ? "2px solid #3b82f6" : "2px solid transparent",
+              borderBottom: tab === t.key ? "2px solid #01696F" : "2px solid transparent",
               marginBottom: -2,
-              color: tab === t.key ? "#3b82f6" : "var(--color-text-muted)",
+              color: tab === t.key ? "#01696F" : "var(--color-text-muted)",
               fontWeight: tab === t.key ? 700 : 500,
               fontSize: 14,
               cursor: "pointer",
@@ -869,7 +869,7 @@ function SectionsTab({ proposal, sections, volumeGroups, selectedSection, onSele
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
                 <span>{VOLUME_ICONS[vt]}</span> {VOLUME_LABELS[vt]}
               </div>
-              <button onClick={() => onAddSection(vt)} style={{ background: "none", border: "none", color: "#3b82f6", cursor: "pointer", fontSize: 14, padding: 0 }}>+</button>
+              <button onClick={() => onAddSection(vt)} style={{ background: "none", border: "none", color: "#01696F", cursor: "pointer", fontSize: 14, padding: 0 }}>+</button>
             </div>
             {secs.map((s) => (
               <div
@@ -880,7 +880,7 @@ function SectionsTab({ proposal, sections, volumeGroups, selectedSection, onSele
                   borderRadius: 6,
                   cursor: "pointer",
                   background: selectedSection?.id === s.id ? "rgba(59,130,246,0.15)" : "transparent",
-                  borderLeft: selectedSection?.id === s.id ? "3px solid #3b82f6" : "3px solid transparent",
+                  borderLeft: selectedSection?.id === s.id ? "3px solid #01696F" : "3px solid transparent",
                   marginBottom: 2,
                   transition: "all 0.1s",
                 }}
@@ -955,7 +955,7 @@ function SectionsTab({ proposal, sections, volumeGroups, selectedSection, onSele
               />
               <button
                 onClick={handleLoadVersions}
-                style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12, color: showVersions ? "#3b82f6" : undefined }}
+                style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12, color: showVersions ? "#01696F" : undefined }}
                 title="View version history"
               >
                 History {showVersions ? "^" : "v"}
@@ -1173,7 +1173,7 @@ function TimelineTab({ proposal }: { proposal: ProposalRow }) {
         {items.map((item, i) => {
           const label = "milestone" in item ? (item as { milestone: string }).milestone : (item as { label: string }).label;
           const st = (item as { status: string }).status;
-          const dotColor = st === "completed" ? "#22c55e" : st === "on_track" ? "#3b82f6" : st === "at_risk" ? "#f59e0b" : "#6b7280";
+          const dotColor = st === "completed" ? "#22c55e" : st === "on_track" ? "#01696F" : st === "at_risk" ? "#f59e0b" : "#6b7280";
 
           return (
             <div key={i} style={{ display: "flex", alignItems: "flex-start", marginBottom: 24, position: "relative" }}>
@@ -1290,7 +1290,7 @@ function ComplianceMapTab({ proposal, sections }: { proposal: ProposalRow; secti
       {/* Stats bar */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         {[
-          { label: "Total Requirements", value: stats.total, color: "#3b82f6" },
+          { label: "Total Requirements", value: stats.total, color: "#01696F" },
           { label: "Fully Addressed", value: stats.addressed, color: "#22c55e" },
           { label: "Partial", value: stats.partial, color: "#f59e0b" },
           { label: "Not Addressed", value: stats.not_addressed, color: "#6b7280" },
@@ -1303,7 +1303,7 @@ function ComplianceMapTab({ proposal, sections }: { proposal: ProposalRow; secti
         ))}
         {stats.total > 0 && (
           <div style={{ ...summaryCard, textAlign: "center" }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#3b82f6" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#01696F" }}>
               {stats.total > 0 ? Math.round(((stats.addressed + stats.partial) / stats.total) * 100) : 0}%
             </div>
             <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Compliance Score</div>
@@ -1375,7 +1375,7 @@ function ComplianceMapTab({ proposal, sections }: { proposal: ProposalRow; secti
                   padding: "1px 5px",
                   borderRadius: 3,
                   background: req.requirement_type === "SHALL" ? "rgba(239,68,68,0.15)" : "rgba(59,130,246,0.15)",
-                  color: req.requirement_type === "SHALL" ? "#ef4444" : "#3b82f6",
+                  color: req.requirement_type === "SHALL" ? "#ef4444" : "#01696F",
                   marginRight: 6,
                 }}>
                   {req.requirement_type}
@@ -1509,7 +1509,7 @@ function ExportTab({ proposal }: { proposal: ProposalRow }) {
       </div>
 
       <div style={{ marginTop: 24, padding: 16, background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#3b82f6", marginBottom: 4 }}>Export Details</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#01696F", marginBottom: 4 }}>Export Details</div>
         <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
           <div>Title: {proposal.title}</div>
           <div>Agency: {proposal.agency}</div>
@@ -1579,7 +1579,7 @@ const btnPrimary: React.CSSProperties = {
   padding: "8px 16px",
   borderRadius: 6,
   border: "none",
-  background: "#3b82f6",
+  background: "#01696F",
   color: "#fff",
   fontSize: 14,
   fontWeight: 600,

@@ -187,7 +187,7 @@ const TABS: { id: TabId; label: string }[] = [
 const PRIORITY_COLORS: Record<string, string> = {
   critical: "#ef4444",
   high: "#f59e0b",
-  medium: "#3b82f6",
+  medium: "#01696F",
   low: "#6b7280",
 };
 
@@ -208,7 +208,7 @@ const TREND_SYMBOLS: Record<string, string> = {
 
 const RESEARCH_STATUS_COLORS: Record<string, string> = {
   completed: "#22c55e",
-  in_progress: "#3b82f6",
+  in_progress: "#01696F",
   queued: "#6b7280",
   failed: "#ef4444",
 };
@@ -393,7 +393,7 @@ function BriefingTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
             fontSize: 13,
             fontWeight: 600,
             border: "none",
-            background: generating ? "#6b7280" : "var(--color-primary, #3b82f6)",
+            background: generating ? "#6b7280" : "var(--color-primary, #01696F)",
             color: "#fff",
             cursor: generating ? "not-allowed" : "pointer",
             display: "flex",
@@ -865,7 +865,7 @@ const MOVEMENT_TYPE_CONFIG: Record<string, { label: string; color: string; icon:
   teaming_announcement: { label: "Teaming", color: "#8b5cf6", icon: "\ud83e\udd1d" },
   contract_win: { label: "Contract Win", color: "#22c55e", icon: "\ud83c\udfc6" },
   leadership_change: { label: "Personnel", color: "#f59e0b", icon: "\ud83d\udc64" },
-  hiring_surge: { label: "Hiring", color: "#3b82f6", icon: "\ud83d\udcca" },
+  hiring_surge: { label: "Hiring", color: "#01696F", icon: "\ud83d\udcca" },
   merger_acquisition: { label: "M&A", color: "#ef4444", icon: "\ud83c\udfed" },
   capability_expansion: { label: "Expansion", color: "#06b6d4", icon: "\ud83d\ude80" },
   protest_filed: { label: "Protest", color: "#f97316", icon: "\u2696\ufe0f" },
@@ -936,7 +936,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
           <SummaryChip label="Shown" value={String(data.filtered)} />
           {mc && mc.total > 0 && (
             <>
-              <SummaryChip label="Movements" value={String(mc.total)} accent="#3b82f6" />
+              <SummaryChip label="Movements" value={String(mc.total)} accent="#01696F" />
               {mc.teaming > 0 && <SummaryChip label="Teaming" value={String(mc.teaming)} accent="#8b5cf6" />}
               {mc.contract_wins > 0 && <SummaryChip label="Wins" value={String(mc.contract_wins)} accent="#22c55e" />}
               {mc.personnel > 0 && <SummaryChip label="Personnel" value={String(mc.personnel)} accent="#f59e0b" />}
@@ -949,7 +949,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
           disabled={scanning}
           style={{
             padding: "8px 18px",
-            background: scanning ? "#444" : "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            background: scanning ? "#444" : "linear-gradient(135deg, #01696F, #8b5cf6)",
             color: "#fff",
             border: "none",
             borderRadius: 8,
@@ -1088,7 +1088,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                         fontSize: 10,
                         fontWeight: 600,
                         background: "rgba(59,130,246,0.15)",
-                        color: "#3b82f6",
+                        color: "#01696F",
                       }}>
                         {movements.length} update{movements.length !== 1 ? "s" : ""}
                       </span>
@@ -1113,7 +1113,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                   {/* News & Activity */}
                   {movements.length > 0 && (
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "#3b82f6", marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "#01696F", marginBottom: 8 }}>
                         News & Activity
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1183,7 +1183,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                                 )}
                                 {m.source_url && (
                                   <a href={m.source_url} target="_blank" rel="noopener noreferrer" style={{
-                                    fontSize: 11, color: "#3b82f6", marginTop: 4, display: "inline-block",
+                                    fontSize: 11, color: "#01696F", marginTop: 4, display: "inline-block",
                                   }}>
                                     {m.source || "Source"} \u2197
                                   </a>
@@ -1300,7 +1300,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                       }}
                       style={{
                         padding: "4px 12px",
-                        background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                        background: "linear-gradient(135deg, #01696F, #8b5cf6)",
                         color: "#fff",
                         border: "none",
                         borderRadius: 4,
@@ -1321,7 +1321,7 @@ function CompetitorsTab({ onSource }: { onSource: (s: "db" | "n8n") => void }) {
                     const aa = c.ai_analysis as { threat_summary?: string; overlap_areas?: string[]; teaming_potential?: string; recommended_strategy?: string };
                     return (
                       <div style={{ marginTop: 12, padding: 12, background: "rgba(59,130,246,0.04)", borderRadius: 6, border: "1px solid rgba(59,130,246,0.15)" }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "#3b82f6", marginBottom: 8 }}>AI Analysis</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "#01696F", marginBottom: 8 }}>AI Analysis</div>
                         {aa.threat_summary && (
                           <div style={{ fontSize: 13, marginBottom: 8 }}>{aa.threat_summary}</div>
                         )}
@@ -1514,7 +1514,7 @@ function TeamingTab() {
                 border: "1px solid var(--color-border)",
                 borderRadius: 8,
               }}>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "#3b82f6" }}>{p.name}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "#01696F" }}>{p.name}</div>
                 <div style={{ display: "grid", gap: 6, fontSize: 13 }}>
                   <div><strong style={{ color: "var(--color-text-muted)" }}>Capability:</strong> {p.capability}</div>
                   <div><strong style={{ color: "var(--color-text-muted)" }}>Rationale:</strong> {p.rationale}</div>

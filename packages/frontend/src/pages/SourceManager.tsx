@@ -9,7 +9,7 @@ import {
 const STATUS_COLORS: Record<string, string> = {
   success: "#22c55e",
   error: "#ef4444",
-  running: "#3b82f6",
+  running: "#01696F",
   never: "#64748b",
 };
 
@@ -95,7 +95,7 @@ export default function SourceManager() {
     return (
       <div style={{ padding: 32 }}>
         <div style={{ color: "#ef4444", marginBottom: 16 }}>Error: {error}</div>
-        <button onClick={load} style={{ padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+        <button onClick={load} style={{ padding: "8px 16px", background: "#01696F", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
           Retry
         </button>
       </div>
@@ -116,7 +116,7 @@ export default function SourceManager() {
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <KPICard label="Total Sources" value={sources.length} color="#3b82f6" />
+        <KPICard label="Total Sources" value={sources.length} color="#01696F" />
         <KPICard label="Active" value={enabledCount} color="#22c55e" />
         <KPICard label="Records Synced" value={totalSynced.toLocaleString()} color="#8b5cf6" />
         <KPICard label="Errors" value={sources.filter((s) => s.last_sync_status === "error").length} color="#ef4444" />
@@ -145,7 +145,7 @@ export default function SourceManager() {
                   borderRadius: 4,
                   fontSize: 10,
                   fontWeight: 600,
-                  fontFamily: "monospace",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                 }}>
                   {TYPE_ICONS[source.source_type] ?? source.source_type}
                 </span>
@@ -156,7 +156,7 @@ export default function SourceManager() {
                   type="checkbox"
                   checked={source.enabled}
                   onChange={() => handleToggle(source)}
-                  style={{ accentColor: "#3b82f6" }}
+                  style={{ accentColor: "#01696F" }}
                 />
                 <span style={{ fontSize: 12, color: "#94a3b8" }}>{source.enabled ? "On" : "Off"}</span>
               </label>
@@ -210,7 +210,7 @@ export default function SourceManager() {
                 disabled={!source.enabled || syncing === source.id || source.source_type === "manual"}
                 style={{
                   padding: "4px 10px",
-                  background: syncing === source.id ? "#475569" : "#3b82f6",
+                  background: syncing === source.id ? "#475569" : "#01696F",
                   color: "#fff",
                   border: "none",
                   borderRadius: 4,

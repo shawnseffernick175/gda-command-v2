@@ -68,7 +68,7 @@ export default function VersionHistory({ table, recordId, onRestore }: VersionHi
 
   const typeColors: Record<string, string> = {
     create: "#22c55e",
-    update: "#3b82f6",
+    update: "#01696F",
     delete: "#ef4444",
     restore: "#a855f7",
   };

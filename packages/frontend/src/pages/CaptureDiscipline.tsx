@@ -68,7 +68,7 @@ function stageColor(stage: string): string {
 const SEVERITY_COLORS: Record<string, string> = {
   critical: "#ef4444",
   warning: "#f59e0b",
-  info: "#3b82f6",
+  info: "#01696F",
 };
 
 const GATE_STATUS_COLORS: Record<string, string> = {
@@ -159,7 +159,7 @@ export default function CaptureDiscipline() {
         </div>
         <div style={styles.kpiCard}>
           <div style={styles.kpiLabel}>With Gate Reviews</div>
-          <div style={{ ...styles.kpiValue, color: "#3b82f6" }}>{d.metrics.with_gates}</div>
+          <div style={{ ...styles.kpiValue, color: "#01696F" }}>{d.metrics.with_gates}</div>
         </div>
         <div style={styles.kpiCard}>
           <div style={styles.kpiLabel}>Overdue</div>

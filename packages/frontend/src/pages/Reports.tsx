@@ -24,7 +24,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  pipeline: "#3b82f6",
+  pipeline: "#01696F",
   bd_performance: "#8b5cf6",
   executive_summary: "#f59e0b",
   sitrep: "#ef4444",
@@ -48,7 +48,7 @@ const FORMAT_COLORS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   completed: "#22c55e",
-  generating: "#3b82f6",
+  generating: "#01696F",
   scheduled: "#8b5cf6",
   failed: "#ef4444",
 };
@@ -242,7 +242,7 @@ export default function Reports() {
         marginBottom: 20,
       }}>
         {[
-          { label: "Templates", value: totalTemplates, color: "#3b82f6" },
+          { label: "Templates", value: totalTemplates, color: "#01696F" },
           { label: "Reports Generated", value: totalReports, color: "#8b5cf6" },
           { label: "Completed", value: completedReports, color: "#22c55e" },
           { label: "Failed", value: failedReports, color: failedReports > 0 ? "#ef4444" : "#6b7280" },
@@ -782,7 +782,7 @@ export default function Reports() {
                     background: "rgba(255,255,255,0.03)",
                     borderRadius: 6,
                     border: "1px solid rgba(255,255,255,0.06)",
-                    fontFamily: "monospace",
+                    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                     fontSize: 12,
                   }}>
                     {Object.entries(selectedReport.parameters).map(([k, v]) => (
@@ -967,7 +967,7 @@ export default function Reports() {
                   {durationMs !== null ? `${(durationMs / 1000).toFixed(1)}s` : "—"}
                 </span>
                 <span style={{
-                  fontFamily: "monospace",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                   fontSize: 11,
                   color: "var(--color-text-muted)",
                   overflow: "hidden",
@@ -1127,7 +1127,7 @@ export default function Reports() {
                   background: "rgba(255,255,255,0.03)",
                   borderRadius: 6,
                   border: "1px solid rgba(255,255,255,0.06)",
-                  fontFamily: "monospace",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                   fontSize: 12,
                   marginBottom: 16,
                 }}>

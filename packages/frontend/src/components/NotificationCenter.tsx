@@ -14,7 +14,7 @@ const TYPE_ICONS: Record<string, string> = {
 const SEVERITY_COLORS: Record<string, string> = {
   critical: "#ef4444",
   warning: "#f59e0b",
-  info: "#3b82f6",
+  info: "#01696F",
 };
 
 function timeAgo(ts: string): string {

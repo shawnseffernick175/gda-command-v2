@@ -93,7 +93,7 @@ export default function AdminTrash() {
             key={t}
             onClick={() => setSelectedTable(t)}
             style={{
-              background: selectedTable === t ? "#3b82f6" : "var(--color-surface, #1e293b)",
+              background: selectedTable === t ? "#01696F" : "var(--color-surface, #1e293b)",
               color: selectedTable === t ? "#fff" : "var(--color-text-muted, #94a3b8)",
               border: "1px solid var(--color-border, #334155)",
               borderRadius: 4,
@@ -129,7 +129,7 @@ export default function AdminTrash() {
               const display = String(r[cfg.displayField] ?? r.title ?? r.name ?? "—");
               return (
               <tr key={rid} style={{ borderBottom: "1px solid var(--color-border, #334155)" }}>
-                <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)", fontFamily: "monospace" }}>
+                <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
                   {rid.slice(0, 16)}
                 </td>
                 <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)" }}>

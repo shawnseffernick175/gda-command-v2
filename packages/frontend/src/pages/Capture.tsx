@@ -184,7 +184,7 @@ function phaseColor(phase: string): string {
   const colors: Record<string, string> = {
     pre_rfp: "#6b7280",
     rfp_released: "#f59e0b",
-    proposal_prep: "#3b82f6",
+    proposal_prep: "#01696F",
     submitted: "#8b5cf6",
     evaluation: "#ec4899",
     awarded: "#10b981",
@@ -201,7 +201,7 @@ function bidColor(decision: string): string {
 function milestoneStatusColor(status: string): string {
   const colors: Record<string, string> = {
     completed: "#10b981",
-    on_track: "#3b82f6",
+    on_track: "#01696F",
     at_risk: "#f59e0b",
     overdue: "#ef4444",
   };
@@ -264,7 +264,7 @@ function activityIcon(type: string): string {
 const SHIPLEY_STAGES = [
   { key: "pre_rfp", label: "Pre-RFP", days: 30, color: "#6b7280", desc: "Opportunity identified, assess fit" },
   { key: "rfp_released", label: "RFP Released", days: 14, color: "#f59e0b", desc: "RFP available, develop capture strategy" },
-  { key: "proposal_prep", label: "Proposal Prep", days: 30, color: "#3b82f6", desc: "Write and assemble proposal" },
+  { key: "proposal_prep", label: "Proposal Prep", days: 30, color: "#01696F", desc: "Write and assemble proposal" },
   { key: "submitted", label: "Submitted", days: 5, color: "#8b5cf6", desc: "Proposal delivered to customer" },
   { key: "evaluation", label: "Evaluation", days: 45, color: "#ec4899", desc: "Government evaluation in progress" },
   { key: "awarded", label: "Awarded", days: 0, color: "#10b981", desc: "Contract awarded, begin transition" },
@@ -472,7 +472,7 @@ export default function Capture() {
               padding: "2px 8px",
               borderRadius: 4,
               background: isLive ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
-              color: isLive ? "#22c55e" : "#3b82f6",
+              color: isLive ? "#22c55e" : "#01696F",
               marginBottom: 16,
             }}
           >
@@ -602,7 +602,7 @@ export default function Capture() {
                       <div style={{ marginTop: 12, fontSize: 13 }}>
                         {m.findings.length > 0 && (
                           <div style={{ marginBottom: 12 }}>
-                            <strong style={{ fontSize: 12, color: "#3b82f6" }}>Findings ({m.findings.length})</strong>
+                            <strong style={{ fontSize: 12, color: "#01696F" }}>Findings ({m.findings.length})</strong>
                             <ul style={{ margin: "4px 0 0", paddingLeft: 20, lineHeight: 1.6 }}>
                               {m.findings.map((f, i) => <li key={i}>{f}</li>)}
                             </ul>
@@ -1087,7 +1087,7 @@ function PlansTab({
                               </div>
                             </div>
                             {tp.past_performance_score != null && (
-                              <span style={{ fontSize: 13, fontWeight: 600, color: "#3b82f6" }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: "#01696F" }}>
                                 PP: {tp.past_performance_score}
                               </span>
                             )}
@@ -1422,7 +1422,7 @@ function MilestonesTab({
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <StatChip label="Total" value={allMilestones.length} />
         <StatChip label="Completed" value={statusCounts["completed"] ?? 0} color="#10b981" />
-        <StatChip label="On Track" value={statusCounts["on_track"] ?? 0} color="#3b82f6" />
+        <StatChip label="On Track" value={statusCounts["on_track"] ?? 0} color="#01696F" />
         <StatChip label="At Risk" value={statusCounts["at_risk"] ?? 0} color="#f59e0b" />
         <StatChip label="Overdue" value={statusCounts["overdue"] ?? 0} color="#ef4444" />
       </div>

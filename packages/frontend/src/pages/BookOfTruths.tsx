@@ -8,7 +8,7 @@ import {
 } from "../api/client";
 
 const CATEGORY_COLORS: Record<string, string> = {
-  faq: "#3b82f6",
+  faq: "#01696F",
   policy: "#f59e0b",
   product: "#22c55e",
   goal: "#a855f7",
@@ -40,7 +40,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const MODULE_COLORS: Record<string, string> = {
-  Operations: "#3b82f6",
+  Operations: "#01696F",
   Capture: "#f59e0b",
   Intelligence: "#8b5cf6",
   Reporting: "#22c55e",
@@ -49,7 +49,7 @@ const MODULE_COLORS: Record<string, string> = {
 
 const SOURCE_STATUS_COLORS: Record<string, string> = {
   active: "#22c55e",
-  planned: "#3b82f6",
+  planned: "#01696F",
   deprecated: "#ef4444",
 };
 
@@ -268,7 +268,7 @@ function EntitiesTab({
   entities,
   expandedId,
   setExpandedId,
-  categoryColor = "#3b82f6",
+  categoryColor = "#01696F",
 }: {
   entities: BookOfTruthsEntityRow[];
   expandedId: string | null;
@@ -351,8 +351,8 @@ function EntitiesTab({
                       <tbody>
                         {entity.fields.map((f) => (
                           <tr key={f.name} style={{ borderBottom: "1px solid #1e1e22" }}>
-                            <td style={{ padding: "6px 8px", color: "#e4e4e7", fontFamily: "monospace" }}>{f.name}</td>
-                            <td style={{ padding: "6px 8px", color: "#8b5cf6", fontFamily: "monospace" }}>{f.type}</td>
+                            <td style={{ padding: "6px 8px", color: "#e4e4e7", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>{f.name}</td>
+                            <td style={{ padding: "6px 8px", color: "#8b5cf6", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>{f.type}</td>
                             <td style={{ padding: "6px 8px", textAlign: "center", color: f.required ? "#22c55e" : "#6b7280" }}>
                               {f.required ? "\u2713" : "\u2013"}
                             </td>
@@ -393,7 +393,7 @@ function EntitiesTab({
                       <h4 style={{ color: "#9ca3af", fontSize: 11, textTransform: "uppercase", letterSpacing: 1, margin: "0 0 6px" }}>API Endpoints</h4>
                       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                         {entity.api_endpoints.map((ep) => (
-                          <code key={ep} style={{ color: "#22c55e", fontSize: 11, fontFamily: "monospace" }}>{ep}</code>
+                          <code key={ep} style={{ color: "#22c55e", fontSize: 11, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>{ep}</code>
                         ))}
                       </div>
                     </div>
@@ -597,7 +597,7 @@ function SourcesTab({ sources }: { sources: BookOfTruthsSourceRow[] }) {
           {src.endpoint && (
             <div style={{ marginBottom: 8 }}>
               <span style={{ color: "#6b7280", fontSize: 10, textTransform: "uppercase" }}>Endpoint</span>
-              <code style={{ display: "block", color: "#22c55e", fontSize: 11, fontFamily: "monospace", marginTop: 2, wordBreak: "break-all" }}>
+              <code style={{ display: "block", color: "#22c55e", fontSize: 11, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", marginTop: 2, wordBreak: "break-all" }}>
                 {src.endpoint}
               </code>
             </div>

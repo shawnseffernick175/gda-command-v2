@@ -22,7 +22,7 @@ import {
 const SEVERITY_COLORS: Record<string, string> = {
   critical: "#ef4444",
   high: "#f59e0b",
-  medium: "#3b82f6",
+  medium: "#01696F",
   low: "#6b7280",
 };
 
@@ -144,7 +144,7 @@ export default function QACenter() {
             padding: "2px 8px",
             borderRadius: 4,
             background: source === "live" ? "rgba(34,197,94,0.15)" : "rgba(59,130,246,0.15)",
-            color: source === "live" ? "var(--color-success)" : "var(--color-accent, #3b82f6)",
+            color: source === "live" ? "var(--color-success)" : "var(--color-accent, #01696F)",
             fontWeight: 500,
           }}>
             {source === "live" ? "Live API" : "Live DB"}
@@ -205,7 +205,7 @@ export default function QACenter() {
               ? "rgba(59,130,246,0.12)"
               : "rgba(34,197,94,0.12)",
             color: diagResult.summary.new_failures === 0
-              ? "var(--color-accent, #3b82f6)"
+              ? "var(--color-accent, #01696F)"
               : "var(--color-success)",
             fontSize: 13,
           }}>
@@ -350,7 +350,7 @@ export default function QACenter() {
 
                     <button
                       onClick={() => setExpandedFix(expandedFix === fix.id ? null : fix.id)}
-                      style={{ background: "none", border: "none", color: "var(--color-accent, #3b82f6)", cursor: "pointer", padding: 0, marginTop: 6, fontSize: 12 }}
+                      style={{ background: "none", border: "none", color: "var(--color-accent, #01696F)", cursor: "pointer", padding: 0, marginTop: 6, fontSize: 12 }}
                     >
                       {expandedFix === fix.id ? "Hide details" : "Show details"}
                     </button>
@@ -417,7 +417,7 @@ function LiveFailuresTable({ failures }: { failures: QAFailure[] }) {
           {failures.map((f, i) => (
             <tr key={f.id ?? i}>
               <td style={tdStyle}>
-                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                <code style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 13 }}>
                   {f.workflowName ?? f.workflow ?? "—"}
                 </code>
                 {f.workflowId && (
@@ -427,7 +427,7 @@ function LiveFailuresTable({ failures }: { failures: QAFailure[] }) {
                 )}
               </td>
               <td style={tdStyle}>
-                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-danger)" }}>
+                <code style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 13, color: "var(--color-danger)" }}>
                   {f.failedNode ?? "—"}
                 </code>
               </td>
@@ -466,14 +466,14 @@ function MockFailuresTable({ failures }: { failures: QAFailure[] }) {
           {failures.map((f) => (
             <tr key={f.id}>
               <td style={tdStyle}>
-                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                <code style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 13 }}>
                   {f.workflow}
                 </code>
               </td>
               <td style={tdStyle}>{f.action}</td>
               <td style={tdStyle}>
                 <code style={{
-                  fontFamily: "var(--font-mono)",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                   fontSize: 13,
                   color: "var(--color-danger)",
                 }}>
@@ -595,7 +595,7 @@ function CheckCard({ check }: { check: QACheckRow }) {
         <span style={{
           fontSize: 11,
           color: "var(--color-text-muted)",
-          fontFamily: "var(--font-mono)",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
           whiteSpace: "nowrap",
         }}>
           {displayMs}ms
@@ -736,7 +736,7 @@ function SAMVerifyRunCard({ run, compact }: { run: SAMVerifyRun; compact?: boole
         <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
           {new Date(run.ran_at).toLocaleString()}
         </span>
-        <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+        <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
           {run.duration_ms}ms
         </span>
       </div>

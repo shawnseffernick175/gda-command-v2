@@ -24,7 +24,7 @@ import {
 const PRIORITY_COLORS: Record<string, string> = {
   critical: "#ef4444",
   high: "#f59e0b",
-  medium: "#3b82f6",
+  medium: "#01696F",
   low: "#6b7280",
 };
 
@@ -278,7 +278,7 @@ export default function Approvals() {
                 const oppCats = new Set(["qualify_write", "bid_decision", "gate_review"]);
                 const riskCats = new Set(["budget_override", "teaming_agreement"]);
                 const groups = [
-                  { label: "Opportunities", color: "#3b82f6", items: items.filter((a) => oppCats.has(a.category)) },
+                  { label: "Opportunities", color: "#01696F", items: items.filter((a) => oppCats.has(a.category)) },
                   { label: "Risks", color: "#f59e0b", items: items.filter((a) => riskCats.has(a.category)) },
                   { label: "Other", color: "#6b7280", items: items.filter((a) => !oppCats.has(a.category) && !riskCats.has(a.category)) },
                 ].filter((g) => g.items.length > 0);
@@ -391,7 +391,7 @@ export default function Approvals() {
 
 const RUN_STATUS_COLORS: Record<string, string> = {
   completed: "#22c55e",
-  running: "#3b82f6",
+  running: "#01696F",
   failed: "#ef4444",
   pending: "#f59e0b",
 };
@@ -555,7 +555,7 @@ function AgentConfigTab() {
               {a.enabled ? "Enabled" : "Disabled"}
             </span>
             {a.schedule && (
-              <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>
+              <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
                 {a.schedule}
               </span>
             )}
@@ -828,7 +828,7 @@ function AgentActionsTab() {
                       padding: "1px 6px",
                       borderRadius: 4,
                       background: "rgba(59,130,246,0.15)",
-                      color: "#3b82f6",
+                      color: "#01696F",
                     }}>
                       {AGENT_NAME_LABELS[item.agent] ?? item.agent}
                     </span>
@@ -863,7 +863,7 @@ function AgentActionsTab() {
                           borderRadius: 6,
                           padding: "8px 12px",
                           fontSize: 12,
-                          fontFamily: "monospace",
+                          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                           whiteSpace: "pre-wrap",
                           maxHeight: 200,
                           overflow: "auto",

@@ -18,7 +18,7 @@ export default function DraftRestoreBanner<T>({ storageKey, onRestore }: DraftRe
     <div
       style={{
         background: "#1e3a5f",
-        border: "1px solid #3b82f6",
+        border: "1px solid #01696F",
         borderRadius: 6,
         padding: "10px 16px",
         marginBottom: 12,
@@ -39,7 +39,7 @@ export default function DraftRestoreBanner<T>({ storageKey, onRestore }: DraftRe
           setDismissed(true);
         }}
         style={{
-          background: "#3b82f6",
+          background: "#01696F",
           color: "#fff",
           border: "none",
           borderRadius: 4,

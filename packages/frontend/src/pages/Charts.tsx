@@ -38,7 +38,7 @@ async function fetchPipeline(): Promise<PipelineRow[]> {
 
 const STAGE_COLORS: Record<string, string> = {
   discovery: "#f59e0b",
-  qualified: "#3b82f6",
+  qualified: "#01696F",
   pipeline: "#8b5cf6",
   proposal: "#ec4899",
   submitted: "#06b6d4",
@@ -103,7 +103,7 @@ export default function Charts() {
               cursor: "pointer",
               fontSize: 13,
               fontWeight: tab === t.key ? 600 : 400,
-              color: tab === t.key ? "#3b82f6" : "#8b949e",
+              color: tab === t.key ? "#01696F" : "#8b949e",
               background: tab === t.key ? "rgba(59,130,246,0.1)" : "transparent",
             }}
           >
@@ -189,7 +189,7 @@ function PwinDistribution({ rows }: { rows: PipelineRow[] }) {
     { label: "81-100%", min: 0.8, max: 1.01 },
   ];
 
-  const bucketColors = ["#ef4444", "#f59e0b", "#eab308", "#3b82f6", "#22c55e"];
+  const bucketColors = ["#ef4444", "#f59e0b", "#eab308", "#01696F", "#22c55e"];
 
   const data = buckets.map((b, i) => ({
     ...b,
@@ -261,7 +261,7 @@ function ByAgency({ rows }: { rows: PipelineRow[] }) {
     .slice(0, 10);
 
   const maxCount = Math.max(...sorted.map(([, v]) => v.count), 1);
-  const colors = ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#06b6d4", "#22c55e", "#ef4444", "#14b8a6", "#a855f7", "#6b7280"];
+  const colors = ["#01696F", "#8b5cf6", "#ec4899", "#f59e0b", "#06b6d4", "#22c55e", "#ef4444", "#14b8a6", "#a855f7", "#6b7280"];
 
   return (
     <div>
@@ -354,7 +354,7 @@ function ValueAnalysis({ rows }: { rows: PipelineRow[] }) {
       <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Deal Size Distribution</h3>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 160, marginBottom: 16 }}>
         {bucketData.map((d, i) => {
-          const colors = ["#6b7280", "#3b82f6", "#8b5cf6", "#f59e0b", "#22c55e"];
+          const colors = ["#6b7280", "#01696F", "#8b5cf6", "#f59e0b", "#22c55e"];
           return (
             <div key={d.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#e5e5e5" }}>{d.count}</span>

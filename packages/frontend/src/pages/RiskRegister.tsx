@@ -76,14 +76,14 @@ function riskColor(level: string): string {
 function scoreColor(score: number): string {
   if (score >= 15) return "#ef4444";
   if (score >= 9) return "#f59e0b";
-  if (score >= 5) return "#3b82f6";
+  if (score >= 5) return "#01696F";
   return "#10b981";
 }
 
 function statusColor(s: string): string {
   const colors: Record<string, string> = {
     open: "#f59e0b",
-    mitigating: "#3b82f6",
+    mitigating: "#01696F",
     accepted: "#8b5cf6",
     closed: "#10b981",
     realized: "#ef4444",
@@ -211,7 +211,7 @@ export default function RiskRegister() {
         <KpiCard label="Total Risks" value={data.total} info={{ whatItIs: "Total number of risks in the register.", whatItMeans: "Complete inventory of identified risks across all opportunities." }} />
         <KpiCard label="Critical" value={data.critical} color="#ef4444" info={{ whatItIs: "Risks with a score of 15+ that are not closed.", whatItMeans: "Highest priority risks requiring immediate attention." }} />
         <KpiCard label="Open" value={data.byStatus["open"] ?? 0} color="#f59e0b" info={{ whatItIs: "Risks identified but not yet being actively mitigated.", whatItMeans: "These risks need mitigation plans assigned." }} />
-        <KpiCard label="Mitigating" value={data.byStatus["mitigating"] ?? 0} color="#3b82f6" info={{ whatItIs: "Risks with active mitigation underway.", whatItMeans: "Mitigation plans are being executed." }} />
+        <KpiCard label="Mitigating" value={data.byStatus["mitigating"] ?? 0} color="#01696F" info={{ whatItIs: "Risks with active mitigation underway.", whatItMeans: "Mitigation plans are being executed." }} />
         <KpiCard label="Accepted" value={data.byStatus["accepted"] ?? 0} color="#8b5cf6" info={{ whatItIs: "Risks acknowledged and accepted without active mitigation.", whatItMeans: "Risk exposure is deemed acceptable or unavoidable." }} />
         <KpiCard label="Closed" value={data.byStatus["closed"] ?? 0} color="#10b981" info={{ whatItIs: "Risks that have been resolved or are no longer applicable.", whatItMeans: "Successfully mitigated or risk conditions changed." }} />
       </div>
@@ -485,7 +485,7 @@ function RiskCard({ risk, expanded, onToggle }: { risk: RiskEntry; expanded: boo
           </div>
 
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-            <span style={{ color: "#3b82f6", fontWeight: 600 }}>IF</span>{" "}
+            <span style={{ color: "#01696F", fontWeight: 600 }}>IF</span>{" "}
             {risk.if_statement}
           </div>
           <div style={{ fontSize: 13, color: "#f59e0b" }}>
@@ -528,7 +528,7 @@ function RiskCard({ risk, expanded, onToggle }: { risk: RiskEntry; expanded: boo
 
           {/* Mitigation plan */}
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#3b82f6", marginBottom: 6 }}>Mitigation Plan</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#01696F", marginBottom: 6 }}>Mitigation Plan</div>
             <div style={{ fontSize: 13, lineHeight: 1.5, padding: "10px 14px", background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)" }}>
               {risk.mitigation_plan}
             </div>
@@ -682,7 +682,7 @@ function RiskMatrix({ risks }: { risks: RiskEntry[] }) {
                       {cell.length > 0 && (
                         <div style={{
                           fontSize: 20, fontWeight: 800, textAlign: "center",
-                          color: score >= 12 ? "#ef4444" : score >= 8 ? "#f59e0b" : score >= 4 ? "#3b82f6" : "#10b981",
+                          color: score >= 12 ? "#ef4444" : score >= 8 ? "#f59e0b" : score >= 4 ? "#01696F" : "#10b981",
                           marginBottom: 4,
                         }}>
                           {cell.length}

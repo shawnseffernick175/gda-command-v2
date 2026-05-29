@@ -18,7 +18,7 @@ import {
 import { authenticatedFetch } from "../api/auth";
 
 const PHASE_COLORS: Record<string, string> = {
-  blue: "#3b82f6",
+  blue: "#01696F",
   pink: "#ec4899",
   red: "#ef4444",
   green: "#22c55e",
@@ -54,7 +54,7 @@ const SHIPLEY_ORDER: string[] = ["blue", "pink", "red", "green", "gold", "white"
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#6b7280",
-  in_progress: "#3b82f6",
+  in_progress: "#01696F",
   completed: "#22c55e",
   failed: "#ef4444",
 };
@@ -837,7 +837,7 @@ function BlackHatFindings({ findings }: { findings: ColorReviewBlackHatFindingRo
                 </div>
                 <div style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5 }}>{f.assessment}</div>
                 {f.counter_strategy && (
-                  <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 6, padding: "6px 10px", background: "rgba(59,130,246,0.08)", borderRadius: 4 }}>
+                  <div style={{ fontSize: 12, color: "#01696F", marginTop: 6, padding: "6px 10px", background: "rgba(59,130,246,0.08)", borderRadius: 4 }}>
                     <strong>Counter:</strong> {f.counter_strategy}
                   </div>
                 )}
@@ -907,7 +907,7 @@ function ComplianceChecks({ checks, expanded, onToggle }: { checks: ColorReviewR
                 </div>
               )}
               {c.suggestion && (
-                <div style={{ marginTop: 8, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+                <div style={{ marginTop: 8, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #01696F" }}>
                   <div style={{ fontSize: 11, color: "#60a5fa", marginBottom: 4, fontWeight: 600 }}>Suggestion</div>
                   <div style={{ fontSize: 13 }}>{c.suggestion}</div>
                 </div>
@@ -969,9 +969,9 @@ function SectionScores({ sections, expanded, onToggle }: { sections: ColorReview
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
                   <div>
-                    <div style={{ fontSize: 11, color: "#3b82f6", fontWeight: 600, marginBottom: 4 }}>Discriminators Found ({(s.discriminators_found ?? []).length})</div>
+                    <div style={{ fontSize: 11, color: "#01696F", fontWeight: 600, marginBottom: 4 }}>Discriminators Found ({(s.discriminators_found ?? []).length})</div>
                     {(s.discriminators_found ?? []).map((d, i) => (
-                      <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #3b82f6" }}>{d}</div>
+                      <div key={i} style={{ fontSize: 12, marginBottom: 3, paddingLeft: 8, borderLeft: "2px solid #01696F" }}>{d}</div>
                     ))}
                     {(s.discriminators_found ?? []).length === 0 && <div style={{ fontSize: 12, color: "var(--color-text-muted)", fontStyle: "italic" }}>None identified</div>}
                   </div>
@@ -984,7 +984,7 @@ function SectionScores({ sections, expanded, onToggle }: { sections: ColorReview
                   </div>
                 </div>
                 {(s.improvement_actions ?? []).length > 0 && (
-                  <div style={{ marginTop: 12, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+                  <div style={{ marginTop: 12, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #01696F" }}>
                     <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Improvement Actions ({(s.improvement_actions ?? []).length})</div>
                     {(s.improvement_actions ?? []).map((a, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3 }}>• {a}</div>
@@ -1045,7 +1045,7 @@ function GoldChecks({ checks, expanded, onToggle }: { checks: ColorReviewGoldChe
               <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border)" }}>
                 <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.5 }}>{c.detail}</div>
                 {(c.recommendations ?? []).length > 0 && (
-                  <div style={{ marginTop: 10, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+                  <div style={{ marginTop: 10, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #01696F" }}>
                     <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Recommendations ({(c.recommendations ?? []).length})</div>
                     {(c.recommendations ?? []).map((r, i) => (
                       <div key={i} style={{ fontSize: 12, marginBottom: 3 }}>• {r}</div>
@@ -1118,7 +1118,7 @@ function GreenChecks({ checks }: { checks: ColorReviewGreenCheckRow[] }) {
           </div>
           <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--color-text-muted)" }}>{c.detail}</div>
           {c.recommendation && (
-            <div style={{ marginTop: 8, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #3b82f6" }}>
+            <div style={{ marginTop: 8, padding: 10, background: "rgba(59,130,246,0.08)", borderRadius: 4, borderLeft: "3px solid #01696F" }}>
               <div style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600, marginBottom: 4 }}>Recommendation</div>
               <div style={{ fontSize: 12 }}>{c.recommendation}</div>
             </div>
@@ -1160,7 +1160,7 @@ function RiskFactors({ factors }: { factors: string[] }) {
   const severityColor = (f: string): string => {
     if (f.startsWith("CRITICAL:")) return "#ef4444";
     if (f.startsWith("HIGH:")) return "#f59e0b";
-    if (f.startsWith("MEDIUM:")) return "#3b82f6";
+    if (f.startsWith("MEDIUM:")) return "#01696F";
     if (f.startsWith("LOW:")) return "#6b7280";
     return "#f59e0b";
   };
@@ -1398,7 +1398,7 @@ function ReviewResultView({ result, onClose }: { result: ColorReviewRunResult; o
             <div key={i} style={{
               padding: "8px 12px",
               borderRadius: 4,
-              borderLeft: `3px solid ${f.startsWith("CRITICAL") ? "#ef4444" : f.startsWith("HIGH") ? "#f59e0b" : "#3b82f6"}`,
+              borderLeft: `3px solid ${f.startsWith("CRITICAL") ? "#ef4444" : f.startsWith("HIGH") ? "#f59e0b" : "#01696F"}`,
               background: "rgba(255,255,255,0.02)",
               fontSize: 12,
               marginBottom: 4,

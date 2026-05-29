@@ -24,7 +24,7 @@ let _nextId = 0;
 const TYPE_STYLES: Record<ToastType, { bg: string; border: string; icon: string }> = {
   success: { bg: "rgba(34,197,94,0.12)", border: "#22c55e", icon: "\u2713" },
   error: { bg: "rgba(239,68,68,0.12)", border: "#ef4444", icon: "\u2717" },
-  info: { bg: "rgba(59,130,246,0.12)", border: "#3b82f6", icon: "\u2139" },
+  info: { bg: "rgba(59,130,246,0.12)", border: "#01696F", icon: "\u2139" },
   warning: { bg: "rgba(245,158,11,0.12)", border: "#f59e0b", icon: "\u26A0" },
 };
 
@@ -86,7 +86,7 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: nu
   return (
     <div style={{
       pointerEvents: "auto",
-      background: "#1a1d27",
+      background: "#FFFFFF",
       border: `1px solid ${s.border}`,
       borderRadius: 8,
       padding: "10px 16px",

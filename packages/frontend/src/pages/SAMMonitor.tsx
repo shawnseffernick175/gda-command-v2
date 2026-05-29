@@ -25,7 +25,7 @@ interface GovSourceFeed {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  new: "#3b82f6",
+  new: "#01696F",
   tracked: "#d97706",
   qualified: "#16a34a",
   dismissed: "#6b7280",
@@ -177,7 +177,7 @@ export default function SAMMonitor() {
       {summary && (
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <SummaryBox label="Total" value={summary.total} />
-          <SummaryBox label="New" value={summary.new_count} color="#3b82f6" onClick={() => setStatusFilter(statusFilter === "new" ? null : "new")} />
+          <SummaryBox label="New" value={summary.new_count} color="#01696F" onClick={() => setStatusFilter(statusFilter === "new" ? null : "new")} />
           <SummaryBox label="Tracked" value={summary.tracked_count} color="#d97706" onClick={() => setStatusFilter(statusFilter === "tracked" ? null : "tracked")} />
           <SummaryBox label="Qualified" value={summary.qualified_count} color="#16a34a" onClick={() => setStatusFilter(statusFilter === "qualified" ? null : "qualified")} />
           <SummaryBox label="Dismissed" value={summary.dismissed_count} color="#6b7280" onClick={() => setStatusFilter(statusFilter === "dismissed" ? null : "dismissed")} />
@@ -191,8 +191,8 @@ export default function SAMMonitor() {
       <div style={{ display: "flex", gap: 0, marginBottom: 16, borderBottom: "1px solid var(--color-border)" }}>
         {(["opportunities", "scans", "gov-sources"] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{
-            padding: "8px 20px", background: "transparent", border: "none", borderBottom: tab === t ? "2px solid #3b82f6" : "2px solid transparent",
-            color: tab === t ? "#3b82f6" : "var(--color-text-muted)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+            padding: "8px 20px", background: "transparent", border: "none", borderBottom: tab === t ? "2px solid #01696F" : "2px solid transparent",
+            color: tab === t ? "#01696F" : "var(--color-text-muted)", fontWeight: 600, fontSize: 13, cursor: "pointer",
           }}>
             {t === "opportunities" ? `Opportunities (${filtered.length})` : t === "scans" ? `Scan History (${scans.length})` : `Gov Sources (${govSources.length})`}
           </button>
@@ -239,8 +239,8 @@ export default function SAMMonitor() {
             <button
               onClick={() => triggerSAMScan()}
               style={{
-                padding: "6px 16px", borderRadius: 6, border: "1px solid #3b82f6",
-                background: "#3b82f618", color: "#3b82f6", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                padding: "6px 16px", borderRadius: 6, border: "1px solid #01696F",
+                background: "#01696F18", color: "#01696F", fontWeight: 600, fontSize: 12, cursor: "pointer",
               }}
             >
               Trigger Scan
@@ -261,7 +261,7 @@ export default function SAMMonitor() {
                 borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background 0.15s",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>{o.notice_id}</span>
+                  <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>{o.notice_id}</span>
                   <div style={{ display: "flex", gap: 6 }}>
                     <Pill label={o.scan_status} color={STATUS_COLORS[o.scan_status] ?? "#6b7280"} />
                     <span style={{ fontSize: 13, fontWeight: 700, color: o.relevance_score >= 85 ? "#16a34a" : o.relevance_score >= 70 ? "#d97706" : "#6b7280" }}>
@@ -302,8 +302,8 @@ export default function SAMMonitor() {
                       }}>Qualify</button>
                     )}
                     <a href={sel.sam_url} target="_blank" rel="noopener noreferrer" style={{
-                      padding: "6px 14px", borderRadius: 6, border: "1px solid #3b82f6",
-                      background: "#3b82f618", color: "#3b82f6", textDecoration: "none", fontWeight: 600, fontSize: 12,
+                      padding: "6px 14px", borderRadius: 6, border: "1px solid #01696F",
+                      background: "#01696F18", color: "#01696F", textDecoration: "none", fontWeight: 600, fontSize: 12,
                     }}>View on SAM.gov</a>
                   </div>
                 </div>
@@ -319,7 +319,7 @@ export default function SAMMonitor() {
                 {/* AI Summary */}
                 <div style={{ marginBottom: 16 }}>
                   <h4 style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600 }}>AI Summary</h4>
-                  <div style={{ padding: 12, background: "#3b82f610", borderRadius: 8, border: "1px solid #3b82f630", fontSize: 13, lineHeight: 1.6 }}>
+                  <div style={{ padding: 12, background: "#01696F10", borderRadius: 8, border: "1px solid #01696F30", fontSize: 13, lineHeight: 1.6 }}>
                     {sel.ai_summary}
                   </div>
                 </div>
@@ -378,12 +378,12 @@ export default function SAMMonitor() {
                 const dur = s.completed_at ? `${Math.round((new Date(s.completed_at).getTime() - new Date(s.started_at).getTime()) / 1000)}s` : "—";
                 return (
                   <tr key={s.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
-                    <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>{s.id}</td>
+                    <td style={{ padding: "10px 14px", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>{s.id}</td>
                     <td style={{ padding: "10px 14px" }}>{relTime(s.started_at)}</td>
                     <td style={{ padding: "10px 14px" }}>{dur}</td>
                     <td style={{ padding: "10px 14px" }}><Pill label={s.status} color={s.status === "completed" ? "#16a34a" : s.status === "failed" ? "#dc2626" : "#d97706"} /></td>
                     <td style={{ padding: "10px 14px", fontWeight: 600 }}>{s.opportunities_found}</td>
-                    <td style={{ padding: "10px 14px", fontWeight: 600, color: s.new_matches > 0 ? "#3b82f6" : "var(--color-text)" }}>{s.new_matches}</td>
+                    <td style={{ padding: "10px 14px", fontWeight: 600, color: s.new_matches > 0 ? "#01696F" : "var(--color-text)" }}>{s.new_matches}</td>
                     <td style={{ padding: "10px 14px" }}>{s.naics_codes_scanned.join(", ")}</td>
                   </tr>
                 );
@@ -404,7 +404,7 @@ export default function SAMMonitor() {
               disabled={syncingAll}
               style={{
                 padding: "8px 18px",
-                background: syncingAll ? "#444" : "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+                background: syncingAll ? "#444" : "linear-gradient(135deg, #01696F, #8b5cf6)",
                 color: "#fff",
                 border: "none",
                 borderRadius: 8,

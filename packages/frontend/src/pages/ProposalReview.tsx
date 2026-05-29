@@ -13,7 +13,7 @@ const STATUS_COLORS: Record<string, string> = {
   draft: "#6b7280",
   in_review: "#f59e0b",
   red_team: "#ef4444",
-  final: "#3b82f6",
+  final: "#01696F",
   submitted: "#22c55e",
   archived: "#9ca3af",
 };
@@ -42,7 +42,7 @@ const FINDING_STATUS_COLORS: Record<string, string> = {
 
 const TIMELINE_COLORS: Record<string, string> = {
   completed: "#22c55e",
-  on_track: "#3b82f6",
+  on_track: "#01696F",
   at_risk: "#f59e0b",
   overdue: "#ef4444",
 };
@@ -152,7 +152,7 @@ export default function ProposalReview() {
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         {[
           { label: "Total", value: String(data.total), color: "var(--color-text)" },
-          { label: "Active", value: String(active), color: "#3b82f6" },
+          { label: "Active", value: String(active), color: "#01696F" },
           { label: "Avg Compliance", value: `${summary.avgCompliance}%`, color: summary.avgCompliance >= 80 ? "#22c55e" : summary.avgCompliance >= 60 ? "#f59e0b" : "#ef4444" },
           { label: "Pipeline Value", value: formatCurrency(summary.totalValue), color: "#8b5cf6" },
           { label: "Agencies", value: String(summary.agencies.length), color: "var(--color-text-muted)" },
@@ -380,7 +380,7 @@ function ProposalDetail({ proposal, tab, onTabChange }: { proposal: ProposalRow;
                   borderRadius: 12,
                   fontSize: 11,
                   background: "rgba(59,130,246,0.1)",
-                  color: "#3b82f6",
+                  color: "#01696F",
                 }}
               >
                 {t}
@@ -557,7 +557,7 @@ function VolumesTab({ volumes }: { volumes: ProposalVolumeRow[] }) {
               fontSize: 10,
               fontWeight: 600,
               background: "rgba(59,130,246,0.1)",
-              color: "#3b82f6",
+              color: "#01696F",
               whiteSpace: "nowrap",
             }}>
               {VOLUME_TYPE_LABELS[v.type] ?? v.type}
@@ -679,8 +679,8 @@ function RedTeamTab({ findings }: { findings: RedTeamFindingRow[] }) {
                     <span style={{ fontWeight: 600, color: "var(--color-text-muted)", fontSize: 11 }}>Finding: </span>
                     <span>{f.finding}</span>
                   </div>
-                  <div style={{ marginBottom: 8, padding: "8px 12px", background: "rgba(59,130,246,0.06)", borderRadius: 6, borderLeft: "3px solid #3b82f6" }}>
-                    <span style={{ fontWeight: 600, color: "#3b82f6", fontSize: 11 }}>Recommendation: </span>
+                  <div style={{ marginBottom: 8, padding: "8px 12px", background: "rgba(59,130,246,0.06)", borderRadius: 6, borderLeft: "3px solid #01696F" }}>
+                    <span style={{ fontWeight: 600, color: "#01696F", fontSize: 11 }}>Recommendation: </span>
                     <span>{f.recommendation}</span>
                   </div>
                   <div style={{ display: "flex", gap: 16, fontSize: 11, color: "var(--color-text-muted)" }}>

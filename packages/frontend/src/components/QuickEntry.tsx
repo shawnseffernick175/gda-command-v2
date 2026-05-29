@@ -19,7 +19,7 @@ interface QuickAction {
 }
 
 const ACTIONS: QuickAction[] = [
-  { id: "opportunity", icon: "📡", label: "New Opportunity", color: "#3b82f6" },
+  { id: "opportunity", icon: "📡", label: "New Opportunity", color: "#01696F" },
   { id: "contact", icon: "👤", label: "New Contact", color: "#8b5cf6" },
   { id: "note", icon: "📝", label: "Quick Note", color: "#22c55e" },
 ];
@@ -210,7 +210,7 @@ export default function QuickEntry() {
           justifyContent: "center",
         }}>
           <div style={{
-            background: "var(--color-surface, #1a1d27)",
+            background: "var(--color-surface, #FFFFFF)",
             border: "1px solid var(--color-border, #2a2d3a)",
             borderRadius: 12,
             padding: 24,
@@ -317,7 +317,7 @@ export default function QuickEntry() {
               }}
             >
               <span style={{
-                background: "var(--color-surface, #1a1d27)",
+                background: "var(--color-surface, #FFFFFF)",
                 border: "1px solid var(--color-border, #2a2d3a)",
                 borderRadius: 6,
                 padding: "6px 12px",
@@ -361,7 +361,7 @@ export default function QuickEntry() {
           width: 56,
           height: 56,
           borderRadius: "50%",
-          background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+          background: "linear-gradient(135deg, #01696F, #8b5cf6)",
           border: "none",
           cursor: "pointer",
           display: "flex",
@@ -468,7 +468,7 @@ function FormActions({
       </button>
       <button onClick={onSubmit} disabled={submitting} style={{
         padding: "8px 16px", borderRadius: 6, border: "none",
-        background: submitting ? "#6b7280" : "#3b82f6", color: "#fff", fontSize: 13,
+        background: submitting ? "#6b7280" : "#01696F", color: "#fff", fontSize: 13,
         fontWeight: 600, cursor: submitting ? "wait" : "pointer",
         opacity: submitting ? 0.7 : 1,
       }}>

@@ -200,7 +200,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
 
 function methodColor(method?: string): string {
   switch (method) {
-    case "POST": return "#3b82f6";
+    case "POST": return "#01696F";
     case "PUT": return "#f59e0b";
     case "PATCH": return "#8b5cf6";
     case "DELETE": return "#ef4444";

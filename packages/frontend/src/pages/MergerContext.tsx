@@ -108,7 +108,7 @@ export default function MergerContext() {
     return (
       <div style={{ padding: 32 }}>
         <div style={{ color: "#ef4444", marginBottom: 16 }}>Error: {error}</div>
-        <button onClick={load} style={{ padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+        <button onClick={load} style={{ padding: "8px 16px", background: "#01696F", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
           Retry
         </button>
       </div>
@@ -129,7 +129,7 @@ export default function MergerContext() {
 
       {/* Impact KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <KPICard label="Total Events" value={mergers.length} color="#3b82f6" />
+        <KPICard label="Total Events" value={mergers.length} color="#01696F" />
         <KPICard label="Negative Impact" value={impactSummary.negative ?? 0} color="#ef4444" />
         <KPICard label="Monitor" value={impactSummary.monitor ?? 0} color="#f59e0b" />
         <KPICard label="Positive" value={impactSummary.positive ?? 0} color="#22c55e" />

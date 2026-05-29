@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STRENGTH_COLORS: Record<string, string> = {
   strong: "#22c55e",
-  moderate: "#3b82f6",
+  moderate: "#01696F",
   weak: "#f59e0b",
   new: "#8b5cf6",
 };
@@ -62,7 +62,7 @@ const TEAMING_ROLE_LABELS: Record<string, string> = {
 const TEAMING_STATUS_COLORS: Record<string, string> = {
   active: "#22c55e",
   past: "#9ca3af",
-  prospective: "#3b82f6",
+  prospective: "#01696F",
 };
 
 const ACTION_STATUS_COLORS: Record<string, string> = {
@@ -152,7 +152,7 @@ export default function Contacts() {
             padding: "2px 8px",
             borderRadius: 4,
             background: "rgba(59,130,246,0.15)",
-            color: "#3b82f6",
+            color: "#01696F",
           }}
         >
           Live DB
@@ -245,7 +245,7 @@ export default function Contacts() {
       {error && <p style={{ color: "#ef4444" }}>{error}</p>}
 
       {!loading && !error && (
-        <div className="two-column-layout" style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, alignItems: "start" }}>
+        <div  style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, alignItems: "start" }}>
           {/* Contact List */}
           <div
             style={{
@@ -485,7 +485,7 @@ function OverviewTab({ contact }: { contact: ContactRow }) {
                   padding: "2px 8px",
                   borderRadius: 4,
                   background: "rgba(59,130,246,0.1)",
-                  color: "#3b82f6",
+                  color: "#01696F",
                   fontWeight: 500,
                 }}
               >
@@ -746,7 +746,7 @@ function OpportunitiesTab({ opportunities }: { opportunities: LinkedOpportunityR
                 padding: "1px 6px",
                 borderRadius: 3,
                 background: "rgba(59,130,246,0.1)",
-                color: "#3b82f6",
+                color: "#01696F",
               }}
             >
               {opp.agency}
@@ -809,7 +809,7 @@ function TeamingTab({ records }: { records: TeamingRecordRow[] }) {
                   padding: "1px 6px",
                   borderRadius: 3,
                   background: "rgba(59,130,246,0.1)",
-                  color: "#3b82f6",
+                  color: "#01696F",
                 }}
               >
                 {TEAMING_ROLE_LABELS[rec.role] ?? rec.role}

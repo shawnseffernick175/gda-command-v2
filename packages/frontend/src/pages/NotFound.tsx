@@ -10,7 +10,7 @@ export default function NotFound() {
       padding: 40,
     }}>
       <div style={{ textAlign: "center", maxWidth: 440 }}>
-        <div style={{ fontSize: 64, fontWeight: 800, color: "#3b82f6", marginBottom: 8 }}>404</div>
+        <div style={{ fontSize: 64, fontWeight: 800, color: "#01696F", marginBottom: 8 }}>404</div>
         <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8, color: "var(--color-text)" }}>
           Page not found
         </h1>
@@ -23,7 +23,7 @@ export default function NotFound() {
             display: "inline-block",
             padding: "10px 28px",
             borderRadius: 8,
-            background: "#3b82f6",
+            background: "#01696F",
             color: "#fff",
             fontSize: 14,
             fontWeight: 600,

@@ -455,7 +455,7 @@ export default function Settings() {
         {backupStatus && backupStatus.backups.daily.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-muted)" }}>Recent Daily Backups</div>
-            <div style={{ fontSize: 13, fontFamily: "monospace", lineHeight: 1.8 }}>
+            <div style={{ fontSize: 13, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", lineHeight: 1.8 }}>
               {backupStatus.backups.daily.slice(0, 7).map((b) => (
                 <div key={b} style={{ color: "var(--color-text-muted)" }}>{b}</div>
               ))}
@@ -466,7 +466,7 @@ export default function Settings() {
         {backupStatus && backupStatus.backups.weekly.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-muted)" }}>Weekly Backups</div>
-            <div style={{ fontSize: 13, fontFamily: "monospace", lineHeight: 1.8 }}>
+            <div style={{ fontSize: 13, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", lineHeight: 1.8 }}>
               {backupStatus.backups.weekly.map((b) => (
                 <div key={b} style={{ color: "var(--color-text-muted)" }}>{b}</div>
               ))}
@@ -512,7 +512,7 @@ export default function Settings() {
               }}
               disabled={emailTesting}
               style={{
-                background: "#3b82f6",
+                background: "#01696F",
                 color: "#fff",
                 border: "none",
                 padding: "8px 16px",
@@ -546,8 +546,8 @@ export default function Settings() {
               disabled={emailTesting}
               style={{
                 background: "transparent",
-                color: "#3b82f6",
-                border: "1px solid #3b82f6",
+                color: "#01696F",
+                border: "1px solid #01696F",
                 padding: "8px 16px",
                 borderRadius: 6,
                 cursor: emailTesting ? "wait" : "pointer",
@@ -658,9 +658,9 @@ export default function Settings() {
                       style={{
                         padding: "4px 12px",
                         borderRadius: 16,
-                        border: active ? "1px solid #3b82f6" : "1px solid var(--color-border)",
+                        border: active ? "1px solid #01696F" : "1px solid var(--color-border)",
                         background: active ? "rgba(59,130,246,0.1)" : "transparent",
-                        color: active ? "#3b82f6" : "var(--color-text-muted)",
+                        color: active ? "#01696F" : "var(--color-text-muted)",
                         cursor: "pointer",
                         fontSize: 12,
                         fontWeight: 600,
@@ -710,7 +710,7 @@ export default function Settings() {
                         padding: "2px 8px",
                         borderRadius: 4,
                         fontWeight: 700,
-                        fontFamily: "monospace",
+                        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                         background: ep.method === "GET" ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)",
                         color: ep.method === "GET" ? "#22c55e" : "#f59e0b",
                       }}
@@ -718,7 +718,7 @@ export default function Settings() {
                       {ep.method}
                     </span>
                   </td>
-                  <td style={{ padding: "8px 14px", fontFamily: "monospace", fontSize: 13 }}>{ep.path}</td>
+                  <td style={{ padding: "8px 14px", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", fontSize: 13 }}>{ep.path}</td>
                   <td style={{ padding: "8px 14px", color: "var(--color-text-muted)" }}>{ep.description}</td>
                 </tr>
               ))}
@@ -880,7 +880,7 @@ function FlagCard({ flag: f }: { flag: FeatureFlag }) {
       <div>
         <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{f.label}</div>
         <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{f.description}</div>
-        <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace", marginTop: 4 }}>
+        <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", marginTop: 4 }}>
           {f.key}
         </div>
       </div>

@@ -11,7 +11,7 @@ import InfoBadge from "../components/InfoBadge";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "#d97706",
-  in_review: "#3b82f6",
+  in_review: "#01696F",
   submitted: "#8b5cf6",
   finalized: "#16a34a",
 };
@@ -95,7 +95,7 @@ export default function CPARSBuilder() {
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <SummaryBox label="Records" value={summary.total} info={{ whatItIs: "Total CPARS/past performance records.", whatItMeans: "Your documented contract history for future proposals." }} />
           <SummaryBox label="Finalized" value={summary.finalized} color="#16a34a" onClick={() => setStatusFilter(statusFilter === "finalized" ? null : "finalized")} info={{ whatItIs: "Records reviewed and approved.", whatItMeans: "Ready to cite in proposals." }} />
-          <SummaryBox label="In Review" value={summary.in_review} color="#3b82f6" onClick={() => setStatusFilter(statusFilter === "in_review" ? null : "in_review")} />
+          <SummaryBox label="In Review" value={summary.in_review} color="#01696F" onClick={() => setStatusFilter(statusFilter === "in_review" ? null : "in_review")} />
           <SummaryBox label="Draft" value={summary.draft} color="#d97706" onClick={() => setStatusFilter(statusFilter === "draft" ? null : "draft")} />
           <SummaryBox label="Submitted" value={summary.submitted} color="#8b5cf6" onClick={() => setStatusFilter(statusFilter === "submitted" ? null : "submitted")} />
           <SummaryBox label="Total Value" value={fmt$(summary.total_value)} info={{ whatItIs: "Combined value of all tracked contracts.", whatItMeans: "Your total contract portfolio size.", howCalculated: "Sum of contract_value across all CPARS records." }} />
@@ -136,7 +136,7 @@ export default function CPARSBuilder() {
               borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background 0.15s",
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>{r.contract_number}</span>
+                <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>{r.contract_number}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   <Pill label={r.status} color={STATUS_COLORS[r.status] ?? "#6b7280"} />
                   {r.overall_rating && <Pill label={r.overall_rating} color={RATING_COLORS[r.overall_rating] ?? "#6b7280"} />}
@@ -207,8 +207,8 @@ export default function CPARSBuilder() {
                 <div style={{ display: "flex", gap: 0, marginBottom: 8 }}>
                   <button onClick={() => setShowNarrative("human")} style={{
                     padding: "6px 16px", border: "1px solid var(--color-border)", borderRadius: "6px 0 0 6px",
-                    background: showNarrative === "human" ? "#3b82f618" : "transparent",
-                    color: showNarrative === "human" ? "#3b82f6" : "var(--color-text-muted)", fontWeight: 600, fontSize: 12, cursor: "pointer",
+                    background: showNarrative === "human" ? "#01696F18" : "transparent",
+                    color: showNarrative === "human" ? "#01696F" : "var(--color-text-muted)", fontWeight: 600, fontSize: 12, cursor: "pointer",
                   }}>Human Narrative</button>
                   <button onClick={() => setShowNarrative("ai")} style={{
                     padding: "6px 16px", border: "1px solid var(--color-border)", borderLeft: "none", borderRadius: "0 6px 6px 0",
@@ -257,7 +257,7 @@ export default function CPARSBuilder() {
                 <div>
                   <h4 style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600 }}>Matched Opportunities</h4>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {sel.matched_opportunities.map((opp) => <Pill key={opp} label={opp} color="#3b82f6" />)}
+                    {sel.matched_opportunities.map((opp) => <Pill key={opp} label={opp} color="#01696F" />)}
                   </div>
                 </div>
               </div>

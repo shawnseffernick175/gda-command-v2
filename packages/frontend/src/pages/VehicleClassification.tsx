@@ -19,7 +19,7 @@ function formatCurrency(v: number | null | undefined): string {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  contract: "#3b82f6",
+  contract: "#01696F",
   agreement: "#8b5cf6",
   schedule: "#06b6d4",
   competition: "#22c55e",
@@ -101,7 +101,7 @@ export default function VehicleClassification() {
     return (
       <div style={{ padding: 32 }}>
         <div style={{ color: "#ef4444", marginBottom: 16 }}>Error: {error}</div>
-        <button onClick={load} style={{ padding: "8px 16px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
+        <button onClick={load} style={{ padding: "8px 16px", background: "#01696F", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>
           Retry
         </button>
       </div>
@@ -125,7 +125,7 @@ export default function VehicleClassification() {
           disabled={classifying}
           style={{
             padding: "8px 16px",
-            background: classifying ? "#475569" : "#3b82f6",
+            background: classifying ? "#475569" : "#01696F",
             color: "#fff",
             border: "none",
             borderRadius: 6,
@@ -145,7 +145,7 @@ export default function VehicleClassification() {
             onClick={() => handleVehicleClick(s.vehicle_type)}
             style={{
               background: selectedVehicle === s.vehicle_type ? "#1e293b" : "#0f172a",
-              border: selectedVehicle === s.vehicle_type ? "1px solid #3b82f6" : "1px solid #1e293b",
+              border: selectedVehicle === s.vehicle_type ? "1px solid #01696F" : "1px solid #1e293b",
               borderRadius: 8,
               padding: 16,
               cursor: "pointer",

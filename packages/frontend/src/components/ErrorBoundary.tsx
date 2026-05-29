@@ -49,7 +49,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0f1117",
+          background: "#F7F6F2",
           color: "#e4e4e7",
         }}>
           <div style={{
@@ -71,7 +71,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </p>
             {this.state.error && (
               <pre style={{
-                background: "#1a1d27",
+                background: "#FFFFFF",
                 border: "1px solid #2a2e3a",
                 borderRadius: 8,
                 padding: 16,
@@ -94,7 +94,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                   padding: "10px 24px",
                   borderRadius: 8,
                   border: "none",
-                  background: "#3b82f6",
+                  background: "#01696F",
                   color: "#fff",
                   fontSize: 14,
                   fontWeight: 600,

@@ -14,7 +14,7 @@ import SourceBadge from "../components/SourceBadge";
 // Constants & helpers
 // ---------------------------------------------------------------------------
 const STATUS_COLORS: Record<string, string> = {
-  new: "#3b82f6",
+  new: "#01696F",
   reviewing: "#f59e0b",
   watching: "#8b5cf6",
   promoted: "#22c55e",
@@ -31,7 +31,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const ROLE_COLORS: Record<string, string> = {
   internal: "#22c55e",
-  partner: "#3b82f6",
+  partner: "#01696F",
   target: "#8b5cf6",
   competitor: "#ef4444",
   unknown: "#6b7280",
@@ -238,7 +238,7 @@ export default function FastTrack() {
           <SummaryStat
             label="New"
             value={summary.new_count}
-            color="#3b82f6"
+            color="#01696F"
             active={statusFilter === "new"}
             onClick={() => setStatusFilter(statusFilter === "new" ? "" : "new")}
           />
@@ -683,7 +683,7 @@ function OODATab({ ooda }: { ooda: FastTrackDetailData["ooda"] }) {
   }
 
   const sections = [
-    { title: "Observe", icon: "👁", color: "#3b82f6", items: ooda.observe, type: "list" as const },
+    { title: "Observe", icon: "👁", color: "#01696F", items: ooda.observe, type: "list" as const },
     { title: "Orient", icon: "🧭", color: "#f59e0b", items: ooda.orient, type: "list" as const },
     { title: "Decide", icon: "⚖", color: "#8b5cf6", items: [ooda.decide], type: "text" as const },
     { title: "Act", icon: "🎯", color: "#22c55e", items: [ooda.act], type: "text" as const },
