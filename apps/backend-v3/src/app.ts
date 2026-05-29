@@ -11,6 +11,9 @@ import { opportunityRoutes } from './routes/opportunities.js';
 import { captureRoutes } from './routes/captures.js';
 import { pipelineRoutes } from './routes/pipeline.js';
 import { webhookRoutes } from './routes/webhooks.js';
+import { launchpadRoutes } from './routes/launchpad.js';
+import { sourceRoutes } from './routes/sources.js';
+import { partnerRoutes } from './routes/partners.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -96,6 +99,9 @@ export async function buildApp() {
   await app.register(opportunityRoutes);
   await app.register(captureRoutes);
   await app.register(pipelineRoutes);
+  await app.register(launchpadRoutes);
+  await app.register(sourceRoutes);
+  await app.register(partnerRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

@@ -4,7 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config/index.js';
 import { checkDbConnection, checkMigrationsCurrent } from '../lib/db.js';
-import { getBoss } from '../lib/queue.js';
+import { getBoss, QUEUE_NAMES } from '../lib/queue.js';
 import { register } from '../lib/metrics.js';
 import { successEnvelope, buildMeta } from '../lib/envelope.js';
 
@@ -39,11 +39,31 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get('/v3/version', async (_req, reply) => {
+    const bossInstance = getBoss();
+    let queueDepths: Record<string, number> = {};
+    if (bossInstance) {
+      try {
+        const sizes = await Promise.all(
+          Object.values(QUEUE_NAMES).map(async (name) => {
+            const size = await bossInstance.getQueueSize(name);
+            return [name, size] as const;
+          })
+        );
+        queueDepths = Object.fromEntries(sizes);
+      } catch {
+        queueDepths = {};
+      }
+    }
+
     return reply.status(200).send({
       version: config.version,
       commit: config.gitSha,
       built_at: new Date().toISOString(),
       node_version: process.version,
+      model_versions: {
+        analysis: config.analysisVersion,
+      },
+      queue_depths: queueDepths,
     });
   });
 
