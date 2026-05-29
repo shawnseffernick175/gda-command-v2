@@ -1,0 +1,28 @@
+name: Visual Token Guardrail
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  check-visual-tokens:
+    name: Forbidden Visual Token Check
+    runs-on: ubuntu-latest
+    # ADVISORY ONLY for now — the legacy codebase has thousands of pre-existing
+    # violations from the F-100 dark-theme drift. The F-100.5 reskin started
+    # cleanup, but every page needs migration before we can hard-fail PRs.
+    # When ready to enforce: remove continue-on-error from this job and from the run step.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run visual token guardrail
+        continue-on-error: true
+        run: node scripts/check-visual-tokens.mjs
