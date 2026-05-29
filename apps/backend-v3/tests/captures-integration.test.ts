@@ -60,16 +60,22 @@ async function ensureTestSchema(): Promise<void> {
     await client.query(`
       CREATE TABLE IF NOT EXISTS pipeline_items (
         id BIGSERIAL PRIMARY KEY,
-        opportunity_id BIGINT NOT NULL,
-        capture_owner TEXT NOT NULL DEFAULT 'unassigned',
-        win_prob_pct INTEGER,
+        opportunity_id BIGINT NOT NULL REFERENCES opportunities(id),
+        capture_owner TEXT NOT NULL,
+        win_probability NUMERIC CHECK (win_probability >= 0 AND win_probability <= 100),
         win_prob_evidence TEXT,
-        milestones JSONB NOT NULL DEFAULT '[]',
-        teaming_partners TEXT[] NOT NULL DEFAULT '{}',
+        milestone_90day TEXT,
+        estimated_value NUMERIC,
+        stage TEXT NOT NULL DEFAULT 'qualifying',
+        source_id BIGINT NOT NULL REFERENCES sources(id),
+        created_by BIGINT,
         capture_kickoff_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
+    `);
+    await client.query(`
+      ALTER TABLE pipeline_items ADD COLUMN IF NOT EXISTS capture_kickoff_at TIMESTAMPTZ
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS captures (
@@ -108,8 +114,8 @@ async function insertTestOpportunity(title: string = 'Cap_Opportunity'): Promise
 
 async function insertTestPipelineItem(oppId: string): Promise<string> {
   const res = await pool.query<{ id: string }>(
-    `INSERT INTO pipeline_items (opportunity_id, capture_owner)
-     VALUES ($1, 'shawn') RETURNING id`,
+    `INSERT INTO pipeline_items (opportunity_id, capture_owner, source_id)
+     VALUES ($1, 'shawn', 1) RETURNING id`,
     [oppId]
   );
   return String(res.rows[0]!.id);
