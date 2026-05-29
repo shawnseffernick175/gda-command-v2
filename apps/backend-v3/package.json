@@ -11,7 +11,11 @@
     "lint": "eslint src/ tests/ --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "migrate:dry-run": "tsx src/migration/run.ts",
+    "migrate:commit": "tsx src/migration/run.ts --commit",
+    "migrate:entity": "tsx src/migration/run.ts --entity",
+    "migrate:report": "tsx src/migration/run.ts --report-only"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
