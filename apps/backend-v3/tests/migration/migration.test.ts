@@ -19,42 +19,28 @@ describe('Migration Pipeline', () => {
     pool = new Pool({ connectionString: DB_URL, max: 3 });
     const client = await pool.connect();
     try {
-      // Set up legacy fixture tables in a separate schema
-      await client.query('CREATE SCHEMA IF NOT EXISTS legacy_fixture');
-      await client.query('SET search_path TO legacy_fixture, public');
-
       // Load the fixture SQL
       const fixtureSQL = readFileSync(
         resolve(__dirname, '../../src/migration/fixtures/legacy/seed.sql'),
         'utf-8',
       );
 
-      // Drop existing fixture tables to ensure idempotency (check both schemas)
-      const tableNames = [
-        'sam_opportunities', 'gda_opportunity_tracker', 'opportunities',
-        'gda_capture_plans', 'gda_action_items', 'source_registry', 'gda_teaming_partners',
-      ];
-      for (const t of tableNames) {
-        await client.query(`DROP TABLE IF EXISTS legacy_fixture."${t}" CASCADE`);
-        await client.query(`DROP TABLE IF EXISTS public."${t}" CASCADE`);
-      }
+      // Check if legacy tables already exist (CI seeds them before tests)
+      const existing = await client.query(
+        `SELECT COUNT(*)::int AS c FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'sam_opportunities'`,
+      );
 
-      // Also drop V3 tables from any prior migration run
-      const v3Tables = [
-        'v3_opportunities', 'v3_captures', 'v3_action_items',
-        'sources', 'migration_partners',
-      ];
-      for (const t of v3Tables) {
-        await client.query(`DROP TABLE IF EXISTS public."${t}" CASCADE`);
-      }
-
-      // Execute fixture SQL within the legacy schema
-      const statements = fixtureSQL
-        .split(';')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0 && !s.startsWith('--'));
-      for (const stmt of statements) {
-        await client.query(stmt);
+      if (existing.rows[0]?.c === 0) {
+        // Tables not yet seeded — execute fixture SQL in public schema
+        await client.query('SET search_path TO public');
+        const statements = fixtureSQL
+          .split(';')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && !s.startsWith('--'));
+        for (const stmt of statements) {
+          await client.query(stmt);
+        }
       }
 
       await client.query('SET search_path TO public');
@@ -65,12 +51,6 @@ describe('Migration Pipeline', () => {
 
   afterAll(async () => {
     if (pool) {
-      const client = await pool.connect();
-      try {
-        await client.query('DROP SCHEMA IF EXISTS legacy_fixture CASCADE');
-      } finally {
-        client.release();
-      }
       await pool.end();
     }
   });
