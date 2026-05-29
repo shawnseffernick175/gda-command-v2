@@ -4,15 +4,15 @@ import pg from 'pg';
 import type PgBoss from 'pg-boss';
 import type { FastifyInstance } from 'fastify';
 
-const DB_URL = 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
-
 process.env['JWT_SECRET'] = 'test-jwt-secret';
 process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
-process.env['DATABASE_URL'] = DB_URL;
+process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
 process.env['NODE_ENV'] = 'test';
-process.env['ANALYSIS_VERSION'] = 'v0.0.1-test';
-process.env['ANALYSIS_TIMEOUT_MS'] = '5000';
-process.env['ANALYSIS_POLL_INTERVAL_MS'] = '50';
+process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
+process.env['ANALYSIS_TIMEOUT_MS'] ??= '5000';
+process.env['ANALYSIS_POLL_INTERVAL_MS'] ??= '50';
+
+const DB_URL = process.env['DATABASE_URL'];
 
 const { Pool } = pg;
 

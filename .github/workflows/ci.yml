@@ -31,7 +31,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build -w packages/shared
-      - run: npm test
+      - run: npm test --workspace=packages/shared --workspace=packages/backend --workspace=packages/frontend --if-present
 
   migrations:
     name: Migration Smoke Test
