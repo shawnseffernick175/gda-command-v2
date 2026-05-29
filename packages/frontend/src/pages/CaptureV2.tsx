@@ -137,13 +137,18 @@ export default function CaptureV2() {
   const handleStageAdvanced = async () => {
     await fetchCaptures();
     if (selected) {
-      const res = await authenticatedFetch("/api/captures");
+      const refreshUrl = behindFilter === "1" ? "/api/captures?behind=1" : "/api/captures";
+      const res = await authenticatedFetch(refreshUrl);
       const json = await res.json();
       if (json.success && json.data?.items) {
         const updated = json.data.items.find(
           (c: CaptureItem) => c.id === selected.id,
         );
-        if (updated) setSelected(updated);
+        if (updated) {
+          setSelected(updated);
+        } else {
+          setSelected(json.data.items[0] ?? null);
+        }
       }
     }
   };
