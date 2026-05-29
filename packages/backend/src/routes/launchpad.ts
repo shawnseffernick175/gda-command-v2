@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
-// Launchpad Routes — daily-driver flags + intel API
+// Launchpad Routes — daily-driver flags + intel + summary API
 // GET  /api/launchpad/flags         — active flags (default ou_tag=envision)
 // POST /api/launchpad/flags/:id/dismiss — dismiss a flag (x-gda-key auth)
 // GET  /api/launchpad/daily-intel   — news items for a given date
+// GET  /api/launchpad/summary       — today-actionable counts for summary grid
 // ---------------------------------------------------------------------------
 
 import { Router } from "express";
@@ -11,6 +12,7 @@ import { getPool } from "../lib/db";
 import { isValidOuTag, defaultOuTag } from "../lib/ou-tag";
 import { verifyToken } from "../lib/auth";
 import { log } from "../lib/logger";
+import { fetchLaunchpadSummary } from "../db/queries/launchpad-summary";
 
 const router = Router();
 
@@ -171,6 +173,40 @@ router.get("/daily-intel", async (req, res) => {
       errorEnvelope("GDA.launchpad", "daily-intel", {
         code: "INTERNAL_ERROR",
         message: "Failed to fetch daily intel",
+        detail: null,
+      }),
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/launchpad/summary — today-actionable counts for the summary grid
+// ---------------------------------------------------------------------------
+router.get("/summary", async (req, res) => {
+  try {
+    const pool = getPool();
+    if (!pool) {
+      return res.json(
+        successEnvelope("GDA.launchpad", "summary", {
+          action_items_due_today: 0,
+          opportunities_hot: 0,
+          capture_behind: 0,
+          partner_new_awards_7d: 0,
+        }),
+      );
+    }
+
+    const rawTag = req.query.ou_tag ?? defaultOuTag();
+    const ouTag = isValidOuTag(rawTag) ? rawTag : defaultOuTag();
+
+    const data = await fetchLaunchpadSummary(pool, ouTag);
+    res.json(successEnvelope("GDA.launchpad", "summary", data));
+  } catch (err) {
+    log.error("launchpad_summary_error", { error: String((err as Error).message) });
+    res.status(500).json(
+      errorEnvelope("GDA.launchpad", "summary", {
+        code: "INTERNAL_ERROR",
+        message: "Failed to fetch launchpad summary",
         detail: null,
       }),
     );

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { authenticatedFetch } from "../api/auth";
 
 interface PartnerProfile {
@@ -239,6 +240,8 @@ function PartnerCard({ profile }: { profile: PartnerProfile }) {
 }
 
 export default function PartnerIntel() {
+  const [searchParams] = useSearchParams();
+  const newAwardsFilter = searchParams.get("new_awards");
   const [profiles, setProfiles] = useState<PartnerProfile[]>([]);
   const [awards, setAwards] = useState<Award[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -282,9 +285,20 @@ export default function PartnerIntel() {
     fetchAll();
   }, [fetchAll]);
 
-  const filteredAwards = awardFilter
-    ? awards.filter((a) => a.partner_ou_tag === awardFilter)
-    : awards;
+  const filteredAwards = useMemo(() => {
+    let result = awards;
+    if (newAwardsFilter === "7d") {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+      result = result.filter(
+        (a) => a.awarded_at && new Date(a.awarded_at) >= cutoff,
+      );
+    }
+    if (awardFilter) {
+      result = result.filter((a) => a.partner_ou_tag === awardFilter);
+    }
+    return result;
+  }, [awards, awardFilter, newAwardsFilter]);
 
   const filteredNews = newsFilter
     ? news.filter((n) => n.partner_ou_tag === newsFilter)

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { authenticatedFetch } from "../api/auth";
 
 interface Opportunity {
@@ -246,6 +247,8 @@ function GradePopover({
 }
 
 export default function OpportunitiesV2() {
+  const [searchParams] = useSearchParams();
+  const hotFilter = searchParams.get("hot");
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -279,6 +282,7 @@ export default function OpportunitiesV2() {
       if (dueBefore) params.set("due_before", dueBefore);
       if (dueAfter) params.set("due_after", dueAfter);
       if (gradeFilter.length === 1) params.set("grade", gradeFilter[0]);
+      if (hotFilter === "1") params.set("hot", "1");
 
       const res = await authenticatedFetch(`/api/v2/opportunities?${params.toString()}`);
       if (res.ok) {
@@ -289,7 +293,7 @@ export default function OpportunitiesV2() {
     } finally {
       setLoading(false);
     }
-  }, [page, naicsFilter, agencyFilter, setAsideFilter, minValue, maxValue, dueBefore, dueAfter, gradeFilter]);
+  }, [page, naicsFilter, agencyFilter, setAsideFilter, minValue, maxValue, dueBefore, dueAfter, gradeFilter, hotFilter]);
 
   useEffect(() => {
     fetchData();

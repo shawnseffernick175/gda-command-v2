@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { authenticatedFetch } from "../api/auth";
 import ComplianceMatrix from "../components/capture/ComplianceMatrix";
 import ColorReviewStrip from "../components/capture/ColorReviewStrip";
@@ -60,6 +61,8 @@ function formatDateEST(d: string | null): string {
 }
 
 export default function CaptureV2() {
+  const [searchParams] = useSearchParams();
+  const behindFilter = searchParams.get("behind");
   const [captures, setCaptures] = useState<CaptureItem[]>([]);
   const [selected, setSelected] = useState<CaptureItem | null>(null);
   const [complianceItems, setComplianceItems] = useState<ComplianceItemRow[]>([]);
@@ -70,7 +73,8 @@ export default function CaptureV2() {
 
   const fetchCaptures = useCallback(async () => {
     try {
-      const res = await authenticatedFetch("/api/captures");
+      const apiUrl = behindFilter === "1" ? "/api/captures?behind=1" : "/api/captures";
+      const res = await authenticatedFetch(apiUrl);
       const json = await res.json();
       if (json.success && json.data?.items) {
         setCaptures(json.data.items);
@@ -83,7 +87,7 @@ export default function CaptureV2() {
     } finally {
       setLoading(false);
     }
-  }, [selected]);
+  }, [selected, behindFilter]);
 
   useEffect(() => {
     fetchCaptures();
@@ -133,13 +137,18 @@ export default function CaptureV2() {
   const handleStageAdvanced = async () => {
     await fetchCaptures();
     if (selected) {
-      const res = await authenticatedFetch("/api/captures");
+      const refreshUrl = behindFilter === "1" ? "/api/captures?behind=1" : "/api/captures";
+      const res = await authenticatedFetch(refreshUrl);
       const json = await res.json();
       if (json.success && json.data?.items) {
         const updated = json.data.items.find(
           (c: CaptureItem) => c.id === selected.id,
         );
-        if (updated) setSelected(updated);
+        if (updated) {
+          setSelected(updated);
+        } else {
+          setSelected(json.data.items[0] ?? null);
+        }
       }
     }
   };

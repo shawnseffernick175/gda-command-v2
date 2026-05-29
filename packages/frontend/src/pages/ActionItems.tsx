@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { authenticatedFetch } from "../api/auth";
 import ActionItemRow from "../components/capture/ActionItemRow";
 import NewActionItemModal from "../components/capture/NewActionItemModal";
@@ -31,7 +32,15 @@ interface Draft {
   created_at: string;
 }
 
+function getTodayISOEST(): string {
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+  });
+}
+
 export default function ActionItems() {
+  const [searchParams] = useSearchParams();
+  const dueFilter = searchParams.get("due");
   const [items, setItems] = useState<ActionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +80,19 @@ export default function ActionItems() {
     loadAll();
   }, [loadAll]);
 
-  const openItems = items.filter((i) => i.status === "open");
-  const blockedItems = items.filter((i) => i.status === "blocked");
-  const doneItems = items.filter((i) => i.status === "done");
+  const filteredItems = useMemo(() => {
+    if (dueFilter === "today") {
+      const todayISO = getTodayISOEST();
+      return items.filter(
+        (i) => i.status === "open" && i.due_date && i.due_date.slice(0, 10) === todayISO,
+      );
+    }
+    return items;
+  }, [items, dueFilter]);
+
+  const openItems = filteredItems.filter((i) => i.status === "open");
+  const blockedItems = filteredItems.filter((i) => i.status === "blocked");
+  const doneItems = filteredItems.filter((i) => i.status === "done");
 
   const handleStatusChange = async (
     itemId: number,
