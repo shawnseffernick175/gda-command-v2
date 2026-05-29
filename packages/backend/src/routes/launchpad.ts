@@ -9,6 +9,7 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { isValidOuTag, defaultOuTag } from "../lib/ou-tag";
+import { verifyToken } from "../lib/auth";
 import { log } from "../lib/logger";
 
 const router = Router();
@@ -56,22 +57,36 @@ router.get("/flags", async (req, res) => {
 });
 
 router.post("/flags/:id/dismiss", async (req, res) => {
+  // Accept either x-gda-key (machine/n8n callers) or JWT (browser callers)
+  let authorized = false;
+
+  // Check x-gda-key first (for n8n / machine callers)
   const key = process.env.GDA_WEBHOOK_KEY;
-  if (!key) {
-    return res.status(503).json(
-      errorEnvelope("GDA.launchpad", "dismiss", {
-        code: "NOT_CONFIGURED",
-        message: "GDA_WEBHOOK_KEY not set",
-        detail: null,
-      }),
-    );
+  const provided = req.headers["x-gda-key"] as string | undefined;
+  if (key && provided === key) {
+    authorized = true;
   }
-  const provided = req.headers["x-gda-key"] as string;
-  if (provided !== key) {
+
+  // Fall back to JWT auth (for browser callers)
+  if (!authorized) {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      try {
+        const payload = verifyToken(authHeader.slice(7));
+        if (payload?.userId) authorized = true;
+      } catch { /* invalid token */ }
+    }
+    // Dev mode: AUTH_REQUIRED=false → allow without token
+    if (!authorized && process.env.AUTH_REQUIRED !== "true") {
+      authorized = true;
+    }
+  }
+
+  if (!authorized) {
     return res.status(401).json(
       errorEnvelope("GDA.launchpad", "dismiss", {
         code: "UNAUTHORIZED",
-        message: "Invalid or missing x-gda-key header",
+        message: "Invalid or missing authorization",
         detail: null,
       }),
     );

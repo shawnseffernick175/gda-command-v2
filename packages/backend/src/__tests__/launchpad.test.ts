@@ -145,8 +145,9 @@ describe("Launchpad Routes", () => {
       expect(getRes.body.data.flags).toHaveLength(2);
     });
 
-    it("rejects without valid x-gda-key", async () => {
+    it("rejects without valid auth in production mode", async () => {
       process.env.GDA_WEBHOOK_KEY = "test-key";
+      process.env.AUTH_REQUIRED = "true";
 
       const app = buildApp();
       const res = await request(app)
@@ -154,6 +155,8 @@ describe("Launchpad Routes", () => {
         .set("x-gda-key", "wrong-key");
 
       expect(res.status).toBe(401);
+
+      delete process.env.AUTH_REQUIRED;
     });
   });
 });

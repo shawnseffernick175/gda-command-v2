@@ -51,7 +51,6 @@ export default function CriticalFlagsList({ flags, onRefresh }: CriticalFlagsLis
     try {
       await authenticatedFetch(`/api/launchpad/flags/${flagId}/dismiss`, {
         method: "POST",
-        headers: { "x-gda-key": "client" },
       });
       onRefresh();
     } catch {

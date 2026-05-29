@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { authenticatedFetch } from "../api/auth";
 
 type TabKey = "envision" | "gda-narrative" | "partners";
 
@@ -374,9 +375,9 @@ export default function CompanyProfile() {
   useEffect(() => {
     async function fetchAll() {
       const [envRes, narRes, parRes] = await Promise.all([
-        fetch("/api/company-profile/envision"),
-        fetch("/api/company-profile/gda-narrative"),
-        fetch("/api/company-profile/partners"),
+        authenticatedFetch("/api/company-profile/envision"),
+        authenticatedFetch("/api/company-profile/gda-narrative"),
+        authenticatedFetch("/api/company-profile/partners"),
       ]);
       if (envRes.ok) {
         const b = await envRes.json();
