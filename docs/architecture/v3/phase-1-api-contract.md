@@ -895,7 +895,7 @@ The F-204 test strategy is amended in lockstep with this contract. Specifically,
 4. Assert list endpoint includes `ai_analyzed_at` and `analysis_version` per item.
 5. Assert frontend client treats 503 ANALYSIS_TIMEOUT as retryable (no degraded UI displayed during the gap).
 
-The F-204 amendment is filed as a separate commit/PR after F-202 merges.
+**Implemented in:** `docs/architecture/v3/phase-1-test-strategy.md` Addendum B (F-204a) — Gates 1–4. Forbidden token CI workflow: `.github/workflows/v3-forbidden-tokens.yml`.
 
 ---
 

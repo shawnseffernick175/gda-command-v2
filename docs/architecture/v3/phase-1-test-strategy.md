@@ -498,3 +498,167 @@ These are addressed by sibling Phase 1 tickets:
 | Schema design | F-201 |
 | API contract / OpenAPI spec | F-202 |
 | Data migration strategy | F-203 |
+
+---
+
+## Addendum B — R2 No-Degradation CI Gates
+
+**Date:** 2026-05-29
+**Amends:** Sections 7, 10
+**Canonical inputs:** F-201 Addendum A.5 (removed concepts), F-201 Addendum A.6 (test coverage), F-202 Addendum A.7 (test coverage cross-reference)
+**Binding rule:** Gates must **FAIL the PR**, not warn. Degradations must be physically uncommittable.
+
+This addendum adds four CI gates required by the no-degradation mandate in F-201 Addendum A.6 and F-202 Addendum A.7. Together they enforce the R2 contract at PR-time so no degradation can land silently.
+
+---
+
+### B.1 Gate 1 — Forbidden token check (schema + code)
+
+**Workflow:** `.github/workflows/v3-forbidden-tokens.yml`
+**Trigger:** Every PR modifying `apps/backend-v3/`, `db/v3/migrations/`, or `docs/architecture/v3/openapi-v3.yaml`
+**Stage:** 1 (Fast Feedback)
+
+The CI script greps for the following forbidden strings — copied verbatim from F-201 Addendum A.5:
+
+| # | Forbidden token | Matches |
+|---|---|---|
+| 1 | `analysis_status` | Column name, field name, or enum value |
+| 2 | `stale: true` | Analysis flag in any response or schema |
+| 3 | `stale: boolean` | Type declaration for a stale flag |
+| 4 | `"stale"` | String literal used as an analysis flag |
+| 5 | `analysis: null` | Null analysis block in any response example |
+| 6 | `"not_yet_analyzed"` | Forbidden analysis state value |
+| 7 | `"running"` | Forbidden analysis state value |
+| 8 | `"pending"` | Forbidden analysis state value |
+
+**Scan scope:**
+
+- `apps/backend-v3/`
+- `db/v3/migrations/`
+- `docs/architecture/v3/openapi-v3.yaml`
+
+**Allowed exceptions (comments only):**
+
+- Addendum docs (`phase-1-architecture-and-schema.md`, `phase-1-api-contract.md`)
+- This test strategy doc (`phase-1-test-strategy.md`)
+- Code comments explicitly stating `FORBIDDEN — do not add`
+- The workflow file itself (`.github/workflows/v3-forbidden-tokens.yml`)
+
+**Failure behavior:** Any match outside of allowed exceptions **fails the PR**. The workflow exits non-zero and prints the offending file, line number, and matched pattern.
+
+---
+
+### B.2 Gate 2 — Detail endpoint contract test (synchronous wait)
+
+**Implementation:** Integration test suite in F-206 backend CI (`apps/backend-v3/tests/integration/`)
+**Trigger:** Every PR (Stage 2 — Full Coverage)
+**Depends on:** F-206 (implementation); this section defines the contract the tests must enforce
+
+The test hits `GET /v3/opportunities/:id` and `GET /v3/captures/:id` in three scenarios:
+
+| # | Scenario | Setup | Expected result |
+|---|---|---|---|
+| 1 | Cache fresh | Seed opportunity with pre-computed analysis where `analysis_version == CURRENT_ANALYSIS_VERSION` and `ai_analyzed_at >= updated_at` | HTTP 200 with full `analysis` block; assert all required fields present including `version` and `generated_at` |
+| 2 | Cache stale, worker available | Seed opportunity with outdated `analysis_version`; pg-boss worker running | HTTP 200 within 10 s after pre-warm; `analysis.version == CURRENT_ANALYSIS_VERSION`; `analysis.generated_at >= updated_at` |
+| 3 | Cache stale, worker stalled | Seed opportunity with outdated `analysis_version`; artificially stall the pg-boss worker beyond 10 s | HTTP 503 with `code: ANALYSIS_TIMEOUT` and `estimated_seconds` in `error.detail` |
+
+**Negative assertions (applied to every scenario):**
+
+- Response body NEVER contains `analysis: null`
+- Response body NEVER contains `stale: true`
+- Response body NEVER contains `analysis_status` (any value)
+
+**503 envelope assertion:** The HTTP 503 response matches the `ErrorEnvelope` schema exactly:
+
+```jsonc
+{
+  "success": false,
+  "error": {
+    "code": "ANALYSIS_TIMEOUT",
+    "message": "<string>",
+    "detail": { "estimated_seconds": "<number>" }
+  },
+  "meta": { "generatedAt": "<ISO 8601>", "requestId": "<string>" }
+}
+```
+
+---
+
+### B.3 Gate 3 — Pre-warm trigger coverage test
+
+**Implementation:** Integration test suite in F-206 backend CI (`apps/backend-v3/tests/integration/`)
+**Trigger:** Every PR (Stage 2 — Full Coverage)
+**Depends on:** F-206 (implementation); this section defines the contract the tests must enforce
+
+For each pre-warm trigger defined in F-201 Addendum A.2, an integration test asserts the trigger enqueues the expected pg-boss job:
+
+| # | Trigger event | Expected pg-boss job | Assert |
+|---|---|---|---|
+| 1 | n8n webhook commit (`POST /api/v3/webhooks/sam-opportunity`) | `analysis-opportunity` enqueued | Job exists in `pgboss.job` with `state = 'created'` for the upserted opportunity |
+| 2 | Manual create (`POST /api/v3/opportunities`) | `analysis-opportunity` enqueued | Job exists for the newly created opportunity |
+| 3 | PATCH with analysis-affecting field (e.g., `title`, `agency`, `naics`, `set_aside`, `value_min`, `value_max`, `incumbent`, `description`, `response_due_at`) | `analysis-opportunity` enqueued | Job exists with the patched opportunity ID |
+| 4 | PATCH with non-analysis field (e.g., `capture_owner`) | NOT enqueued | No new `analysis-opportunity` job created |
+| 5 | Source addition (`source_id` change on opportunity) | `analysis-opportunity` enqueued | Job exists for the affected opportunity |
+| 6 | Model version bump cron | Bulk enqueue | All opportunities with `analysis_version != CURRENT_ANALYSIS_VERSION` have jobs enqueued |
+| 7 | 24 h periodic refresh cron | Enqueue stale rows | All opportunities with `ai_analyzed_at < NOW() - INTERVAL '24 hours'` have jobs enqueued |
+
+**Failure behavior:** If any trigger silently drops (i.e., the expected job is not found in pg-boss within 5 s of the trigger event), the test **fails the PR**. This is a regression guard against silent analysis gaps.
+
+---
+
+### B.4 Gate 4 — Drift detector (cross-reference to F-205)
+
+**Implementation:** F-205 drift detector workflow (`.github/workflows/v3-drift-detector.yml`)
+**Trigger:** Every PR touching `db/v3/migrations/` (Stage 2 — Full Coverage)
+**Depends on:** F-205 (implementation); this section defines the pass criteria the drift detector must enforce
+
+The F-205 drift detector is cross-referenced here with explicit pass criteria for the R2 no-degradation contract:
+
+| # | Pass criterion | What it checks |
+|---|---|---|
+| 1 | Schema matches design doc | `pg_dump --schema-only` of migration-built DB matches the schema described in `phase-1-architecture-and-schema.md` |
+| 2 | No forbidden columns | None of the forbidden tokens from Gate 1 (B.1) appear as column names, enum values, or CHECK constraint values in the schema |
+| 3 | pg-boss tables present | `pgboss.job`, `pgboss.schedule`, and related pg-boss system tables exist after migration replay |
+| 4 | R1 source sibling tables present | Every fact table that carries analysis-bearing fields also has the R1 source attribution columns (`source_kind`, `source_url`, `source_title`) with `NOT NULL` constraints |
+
+---
+
+### B.5 Updated CI pipeline stage map
+
+The four gates above integrate into the existing PR pipeline (§10.1) as follows:
+
+```
+PR opened (draft or ready)
+│
+├─ Stage 1: FAST FEEDBACK (< 2 min)
+│  ├── Lint (ESLint + Prettier)
+│  ├── TypeScript typecheck (all workspaces)
+│  ├── Unit tests (Vitest, no DB)
+│  ├── Envision-only scope guard (grep for forbidden patterns)
+│  ├── Secret scan (gitleaks)
+│  └── ★ Gate 1: Forbidden token scan (v3-forbidden-tokens.yml)  ← NEW
+│
+├─ Stage 2: FULL COVERAGE (< 10 min, runs on "ready for review")
+│  ├── Integration tests (Vitest + Testcontainers Postgres)
+│  ├── Schema drift detector
+│  ├── ★ Gate 4: Drift detector R2 pass criteria (F-205)          ← NEW
+│  ├── Contract tests (OpenAPI validation)
+│  ├── R1 source-coverage gate
+│  ├── R2 auto-analysis gate
+│  ├── ★ Gate 2: Detail endpoint contract test (F-206)            ← NEW
+│  ├── ★ Gate 3: Pre-warm trigger coverage test (F-206)           ← NEW
+│  ├── n8n contract tests
+│  ├── Prod-shape migration replay (if PR touches migrations/)
+│  └── Bundle size check (if PR touches frontend/)
+│
+└─ All checks pass → PR is mergeable
+```
+
+---
+
+### B.6 Non-negotiables
+
+1. All four gates **FAIL the PR** — they are not advisory warnings. Degradations must be physically uncommittable.
+2. The forbidden token list in Gate 1 is canonical from F-201 Addendum A.5 — copied verbatim, not paraphrased.
+3. Gate 2 and Gate 3 test specifications are binding for the F-206 implementation. F-206 tests must satisfy every row in the tables above.
+4. Gate 4 cross-references F-205 — the drift detector must enforce the R2 pass criteria defined here.

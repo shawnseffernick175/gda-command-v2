@@ -1056,7 +1056,7 @@ The F-204 test strategy gates the following CI checks against the rules in this 
 3. **R2 update gate:** CI updates an analysis-affecting field via PATCH, polls pg-boss until the re-analysis job completes, asserts `ai_analyzed_at >= updated_at`.
 4. **R2 503 contract gate:** CI artificially stalls a job to exceed the 10-second SLA, asserts the detail endpoint returns HTTP 503 with `ANALYSIS_TIMEOUT` code (never a degraded 200 response).
 
-A follow-up commit to F-204 will codify these gates in `docs/architecture/v3/phase-1-test-strategy.md` Section 7 (R2 auto-analysis CI).
+**Implemented in:** `docs/architecture/v3/phase-1-test-strategy.md` Addendum B (F-204a) — Gates 1–4. Forbidden token CI workflow: `.github/workflows/v3-forbidden-tokens.yml`.
 
 ---
 

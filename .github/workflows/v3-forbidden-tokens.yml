@@ -1,0 +1,122 @@
+# Gate 1 — Forbidden token check (R2 no-degradation contract)
+#
+# Enforces F-201 Addendum A.5: these tokens are permanently removed from
+# the V3 API surface.  Any match outside of explicitly allowed comments
+# FAILS the PR — degradations must be physically uncommittable.
+#
+# Canonical forbidden list (copy-verbatim from F-201 Addendum A.5):
+#   - analysis_status  (column, field, or enum)
+#   - stale: true  /  stale: boolean  /  "stale"  (as analysis flag)
+#   - analysis: null  (in any response example)
+#   - "not_yet_analyzed"  /  "running"  /  "pending"  (as analysis states)
+
+name: V3 Forbidden Tokens
+
+on:
+  pull_request:
+    paths:
+      - 'apps/backend-v3/**'
+      - 'db/v3/migrations/**'
+      - 'docs/architecture/v3/openapi-v3.yaml'
+
+jobs:
+  forbidden-tokens:
+    name: R2 forbidden token scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan for forbidden tokens
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # -----------------------------------------------------------
+          # Directories / files to scan
+          # -----------------------------------------------------------
+          SCAN_PATHS=(
+            "apps/backend-v3/"
+            "db/v3/migrations/"
+            "docs/architecture/v3/openapi-v3.yaml"
+          )
+
+          # -----------------------------------------------------------
+          # Files allowed to mention forbidden tokens in comments only
+          # -----------------------------------------------------------
+          ALLOWED_FILES=(
+            "docs/architecture/v3/phase-1-test-strategy.md"
+            "docs/architecture/v3/phase-1-architecture-and-schema.md"
+            "docs/architecture/v3/phase-1-api-contract.md"
+            ".github/workflows/v3-forbidden-tokens.yml"
+          )
+
+          # -----------------------------------------------------------
+          # Build a post-filter regex to exclude allowed file paths
+          # (grep --exclude only matches basenames, so we post-filter
+          # the grep -rn output by full relative path instead)
+          # -----------------------------------------------------------
+          ALLOWED_FILTER=""
+          for f in "${ALLOWED_FILES[@]}"; do
+            if [ -n "$ALLOWED_FILTER" ]; then
+              ALLOWED_FILTER+="|"
+            fi
+            ALLOWED_FILTER+="$(echo "$f" | sed 's/[.[\/]/\\&/g')"
+          done
+
+          # -----------------------------------------------------------
+          # Forbidden patterns (verbatim from F-201 Addendum A.5)
+          # -----------------------------------------------------------
+          PATTERNS=(
+            'analysis_status'
+            'stale:\s*true'
+            'stale:\s*boolean'
+            '"stale"'
+            'analysis:\s*null'
+            '"not_yet_analyzed"'
+            '"running"'
+            '"pending"'
+          )
+
+          FOUND=0
+
+          for pattern in "${PATTERNS[@]}"; do
+            # Only scan paths that exist in the repo
+            EXISTING_PATHS=()
+            for p in "${SCAN_PATHS[@]}"; do
+              if [ -e "$p" ]; then
+                EXISTING_PATHS+=("$p")
+              fi
+            done
+
+            if [ ${#EXISTING_PATHS[@]} -eq 0 ]; then
+              echo "No scan paths exist yet — skipping pattern: $pattern"
+              continue
+            fi
+
+            # Search, filtering out allowed files and comment-only FORBIDDEN lines
+            MATCHES=$(grep -rn -E "$pattern" \
+              "${EXISTING_PATHS[@]}" 2>/dev/null \
+              | grep -v -E "^($ALLOWED_FILTER):" \
+              | grep -v -E ':[0-9]+:\s*(//|#|/\*|\*|<!--).*FORBIDDEN' \
+              || true)
+
+            if [ -n "$MATCHES" ]; then
+              echo "::error::Forbidden token matched: $pattern"
+              echo "$MATCHES"
+              FOUND=1
+            fi
+          done
+
+          if [ "$FOUND" -eq 1 ]; then
+            echo ""
+            echo "=========================================="
+            echo "FAILED: Forbidden R2 tokens detected."
+            echo "These tokens are permanently banned from"
+            echo "the V3 codebase per F-201 Addendum A.5."
+            echo "=========================================="
+            exit 1
+          fi
+
+          echo "PASSED: No forbidden R2 tokens found."
