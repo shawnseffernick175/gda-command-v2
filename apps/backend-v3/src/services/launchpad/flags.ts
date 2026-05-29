@@ -41,8 +41,11 @@ interface FlagRow {
 export interface LaunchpadFlagsResult {
   flags: LaunchpadFlag[];
   compliance_gaps: number;
+  compliance_gaps_sources: SourceCitation[];
   teaming_unresolved: number;
+  teaming_unresolved_sources: SourceCitation[];
   analysis_timeouts_24h: number;
+  analysis_timeouts_24h_sources: SourceCitation[];
 }
 
 export async function computeFlags(): Promise<LaunchpadFlagsResult> {
@@ -106,10 +109,18 @@ export async function computeFlags(): Promise<LaunchpadFlagsResult> {
     created_at: row.created_at,
   }));
 
+  const now = new Date().toISOString();
+  const internalSrc = (filterUrl: string, label: string): SourceCitation[] => [
+    { kind: 'internal', title: `GDA Command V3 — ${label}`, url: filterUrl, retrieved_at: now },
+  ];
+
   return {
     flags,
     compliance_gaps: parseInt(complianceRes.rows[0]?.count ?? '0', 10),
+    compliance_gaps_sources: internalSrc('/v3/captures?compliance=non_compliant', 'compliance gaps count'),
     teaming_unresolved: parseInt(teamingRes.rows[0]?.count ?? '0', 10),
+    teaming_unresolved_sources: internalSrc('/v3/opportunities?teaming=unresolved&status=qualified', 'teaming unresolved count'),
     analysis_timeouts_24h: parseInt(timeoutsRes.rows[0]?.count ?? '0', 10),
+    analysis_timeouts_24h_sources: internalSrc('/v3/metrics?filter=analysis_timeout_24h', 'analysis timeouts count'),
   };
 }

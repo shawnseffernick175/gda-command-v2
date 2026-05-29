@@ -32,11 +32,13 @@ interface PartnerProfile {
   primary_naics: string | null;
   primary_naics_sources: SourceCitation[];
   capabilities: string[];
+  capabilities_sources: SourceCitation[];
   certifications: Certification[];
   certifications_sources: SourceCitation[];
   vehicles: Vehicle[];
   vehicles_sources: SourceCitation[];
   past_performance_summary: string;
+  past_performance_summary_sources: SourceCitation[];
   recent_awards: unknown[];
   recent_awards_sources: SourceCitation[];
   teaming_history: unknown[];
@@ -63,6 +65,7 @@ const PARTNERS: Record<string, PartnerProfile> = {
     primary_naics: '541512',
     primary_naics_sources: [{ ...SAM_SOURCE, url: 'https://sam.gov/entity/TECGLUBFP6N6', title: 'SAM.gov Riverstone Entity' }],
     capabilities: ['TechSIGINT', 'Cyber Operations', 'IC Clearance', 'Classified DevSecOps', 'SecurScale'],
+    capabilities_sources: [{ ...SAM_SOURCE, url: 'https://sam.gov/entity/TECGLUBFP6N6', title: 'SAM.gov Riverstone Capabilities' }],
     certifications: [
       { name: 'HUBZone', status: 'active', expiration_date: null },
       { name: 'WOSB', status: 'active', expiration_date: null },
@@ -74,6 +77,7 @@ const PARTNERS: Record<string, PartnerProfile> = {
     ],
     vehicles_sources: [{ kind: 'fpds', title: 'FPDS SHIELD Award', url: 'https://www.fpds.gov/ezsearch/search.do?q=HQ085926DF469', retrieved_at: '2026-05-29T06:00:00.000Z' }],
     past_performance_summary: 'IC-focused cyber and TechSIGINT provider with MDA SHIELD prime contract. HUBZone certified — unlocks set-aside bids for Envision teaming.',
+    past_performance_summary_sources: [{ kind: 'fpds', title: 'FPDS Riverstone Past Performance', url: 'https://www.fpds.gov/ezsearch/search.do?q=Riverstone+Solutions', retrieved_at: '2026-05-29T06:00:00.000Z' }],
     recent_awards: [],
     recent_awards_sources: [],
     teaming_history: [],
@@ -91,6 +95,7 @@ const PARTNERS: Record<string, PartnerProfile> = {
     primary_naics: '611430',
     primary_naics_sources: [{ ...SAM_SOURCE, url: 'https://sam.gov/entity/pd-systems', title: 'SAM.gov PD Systems Entity' }],
     capabilities: ['XR/AR/VR Training', 'Digital Twin Platforms', 'LVC Integration', 'Simulation', 'Immersive Training'],
+    capabilities_sources: [{ ...SAM_SOURCE, url: 'https://sam.gov/entity/pd-systems', title: 'SAM.gov PD Systems Capabilities' }],
     certifications: [
       { name: 'V3 Veteran', status: 'active', expiration_date: null },
       { name: 'SDB', status: 'active', expiration_date: null },
@@ -99,6 +104,7 @@ const PARTNERS: Record<string, PartnerProfile> = {
     vehicles: [],
     vehicles_sources: [],
     past_performance_summary: 'Training-focused integrator with 300+ headcount. V3 Veteran certified — strengthens bids requiring veteran preference. XR/AR/VR depth fills immersive training gaps.',
+    past_performance_summary_sources: [{ ...SAM_SOURCE, url: 'https://sam.gov/entity/pd-systems', title: 'SAM.gov PD Systems Past Performance' }],
     recent_awards: [],
     recent_awards_sources: [],
     teaming_history: [],

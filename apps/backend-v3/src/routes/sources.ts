@@ -1,3 +1,6 @@
+import { URL } from 'node:url';
+import { isIP } from 'node:net';
+import dns from 'node:dns/promises';
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
@@ -6,8 +9,7 @@ import { invalidateAllCaches } from '../services/launchpad/cache.js';
 
 const VALID_KINDS = [
   'sam_gov', 'fpds', 'usaspending', 'govwin',
-  'govtribe', 'news', 'doctrine', 'partner_site',
-  'internal', 'manual', 'n8n_workflow',
+  'news', 'doctrine', 'partner_site', 'internal',
 ] as const;
 
 type SourceKind = typeof VALID_KINDS[number];
@@ -31,8 +33,41 @@ interface CreateSourceBody {
   meta?: Record<string, unknown>;
 }
 
+const PRIVATE_RANGES = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^0\./,
+  /^::1$/,
+  /^fd/i,
+  /^fe80/i,
+];
+
+function isPrivateIp(ip: string): boolean {
+  return PRIVATE_RANGES.some((r) => r.test(ip));
+}
+
 async function checkUrlReachable(url: string): Promise<{ reachable: boolean; warning?: string }> {
   try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { reachable: false, warning: 'Only http and https URLs are allowed' };
+    }
+
+    const hostname = parsed.hostname;
+    if (isIP(hostname)) {
+      if (isPrivateIp(hostname)) {
+        return { reachable: false, warning: 'Private/internal IP addresses are not allowed' };
+      }
+    } else {
+      const addresses = await dns.resolve4(hostname).catch(() => [] as string[]);
+      if (addresses.some(isPrivateIp)) {
+        return { reachable: false, warning: 'Hostname resolves to a private/internal IP' };
+      }
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(url, {
@@ -42,7 +77,7 @@ async function checkUrlReachable(url: string): Promise<{ reachable: boolean; war
     });
     clearTimeout(timeout);
     if (res.ok) return { reachable: true };
-    return { reachable: false, warning: `URL returned status ${res.status}` };
+    return { reachable: false, warning: 'URL not reachable' };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return { reachable: false, warning: `URL unreachable: ${message}` };

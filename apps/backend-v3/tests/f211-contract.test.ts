@@ -244,16 +244,30 @@ describe('Contract: GET /v3/launchpad/summary', () => {
 });
 
 describe('Contract: GET /v3/launchpad/flags', () => {
-  it('returns SuccessEnvelope with flags array', async () => {
+  it('returns SuccessEnvelope with flags array and R1 sources on counts', async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/v3/launchpad/flags',
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as SuccessBody<{ flags: unknown[] }>;
+    const body = JSON.parse(res.body) as SuccessBody<{
+      flags: unknown[];
+      compliance_gaps: number;
+      compliance_gaps_sources: unknown[];
+      teaming_unresolved: number;
+      teaming_unresolved_sources: unknown[];
+      analysis_timeouts_24h: number;
+      analysis_timeouts_24h_sources: unknown[];
+    }>;
     assertSuccessEnvelope(body);
     expect(Array.isArray(body.data.flags)).toBe(true);
+    expect(typeof body.data.compliance_gaps).toBe('number');
+    expect(Array.isArray(body.data.compliance_gaps_sources)).toBe(true);
+    expect(typeof body.data.teaming_unresolved).toBe('number');
+    expect(Array.isArray(body.data.teaming_unresolved_sources)).toBe(true);
+    expect(typeof body.data.analysis_timeouts_24h).toBe('number');
+    expect(Array.isArray(body.data.analysis_timeouts_24h_sources)).toBe(true);
   });
 
   it('returns X-Cache-Hit header', async () => {
@@ -399,12 +413,18 @@ describe('Contract: GET /v3/partners/:id', () => {
       display_name: string;
       certifications: { name: string }[];
       capabilities: string[];
+      capabilities_sources: unknown[];
+      past_performance_summary_sources: unknown[];
     }>;
     assertSuccessEnvelope(body);
     expect(body.data.id).toBe('riverstone');
     expect(body.data.display_name).toBe('Riverstone Solutions');
     expect(body.data.certifications.length).toBeGreaterThan(0);
     expect(body.data.capabilities.length).toBeGreaterThan(0);
+    expect(Array.isArray(body.data.capabilities_sources)).toBe(true);
+    expect(body.data.capabilities_sources.length).toBeGreaterThan(0);
+    expect(typeof body.data.past_performance_summary_sources).not.toBe('undefined');
+    expect(Array.isArray(body.data.past_performance_summary_sources)).toBe(true);
   });
 
   it('returns pd_systems partner detail', async () => {

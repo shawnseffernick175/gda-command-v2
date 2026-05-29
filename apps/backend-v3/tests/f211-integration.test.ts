@@ -288,14 +288,14 @@ describe('Integration: source register with unreachable URL', () => {
       url: '/v3/sources',
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({
-        kind: 'manual',
+        kind: 'internal',
         title: 'F211 Test Unreachable',
         url: 'http://192.0.2.1:1/unreachable',
       }),
     });
     expect(res.statusCode).toBe(201);
     const body = JSON.parse(res.body) as { data: { warning?: string; source: { kind: string } } };
-    expect(body.data.source.kind).toBe('manual');
+    expect(body.data.source.kind).toBe('internal');
     expect(body.data.warning).toBeDefined();
     expect(typeof body.data.warning).toBe('string');
   });
