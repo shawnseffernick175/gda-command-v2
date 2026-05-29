@@ -48,9 +48,9 @@ async function getV3Counts(pool: pg.Pool): Promise<MigrationCounts> {
   };
 
   const tables: [keyof MigrationCounts, string][] = [
-    ['opportunities', 'opportunities'],
-    ['captures', 'captures'],
-    ['action_items', 'action_items'],
+    ['opportunities', 'v3_opportunities'],
+    ['captures', 'v3_captures'],
+    ['action_items', 'v3_action_items'],
     ['sources', 'sources'],
     ['partners', 'migration_partners'],
   ];
@@ -76,7 +76,7 @@ async function getFieldCoverage(pool: pg.Pool): Promise<FieldCoverageRow[]> {
   for (const field of analysisFields) {
     try {
       const withValueRes = await pool.query<{ count: string }>(
-        `SELECT COUNT(*)::text AS count FROM opportunities
+        `SELECT COUNT(*)::text AS count FROM v3_opportunities
          WHERE analysis IS NOT NULL
          AND analysis->$1 IS NOT NULL
          AND analysis->>$1 != 'null'`,
@@ -86,7 +86,7 @@ async function getFieldCoverage(pool: pg.Pool): Promise<FieldCoverageRow[]> {
 
       const sourcesField = `${field}_sources`;
       const withSourcesRes = await pool.query<{ count: string }>(
-        `SELECT COUNT(*)::text AS count FROM opportunities
+        `SELECT COUNT(*)::text AS count FROM v3_opportunities
          WHERE analysis IS NOT NULL
          AND analysis->$1 IS NOT NULL
          AND analysis->>$1 != 'null'

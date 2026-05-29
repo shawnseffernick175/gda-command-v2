@@ -47,7 +47,7 @@ async function ensureMigrationTables(client: pg.PoolClient): Promise<void> {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS opportunities (
+    CREATE TABLE IF NOT EXISTS v3_opportunities (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       title TEXT NOT NULL,
       agency TEXT,
@@ -84,12 +84,12 @@ async function ensureMigrationTables(client: pg.PoolClient): Promise<void> {
   `);
 
   await client.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_opportunities_legacy_id
-    ON opportunities (legacy_id) WHERE legacy_id IS NOT NULL
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_v3_opportunities_legacy_id
+    ON v3_opportunities (legacy_id) WHERE legacy_id IS NOT NULL
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS captures (
+    CREATE TABLE IF NOT EXISTS v3_captures (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       opportunity_id UUID NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
@@ -103,12 +103,12 @@ async function ensureMigrationTables(client: pg.PoolClient): Promise<void> {
   `);
 
   await client.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_captures_legacy_id
-    ON captures (legacy_id) WHERE legacy_id IS NOT NULL
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_v3_captures_legacy_id
+    ON v3_captures (legacy_id) WHERE legacy_id IS NOT NULL
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS action_items (
+    CREATE TABLE IF NOT EXISTS v3_action_items (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       title TEXT NOT NULL,
       detail TEXT,
@@ -127,8 +127,8 @@ async function ensureMigrationTables(client: pg.PoolClient): Promise<void> {
   `);
 
   await client.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_action_items_legacy_id
-    ON action_items (legacy_id) WHERE legacy_id IS NOT NULL
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_v3_action_items_legacy_id
+    ON v3_action_items (legacy_id) WHERE legacy_id IS NOT NULL
   `);
 
   await client.query(`
@@ -162,7 +162,7 @@ export async function loadOpportunities(
   let count = 0;
   for (const r of records) {
     await client.query(
-      `INSERT INTO opportunities (
+      `INSERT INTO v3_opportunities (
         id, title, agency, sub_agency, solicitation_number, sam_notice_id,
         status, grade, grade_evidence, value_min, value_max, naics, psc,
         set_aside, place_of_performance, response_due_at, posted_at,
@@ -200,9 +200,9 @@ export async function loadOpportunities(
         qualified_at = EXCLUDED.qualified_at,
         qualified_by = EXCLUDED.qualified_by,
         updated_at = CASE
-          WHEN EXCLUDED.updated_at > opportunities.updated_at
+          WHEN EXCLUDED.updated_at > v3_opportunities.updated_at
           THEN EXCLUDED.updated_at
-          ELSE opportunities.updated_at
+          ELSE v3_opportunities.updated_at
         END`,
       [
         r.id, r.title, r.agency, r.sub_agency, r.solicitation_number,
@@ -226,7 +226,7 @@ export async function loadCaptures(
   let count = 0;
   for (const r of records) {
     await client.query(
-      `INSERT INTO captures (
+      `INSERT INTO v3_captures (
         id, opportunity_id, status, analysis, analysis_version,
         ai_analyzed_at, legacy_id, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -238,9 +238,9 @@ export async function loadCaptures(
         analysis_version = EXCLUDED.analysis_version,
         ai_analyzed_at = EXCLUDED.ai_analyzed_at,
         updated_at = CASE
-          WHEN EXCLUDED.updated_at > captures.updated_at
+          WHEN EXCLUDED.updated_at > v3_captures.updated_at
           THEN EXCLUDED.updated_at
-          ELSE captures.updated_at
+          ELSE v3_captures.updated_at
         END`,
       [
         r.id, r.opportunity_id, r.status,
@@ -261,7 +261,7 @@ export async function loadActionItems(
   let count = 0;
   for (const r of records) {
     await client.query(
-      `INSERT INTO action_items (
+      `INSERT INTO v3_action_items (
         id, title, detail, owner, status, due_date, source, source_id,
         linked_record_type, linked_record_id, completed_at,
         legacy_id, created_at, updated_at
@@ -281,7 +281,7 @@ export async function loadActionItems(
         updated_at = CASE
           WHEN EXCLUDED.updated_at > action_items.updated_at
           THEN EXCLUDED.updated_at
-          ELSE action_items.updated_at
+          ELSE v3_action_items.updated_at
         END`,
       [
         r.id, r.title, r.detail, r.owner, r.status, r.due_date,
