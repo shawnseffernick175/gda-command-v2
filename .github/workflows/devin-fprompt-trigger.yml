@@ -1,0 +1,93 @@
+name: Devin F-Prompt Auto-Trigger
+
+# Fires a Devin session when an issue is labeled `devin-ready`.
+# The issue body must include the F-prompt path. The macro `!fprompt <number>` in the issue body
+# is recognized by the Devin playbook to read the right file from the repo.
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  start-devin:
+    if: github.event.label.name == 'devin-ready'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Build Devin prompt from issue body
+        id: build
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          # Compose the prompt that goes to Devin's session.
+          # We prepend a stable header so Devin reads canonical docs first,
+          # then we append the issue body (which should contain the !fprompt macro).
+          PROMPT=$(cat <<EOF
+          You were triggered automatically by GitHub issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
+
+          Issue URL: ${ISSUE_URL}
+
+          === HARD RULES ===
+          - Repo: shawnseffernick175/gda-command-v2
+          - Always read these canonical docs FIRST, in this order:
+            1. docs/canonical/aesthetics_canonical_v1.md
+            2. docs/canonical/gda_company_profile_v1.md
+            3. docs/canonical/tool_ownership_model_v1.md
+            4. docs/canonical/doctrine_to_doors_map.md
+            5. docs/canonical/partner_intel_spec_v1.md
+          - Open one PR per F-prompt. CI must be 5/5 green before review.
+          - Match branch name and PR title to the prompt file's header.
+          - Forbidden tokens: #0f1117, #1a1d27, #3b82f6, JetBrains Mono, inline style={...} for colors.
+
+          === ISSUE BODY (the request) ===
+          ${ISSUE_BODY}
+          EOF
+          )
+          # JSON-escape and store
+          ESCAPED=$(jq -Rs . <<< "$PROMPT")
+          echo "prompt=$ESCAPED" >> "$GITHUB_OUTPUT"
+
+      - name: Start Devin session
+        id: devin
+        env:
+          DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+          PROMPT_JSON: ${{ steps.build.outputs.prompt }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer ${DEVIN_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{\"prompt\": ${PROMPT_JSON}, \"idempotent\": true}" \
+            "https://api.devin.ai/v1/sessions")
+
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+          echo "HTTP $STATUS"
+          echo "$BODY"
+
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ]; then
+            echo "Devin API call failed."
+            exit 1
+          fi
+
+          SESSION_URL=$(echo "$BODY" | jq -r '.url // .session_url // ""')
+          SESSION_ID=$(echo "$BODY" | jq -r '.session_id // .id // ""')
+
+          echo "session_url=$SESSION_URL" >> "$GITHUB_OUTPUT"
+          echo "session_id=$SESSION_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Comment session link back on the issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --body "🤖 Devin session started: ${{ steps.devin.outputs.session_url }}
+
+          Session ID: \`${{ steps.devin.outputs.session_id }}\`
+
+          The session will read the canonical docs, follow the F-prompt referenced in this issue, and open a PR when CI is green."
