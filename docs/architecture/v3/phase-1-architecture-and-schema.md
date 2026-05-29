@@ -948,3 +948,118 @@ V3 does not target high availability (no read replicas, no multi-AZ). The user b
 | 10 | `audit_log` replaces `record_version` trigger system | `record_version` was 26 MB (16,425 rows) with duplicate trigger bugs |
 | 11 | Side-by-side container topology with Traefik routing for cutover | Need instant rollback capability during 30-day soak |
 | 12 | `partners` as 2-row lookup table with JSONB certs/vehicles | Partner data is lookup-only; no need for normalized partner sub-tables |
+
+
+## Addendum A — No-Degradation Mandate (R2 Hardening)
+
+**Date:** 2026-05-29
+**Binding rule:** The user has explicitly stated: "I do not want a degraded tool. I laid out what I want, now let's get there."
+
+This addendum amends Section 5 (Auto-analysis model) to eliminate every code path that could expose the user to placeholder, pending, stale, or "unavailable" analysis state.
+
+---
+
+### A.1 R2 invariant (binding, non-negotiable)
+
+> **When the user opens an opportunity detail page, the analysis block in the response is always populated with fresh data. No placeholder. No `null`. No "running" status. No "stale: true" flag. No polling. No 30-second timeout fallback.**
+
+This replaces Section 5.2 steps 4-5 and Section 5.4 verbatim. The "analysis_status" field is removed from the API contract. The frontend polling loop is removed.
+
+---
+
+### A.2 Pre-warm policy
+
+Analysis runs proactively at every event that could change the analysis result. The detail endpoint is **never** the first place analysis runs.
+
+| Event | Action |
+|---|---|
+| n8n webhook upserts an opportunity (`POST /api/v3/webhooks/sam-opportunity` and any future opp-creating webhooks) | Enqueue analysis job for the upserted opportunity immediately upon transaction commit. |
+| Manual opportunity create (`POST /api/v3/opportunities`) | Enqueue analysis job immediately upon transaction commit. Return 201 with the opportunity record; analysis job runs async. |
+| Opportunity update (`PATCH /api/v3/opportunities/:id`) | If any field in the analysis-affecting set changed (`title`, `agency`, `sub_agency`, `solicitation_number`, `sam_notice_id`, `naics`, `psc`, `set_aside`, `value_min`, `value_max`, `incumbent`, `description`, `tags`, `response_due_at`), enqueue re-analysis on commit. |
+| Source data changes (`opportunities.source_id` changes) | Enqueue re-analysis on commit. |
+| Analysis model version bump (config constant changes) | Background job sweeps all opportunities where `analysis_version != current_version` and re-analyzes them, oldest first. Job runs at server boot and on a 6-hour cron. |
+| Periodic refresh | Background job sweeps all opportunities where `ai_analyzed_at < NOW() - INTERVAL '24 hours'` and re-analyzes them. Job runs every 6 hours. |
+
+**Net effect:** by the time a user opens a detail page, the analysis JSONB is already populated and fresh in 99%+ of cases.
+
+---
+
+### A.3 Detail endpoint behavior (synchronous block — no polling)
+
+Replaces Section 5.2:
+
+```
+GET /api/v3/opportunities/:id
+
+Algorithm:
+1. SELECT opportunity row including analysis, analysis_version, ai_analyzed_at, updated_at.
+2. Determine freshness:
+   - cache_fresh = (analysis IS NOT NULL)
+                   AND (analysis_version = CURRENT_ANALYSIS_VERSION)
+                   AND (ai_analyzed_at >= updated_at)
+3. IF cache_fresh:
+     Return opportunity with analysis populated. Target p50 < 50ms.
+4. IF NOT cache_fresh:
+     a. Check pg-boss for an existing analysis job for this opportunity_id with state 'created' or 'active'.
+     b. IF a job is in flight:
+          Wait up to 10 seconds for job completion (poll job state with 100ms backoff).
+        ELSE:
+          Enqueue a new analysis job with priority=HIGH and wait up to 10 seconds for completion.
+     c. On completion: re-read the opportunity row, return with populated analysis.
+     d. IF the 10-second wait elapses without completion:
+          Return HTTP 503 with error code 'ANALYSIS_TIMEOUT'.
+          Do NOT return the opportunity with null analysis.
+          Do NOT return the opportunity with stale analysis.
+          The frontend treats 503 as a retryable error and re-issues the request after 2 seconds.
+```
+
+**Why 503 instead of degraded response:** A 503 is a clear signal that the system is not ready to serve this view. The frontend retries (with backoff) until success. The user never sees a half-populated detail page. This matches the user's mandate: no degraded tool.
+
+**Backstop:** Pre-warm policy (A.2) ensures cache misses are vanishingly rare. The 503 path exists only for the cold-start moment after a deploy or for opportunities that have never been opened before the analyzer caught up.
+
+---
+
+### A.4 Job queue: pg-boss from day one
+
+Replaces Section 9 Question 4 default ("in-process async"). The binding decision is:
+
+- **Job runner:** `pg-boss` (Postgres-backed job queue).
+- **Rationale:** In-process fire-and-forget loses jobs on container restart, has no retry, no priority, no observability. pg-boss has all four. Single-operator scale is irrelevant — the cost of pg-boss is negligible and the correctness gain is large.
+- **Queues:**
+  - `analysis-opportunity` (priority HIGH for detail-endpoint-triggered jobs, NORMAL for pre-warm)
+  - `analysis-capture` (same model for capture detail endpoints)
+  - `ingest-postprocess` (for webhook side-effects beyond the initial upsert)
+- **Concurrency:** Single worker per queue initially. Configurable per queue. Workers run in the same `gda-backend-v3` container — no separate worker container needed at single-operator scale.
+- **Observability:** pg-boss exposes job state in Postgres tables (`pgboss.job`). Admin endpoint `GET /api/v3/admin/jobs` surfaces queue depth and active jobs for the operator.
+
+---
+
+### A.5 Removed concepts (do not implement)
+
+The following are explicitly forbidden in the V3 implementation:
+
+- `analysis_status` field in any API response.
+- `"running"` / `"pending"` / `"not_yet_analyzed"` values anywhere in the API surface.
+- `stale: true` flag in analysis responses.
+- Frontend polling for analysis completion.
+- 30-second client-side "analysis unavailable" fallback view.
+- Returning `analysis: null` from the detail endpoint under any condition.
+
+---
+
+### A.6 Test coverage (F-204 amendment trigger)
+
+The F-204 test strategy gates the following CI checks against the rules in this addendum. These are added on top of the existing F-204 R2 gates:
+
+1. **R2 freshness gate:** For every detail endpoint, CI creates a record, calls the detail endpoint, and asserts `analysis` is populated within the 10-second SLA. No `analysis: null`. No `analysis_status: "running"`. No `stale: true`.
+2. **R2 pre-warm gate:** CI inserts an opportunity via the ingest webhook, polls pg-boss until the analysis job completes, then calls the detail endpoint and asserts `analysis` is populated with `ai_analyzed_at >= opportunity.created_at`.
+3. **R2 update gate:** CI updates an analysis-affecting field via PATCH, polls pg-boss until the re-analysis job completes, asserts `ai_analyzed_at >= updated_at`.
+4. **R2 503 contract gate:** CI artificially stalls a job to exceed the 10-second SLA, asserts the detail endpoint returns HTTP 503 with `ANALYSIS_TIMEOUT` code (never a degraded 200 response).
+
+A follow-up commit to F-204 will codify these gates in `docs/architecture/v3/phase-1-test-strategy.md` Section 7 (R2 auto-analysis CI).
+
+---
+
+### A.7 Backwards compatibility
+
+This addendum supersedes any conflicting language in Section 5 and Section 9 Question 4 of the parent document. Where the parent document and this addendum conflict, the addendum governs.
