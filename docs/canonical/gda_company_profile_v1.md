@@ -215,7 +215,7 @@ External brand pillars are **Enable / Protect / Train**. Each OU is P&L-accounta
 ## 10. Open Items / Data Gaps to Close
 
 1. ✅ **PD Systems UEI/CAGE** captured: UEI MBF6MBLZLMC3 · CAGE 4V8V7.
-2. ⏸️ **Riverstone UEI** — CAGE 71WX3 confirmed via SHIELD awardee list; UEI deferred (user will provide).
+2. ✅ **Riverstone UEI** — `TECGLUBFP6N6` (12-char alphanumeric). Confirmed via FPDS ATOM feed for contract HQ085926DF469 and USAspending recipient children endpoint (DUNS 933887031). Same entity as CAGE 71WX3. SAM registration active through 2026-06-08. Legal name: RIVERSTONE SOLUTIONS, INC. Address: 641 Wynn Dr NW Ste 102B, Huntsville, AL 35816. SBA certs: WOSB, HUBZone (SBA-certified, monitor for July 2026 redesignated-area expiry), Self-Certified SDB.
 3. ⚠️ **Envision FY26 revenue target** — currently `[Insert]`. OU3 is $38.4M; if enterprise is $70.1M, OU1+OU2 share = ~$31.7M.
 4. ⚠️ **CIO-SP3 SB/8(a) expired 4/29/2026** — Day-1 banner on Sentinel + Launchpad.
 5. ⚠️ **CMMI ML3 expires 8/7/2026** — Day-1 banner; recert plan needed.
