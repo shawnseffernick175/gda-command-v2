@@ -1,3 +1,6 @@
+import SourceBadge from "../SourceBadge";
+import type { SourceRef } from "../opportunity/FieldWithSource";
+
 interface Draft {
   id: number;
   action_item_id: number;
@@ -11,11 +14,15 @@ interface ActionItem {
   id: number;
   ou_tag: string;
   title: string;
+  title_sources?: SourceRef[];
   detail: string | null;
+  detail_sources?: SourceRef[];
   owner_email: string;
+  owner_email_sources?: SourceRef[];
   source: string;
   source_id: string | null;
   due_date: string | null;
+  due_date_sources?: SourceRef[];
   due_inferred_from: string | null;
   status: string;
   created_at: string;
@@ -39,6 +46,36 @@ const SOURCE_LABELS: Record<string, string> = {
   sentinel: "Sentinel",
   launchpad: "Launchpad",
 };
+
+const KIND_TO_SOURCE_MAP: Record<string, string> = {
+  sam_gov: "sam.gov",
+  fpds: "fpds",
+  usaspending: "usaspending",
+  govwin: "govwin",
+  internal: "manual",
+  news: "manual",
+  doctrine: "manual",
+  partner_site: "manual",
+};
+
+function InlineSources({ sources }: { sources: SourceRef[] }) {
+  if (!sources || sources.length === 0) return null;
+  if (sources.length === 1) {
+    return (
+      <a href={sources[0].url} target="_blank" rel="noopener noreferrer" title={sources[0].title}>
+        <SourceBadge source={KIND_TO_SOURCE_MAP[sources[0].kind] ?? "manual"} hideManual={false} size="sm" />
+      </a>
+    );
+  }
+  return (
+    <SourceBadge
+      source={`${sources.length} sources`}
+      hideManual={false}
+      size="sm"
+      sources={sources}
+    />
+  );
+}
 
 const KIND_LABELS: Record<string, string> = {
   reply: "Reply",
@@ -88,8 +125,9 @@ export default function ActionItemRow({
         onClick={onToggle}
       >
         <div className="flex items-center gap-4">
-          <span className="text-body text-ink font-medium flex-1 truncate">
+          <span className="text-body text-ink font-medium flex-1 truncate inline-flex items-center gap-1">
             {item.title}
+            {item.title_sources && <InlineSources sources={item.title_sources} />}
           </span>
           <span className="text-caption text-muted px-2 py-0.5 rounded border border-border bg-white">
             {item.owner_email}

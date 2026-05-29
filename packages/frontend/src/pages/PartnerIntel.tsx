@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { authenticatedFetch } from "../api/auth";
+import SourceBadge from "../components/SourceBadge";
+import type { SourceRef } from "../components/opportunity/FieldWithSource";
 
 interface PartnerProfile {
   ou_tag: string;
@@ -44,9 +46,13 @@ interface Award {
   id: number;
   partner_ou_tag: string;
   contract_id: string | null;
+  contract_id_sources?: SourceRef[];
   customer: string | null;
+  customer_sources?: SourceRef[];
   value: number | null;
+  value_sources?: SourceRef[];
   awarded_at: string | null;
+  awarded_at_sources?: SourceRef[];
   source: string;
 }
 
@@ -143,6 +149,48 @@ const REASON_DESCRIPTIONS: Record<string, (partner: string, count: number) => st
   scope_overflow: (_p, n) => `${n} opp${n !== 1 ? "s" : ""} flagged for scope overflow.`,
   de_confliction: (_p, n) => `${n} opp${n !== 1 ? "s" : ""} require de-confliction with partner activity.`,
 };
+
+const KIND_TO_SOURCE: Record<string, string> = {
+  sam_gov: "sam.gov",
+  fpds: "fpds",
+  usaspending: "usaspending",
+  govwin: "govwin",
+  internal: "manual",
+  news: "manual",
+  doctrine: "manual",
+  partner_site: "manual",
+};
+
+function InlineSources({ sources }: { sources: SourceRef[] }) {
+  if (!sources || sources.length === 0) return null;
+  if (sources.length === 1) {
+    return (
+      <a href={sources[0].url} target="_blank" rel="noopener noreferrer" title={sources[0].title}>
+        <SourceBadge source={KIND_TO_SOURCE[sources[0].kind] ?? "manual"} hideManual={false} size="sm" />
+      </a>
+    );
+  }
+  const maxVisible = 3;
+  if (sources.length <= maxVisible) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        {sources.map((s, i) => (
+          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" title={s.title}>
+            <SourceBadge source={KIND_TO_SOURCE[s.kind] ?? "manual"} hideManual={false} size="sm" />
+          </a>
+        ))}
+      </span>
+    );
+  }
+  return (
+    <SourceBadge
+      source={`${sources.length} sources`}
+      hideManual={false}
+      size="sm"
+      sources={sources}
+    />
+  );
+}
 
 function PartnerCard({ profile }: { profile: PartnerProfile }) {
   return (
@@ -369,10 +417,30 @@ export default function PartnerIntel() {
               {filteredAwards.map((a) => (
                 <tr key={a.id} className="border-b border-border">
                   <td className="py-2 pr-3">{a.partner_ou_tag === "riverstone" ? "Riverstone" : "PD Systems"}</td>
-                  <td className="py-2 pr-3 text-caption num">{a.contract_id ?? "—"}</td>
-                  <td className="py-2 pr-3">{a.customer ?? "—"}</td>
-                  <td className="py-2 pr-3 text-right num">{formatCurrency(a.value)}</td>
-                  <td className="py-2 pr-3 num">{formatDateEST(a.awarded_at)}</td>
+                  <td className="py-2 pr-3 text-caption num">
+                    <span className="inline-flex items-center gap-1">
+                      {a.contract_id ?? "—"}
+                      {a.contract_id_sources && <InlineSources sources={a.contract_id_sources} />}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <span className="inline-flex items-center gap-1">
+                      {a.customer ?? "—"}
+                      {a.customer_sources && <InlineSources sources={a.customer_sources} />}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3 text-right num">
+                    <span className="inline-flex items-center gap-1 justify-end">
+                      {formatCurrency(a.value)}
+                      {a.value_sources && <InlineSources sources={a.value_sources} />}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-3 num">
+                    <span className="inline-flex items-center gap-1">
+                      {formatDateEST(a.awarded_at)}
+                      {a.awarded_at_sources && <InlineSources sources={a.awarded_at_sources} />}
+                    </span>
+                  </td>
                   <td className="py-2 text-caption">{a.source}</td>
                 </tr>
               ))}

@@ -2,6 +2,10 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
+import { attachSources } from "../lib/source-validator";
+import type { SourceRef } from "../lib/source-validator";
+import { fpdsUrl } from "../services/sources/fpds";
+import { usaspendingUrl } from "../services/sources/usaspending";
 
 const router = Router();
 
@@ -225,9 +229,32 @@ router.get("/awards", async (req, res) => {
       [...params, limit, offset],
     );
 
+    const now = new Date().toISOString();
+    const sourcedAwards = dataResult.rows.map((row: Record<string, unknown>) => {
+      const contractId = row.contract_id ? String(row.contract_id) : null;
+      const fpdsSource: SourceRef[] = contractId
+        ? [{ kind: "fpds", title: `FPDS ${contractId}`, url: fpdsUrl(contractId), retrieved_at: now }]
+        : [];
+      const usaSource: SourceRef[] = contractId
+        ? [{ kind: "usaspending", title: `USAspending ${contractId}`, url: usaspendingUrl(contractId), retrieved_at: now }]
+        : [];
+      const combinedSources = [...fpdsSource, ...usaSource];
+
+      const fieldMap: Record<string, SourceRef[]> = {
+        contract_id: combinedSources,
+        customer: combinedSources,
+        value: combinedSources,
+        awarded_at: combinedSources,
+      };
+
+      return attachSources(row, fieldMap, [
+        "partner_ou_tag", "source", "created_at", "updated_at",
+      ]);
+    });
+
     res.json(
       successEnvelope("partner-intel", "awards", {
-        awards: dataResult.rows,
+        awards: sourcedAwards,
         total: Number(countResult.rows[0].count),
         page: Number(page) || 1,
         per_page: limit,

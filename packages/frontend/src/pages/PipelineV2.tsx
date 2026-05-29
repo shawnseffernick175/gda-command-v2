@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { authenticatedFetch } from "../api/auth";
+import SourceBadge from "../components/SourceBadge";
+import type { SourceRef } from "../components/opportunity/FieldWithSource";
 
 interface PipelineItem {
   id: number;
@@ -13,13 +15,24 @@ interface PipelineItem {
   created_at: string;
   updated_at: string;
   opportunity_title: string;
+  opportunity_title_sources?: SourceRef[];
   opportunity_agency: string | null;
+  opportunity_agency_sources?: SourceRef[];
   opportunity_naics: string | null;
+  opportunity_naics_sources?: SourceRef[];
   opportunity_set_aside: string | null;
+  opportunity_set_aside_sources?: SourceRef[];
   opportunity_due_at: string | null;
+  opportunity_due_at_sources?: SourceRef[];
   opportunity_value_min: number | null;
+  opportunity_value_min_sources?: SourceRef[];
   opportunity_value_max: number | null;
+  opportunity_value_max_sources?: SourceRef[];
   opportunity_grade: string | null;
+  opportunity_grade_sources?: SourceRef[];
+  capture_owner_sources?: SourceRef[];
+  win_prob_pct_sources?: SourceRef[];
+  win_prob_evidence_sources?: SourceRef[];
 }
 
 interface Milestone {
@@ -74,6 +87,48 @@ function MilestoneStatus({ milestone }: { milestone: Milestone }) {
         {isDone ? "Done" : isPastDue ? "Overdue" : "Pending"}
       </span>
     </div>
+  );
+}
+
+const KIND_TO_SOURCE: Record<string, string> = {
+  sam_gov: "sam.gov",
+  fpds: "fpds",
+  usaspending: "usaspending",
+  govwin: "govwin",
+  internal: "manual",
+  news: "manual",
+  doctrine: "manual",
+  partner_site: "manual",
+};
+
+function InlineSources({ sources }: { sources: SourceRef[] }) {
+  if (!sources || sources.length === 0) return null;
+  if (sources.length === 1) {
+    return (
+      <a href={sources[0].url} target="_blank" rel="noopener noreferrer" title={sources[0].title}>
+        <SourceBadge source={KIND_TO_SOURCE[sources[0].kind] ?? "manual"} hideManual={false} size="sm" />
+      </a>
+    );
+  }
+  const maxVisible = 3;
+  if (sources.length <= maxVisible) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        {sources.map((s, i) => (
+          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" title={s.title}>
+            <SourceBadge source={KIND_TO_SOURCE[s.kind] ?? "manual"} hideManual={false} size="sm" />
+          </a>
+        ))}
+      </span>
+    );
+  }
+  return (
+    <SourceBadge
+      source={`${sources.length} sources`}
+      hideManual={false}
+      size="sm"
+      sources={sources}
+    />
   );
 }
 
@@ -281,6 +336,9 @@ export default function PipelineV2() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-body font-semibold text-accent">{item.opportunity_title}</span>
+                    {item.opportunity_title_sources && item.opportunity_title_sources.length > 0 && (
+                      <InlineSources sources={item.opportunity_title_sources} />
+                    )}
                     {item.opportunity_grade && (
                       <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-semibold ${item.opportunity_grade === "A" ? "bg-green-700 text-white" : item.opportunity_grade === "B" ? "bg-amber-600 text-white" : "bg-red-700 text-white"}`}>
                         {item.opportunity_grade}
@@ -288,13 +346,20 @@ export default function PipelineV2() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-4 text-caption text-muted">
-                    <span>Owner: <span className="text-ink font-medium">{item.capture_owner}</span></span>
-                    <span>Due {formatDateEST(item.opportunity_due_at)}</span>
+                    <span className="inline-flex items-center gap-1">Owner: <span className="text-ink font-medium">{item.capture_owner}</span>
+                      {item.capture_owner_sources && <InlineSources sources={item.capture_owner_sources} />}
+                    </span>
+                    <span className="inline-flex items-center gap-1">Due {formatDateEST(item.opportunity_due_at)}
+                      {item.opportunity_due_at_sources && <InlineSources sources={item.opportunity_due_at_sources} />}
+                    </span>
                     <span>Milestones: <span className="num">{item.milestones.length}</span></span>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <WinProbBar pct={item.win_prob_pct} />
+                  <span className="inline-flex items-center gap-1">
+                    <WinProbBar pct={item.win_prob_pct} />
+                    {item.win_prob_pct_sources && <InlineSources sources={item.win_prob_pct_sources} />}
+                  </span>
                   {item.teaming_partners.length > 0 && (
                     <div className="flex gap-1">
                       {item.teaming_partners.map((p) => (

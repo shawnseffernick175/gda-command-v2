@@ -2,6 +2,9 @@ import { Router } from "express";
 import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
+import { attachSources } from "../lib/source-validator";
+import type { SourceRef } from "../lib/source-validator";
+import { samGovUrl } from "../services/sources/sam-gov";
 
 const router = Router();
 
@@ -74,10 +77,37 @@ router.get("/", async (req, res) => {
       params,
     );
 
+    const now = new Date().toISOString();
+    const sourcedItems = result.rows.map((row: Record<string, unknown>) => {
+      const samNoticeId = row.opportunity_id ? String(row.opportunity_id) : null;
+      const samSource: SourceRef[] = samNoticeId
+        ? [{ kind: "sam_gov", title: `SAM.gov Opportunity ${row.opportunity_title ?? samNoticeId}`, url: samGovUrl(samNoticeId), retrieved_at: now }]
+        : [];
+
+      const fieldMap: Record<string, SourceRef[]> = {
+        opportunity_title: samSource,
+        opportunity_agency: samSource,
+        opportunity_naics: samSource,
+        opportunity_set_aside: samSource,
+        opportunity_due_at: samSource,
+        opportunity_value_min: samSource,
+        opportunity_value_max: samSource,
+        opportunity_grade: samSource,
+        capture_owner: [{ kind: "internal", title: "Pipeline assignment", url: `/audit/edits/${row.id}`, retrieved_at: now }],
+        win_prob_pct: [{ kind: "internal", title: "Win probability assessment", url: `/audit/edits/${row.id}`, retrieved_at: now }],
+        win_prob_evidence: [{ kind: "internal", title: "Win probability evidence", url: `/audit/edits/${row.id}`, retrieved_at: now }],
+      };
+
+      return attachSources(row, fieldMap, [
+        "milestones", "teaming_partners", "created_at", "updated_at",
+        "opportunity_id",
+      ]);
+    });
+
     res.json(
       successEnvelope("pipeline-v2", "list", {
-        items: result.rows,
-        total: result.rows.length,
+        items: sourcedItems,
+        total: sourcedItems.length,
       }),
     );
   } catch (err) {

@@ -5,6 +5,8 @@ import ComplianceMatrix from "../components/capture/ComplianceMatrix";
 import ColorReviewStrip from "../components/capture/ColorReviewStrip";
 import PricingGuardrail from "../components/capture/PricingGuardrail";
 import TeamingWorksheetPanel from "../components/capture/TeamingWorksheetPanel";
+import SourceBadge from "../components/SourceBadge";
+import type { SourceRef } from "../components/opportunity/FieldWithSource";
 
 interface CaptureItem {
   id: number;
@@ -21,7 +23,9 @@ interface CaptureItem {
   updated_at: string;
   pipeline_capture_owner: string;
   opportunity_title: string;
+  opportunity_title_sources?: SourceRef[];
   opportunity_agency: string | null;
+  agency_sources?: SourceRef[];
 }
 
 interface PricingAssumptions {
@@ -49,6 +53,48 @@ const STAGE_LABELS: Record<string, string> = {
   gold: "Gold",
   submitted: "Submitted",
 };
+
+const KIND_TO_SOURCE: Record<string, string> = {
+  sam_gov: "sam.gov",
+  fpds: "fpds",
+  usaspending: "usaspending",
+  govwin: "govwin",
+  internal: "manual",
+  news: "manual",
+  doctrine: "manual",
+  partner_site: "manual",
+};
+
+function InlineSources({ sources }: { sources: SourceRef[] }) {
+  if (!sources || sources.length === 0) return null;
+  if (sources.length === 1) {
+    return (
+      <a href={sources[0].url} target="_blank" rel="noopener noreferrer" title={sources[0].title}>
+        <SourceBadge source={KIND_TO_SOURCE[sources[0].kind] ?? "manual"} hideManual={false} size="sm" />
+      </a>
+    );
+  }
+  const maxVisible = 3;
+  if (sources.length <= maxVisible) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        {sources.map((s, i) => (
+          <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" title={s.title}>
+            <SourceBadge source={KIND_TO_SOURCE[s.kind] ?? "manual"} hideManual={false} size="sm" />
+          </a>
+        ))}
+      </span>
+    );
+  }
+  return (
+    <SourceBadge
+      source={`${sources.length} sources`}
+      hideManual={false}
+      size="sm"
+      sources={sources}
+    />
+  );
+}
 
 function formatDateEST(d: string | null): string {
   if (!d) return "—";
@@ -200,13 +246,23 @@ export default function CaptureV2() {
               }`}
               onClick={() => handleSelectCapture(c)}
             >
-              <p className="text-body text-ink font-medium truncate">
-                {c.opportunity_title}
-              </p>
-              <p className="text-caption text-muted">
-                {c.opportunity_agency || "—"} &middot;{" "}
-                {STAGE_LABELS[c.color_review_stage] || c.color_review_stage}
-              </p>
+              <div className="flex items-center gap-1 mb-0.5">
+                <p className="text-body text-ink font-medium truncate">
+                  {c.opportunity_title}
+                </p>
+                {c.opportunity_title_sources && (
+                  <InlineSources sources={c.opportunity_title_sources} />
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <p className="text-caption text-muted">
+                  {c.opportunity_agency || "—"} &middot;{" "}
+                  {STAGE_LABELS[c.color_review_stage] || c.color_review_stage}
+                </p>
+                {c.agency_sources && (
+                  <InlineSources sources={c.agency_sources} />
+                )}
+              </div>
               <p className="text-caption text-muted">
                 {formatDateEST(c.updated_at)}
               </p>

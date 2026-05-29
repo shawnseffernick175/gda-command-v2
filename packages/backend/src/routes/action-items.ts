@@ -3,6 +3,8 @@ import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { log } from "../lib/logger";
 import { extractActionFromEmail, type EmailPayload } from "../lib/email-action-extractor";
+import { attachSources } from "../lib/source-validator";
+import type { SourceRef } from "../lib/source-validator";
 
 const router = Router();
 
@@ -90,10 +92,46 @@ router.get("/", async (req, res) => {
       params,
     );
 
+    const now = new Date().toISOString();
+    const sourcedItems = result.rows.map((row: Record<string, unknown>) => {
+      const itemSource = row.source as string | null;
+      const sourceId = row.source_id as string | null;
+      let citationSources: SourceRef[];
+
+      if (itemSource === "email" && sourceId) {
+        citationSources = [{
+          kind: "internal",
+          title: `Source email ${sourceId}`,
+          url: `/inbox/messages/${sourceId}`,
+          retrieved_at: now,
+        }];
+      } else {
+        citationSources = [{
+          kind: "internal",
+          title: `Manual entry`,
+          url: `/audit/edits/${row.id}`,
+          retrieved_at: now,
+        }];
+      }
+
+      const fieldMap: Record<string, SourceRef[]> = {
+        title: citationSources,
+        detail: citationSources,
+        owner_email: citationSources,
+        due_date: citationSources,
+      };
+
+      return attachSources(row, fieldMap, [
+        "source", "source_id", "due_inferred_from", "completed_at",
+        "linked_record_type", "linked_record_id", "drafts",
+        "created_at", "updated_at",
+      ]);
+    });
+
     res.json(
       successEnvelope("action-items", "list", {
-        items: result.rows,
-        total: result.rows.length,
+        items: sourcedItems,
+        total: sourcedItems.length,
       }),
     );
   } catch (err) {
