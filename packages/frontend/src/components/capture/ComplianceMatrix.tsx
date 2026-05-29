@@ -35,6 +35,7 @@ export default function ComplianceMatrix({
     try {
       const res = await authenticatedFetch(`/api/compliance-items/${item.id}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-gda-key": "header" },
         body: JSON.stringify({ [field]: value }),
       });
       const json = await res.json();

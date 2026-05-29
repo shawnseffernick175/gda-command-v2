@@ -335,11 +335,11 @@ router.post("/ingest-email", async (req, res) => {
 
     const payload: EmailPayload = req.body;
 
-    if (!payload.from || !payload.to || !payload.subject || !payload.body_text) {
+    if (!payload.from || !payload.to || !payload.body_text) {
       res.status(400).json(
         errorEnvelope("action-items", "ingest-email", {
           code: "VALIDATION_ERROR",
-          message: "Email payload requires from, to, subject, and body_text fields",
+          message: "Email payload requires from, to, and body_text fields",
           detail: null,
         }),
       );

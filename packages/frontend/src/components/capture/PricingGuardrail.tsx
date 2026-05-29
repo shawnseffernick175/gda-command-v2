@@ -42,6 +42,7 @@ export default function PricingGuardrail({
     try {
       const res = await authenticatedFetch(`/api/captures/${captureId}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-gda-key": "header" },
         body: JSON.stringify({
           pricing_assumptions: {
             ...initialAssumptions,

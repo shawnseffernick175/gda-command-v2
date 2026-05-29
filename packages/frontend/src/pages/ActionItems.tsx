@@ -82,6 +82,7 @@ export default function ActionItems() {
     try {
       const res = await authenticatedFetch(`/api/action-items/${itemId}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-gda-key": "header" },
         body: JSON.stringify({ status: newStatus }),
       });
       const json = await res.json();
@@ -100,7 +101,7 @@ export default function ActionItems() {
     try {
       const res = await authenticatedFetch(
         `/api/action-items/${itemId}/approve-draft/${draftId}`,
-        { method: "POST" },
+        { method: "POST", headers: { "Content-Type": "application/json", "x-gda-key": "header" } },
       );
       const json = await res.json();
       if (json.success) {
@@ -122,6 +123,7 @@ export default function ActionItems() {
       };
       const res = await authenticatedFetch("/api/action-items/ingest-email", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -143,6 +145,7 @@ export default function ActionItems() {
     try {
       const res = await authenticatedFetch("/api/action-items", {
         method: "POST",
+        headers: { "Content-Type": "application/json", "x-gda-key": "header" },
         body: JSON.stringify(data),
       });
       const json = await res.json();

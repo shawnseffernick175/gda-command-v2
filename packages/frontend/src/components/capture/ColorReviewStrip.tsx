@@ -34,6 +34,7 @@ export default function ColorReviewStrip({
         `/api/captures/${captureId}/advance-stage`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json", "x-gda-key": "header" },
           body: JSON.stringify({ note }),
         },
       );

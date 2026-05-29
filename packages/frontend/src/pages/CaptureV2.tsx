@@ -100,7 +100,7 @@ export default function CaptureV2() {
         {
           method: "POST",
           body: formData,
-          headers: {},
+          headers: { "x-gda-key": "header" },
         },
       );
       const json = await res.json();

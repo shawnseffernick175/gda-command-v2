@@ -40,6 +40,7 @@ export default function TeamingWorksheetPanel({ captureId }: Props) {
         `/api/captures/${captureId}/generate-teaming-worksheet`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json", "x-gda-key": "header" },
           body: JSON.stringify({ partner_ou_tags: selectedPartners }),
         },
       );
