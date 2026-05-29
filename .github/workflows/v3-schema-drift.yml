@@ -1,0 +1,203 @@
+name: V3 Schema Drift Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  v3-migration-smoke:
+    name: V3 Migration Smoke Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda_v3
+          POSTGRES_PASSWORD: gda_v3_ci
+          POSTGRES_DB: gda_v3
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gda_v3 -d gda_v3"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply all V3 migrations from scratch
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
+        run: npx tsx db/v3/migrate.ts
+
+      - name: Verify V3 schema matches design doc (drift detector)
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
+          DRIFT_REPORT_PATH: /tmp/v3-drift-report.md
+        run: npx tsx scripts/v3-schema-diff.ts
+
+      - name: Verify forbidden columns absent
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
+        run: |
+          FORBIDDEN=$(PGPASSWORD=gda_v3_ci psql -h localhost -p 5433 -U gda_v3 -d gda_v3 -tAc "
+            SELECT table_name || '.' || column_name
+            FROM information_schema.columns
+            WHERE table_schema IN ('public', 'pgboss')
+              AND column_name IN ('analysis_status', 'stale', 'is_running')
+          ")
+          if [ -n "$FORBIDDEN" ]; then
+            echo "::error::Forbidden columns found (Addendum A.5): $FORBIDDEN"
+            exit 1
+          fi
+          echo "No forbidden columns found."
+
+      - name: Verify v3_schema_migrations tracker populated
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
+        run: |
+          COUNT=$(PGPASSWORD=gda_v3_ci psql -h localhost -p 5433 -U gda_v3 -d gda_v3 -tAc "
+            SELECT count(*) FROM v3_schema_migrations
+          ")
+          echo "Applied V3 migrations: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then
+            echo "::error::No V3 migrations recorded in v3_schema_migrations"
+            exit 1
+          fi
+
+      - name: Verify pg-boss queues seeded
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
+        run: |
+          QUEUES=$(PGPASSWORD=gda_v3_ci psql -h localhost -p 5433 -U gda_v3 -d gda_v3 -tAc "
+            SELECT string_agg(name, ', ' ORDER BY name) FROM pgboss.schedule
+          ")
+          echo "Seeded queues: $QUEUES"
+          for q in "analysis-capture" "analysis-opportunity" "ingest-postprocess"; do
+            if ! echo "$QUEUES" | grep -q "$q"; then
+              echo "::error::Missing pg-boss queue: $q"
+              exit 1
+            fi
+          done
+          echo "All required pg-boss queues present."
+
+      - name: Verify core table structure
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
+        run: |
+          TABLES=$(PGPASSWORD=gda_v3_ci psql -h localhost -p 5433 -U gda_v3 -d gda_v3 -tAc "
+            SELECT string_agg(table_name, ', ' ORDER BY table_name)
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+          ")
+          echo "V3 tables: $TABLES"
+          EXPECTED="sources users opportunities pipeline_items captures compliance_items action_items action_item_drafts partners teaming_attachments launchpad_flags audit_log v3_schema_migrations opportunity_analysis_cache capture_analysis_cache analysis_jobs"
+          for t in $EXPECTED; do
+            if ! echo "$TABLES" | grep -q "$t"; then
+              echo "::error::Missing expected table: $t"
+              exit 1
+            fi
+          done
+          echo "All expected V3 tables present."
+
+      - name: Post drift report as PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = '/tmp/v3-drift-report.md';
+            let report = '';
+            try {
+              report = fs.readFileSync(reportPath, 'utf8');
+            } catch {
+              report = '## V3 Schema Drift Check\n\n*Drift report not generated (migration or detector may have failed).*';
+            }
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('V3 Schema Drift')
+            );
+            const body = report + '\n\n---\n*Generated by `v3-schema-drift.yml` CI*';
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  v3-drift-negative-test:
+    name: V3 Drift Detector Negative Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda_v3
+          POSTGRES_PASSWORD: gda_v3_ci
+          POSTGRES_DB: gda_v3_broken
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U gda_v3 -d gda_v3_broken"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply V3 migrations then break schema
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5434/gda_v3_broken
+        run: |
+          npx tsx db/v3/migrate.ts
+          # Deliberately break schema — drop a required table
+          PGPASSWORD=gda_v3_ci psql -h localhost -p 5434 -U gda_v3 -d gda_v3_broken -c "
+            DROP TABLE IF EXISTS compliance_items CASCADE;
+          "
+          # Add a forbidden column
+          PGPASSWORD=gda_v3_ci psql -h localhost -p 5434 -U gda_v3 -d gda_v3_broken -c "
+            ALTER TABLE opportunities ADD COLUMN analysis_status TEXT;
+          "
+
+      - name: Drift detector MUST fail on broken schema
+        env:
+          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5434/gda_v3_broken
+        run: |
+          set +e
+          npx tsx scripts/v3-schema-diff.ts
+          EXIT_CODE=$?
+          set -e
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "::error::Drift detector should have FAILED on broken schema but returned 0"
+            exit 1
+          fi
+          echo "Drift detector correctly detected broken schema (exit code $EXIT_CODE)"
