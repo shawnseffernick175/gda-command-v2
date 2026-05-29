@@ -51,12 +51,17 @@ export function internalSource(title: string, url: string): SourceRef {
  * Resolve source refs for an opportunity field from the join tables.
  * Returns SourceRef[] for a given opportunity_id and field name.
  */
+const VALID_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+
 export async function resolveFieldSources(
   pool: { query: (text: string, values: unknown[]) => Promise<{ rows: SourceRow[] }> },
   tableName: string,
   foreignKey: string,
   parentId: string,
 ): Promise<SourceRef[]> {
+  if (!VALID_IDENTIFIER.test(tableName) || !VALID_IDENTIFIER.test(foreignKey)) {
+    throw new Error(`Invalid SQL identifier: ${tableName} / ${foreignKey}`);
+  }
   const res = await pool.query(
     `SELECT s.kind, s.title, s.url, s.retrieved_at
      FROM "${tableName}" jt

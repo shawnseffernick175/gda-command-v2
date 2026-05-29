@@ -62,6 +62,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
               posted_at = COALESCE(EXCLUDED.posted_at, opportunities.posted_at),
               value_min = COALESCE(EXCLUDED.value_min, opportunities.value_min),
               value_max = COALESCE(EXCLUDED.value_max, opportunities.value_max),
+              source_id = EXCLUDED.source_id,
               updated_at = NOW()
             RETURNING id`,
             [

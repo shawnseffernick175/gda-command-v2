@@ -98,8 +98,10 @@ function parseAnalysis(row: OpportunityRow): AnalysisBlock | null {
   };
 }
 
-export async function rowToSummary(row: OpportunityRow): Promise<OpportunitySummary> {
-  const sources = await resolveOpportunitySources(String(row.id));
+function buildSummaryFromSources(
+  row: OpportunityRow,
+  sources: Record<string, SourceRef[]>,
+): OpportunitySummary {
   const teamingFlags = evaluateTeamingFlags(row);
   return {
     id: String(row.id),
@@ -128,10 +130,15 @@ export async function rowToSummary(row: OpportunityRow): Promise<OpportunitySumm
   };
 }
 
-export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetail> {
-  const summary = await rowToSummary(row);
-  const analysis = parseAnalysis(row);
+export async function rowToSummary(row: OpportunityRow): Promise<OpportunitySummary> {
   const sources = await resolveOpportunitySources(String(row.id));
+  return buildSummaryFromSources(row, sources);
+}
+
+export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetail> {
+  const sources = await resolveOpportunitySources(String(row.id));
+  const summary = buildSummaryFromSources(row, sources);
+  const analysis = parseAnalysis(row);
 
   let enrichedAnalysis = analysis;
   if (enrichedAnalysis) {
