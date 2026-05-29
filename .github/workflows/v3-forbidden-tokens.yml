@@ -53,11 +53,16 @@ jobs:
           )
 
           # -----------------------------------------------------------
-          # Build a grep exclusion pattern for allowed files
+          # Build a post-filter regex to exclude allowed file paths
+          # (grep --exclude only matches basenames, so we post-filter
+          # the grep -rn output by full relative path instead)
           # -----------------------------------------------------------
-          EXCLUDE_ARGS=()
+          ALLOWED_FILTER=""
           for f in "${ALLOWED_FILES[@]}"; do
-            EXCLUDE_ARGS+=(--exclude="$f")
+            if [ -n "$ALLOWED_FILTER" ]; then
+              ALLOWED_FILTER+="|"
+            fi
+            ALLOWED_FILTER+="$(echo "$f" | sed 's/[.[\/]/\\&/g')"
           done
 
           # -----------------------------------------------------------
@@ -90,10 +95,11 @@ jobs:
               continue
             fi
 
-            # Search, excluding allowed files and filtering out comment-only lines
-            MATCHES=$(grep -rn -E "$pattern" "${EXCLUDE_ARGS[@]}" \
+            # Search, filtering out allowed files and comment-only FORBIDDEN lines
+            MATCHES=$(grep -rn -E "$pattern" \
               "${EXISTING_PATHS[@]}" 2>/dev/null \
-              | grep -v -E '^\s*(//|#|/\*|\*|<!--).*FORBIDDEN' \
+              | grep -v -E "^($ALLOWED_FILTER):" \
+              | grep -v -E ':[0-9]+:\s*(//|#|/\*|\*|<!--).*FORBIDDEN' \
               || true)
 
             if [ -n "$MATCHES" ]; then
