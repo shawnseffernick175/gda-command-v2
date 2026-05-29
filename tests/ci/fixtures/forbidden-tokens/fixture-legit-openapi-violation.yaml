@@ -1,0 +1,21 @@
+# Fixture: simulates an OpenAPI spec where forbidden tokens appear
+# in schema properties and enum values (NOT in description blocks).
+# The gate MUST flag this as a violation.
+
+openapi: '3.1.0'
+info:
+  title: GDA Command V3 API (violation fixture)
+  version: '3.0.0'
+
+components:
+  schemas:
+    OpportunityDetail:
+      type: object
+      properties:
+        analysis_status:
+          type: string
+          description: Current analysis processing state
+          enum:
+            - complete
+            - "not_yet_analyzed"
+            - "pending"
