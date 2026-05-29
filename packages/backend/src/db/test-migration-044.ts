@@ -11,6 +11,10 @@
  *  2. No record_version row is created for the non-UUID ID
  *  3. A valid UUID ID DOES get a record_version row
  *
+ * NOTE: Sprint 2 (migration 129) renamed the legacy opportunities table
+ * to opportunities_legacy. This test detects the rename and uses the
+ * correct table name automatically.
+ *
  * Usage: DATABASE_URL=... npx tsx src/db/test-migration-044.ts
  */
 
@@ -38,10 +42,18 @@ async function run() {
   try {
     process.stdout.write("[test-044] Starting regression test...\n");
 
+    // Sprint 2 renames opportunities → opportunities_legacy; detect which exists
+    const { rows: legacyCheck } = await pool.query(
+      `SELECT to_regclass('opportunities_legacy') IS NOT NULL AS exists`
+    );
+    const tableName = legacyCheck[0]?.exists
+      ? "opportunities_legacy"
+      : "opportunities";
+
     // Insert a row with a non-UUID text ID
     const nonUuidId = "opp-regression-test-044";
     await pool.query(
-      `INSERT INTO opportunities (id, title, status) VALUES ($1, $2, 'discovery')
+      `INSERT INTO ${tableName} (id, title, status) VALUES ($1, $2, 'discovery')
        ON CONFLICT (id) DO NOTHING`,
       [nonUuidId, "Regression Test Opportunity"]
     );
@@ -49,7 +61,7 @@ async function run() {
     // Insert a row with a valid UUID text ID
     const uuidId = "a0000000-0000-0000-0000-000000000044";
     await pool.query(
-      `INSERT INTO opportunities (id, title, status) VALUES ($1, $2, 'discovery')
+      `INSERT INTO ${tableName} (id, title, status) VALUES ($1, $2, 'discovery')
        ON CONFLICT (id) DO NOTHING`,
       [uuidId, "Regression Test UUID Opportunity"]
     );
@@ -60,7 +72,7 @@ async function run() {
       [nonUuidId, uuidId]
     );
 
-    // Run the same DO $$ logic from migration 044 against opportunities only
+    // Run the same DO $$ logic from migration 044 against the legacy table
     await pool.query(`
       DO $$
       DECLARE
@@ -68,7 +80,7 @@ async function run() {
         snap JSONB;
         id_val TEXT;
       BEGIN
-        FOR row_rec IN SELECT * FROM opportunities
+        FOR row_rec IN SELECT * FROM ${tableName}
         LOOP
           snap := to_jsonb(row_rec);
           id_val := snap->>'id';
@@ -108,7 +120,7 @@ async function run() {
       nonUuidId,
       uuidId,
     ]);
-    await pool.query(`DELETE FROM opportunities WHERE id IN ($1, $2)`, [
+    await pool.query(`DELETE FROM ${tableName} WHERE id IN ($1, $2)`, [
       nonUuidId,
       uuidId,
     ]);
