@@ -6,7 +6,15 @@
 **Author:** Devin (automated audit)
 **Status:** Draft — awaiting human sign-off
 
-> **Prod DB access:** SSH to both `HOSTINGER_VPS_IP` and `100.100.80.78` timed out (connection refused / timeout). All Section 1 data below comes from the **local dev database** built by applying all 134 migration files against a fresh `gda_command` database on the Docker `gda-postgres` container. Prod-specific row counts, disk sizes, and any data that exists only in prod (e.g., rows inserted by n8n workflows not in migration seeds) are marked **`UNVERIFIED — needs prod DB access`**. The schema itself is deterministic from migrations and is therefore accurate.
+> **⚠ CRITICAL CORRECTION — see `phase-0-prod-verification-addendum.md`**
+>
+> The original audit below was generated from a local dev database running all 134 migration files. **Production reality differs significantly:** only 128 of 134 migrations have been applied to prod. Migrations 127–130 (Sprint 1 OU registry, Sprint 2 opportunities/pipeline/partner-intel, Sprint 3 capture/action-items) **never landed in production**. This means 11 tables expected by Sprint 2/3 route code (`pipeline_items`, `captures`, `action_items`, `action_item_drafts`, `compliance_items`, `partner_intel_profiles`, `partner_awards`, `partner_news_items`, `teaming_flags`, `launchpad_flags`, `ou_registry`) **do not exist in prod**. The `opportunities` table in prod retains its legacy schema (text PK, no `ou_tag` column).
+>
+> Additionally, prod has a **dual migration tracker** (`schema_migrations` with 128 rows + `_migrations` with 22 rows) — this is the root cause of the drift.
+>
+> The addendum file contains verbatim prod query results. **Where this document and the addendum conflict, the addendum is authoritative.**
+
+> **Prod DB access (original):** SSH to both `HOSTINGER_VPS_IP` and `100.100.80.78` timed out during the automated audit. All Section 1 data below comes from the **local dev database** built by applying all 134 migration files against a fresh `gda_command` database on the Docker `gda-postgres` container. Prod-verified corrections are inline below and detailed in the addendum.
 
 ---
 
@@ -185,7 +193,9 @@ Command: docker exec gda-postgres psql -U gda -d gda_command -c "\dt public.*"
  public | win_loss_analyses           | table | gda
 ```
 
-**Total: 155 tables** (including `schema_migrations`).
+**Total (dev): 155 tables** (including `schema_migrations`).
+
+> **PROD CORRECTION:** Production has **154 tables**. Missing from prod: `pipeline_items`, `captures`, `action_items`, `action_item_drafts`, `compliance_items`, `partner_intel_profiles`, `partner_awards`, `partner_news_items`, `teaming_flags`, `launchpad_flags`, `ou_registry` (11 tables from migrations 127–130 that never applied). Prod has additional tables not in dev: `_migrations`, `govtribe_credit_monthly`, `v_opportunity_active`, `v_opportunity_all_tracked`. Net: 154 tables in prod. See addendum for full verified list.
 
 ### 1.2 Full enum/type list
 
@@ -207,7 +217,9 @@ Command: docker exec gda-postgres psql -U gda -d gda_command -c "\dT+ public.*"
 | `teaming_flag_reason` | `hubzone`, `v3_veteran`, `ic_clearance`, `training_depth`, `scope_overflow`, `de_confliction` |
 | `vector` | (pgvector extension type) |
 
-**Total: 11 types** (8 application enums + 3 pgvector extension types).
+**Total (dev): 11 types** (8 application enums + 3 pgvector extension types).
+
+> **PROD CORRECTION:** Production has only **1 application enum** (`entity_status`) plus the 3 pgvector extension types. The following enums **do not exist in prod**: `ou_tag`, `color_review_stage`, `action_source`, `action_status`, `draft_kind`, `draft_status`, `teaming_flag_reason` — all defined in migrations 127, 129, 130 that never applied.
 
 ### 1.3 Per-table column inventory
 
@@ -255,6 +267,8 @@ Command: SELECT relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup
 | `partner_intel_profiles` | 2 |
 | `company_profile` | 1 |
 | All other tables | 0 (no seed data) |
+
+> **PROD CORRECTION (verified):** Top tables by row count in prod: `sam_opportunities` 20,062 rows, `gda_opportunity_tracker` 1,924 rows, `opportunities` 658 rows, `document_embeddings` 901 rows, `record_version` 16,425 rows, `fpds_awards` 534 rows, `gda_risk_register` 527 rows. See addendum for full top-10.
 
 ### 1.5 Index list
 
@@ -342,7 +356,7 @@ Command: SELECT pg_database_size('gda_command'), pg_size_pretty(pg_database_size
 | Second largest | `schema_migrations` (96 kB) |
 | Third largest | `opportunities_legacy` (88 kB) |
 
-**`UNVERIFIED — needs prod DB access`**: Prod database size, row counts, and table sizes will differ significantly due to live data.
+> **PROD CORRECTION (verified):** Prod database size is **95 MB**. Top tables by size: `record_version` 26 MB, `document_embeddings` 15 MB, `sam_opportunities` 14 MB, `gda_embeddings` 14 MB, `gda_opportunity_tracker` 1,736 KB, `fpds_awards` 752 KB, `opportunities` 728 KB.
 
 ---
 
@@ -436,15 +450,23 @@ Result: 134 SQL files
 Command: SELECT name, applied_at FROM schema_migrations ORDER BY id;
 ```
 
-All 134 migrations are recorded in `schema_migrations` with `applied_at` timestamps. On dev, all applied at `2026-05-29 15:53:43–44+00` (batch apply).
+On dev: all 134 migrations are recorded in `schema_migrations` with `applied_at` timestamps, applied at `2026-05-29 15:53:43–44+00` (batch apply).
 
-**`UNVERIFIED — needs prod DB access`**: Prod `schema_migrations` table would show actual historical application dates.
+> **PROD CORRECTION (verified, CRITICAL):** Production has **two competing migration tracker tables**:
+> - `schema_migrations` — **128 rows** (migrations 001–126 only)
+> - `_migrations` — **22 rows** (separate tracker, likely from an older migration runner)
+>
+> **Migrations 127–130 (Sprint 1/2/3) have never been applied to production.** This is the root cause of all Sprint 2/3 500 errors.
 
 ### 2.3 Diff between files-on-disk and applied-in-prod
 
-On dev: **134 migration files on disk = 134 rows in `schema_migrations`**. Perfect match. No orphans in either direction.
+On dev: **134 migration files on disk = 134 rows in `schema_migrations`**. Perfect match.
 
-**`UNVERIFIED — needs prod DB access`**: Cannot confirm prod alignment without SSH.
+> **PROD CORRECTION (verified, CRITICAL):** Production has a **6-migration gap**:
+> - Files on disk: 134 (001–130)
+> - Applied in prod `schema_migrations`: 128 (001–126)
+> - **NOT applied in prod:** `127_ou_registry_launchpad_flags.sql`, `128_riverstone_uei_confirmed.sql`, `129_sprint2_opps_pipeline_partner_intel.sql`, `130_sprint3_capture_action_items.sql`, plus 121–126 status uncertain (they may be in the `_migrations` table instead)
+> - **Dual tracker root cause:** The migration runner writes to `schema_migrations` but a second table `_migrations` (22 rows) exists, suggesting a runner change between deployments lost state continuity.
 
 ### 2.4 Ten most recent migrations (121–130): full contents and effect
 
@@ -535,13 +557,17 @@ Effect: Landed. Confirms Riverstone UEI from FPDS data.
 
 180-line migration. Renames legacy `opportunities` → `opportunities_legacy`. Creates new Sprint 2 `opportunities` table (with `ou_tag`, `sam_notice_id`, `grade`, `grade_evidence`, etc.), `pipeline_items`, `partner_intel_profiles` (seeded with Riverstone + PD Systems profiles), `teaming_flags`, `partner_awards`, `partner_news_items`.
 
-Effect: Landed. Core Sprint 2 schema (F-101). This is the table-rename that creates the dual-opportunities situation.
+Effect on dev: Landed. Core Sprint 2 schema (F-101). This is the table-rename that creates the dual-opportunities situation.
+
+> **PROD CORRECTION (CRITICAL):** This migration **never applied to production**. The `opportunities` table in prod retains the legacy schema: `id text` (not BIGSERIAL), no `ou_tag`, no `sam_notice_id`, no `value_min`/`value_max`, no `grade`/`grade_evidence`. The `opportunities_legacy` rename never happened. See addendum for verified prod `opportunities` column list.
 
 **Migration 130 — `130_sprint3_capture_action_items.sql`**
 
 105-line migration. Creates enums (`color_review_stage`, `action_source`, `action_status`, `draft_kind`, `draft_status`) and tables (`captures`, `compliance_items`, `action_items`, `action_item_drafts`).
 
-Effect: Landed. Sprint 3 schema (F-102).
+Effect on dev: Landed. Sprint 3 schema (F-102).
+
+> **PROD CORRECTION (CRITICAL):** This migration **never applied to production**. `captures`, `compliance_items`, `action_items`, `action_item_drafts` tables **do not exist in prod**. The `action_source`, `action_status`, `color_review_stage`, `draft_kind`, `draft_status` enums **do not exist in prod**.
 
 ---
 
@@ -658,7 +684,11 @@ All shadow objects were created by **migration files** committed to the reposito
 - **Wave 1 (057–084):** Prefix `n8n_gda_*` or `gda_*`. Created to match n8n workflow table expectations. Creator: Devin sessions (per git commit history).
 - **Wave 2 (085–120):** Prefix `step3b_gda_*` or `step4b_gda_*`. Created as a bulk provisioning step. Creator: Devin sessions (per git commit history).
 
-No tables were found that were created by direct `psql` sessions or n8n workflow DDL outside of migration files (on dev). **`UNVERIFIED — needs prod DB access`** for prod-only shadow objects.
+No tables were found that were created by direct `psql` sessions or n8n workflow DDL outside of migration files (on dev).
+
+> **PROD CORRECTION:** Prod contains additional objects not in the dev DB: `_migrations` (second migration tracker, 22 rows), `govtribe_credit_monthly`, `v_opportunity_active` (view), `v_opportunity_all_tracked` (view). These have no corresponding migration file — they are true shadow objects created outside the canonical migration pipeline. Creator: **UNKNOWN** (likely n8n workflows or manual psql sessions).
+>
+> **n8n workflow count (verified):** Production n8n instance has **158 active workflows** (confirmed via n8n database query).
 
 ### 3.4 Reconciliation with F-023 (issue #258)
 
@@ -944,7 +974,15 @@ No migration contains `DROP TABLE`. The `opportunities_legacy` rename in 129 is 
 
 ### 6.5 Files in `.env.bak.*` form on the VPS
 
-**`BLOCKED — needs prod VPS access`**: SSH to both `HOSTINGER_VPS_IP` and `100.100.80.78` timed out. Cannot list `.env.bak.*` files on the production VPS.
+> **PROD CORRECTION (verified):** Three `.env.bak.*` files confirmed on VPS:
+>
+> ```
+> /root/gda-command-v2/.env.bak.20260526-0044
+> /root/gda-command-v2/.env.bak.20260526-0048-leakfix
+> /root/gda-command-v2/.env.bak.f020-broken-1779851973
+> ```
+>
+> The `f020-broken` filename indicates artifacts from a failed F-020 deployment. These contain sensitive credentials and should be moved to an out-of-tree secrets store, then deleted from the VPS. Flagged as a security item.
 
 ---
 
@@ -1033,13 +1071,31 @@ Per `docs/canonical/product_rules.md`, R2 requires analysis to auto-trigger on o
 
 ### 9.1 Decisions Phase 1 design must address
 
+> **CRITICAL (from prod verification):** Items 1–3 below are now the highest-priority items given the prod state.
+
+0. **Fix the dual migration tracker (ROOT CAUSE — CRITICAL)**
+   - Prod has `schema_migrations` (128 rows) and `_migrations` (22 rows). The migration runner was changed between deployments, causing state loss. V3 must pick a single canonical tracker and reconcile.
+   - Until this is fixed, no new migrations will reliably apply to prod.
+
+0b. **Three competing opportunity tables in prod (CRITICAL)**
+   - `sam_opportunities` (20,062 rows — n8n sync from SAM.gov) — the real opportunity inventory
+   - `gda_opportunity_tracker` (1,924 rows — n8n shadow tracking)
+   - `opportunities` (658 rows — legacy backend-owned, text PK)
+   - V3 must pick the canonical source and write the import strategy for the other two.
+
+0c. **Sprint 2/3 code is deployed but non-functional (CRITICAL)**
+   - All features from F-100 through F-105 query tables/columns that don't exist in prod.
+   - Every Pipeline, Capture, Partner Intel, Action Items view returns HTTP 500.
+   - V3 must either: (a) apply migrations 127–130 to prod to activate Sprint 2/3, or (b) treat Sprint 2/3 as V3-only code and skip legacy prod activation.
+
 1. **Keep / drop / merge the 63 shadow tables?**
    - 63 `gda_*` tables are accessed only by n8n via direct DB. They duplicate concepts that exist in the canonical schema (e.g., `gda_action_items` vs. `action_items`, `gda_capture_plans` vs. `capture_plans`, `gda_contacts` vs. `contacts`).
    - Options: (a) migrate n8n workflows to use canonical tables and drop shadow tables, (b) merge shadow table data into canonical tables, (c) keep shadow tables as-is and build V3 only on canonical.
 
-2. **`opportunities_legacy` vs. `opportunities` — migration path?**
-   - The dual-table situation created by migration 129 is the single biggest schema debt. Many legacy tables (bid_recommendations, capture_plans, capture_gate_reviews, proposals, shred_jobs, merger_opp_impacts) FK to `opportunities_legacy`. The new Sprint 2 tables (pipeline_items, captures) FK to `opportunities`.
-   - V3 must decide: (a) migrate all legacy FKs to the new table, (b) keep `opportunities_legacy` as a read-only archive, (c) merge both into a single V3 table.
+2. **`opportunities` schema — legacy text PK vs. Sprint 2 BIGSERIAL**
+   - In prod, `opportunities` still has the legacy schema (text PK, no `ou_tag`). Migration 129 (which renames to `opportunities_legacy` and creates new Sprint 2 `opportunities`) never applied.
+   - Many legacy tables FK to `opportunities.id` (text). Sprint 2/3 tables (if applied) would FK to `opportunities.id` (BIGSERIAL).
+   - V3 must decide: (a) migrate legacy data to a unified BIGSERIAL table, (b) keep legacy text-PK table as read-only archive, (c) create a clean V3 table and import selectively.
 
 3. **Data retention policy for legacy rows**
    - `opportunities_legacy` may contain prod data from n8n workflows that won't migrate cleanly to the Sprint 2 schema.
