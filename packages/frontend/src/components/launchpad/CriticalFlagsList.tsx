@@ -27,7 +27,10 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 function formatDateEST(dateStr: string): string {
   try {
-    const d = new Date(dateStr + "T00:00:00");
+    // Handle both "2026-04-29" and "2026-04-29T00:00:00.000Z" formats
+    const raw = dateStr.length === 10 ? dateStr + "T12:00:00Z" : dateStr;
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("en-US", {
       timeZone: "America/New_York",
       month: "numeric",
