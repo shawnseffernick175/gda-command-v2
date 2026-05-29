@@ -9,6 +9,7 @@ import { authHook } from './middleware/auth.js';
 import { systemRoutes } from './routes/system.js';
 import { opportunityRoutes } from './routes/opportunities.js';
 import { captureRoutes } from './routes/captures.js';
+import { pipelineRoutes } from './routes/pipeline.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
@@ -94,6 +95,7 @@ export async function buildApp() {
   await app.register(systemRoutes);
   await app.register(opportunityRoutes);
   await app.register(captureRoutes);
+  await app.register(pipelineRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });
