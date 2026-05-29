@@ -1,0 +1,191 @@
+import type { SourceRef } from '../../lib/sources.js';
+
+export interface OpportunityRow {
+  id: string;
+  title: string;
+  agency: string | null;
+  sub_agency: string | null;
+  solicitation_number: string | null;
+  sam_notice_id: string | null;
+  status: string;
+  grade: string | null;
+  grade_evidence: string | null;
+  value_min: number | null;
+  value_max: number | null;
+  naics: string | null;
+  psc: string | null;
+  set_aside: string | null;
+  place_of_performance: string | null;
+  response_due_at: string | null;
+  posted_at: string | null;
+  incumbent: string | null;
+  description: string | null;
+  tags: string[];
+  data_source: string;
+  analysis: AnalysisBlock | null;
+  analysis_version: string | null;
+  ai_analyzed_at: string | null;
+  qualified_at: string | null;
+  qualified_by: string | null;
+  source_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalysisBlock {
+  version: string;
+  generated_at: string;
+  pwin: number;
+  pwin_sources: SourceRef[];
+  incumbent: string | null;
+  incumbent_sources: SourceRef[];
+  competitors: Competitor[];
+  competitors_sources: SourceRef[];
+  blackhat: BlackhatAssessment | null;
+  blackhat_sources: SourceRef[];
+  wargame: WargameOutput | null;
+  wargame_sources: SourceRef[];
+  timeline: Timeline | null;
+  timeline_sources: SourceRef[];
+}
+
+export interface Competitor {
+  name: string;
+  threat_level: 'low' | 'medium' | 'high';
+}
+
+export interface BlackhatAssessment {
+  envision_fit: string;
+  competitor_strength: string;
+  risk_areas: string[];
+}
+
+export interface WargameOutput {
+  strategy: string;
+  win_themes: string[];
+  discriminators: string[];
+}
+
+export interface Timeline {
+  rfp_release: string | null;
+  proposals_due: string | null;
+  award_estimate: string | null;
+}
+
+export interface TeamingFlag {
+  id: string;
+  reason: string;
+  suggested_partner: string;
+  detail: string;
+}
+
+export interface OpportunitySummary {
+  id: string;
+  title: string;
+  title_sources: SourceRef[];
+  agency: string | null;
+  agency_sources: SourceRef[];
+  naics: string | null;
+  naics_sources: SourceRef[];
+  set_aside: string | null;
+  set_aside_sources: SourceRef[];
+  grade: string | null;
+  grade_sources: SourceRef[];
+  status: string;
+  response_due_at: string | null;
+  response_due_at_sources: SourceRef[];
+  value_min: number | null;
+  value_min_sources: SourceRef[];
+  value_max: number | null;
+  value_max_sources: SourceRef[];
+  teaming_flags: TeamingFlag[];
+  ai_analyzed_at: string | null;
+  analysis_version: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OpportunityDetail extends OpportunitySummary {
+  sam_notice_id: string | null;
+  sub_agency: string | null;
+  description: string | null;
+  description_sources: SourceRef[];
+  posted_at: string | null;
+  qualified_at: string | null;
+  qualified_by: string | null;
+  grade_evidence: string | null;
+  analysis: AnalysisBlock;
+}
+
+export interface OpportunityCreateInput {
+  title: string;
+  source: string;
+  sam_notice_id?: string;
+  naics?: string;
+  agency?: string;
+  sub_agency?: string;
+  description?: string;
+  set_aside?: string;
+  response_due_at?: string;
+  posted_at?: string;
+  value_min?: number;
+  value_max?: number;
+}
+
+export interface OpportunityUpdateInput {
+  title?: string;
+  naics?: string;
+  agency?: string;
+  sub_agency?: string;
+  description?: string;
+  set_aside?: string;
+  response_due_at?: string;
+  value_min?: number;
+  value_max?: number;
+  solicitation_number?: string;
+  sam_notice_id?: string;
+  psc?: string;
+  incumbent?: string;
+  tags?: string[];
+}
+
+export interface ListFilters {
+  status?: string;
+  agency?: string;
+  naics?: string;
+  grade?: string;
+  due_before?: string;
+  due_after?: string;
+  set_aside?: string;
+  min_value?: number;
+  max_value?: number;
+  hot?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  pagination: {
+    limit: number;
+    cursor: string | null;
+    hasMore: boolean;
+  };
+}
+
+export const ANALYSIS_AFFECTING_FIELDS = new Set([
+  'title',
+  'agency',
+  'sub_agency',
+  'solicitation_number',
+  'sam_notice_id',
+  'naics',
+  'psc',
+  'set_aside',
+  'value_min',
+  'value_max',
+  'incumbent',
+  'description',
+  'tags',
+  'response_due_at',
+]);

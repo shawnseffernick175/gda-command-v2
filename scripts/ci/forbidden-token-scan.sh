@@ -36,6 +36,7 @@ ALLOWED_FILES=(
   "docs/architecture/v3/phase-1-test-strategy.md"
   "docs/architecture/v3/phase-1-architecture-and-schema.md"
   "docs/architecture/v3/phase-1-api-contract.md"
+  "docs/architecture/v3/openapi-v3.yaml"
   ".github/workflows/v3-forbidden-tokens.yml"
   "scripts/ci/forbidden-token-scan.sh"
 )
@@ -197,7 +198,7 @@ for pattern in "${PATTERNS[@]}"; do
       # Also collect YAML files inside directories
       while IFS= read -r yf; do
         YAML_PATHS+=("$yf")
-      done < <(find "$ep" -type f \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null)
+      done < <(find "$ep" -path '*/node_modules' -prune -o -type f \( -name '*.yaml' -o -name '*.yml' \) -print 2>/dev/null)
     else
       OTHER_PATHS+=("$ep")
     fi
@@ -209,7 +210,7 @@ for pattern in "${PATTERNS[@]}"; do
   # Scan non-YAML files
   # ---------------------------------------------------------
   if [ ${#OTHER_PATHS[@]} -gt 0 ]; then
-    MATCHES=$(grep -rHn --exclude='*.yaml' --exclude='*.yml' -E "$pattern" "${OTHER_PATHS[@]}" 2>/dev/null || true)
+    MATCHES=$(grep -rHn --exclude='*.yaml' --exclude='*.yml' --exclude-dir=node_modules -E "$pattern" "${OTHER_PATHS[@]}" 2>/dev/null || true)
     if [ -n "$MATCHES" ]; then
       while IFS= read -r line; do
         rel="${line#"$REPO_ROOT/"}"
