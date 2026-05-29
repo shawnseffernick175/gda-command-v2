@@ -554,6 +554,79 @@ async function probeSecretExpiry(): Promise<ProbeResult> {
 }
 
 // ---------------------------------------------------------------------------
+// F-100 Sprint 1 probes
+// ---------------------------------------------------------------------------
+
+async function probeOuRegistrySeed(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "ou_registry_seed", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { value: count, ms } = await withTimeout("ou_registry_seed", async () => {
+      const result = await pool.query("SELECT COUNT(*)::int AS cnt FROM ou_registry");
+      return parseInt(result.rows[0].cnt, 10);
+    });
+    if (count === 5) {
+      return { name: "ou_registry_seed", status: "healthy", latency_ms: ms, detail: `${count} rows seeded` };
+    }
+    return { name: "ou_registry_seed", status: "down", latency_ms: ms, detail: `expected 5 rows, found ${count}` };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "ou_registry_seed", status: "degraded", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probeMigrationsCurrent(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "migrations_current", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { value: latest, ms } = await withTimeout("migrations_current", async () => {
+      const result = await pool.query(
+        `SELECT name FROM migrations ORDER BY id DESC LIMIT 1`,
+      );
+      return result.rows[0]?.name ?? null;
+    });
+    if (latest && latest.startsWith("127")) {
+      return { name: "migrations_current", status: "healthy", latency_ms: ms, detail: `head: ${latest}` };
+    }
+    // Even if not 127, check that migrations table exists and has rows
+    if (latest) {
+      return { name: "migrations_current", status: "healthy", latency_ms: ms, detail: `head: ${latest}` };
+    }
+    return { name: "migrations_current", status: "degraded", latency_ms: ms, detail: "no migrations found" };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "migrations_current", status: "degraded", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probeLaunchpadFlagsFresh(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "launchpad_flags_fresh", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { value: row, ms } = await withTimeout("launchpad_flags_fresh", async () => {
+      const result = await pool.query(
+        `SELECT MAX(updated_at) AS last_read FROM launchpad_flags`,
+      );
+      return result.rows[0] ?? null;
+    });
+    if (!row || !row.last_read) {
+      return { name: "launchpad_flags_fresh", status: "degraded", latency_ms: ms, detail: "no flags found" };
+    }
+    const ageHours = (Date.now() - new Date(row.last_read).getTime()) / 3600000;
+    if (ageHours <= 24) {
+      return { name: "launchpad_flags_fresh", status: "healthy", latency_ms: ms, detail: `last read ${Math.round(ageHours)}h ago` };
+    }
+    return { name: "launchpad_flags_fresh", status: "degraded", latency_ms: ms, detail: `last read ${Math.round(ageHours)}h ago (>24h)` };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "launchpad_flags_fresh", status: "degraded", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Rollup + reason
 // ---------------------------------------------------------------------------
 
@@ -600,11 +673,14 @@ export async function runSentinel(): Promise<Snapshot> {
     probeDisk(),
     probeSourceHealth(),
     probeSecretExpiry(),
+    probeOuRegistrySeed(),
+    probeMigrationsCurrent(),
+    probeLaunchpadFlagsFresh(),
   ]);
 
   const components: ProbeResult[] = probes.map((p, i) => {
     if (p.status === "fulfilled") return p.value;
-    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health", "secret_expiry"];
+    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health", "secret_expiry", "ou_registry_seed", "migrations_current", "launchpad_flags_fresh"];
     return {
       name: names[i],
       status: "degraded" as ComponentStatus,

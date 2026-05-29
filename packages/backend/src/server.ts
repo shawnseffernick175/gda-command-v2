@@ -59,6 +59,7 @@ import mergersRouter from "./routes/mergers";
 import aiGatewayRouter from "./routes/ai-gateway";
 import captureDisciplineRouter from "./routes/capture-discipline";
 import sentinelRouter from "./routes/sentinel";
+import launchpadRouter from "./routes/launchpad";
 import vectorInternalRouter from "./routes/vector-internal";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
@@ -125,6 +126,9 @@ app.use("/api/ingest", ingestLimiter, ingestRouter);
 // --- Sentinel routes (mixed auth: /current public, /history JWT, /run x-gda-key) ---
 app.use("/api/sentinel", apiLimiter, sentinelRouter);
 
+// --- Launchpad routes (mixed auth: flags public, dismiss x-gda-key) ---
+app.use("/api/launchpad", apiLimiter, launchpadRouter);
+
 // --- Internal vector endpoints (key-based auth for n8n dual-write) ---
 app.use("/api/internal", ingestLimiter, vectorInternalRouter);
 
@@ -143,7 +147,7 @@ app.use("/api", apiLimiter);
 // /auth   → login/register (authRouter handles internally)
 // /ingest → key-based auth (ingestRouter handles internally)
 // /sentinel → mixed: /current public, /history JWT, /run x-gda-key (sentinelRouter handles internally)
-const SELF_AUTH_PREFIXES = ["/auth", "/ingest", "/sentinel"];
+const SELF_AUTH_PREFIXES = ["/auth", "/ingest", "/sentinel", "/launchpad"];
 app.use("/api", (req, res, next) => {
   if (SELF_AUTH_PREFIXES.some((p) => req.path.startsWith(p))) return next();
   return authMiddleware(req, res, next);

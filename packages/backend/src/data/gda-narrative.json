@@ -1,0 +1,93 @@
+{
+  "identity": {
+    "legal_name": "Georgetown Defense Analytics (GDA)",
+    "stage": "Holding company / parent rolling up 3 acquired companies into one prime-ready platform.",
+    "ceo": "Alexander Johnson (AJ Johnson)",
+    "purpose": "Georgetown Defense Analytics exists to reduce mission risk for those who defend our Nation.",
+    "operating_identity": "Agile Integrator — large enough to govern risk/compliance, small enough to execute at the speed of relevance.",
+    "market_positioning": "Boring Excellence — assurance over innovation theater. Predictable execution. Certainty of outcome."
+  },
+  "pillars": [
+    {
+      "number": "I",
+      "name": "ENABLE",
+      "title": "Defense & Mission Systems",
+      "anchor_company": "Envision Innovative Solutions",
+      "focus": "Logistics, sustainment, training, systems engineering, field services, C5ISR",
+      "role": "Execution backbone, operational scale"
+    },
+    {
+      "number": "II",
+      "name": "PROTECT",
+      "title": "Intelligence & Cyber Engineering",
+      "anchor_company": "Riverstone Solutions",
+      "focus": "TechSIGINT, cyber engineering, mission software, classified DevSecOps",
+      "role": "Credibility, margin, valuation engine"
+    },
+    {
+      "number": "III",
+      "name": "TRAIN",
+      "title": "Training, Simulation & Digital Readiness",
+      "anchor_company": "PD Systems",
+      "focus": "XR/AR/VR, digital twins, LVC integration, immersive training, SERE, battlefield effects",
+      "role": "Innovation, differentiation, force multiplier"
+    }
+  ],
+  "financials": {
+    "fy25_baseline_revenue": "$54.1M (5-yr avg)",
+    "fy26_target_revenue": "$70.1M",
+    "fy26_gross_margin_floor": ">=10%",
+    "fy26_ebitda_margin": "5.7%",
+    "fy26_backlog": "$175M+",
+    "fy28_target_revenue": "$500M run-rate",
+    "fy28_gross_margin": "24%",
+    "fy28_backlog": "$450M+",
+    "fy28_win_rate": "30%+",
+    "fy28_prime_mix": "80% direct-to-gov"
+  },
+  "strategic_pivot": {
+    "from": {
+      "governance": "Decentralized / fragmented",
+      "structure": "Siloed fiefdoms",
+      "bd_approach": "Relationship-led, opportunistic",
+      "capture": "Contract-by-contract",
+      "pricing": "Opportunistic",
+      "contract_structure": "Cost-Plus / T&M",
+      "compliance": "Self-attestation",
+      "metrics": "Activity (hours)",
+      "decision_speed": "Committee consensus"
+    },
+    "to": {
+      "governance": "Integrated Enterprise Model",
+      "structure": "Three OUs + shared services",
+      "bd_approach": "Process-driven, Deep Ocean Patrol",
+      "capture": "Enterprise portfolio focus",
+      "pricing": "Disciplined guardrails",
+      "contract_structure": "Firm Fixed Price / outcome",
+      "compliance": "CMMC L3 / 3rd party audit",
+      "metrics": "Verifiable outcomes",
+      "decision_speed": "Clear delegated authority"
+    }
+  },
+  "phased_roadmap": [
+    {
+      "phase": "Foundation",
+      "year": "FY26",
+      "theme": "Stabilization & Doctrine",
+      "deliverables": "Org re-structure (3 OUs live), Brand launch (GDA), Doctrine rollout, CMMC L2 assessment scheduled, 4 net-new prime awards, single prioritized pipeline"
+    },
+    {
+      "phase": "Acceleration",
+      "year": "FY27",
+      "theme": "Maturation & Scale",
+      "deliverables": "Capture engine live, CMMC L2 audit passed, Major IDIQ awards, Win rates >45%, Program variance <10%, Real-time BI dashboard live"
+    },
+    {
+      "phase": "Dominance",
+      "year": "FY28",
+      "theme": "Optimization & Margins",
+      "deliverables": "Enterprise AI Ops, 24% gross margin, Zero-defect compliance audit, Full CMMC L2, Margin optimization"
+    }
+  ],
+  "positioning_paragraph": "Georgetown Defense Analytics occupies the gap between Tier-1 primes and boutiques. Three operating units — Enable (Envision), Protect (Riverstone), Train (PD Systems) — deliver integrated mission support across defense, intelligence, and training. The $100M-to-$500M ramp is built on disciplined capture, zero-defect compliance, and the doctrine that 'the standard you walk past is the standard you accept.' Boring Excellence is the brand promise: predictable execution, certainty of outcome, assurance over innovation theater."
+}
