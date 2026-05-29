@@ -29,13 +29,23 @@ describe('Migration Pipeline', () => {
         'utf-8',
       );
 
-      // Drop existing fixture tables to ensure idempotency
+      // Drop existing fixture tables to ensure idempotency (check both schemas)
       const tableNames = [
         'sam_opportunities', 'gda_opportunity_tracker', 'opportunities',
         'gda_capture_plans', 'gda_action_items', 'source_registry', 'gda_teaming_partners',
       ];
       for (const t of tableNames) {
         await client.query(`DROP TABLE IF EXISTS legacy_fixture."${t}" CASCADE`);
+        await client.query(`DROP TABLE IF EXISTS public."${t}" CASCADE`);
+      }
+
+      // Also drop V3 tables from any prior migration run
+      const v3Tables = [
+        'v3_opportunities', 'v3_captures', 'v3_action_items',
+        'sources', 'migration_partners',
+      ];
+      for (const t of v3Tables) {
+        await client.query(`DROP TABLE IF EXISTS public."${t}" CASCADE`);
       }
 
       // Execute fixture SQL within the legacy schema
