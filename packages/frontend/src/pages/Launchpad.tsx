@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import LaunchpadHeader from "../components/launchpad/LaunchpadHeader";
+import SummaryCardGrid from "../components/launchpad/SummaryCardGrid";
 import CriticalFlagsList from "../components/launchpad/CriticalFlagsList";
 import DailyIntelList from "../components/launchpad/DailyIntelList";
 import SystemStatusStrip from "../components/SystemStatusStrip";
@@ -83,6 +84,10 @@ export default function Launchpad() {
   return (
     <div className="container-page py-12">
       <LaunchpadHeader dateStr={dateStr} />
+
+      <section className="mb-8">
+        <SummaryCardGrid />
+      </section>
 
       <section className="mb-8">
         <h2 className="h-section text-ink mb-4">Critical Flags</h2>

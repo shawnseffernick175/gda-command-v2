@@ -32,6 +32,11 @@
     --color-warning: #f59e0b;
     --color-danger: #ef4444;
     --sidebar-width: 220px;
+    --bg: #F7F6F2;
+    --ink: #28251D;
+    --muted: #7A7974;
+    --border: #D4D1CA;
+    --accent: #01696F;
   }
 
   a {
@@ -72,4 +77,37 @@
   .btn:hover { background: #F7F6F2; }
   .btn-primary { background: #01696F; color: #FFFFFF; border-color: #01696F; }
   .btn-primary:hover { background: #015C61; }
+}
+
+/* Summary Card Grid — F-103 */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+@media (max-width: 768px) {
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.summary-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
+  padding: 24px 20px;
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color 120ms ease;
+}
+.summary-card.active { border-top-color: var(--accent); }
+.summary-card:hover { border-color: var(--accent); }
+.summary-card-count {
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.summary-card-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 8px;
 }

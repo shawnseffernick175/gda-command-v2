@@ -58,6 +58,7 @@ router.get("/", async (req, res) => {
       ou_tag,
       page,
       per_page,
+      hot,
     } = req.query;
 
     const ouTag = (ou_tag as string) || "envision";
@@ -100,6 +101,11 @@ router.get("/", async (req, res) => {
       conditions.push("qualified_at IS NOT NULL");
     } else if (qualified === "false") {
       conditions.push("qualified_at IS NULL");
+    }
+    if (hot === "1") {
+      conditions.push(
+        `(grade = 'A' OR id IN (SELECT pi.opportunity_id FROM pipeline_items pi WHERE pi.win_prob_pct >= 70))`,
+      );
     }
 
     const where =

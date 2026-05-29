@@ -64,7 +64,7 @@ router.get("/", async (req, res) => {
       return;
     }
 
-    const { ou_tag, stage } = req.query;
+    const { ou_tag, stage, behind } = req.query;
     const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
@@ -76,6 +76,10 @@ router.get("/", async (req, res) => {
     if (stage) {
       conditions.push(`c.color_review_stage = $${paramIndex++}`);
       params.push(stage);
+    }
+    if (behind === "1") {
+      conditions.push(`c.color_review_stage != 'submitted'`);
+      conditions.push(`o.response_due_at < NOW()`);
     }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
