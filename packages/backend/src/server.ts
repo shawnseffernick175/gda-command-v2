@@ -61,6 +61,9 @@ import captureDisciplineRouter from "./routes/capture-discipline";
 import sentinelRouter from "./routes/sentinel";
 import launchpadRouter from "./routes/launchpad";
 import vectorInternalRouter from "./routes/vector-internal";
+import opportunitiesV2Router from "./routes/opportunities-v2";
+import pipelineV2Router from "./routes/pipeline-v2";
+import partnerIntelRouter from "./routes/partner-intel";
 import { successEnvelope } from "./middleware/envelope";
 import { webhookConfig, apiConfig } from "./lib/n8n-client";
 import { dbConfig, healthCheck as dbHealthCheck, waitForDB } from "./lib/db";
@@ -147,7 +150,7 @@ app.use("/api", apiLimiter);
 // /auth   → login/register (authRouter handles internally)
 // /ingest → key-based auth (ingestRouter handles internally)
 // /sentinel → mixed: /current public, /history JWT, /run x-gda-key (sentinelRouter handles internally)
-const SELF_AUTH_PREFIXES = ["/auth", "/ingest", "/sentinel", "/launchpad"];
+const SELF_AUTH_PREFIXES = ["/auth", "/ingest", "/sentinel", "/launchpad", "/v2", "/partner-intel"];
 app.use("/api", (req, res, next) => {
   if (SELF_AUTH_PREFIXES.some((p) => req.path.startsWith(p))) return next();
   return authMiddleware(req, res, next);
@@ -212,6 +215,9 @@ app.use("/api/sources", sourcesRouter);
 app.use("/api/mergers", mergersRouter);
 app.use("/api/ai-gateway", aiGatewayRouter);
 app.use("/api/capture-discipline", captureDisciplineRouter);
+app.use("/api/v2/opportunities", opportunitiesV2Router);
+app.use("/api/v2/pipeline", pipelineV2Router);
+app.use("/api/partner-intel", partnerIntelRouter);
 
 // --- n8n webhook proxy (generic pass-through to any n8n workflow) ---
 app.use("/api/n8n", n8nProxyRouter);

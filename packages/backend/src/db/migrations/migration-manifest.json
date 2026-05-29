@@ -130,5 +130,6 @@
   "125_vector_embeddings_dual_write.sql": "9a884c79bb4158f7ec50902d0540ac6bd1358642b7cae7835e55869ed386f354",
   "126_staging_banner_off.sql": "3a894bd30cbf1e582b3aae13cd99d63d4db30f2809ec5dc9848d1cee8f0ebbb8",
   "127_ou_registry_launchpad_flags.sql": "d823627ea97bbf6e9e7396088c84bebbc7fd51b93fbb73ad45ef5287adeb398d",
-  "128_riverstone_uei_confirmed.sql": "ffd32664600fccdfe9c8de7a3df8db034603b1a2e08a38867d192125894adbcb"
+  "128_riverstone_uei_confirmed.sql": "ffd32664600fccdfe9c8de7a3df8db034603b1a2e08a38867d192125894adbcb",
+  "129_sprint2_opps_pipeline_partner_intel.sql": "f0eb1d1d7554b550a169a1bc0105260fb81f193af2fad8c0985c2e1553f52b59"
 }

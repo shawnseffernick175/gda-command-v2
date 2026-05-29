@@ -1,0 +1,75 @@
+{
+  "name": "SAM.gov Opportunity Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 1 }]
+        }
+      },
+      "name": "Cron Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.sam.gov/opportunities/v2/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "postedFrom", "value": "={{ $now.minus({ hours: 2 }).toFormat('MM/dd/yyyy') }}" },
+            { "name": "limit", "value": "100" },
+            { "name": "api_key", "value": "={{ $env.SAM_GOV_API_KEY }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch SAM.gov Opps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst opps = items[0].json.opportunitiesData || [];\nreturn opps.map(o => ({\n  json: {\n    source: 'sam_gov',\n    sam_notice_id: o.noticeId,\n    title: o.title,\n    agency: o.department || o.fullParentPathName,\n    sub_agency: o.subtier || null,\n    naics: o.naicsCode || null,\n    set_aside: o.typeOfSetAside || null,\n    description: o.description || null,\n    response_due_at: o.responseDeadLine || null,\n    posted_at: o.postedDate || null,\n    value_min: null,\n    value_max: null\n  }\n}));"
+      },
+      "name": "Map to Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.GDA_BACKEND_URL }}/api/v2/opportunities",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-gda-key", "value": "={{ $env.GDA_WEBHOOK_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "body", "value": "={{ JSON.stringify($json) }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "POST to GDA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 300]
+    }
+  ],
+  "connections": {
+    "Cron Hourly": { "main": [[{ "node": "Fetch SAM.gov Opps", "type": "main", "index": 0 }]] },
+    "Fetch SAM.gov Opps": { "main": [[{ "node": "Map to Schema", "type": "main", "index": 0 }]] },
+    "Map to Schema": { "main": [[{ "node": "POST to GDA", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

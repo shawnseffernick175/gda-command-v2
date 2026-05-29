@@ -47,6 +47,9 @@ const SourceManager = lazy(() => import("./pages/SourceManager"));
 const MergerContext = lazy(() => import("./pages/MergerContext"));
 const AIGateway = lazy(() => import("./pages/AIGateway"));
 const CaptureDiscipline = lazy(() => import("./pages/CaptureDiscipline"));
+const OpportunitiesV2 = lazy(() => import("./pages/OpportunitiesV2"));
+const PipelineV2 = lazy(() => import("./pages/PipelineV2"));
+const PartnerIntel = lazy(() => import("./pages/PartnerIntel"));
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -65,6 +68,9 @@ const NAV_GROUPS = [
       { path: "/fast-track", label: "Fast Track", icon: "🚀" },
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
+      { path: "/opportunities-v2", label: "Opportunities", icon: "📋" },
+      { path: "/pipeline-v2", label: "War Room", icon: "🎯" },
+      { path: "/partner-intel", label: "Partner Intel", icon: "🔍" },
       { path: "/vehicles", label: "Vehicles", icon: "🏗" },
       { path: "/approvals", label: "Approvals", icon: "✓" },
       { path: "/risk-register", label: "Risk Register", icon: "⚠" },
@@ -434,6 +440,9 @@ export default function App() {
             <Route path="/mergers" element={<MergerContext />} />
             <Route path="/ai-gateway" element={<AIGateway />} />
             <Route path="/capture-discipline" element={<CaptureDiscipline />} />
+            <Route path="/opportunities-v2" element={<OpportunitiesV2 />} />
+            <Route path="/pipeline-v2" element={<PipelineV2 />} />
+            <Route path="/partner-intel" element={<PartnerIntel />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </Suspense>

@@ -9,6 +9,10 @@
  * State-dependent: this migration only has an effect on production databases
  * that ran the old DIBBS code. On fresh databases, the DELETEs are no-ops.
  *
+ * NOTE: Sprint 2 (migration 129) renamed the legacy opportunities table
+ * to opportunities_legacy. This test detects the rename and uses the
+ * correct table name automatically.
+ *
  * Usage: DATABASE_URL=... npx tsx src/db/test-migration-048.ts
  */
 
@@ -38,13 +42,27 @@ async function run() {
   try {
     process.stdout.write("[test-048] Starting regression test...\n");
 
-    // Read migration 048 SQL
+    // Sprint 2 renames opportunities → opportunities_legacy; detect which exists
+    const { rows: legacyCheck } = await pool.query(
+      `SELECT to_regclass('opportunities_legacy') IS NOT NULL AS exists`
+    );
+    const tableName = legacyCheck[0]?.exists
+      ? "opportunities_legacy"
+      : "opportunities";
+
+    // Read migration 048 SQL and adjust table name if needed
     const migration048Path = path.join(
       __dirname,
       "migrations",
       "048_cleanup_fake_dibbs_records.sql",
     );
-    const migration048SQL = fs.readFileSync(migration048Path, "utf-8");
+    let migration048SQL = fs.readFileSync(migration048Path, "utf-8");
+    if (tableName === "opportunities_legacy") {
+      migration048SQL = migration048SQL.replace(
+        /\bopportunities\b/g,
+        "opportunities_legacy",
+      );
+    }
 
     // --- Test 1: Production state (fake DIBBS records exist) ---
     process.stdout.write("\n  Test 1: Production state (fake DIBBS records exist)\n");
@@ -58,7 +76,7 @@ async function run() {
 
     for (const rec of fakeRecords) {
       await pool.query(
-        `INSERT INTO opportunities (id, title, description, agency, data_source, status, score)
+        `INSERT INTO ${tableName} (id, title, description, agency, data_source, status, score)
          VALUES ($1, $2, $3, $4, $5, 'discovery', 0)
          ON CONFLICT (id) DO NOTHING`,
         [rec.id, rec.title, `Automated check for ${rec.keyword} requirements on DIBBS`, "Defense Logistics Agency", "dibbs"],
@@ -67,7 +85,7 @@ async function run() {
 
     // Verify fake records exist before migration
     const { rows: beforeRows } = await pool.query(
-      `SELECT id FROM opportunities WHERE id LIKE 'dibbs-check-%'`,
+      `SELECT id FROM ${tableName} WHERE id LIKE 'dibbs-check-%'`,
     );
     assert(
       beforeRows.length >= fakeRecords.length,
@@ -91,7 +109,7 @@ async function run() {
 
     // Verify fake records are gone
     const { rows: afterRows } = await pool.query(
-      `SELECT id FROM opportunities WHERE id LIKE 'dibbs-check-%'`,
+      `SELECT id FROM ${tableName} WHERE id LIKE 'dibbs-check-%'`,
     );
     assert(
       afterRows.length === 0,
@@ -122,7 +140,7 @@ async function run() {
     // Insert a real opportunity to verify it's not deleted
     const realId = `opp-test-real-${Date.now()}`;
     await pool.query(
-      `INSERT INTO opportunities (id, title, status, score)
+      `INSERT INTO ${tableName} (id, title, status, score)
        VALUES ($1, 'Real Opportunity', 'discovery', 0)
        ON CONFLICT (id) DO NOTHING`,
       [realId],
@@ -133,7 +151,7 @@ async function run() {
 
     // Real opportunity should still exist
     const { rows: realRows } = await pool.query(
-      `SELECT id FROM opportunities WHERE id = $1`,
+      `SELECT id FROM ${tableName} WHERE id = $1`,
       [realId],
     );
     assert(
@@ -142,7 +160,7 @@ async function run() {
     );
 
     // Cleanup test data
-    await pool.query(`DELETE FROM opportunities WHERE id = $1`, [realId]);
+    await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [realId]);
 
     // --- Summary ---
     process.stdout.write(`\n[test-048] ${passed} passed, ${failed} failed\n`);
