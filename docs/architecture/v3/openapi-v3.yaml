@@ -1198,11 +1198,10 @@ paths:
                 built_at: "2026-05-29T15:00:00.000Z"
                 node_version: "20.14.0"
 
-# ---------------------------------------------------------------------------
-# Webhooks (n8n inbound — defined in webhooks section per OpenAPI 3.1)
-# ---------------------------------------------------------------------------
-webhooks:
-  samOpportunity:
+  # ---------------------------------------------------------------------------
+  # Webhooks (n8n inbound — routable paths)
+  # ---------------------------------------------------------------------------
+  /webhooks/sam-opportunity:
     post:
       operationId: webhookSamOpportunity
       summary: n8n posts SAM.gov findings
@@ -1228,7 +1227,7 @@ webhooks:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  fpdsAward:
+  /webhooks/fpds-award:
     post:
       operationId: webhookFpdsAward
       summary: n8n posts FPDS award data
@@ -1252,7 +1251,7 @@ webhooks:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  emailActionItem:
+  /webhooks/email-action-item:
     post:
       operationId: webhookEmailActionItem
       summary: n8n posts email-derived action items
@@ -1571,6 +1570,10 @@ components:
             $ref: '#/components/schemas/SourceRef'
         grade:
           $ref: '#/components/schemas/Grade'
+        grade_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
         status:
           $ref: '#/components/schemas/OpportunityStatus'
         response_due_at:
@@ -2071,6 +2074,8 @@ components:
     CaptureUpdate:
       type: object
       properties:
+        color_review_stage:
+          type: string
         color_review_notes:
           type: string
         pricing_assumptions:
