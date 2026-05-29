@@ -750,3 +750,164 @@ are handled by the new base URL. The only exception is `partner-intel/profiles/:
 - **Schema design** → F-201
 - **Data migration** → F-203
 - **Test strategy** → F-204
+
+
+## Addendum A — No-Degradation Mandate (R2 Contract Hardening)
+
+**Date:** 2026-05-29
+**Binding rule:** The user has explicitly stated: "I do not want a degraded tool. I laid out what I want, now let's get there."
+
+This addendum hardens Section 1.6 (R2 — Auto-analysis) and resolves Open Question 7 (analysis caching strategy) to eliminate every contract path that could expose the user to placeholder, pending, stale, or "unavailable" analysis state.
+
+---
+
+### A.1 R2 contract invariant
+
+> **Every detail endpoint (`GET /api/v3/opportunities/:id`, `GET /api/v3/captures/:id`) returns either a fully-populated, fresh analysis block or HTTP 503. There is no third state.**
+
+The following are removed from the API contract:
+
+- `analysis_status` field — removed from all response schemas.
+- `"stale": true` flag — removed from analysis block.
+- Returning `analysis: null` — forbidden under any condition.
+- Returning analysis where `ai_analyzed_at < opportunity.updated_at` — forbidden.
+- Returning analysis where `analysis_version != current model version` — forbidden.
+
+---
+
+### A.2 Replaces Section 1.6
+
+The analysis block returned in every detail response satisfies all of the following:
+
+1. `analysis` is an object (never null).
+2. `analysis.generated_at >= record.updated_at`.
+3. `analysis.version == server's current ANALYSIS_VERSION constant`.
+4. Every analysis field has the same R1 `<field>_sources` siblings as top-level fields.
+
+Example detail response:
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "id": "opp_123",
+    "title": "Army RS3 TO 47",
+    "title_sources": [ /* ... */ ],
+    "analysis": {
+      "version": "v3.2026.05",
+      "generated_at": "2026-05-29T14:05:00.000Z",
+      "pwin": 0.72,
+      "pwin_sources": [ /* ... */ ],
+      "incumbent": "CACI International",
+      "incumbent_sources": [ /* ... */ ],
+      "competitors": [ /* ... */ ],
+      "competitors_sources": [ /* ... */ ],
+      "blackhat": { /* ... */ },
+      "blackhat_sources": [ /* ... */ ],
+      "wargame": { /* ... */ },
+      "wargame_sources": [ /* ... */ ],
+      "timeline": { /* ... */ },
+      "timeline_sources": [ /* ... */ ]
+    }
+  }
+}
+```
+
+No `analysis_status`. No `stale`. No `null`.
+
+---
+
+### A.3 Detail endpoint synchronous behavior
+
+When a detail endpoint is called and the cached analysis is missing, stale, or version-mismatched, the server:
+
+1. Enqueues (or attaches to an in-flight) high-priority analysis job.
+2. Blocks the request up to **10 seconds** waiting for job completion.
+3. On completion within 10 seconds: returns 200 with the fresh analysis populated per A.2.
+4. On timeout: returns **HTTP 503** with the error envelope:
+
+```jsonc
+{
+  "success": false,
+  "error": {
+    "code": "ANALYSIS_TIMEOUT",
+    "message": "Analysis is being computed. Retry in a few seconds.",
+    "detail": { "estimated_seconds": 5 }
+  },
+  "meta": { "generatedAt": "...", "requestId": "..." }
+}
+```
+
+The frontend client treats 503 ANALYSIS_TIMEOUT as a retryable condition with a 2-second backoff. The user sees a loading indicator (not a degraded view) until the next request succeeds.
+
+**Why this is not a degradation:** Pre-warm policy (Addendum A.5) ensures > 99% of detail opens hit a fresh cache and return < 50ms. The 503 path is a rare edge case (post-deploy cold start, brand-new opportunity opened before pre-warm completed). In every case, the user either sees fresh analysis or a loading indicator — never wrong, never partial, never stale.
+
+---
+
+### A.4 Resolution of Open Question 7
+
+Open Question 7 in the parent document offered two options:
+
+> "Should stale analysis be served immediately while re-analysis runs in the background, or should the response wait for fresh analysis?"
+
+**Binding answer: WAIT FOR FRESH.** Do not serve stale. Do not flag stale. The detail endpoint guarantees freshness or 503. This resolves Q7 and removes the "stale: true" flag from the contract permanently.
+
+---
+
+### A.5 Pre-warm policy (cross-reference)
+
+The architecture document (F-201) Addendum A.2 defines the pre-warm policy. Summary for API contract purposes:
+
+| Event | API behavior |
+|---|---|
+| `POST /api/v3/webhooks/sam-opportunity` (n8n SAM ingest) | Webhook returns 200 with upsert counts; analysis job enqueued post-commit. |
+| `POST /api/v3/opportunities` (manual create) | Returns 201 with the new opportunity; analysis job enqueued post-commit. |
+| `PATCH /api/v3/opportunities/:id` (update) | Returns 200 with the updated opportunity; if any analysis-affecting field changed, re-analysis job enqueued post-commit. |
+| Background sweep | Every 6 hours, all opportunities with `ai_analyzed_at < NOW() - 24h` or `analysis_version != current` are re-analyzed at NORMAL priority. |
+
+The list endpoint (`GET /api/v3/opportunities`) does NOT include the full analysis block (to keep list responses lightweight), but does include `ai_analyzed_at` and `analysis_version` so the frontend can preview freshness state.
+
+---
+
+### A.6 OpenAPI spec updates required
+
+The companion `openapi-v3.yaml` is updated as follows:
+
+1. Remove `analysis_status` from all schemas.
+2. Remove `stale` boolean from the `Analysis` schema.
+3. Add `analysis.version` (string, required) and `analysis.generated_at` (string-date-time, required).
+4. Mark `analysis` as required (not nullable) in all detail response schemas.
+5. Add `ANALYSIS_TIMEOUT` to the documented error codes.
+6. Add 503 response with `ANALYSIS_TIMEOUT` envelope to all detail endpoint specs.
+7. List endpoint schemas include `ai_analyzed_at` (string-date-time) and `analysis_version` (string) at the top level; `analysis` block remains list-only-excluded.
+
+The OpenAPI file edits land in the same commit as this addendum.
+
+---
+
+### A.7 Test coverage cross-reference (F-204 amendment)
+
+The F-204 test strategy is amended in lockstep with this contract. Specifically, the R2 auto-analysis gate adds:
+
+1. Assert HTTP 503 path returns `ANALYSIS_TIMEOUT` with documented envelope, not a 200 with `analysis: null`.
+2. Assert `analysis.version` matches current model version constant.
+3. Assert `analysis.generated_at >= opportunity.updated_at` on every successful detail response.
+4. Assert list endpoint includes `ai_analyzed_at` and `analysis_version` per item.
+5. Assert frontend client treats 503 ANALYSIS_TIMEOUT as retryable (no degraded UI displayed during the gap).
+
+The F-204 amendment is filed as a separate commit/PR after F-202 merges.
+
+---
+
+### A.8 Removed (do not implement)
+
+- Open Question 7 default ("serve stale + background refresh, with a `stale: true` flag").
+- Any frontend polling loop for analysis state.
+- Any "analysis unavailable" or "analysis pending" UI placeholder.
+- Any response shape that returns 200 with `analysis: null`.
+
+---
+
+### A.9 Backwards compatibility
+
+This addendum supersedes any conflicting language in Section 1.6 and Question 7 of the parent document. Where the parent document and this addendum conflict, the addendum governs. The OpenAPI spec edits accompanying this addendum are the binding wire format.

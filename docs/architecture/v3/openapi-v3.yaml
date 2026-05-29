@@ -277,8 +277,8 @@ paths:
                         title: "SAM.gov timeline"
                         url: "https://sam.gov/opp/abc123/view"
                         retrieved_at: "2026-05-29T10:05:00.000Z"
+                    version: "v1.3.2"
                     generated_at: "2026-05-29T10:05:00.000Z"
-                    stale: false
                 meta:
                   generatedAt: "2026-05-29T16:00:00.000Z"
                   source: v3
@@ -287,6 +287,26 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          description: |
+            ANALYSIS_TIMEOUT — R2 analysis could not complete within 10s.
+            Per no-degradation contract, the detail endpoint never returns
+            null/placeholder/stale analysis. Client must retry. Includes
+            estimated_seconds in error.detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                success: false
+                error:
+                  code: ANALYSIS_TIMEOUT
+                  message: "Analysis not ready, retry in a few seconds"
+                  detail: "estimated_seconds=8"
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_ghi789
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -648,8 +668,8 @@ paths:
                         title: "ML-based Pwin model v2"
                         url: "/audit/analysis/cap_001"
                         retrieved_at: "2026-05-29T10:05:00.000Z"
+                    version: "v1.3.2"
                     generated_at: "2026-05-29T10:05:00.000Z"
-                    stale: false
                 meta:
                   generatedAt: "2026-05-29T16:00:00.000Z"
                   source: v3
@@ -658,6 +678,24 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          description: |
+            ANALYSIS_TIMEOUT — Capture R2 analysis (pwin) could not complete
+            within 10s. Never returns null/stale analysis. Client must retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                success: false
+                error:
+                  code: ANALYSIS_TIMEOUT
+                  message: "Analysis not ready, retry in a few seconds"
+                  detail: "estimated_seconds=6"
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_stu901
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -1602,6 +1640,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TeamingFlag'
+        ai_analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Timestamp of most recent successful R2 analysis. Used by list views
+            to signal freshness without including the full analysis block.
+            null only if analysis has never been computed (transient — pre-warm
+            policy ensures coverage on ingest). See F-201 Addendum A.
+        analysis_version:
+          type: string
+          nullable: true
+          description: Model version of most recent successful analysis (e.g. "v1.3.2").
         created_at:
           type: string
           format: date-time
@@ -1643,6 +1694,14 @@ components:
               nullable: true
             analysis:
               $ref: '#/components/schemas/Analysis'
+              description: |
+                R2 contract invariant: when this response is returned (HTTP 200),
+                analysis is ALWAYS present, fresh, and non-null. If analysis is
+                not ready within 10s the endpoint returns 503 ANALYSIS_TIMEOUT.
+                There is no third state (no analysis_status, no stale flag, no
+                placeholder, no polling). See phase-1-api-contract.md Addendum A.
+          required:
+            - analysis
 
     OpportunityCreate:
       type: object
@@ -1711,9 +1770,18 @@ components:
           type: string
 
     # -- Analysis (R2) -----------------------------------------------------
+    # NO-DEGRADATION CONTRACT (F-202 Addendum A):
+    # - Endpoints returning this block ALWAYS return it fresh and complete.
+    # - There is NO analysis_status field, NO stale field, NO null analysis.
+    # - If analysis cannot be returned fresh within 10s, the endpoint returns
+    #   503 ANALYSIS_TIMEOUT instead. Client must retry.
     Analysis:
       type: object
+      required: [pwin, version, generated_at]
       properties:
+        version:
+          type: string
+          description: Analysis model version, e.g. "v1.3.2"
         pwin:
           type: number
           minimum: 0
@@ -1779,8 +1847,7 @@ components:
         generated_at:
           type: string
           format: date-time
-        stale:
-          type: boolean
+          description: Timestamp analysis was computed (UTC). Required.
 
     # -- Pipeline -----------------------------------------------------------
     PipelineListResponse:
@@ -2002,6 +2069,17 @@ components:
             $ref: '#/components/schemas/SourceRef'
         color_review_stage:
           type: string
+        ai_analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Timestamp of most recent successful R2 analysis (pwin). Used by
+            list views for freshness signal without full analysis block.
+        analysis_version:
+          type: string
+          nullable: true
+          description: Model version of most recent successful analysis.
         created_at:
           type: string
           format: date-time
@@ -2063,6 +2141,12 @@ components:
               description: Pricing guardrail check result (included on update when margin_pct is set)
             analysis:
               $ref: '#/components/schemas/Analysis'
+              description: |
+                R2 contract invariant: when CaptureDetail returns 200, analysis is
+                always fresh and non-null. If not ready within 10s the endpoint
+                returns 503 ANALYSIS_TIMEOUT. See phase-1-api-contract.md Addendum A.
+          required:
+            - analysis
 
     CaptureCreate:
       type: object
