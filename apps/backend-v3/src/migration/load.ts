@@ -374,6 +374,17 @@ export async function enqueuePreWarmJobs(
 ): Promise<number> {
   if (jobs.length === 0) return 0;
 
+  const pgbossExists = await client.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'pgboss' AND table_name = 'job'
+     ) AS "exists"`,
+  );
+  if (!pgbossExists.rows[0]?.exists) {
+    console.log('  pgboss.job table not found — skipping pre-warm job enqueue (OK for CI)');
+    return 0;
+  }
+
   let count = 0;
   for (const job of jobs) {
     const queueName = job.entityType === 'opportunity'
@@ -382,8 +393,7 @@ export async function enqueuePreWarmJobs(
 
     await client.query(
       `INSERT INTO pgboss.job (name, data, priority, state, retrylimit, retrydelay, retrybackoff)
-       SELECT $1, $2, 0, 'created', 3, 5, true
-       WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'pgboss' AND table_name = 'job')
+       VALUES ($1, $2, 0, 'created', 3, 5, true)
        ON CONFLICT DO NOTHING`,
       [queueName, JSON.stringify(job)],
     );
