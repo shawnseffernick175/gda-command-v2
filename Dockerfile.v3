@@ -1,0 +1,23 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY apps/backend-v3/package.json apps/backend-v3/package-lock.json* ./
+RUN npm install --production=false
+
+COPY apps/backend-v3/tsconfig.json ./
+COPY apps/backend-v3/src/ ./src/
+RUN npx tsc
+
+FROM node:20-alpine
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules/ ./node_modules/
+COPY --from=builder /app/dist/ ./dist/
+COPY docs/architecture/v3/openapi-v3.yaml ./docs/architecture/v3/openapi-v3.yaml
+
+EXPOSE 4000
+
+CMD ["node", "dist/server.js"]

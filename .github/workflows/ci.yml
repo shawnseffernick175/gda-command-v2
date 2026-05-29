@@ -31,7 +31,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build -w packages/shared
-      - run: npm test
+      - run: npm test --workspace=packages/shared --workspace=packages/backend --workspace=packages/frontend --if-present
 
   migrations:
     name: Migration Smoke Test
@@ -131,6 +131,53 @@ jobs:
         if: env.staging_unreachable == 'true'
         run: |
           echo "::warning::Staging DB unreachable (environmental). Skipping staging migration test. This does NOT indicate a migration problem."
+
+  v3-contract:
+    name: V3 Contract Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda
+          POSTGRES_PASSWORD: gda_ci_password
+          POSTGRES_DB: gda_command
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gda -d gda_command"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: V3 backend — build
+        working-directory: apps/backend-v3
+        run: npx tsc --noEmit
+      - name: V3 backend — auth + contract tests
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          JWT_SECRET: ci-jwt-secret
+          GDA_WEBHOOK_KEY: ci-webhook-key
+          NODE_ENV: test
+        run: npx vitest run tests/auth.test.ts tests/contract.test.ts
+      - name: V3 backend — integration tests
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          JWT_SECRET: ci-jwt-secret
+          GDA_WEBHOOK_KEY: ci-webhook-key
+          NODE_ENV: test
+          ANALYSIS_VERSION: v0.0.1-test
+          ANALYSIS_TIMEOUT_MS: "5000"
+          ANALYSIS_POLL_INTERVAL_MS: "50"
+        run: npx vitest run tests/integration.test.ts
 
   compose-drift:
     name: Compose Drift Check
