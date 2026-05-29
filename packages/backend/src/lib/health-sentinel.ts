@@ -557,6 +557,71 @@ async function probeSecretExpiry(): Promise<ProbeResult> {
 // F-100 Sprint 1 probes
 // ---------------------------------------------------------------------------
 
+// Sprint 2 probes — F-101
+async function probeOpportunitiesTableAlive(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "opportunities_table_alive", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { ms } = await withTimeout("opportunities_table_alive", async () => {
+      await pool.query("SELECT COUNT(*) FROM opportunities");
+    });
+    return { name: "opportunities_table_alive", status: "healthy", latency_ms: ms, detail: "ok" };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "opportunities_table_alive", status: "down", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probePipelineTableAlive(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "pipeline_table_alive", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { ms } = await withTimeout("pipeline_table_alive", async () => {
+      await pool.query("SELECT COUNT(*) FROM pipeline_items");
+    });
+    return { name: "pipeline_table_alive", status: "healthy", latency_ms: ms, detail: "ok" };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "pipeline_table_alive", status: "down", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probePartnerIntelSeeded(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "partner_intel_seeded", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { value: count, ms } = await withTimeout("partner_intel_seeded", async () => {
+      const result = await pool.query("SELECT COUNT(*)::int AS cnt FROM partner_intel_profiles");
+      return parseInt(result.rows[0].cnt, 10);
+    });
+    if (count === 2) {
+      return { name: "partner_intel_seeded", status: "healthy", latency_ms: ms, detail: `${count} profiles seeded` };
+    }
+    return { name: "partner_intel_seeded", status: "down", latency_ms: ms, detail: `expected 2, found ${count}` };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "partner_intel_seeded", status: "degraded", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probeTeamingFlagsTableAlive(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "teaming_flags_table_alive", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { ms } = await withTimeout("teaming_flags_table_alive", async () => {
+      await pool.query("SELECT COUNT(*) FROM teaming_flags");
+    });
+    return { name: "teaming_flags_table_alive", status: "healthy", latency_ms: ms, detail: "ok" };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "teaming_flags_table_alive", status: "down", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
 async function probeOuRegistrySeed(): Promise<ProbeResult> {
   const start = Date.now();
   try {
@@ -676,11 +741,15 @@ export async function runSentinel(): Promise<Snapshot> {
     probeOuRegistrySeed(),
     probeMigrationsCurrent(),
     probeLaunchpadFlagsFresh(),
+    probeOpportunitiesTableAlive(),
+    probePipelineTableAlive(),
+    probePartnerIntelSeeded(),
+    probeTeamingFlagsTableAlive(),
   ]);
 
   const components: ProbeResult[] = probes.map((p, i) => {
     if (p.status === "fulfilled") return p.value;
-    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health", "secret_expiry", "ou_registry_seed", "migrations_current", "launchpad_flags_fresh"];
+    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health", "secret_expiry", "ou_registry_seed", "migrations_current", "launchpad_flags_fresh", "opportunities_table_alive", "pipeline_table_alive", "partner_intel_seeded", "teaming_flags_table_alive"];
     return {
       name: names[i],
       status: "degraded" as ComponentStatus,
