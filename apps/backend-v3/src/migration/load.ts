@@ -53,6 +53,10 @@ async function ensureMigrationTables(client: pg.PoolClient): Promise<void> {
   `);
 
   await client.query(`
+    SELECT setval('sources_id_seq', GREATEST((SELECT MAX(id) FROM sources), 1))
+  `);
+
+  await client.query(`
     CREATE TABLE IF NOT EXISTS v3_opportunities (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       title TEXT NOT NULL,
@@ -412,15 +416,12 @@ export async function loadAll(
 
     await ensureMigrationTables(client);
 
-    const [opportunities, captures, action_items, sources, partners, preWarm] =
-      await Promise.all([
-        loadOpportunities(client, data.opportunities),
-        loadCaptures(client, data.captures),
-        loadActionItems(client, data.actionItems),
-        loadSources(client, data.sources),
-        loadPartners(client, data.partners),
-        enqueuePreWarmJobs(client, data.preWarmJobs),
-      ]);
+    const opportunities = await loadOpportunities(client, data.opportunities);
+    const captures = await loadCaptures(client, data.captures);
+    const action_items = await loadActionItems(client, data.actionItems);
+    const sources = await loadSources(client, data.sources);
+    const partners = await loadPartners(client, data.partners);
+    const preWarm = await enqueuePreWarmJobs(client, data.preWarmJobs);
 
     await client.query('COMMIT');
 
