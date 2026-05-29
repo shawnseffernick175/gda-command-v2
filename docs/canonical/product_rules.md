@@ -13,3 +13,15 @@ If a field has no source, the API omits it from the response. The UI never rende
 ## R2 — Analysis is automatic on opportunity open
 
 Opening any opportunity detail page automatically triggers full analysis (pwin, incumbent, competitors, blackhat, wargame, timeline). There is no "Run Analysis" or "Click to Analyze" button anywhere in the application. Results are cached on `(opp_id, opp.updated_at)`; re-runs are silent and background.
+
+## Implementation status
+
+| Page | R1 compliant | PR |
+|---|---|---|
+| OpportunityDetail | Yes | #379 (F-104) |
+| Pipeline | Yes | #current (F-105) |
+| Capture | Yes | #current (F-105) |
+| Partner Intel | Yes | #current (F-105) |
+| Action Items | Yes | #current (F-105) |
+| Launchpad | Pending | — |
+| Settings | Pending | — |

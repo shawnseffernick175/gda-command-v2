@@ -4,16 +4,22 @@ import { authenticatedFetch } from "../api/auth";
 import ActionItemRow from "../components/capture/ActionItemRow";
 import NewActionItemModal from "../components/capture/NewActionItemModal";
 import EmailPasteModal from "../components/capture/EmailPasteModal";
+import SourceBadge from "../components/SourceBadge";
+import type { SourceRef } from "../components/opportunity/FieldWithSource";
 
 interface ActionItem {
   id: number;
   ou_tag: string;
   title: string;
+  title_sources?: SourceRef[];
   detail: string | null;
+  detail_sources?: SourceRef[];
   owner_email: string;
+  owner_email_sources?: SourceRef[];
   source: string;
   source_id: string | null;
   due_date: string | null;
+  due_date_sources?: SourceRef[];
   due_inferred_from: string | null;
   status: string;
   created_at: string;
@@ -36,6 +42,36 @@ function getTodayISOEST(): string {
   return new Date().toLocaleDateString("en-CA", {
     timeZone: "America/New_York",
   });
+}
+
+const KIND_TO_SOURCE: Record<string, string> = {
+  sam_gov: "sam.gov",
+  fpds: "fpds",
+  usaspending: "usaspending",
+  govwin: "govwin",
+  internal: "manual",
+  news: "manual",
+  doctrine: "manual",
+  partner_site: "manual",
+};
+
+function InlineSources({ sources }: { sources: SourceRef[] }) {
+  if (!sources || sources.length === 0) return null;
+  if (sources.length === 1) {
+    return (
+      <a href={sources[0].url} target="_blank" rel="noopener noreferrer" title={sources[0].title}>
+        <SourceBadge source={KIND_TO_SOURCE[sources[0].kind] ?? "manual"} hideManual={false} size="sm" />
+      </a>
+    );
+  }
+  return (
+    <SourceBadge
+      source={`${sources.length} sources`}
+      hideManual={false}
+      size="sm"
+      sources={sources}
+    />
+  );
 }
 
 export default function ActionItems() {

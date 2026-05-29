@@ -4,6 +4,8 @@ import { successEnvelope, errorEnvelope } from "../middleware/envelope";
 import { getPool } from "../lib/db";
 import { requireRole } from "../lib/auth";
 import { n8nWebhookConfigured, fetchCapturePlansFromN8n } from "../lib/n8n-data";
+import { attachSources } from "../lib/source-validator";
+import type { SourceRef } from "../lib/source-validator";
 import type { CapturePlan } from "@gda/shared";
 
 const router = Router();
@@ -146,8 +148,36 @@ router.get("/plans", async (_req, res) => {
 
   const stats = computePlanStats(allPlans, plans);
 
+  const now = new Date().toISOString();
+  const sourcedPlans = plans.map((plan) => {
+    const internalSource: SourceRef[] = [{
+      kind: "internal",
+      title: `Capture plan — ${plan.opportunity_title}`,
+      url: `/audit/edits/${plan.id}`,
+      retrieved_at: now,
+    }];
+
+    const fieldMap: Record<string, SourceRef[]> = {
+      opportunity_title: internalSource,
+      agency: internalSource,
+      capture_manager: internalSource,
+      pwin: internalSource,
+      value_estimated: internalSource,
+    };
+
+    return attachSources(
+      plan as unknown as Record<string, unknown>,
+      fieldMap,
+      [
+        "milestones", "gate_reviews", "win_themes", "discriminators",
+        "risks", "teaming_partners", "created_at", "updated_at",
+        "opportunity_id",
+      ],
+    );
+  });
+
   res.json(
-    successEnvelope("GDA.capture", "list-plans", { plans, ...stats, source })
+    successEnvelope("GDA.capture", "list-plans", { plans: sourcedPlans, ...stats, source })
   );
 });
 
