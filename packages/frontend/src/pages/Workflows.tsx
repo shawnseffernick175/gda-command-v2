@@ -162,7 +162,7 @@ export default function Workflows() {
           Could not connect to the n8n workflow engine. This is expected in development if n8n is not running.
           All other GDA Command features work independently.
         </p>
-        <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 16, fontFamily: "monospace", background: "var(--color-surface)", padding: "8px 16px", borderRadius: 6, display: "inline-block" }}>
+        <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 16,  background: "var(--color-surface)", padding: "8px 16px", borderRadius: 6, display: "inline-block" }}>
           {error}
         </div>
         <div>

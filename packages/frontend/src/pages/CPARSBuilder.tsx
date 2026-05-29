@@ -136,7 +136,7 @@ export default function CPARSBuilder() {
               borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background 0.15s",
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>{r.contract_number}</span>
+                <span style={{ fontSize: 11, color: "var(--color-text-muted)",  }}>{r.contract_number}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   <Pill label={r.status} color={STATUS_COLORS[r.status] ?? "#6b7280"} />
                   {r.overall_rating && <Pill label={r.overall_rating} color={RATING_COLORS[r.overall_rating] ?? "#6b7280"} />}

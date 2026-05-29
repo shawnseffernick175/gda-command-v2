@@ -261,7 +261,7 @@ export default function SAMMonitor() {
                 borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background 0.15s",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>{o.notice_id}</span>
+                  <span style={{ fontSize: 11, color: "var(--color-text-muted)",  }}>{o.notice_id}</span>
                   <div style={{ display: "flex", gap: 6 }}>
                     <Pill label={o.scan_status} color={STATUS_COLORS[o.scan_status] ?? "#6b7280"} />
                     <span style={{ fontSize: 13, fontWeight: 700, color: o.relevance_score >= 85 ? "#16a34a" : o.relevance_score >= 70 ? "#d97706" : "#6b7280" }}>
@@ -378,7 +378,7 @@ export default function SAMMonitor() {
                 const dur = s.completed_at ? `${Math.round((new Date(s.completed_at).getTime() - new Date(s.started_at).getTime()) / 1000)}s` : "—";
                 return (
                   <tr key={s.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
-                    <td style={{ padding: "10px 14px", fontFamily: "monospace" }}>{s.id}</td>
+                    <td style={{ padding: "10px 14px",  }}>{s.id}</td>
                     <td style={{ padding: "10px 14px" }}>{relTime(s.started_at)}</td>
                     <td style={{ padding: "10px 14px" }}>{dur}</td>
                     <td style={{ padding: "10px 14px" }}><Pill label={s.status} color={s.status === "completed" ? "#16a34a" : s.status === "failed" ? "#dc2626" : "#d97706"} /></td>

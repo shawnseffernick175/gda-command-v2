@@ -19,16 +19,9 @@ interface CriticalFlagsListProps {
   onRefresh: () => void;
 }
 
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "#dc2626",
-  warning: "#d97706",
-  info: "#2563eb",
-};
-
 function formatDateEST(dateStr: string): string {
   try {
-    // Extract date-only portion to avoid UTC midnight → EST date-shift
-    const datePart = dateStr.slice(0, 10); // "2026-04-29"
+    const datePart = dateStr.slice(0, 10);
     const d = new Date(datePart + "T12:00:00Z");
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("en-US", {
@@ -40,6 +33,37 @@ function formatDateEST(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function SeverityBadge({ severity, title, dueDate }: { severity: string; title: string; dueDate: string | null }) {
+  if (severity === "critical") {
+    let label: string;
+    if (dueDate) {
+      const d = new Date(dueDate.slice(0, 10) + "T12:00:00Z");
+      const days = Math.ceil((d.getTime() - Date.now()) / 86400000);
+      label = days > 0
+        ? `CRITICAL — ${days} DAYS`
+        : `EXPIRED ${formatDateEST(dueDate)}`;
+    } else {
+      label = title.toUpperCase().includes("EXPIRED") ? "EXPIRED" : title;
+    }
+    return (
+      <span className="inline-block rounded px-2 py-0.5 text-[11px] font-semibold bg-critical text-white">
+        {label}
+      </span>
+    );
+  }
+  if (severity === "warning" && dueDate) {
+    const d = new Date(dueDate.slice(0, 10) + "T12:00:00Z");
+    const days = Math.ceil((d.getTime() - Date.now()) / 86400000);
+    const label = days > 0 ? `EXPIRES IN ${days} DAYS` : `EXPIRED`;
+    return (
+      <span className="inline-block rounded px-2 py-0.5 text-[11px] font-semibold border border-amber-700 text-amber-700">
+        {label}
+      </span>
+    );
+  }
+  return null;
 }
 
 export default function CriticalFlagsList({ flags, onRefresh }: CriticalFlagsListProps) {
@@ -62,26 +86,16 @@ export default function CriticalFlagsList({ flags, onRefresh }: CriticalFlagsLis
 
   if (flags.length === 0) {
     return (
-      <div
-        style={{
-          padding: 24,
-          background: "#F7F6F2",
-          borderRadius: 8,
-          border: "1px solid #D4D1CA",
-          color: "#6b7280",
-          fontSize: 15,
-          fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-        }}
-      >
+      <div className="card text-muted text-body">
         No active flags.
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-4">
       {flags.map((flag) => {
-        const accentColor = SEVERITY_COLORS[flag.severity] ?? SEVERITY_COLORS.info;
+        const isCritical = flag.severity === "critical";
         const isExpanded = expanded[flag.id] ?? false;
         const detailText = flag.detail.replace(/⚠️/g, "");
         const truncated = detailText.length > 200 && !isExpanded;
@@ -89,121 +103,42 @@ export default function CriticalFlagsList({ flags, onRefresh }: CriticalFlagsLis
         return (
           <div
             key={flag.id}
-            style={{
-              background: "#fff",
-              borderRadius: 8,
-              border: "1px solid #D4D1CA",
-              borderLeft: `4px solid ${accentColor}`,
-              padding: 24,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-              fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-            }}
+            className={`card ${isCritical ? "border-l-4 border-l-critical" : "border-l-4 border-l-accent"}`}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: accentColor,
-                  flexShrink: 0,
-                  marginTop: 6,
-                }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    flexWrap: "wrap",
-                    marginBottom: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 600,
-                      color: "#28251D",
-                      lineHeight: 1.3,
-                    }}
-                  >
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-wrap mb-2">
+                  <span className="text-[16px] font-semibold text-ink leading-tight">
                     {flag.title}
                   </span>
+                  <SeverityBadge severity={flag.severity} title={flag.title} dueDate={flag.due_date} />
                   {flag.due_date && (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: "#6b7280",
-                        fontFeatureSettings: '"tnum"',
-                        whiteSpace: "nowrap",
-                      }}
-                    >
+                    <span className="caption num whitespace-nowrap">
                       Due: {formatDateEST(flag.due_date)}
                     </span>
                   )}
                 </div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 15,
-                    color: "#374151",
-                    lineHeight: 1.5,
-                  }}
-                >
+                <p className="m-0 text-body text-ink leading-relaxed">
                   {truncated ? detailText.slice(0, 200) + "..." : detailText}
                   {detailText.length > 200 && (
                     <button
                       onClick={() => setExpanded((prev) => ({ ...prev, [flag.id]: !isExpanded }))}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#01696F",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        marginLeft: 4,
-                        padding: 0,
-                      }}
+                      className="bg-transparent border-none text-accent cursor-pointer text-[13px] font-medium ml-1 p-0"
                     >
                       {isExpanded ? "Show less" : "Show more"}
                     </button>
                   )}
                 </p>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
-                    marginTop: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
+                <div className="flex items-center gap-4 mt-3 flex-wrap">
                   {flag.doctrine_anchor && (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: "#6b7280",
-                        fontStyle: "italic",
-                      }}
-                    >
+                    <span className="doctrine-tag">
                       {flag.doctrine_anchor}
                     </span>
                   )}
                   <button
                     onClick={() => handleDismiss(flag.id)}
                     disabled={dismissing === flag.id}
-                    style={{
-                      background: "none",
-                      border: "1px solid #D4D1CA",
-                      borderRadius: 4,
-                      color: "#6b7280",
-                      cursor: dismissing === flag.id ? "not-allowed" : "pointer",
-                      fontSize: 12,
-                      padding: "4px 12px",
-                      marginLeft: "auto",
-                      opacity: dismissing === flag.id ? 0.5 : 1,
-                    }}
+                    className={`btn ml-auto ${dismissing === flag.id ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     {dismissing === flag.id ? "Dismissing..." : "Dismiss"}
                   </button>

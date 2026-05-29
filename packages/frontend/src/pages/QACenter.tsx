@@ -417,7 +417,7 @@ function LiveFailuresTable({ failures }: { failures: QAFailure[] }) {
           {failures.map((f, i) => (
             <tr key={f.id ?? i}>
               <td style={tdStyle}>
-                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                <code style={{  fontSize: 13 }}>
                   {f.workflowName ?? f.workflow ?? "—"}
                 </code>
                 {f.workflowId && (
@@ -427,7 +427,7 @@ function LiveFailuresTable({ failures }: { failures: QAFailure[] }) {
                 )}
               </td>
               <td style={tdStyle}>
-                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-danger)" }}>
+                <code style={{  fontSize: 13, color: "var(--color-danger)" }}>
                   {f.failedNode ?? "—"}
                 </code>
               </td>
@@ -466,14 +466,14 @@ function MockFailuresTable({ failures }: { failures: QAFailure[] }) {
           {failures.map((f) => (
             <tr key={f.id}>
               <td style={tdStyle}>
-                <code style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                <code style={{  fontSize: 13 }}>
                   {f.workflow}
                 </code>
               </td>
               <td style={tdStyle}>{f.action}</td>
               <td style={tdStyle}>
                 <code style={{
-                  fontFamily: "var(--font-mono)",
+                  
                   fontSize: 13,
                   color: "var(--color-danger)",
                 }}>
@@ -595,7 +595,7 @@ function CheckCard({ check }: { check: QACheckRow }) {
         <span style={{
           fontSize: 11,
           color: "var(--color-text-muted)",
-          fontFamily: "var(--font-mono)",
+          
           whiteSpace: "nowrap",
         }}>
           {displayMs}ms
@@ -736,7 +736,7 @@ function SAMVerifyRunCard({ run, compact }: { run: SAMVerifyRun; compact?: boole
         <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
           {new Date(run.ran_at).toLocaleString()}
         </span>
-        <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+        <span style={{ fontSize: 11, color: "var(--color-text-muted)",  }}>
           {run.duration_ms}ms
         </span>
       </div>

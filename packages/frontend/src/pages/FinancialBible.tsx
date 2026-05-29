@@ -662,7 +662,7 @@ function DrillDownView({ data, monthly }: { data: FinancialDrillDownData; monthl
                   <td style={{ padding: "10px 16px" }}>
                     <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500, background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>{li.category}</span>
                   </td>
-                  <td style={{ padding: "10px 16px", fontSize: 12, fontFamily: "monospace", color: "var(--color-text-muted)" }}>{li.contract_id ?? "—"}</td>
+                  <td style={{ padding: "10px 16px", fontSize: 12,  color: "var(--color-text-muted)" }}>{li.contract_id ?? "—"}</td>
                   <td style={{ padding: "10px 16px", fontSize: 12, color: "var(--color-text-muted)" }}>{li.notes ?? "—"}</td>
                 </tr>
               ))}

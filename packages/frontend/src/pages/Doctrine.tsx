@@ -550,7 +550,7 @@ function PublishRunCard({ run }: { run: DoctrinePublishRunRow }) {
         </div>
 
         {run.commit_sha && (
-          <code style={{ fontSize: 12, color: "#60a5fa", fontFamily: "monospace" }}>
+          <code style={{ fontSize: 12, color: "#60a5fa",  }}>
             {run.commit_sha.slice(0, 7)}
           </code>
         )}
@@ -668,7 +668,7 @@ function FinalizeResultPanel({
           <span style={{ fontSize: 14, fontWeight: 600 }}>
             Finalize {result.sprintId}
           </span>
-          <code style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>
+          <code style={{ fontSize: 11, color: "var(--color-text-muted)",  }}>
             {result.correlationId}
           </code>
         </div>

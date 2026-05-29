@@ -395,7 +395,7 @@ function RequirementsTab({
                 </span>
 
                 {/* Section */}
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)", fontFamily: "monospace" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-muted)",  }}>
                   {req.section}
                 </span>
 
@@ -476,7 +476,7 @@ function RequirementsTab({
                               borderRadius: 4,
                               background: "rgba(139,92,246,0.1)",
                               color: "#8b5cf6",
-                              fontFamily: "monospace",
+                              
                             }}
                           >
                             {cid}
@@ -620,7 +620,7 @@ function ClausesTab({
                     borderRadius: 4,
                     background: `${CLAUSE_TYPE_COLORS[clause.type]}15`,
                     color: CLAUSE_TYPE_COLORS[clause.type],
-                    fontFamily: "monospace",
+                    
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -734,7 +734,7 @@ function ClausesTab({
                               borderRadius: 4,
                               background: "rgba(139,92,246,0.1)",
                               color: "#8b5cf6",
-                              fontFamily: "monospace",
+                              
                             }}
                           >
                             {rc}

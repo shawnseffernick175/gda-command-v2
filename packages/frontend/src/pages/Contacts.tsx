@@ -245,7 +245,7 @@ export default function Contacts() {
       {error && <p style={{ color: "#ef4444" }}>{error}</p>}
 
       {!loading && !error && (
-        <div className="two-column-layout" style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, alignItems: "start" }}>
           {/* Contact List */}
           <div
             style={{

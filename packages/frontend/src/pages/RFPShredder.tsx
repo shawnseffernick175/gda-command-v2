@@ -555,7 +555,7 @@ function JobsTab({
             </div>
             <div>
               <div style={{ color: "var(--color-text-muted)", fontSize: 11, marginBottom: 2 }}>Correlation ID</div>
-              <div style={{ fontFamily: "monospace", fontSize: 11 }}>{selectedJob.correlation_id}</div>
+              <div style={{  fontSize: 11 }}>{selectedJob.correlation_id}</div>
             </div>
           </div>
 
@@ -728,7 +728,7 @@ function RequirementsTab({
           >
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--color-text-muted)" }}>{req.section}</span>
+                <span style={{  fontSize: 11, color: "var(--color-text-muted)" }}>{req.section}</span>
                 <span style={{
                   padding: "1px 6px", borderRadius: 8, fontSize: 10, fontWeight: 600,
                   background: `${MATCH_COLORS[req.compliance_match]}20`,
@@ -898,7 +898,7 @@ function ComplianceMapTab({
               borderLeft: `4px solid ${MATCH_COLORS[entry.match_level]}`,
             }}
           >
-            <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--color-text-muted)", width: 40 }}>{entry.section}</span>
+            <span style={{  fontSize: 11, color: "var(--color-text-muted)", width: 40 }}>{entry.section}</span>
             <span style={{
               padding: "1px 8px", borderRadius: 8, fontSize: 10, fontWeight: 600, flexShrink: 0,
               background: `${MATCH_COLORS[entry.match_level]}20`,
@@ -1073,7 +1073,7 @@ function ResponseOutlineTab({
                     {sec.requirements_covered.map((rid) => (
                       <span key={rid} style={{
                         padding: "2px 8px", borderRadius: 10, fontSize: 11,
-                        background: "#7c3aed15", color: "#7c3aed", fontFamily: "monospace",
+                        background: "#7c3aed15", color: "#7c3aed", 
                       }}>{rid}</span>
                     ))}
                   </div>
