@@ -37,11 +37,16 @@ function formatDateEST(dateStr: string): string {
 
 function SeverityBadge({ severity, title, dueDate }: { severity: string; title: string; dueDate: string | null }) {
   if (severity === "critical") {
-    const label = dueDate
-      ? `EXPIRED ${formatDateEST(dueDate).replace(/\//g, "/")}`
-      : title.toUpperCase().includes("EXPIRED")
-        ? "EXPIRED"
-        : title;
+    let label: string;
+    if (dueDate) {
+      const d = new Date(dueDate.slice(0, 10) + "T12:00:00Z");
+      const days = Math.ceil((d.getTime() - Date.now()) / 86400000);
+      label = days > 0
+        ? `CRITICAL — ${days} DAYS`
+        : `EXPIRED ${formatDateEST(dueDate)}`;
+    } else {
+      label = title.toUpperCase().includes("EXPIRED") ? "EXPIRED" : title;
+    }
     return (
       <span className="inline-block rounded px-2 py-0.5 text-[11px] font-semibold bg-critical text-white">
         {label}
