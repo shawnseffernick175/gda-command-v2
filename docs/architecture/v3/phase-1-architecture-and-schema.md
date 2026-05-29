@@ -198,6 +198,8 @@ CREATE TABLE opportunities (
   analysis_version    TEXT,                    -- analysis model version for cache invalidation
   ai_analyzed_at      TIMESTAMPTZ,             -- when analysis last ran
   is_teaming_required BOOLEAN       NOT NULL DEFAULT FALSE,
+  qualified_at        TIMESTAMPTZ,             -- when opp was qualified (F-207)
+  qualified_by        TEXT,                    -- who qualified it (user display name)
   source_id           BIGINT        NOT NULL REFERENCES sources(id),
   created_by          BIGINT        REFERENCES users(id),
   created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -226,6 +228,8 @@ CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted
 | `analysis` | JSONB: R2 cached auto-analysis (pwin, incumbent, competitors, wargame, timeline) |
 | `analysis_version` | Model version string for cache invalidation when analysis logic changes |
 | `is_teaming_required` | Flag indicating this opp needs a teaming partner (replaces `teaming_flags` table logic) |
+| `qualified_at` | When the opportunity was qualified (set by POST /v3/opportunities/:id/qualify) |
+| `qualified_by` | Who qualified it (user display name from JWT claims) |
 | `source_id` | **R1 FK** — every opportunity must cite its source. DB-enforced NOT NULL. |
 | `deleted_at` | Soft delete (partial indexes exclude deleted rows from all queries) |
 

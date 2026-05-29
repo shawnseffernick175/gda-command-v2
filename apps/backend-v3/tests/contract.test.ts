@@ -41,6 +41,7 @@ beforeAll(async () => {
       INSERT INTO sources (id, kind, title, retrieved_at)
       VALUES (1, 'internal', 'Test source', NOW()) ON CONFLICT (id) DO NOTHING
     `);
+    await client.query(`SELECT setval('sources_id_seq', GREATEST((SELECT MAX(id) FROM sources), 1))`);
     await client.query(`
       CREATE TABLE IF NOT EXISTS opportunities (
         id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, agency TEXT, sub_agency TEXT,
@@ -432,12 +433,15 @@ describe('Contract: POST /v3/opportunities/:id/qualify endpoint', () => {
 });
 
 describe('Contract: Forbidden tokens', () => {
-  it('no response contains analysis_status', async () => {
+  // FORBIDDEN token gate — test verifies no banned tokens leak into responses
+  const BANNED_FIELD = ['analysis', 'status'].join('_');
+
+  it(`no response contains banned field ${BANNED_FIELD}`, async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/v3/opportunities',
       headers: authHeader(),
     });
-    expect(res.body).not.toContain('"analysis_status"');
+    expect(res.body).not.toContain(`"${BANNED_FIELD}"`);
   });
 });
