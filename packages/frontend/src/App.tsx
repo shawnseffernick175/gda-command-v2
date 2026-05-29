@@ -4,6 +4,8 @@ import Login from "./pages/Login";
 import { isAuthenticated, logout, getUser, authenticatedFetch } from "./api/auth";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
+const Launchpad = lazy(() => import("./pages/Launchpad"));
+const CompanyProfilePage = lazy(() => import("./pages/CompanyProfile"));
 
 const QACenter = lazy(() => import("./pages/QACenter"));
 const OpsTracker = lazy(() => import("./pages/OpsTracker"));
@@ -59,6 +61,7 @@ const NAV_GROUPS = [
     label: "Operations",
     items: [
       { path: "/", label: "Launchpad", icon: "🏠" },
+      { path: "/company-profile", label: "Company Profile", icon: "🏛" },
       { path: "/fast-track", label: "Fast Track", icon: "🚀" },
       { path: "/ops-tracker", label: "Ops Tracker", icon: "📡" },
       { path: "/pipeline", label: "Pipeline", icon: "📊" },
@@ -492,7 +495,9 @@ export default function App() {
           <Breadcrumb />
           <Suspense fallback={<div style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>Loading…</div>}>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Launchpad />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/company-profile" element={<CompanyProfilePage />} />
             <Route path="/qa-center" element={<QACenter />} />
             <Route path="/ops-tracker" element={<OpsTracker />} />
             <Route path="/pipeline" element={<Pipeline />} />

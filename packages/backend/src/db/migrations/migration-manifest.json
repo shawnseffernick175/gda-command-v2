@@ -128,5 +128,6 @@
   "123_demote_gda_role.sql": "199df930dcdaa76f421066f11ca592d0c56b74a9ec55cc2e1ee213fcc9a1e121",
   "124_universal_ingestion.sql": "1c0785ead534b7aa40744207f9fc240ecc02ee88e87841496c859f80f1e695af",
   "125_vector_embeddings_dual_write.sql": "9a884c79bb4158f7ec50902d0540ac6bd1358642b7cae7835e55869ed386f354",
-  "126_staging_banner_off.sql": "3a894bd30cbf1e582b3aae13cd99d63d4db30f2809ec5dc9848d1cee8f0ebbb8"
+  "126_staging_banner_off.sql": "3a894bd30cbf1e582b3aae13cd99d63d4db30f2809ec5dc9848d1cee8f0ebbb8",
+  "127_ou_registry_launchpad_flags.sql": "d823627ea97bbf6e9e7396088c84bebbc7fd51b93fbb73ad45ef5287adeb398d"
 }
