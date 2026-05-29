@@ -150,7 +150,7 @@ app.use("/api", apiLimiter);
 // /auth   → login/register (authRouter handles internally)
 // /ingest → key-based auth (ingestRouter handles internally)
 // /sentinel → mixed: /current public, /history JWT, /run x-gda-key (sentinelRouter handles internally)
-const SELF_AUTH_PREFIXES = ["/auth", "/ingest", "/sentinel", "/launchpad"];
+const SELF_AUTH_PREFIXES = ["/auth", "/ingest", "/sentinel", "/launchpad", "/v2", "/partner-intel"];
 app.use("/api", (req, res, next) => {
   if (SELF_AUTH_PREFIXES.some((p) => req.path.startsWith(p))) return next();
   return authMiddleware(req, res, next);

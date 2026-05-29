@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS partner_awards (
   ingested_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_partner_awards_dedup ON partner_awards(partner_ou_tag, contract_id) WHERE contract_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_partner_awards_ou    ON partner_awards(partner_ou_tag);
 CREATE INDEX IF NOT EXISTS idx_partner_awards_date  ON partner_awards(awarded_at DESC);
 
@@ -148,6 +149,7 @@ CREATE TABLE IF NOT EXISTS partner_news_items (
   ingested_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_partner_news_dedup ON partner_news_items(partner_ou_tag, url) WHERE url IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_partner_news_ou      ON partner_news_items(partner_ou_tag);
 CREATE INDEX IF NOT EXISTS idx_partner_news_pub     ON partner_news_items(published_at DESC);
 

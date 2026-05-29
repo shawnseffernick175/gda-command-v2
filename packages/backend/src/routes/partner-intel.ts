@@ -294,13 +294,13 @@ router.post("/awards/batch", requireKey, async (req, res) => {
         const result = await pool.query(
           `INSERT INTO partner_awards (partner_ou_tag, contract_id, customer, value, awarded_at, source)
            VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT DO NOTHING
+           ON CONFLICT (partner_ou_tag, contract_id) WHERE contract_id IS NOT NULL DO NOTHING
            RETURNING id`,
           [
             partner_ou_tag,
             award.contract_id || null,
             award.customer || null,
-            award.value || null,
+            award.value ?? null,
             award.awarded_at || null,
             award.source || "usaspending",
           ],
@@ -503,7 +503,8 @@ router.post("/news/batch", requireKey, async (req, res) => {
 
         await pool.query(
           `INSERT INTO partner_news_items (partner_ou_tag, headline, url, source, published_at)
-           VALUES ($1, $2, $3, $4, $5)`,
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (partner_ou_tag, url) WHERE url IS NOT NULL DO NOTHING`,
           [
             partner_ou_tag,
             item.headline || "Untitled",
