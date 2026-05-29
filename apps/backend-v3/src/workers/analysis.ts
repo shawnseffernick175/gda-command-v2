@@ -17,6 +17,7 @@
  *   - blackhat: strategy assessment (Envision capability fit)
  *   - wargame: win-strategy outline
  *   - timeline: RFP release, proposals_due, award_estimate
+ *   - capture analysis: real pwin model using capture-specific signals (from capture-analysis.ts)
  *
  * Every field has *_sources siblings populated per R1.
  * Worker NEVER writes partial results.
@@ -35,6 +36,9 @@ import {
   type DraftKind,
 } from '../services/drafts/index.js';
 import type { ActionItemRow } from '../services/action-items/index.js';
+import { computeCaptureAnalysis } from './capture-analysis.js';
+import type { ComplianceItem } from '../services/captures/compliance.js';
+import type { ColorReviewStage } from '../services/captures/color-review.js';
 
 const { Pool } = pg;
 
@@ -42,6 +46,8 @@ const pool = new Pool({
   connectionString: config.databaseUrl,
   max: 5,
 });
+
+let workerBossRef: PgBoss | null = null;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Pwin deterministic model
@@ -530,7 +536,50 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
     );
 
     logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin }, 'Opportunity analysis written');
+
+    // Re-analyze any captures linked to this opportunity
+    try {
+      const captureRes = await pool.query<{ id: string }>(
+        'SELECT id FROM captures WHERE opportunity_id = $1',
+        [entityId],
+      );
+      if (captureRes.rows.length > 0 && workerBossRef) {
+        for (const capture of captureRes.rows) {
+          try {
+            await workerBossRef.send(QUEUE_NAMES.ANALYSIS_CAPTURE, {
+              entityType: 'capture' as const,
+              entityId: String(capture.id),
+              priority: 'normal' as const,
+              trigger: 'pre-warm' as const,
+            }, {
+              priority: 5,
+              retryLimit: 3,
+              retryDelay: 5,
+              retryBackoff: true,
+              singletonKey: `cap-${capture.id}`,
+            });
+          } catch (err) {
+            logger.warn({ err, captureId: capture.id }, 'Failed to re-enqueue capture after opp analysis');
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn({ err, entityId }, 'Failed to query captures for re-analysis');
+    }
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Capture analysis (real pwin model via capture-analysis.ts)
+// ────────────────────────────────────────────────────────────────────────────
+
+interface CaptureDbRow {
+  id: string;
+  opportunity_id: string | null;
+  color_review_stage: ColorReviewStage;
+  compliance_items: ComplianceItem[];
+  pricing_assumptions: { margin_pct?: number; labor_rates?: Record<string, number> } | null;
+  teaming_worksheet: { partners: string[]; rationale: string } | null;
 }
 
 async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promise<void> {
@@ -538,31 +587,43 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
     const { entityId } = job.data;
     logger.info({ entityId, jobId: job.id }, 'Processing capture analysis');
 
-    const res = await pool.query(
-      'SELECT * FROM captures WHERE id = $1',
+    const captureRes = await pool.query<CaptureDbRow>(
+      'SELECT id, opportunity_id, color_review_stage, compliance_items, pricing_assumptions, teaming_worksheet FROM captures WHERE id = $1',
       [entityId],
     );
-    const row = res.rows[0] as Record<string, unknown> | undefined;
-    if (!row) {
-      logger.warn({ entityId }, 'Capture not found — skipping analysis');
+    const capture = captureRes.rows[0];
+    if (!capture) {
+      logger.warn({ entityId }, 'Capture not found for analysis');
       return;
     }
 
-    // Capture analysis is simpler — reuse pwin from linked opportunity
+    let oppAnalysis: { pwin?: number } | null = null;
+    if (capture.opportunity_id) {
+      const oppRes = await pool.query<{ analysis: Record<string, unknown> | null }>(
+        'SELECT analysis FROM opportunities WHERE id = $1 AND deleted_at IS NULL',
+        [capture.opportunity_id],
+      );
+      const opp = oppRes.rows[0];
+      if (opp?.analysis) {
+        oppAnalysis = { pwin: typeof opp.analysis.pwin === 'number' ? opp.analysis.pwin : 0.5 };
+      }
+    }
+
+    const complianceItems = Array.isArray(capture.compliance_items) ? capture.compliance_items : [];
+    const marginPct = capture.pricing_assumptions?.margin_pct ?? null;
+    const hasTeamingPartners = Array.isArray(capture.teaming_worksheet?.partners) &&
+      capture.teaming_worksheet!.partners.length > 0;
+
+    const analysis = computeCaptureAnalysis({
+      captureId: String(entityId),
+      colorReviewStage: capture.color_review_stage,
+      complianceItems,
+      pricingMarginPct: marginPct,
+      hasTeamingPartners,
+      opportunityAnalysis: oppAnalysis,
+    });
+
     const now = new Date().toISOString();
-    const analysis = {
-      pwin: 0.5,
-      pwin_sources: [
-        {
-          kind: 'internal',
-          title: `Capture analysis model ${config.analysisVersion}`,
-          url: '/audit/analysis/capture',
-          retrieved_at: now,
-        },
-      ],
-      version: config.analysisVersion,
-      generated_at: now,
-    };
 
     await pool.query(
       `UPDATE captures
@@ -574,7 +635,7 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
       [JSON.stringify(analysis), config.analysisVersion, now, entityId],
     );
 
-    logger.info({ entityId, version: config.analysisVersion }, 'Capture analysis written');
+    logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin }, 'Capture analysis written');
   }
 }
 
@@ -715,6 +776,7 @@ export async function startWorker(): Promise<PgBoss> {
   });
 
   await boss.start();
+  workerBossRef = boss;
   logger.info('Worker pg-boss started');
 
   await boss.work<AnalysisJobData>(
