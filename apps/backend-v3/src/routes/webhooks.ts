@@ -8,10 +8,18 @@
 
 import type { FastifyInstance } from 'fastify';
 import { verifyWebhookHmac } from '../middleware/auth.js';
-import { successEnvelope } from '../lib/envelope.js';
+import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { pool } from '../lib/db.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js';
 import { logger } from '../lib/logger.js';
+import { createActionItem, toApiShape } from '../services/action-items/index.js';
+
+interface EmailWebhookPayload {
+  from: string;
+  to: string;
+  subject?: string;
+  body_text: string;
+}
 
 export async function webhookRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', verifyWebhookHmac);
@@ -158,13 +166,42 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  app.post('/v3/webhooks/email-action-item', async (req, reply) => {
+  app.post<{ Body: EmailWebhookPayload }>('/v3/webhooks/email-action-item', async (req, reply) => {
     req.log.info('Received email action item webhook');
+
+    const body = req.body as EmailWebhookPayload | undefined;
+    if (!body || !body.from || !body.body_text) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'from and body_text are required', req.requestId)
+      );
+    }
+
+    const title = body.subject
+      ? body.subject.trim()
+      : body.body_text.trim().slice(0, 120);
+
+    const detail = body.body_text.trim();
+    const senderName = body.from.split('@')[0] ?? 'unknown';
+
+    const row = await createActionItem(
+      {
+        title,
+        detail,
+        owner: senderName,
+        source: 'email',
+        source_id: `email:${body.from}:${Date.now()}`,
+        due_date: undefined,
+        linked_record_type: undefined,
+        linked_record_id: undefined,
+      },
+      'webhook:email'
+    );
+
     return reply.status(201).send(
       successEnvelope(
-        { created: false, message: 'Stub — not yet implemented' },
+        { id: row.id, ...toApiShape(row) },
         req.requestId,
-      ),
+      )
     );
   });
 }
