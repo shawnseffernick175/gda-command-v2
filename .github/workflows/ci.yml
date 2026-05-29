@@ -178,6 +178,15 @@ jobs:
           ANALYSIS_TIMEOUT_MS: "5000"
           ANALYSIS_POLL_INTERVAL_MS: "50"
         run: npx vitest run tests/integration.test.ts
+      - name: V3 backend — pipeline tests
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          JWT_SECRET: ci-jwt-secret
+          GDA_WEBHOOK_KEY: ci-webhook-key
+          NODE_ENV: test
+          ANALYSIS_VERSION: v0.0.1-test
+        run: npx vitest run tests/pipeline.test.ts
 
   compose-drift:
     name: Compose Drift Check
