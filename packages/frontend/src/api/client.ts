@@ -4156,3 +4156,71 @@ export function fetchMergers(filters?: { status?: string; impact?: string }) {
 export function fetchMergerDetail(id: string) {
   return request<{ merger: MergerEntry; impacts: MergerImpactEntry[] }>(`/mergers/${id}`);
 }
+
+// ---------------------------------------------------------------------------
+// Combined Opportunity Analysis (F-104 — R1, R2)
+// ---------------------------------------------------------------------------
+
+export interface SourceRef {
+  kind:
+    | "sam_gov"
+    | "fpds"
+    | "usaspending"
+    | "govwin"
+    | "news"
+    | "doctrine"
+    | "partner_site"
+    | "internal";
+  title: string;
+  url: string;
+  retrieved_at: string;
+}
+
+export interface OpportunityAnalysisData {
+  pwin: (PwinBreakdownData & { sources: SourceRef[] }) | null;
+  incumbent: (IncumbentData & { sources: SourceRef[] }) | null;
+  competitors: (CompetitorFieldData & { sources: SourceRef[] }) | null;
+  blackhat: (BlackHatAnalysisData & { sources: SourceRef[] }) | null;
+  wargame: (WargameAnalysisData & { sources: SourceRef[] }) | null;
+  timeline: TimelineEvent[];
+  sources: SourceRef[];
+}
+
+const analysisEtagCache = new Map<string, string>();
+
+export async function fetchOpportunityAnalysis(
+  id: string,
+): Promise<GDAEnvelope<OpportunityAnalysisData>> {
+  const headers: Record<string, string> = {};
+  const cachedEtag = analysisEtagCache.get(id);
+  if (cachedEtag) {
+    headers["If-None-Match"] = cachedEtag;
+  }
+
+  const res = await authenticatedFetch(`${API_BASE}/opportunities/${id}/analysis`, {
+    headers,
+  });
+
+  if (res.status === 304) {
+    return {
+      success: true,
+      workflow: "gda-opportunity-analysis",
+      action: "read",
+      dryRun: false,
+      data: null,
+      meta: { cached: true },
+      error: null,
+    };
+  }
+
+  const etag = res.headers.get("etag");
+  if (etag) {
+    analysisEtagCache.set(id, etag);
+  }
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+
+  return res.json() as Promise<GDAEnvelope<OpportunityAnalysisData>>;
+}
