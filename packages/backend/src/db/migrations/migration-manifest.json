@@ -132,5 +132,6 @@
   "127_ou_registry_launchpad_flags.sql": "d823627ea97bbf6e9e7396088c84bebbc7fd51b93fbb73ad45ef5287adeb398d",
   "128_riverstone_uei_confirmed.sql": "ffd32664600fccdfe9c8de7a3df8db034603b1a2e08a38867d192125894adbcb",
   "129_sprint2_opps_pipeline_partner_intel.sql": "f0eb1d1d7554b550a169a1bc0105260fb81f193af2fad8c0985c2e1553f52b59",
-  "130_sprint3_capture_action_items.sql": "2edfb738a6a51cea88e753bc6b331778b8e6ea2becb626d5f17ba67eafc06594"
+  "130_sprint3_capture_action_items.sql": "2edfb738a6a51cea88e753bc6b331778b8e6ea2becb626d5f17ba67eafc06594",
+  "131_hotfix_sprint2_sprint3_schema_drift.sql": "f23de8a2aa0bc0a31a366e2b942769e5e67c6eb89bcdb132ac07d4ccd46a4cf1"
 }
