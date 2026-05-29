@@ -9,6 +9,11 @@
 #   - stale: true  /  stale: boolean  /  "stale"  (as analysis flag)
 #   - analysis: null  (in any response example)
 #   - "not_yet_analyzed"  /  "running"  /  "pending"  (as analysis states)
+#
+# Allowlist (F-204b):
+#   - Test files (*.test.ts, *.spec.ts, /tests/) — they verify the contract
+#   - YAML description: blocks and comments — they document the contract
+#   - Files with FORBIDDEN magic-comment marker — explicit opt-out (rare)
 
 name: V3 Forbidden Tokens
 
@@ -18,10 +23,96 @@ on:
       - 'apps/backend-v3/**'
       - 'db/v3/migrations/**'
       - 'docs/architecture/v3/openapi-v3.yaml'
+      - 'scripts/ci/forbidden-token-scan.sh'
+      - 'tests/ci/**'
+      - '.github/workflows/v3-forbidden-tokens.yml'
 
 jobs:
+  gate-self-test:
+    name: Gate self-test (fixture validation)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run gate self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASS=0
+          FAIL=0
+          SCRIPT="./scripts/ci/forbidden-token-scan.sh"
+          FIXTURES="tests/ci/fixtures/forbidden-tokens"
+
+          # Create a temp directory inside apps/backend-v3/tests/ so that
+          # the test-exclusion fixtures are scanned via a path the scanner
+          # recognises as an excluded test directory.
+          TEST_DIR="apps/backend-v3/tests/__gate_fixtures__"
+          mkdir -p "$TEST_DIR"
+          ln -sf "$PWD/$FIXTURES/fixture-legit-test.test.ts" \
+            "$TEST_DIR/fixture-legit-test.test.ts"
+          ln -sf "$PWD/$FIXTURES/fixture-legit-anti-token-test.test.ts" \
+            "$TEST_DIR/fixture-legit-anti-token-test.test.ts"
+
+          run_expect() {
+            local fixture="$1"
+            local expect="$2"  # "pass" or "fail"
+            local label="$3"
+
+            if "$SCRIPT" "$fixture" > /tmp/gate-output.txt 2>&1; then
+              actual="pass"
+            else
+              actual="fail"
+            fi
+
+            if [ "$actual" = "$expect" ]; then
+              echo "  OK   $label (expected $expect, got $actual)"
+              PASS=$((PASS + 1))
+            else
+              echo "  FAIL $label (expected $expect, got $actual)"
+              cat /tmp/gate-output.txt
+              FAIL=$((FAIL + 1))
+            fi
+          }
+
+          echo "=== Gate Self-Tests ==="
+
+          # Violations — must FAIL
+          run_expect "$FIXTURES/fixture-violation-route.ts" \
+            "fail" "fixture-violation-route.ts (src-like code with analysis_status)"
+
+          run_expect "$FIXTURES/fixture-violation-migration.sql" \
+            "fail" "fixture-violation-migration.sql (migration with stale column)"
+
+          # Legit test files — must PASS (scanned via apps/backend-v3/tests/ path)
+          run_expect "$TEST_DIR/fixture-legit-test.test.ts" \
+            "pass" "fixture-legit-test.test.ts (test file with analysis: null)"
+
+          run_expect "$TEST_DIR/fixture-legit-anti-token-test.test.ts" \
+            "pass" "fixture-legit-anti-token-test.test.ts (anti-token test needles)"
+
+          # YAML — descriptions pass, enum violations fail
+          run_expect "$FIXTURES/fixture-legit-openapi.yaml" \
+            "pass" "fixture-legit-openapi.yaml (tokens in description blocks only)"
+
+          run_expect "$FIXTURES/fixture-legit-openapi-violation.yaml" \
+            "fail" "fixture-legit-openapi-violation.yaml (token in enum value)"
+
+          # Cleanup
+          rm -rf "$TEST_DIR"
+
+          echo ""
+          echo "=== Results: $PASS passed, $FAIL failed ==="
+
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::Gate self-tests failed. The scanner is broken."
+            exit 1
+          fi
+
   forbidden-tokens:
     name: R2 forbidden token scan
+    needs: gate-self-test
     runs-on: ubuntu-latest
 
     steps:
@@ -30,93 +121,4 @@ jobs:
 
       - name: Scan for forbidden tokens
         shell: bash
-        run: |
-          set -euo pipefail
-
-          # -----------------------------------------------------------
-          # Directories / files to scan
-          # -----------------------------------------------------------
-          SCAN_PATHS=(
-            "apps/backend-v3/"
-            "db/v3/migrations/"
-            "docs/architecture/v3/openapi-v3.yaml"
-          )
-
-          # -----------------------------------------------------------
-          # Files allowed to mention forbidden tokens in comments only
-          # -----------------------------------------------------------
-          ALLOWED_FILES=(
-            "docs/architecture/v3/phase-1-test-strategy.md"
-            "docs/architecture/v3/phase-1-architecture-and-schema.md"
-            "docs/architecture/v3/phase-1-api-contract.md"
-            ".github/workflows/v3-forbidden-tokens.yml"
-          )
-
-          # -----------------------------------------------------------
-          # Build a post-filter regex to exclude allowed file paths
-          # (grep --exclude only matches basenames, so we post-filter
-          # the grep -rn output by full relative path instead)
-          # -----------------------------------------------------------
-          ALLOWED_FILTER=""
-          for f in "${ALLOWED_FILES[@]}"; do
-            if [ -n "$ALLOWED_FILTER" ]; then
-              ALLOWED_FILTER+="|"
-            fi
-            ALLOWED_FILTER+="$(echo "$f" | sed 's/[.[\/]/\\&/g')"
-          done
-
-          # -----------------------------------------------------------
-          # Forbidden patterns (verbatim from F-201 Addendum A.5)
-          # -----------------------------------------------------------
-          PATTERNS=(
-            'analysis_status'
-            'stale:\s*true'
-            'stale:\s*boolean'
-            '"stale"'
-            'analysis:\s*null'
-            '"not_yet_analyzed"'
-            '"running"'
-            '"pending"'
-          )
-
-          FOUND=0
-
-          for pattern in "${PATTERNS[@]}"; do
-            # Only scan paths that exist in the repo
-            EXISTING_PATHS=()
-            for p in "${SCAN_PATHS[@]}"; do
-              if [ -e "$p" ]; then
-                EXISTING_PATHS+=("$p")
-              fi
-            done
-
-            if [ ${#EXISTING_PATHS[@]} -eq 0 ]; then
-              echo "No scan paths exist yet — skipping pattern: $pattern"
-              continue
-            fi
-
-            # Search, filtering out allowed files and comment-only FORBIDDEN lines
-            MATCHES=$(grep -rn -E "$pattern" \
-              "${EXISTING_PATHS[@]}" 2>/dev/null \
-              | grep -v -E "^($ALLOWED_FILTER):" \
-              | grep -v -E ':[0-9]+:\s*(//|#|/\*|\*|<!--).*FORBIDDEN' \
-              || true)
-
-            if [ -n "$MATCHES" ]; then
-              echo "::error::Forbidden token matched: $pattern"
-              echo "$MATCHES"
-              FOUND=1
-            fi
-          done
-
-          if [ "$FOUND" -eq 1 ]; then
-            echo ""
-            echo "=========================================="
-            echo "FAILED: Forbidden R2 tokens detected."
-            echo "These tokens are permanently banned from"
-            echo "the V3 codebase per F-201 Addendum A.5."
-            echo "=========================================="
-            exit 1
-          fi
-
-          echo "PASSED: No forbidden R2 tokens found."
+        run: ./scripts/ci/forbidden-token-scan.sh
