@@ -6,6 +6,10 @@
 **Author:** Devin (automated audit)
 **Status:** Draft — awaiting human sign-off
 
+> **⚠ SCOPE CORRECTION — see `phase-0-scope-correction.md`**
+>
+> GDA Command is a **single-tenant Envision tool**. The `ou_tag` enum, `ou_registry` table, multi-OU scoping on all tables, and Partner Intel browse pages are **removed from V3 scope**. Partners appear only as teaming attachments on Envision-owned opportunities. This supersedes all multi-OU patterns from F-100 through F-105. See the scope correction document for binding details.
+
 > **⚠ CRITICAL CORRECTION — see `phase-0-prod-verification-addendum.md`**
 >
 > The original audit below was generated from a local dev database running all 134 migration files. **Production reality differs significantly:** only 128 of 134 migrations have been applied to prod. Migrations 127–130 (Sprint 1 OU registry, Sprint 2 opportunities/pipeline/partner-intel, Sprint 3 capture/action-items) **never landed in production**. This means 11 tables expected by Sprint 2/3 route code (`pipeline_items`, `captures`, `action_items`, `action_item_drafts`, `compliance_items`, `partner_intel_profiles`, `partner_awards`, `partner_news_items`, `teaming_flags`, `launchpad_flags`, `ou_registry`) **do not exist in prod**. The `opportunities` table in prod retains its legacy schema (text PK, no `ou_tag` column).
@@ -1087,6 +1091,13 @@ Per `docs/canonical/product_rules.md`, R2 requires analysis to auto-trigger on o
    - All features from F-100 through F-105 query tables/columns that don't exist in prod.
    - Every Pipeline, Capture, Partner Intel, Action Items view returns HTTP 500.
    - V3 must either: (a) apply migrations 127–130 to prod to activate Sprint 2/3, or (b) treat Sprint 2/3 as V3-only code and skip legacy prod activation.
+
+0d. **Scope correction: Envision-only (BINDING — see `phase-0-scope-correction.md`)**
+   - GDA Command is single-tenant Envision. `ou_tag` enum, `ou_registry` table, multi-OU scoping, and Partner Intel browse pages are **removed from V3 scope**.
+   - `partner_intel_profiles` demoted to read-only lookup for teaming enrichment (not browsable).
+   - `partner_awards`, `partner_news_items` tables removed from V3.
+   - `teaming_flags` kept — only legitimate use of partner data.
+   - Phase 4 data migration must filter out non-Envision rows from legacy + shadow tables.
 
 1. **Keep / drop / merge the 63 shadow tables?**
    - 63 `gda_*` tables are accessed only by n8n via direct DB. They duplicate concepts that exist in the canonical schema (e.g., `gda_action_items` vs. `action_items`, `gda_capture_plans` vs. `capture_plans`, `gda_contacts` vs. `contacts`).
