@@ -928,7 +928,7 @@ export default function UserManual() {
                       display: "inline-block",
                       padding: "2px 8px",
                       fontSize: 12,
-                      fontFamily: "monospace",
+                      
                       background: "#0d1117",
                       border: "1px solid #30363d",
                       borderRadius: 4,

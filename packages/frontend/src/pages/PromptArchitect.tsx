@@ -299,7 +299,7 @@ export default function PromptArchitect() {
             <textarea value={newTemplate} onChange={(e) => setNewTemplate(e.target.value)}
               placeholder="Enter prompt template text. Use {{variable}} for placeholders."
               rows={6}
-              style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13, fontFamily: "monospace", resize: "vertical" }} />
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text)", fontSize: 13,  resize: "vertical" }} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={handleCreatePrompt} disabled={creating || !newName.trim() || !newTemplate.trim()}
@@ -575,7 +575,7 @@ function PromptDetail({
           background: "rgba(0,0,0,0.2)",
           borderRadius: 8,
           padding: 16,
-          fontFamily: "monospace",
+          
           fontSize: 13,
           lineHeight: 1.6,
           whiteSpace: "pre-wrap",

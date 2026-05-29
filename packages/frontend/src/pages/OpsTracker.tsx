@@ -611,7 +611,7 @@ export default function OpsTracker() {
                   <td
                     style={{
                       ...tdStyle,
-                      fontFamily: "monospace",
+                      
                       fontSize: 12,
                       color: "var(--color-text-muted)",
                     }}

@@ -207,7 +207,7 @@ export default function App() {
   // Loading state while checking auth
   if (authed === null) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f172a", color: "#94a3b8" }}>
+      <div className="min-h-screen flex items-center justify-center bg-bg text-muted">
         Loading...
       </div>
     );
@@ -222,75 +222,41 @@ export default function App() {
     <ErrorBoundary>
     <ToastProvider>
     <StagingBanner />
-    <div style={{ minHeight: "100vh", display: "flex" }}>
+    <div className="min-h-screen flex bg-bg text-ink font-sans">
       {/* Mobile sidebar backdrop */}
       {isMobile && sidebarOpen && (
         <div
-          className="sidebar-overlay"
           onClick={() => setSidebarOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 99,
-          }}
+          className="fixed inset-0 bg-black/50 z-[99]"
         />
       )}
 
       {/* Sidebar */}
-      <aside style={{
-        width: isMobile ? SIDEBAR_EXPANDED_WIDTH : sidebarWidth,
-        minWidth: isMobile ? SIDEBAR_EXPANDED_WIDTH : sidebarWidth,
-        background: "var(--color-surface)",
-        borderRight: "1px solid var(--color-border)",
-        display: "flex",
-        flexDirection: "column",
-        transition: isMobile ? "transform 0.25s ease" : "width 0.2s ease, min-width 0.2s ease",
-        overflow: "hidden",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        bottom: 0,
-        zIndex: 100,
-        transform: isMobile && !sidebarOpen ? "translateX(-100%)" : "translateX(0)",
-      }}>
+      <aside
+        className="fixed top-0 left-0 bottom-0 z-[100] flex flex-col overflow-hidden bg-white border-r border-border"
+        style={{
+          width: isMobile ? SIDEBAR_EXPANDED_WIDTH : sidebarWidth,
+          minWidth: isMobile ? SIDEBAR_EXPANDED_WIDTH : sidebarWidth,
+          transition: isMobile ? "transform 0.25s ease" : "width 0.2s ease, min-width 0.2s ease",
+          transform: isMobile && !sidebarOpen ? "translateX(-100%)" : "translateX(0)",
+        }}
+      >
         {/* Logo / Brand */}
-        <div style={{
-          padding: sidebarOpen ? "16px 16px 12px" : "16px 8px 12px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid var(--color-border)",
-          minHeight: 56,
-        }}>
-          <Link to="/" style={{
-            fontWeight: 700,
-            fontSize: sidebarOpen ? 16 : 0,
-            letterSpacing: "0.5px",
-            textDecoration: "none",
-            color: "var(--color-text)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            transition: "font-size 0.2s",
-          }}>
+        <div
+          className="flex items-center justify-between border-b border-border min-h-[56px]"
+          style={{ padding: sidebarOpen ? "16px 16px 12px" : "16px 8px 12px" }}
+        >
+          <Link
+            to="/"
+            className="font-bold text-ink no-underline whitespace-nowrap overflow-hidden transition-all"
+            style={{ fontSize: sidebarOpen ? 16 : 0 }}
+          >
             {sidebarOpen ? "GDA Command" : ""}
           </Link>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--color-text-muted)",
-              cursor: "pointer",
-              fontSize: 16,
-              padding: "4px 6px",
-              borderRadius: 4,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
+            className="bg-transparent border-none text-muted cursor-pointer text-[16px] p-1 rounded flex items-center justify-center shrink-0"
           >
             {sidebarOpen ? "◀" : "▶"}
           </button>
@@ -300,32 +266,16 @@ export default function App() {
         <GlobalSearch ref={searchRef} collapsed={!sidebarOpen} />
 
         {/* Nav Groups */}
-        <nav style={{
-          flex: 1,
-          overflow: "auto",
-          padding: "8px 0",
-        }}>
+        <nav className="flex-1 overflow-auto py-2">
           {NAV_GROUPS.map((group) => (
-            <div key={group.label} style={{ marginBottom: 8 }}>
+            <div key={group.label} className="mb-2">
               {sidebarOpen && (
-                <div style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: "var(--color-text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.8px",
-                  padding: "8px 16px 4px",
-                  opacity: 0.6,
-                }}>
+                <div className="text-[10px] font-semibold text-muted uppercase tracking-wider px-4 pt-2 pb-1 opacity-60">
                   {group.label}
                 </div>
               )}
               {!sidebarOpen && (
-                <div style={{
-                  height: 1,
-                  background: "var(--color-border)",
-                  margin: "4px 8px 8px",
-                }} />
+                <div className="h-px bg-border mx-2 mb-2 mt-1" />
               )}
               {group.items
                 .filter(({ path }) => {
@@ -343,32 +293,22 @@ export default function App() {
                     key={path}
                     to={path}
                     title={sidebarOpen ? undefined : label}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: sidebarOpen ? "7px 16px" : "7px 0",
-                      margin: sidebarOpen ? "1px 8px" : "1px 6px",
-                      borderRadius: 6,
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 400,
-                      color: active ? "var(--color-primary)" : "var(--color-text-muted)",
-                      background: active ? "rgba(59,130,246,0.1)" : "transparent",
-                      textDecoration: "none",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      transition: "background 0.15s",
-                      justifyContent: sidebarOpen ? "flex-start" : "center",
-                    }}
+                    className={`flex items-center gap-2.5 text-[13px] no-underline whitespace-nowrap overflow-hidden rounded transition-colors duration-[120ms] ${
+                      sidebarOpen ? "px-4 py-[7px] mx-2 my-px justify-start" : "py-[7px] mx-1.5 my-px justify-center"
+                    } ${
+                      active
+                        ? "font-semibold text-accent border-b-0"
+                        : "font-normal text-muted"
+                    }`}
+                    style={active ? { background: "rgba(1,105,111,0.08)" } : undefined}
                   >
-                    <span style={{
-                      fontSize: 15,
-                      width: 20,
-                      textAlign: "center",
-                      flexShrink: 0,
-                      filter: active ? "none" : "grayscale(0.6)",
-                      opacity: active ? 1 : 0.7,
-                    }}>
+                    <span
+                      className="text-[15px] w-5 text-center shrink-0"
+                      style={{
+                        filter: active ? "none" : "grayscale(0.6)",
+                        opacity: active ? 1 : 0.7,
+                      }}
+                    >
                       {icon}
                     </span>
                     {sidebarOpen && <span>{label}</span>}
@@ -380,35 +320,24 @@ export default function App() {
         </nav>
 
         {/* Notification Center */}
-        <div style={{ borderTop: "1px solid var(--color-border)", padding: sidebarOpen ? "4px 0" : "4px 0" }}>
+        <div className="border-t border-border py-1">
           <NotificationCenter collapsed={!sidebarOpen} />
         </div>
 
         {/* User / Logout */}
-        <div style={{
-          borderTop: "1px solid var(--color-border)",
-          padding: sidebarOpen ? "8px 12px" : "8px 4px",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}>
+        <div
+          className="border-t border-border flex items-center gap-2"
+          style={{ padding: sidebarOpen ? "8px 12px" : "8px 4px" }}
+        >
           {sidebarOpen ? (
             <>
-              <span style={{ fontSize: 12, color: "var(--color-text-muted)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span className="caption flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {getUser()?.display_name ?? "Admin"}
               </span>
               <button
                 onClick={handleLogout}
                 title="Sign out"
-                style={{
-                  background: "none",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 4,
-                  color: "var(--color-text-muted)",
-                  cursor: "pointer",
-                  fontSize: 11,
-                  padding: "2px 8px",
-                }}
+                className="btn text-[11px] px-2 py-0.5"
               >
                 Logout
               </button>
@@ -417,15 +346,7 @@ export default function App() {
             <button
               onClick={handleLogout}
               title="Sign out"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 16,
-                width: "100%",
-                textAlign: "center",
-                padding: "4px 0",
-              }}
+              className="bg-transparent border-none cursor-pointer text-[16px] w-full text-center py-1"
             >
               {"🚪"}
             </button>
@@ -434,66 +355,39 @@ export default function App() {
 
         {/* Bottom branding */}
         {sidebarOpen && (
-          <div style={{
-            padding: "8px 16px",
-            fontSize: 10,
-            color: "var(--color-text-muted)",
-            opacity: 0.5,
-            textAlign: "center",
-          }}>
+          <div className="px-4 py-2 text-[10px] text-muted opacity-50 text-center">
             GDA Command v2
           </div>
         )}
       </aside>
 
       {/* Main Content */}
-      <div style={{
-        flex: 1,
-        marginLeft: isMobile ? 0 : sidebarWidth,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
-        transition: isMobile ? "none" : "margin-left 0.2s ease",
-      }}>
+      <div
+        className="flex-1 flex flex-col min-h-screen"
+        style={{
+          marginLeft: isMobile ? 0 : sidebarWidth,
+          transition: isMobile ? "none" : "margin-left 0.2s ease",
+        }}
+      >
         {/* Mobile header with hamburger */}
         {isMobile && (
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "10px 16px",
-            background: "var(--color-surface)",
-            borderBottom: "1px solid var(--color-border)",
-            position: "sticky",
-            top: 0,
-            zIndex: 50,
-          }}>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-border sticky top-0 z-50">
             <button
               onClick={() => setSidebarOpen(true)}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--color-text)",
-                cursor: "pointer",
-                fontSize: 20,
-                padding: "4px 8px",
-                borderRadius: 4,
-                display: "flex",
-                alignItems: "center",
-              }}
+              className="bg-transparent border-none text-ink cursor-pointer text-[20px] p-1 rounded flex items-center"
               aria-label="Open menu"
             >
               ☰
             </button>
-            <span style={{ fontWeight: 700, fontSize: 14 }}>GDA Command</span>
+            <span className="font-bold text-[14px]">GDA Command</span>
           </div>
         )}
 
         <FinancialKPIStrip />
 
-        <main style={{ flex: 1, padding: isMobile ? 12 : 24 }}>
+        <main className={`flex-1 ${isMobile ? "p-3" : "p-6"}`}>
           <Breadcrumb />
-          <Suspense fallback={<div style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>Loading…</div>}>
+          <Suspense fallback={<div className="p-8 text-center text-muted">Loading…</div>}>
           <Routes>
             <Route path="/" element={<Launchpad />} />
             <Route path="/home" element={<Home />} />
@@ -601,39 +495,35 @@ function AskAnythingFAB() {
       <button
         onClick={() => setOpen(true)}
         title="Ask a question about anything in GDA Command"
-        style={{
-          position: "fixed", bottom: 80, right: 16, width: 40, height: 40, borderRadius: "50%",
-          background: "#3b82f6", color: "#fff", border: "none", cursor: "pointer", fontSize: 18,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.25)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85,
-        }}
+        className="fixed bottom-20 right-4 w-10 h-10 rounded-full bg-accent text-white border-none cursor-pointer text-[18px] shadow-md z-[10000] flex items-center justify-center opacity-85"
       >?</button>
     );
   }
 
   return (
-    <div style={{
-      position: "fixed", bottom: 80, right: 16, width: 380, maxHeight: 420,
-      background: "var(--color-surface)", border: "1px solid var(--color-border)",
-      borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.3)", zIndex: 10000, display: "flex", flexDirection: "column",
-    }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 700, fontSize: 14 }}>Ask a Question</span>
-        <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", color: "var(--color-text-muted)", cursor: "pointer", fontSize: 16 }}>X</button>
+    <div className="fixed bottom-20 right-4 w-[380px] max-h-[420px] bg-white border border-border rounded shadow-lg z-[10000] flex flex-col">
+      <div className="p-3 px-4 border-b border-border flex justify-between items-center">
+        <span className="font-bold text-[14px]">Ask a Question</span>
+        <button onClick={() => setOpen(false)} className="bg-transparent border-none text-muted cursor-pointer text-[16px]">X</button>
       </div>
       {answer && (
-        <div style={{ padding: 16, fontSize: 13, lineHeight: 1.6, overflowY: "auto", maxHeight: 260, borderBottom: "1px solid var(--color-border)" }}>
+        <div className="p-4 text-[13px] leading-relaxed overflow-y-auto max-h-[260px] border-b border-border">
           {answer}
         </div>
       )}
-      <div style={{ padding: 12, display: "flex", gap: 8 }}>
+      <div className="p-3 flex gap-2">
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") handleAsk(); }}
           placeholder="Ask about opportunities, pipeline, competitors..."
-          style={{ flex: 1, padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }}
+          className="flex-1 px-3 py-2 bg-bg border border-border rounded text-ink text-[13px]"
         />
-        <button onClick={handleAsk} disabled={loading} style={{ padding: "8px 14px", background: loading ? "#6b7280" : "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+        <button
+          onClick={handleAsk}
+          disabled={loading}
+          className={`px-3.5 py-2 text-white border-none rounded cursor-pointer font-semibold text-[13px] ${loading ? "bg-muted" : "bg-accent"}`}
+        >
           {loading ? "..." : "Ask"}
         </button>
       </div>

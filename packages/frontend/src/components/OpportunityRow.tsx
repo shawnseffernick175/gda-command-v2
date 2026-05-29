@@ -138,7 +138,7 @@ export function OpportunityTableRow({
       onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)")}
       onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
     >
-      <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: 12, color: "var(--color-text-muted)" }}>
+      <td style={{ ...tdStyle,  fontSize: 12, color: "var(--color-text-muted)" }}>
         <Link
           to={`/opportunities/${opp.id}`}
           state={{ from: from ?? "/" }}
@@ -162,7 +162,7 @@ export function OpportunityTableRow({
           {opp.department ?? "—"}
         </div>
       </td>
-      <td style={{ ...tdStyle, fontFamily: "monospace" }}>
+      <td style={{ ...tdStyle,  }}>
         {formatCurrency(opp.value_estimated)}
       </td>
       <td style={tdStyle}>{formatPwin(opp.probability_of_win)}</td>

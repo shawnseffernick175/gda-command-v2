@@ -782,7 +782,7 @@ export default function Reports() {
                     background: "rgba(255,255,255,0.03)",
                     borderRadius: 6,
                     border: "1px solid rgba(255,255,255,0.06)",
-                    fontFamily: "monospace",
+                    
                     fontSize: 12,
                   }}>
                     {Object.entries(selectedReport.parameters).map(([k, v]) => (
@@ -967,7 +967,7 @@ export default function Reports() {
                   {durationMs !== null ? `${(durationMs / 1000).toFixed(1)}s` : "—"}
                 </span>
                 <span style={{
-                  fontFamily: "monospace",
+                  
                   fontSize: 11,
                   color: "var(--color-text-muted)",
                   overflow: "hidden",
@@ -1127,7 +1127,7 @@ export default function Reports() {
                   background: "rgba(255,255,255,0.03)",
                   borderRadius: 6,
                   border: "1px solid rgba(255,255,255,0.06)",
-                  fontFamily: "monospace",
+                  
                   fontSize: 12,
                   marginBottom: 16,
                 }}>

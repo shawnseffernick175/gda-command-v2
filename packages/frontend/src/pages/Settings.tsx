@@ -455,7 +455,7 @@ export default function Settings() {
         {backupStatus && backupStatus.backups.daily.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-muted)" }}>Recent Daily Backups</div>
-            <div style={{ fontSize: 13, fontFamily: "monospace", lineHeight: 1.8 }}>
+            <div style={{ fontSize: 13,  lineHeight: 1.8 }}>
               {backupStatus.backups.daily.slice(0, 7).map((b) => (
                 <div key={b} style={{ color: "var(--color-text-muted)" }}>{b}</div>
               ))}
@@ -466,7 +466,7 @@ export default function Settings() {
         {backupStatus && backupStatus.backups.weekly.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--color-text-muted)" }}>Weekly Backups</div>
-            <div style={{ fontSize: 13, fontFamily: "monospace", lineHeight: 1.8 }}>
+            <div style={{ fontSize: 13,  lineHeight: 1.8 }}>
               {backupStatus.backups.weekly.map((b) => (
                 <div key={b} style={{ color: "var(--color-text-muted)" }}>{b}</div>
               ))}
@@ -710,7 +710,7 @@ export default function Settings() {
                         padding: "2px 8px",
                         borderRadius: 4,
                         fontWeight: 700,
-                        fontFamily: "monospace",
+                        
                         background: ep.method === "GET" ? "rgba(34,197,94,0.15)" : "rgba(245,158,11,0.15)",
                         color: ep.method === "GET" ? "#22c55e" : "#f59e0b",
                       }}
@@ -718,7 +718,7 @@ export default function Settings() {
                       {ep.method}
                     </span>
                   </td>
-                  <td style={{ padding: "8px 14px", fontFamily: "monospace", fontSize: 13 }}>{ep.path}</td>
+                  <td style={{ padding: "8px 14px",  fontSize: 13 }}>{ep.path}</td>
                   <td style={{ padding: "8px 14px", color: "var(--color-text-muted)" }}>{ep.description}</td>
                 </tr>
               ))}
@@ -880,7 +880,7 @@ function FlagCard({ flag: f }: { flag: FeatureFlag }) {
       <div>
         <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{f.label}</div>
         <div style={{ fontSize: 13, color: "var(--color-text-muted)" }}>{f.description}</div>
-        <div style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace", marginTop: 4 }}>
+        <div style={{ fontSize: 11, color: "var(--color-text-muted)",  marginTop: 4 }}>
           {f.key}
         </div>
       </div>

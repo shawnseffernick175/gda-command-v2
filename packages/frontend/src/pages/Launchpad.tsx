@@ -74,91 +74,33 @@ export default function Launchpad() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          maxWidth: 1280,
-          margin: "0 auto",
-          padding: "48px 32px",
-          fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-          color: "#6b7280",
-          fontSize: 15,
-        }}
-      >
+      <div className="container-page py-12 text-muted text-body">
         Loading Launchpad...
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 1280,
-        margin: "0 auto",
-        padding: "48px 32px",
-        background: "#F7F6F2",
-        minHeight: "100%",
-        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-      }}
-    >
+    <div className="container-page py-12">
       <LaunchpadHeader dateStr={dateStr} />
 
-      <section style={{ marginBottom: 32 }}>
-        <h2
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#28251D",
-            margin: "0 0 16px 0",
-          }}
-        >
-          Critical Flags
-        </h2>
+      <section className="mb-8">
+        <h2 className="h-section text-ink mb-4">Critical Flags</h2>
         <CriticalFlagsList flags={flags} onRefresh={fetchFlags} />
       </section>
 
-      <section style={{ marginBottom: 32 }}>
-        <h2
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#28251D",
-            margin: "0 0 16px 0",
-          }}
-        >
-          System Status
-        </h2>
+      <section className="mb-8">
+        <h2 className="h-section text-ink mb-4">System Status</h2>
         <SystemStatusStrip />
       </section>
 
-      <section style={{ marginBottom: 32 }}>
-        <h2
-          style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: "#28251D",
-            margin: "0 0 16px 0",
-          }}
-        >
-          Daily Intel
-        </h2>
+      <section className="mb-8">
+        <h2 className="h-section text-ink mb-4">Daily Intel</h2>
         <DailyIntelList items={intelItems} dateStr={dateStr} />
       </section>
 
-      <footer
-        style={{
-          borderTop: "1px solid #D4D1CA",
-          paddingTop: 24,
-          marginTop: 48,
-        }}
-      >
-        <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            color: "#9ca3af",
-            fontStyle: "italic",
-          }}
-        >
+      <footer className="border-t border-border pt-6 mt-12">
+        <p className="doctrine-tag m-0">
           Doctrine: &ldquo;The standard you walk past is the standard you accept.&rdquo;
         </p>
       </footer>

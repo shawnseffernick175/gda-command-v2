@@ -450,7 +450,7 @@ export default function Home() {
 function KPISection({ kpis }: { kpis: DashboardKPIs }) {
   const navigate = useNavigate();
   return (
-    <div className="kpi-grid" style={{
+    <div style={{
       display: "grid",
       gridTemplateColumns: "repeat(4, 1fr)",
       gap: 16,
@@ -527,7 +527,7 @@ function CommandSignalsSection({ signals }: { signals: CommandSignalsData }) {
   });
 
   return (
-    <div className="signal-grid" style={{
+    <div style={{
       display: "grid",
       gridTemplateColumns: "repeat(4, 1fr)",
       gap: 16,
@@ -756,7 +756,7 @@ const QUICK_ACCESS_CARDS = [
 
 function QuickAccessSection() {
   return (
-    <div className="quick-access-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
       {QUICK_ACCESS_CARDS.map((card) => (
         <Card key={card.to} {...card} />
       ))}

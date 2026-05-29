@@ -145,7 +145,7 @@ export default function SourceManager() {
                   borderRadius: 4,
                   fontSize: 10,
                   fontWeight: 600,
-                  fontFamily: "monospace",
+                  
                 }}>
                   {TYPE_ICONS[source.source_type] ?? source.source_type}
                 </span>

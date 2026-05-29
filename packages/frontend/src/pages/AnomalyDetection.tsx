@@ -561,7 +561,7 @@ function RulesTab({ rules, onRuleAdded }: { rules: EscalationRuleRow[]; onRuleAd
         <div style={{ padding: 16, background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 8, marginBottom: 16 }}>
           <div style={{ display: "grid", gap: 10 }}>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Rule name (e.g., Pwin Drop > 15%)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }} />
-            <input value={newCondition} onChange={(e) => setNewCondition(e.target.value)} placeholder="Condition (e.g., pwin_change < -0.15)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13, fontFamily: "monospace" }} />
+            <input value={newCondition} onChange={(e) => setNewCondition(e.target.value)} placeholder="Condition (e.g., pwin_change < -0.15)" style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13,  }} />
             <select value={newPriority} onChange={(e) => setNewPriority(e.target.value)} style={{ padding: "8px 12px", background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 6, color: "var(--color-text)", fontSize: 13 }}>
               <option value="info">Info</option>
               <option value="warning">Warning</option>
@@ -591,7 +591,7 @@ function RulesTab({ rules, onRuleAdded }: { rules: EscalationRuleRow[]; onRuleAd
               </div>
             </div>
             <div style={{
-              fontFamily: "monospace", fontSize: 12, padding: "8px 12px",
+               fontSize: 12, padding: "8px 12px",
               background: "var(--color-bg)", borderRadius: 6, border: "1px solid var(--color-border)",
               color: "var(--color-text-muted)",
             }}>

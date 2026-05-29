@@ -129,7 +129,7 @@ export default function AdminTrash() {
               const display = String(r[cfg.displayField] ?? r.title ?? r.name ?? "—");
               return (
               <tr key={rid} style={{ borderBottom: "1px solid var(--color-border, #334155)" }}>
-                <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)", fontFamily: "monospace" }}>
+                <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)",  }}>
                   {rid.slice(0, 16)}
                 </td>
                 <td style={{ padding: "8px 12px", color: "var(--color-text, #e2e8f0)" }}>

@@ -138,7 +138,7 @@ export default function FPDSMonitor() {
               borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background 0.15s",
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>{a.piid}</span>
+                <span style={{ fontSize: 11, color: "var(--color-text-muted)",  }}>{a.piid}</span>
                 <div style={{ display: "flex", gap: 6 }}>
                   {a.is_competitor && <Pill label="Competitor" color="#dc2626" />}
                   {a.is_recompete_candidate && <Pill label="Recompete" color="#3b82f6" />}

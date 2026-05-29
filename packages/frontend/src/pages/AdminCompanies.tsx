@@ -267,7 +267,7 @@ export default function AdminCompanies() {
               {editing ? (
                 <textarea value={JSON.stringify(formData.certifications ?? [], null, 2)}
                   onChange={e => { try { updateField("certifications", JSON.parse(e.target.value)); } catch { /* ignore parse errors while typing */ } }}
-                  style={{ ...inputStyle, minHeight: 80, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} />
+                  style={{ ...inputStyle, minHeight: 80, resize: "vertical",  fontSize: 12 }} />
               ) : (
                 <pre style={{ color: "#cbd5e1", fontSize: 12, margin: 0, whiteSpace: "pre-wrap" }}>
                   {JSON.stringify(selected.certifications, null, 2)}
@@ -279,7 +279,7 @@ export default function AdminCompanies() {
               {editing ? (
                 <textarea value={JSON.stringify(formData.contract_vehicles ?? [], null, 2)}
                   onChange={e => { try { updateField("contract_vehicles", JSON.parse(e.target.value)); } catch { /* ignore parse errors while typing */ } }}
-                  style={{ ...inputStyle, minHeight: 80, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} />
+                  style={{ ...inputStyle, minHeight: 80, resize: "vertical",  fontSize: 12 }} />
               ) : (
                 <pre style={{ color: "#cbd5e1", fontSize: 12, margin: 0, whiteSpace: "pre-wrap" }}>
                   {JSON.stringify(selected.contract_vehicles, null, 2)}
@@ -309,7 +309,7 @@ function FieldGroup({ label, children, style }: { label: string; children: React
 }
 
 function ReadOnlyField({ value }: { value: string }) {
-  return <div style={{ color: "#64748b", fontSize: 13, fontFamily: "monospace" }}>{value}</div>;
+  return <div style={{ color: "#64748b", fontSize: 13,  }}>{value}</div>;
 }
 
 function EditableField({ editing, value, onChange }: { editing: boolean; value: string; onChange: (v: string) => void }) {

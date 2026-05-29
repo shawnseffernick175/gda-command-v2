@@ -555,7 +555,7 @@ function AgentConfigTab() {
               {a.enabled ? "Enabled" : "Disabled"}
             </span>
             {a.schedule && (
-              <span style={{ fontSize: 11, color: "var(--color-text-muted)", fontFamily: "monospace" }}>
+              <span style={{ fontSize: 11, color: "var(--color-text-muted)",  }}>
                 {a.schedule}
               </span>
             )}
@@ -863,7 +863,7 @@ function AgentActionsTab() {
                           borderRadius: 6,
                           padding: "8px 12px",
                           fontSize: 12,
-                          fontFamily: "monospace",
+                          
                           whiteSpace: "pre-wrap",
                           maxHeight: 200,
                           overflow: "auto",
