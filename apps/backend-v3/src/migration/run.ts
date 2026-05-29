@@ -155,7 +155,12 @@ async function main(): Promise<void> {
     actionItems: entity === 'all' || entity === 'action_item' ? transformed.actionItems : [],
     sources: entity === 'all' ? transformed.sources : [],
     partners: entity === 'all' ? transformed.partners : [],
-    preWarmJobs: transformed.preWarmJobs,
+    preWarmJobs: entity === 'all'
+      ? transformed.preWarmJobs
+      : transformed.preWarmJobs.filter((j) =>
+          (entity === 'opportunity' && j.entityType === 'opportunity') ||
+          (entity === 'capture' && j.entityType === 'capture'),
+        ),
   });
 
   const loadResult = await loadAll(options.v3DatabaseUrl, filterData(options.entity));

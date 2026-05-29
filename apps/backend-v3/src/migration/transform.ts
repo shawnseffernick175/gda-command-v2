@@ -91,7 +91,7 @@ function buildSourcesForField(
   if (fieldValue === null || fieldValue === undefined) return [];
   if (!sourceUrl) return [];
   return [{
-    kind: inferSourceKindFromUrl(sourceUrl) || normalizeSourceKind(dataSource),
+    kind: inferSourceKindFromUrl(sourceUrl) === 'internal' ? normalizeSourceKind(dataSource) : inferSourceKindFromUrl(sourceUrl),
     title: `V2 data migration`,
     url: sourceUrl,
     retrieved_at: new Date().toISOString(),

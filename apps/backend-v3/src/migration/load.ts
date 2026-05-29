@@ -36,8 +36,14 @@ async function ensureMigrationTables(client: pg.PoolClient): Promise<void> {
       retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       confidence TEXT NOT NULL DEFAULT 'high',
       meta JSONB NOT NULL DEFAULT '{}',
+      legacy_id TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sources_legacy_id
+    ON sources (legacy_id) WHERE legacy_id IS NOT NULL
   `);
 
   await client.query(`
@@ -279,7 +285,7 @@ export async function loadActionItems(
         linked_record_id = EXCLUDED.linked_record_id,
         completed_at = EXCLUDED.completed_at,
         updated_at = CASE
-          WHEN EXCLUDED.updated_at > action_items.updated_at
+          WHEN EXCLUDED.updated_at > v3_action_items.updated_at
           THEN EXCLUDED.updated_at
           ELSE v3_action_items.updated_at
         END`,
@@ -301,10 +307,17 @@ export async function loadSources(
   let count = 0;
   for (const r of records) {
     await client.query(
-      `INSERT INTO sources (kind, url, title, retrieved_at, confidence, meta, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT DO NOTHING`,
-      [r.kind, r.url, r.title, r.retrieved_at, r.confidence, JSON.stringify(r.meta), r.created_at],
+      `INSERT INTO sources (kind, url, title, retrieved_at, confidence, meta, legacy_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (legacy_id) WHERE legacy_id IS NOT NULL
+       DO UPDATE SET
+         kind = EXCLUDED.kind,
+         url = EXCLUDED.url,
+         title = EXCLUDED.title,
+         retrieved_at = EXCLUDED.retrieved_at,
+         confidence = EXCLUDED.confidence,
+         meta = EXCLUDED.meta`,
+      [r.kind, r.url, r.title, r.retrieved_at, r.confidence, JSON.stringify(r.meta), r.legacy_id, r.created_at],
     );
     count++;
   }
