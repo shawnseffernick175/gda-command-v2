@@ -622,6 +622,82 @@ async function probeTeamingFlagsTableAlive(): Promise<ProbeResult> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// F-102 Sprint 3 probes
+// ---------------------------------------------------------------------------
+
+async function probeCapturesTableAlive(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "captures_table_alive", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { ms } = await withTimeout("captures_table_alive", async () => {
+      await pool.query("SELECT COUNT(*) FROM captures");
+    });
+    return { name: "captures_table_alive", status: "healthy", latency_ms: ms, detail: "ok" };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "captures_table_alive", status: "down", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probeComplianceItemsTableAlive(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "compliance_items_table_alive", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { ms } = await withTimeout("compliance_items_table_alive", async () => {
+      await pool.query("SELECT COUNT(*) FROM compliance_items");
+    });
+    return { name: "compliance_items_table_alive", status: "healthy", latency_ms: ms, detail: "ok" };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "compliance_items_table_alive", status: "down", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probeActionItemsTableAlive(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "action_items_table_alive", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { ms } = await withTimeout("action_items_table_alive", async () => {
+      await pool.query("SELECT COUNT(*) FROM action_items");
+    });
+    return { name: "action_items_table_alive", status: "healthy", latency_ms: ms, detail: "ok" };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "action_items_table_alive", status: "down", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
+async function probeEmailIngestActive(): Promise<ProbeResult> {
+  const start = Date.now();
+  try {
+    const pool = getPool();
+    if (!pool) return { name: "email_ingest_active", status: "degraded", latency_ms: 0, detail: "pool not configured" };
+    const { value: row, ms } = await withTimeout("email_ingest_active", async () => {
+      const result = await pool.query(
+        `SELECT MAX(created_at) AS last_email FROM action_items WHERE source = 'email'`,
+      );
+      return result.rows[0] ?? null;
+    });
+
+    if (!row || !row.last_email) {
+      return { name: "email_ingest_active", status: "healthy", latency_ms: ms, detail: "Last email-sourced action item: none yet" };
+    }
+
+    const ageHours = (Date.now() - new Date(row.last_email).getTime()) / 3600000;
+    if (ageHours <= 48) {
+      return { name: "email_ingest_active", status: "healthy", latency_ms: ms, detail: `Last email-sourced action item: ${row.last_email}` };
+    }
+    return { name: "email_ingest_active", status: "degraded", latency_ms: ms, detail: `Last email-sourced action item: ${row.last_email} (>${Math.round(ageHours)}h ago)` };
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError" ? "timeout" : String((err as Error).message);
+    return { name: "email_ingest_active", status: "degraded", latency_ms: Date.now() - start, detail: msg };
+  }
+}
+
 async function probeOuRegistrySeed(): Promise<ProbeResult> {
   const start = Date.now();
   try {
@@ -745,11 +821,15 @@ export async function runSentinel(): Promise<Snapshot> {
     probePipelineTableAlive(),
     probePartnerIntelSeeded(),
     probeTeamingFlagsTableAlive(),
+    probeCapturesTableAlive(),
+    probeComplianceItemsTableAlive(),
+    probeActionItemsTableAlive(),
+    probeEmailIngestActive(),
   ]);
 
   const components: ProbeResult[] = probes.map((p, i) => {
     if (p.status === "fulfilled") return p.value;
-    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health", "secret_expiry", "ou_registry_seed", "migrations_current", "launchpad_flags_fresh", "opportunities_table_alive", "pipeline_table_alive", "partner_intel_seeded", "teaming_flags_table_alive"];
+    const names = ["postgres", "n8n_canary", "amendment_monitor", "writers_24h", "sam_api", "embeddings", "disk", "source_health", "secret_expiry", "ou_registry_seed", "migrations_current", "launchpad_flags_fresh", "opportunities_table_alive", "pipeline_table_alive", "partner_intel_seeded", "teaming_flags_table_alive", "captures_table_alive", "compliance_items_table_alive", "action_items_table_alive", "email_ingest_active"];
     return {
       name: names[i],
       status: "degraded" as ComponentStatus,

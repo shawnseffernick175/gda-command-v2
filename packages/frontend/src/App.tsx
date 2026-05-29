@@ -50,6 +50,8 @@ const CaptureDiscipline = lazy(() => import("./pages/CaptureDiscipline"));
 const OpportunitiesV2 = lazy(() => import("./pages/OpportunitiesV2"));
 const PipelineV2 = lazy(() => import("./pages/PipelineV2"));
 const PartnerIntel = lazy(() => import("./pages/PartnerIntel"));
+const CaptureV2 = lazy(() => import("./pages/CaptureV2"));
+const ActionItems = lazy(() => import("./pages/ActionItems"));
 import FinancialKPIStrip from "./components/FinancialKPIStrip";
 import GlobalSearch, { type GlobalSearchHandle } from "./components/GlobalSearch";
 import NotificationCenter from "./components/NotificationCenter";
@@ -85,6 +87,8 @@ const NAV_GROUPS = [
       { path: "/proposals", label: "Proposal Builder", icon: "📄" },
       { path: "/color-review", label: "Color Review", icon: "🎨" },
       { path: "/capture", label: "Capture Plans", icon: "🎯" },
+      { path: "/capture-v2", label: "Capture", icon: "📋" },
+      { path: "/action-items", label: "Action Items", icon: "📌" },
     ],
   },
   {
@@ -443,6 +447,8 @@ export default function App() {
             <Route path="/opportunities-v2" element={<OpportunitiesV2 />} />
             <Route path="/pipeline-v2" element={<PipelineV2 />} />
             <Route path="/partner-intel" element={<PartnerIntel />} />
+            <Route path="/capture-v2" element={<CaptureV2 />} />
+            <Route path="/action-items" element={<ActionItems />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           </Suspense>

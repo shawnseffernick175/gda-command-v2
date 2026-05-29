@@ -1,0 +1,176 @@
+{
+  "name": "GDA Email Action Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 10,
+        "simple": true,
+        "filters": {
+          "readStatus": "unread",
+          "receivedAfter": "={{ $now.minus(5, 'minute').toISO() }}"
+        }
+      },
+      "name": "Email Trigger",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [250, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ingest-email-credential",
+          "name": "ingest@gda.csr-llc.tech Gmail"
+        }
+      },
+      "notes": "NOTE: Requires Gmail/IMAP credential for ingest@gda.csr-llc.tech to be wired in n8n. If credential does not exist, create it before importing this workflow."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [],
+          "string": [
+            {
+              "value1": "={{ $json.subject }}",
+              "operation": "notContains",
+              "value2": "[SENTINEL]"
+            },
+            {
+              "value1": "={{ $json.subject }}",
+              "operation": "notContains",
+              "value2": "[SYSTEM]"
+            }
+          ]
+        }
+      },
+      "name": "Filter System Emails",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "from", "value": "={{ $json.from?.emailAddress || $json.from }}" },
+            { "name": "to", "value": "={{ $json.to?.emailAddress || $json.to || 'ingest@gda.csr-llc.tech' }}" },
+            { "name": "subject", "value": "={{ $json.subject }}" },
+            { "name": "body_text", "value": "={{ $json.textPlain || $json.snippet || '' }}" },
+            { "name": "body_html", "value": "={{ $json.textHtml || '' }}" },
+            { "name": "message_id", "value": "={{ $json.messageId || $json.id }}" },
+            { "name": "received_at", "value": "={{ $json.date || $now.toISO() }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Transform to EmailPayload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GDA_BASE_URL }}/api/action-items/ingest-email",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-gda-key",
+              "value": "={{ $credentials.gdaWebhookAuth.apiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: $json.from, to: $json.to, subject: $json.subject, body_text: $json.body_text, body_html: $json.body_html, message_id: $json.message_id, received_at: $json.received_at }) }}"
+      },
+      "name": "POST to GDA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "F4J3vYsPrJrYiO49",
+          "name": "GDA Webhook Auth v2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "log_action_item_id", "value": "={{ $json.data?.action_item?.id || 'unknown' }}" },
+            { "name": "log_action_item_title", "value": "={{ $json.data?.action_item?.title || 'unknown' }}" },
+            { "name": "log_status", "value": "success" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Log Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "error_status_code", "value": "={{ $json.statusCode }}" },
+            { "name": "error_body", "value": "={{ JSON.stringify($json) }}" },
+            { "name": "log_status", "value": "error" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1130, 500]
+    }
+  ],
+  "connections": {
+    "Email Trigger": {
+      "main": [
+        [{ "node": "Filter System Emails", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter System Emails": {
+      "main": [
+        [{ "node": "Transform to EmailPayload", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Transform to EmailPayload": {
+      "main": [
+        [{ "node": "POST to GDA", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST to GDA": {
+      "main": [
+        [{ "node": "Log Result", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "GDA", "id": "1" },
+    { "name": "email-ingest", "id": "2" },
+    { "name": "action-items", "id": "3" }
+  ],
+  "_meta": {
+    "notes": "F-102 Sprint 3 — Email Action Ingest workflow. Requires: (1) Gmail/IMAP credential for ingest@gda.csr-llc.tech, (2) GDA Webhook Auth v2 credential (id: F4J3vYsPrJrYiO49). Error handler node is wired to the POST to GDA node's error output — connect it in the n8n editor after import."
+  }
+}
