@@ -57,8 +57,11 @@ async function getV3Counts(pool: pg.Pool): Promise<MigrationCounts> {
 
   for (const [key, tableName] of tables) {
     try {
+      const whereClause = tableName === 'sources'
+        ? ' WHERE legacy_id IS NOT NULL'
+        : '';
       const res = await pool.query<{ count: string }>(
-        `SELECT COUNT(*)::text AS count FROM "${tableName}"`,
+        `SELECT COUNT(*)::text AS count FROM "${tableName}"${whereClause}`,
       );
       counts[key].v3 = parseInt(res.rows[0]?.count ?? '0', 10);
     } catch {
