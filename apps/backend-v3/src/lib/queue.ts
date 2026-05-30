@@ -6,6 +6,8 @@ export const QUEUE_NAMES = {
   ANALYSIS_OPPORTUNITY: 'analysis-opportunity',
   ANALYSIS_CAPTURE: 'analysis-capture',
   INGEST_POSTPROCESS: 'ingest-postprocess',
+  ANALYSIS_PERIODIC_REFRESH: 'analysis-periodic-refresh',
+  ANALYSIS_MODEL_VERSION_SWEEP: 'analysis-model-version-sweep',
 } as const;
 
 let boss: PgBoss | null = null;
@@ -35,7 +37,12 @@ export async function initBoss(): Promise<PgBoss> {
   });
 
   await boss.start();
-  logger.info('pg-boss started');
+
+  for (const name of Object.values(QUEUE_NAMES)) {
+    await boss.createQueue(name);
+  }
+
+  logger.info({ queues: Object.values(QUEUE_NAMES) }, 'pg-boss started, queues registered');
   return boss;
 }
 

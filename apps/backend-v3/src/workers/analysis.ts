@@ -1,7 +1,8 @@
 /**
  * pg-boss analysis worker — real R2 implementation.
  *
- * Subscribes to: analysis-opportunity, analysis-capture, ingest-postprocess
+ * Subscribes to: analysis-opportunity, analysis-capture, ingest-postprocess,
+ *                 analysis-periodic-refresh, analysis-model-version-sweep
  *
  * Pre-warm policy (F-201 Addendum A.2):
  *   - n8n webhook commit → enqueue
@@ -684,16 +685,10 @@ async function handleIngestPostprocess(jobs: PgBoss.Job<Record<string, unknown>>
 // ────────────────────────────────────────────────────────────────────────────
 
 async function scheduleModelVersionBumpCron(boss: PgBoss): Promise<void> {
-  const cronName = 'analysis-model-version-sweep';
-  try {
-    await boss.createQueue(cronName);
-  } catch {
-    // queue may already exist
-  }
-  await boss.schedule(cronName, '0 */6 * * *', {}, {
+  await boss.schedule(QUEUE_NAMES.ANALYSIS_MODEL_VERSION_SWEEP, '0 */6 * * *', {}, {
     retryLimit: 1,
   });
-  await boss.work<Record<string, unknown>>(cronName, { batchSize: 1 }, async () => {
+  await boss.work<Record<string, unknown>>(QUEUE_NAMES.ANALYSIS_MODEL_VERSION_SWEEP, { batchSize: 1 }, async () => {
     logger.info('Running model version bump sweep');
     const res = await pool.query<{ id: string }>(
       `SELECT id FROM opportunities
@@ -721,16 +716,10 @@ async function scheduleModelVersionBumpCron(boss: PgBoss): Promise<void> {
 }
 
 async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
-  const cronName = 'analysis-periodic-refresh';
-  try {
-    await boss.createQueue(cronName);
-  } catch {
-    // queue may already exist
-  }
-  await boss.schedule(cronName, '0 */6 * * *', {}, {
+  await boss.schedule(QUEUE_NAMES.ANALYSIS_PERIODIC_REFRESH, '0 */6 * * *', {}, {
     retryLimit: 1,
   });
-  await boss.work<Record<string, unknown>>(cronName, { batchSize: 1 }, async () => {
+  await boss.work<Record<string, unknown>>(QUEUE_NAMES.ANALYSIS_PERIODIC_REFRESH, { batchSize: 1 }, async () => {
     logger.info('Running 24h periodic refresh sweep');
     const res = await pool.query<{ id: string }>(
       `SELECT id FROM opportunities
@@ -777,7 +766,12 @@ export async function startWorker(): Promise<PgBoss> {
 
   await boss.start();
   workerBossRef = boss;
-  logger.info('Worker pg-boss started');
+
+  for (const name of Object.values(QUEUE_NAMES)) {
+    await boss.createQueue(name);
+  }
+
+  logger.info({ queues: Object.values(QUEUE_NAMES) }, 'Worker pg-boss started, queues registered');
 
   await boss.work<AnalysisJobData>(
     QUEUE_NAMES.ANALYSIS_OPPORTUNITY,

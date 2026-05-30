@@ -47,4 +47,13 @@ BEGIN
   END IF;
 END$$;
 
+-- Widen the analysis_jobs.queue_name CHECK to include the two new queues.
+-- The new constraint is strictly more permissive (superset of the original).
+ALTER TABLE analysis_jobs DROP CONSTRAINT IF EXISTS analysis_jobs_queue_name_check;
+ALTER TABLE analysis_jobs ADD CONSTRAINT analysis_jobs_queue_name_check
+  CHECK (queue_name IN (
+    'analysis-opportunity', 'analysis-capture', 'ingest-postprocess',
+    'analysis-periodic-refresh', 'analysis-model-version-sweep'
+  ));
+
 COMMIT;
