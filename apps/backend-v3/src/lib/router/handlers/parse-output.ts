@@ -3,8 +3,6 @@
  * On validation failure, returns the error for re-prompt.
  */
 
-import type { z } from 'zod';
-
 export interface ParseResult<T> {
   ok: true;
   data: T;
@@ -15,9 +13,23 @@ export interface ParseError {
   error: string;
 }
 
+interface SafeParseSuccess<T> {
+  success: true;
+  data: T;
+}
+
+interface SafeParseError {
+  success: false;
+  error: { issues: Array<{ path: PropertyKey[]; message: string }> };
+}
+
+interface ZodLikeSchema<T> {
+  safeParse(data: unknown): SafeParseSuccess<T> | SafeParseError;
+}
+
 export function parseAndValidate<T>(
   text: string,
-  schema: z.ZodType<T>,
+  schema: ZodLikeSchema<T>,
 ): ParseResult<T> | ParseError {
   let parsed: unknown;
   try {
@@ -34,7 +46,7 @@ export function parseAndValidate<T>(
   }
 
   const issues = result.error.issues
-    .map((i) => `${i.path.join('.')}: ${i.message}`)
+    .map((i) => `${i.path.map(String).join('.')}: ${i.message}`)
     .join('; ');
   return { ok: false, error: `Schema validation failed: ${issues}` };
 }
