@@ -21,12 +21,14 @@ CREATE TABLE sources (
   confidence    TEXT          NOT NULL DEFAULT 'high'
                               CHECK (confidence IN ('high', 'medium', 'low')),
   meta          JSONB         NOT NULL DEFAULT '{}',
+  legacy_id     TEXT,
   created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_sources_kind      ON sources (kind);
 CREATE INDEX idx_sources_url       ON sources (url) WHERE url IS NOT NULL;
 CREATE INDEX idx_sources_retrieved  ON sources (retrieved_at DESC);
+CREATE UNIQUE INDEX sources_legacy_id_uniq ON sources(legacy_id) WHERE legacy_id IS NOT NULL;
 
 -- ============================================================================
 -- 2.2  users — Operators
