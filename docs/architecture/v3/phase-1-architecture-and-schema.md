@@ -106,12 +106,14 @@ CREATE TABLE sources (
   confidence    TEXT          NOT NULL DEFAULT 'high'
                               CHECK (confidence IN ('high', 'medium', 'low')),
   meta          JSONB         NOT NULL DEFAULT '{}',  -- extensible payload (e.g., SAM notice ID, FPDS award ID)
+  legacy_id     TEXT,                          -- V2 migration: original row ID for upsert dedup
   created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_sources_kind      ON sources (kind);
 CREATE INDEX idx_sources_url       ON sources (url) WHERE url IS NOT NULL;
 CREATE INDEX idx_sources_retrieved  ON sources (retrieved_at DESC);
+CREATE UNIQUE INDEX sources_legacy_id_uniq ON sources(legacy_id) WHERE legacy_id IS NOT NULL;
 ```
 
 | Column | Purpose |
@@ -123,11 +125,13 @@ CREATE INDEX idx_sources_retrieved  ON sources (retrieved_at DESC);
 | `retrieved_at` | When the data was fetched from the source — staleness detection |
 | `confidence` | Grade of the source: `high` (official government DB), `medium` (third-party aggregator), `low` (news/manual) |
 | `meta` | Extensible JSONB for source-specific metadata (SAM notice ID, FPDS contract number, etc.) |
+| `legacy_id` | V2 migration: original row ID used for idempotent upserts via `ON CONFLICT`. NULL for V3-native records |
 
 **Indexes:**
 - `kind` — filter by source type (e.g., show all SAM.gov-sourced records)
 - `url` partial — deduplicate sources by URL
 - `retrieved_at DESC` — staleness queries ("sources older than 7 days")
+- `sources_legacy_id_uniq` — unique partial index on `legacy_id` for migration upsert dedup
 
 **Why this choice:** Phase 0 found R1 compliance was API-layer only (`SourceRef` interface in `analysis.ts`) with no DB-level enforcement. Tables had inconsistent `source_url` / `data_source` / `raw_source_url` columns. A canonical `sources` table with FK constraints ensures no unsourced record can exist in V3. This is the "Data First, Then Debate" doctrine made structural.
 

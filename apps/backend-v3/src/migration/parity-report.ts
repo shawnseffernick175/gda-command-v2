@@ -176,6 +176,24 @@ export async function generateParityReport(input: ParityReportInput): Promise<Pa
   try {
     const v3Counts = await getV3Counts(pool);
 
+    // Count DUPLICATE_KEY gaps per entity for dedup-aware pass logic.
+    // Gap entries use singular entity_type ('opportunity', 'capture') from
+    // transform.ts; counts table rows use plural ('opportunities', 'captures').
+    // Map plural → singular so the lookup resolves correctly.
+    const pluralToSingular: Record<string, string> = {
+      opportunities: 'opportunity',
+      captures: 'capture',
+      action_items: 'action_item',
+      sources: 'source',
+      partners: 'partner',
+    };
+    const dupKeyByEntity: Record<string, number> = {};
+    for (const gap of input.gaps) {
+      if (gap.reason === 'DUPLICATE_KEY') {
+        dupKeyByEntity[gap.entity_type] = (dupKeyByEntity[gap.entity_type] ?? 0) + 1;
+      }
+    }
+
     const countsTable: CountsRow[] = [
       {
         entity: 'opportunities',
@@ -215,13 +233,26 @@ export async function generateParityReport(input: ParityReportInput): Promise<Pa
     ];
 
     for (const row of countsTable) {
-      row.notes = row.delta === 0 ? 'exact match' : `MISMATCH (delta: ${row.delta})`;
+      const gapKey = pluralToSingular[row.entity] ?? row.entity;
+      const dupCount = dupKeyByEntity[gapKey] ?? 0;
+      if (row.delta === 0) {
+        row.notes = 'exact match';
+      } else if (dupCount > 0 && row.v3Count + dupCount === row.v2Count) {
+        row.notes = `${dupCount} dedup — PASS`;
+      } else {
+        row.notes = `MISMATCH (delta: ${row.delta})`;
+      }
     }
 
     const fieldCoverage = await getFieldCoverage(pool);
     const r2Audit = await runR2Audit(input.v3DatabaseUrl);
 
-    const countsPassed = countsTable.every((r) => r.delta === 0);
+    const countsPassed = countsTable.every((r) => {
+      if (r.delta === 0) return true;
+      const gapKey = pluralToSingular[r.entity] ?? r.entity;
+      const dupCount = dupKeyByEntity[gapKey] ?? 0;
+      return dupCount > 0 && r.v3Count + dupCount === r.v2Count;
+    });
     const r2Passed = r2Audit.passed;
     const passed = countsPassed && r2Passed;
 
