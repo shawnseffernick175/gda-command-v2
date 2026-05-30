@@ -1,10 +1,12 @@
 /**
  * Shared handler test suite generator.
  * Each handler file imports this and calls defineHandlerTests() with its config.
- * Produces 8 standardized scenarios per handler.
+ * Produces 3 handler-level scenarios per handler (S1-S3).
+ * Router-level scenarios (S4-S8: timeout, fallback, retry, disable_retry) live
+ * in tests/router/llm-router.test.ts where route() is exercised directly.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,19 +21,6 @@ function loadFixtureOutput(taskFile: string): unknown {
   const raw = readFileSync(join(FIXTURE_DIR, `${taskFile}.json`), 'utf-8');
   const fixture = JSON.parse(raw) as { output: unknown };
   return fixture.output;
-}
-
-/** Returns a promise that rejects with AbortError when signal fires. */
-function abortableNever(signal: AbortSignal): Promise<never> {
-  return new Promise((_resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException('The operation was aborted.', 'AbortError'));
-      return;
-    }
-    signal.addEventListener('abort', () => {
-      reject(new DOMException('The operation was aborted.', 'AbortError'));
-    }, { once: true });
-  });
 }
 
 export interface HandlerTestConfig<T extends Task> {
@@ -57,21 +46,11 @@ export function defineHandlerTests<T extends Task>(config: HandlerTestConfig<T>)
     assertionKey,
     isEmbedHandler = false,
     primaryModel = 'mock-model',
-    fallbackModel = null,
   } = config;
 
   describe(`[Handler] ${task}`, () => {
-    beforeEach(() => {
-      vi.useFakeTimers({ shouldAdvanceTime: false });
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
     // Scenario 1: Success on first call
     it('succeeds on first call with valid output', async () => {
-      vi.useRealTimers();
       const fixtureOutput = loadFixtureOutput(fixtureFile);
       const { ctx, chatFn, embedFn } = createMockProvider({ model: primaryModel });
 
@@ -102,7 +81,6 @@ export function defineHandlerTests<T extends Task>(config: HandlerTestConfig<T>)
 
     // Scenario 2: Validation fail → re-prompt → success
     it('re-prompts on validation failure and succeeds on retry', async () => {
-      vi.useRealTimers();
       if (isEmbedHandler) return;
 
       const fixtureOutput = loadFixtureOutput(fixtureFile);
@@ -127,7 +105,6 @@ export function defineHandlerTests<T extends Task>(config: HandlerTestConfig<T>)
 
     // Scenario 3: Validation fail → re-prompt → still invalid → throws INVALID_OUTPUT
     it('throws INVALID_OUTPUT after double validation failure', async () => {
-      vi.useRealTimers();
       if (isEmbedHandler) return;
 
       const { ctx, chatFn } = createMockProvider({ model: primaryModel });
@@ -141,109 +118,6 @@ export function defineHandlerTests<T extends Task>(config: HandlerTestConfig<T>)
 
       await expect(handler(sampleInput, ctx)).rejects.toThrow('INVALID_OUTPUT');
       expect(chatFn).toHaveBeenCalledTimes(2);
-    });
-
-    // Scenario 4: Primary times out → handler aborts via AbortSignal
-    it('aborts when signal fires (simulating wall-clock timeout)', async () => {
-      vi.useRealTimers();
-      const { ctx, chatFn, embedFn } = createMockProvider({ model: primaryModel });
-
-      // Mock provider returns a promise that rejects on abort
-      if (isEmbedHandler) {
-        embedFn.mockImplementationOnce((_req: unknown, signal?: AbortSignal) => {
-          return abortableNever(signal!);
-        });
-      } else {
-        chatFn.mockImplementationOnce((_req: unknown, signal?: AbortSignal) => {
-          return abortableNever(signal!);
-        });
-      }
-
-      const controller = new AbortController();
-      const ctxWithSignal: HandlerContext = { ...ctx, signal: controller.signal };
-
-      const p = handler(sampleInput, ctxWithSignal);
-      controller.abort();
-
-      await expect(p).rejects.toThrow();
-    });
-
-    // Scenario 5: Primary fails → fallback fires when budget remains
-    it('throws on primary failure so router can trigger fallback', async () => {
-      vi.useRealTimers();
-      if (!fallbackModel) return;
-
-      const { ctx, chatFn, embedFn } = createMockProvider({ model: primaryModel });
-
-      const primaryError = new Error('Provider unavailable') as NodeJS.ErrnoException;
-      primaryError.code = 'ECONNRESET';
-
-      if (isEmbedHandler) {
-        embedFn.mockRejectedValueOnce(primaryError);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow('Provider unavailable');
-      } else {
-        chatFn.mockRejectedValueOnce(primaryError);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow('Provider unavailable');
-      }
-    });
-
-    // Scenario 6: Primary fails → no fallback invoked at handler level
-    it('only calls provider once on failure (fallback is router-level)', async () => {
-      vi.useRealTimers();
-      if (!fallbackModel) return;
-
-      const { ctx, chatFn, embedFn } = createMockProvider({ model: primaryModel });
-
-      const err = new Error('timeout') as NodeJS.ErrnoException;
-      err.code = 'ETIMEDOUT';
-
-      if (isEmbedHandler) {
-        embedFn.mockRejectedValueOnce(err);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow();
-        expect(embedFn).toHaveBeenCalledTimes(1);
-      } else {
-        chatFn.mockRejectedValueOnce(err);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow();
-        expect(chatFn).toHaveBeenCalledTimes(1);
-      }
-    });
-
-    // Scenario 7: Retry backoff is router-level; handler throws on single failure
-    it('handler does not retry internally (retry is router-level)', async () => {
-      vi.useRealTimers();
-
-      const { ctx, chatFn, embedFn } = createMockProvider({ model: primaryModel });
-
-      const transientError = Object.assign(new Error('connection reset'), { code: 'ECONNRESET' });
-
-      if (isEmbedHandler) {
-        embedFn.mockRejectedValueOnce(transientError);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow('connection reset');
-        expect(embedFn).toHaveBeenCalledTimes(1);
-      } else {
-        chatFn.mockRejectedValueOnce(transientError);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow('connection reset');
-        expect(chatFn).toHaveBeenCalledTimes(1);
-      }
-    });
-
-    // Scenario 8: Single provider call on error (disable_router_retry is router-level)
-    it('provider called exactly once on error (retry suppression is router-level)', async () => {
-      vi.useRealTimers();
-
-      const { ctx, chatFn, embedFn } = createMockProvider({ model: primaryModel });
-
-      const err = Object.assign(new Error('server error'), { status: 500 });
-
-      if (isEmbedHandler) {
-        embedFn.mockRejectedValueOnce(err);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow('server error');
-        expect(embedFn).toHaveBeenCalledTimes(1);
-      } else {
-        chatFn.mockRejectedValueOnce(err);
-        await expect(handler(sampleInput, ctx)).rejects.toThrow('server error');
-        expect(chatFn).toHaveBeenCalledTimes(1);
-      }
     });
   });
 }
