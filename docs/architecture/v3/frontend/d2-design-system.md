@@ -90,7 +90,7 @@ Every component uses these semantic aliases, never raw hex:
 | Token | Value | Usage |
 |---|---|---|
 | `font-ui` | `'Inter', system-ui, -apple-system, sans-serif` | All UI text |
-| `font-numeric` | `'Inter', system-ui, sans-serif` with `font-feature-settings: 'tnum' 'ss01'` | Tabular numbers, financial data, KPIs |
+| `font-numeric` | `'Inter', system-ui, sans-serif` with `font-feature-settings: 'tnum', 'ss01'` | Tabular numbers, financial data, KPIs |
 | `font-mono` | `'JetBrains Mono', ui-monospace, monospace` | Solicitation IDs, notice numbers, code blocks |
 
 **Loading:** Inter from Google Fonts (weights 400, 500, 600, 700). JetBrains Mono from Google Fonts (weights 400, 500).
@@ -1709,7 +1709,7 @@ html {
 
 table, td, th, [data-numeric] {
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 'ss01';
+  font-feature-settings: 'tnum', 'ss01';
 }
 ```
 
