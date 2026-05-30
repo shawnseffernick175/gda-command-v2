@@ -263,6 +263,8 @@ describe('llm-router — wall-clock + fallback + retry behavior', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: false });
     providerMocks.clear();
+    // Force real-mode so mock fixtures don't short-circuit route()
+    delete process.env.LLM_ROUTER_MODE;
     // Set dummy API keys so validateKeys() doesn't throw
     process.env.ANTHROPIC_API_KEY = 'test-key';
     process.env.OPENAI_API_KEY = 'test-key';
@@ -289,6 +291,7 @@ describe('llm-router — wall-clock + fallback + retry behavior', () => {
       const p = route({
         task: 'opportunity_analysis',
         input: sampleInputFor('opportunity_analysis'),
+        opts: { mock: false },
       });
       await vi.advanceTimersByTimeAsync(entry.timeout_ms + 100);
       const result = await p;
@@ -306,7 +309,7 @@ describe('llm-router — wall-clock + fallback + retry behavior', () => {
         mockModelHang(entry.model);
         if (entry.fallback) mockModelHang(entry.fallback.model);
 
-        const p = route({ task, input: sampleInputFor(task) });
+        const p = route({ task, input: sampleInputFor(task), opts: { mock: false } });
         await vi.advanceTimersByTimeAsync(entry.timeout_ms + 100);
         const result = await p;
 
@@ -335,7 +338,7 @@ describe('llm-router — wall-clock + fallback + retry behavior', () => {
         const p = route({
           task,
           input: sampleInputFor(task),
-          opts: { disable_router_retry: true },
+          opts: { disable_router_retry: true, mock: false },
         });
         // Small tick to resolve promises
         await vi.advanceTimersByTimeAsync(50);
@@ -367,7 +370,7 @@ describe('llm-router — wall-clock + fallback + retry behavior', () => {
         const p = route({
           task,
           input: sampleInputFor(task),
-          opts: { disable_router_retry: true },
+          opts: { disable_router_retry: true, mock: false },
         });
         // Advance past the delayed throw
         await vi.advanceTimersByTimeAsync(delay + 50);
@@ -396,7 +399,7 @@ describe('llm-router — wall-clock + fallback + retry behavior', () => {
         { return: true },
       ]);
 
-      const p = route({ task, input: sampleInputFor(task) });
+      const p = route({ task, input: sampleInputFor(task), opts: { mock: false } });
 
       // After initial call (synchronous): 1 call
       await vi.advanceTimersByTimeAsync(1);
@@ -436,7 +439,7 @@ describe('llm-router — wall-clock + fallback + retry behavior', () => {
         const p = route({
           task,
           input: sampleInputFor(task),
-          opts: { disable_router_retry: true },
+          opts: { disable_router_retry: true, mock: false },
         });
         await vi.advanceTimersByTimeAsync(100);
         const result = await p;
