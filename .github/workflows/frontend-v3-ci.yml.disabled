@@ -1,0 +1,200 @@
+# Frontend V3 CI — lint, typecheck, unit, integration, contract, build, bundle-size, Lighthouse
+#
+# Draft workflow (F-215-D5). Disabled until F-218 enables it by removing .disabled extension.
+# Mirrors Backend V3 CI rigor — every PR touching packages/frontend-v3/ runs this full suite.
+
+name: Frontend V3 CI
+
+on:
+  pull_request:
+    paths:
+      - 'packages/frontend-v3/**'
+      - '.github/workflows/frontend-v3-ci.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run ESLint
+        working-directory: packages/frontend-v3
+        run: npx eslint . --max-warnings 0
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/shared
+
+      - name: TypeScript strict check
+        working-directory: packages/frontend-v3
+        run: npx tsc --noEmit --strict
+
+  test-unit-integration:
+    name: Unit + Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/shared
+
+      - name: Run unit + integration tests
+        working-directory: packages/frontend-v3
+        env:
+          MOCK_LLM: '1'
+        run: npx vitest run --coverage
+
+      - name: Post coverage summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let summary = '';
+            try {
+              const report = JSON.parse(fs.readFileSync('packages/frontend-v3/coverage/coverage-summary.json', 'utf8'));
+              const total = report.total;
+              summary = `## Frontend V3 Coverage\n\n`;
+              summary += `| Metric | Coverage |\n|---|---|\n`;
+              summary += `| Statements | ${total.statements.pct}% |\n`;
+              summary += `| Branches | ${total.branches.pct}% |\n`;
+              summary += `| Functions | ${total.functions.pct}% |\n`;
+              summary += `| Lines | ${total.lines.pct}% |\n`;
+            } catch {
+              summary = '## Frontend V3 Coverage\n\n*Coverage report not generated.*';
+            }
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Frontend V3 Coverage')
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: summary,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary,
+              });
+            }
+
+  test-contract:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/shared
+
+      - name: Run contract tests
+        working-directory: packages/frontend-v3
+        env:
+          MOCK_LLM: '1'
+        run: npx vitest run --config vitest.contract.config.ts
+
+  build-and-bundle:
+    name: Build + Bundle Size + Lighthouse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/shared
+
+      - name: Build frontend-v3
+        working-directory: packages/frontend-v3
+        run: npx vite build
+
+      - name: Check bundle size
+        working-directory: packages/frontend-v3
+        run: |
+          MAX_MAIN_KB=350
+          MAX_SURFACE_KB=100
+
+          echo "## Bundle Size Report" > /tmp/bundle-report.md
+
+          # Find main chunk
+          MAIN_SIZE=$(find dist/assets -name 'index-*.js' -exec gzip -c {} \; | wc -c)
+          MAIN_KB=$((MAIN_SIZE / 1024))
+          echo "Main bundle: ${MAIN_KB}KB gzipped (budget: ${MAX_MAIN_KB}KB)" | tee -a /tmp/bundle-report.md
+
+          if [ "$MAIN_KB" -gt "$MAX_MAIN_KB" ]; then
+            echo "::error::Main bundle exceeds ${MAX_MAIN_KB}KB budget: ${MAIN_KB}KB"
+            exit 1
+          fi
+
+          # Check per-surface chunks
+          OVER_BUDGET=0
+          for chunk in dist/assets/*.js; do
+            SIZE=$(gzip -c "$chunk" | wc -c)
+            KB=$((SIZE / 1024))
+            NAME=$(basename "$chunk")
+            echo "  $NAME: ${KB}KB gzipped" >> /tmp/bundle-report.md
+            if [ "$KB" -gt "$MAX_SURFACE_KB" ] && [ "$NAME" != "index-"* ]; then
+              echo "::warning::Chunk $NAME exceeds ${MAX_SURFACE_KB}KB: ${KB}KB"
+              OVER_BUDGET=$((OVER_BUDGET + 1))
+            fi
+          done
+
+          if [ "$OVER_BUDGET" -gt 0 ]; then
+            echo "::warning::$OVER_BUDGET chunk(s) exceed per-surface budget"
+          fi
+
+          echo "Bundle size check passed."
+
+      - name: Lighthouse performance audit
+        working-directory: packages/frontend-v3
+        run: |
+          npx -y @lhci/cli@0.14.x autorun \
+            --collect.staticDistDir=dist \
+            --assert.preset=lighthouse:recommended \
+            --assert.assertions.categories:performance=error \
+            --assert.assertions.categories:performance.minScore=0.9 \
+            || { echo "::error::Lighthouse performance score below 90"; exit 1; }

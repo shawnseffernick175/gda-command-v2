@@ -1,0 +1,100 @@
+# Frontend V3 E2E — full Playwright suite against Docker Compose stack
+#
+# Draft workflow (F-215-D5). Disabled until F-218 enables it by removing .disabled extension.
+# Spins up V3 backend + frontend-v3 + Postgres, runs full operator journeys.
+
+name: Frontend V3 E2E
+
+on:
+  pull_request:
+    paths:
+      - 'packages/frontend-v3/**'
+      - 'apps/backend-v3/**'
+      - '.github/workflows/frontend-v3-e2e.yml'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Start services via Docker Compose
+        env:
+          MOCK_LLM: '1'
+        run: |
+          docker compose -f docker-compose.v3-e2e.yml up -d --build
+          echo "Waiting for services to be healthy..."
+
+          # Wait for backend health endpoint
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3001/api/v3/health > /dev/null 2>&1; then
+              echo "Backend healthy after ${i}s"
+              break
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "::error::Backend failed to start within 60s"
+              docker compose -f docker-compose.v3-e2e.yml logs
+              exit 1
+            fi
+            sleep 1
+          done
+
+          # Wait for frontend
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Frontend healthy after ${i}s"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::Frontend failed to start within 30s"
+              docker compose -f docker-compose.v3-e2e.yml logs
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Run E2E tests
+        working-directory: packages/frontend-v3
+        env:
+          MOCK_LLM: '1'
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+        run: npx playwright test --config playwright.e2e.config.ts
+
+      - name: Upload trace files on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: packages/frontend-v3/test-results/
+          retention-days: 14
+
+      - name: Check for console errors
+        working-directory: packages/frontend-v3
+        run: |
+          CONSOLE_LOG="test-results/console-errors.log"
+          if [ -f "$CONSOLE_LOG" ] && [ -s "$CONSOLE_LOG" ]; then
+            echo "::error::Console errors detected during E2E cold load:"
+            cat "$CONSOLE_LOG"
+            exit 1
+          fi
+          echo "No console errors on cold load."
+
+      - name: Tear down services
+        if: always()
+        run: docker compose -f docker-compose.v3-e2e.yml down -v

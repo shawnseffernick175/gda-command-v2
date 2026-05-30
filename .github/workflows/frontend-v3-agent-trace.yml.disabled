@@ -1,0 +1,88 @@
+# Frontend V3 Agent Trace — reasoning-trace expander enforcement
+#
+# Draft workflow (F-215-D5). Disabled until F-218 enables it by removing .disabled extension.
+# Verifies every agent surface renders a reasoning-trace expander with required fields.
+# Absence = CI red.
+
+name: Frontend V3 Agent Trace
+
+on:
+  pull_request:
+    paths:
+      - 'packages/frontend-v3/**'
+      - '.github/workflows/frontend-v3-agent-trace.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  agent-trace-static:
+    name: Agent trace — static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify reasoning-trace expander in agent surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          VIOLATIONS=0
+
+          echo "=== Agent Trace Static Analysis ==="
+
+          # Every agent surface component must reference reasoning-trace
+          AGENT_SURFACES="packages/frontend-v3/src/components/agent"
+          if [ -d "$AGENT_SURFACES" ]; then
+            for file in "$AGENT_SURFACES"/*.tsx; do
+              [ -f "$file" ] || continue
+              BASENAME=$(basename "$file")
+
+              # Skip test files
+              echo "$BASENAME" | grep -qE '\.test\.' && continue
+
+              # Check for reasoning-trace data-testid
+              if ! grep -q 'reasoning-trace' "$file"; then
+                echo "::error::Agent surface $BASENAME missing reasoning-trace expander"
+                VIOLATIONS=$((VIOLATIONS + 1))
+              fi
+
+              # Check for required trace fields
+              for field in model_used trace_id sources; do
+                if ! grep -q "$field" "$file"; then
+                  echo "::error::Agent surface $BASENAME missing required trace field: $field"
+                  VIOLATIONS=$((VIOLATIONS + 1))
+                fi
+              done
+            done
+          else
+            echo "::notice::Agent surfaces directory not found yet — will be created in F-218"
+          fi
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::error::$VIOLATIONS agent trace violation(s) found"
+            exit 1
+          fi
+
+          echo "Agent trace static analysis passed."
+
+  agent-trace-runtime:
+    name: Agent trace — runtime verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/shared
+
+      - name: Run agent trace contract tests
+        working-directory: packages/frontend-v3
+        env:
+          MOCK_LLM: '1'
+        run: |
+          npx vitest run --config vitest.contract.config.ts \
+            --testPathPattern='agent-trace.*\.contract\.test'
