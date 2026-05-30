@@ -353,7 +353,7 @@ For `opportunity_analysis`: fallback to Haiku is allowed, but `quality_flag: 'de
 
 ### 8.3 Tasks with no fallback
 
-`fast_track_triage`, `sentinel_summary`, `semantic_embed`, `source_research` — these fail loud. No fallback, no degraded mode.
+`fast_track_triage`, `sentinel_summary`, `doctrine_score`, `semantic_embed`, `source_research` — these fail loud. No fallback, no degraded mode.
 
 ---
 
