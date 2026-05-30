@@ -187,6 +187,15 @@ jobs:
           NODE_ENV: test
           ANALYSIS_VERSION: v0.0.1-test
         run: npx vitest run tests/pipeline.test.ts
+      - name: V3 backend — router tests (mock mode)
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          JWT_SECRET: ci-jwt-secret
+          GDA_WEBHOOK_KEY: ci-webhook-key
+          NODE_ENV: test
+          MOCK_LLM: "1"
+        run: npx vitest run tests/router/
 
   migration-parity-check:
     name: Migration Parity Check

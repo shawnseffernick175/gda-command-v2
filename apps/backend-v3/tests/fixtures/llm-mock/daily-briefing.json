@@ -1,0 +1,36 @@
+{
+  "output": {
+    "headline": "3 pursuits need attention today — CMMI renewal is now urgent",
+    "priority_actions": [
+      {
+        "action": "Review and approve RS3 Task Order 6 proposal — Pink Team complete, Red Team scheduled for Thursday",
+        "urgency": "immediate",
+        "related_entity": "capture:rs3-to6-logistics"
+      },
+      {
+        "action": "Initiate CMMI-DEV ML3 renewal process — certification expires 8/7/2026 (69 days remaining)",
+        "urgency": "today",
+        "related_entity": "cert:cmmi-dev-ml3"
+      },
+      {
+        "action": "Respond to Army Sustainment Command RFI W912PM-26-R-0087 — deadline in 5 business days",
+        "urgency": "today",
+        "related_entity": "opp:W912PM-26-R-0087"
+      },
+      {
+        "action": "Schedule teaming call with Riverstone re: MDA SHIELD sub-opportunity",
+        "urgency": "this_week",
+        "related_entity": "partner:riverstone-mda-shield"
+      }
+    ],
+    "risk_flags": [
+      "CMMI-DEV ML3 certification expires in 69 days — 2 active proposals reference this certification",
+      "CIO-SP3 SB/8(a) vehicle EXPIRED 4/29/2026 — cannot bid on new CIO-SP3 task orders"
+    ],
+    "market_intel_summary": "3 new Army sustainment opportunities posted on SAM.gov this week matching Envision's NAICS profile. GovTribe signals increased DLA spending in logistics automation — aligns with Envision's C5ISR capabilities.",
+    "cert_expiration_warnings": [
+      "CMMI-DEV ML3 expires 8/7/2026 (69 days) — CRITICAL: renewal process takes 60-90 days",
+      "CIO-SP3 SB/8(a) EXPIRED 4/29/2026 — no remediation path available"
+    ]
+  }
+}

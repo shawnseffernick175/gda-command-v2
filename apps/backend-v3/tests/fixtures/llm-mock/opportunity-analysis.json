@@ -1,0 +1,29 @@
+{
+  "output": {
+    "pwin": 68,
+    "pwin_rationale": "Envision has strong past performance with Army Sustainment Command through the RS3 vehicle (5 task orders, 98% CPAR ratings). The NAICS 541330 alignment is direct, and the logistics/sustainment scope matches Envision's core competency. Key risk: incumbent BAE Systems holds the current contract with established customer relationships.",
+    "incumbent_analysis": "BAE Systems holds the predecessor contract W912PM-21-D-0045, awarded in 2021 for $12.3M. Performance has been rated Satisfactory on most recent CPAR. The recompete suggests the government is open to new offerors, likely due to cost concerns.",
+    "competitor_landscape": "Expected bidders include BAE Systems (incumbent advantage), SAIC (strong logistics portfolio), and Engility (competitive pricing). Envision's SDB status and RS3 vehicle access provide differentiation. The HUBZone set-aside component could be unlocked through Riverstone teaming.",
+    "blackhat_assessment": "BAE will emphasize continuity and transition risk avoidance. SAIC will lead with enterprise IT integration capabilities. Envision should counter with agile delivery, lower overhead rates, and proven Army sustainment track record.",
+    "wargame_summary": "Scenario modeling suggests Envision wins if: (1) pricing is 10-15% below incumbent, (2) past performance narrative emphasizes RS3 task order execution, (3) teaming with Riverstone unlocks HUBZone preference. Loss scenario: incumbent relationship too deep, evaluation weighted heavily toward transition risk.",
+    "timeline_analysis": "Response deadline is 45 days out. Pink team review should be complete within 2 weeks. Red team at day 30. Final submission preparation requires 10 business days minimum. Timeline is tight but feasible with immediate capture plan initiation.",
+    "strengths": [
+      "Direct RS3 vehicle access — no full-and-open competition required",
+      "5 relevant Army task orders with 98% CPAR ratings",
+      "SDB and Minority-Owned certifications for evaluation preference",
+      "Existing cleared personnel familiar with Army sustainment operations",
+      "CMMI-DEV ML3 certification demonstrates process maturity"
+    ],
+    "weaknesses": [
+      "No direct incumbent relationship on this specific contract",
+      "BAE's established customer rapport creates transition risk perception",
+      "Limited HUBZone workforce without Riverstone teaming",
+      "Envision's CMMI-DEV ML3 certification expires 8/7/2026 — tight window"
+    ],
+    "recommended_teaming": [
+      "Riverstone Solutions — HUBZone certification unlocks set-aside preference, TechSIGINT capabilities complement Envision's logistics focus",
+      "Consider PD Systems for training component if scope includes immersive/LVC elements"
+    ],
+    "doctrine_alignment_score": 85
+  }
+}

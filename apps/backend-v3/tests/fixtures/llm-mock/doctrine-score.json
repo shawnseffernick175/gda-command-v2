@@ -1,0 +1,48 @@
+{
+  "output": {
+    "overall_score": 82,
+    "principle_scores": [
+      {
+        "principle": "Alignment",
+        "score": 90,
+        "rationale": "Opportunity directly aligns with Envision's logistics and sustainment focus. Army Sustainment Command is a primary customer."
+      },
+      {
+        "principle": "Ethics Always",
+        "score": 95,
+        "rationale": "Standard government contract pursuit with no ethical concerns. All certifications are current and accurately represented."
+      },
+      {
+        "principle": "Teamwork",
+        "score": 75,
+        "rationale": "Teaming with Riverstone for HUBZone advantage is viable but not yet confirmed. Cross-OU collaboration opportunity exists."
+      },
+      {
+        "principle": "Data First",
+        "score": 80,
+        "rationale": "Solid SAM.gov and FPDS data available. Incumbent information from USAspending confirms contract history. Some competitive intelligence gaps remain."
+      },
+      {
+        "principle": "Relentless Execution",
+        "score": 78,
+        "rationale": "Timeline is feasible within 90-day capture cycle. Key risk: CMMI renewal must run in parallel with proposal development."
+      },
+      {
+        "principle": "Relationships",
+        "score": 85,
+        "rationale": "Strong existing relationship with Army Sustainment Command through RS3 vehicle. 5 task orders demonstrate customer trust."
+      },
+      {
+        "principle": "Market/Mission/Brand Focus",
+        "score": 88,
+        "rationale": "Squarely in Envision's lane — logistics sustainment for Army customers. No scope creep into unfamiliar territory."
+      }
+    ],
+    "alignment_summary": "This opportunity scores well across all 7 doctrine principles. It is a core-lane pursuit for Envision with strong customer relationships and vehicle access. The primary concern is the CMMI certification timeline overlap.",
+    "concerns": [
+      "CMMI-DEV ML3 certification expires during likely performance period",
+      "Competitive intelligence on BAE Systems incumbent approach is incomplete",
+      "Teaming arrangement with Riverstone not yet formalized"
+    ]
+  }
+}

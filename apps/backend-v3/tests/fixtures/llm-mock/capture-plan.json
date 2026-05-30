@@ -1,0 +1,141 @@
+{
+  "output": {
+    "capture_plan": {
+      "customer_profile": "Army Sustainment Command (ASC), Fort Gregg-Adams, VA. Key decision-maker: Program Manager for Logistics Systems Modernization. ASC prioritizes reliable sustainment operations, cost-effective solutions, and minimal transition disruption. Hot buttons: zero downtime during transition, proven track record with Army sustainment systems, and small business participation goals.",
+      "requirements_summary": "The requirement covers end-to-end logistics sustainment services including supply chain management, equipment maintenance and repair, field service engineering, and training support. Key technical requirements: ITSM framework compliance, CMMI-DEV ML3 process maturity, and experience with Army logistics information systems (GCSS-Army, LMP).",
+      "solution_strategy": "Envision will position as the agile integrator — large enough to manage the program with full compliance (ISO 9001, CMMI-DEV ML3, CMMC ML2), small enough to deliver responsive field service. Solution anchors: (1) proven RS3 task order execution model, (2) pre-cleared workforce familiar with ASC operations, (3) rapid deployment capability within 30 days of award.",
+      "win_themes": [
+        {
+          "theme": "Proven Army Sustainment Partner",
+          "evidence": ["5 RS3 task orders with 98% CPAR ratings", "8 years continuous service to Army Sustainment Command", "Pre-cleared workforce of 45 personnel at Fort Gregg-Adams"],
+          "customer_hot_button": "Transition risk elimination"
+        },
+        {
+          "theme": "Cost-Effective Agile Delivery",
+          "evidence": ["15% lower overhead rate vs. large prime competitors", "SDB pricing advantages", "Lean management structure reduces indirect costs"],
+          "customer_hot_button": "Budget optimization"
+        },
+        {
+          "theme": "Certified Process Excellence",
+          "evidence": ["CMMI-DEV ML3 certification", "ISO 9001:2015 quality management", "DCAA-approved accounting system"],
+          "customer_hot_button": "Compliance confidence"
+        }
+      ],
+      "ghost_themes": [
+        {
+          "target_competitor": "BAE Systems",
+          "theme": "Agility Over Bureaucracy",
+          "rationale": "BAE's large-company overhead and slow decision-making contrasts with Envision's direct line to program leadership. Position Envision as the responsive partner who resolves issues in hours, not weeks."
+        },
+        {
+          "target_competitor": "SAIC",
+          "theme": "Sustainment Specialist, Not IT Generalist",
+          "rationale": "SAIC's logistics portfolio is secondary to their IT focus. Envision's core identity is Army sustainment — this is our primary mission, not a side capability."
+        }
+      ],
+      "discriminators": [
+        "Only offeror with 5+ consecutive RS3 task orders and 98% CPAR history",
+        "SDB + Minority-Owned certifications for evaluation preference",
+        "Pre-cleared workforce eliminates 90-day onboarding window",
+        "CMMI-DEV ML3 + ISO 9001:2015 dual certification"
+      ],
+      "pricing_strategy": "Competitive pricing targeting 10-15% below estimated incumbent rates. Leverage SDB evaluation preference for best-value scoring advantage. Fixed-price CLINs for recurring services, T&M for surge requirements. No opportunistic pricing per Doctrine §Pricing.",
+      "teaming_plan": {
+        "partners": [
+          {
+            "name": "Riverstone Solutions",
+            "role": "sub",
+            "contribution": "HUBZone workforce for set-aside compliance, TechSIGINT capabilities for cyber-related sustainment requirements",
+            "certs_leveraged": ["HUBZone", "WOSB"],
+            "vehicles_leveraged": ["MDA SHIELD"]
+          }
+        ],
+        "rationale": "Riverstone's HUBZone certification unlocks the small business set-aside preference. Their TechSIGINT/cyber capabilities complement Envision's logistics focus for any cyber-related sustainment scope.",
+        "teaming_arrangement": "prime_sub"
+      }
+    },
+    "pink_hat_gaps": [
+      {
+        "gap": "Missing detailed staffing plan with named key personnel",
+        "section": "Volume II - Management",
+        "severity": "blocking",
+        "recommended_fix": "Complete staffing matrix with named key personnel and their qualifications by next week"
+      },
+      {
+        "gap": "Past performance narratives need customer reference validation",
+        "section": "Volume III - Past Performance",
+        "severity": "significant",
+        "recommended_fix": "Contact references and confirm willingness to provide positive ratings"
+      }
+    ],
+    "red_team_weaknesses": [
+      {
+        "weakness": "CMMI-DEV ML3 certification expires 8/7/2026 — if contract award slips past this date, compliance claim is void",
+        "likelihood": "Med",
+        "mitigation": "Initiate CMMI renewal process immediately. Include contingency language in proposal."
+      },
+      {
+        "weakness": "No direct incumbent relationship on this specific contract",
+        "likelihood": "High",
+        "mitigation": "Emphasize RS3 task order history as equivalent past performance. Highlight zero-transition-risk staffing approach."
+      }
+    ],
+    "gold_team_readiness": {
+      "ready": false,
+      "items": [
+        {
+          "item": "Executive summary complete",
+          "status": "complete",
+          "notes": null
+        },
+        {
+          "item": "Pricing volumes reviewed by contracts",
+          "status": "incomplete",
+          "notes": "Pending final rate approval from CFO"
+        },
+        {
+          "item": "All volumes cross-referenced for consistency",
+          "status": "incomplete",
+          "notes": "Volume II and III need alignment check"
+        },
+        {
+          "item": "Compliance matrix 100% addressed",
+          "status": "complete",
+          "notes": null
+        }
+      ]
+    },
+    "black_hat_competitor_positioning": [
+      {
+        "competitor": "BAE Systems",
+        "likely_approach": "Incumbent advantage — emphasize continuity, existing workforce, established processes",
+        "strengths_vs_us": ["Deep customer relationships", "Existing cleared workforce on-site", "Established transition-free delivery"],
+        "weaknesses_vs_us": ["Higher overhead rates", "Slower decision-making", "Less agile for scope changes"],
+        "counter_strategy": "Quantify cost savings of 15% lower overhead. Emphasize Envision's pre-cleared workforce as equivalent transition advantage."
+      }
+    ],
+    "next_action": {
+      "action": "Complete staffing plan with named key personnel and schedule Pink Team review",
+      "owner": "Shawn",
+      "deadline": "2026-06-15",
+      "priority": "high"
+    },
+    "source_chips": [
+      {
+        "label": "RS3 Contract Vehicle",
+        "url": "https://sam.gov/opp/abc123/view",
+        "kind": "sam_gov",
+        "retrieved_at": "2026-05-30T12:00:00Z"
+      },
+      {
+        "label": "Envision CPAR History",
+        "url": "https://www.ppirs.gov/envision",
+        "kind": "internal",
+        "retrieved_at": "2026-05-30T12:00:00Z"
+      }
+    ],
+    "generated_at": "2026-05-30T12:00:00Z",
+    "model_used": "claude-opus-4-5",
+    "is_partial": false
+  }
+}

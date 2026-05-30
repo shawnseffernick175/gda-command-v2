@@ -1,0 +1,12 @@
+{
+  "output": {
+    "severity": "warning",
+    "root_cause": "The GovTribe data ingest has not completed its scheduled hourly sync in the last 3 hours. The API endpoint is returning intermittent 503 errors, likely due to maintenance on GovTribe's side.",
+    "recommended_fix": "Monitor GovTribe API status page for maintenance window updates. If the issue persists beyond 6 hours, switch to the backup SAM.gov direct feed for opportunity discovery. No operator action needed now — Sentinel will auto-retry.",
+    "affected_components": [
+      "govtribe-ingest",
+      "opportunity-discovery",
+      "fast-track-signals"
+    ]
+  }
+}

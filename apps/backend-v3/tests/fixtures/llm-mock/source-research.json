@@ -1,0 +1,26 @@
+{
+  "output": {
+    "findings": [
+      {
+        "title": "Army Sustainment Command FY26 Logistics Modernization Strategy",
+        "url": "https://www.army.mil/article/262541/asc-logistics-modernization-fy26",
+        "snippet": "ASC announces expanded investment in logistics automation and sustainment services for FY26, with emphasis on predictive maintenance, supply chain visibility, and field service engineering across CONUS and OCONUS installations.",
+        "relevance_score": 0.94
+      },
+      {
+        "title": "DLA Spending Trends Q1 FY26 — Logistics Services",
+        "url": "https://www.dla.mil/About/News/Articles/fy26-q1-logistics-spending",
+        "snippet": "Defense Logistics Agency reports 12% increase in logistics services obligations for Q1 FY26, driven by Army sustainment modernization programs and increased field service requirements at installations supporting Pacific theater operations.",
+        "relevance_score": 0.87
+      },
+      {
+        "title": "RS3 Vehicle Task Order Pipeline Update",
+        "url": "https://sam.gov/opp/rs3-pipeline-2026/view",
+        "snippet": "Army Contracting Command releases updated RS3 task order forecast for remainder of FY26, including 8 new requirements in logistics sustainment, systems engineering, and training support services.",
+        "relevance_score": 0.82
+      }
+    ],
+    "summary": "Research confirms strong market signals for Army logistics sustainment services in FY26. ASC is expanding investment in logistics modernization, DLA spending in logistics services is up 12%, and the RS3 vehicle has 8 new task orders forecast. This validates Envision's positioning in the Army sustainment market.",
+    "sources_consulted": 12
+  }
+}
