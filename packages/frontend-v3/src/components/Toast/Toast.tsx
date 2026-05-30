@@ -7,7 +7,7 @@ const severityBarColor: Record<string, string> = {
   error: 'bg-critical',
 };
 
-export function Toast({ severity, message, action, dismissible = true, duration: _duration }: ToastProps & { onDismiss?: () => void }) {
+export function Toast({ severity, message, action, dismissible = true, duration: _duration, onDismiss }: ToastProps & { onDismiss?: () => void }) {
   return (
     <div
       className="flex items-center gap-3 rounded-md border border-border bg-surface-raised max-w-sm overflow-hidden"
@@ -22,7 +22,7 @@ export function Toast({ severity, message, action, dismissible = true, duration:
         </button>
       )}
       {dismissible && (
-        <button type="button" className="text-ink-muted hover:text-ink-primary pr-3 text-sm" aria-label="Dismiss">
+        <button type="button" className="text-ink-muted hover:text-ink-primary pr-3 text-sm" aria-label="Dismiss" onClick={onDismiss}>
           &times;
         </button>
       )}

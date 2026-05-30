@@ -45,9 +45,9 @@ export function PipelineAgingChart({ data }: Props) {
           value: item.daysInStage,
           itemStyle: {
             color:
-              item.daysInStage > item.threshold
+              item.daysInStage >= item.threshold
                 ? darkColors.critical
-                : item.daysInStage >= item.threshold
+                : item.daysInStage >= item.threshold * 0.8
                   ? darkColors.warning
                   : darkColors.accent,
           },
