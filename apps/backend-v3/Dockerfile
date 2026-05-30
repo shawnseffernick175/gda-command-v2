@@ -38,6 +38,6 @@ ENV GIT_SHA=$DEPLOY_COMMIT_SHA
 EXPOSE 4000
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
-  CMD wget -qO- http://127.0.0.1:4000/healthz || exit 1
+  CMD wget -qO- http://127.0.0.1:4000/v3/health || exit 1
 
 CMD ["node", "apps/backend-v3/dist/server.js"]

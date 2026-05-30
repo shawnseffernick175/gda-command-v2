@@ -52,20 +52,20 @@ docker ps --filter name=gda-backend-v3 --format '{{.Names}} {{.Status}}'
 docker inspect gda-backend-v3 --format '{{.Config.Image}} {{.Config.Env}}'
 # Expected: DATABASE_URL pointing at postgres-staging
 
-# 3. /healthz returns 200 with status:ok and gitSha
-curl -fsS https://gda-v3.csr-llc.tech/healthz
-# Expected: HTTP 200, body includes "status":"ok" and a "gitSha"
+# 3. /v3/health returns 200 with status:ok and version (gitSha)
+curl -fsS https://gda-v3.csr-llc.tech/v3/health
+# Expected: HTTP 200, body includes "status":"ok" and a version/gitSha
 
-# 4. /readyz returns 200
-curl -fsS https://gda-v3.csr-llc.tech/readyz
+# 4. /v3/ready returns 200
+curl -fsS https://gda-v3.csr-llc.tech/v3/ready
 # Expected: HTTP 200
 
-# 5. /metrics returns Prometheus exposition
-curl -fsS https://gda-v3.csr-llc.tech/metrics | head -20
+# 5. /v3/metrics returns Prometheus exposition
+curl -fsS https://gda-v3.csr-llc.tech/v3/metrics | head -20
 # Expected: Prometheus text exposition format
 
 # 6. TLS certificate is valid
-curl -fsSI https://gda-v3.csr-llc.tech/healthz | grep -i 'strict-transport-security\|content-type'
+curl -fsSI https://gda-v3.csr-llc.tech/v3/health | grep -i 'strict-transport-security\|content-type'
 # Expected: No curl TLS error, HSTS or valid cert headers
 
 # 7. Soak metrics are being written (after 5 min uptime)
