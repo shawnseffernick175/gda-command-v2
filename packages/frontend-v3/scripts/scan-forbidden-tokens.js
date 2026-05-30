@@ -26,6 +26,9 @@ const ALLOWLIST_DIRS = [
 
 const HEX_PATTERN = /#[0-9a-fA-F]{3,8}\b/g;
 const BOX_SHADOW_PATTERN = /box-shadow\s*:/gi;
+const GRADIENT_HEX_PATTERN = /(?:linear|radial|conic)-gradient\([^)]*#[0-9a-fA-F]{3,8}/gi;
+const INLINE_STYLE_HEX_PATTERN = /style\s*=\s*\{\{[^}]*['"]#[0-9a-fA-F]{3,8}/g;
+const EMOJI_PATTERN = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}]/gu;
 const FORBIDDEN_LIBS = ['recharts', 'chart.js', 'react-chartjs-2', 'nivo', 'victory', 'react-vis'];
 const FORBIDDEN_LIB_PATTERN = new RegExp(`from\\s+['"](?:${FORBIDDEN_LIBS.join('|')})['"]`, 'g');
 
@@ -96,10 +99,34 @@ for (const file of files) {
       violations++;
     }
 
+    // Gradient with raw hex
+    GRADIENT_HEX_PATTERN.lastIndex = 0;
+    while ((match = GRADIENT_HEX_PATTERN.exec(line)) !== null) {
+      console.log(`  VIOLATION ${rel}:${lineNum}`);
+      console.log(`     Forbidden gradient with raw hex: ${match[0]}`);
+      violations++;
+    }
+
+    // Inline style with raw hex
+    INLINE_STYLE_HEX_PATTERN.lastIndex = 0;
+    while ((match = INLINE_STYLE_HEX_PATTERN.exec(line)) !== null) {
+      console.log(`  VIOLATION ${rel}:${lineNum}`);
+      console.log(`     Forbidden inline style with raw hex: ${match[0]}`);
+      violations++;
+    }
+
+    // Emoji characters in production code
+    EMOJI_PATTERN.lastIndex = 0;
+    while ((match = EMOJI_PATTERN.exec(line)) !== null) {
+      console.log(`  VIOLATION ${rel}:${lineNum}`);
+      console.log(`     Forbidden emoji character: U+${match[0].codePointAt(0)?.toString(16).toUpperCase()}`);
+      violations++;
+    }
+
     // Forbidden lib imports
     FORBIDDEN_LIB_PATTERN.lastIndex = 0;
     while ((match = FORBIDDEN_LIB_PATTERN.exec(line)) !== null) {
-      console.log(`  ❌ ${rel}:${lineNum}`);
+      console.log(`  VIOLATION ${rel}:${lineNum}`);
       console.log(`     Forbidden chart library import: ${match[0]}`);
       violations++;
     }

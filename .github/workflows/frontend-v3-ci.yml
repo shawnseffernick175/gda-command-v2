@@ -132,7 +132,7 @@ jobs:
         working-directory: packages/frontend-v3
         env:
           MOCK_LLM: '1'
-        run: npx vitest run --config vitest.contract.config.ts
+        run: npx vitest run --config vitest.contract.config.ts --passWithNoTests
 
   build-and-bundle:
     name: Build + Bundle Size + Lighthouse

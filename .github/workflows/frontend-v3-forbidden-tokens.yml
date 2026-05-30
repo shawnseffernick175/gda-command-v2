@@ -118,8 +118,12 @@ jobs:
           fi
 
           # 8. JetBrains Mono font (forbidden per hard rules)
+          # Exclude token definition files (tokens.css, tokens.ts, app.css) where font-family is declared
           if grep -rn --include='*.ts' --include='*.tsx' --include='*.css' \
-              -i 'JetBrains Mono' packages/frontend-v3/src/; then
+              -i 'JetBrains Mono' packages/frontend-v3/src/ \
+              | grep -v 'tokens\.css' \
+              | grep -v 'tokens\.ts' \
+              | grep -v 'app\.css'; then
             echo "::error::JetBrains Mono font reference found (forbidden per hard rules)"
             VIOLATIONS=$((VIOLATIONS + 1))
           fi

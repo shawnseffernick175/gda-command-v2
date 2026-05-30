@@ -61,7 +61,7 @@ export function Select<T extends string = string>({
               onClick={() => { onChange(opt.value); setOpen(false); setSearch(''); }}
             >
               {opt.label}
-              {opt.value === value && <span className="ml-2">✓</span>}
+              {opt.value === value && <span className="ml-2 inline-block w-2.5 h-1.5 border-b-2 border-l-2 border-current -rotate-45 -translate-y-0.5" aria-hidden="true" />}
             </div>
           ))}
         </div>

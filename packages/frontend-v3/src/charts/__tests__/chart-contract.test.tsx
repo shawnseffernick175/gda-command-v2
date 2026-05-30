@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FundingVelocityChart } from '../FundingVelocityChart';
 import { PipelineAgingChart } from '../PipelineAgingChart';
@@ -82,6 +82,7 @@ describe('[Contract] Chart rendering', () => {
     anchors.forEach((a) => {
       expect(a.getAttribute('href')).toMatch(/^https?:\/\//);
       expect(a.getAttribute('target')).toBe('_blank');
+      expect(a.getAttribute('rel')).toContain('noopener');
     });
   });
 
@@ -102,6 +103,11 @@ describe('[Contract] Chart rendering', () => {
     const { container } = render(<WinProbabilityDistributionChart data={winProbData} />);
     const anchors = container.querySelectorAll('a[href]');
     expect(anchors.length).toBeGreaterThan(0);
+    anchors.forEach((a) => {
+      expect(a.getAttribute('href')).toMatch(/^https?:\/\//);
+      expect(a.getAttribute('target')).toBe('_blank');
+      expect(a.getAttribute('rel')).toContain('noopener');
+    });
   });
 
   it('SourceKindContributionChart renders ECharts with correct data shape', () => {
@@ -120,6 +126,11 @@ describe('[Contract] Chart rendering', () => {
     const { container } = render(<SourceKindContributionChart data={sourceKindData} />);
     const anchors = container.querySelectorAll('a[href]');
     expect(anchors.length).toBeGreaterThan(0);
+    anchors.forEach((a) => {
+      expect(a.getAttribute('href')).toMatch(/^https?:\/\//);
+      expect(a.getAttribute('target')).toBe('_blank');
+      expect(a.getAttribute('rel')).toContain('noopener');
+    });
   });
 
   it('CaptureStageFunnelChart renders ECharts with correct data shape', () => {
@@ -137,6 +148,11 @@ describe('[Contract] Chart rendering', () => {
     const { container } = render(<CaptureStageFunnelChart data={funnelData} />);
     const anchors = container.querySelectorAll('a[href]');
     expect(anchors.length).toBeGreaterThan(0);
+    anchors.forEach((a) => {
+      expect(a.getAttribute('href')).toMatch(/^https?:\/\//);
+      expect(a.getAttribute('target')).toBe('_blank');
+      expect(a.getAttribute('rel')).toContain('noopener');
+    });
   });
 
   it('chart components only import echarts (verified by forbidden-tokens scanner)', () => {
@@ -144,5 +160,37 @@ describe('[Contract] Chart rendering', () => {
     // This test confirms the charts render via our ECharts mock, not another library.
     const { container } = render(<FundingVelocityChart data={fundingData} />);
     expect(container.querySelector('[data-testid="echarts-mock"]')).toBeInTheDocument();
+  });
+});
+
+describe('[Contract] Chart data-point sanity check', () => {
+  it('FundingVelocityChart renders > 0 data-point elements', () => {
+    render(<FundingVelocityChart data={fundingData} />);
+    const dataPoints = screen.getAllByTestId(/^data-point-/);
+    expect(dataPoints.length).toBeGreaterThan(0);
+  });
+
+  it('PipelineAgingChart renders > 0 data-point elements', () => {
+    render(<PipelineAgingChart data={agingData} />);
+    const dataPoints = screen.getAllByTestId(/^data-point-/);
+    expect(dataPoints.length).toBeGreaterThan(0);
+  });
+
+  it('WinProbabilityDistributionChart renders > 0 data-point elements', () => {
+    render(<WinProbabilityDistributionChart data={winProbData} />);
+    const dataPoints = screen.getAllByTestId(/^data-point-/);
+    expect(dataPoints.length).toBeGreaterThan(0);
+  });
+
+  it('SourceKindContributionChart renders > 0 data-point elements', () => {
+    render(<SourceKindContributionChart data={sourceKindData} />);
+    const dataPoints = screen.getAllByTestId(/^data-point-/);
+    expect(dataPoints.length).toBeGreaterThan(0);
+  });
+
+  it('CaptureStageFunnelChart renders > 0 data-point elements', () => {
+    render(<CaptureStageFunnelChart data={funnelData} />);
+    const dataPoints = screen.getAllByTestId(/^data-point-/);
+    expect(dataPoints.length).toBeGreaterThan(0);
   });
 });

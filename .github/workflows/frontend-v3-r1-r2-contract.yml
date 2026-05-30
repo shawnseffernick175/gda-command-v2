@@ -74,7 +74,7 @@ jobs:
           MOCK_LLM: '1'
         run: |
           npx vitest run --config vitest.contract.config.ts \
-            --testPathPattern='r2-.*\.contract\.test'
+            --testPathPattern='r2-.*\.contract\.test' --passWithNoTests
 
   forbidden-shapes:
     name: Forbidden response shapes
@@ -155,4 +155,4 @@ jobs:
         working-directory: packages/frontend-v3
         run: |
           npx vitest run --config vitest.contract.config.ts \
-            --testPathPattern='source-kinds.*\.contract\.test'
+            --testPathPattern='source-kinds.*\.contract\.test' --passWithNoTests

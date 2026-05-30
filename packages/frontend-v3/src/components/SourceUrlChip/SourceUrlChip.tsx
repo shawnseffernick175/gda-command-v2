@@ -18,7 +18,7 @@ function relativeTime(iso: string): string {
   return `Retrieved ${days}d ago`;
 }
 
-export function SourceUrlChip({ url, source_kind, retrieved_at, label }: SourceUrlChipProps) {
+export function SourceUrlChip({ url, source_kind, retrieved_at, label, ...rest }: SourceUrlChipProps & Record<string, unknown>) {
   return (
     <a
       href={url}
@@ -27,7 +27,7 @@ export function SourceUrlChip({ url, source_kind, retrieved_at, label }: SourceU
       className="inline-flex items-center gap-1 h-6 px-2 rounded-full border border-border bg-surface-raised text-xs font-medium text-ink-primary hover:text-accent transition-colors"
       title={relativeTime(retrieved_at)}
       data-source-kind={source_kind}
-      data-testid="data-point-source-url-chip"
+      data-testid={(rest['data-testid'] as string) || 'data-point-source-url-chip'}
     >
       <span className="text-ink-muted">{label || extractDomain(url)}</span>
       <span className="text-ink-dim">&rarr;</span>
