@@ -20,6 +20,7 @@ const PUBLIC_PATHS = new Set([
   '/v3/openapi.yaml',
   '/v3/docs',
   '/v3/docs/',
+  '/v3/soak-metrics',
 ]);
 
 function isPublicPath(url: string): boolean {
