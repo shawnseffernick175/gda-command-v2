@@ -70,11 +70,74 @@ export interface CapturePlanInput {
 
 export interface DailyBriefingInput {
   date: string;
-  new_opportunities_count: number;
-  pipeline_summary: string;
-  expiring_certs: string[];
-  action_items_due: string[];
-  sentinel_alerts: string[];
+  open_opportunities: OpportunitySummary[];
+  captures_with_gaps: CaptureSummary[];
+  action_items_due: ActionItemSummary[];
+  sentinel_status: SentinelStatusSummary;
+  pending_recommendations: AgentRecommendation[];
+  pipeline_at_risk: PipelineMilestoneItem[];
+  expiring_certs: ExpiringCert[];
+}
+
+export interface OpportunitySummary {
+  opportunity_id: string;
+  title: string;
+  solicitation_number: string | null;
+  response_deadline: string | null;
+  grade: 'A' | 'B' | 'C';
+  pwin: number | null;
+  days_until_deadline: number | null;
+}
+
+export interface CaptureSummary {
+  capture_id: string;
+  opportunity_title: string;
+  color_review_stage: 'pink' | 'red' | 'gold' | 'none';
+  gaps: string[];
+  next_milestone: string | null;
+}
+
+export interface ActionItemSummary {
+  id: string;
+  title: string;
+  due_date: string;
+  urgency: 'overdue' | 'today' | 'this_week';
+  related_entity: string | null;
+}
+
+export interface SentinelStatusSummary {
+  overall_health: 'healthy' | 'degraded' | 'critical';
+  active_alerts: SentinelAlert[];
+  last_check_at: string;
+}
+
+export interface SentinelAlert {
+  component: string;
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  detected_at: string;
+}
+
+export interface AgentRecommendation {
+  agent: string;
+  recommendation: string;
+  related_entity: string | null;
+  confidence: number;
+}
+
+export interface PipelineMilestoneItem {
+  opportunity_id: string;
+  opportunity_title: string;
+  milestone: string;
+  target_date: string;
+  risk_reason: string;
+}
+
+export interface ExpiringCert {
+  cert_name: string;
+  expiration_date: string;
+  days_remaining: number;
+  severity: 'critical' | 'warning';
 }
 
 export interface SentinelSummaryInput {
@@ -129,23 +192,61 @@ export interface OpportunityAnalysisOutput {
   doctrine_alignment_score: number;
 }
 
+/**
+ * `capture_plan` output type is `CoachOutput` as defined in D3 §5.5.
+ * The shape must be identical to D3 — this types file is a consumer of
+ * D3's authoritative schema, not a redefinition of it.
+ */
 export interface CapturePlanOutput {
-  executive_summary: string;
-  win_themes: string[];
-  discriminators: string[];
-  solution_approach: string;
-  teaming_strategy: string;
-  pricing_guidance: string;
-  risk_assessment: string;
-  milestone_plan: CaptureMilestone[];
-  color_review_readiness: 'not_ready' | 'pink_ready' | 'red_ready' | 'gold_ready';
+  pink_hat_gaps: PinkHatGap[];
+  red_team_weaknesses: RedTeamWeakness[];
+  gold_team_readiness: GoldTeamReadiness;
+  black_hat_competitor_positioning: CompetitorPosition[];
+  next_action: NextAction;
+  source_chips: SourceChip[];
+  is_partial: boolean;
 }
 
-export interface CaptureMilestone {
-  name: string;
-  target_date: string;
+export interface PinkHatGap {
+  requirement_ref: string;
+  gap_description: string;
+  severity: 'critical' | 'major' | 'minor';
+  suggested_fix: string;
+}
+
+export interface RedTeamWeakness {
+  area: string;
+  weakness: string;
+  competitor_advantage: string | null;
+  mitigation: string;
+}
+
+export interface GoldTeamReadiness {
+  overall_score: number;
+  strengths: string[];
+  remaining_gaps: string[];
+  recommendation: 'submit' | 'revise' | 'no_bid';
+}
+
+export interface CompetitorPosition {
+  competitor_name: string;
+  likely_strategy: string;
+  strengths: string[];
+  weaknesses: string[];
+  counter_strategy: string;
+}
+
+export interface NextAction {
+  action: string;
   owner: string;
-  status: 'pending' | 'in_progress' | 'complete';
+  deadline: string | null;
+  priority: 'immediate' | 'this_week' | 'next_milestone';
+}
+
+export interface SourceChip {
+  kind: string;
+  title: string;
+  url: string;
 }
 
 export interface DailyBriefingOutput {
@@ -253,6 +354,12 @@ export interface RouteRequestOpts {
   mock?: boolean;
   operator_id?: string;
   object_ref?: string;
+  /**
+   * Disable router-internal retry loop. Used for tasks invoked via pg-boss
+   * jobs (Scout, Commander, Sentinel background) where the job queue owns
+   * retry semantics. Default: false (router retry enabled).
+   */
+  disable_router_retry?: boolean;
 }
 
 export interface RouteResponseOk<T extends Task> {
@@ -307,6 +414,13 @@ export interface RoutingTableEntry {
 export interface FallbackConfig {
   provider: Provider;
   model: string;
+  /**
+   * Minimum remaining wall-clock budget (ms) required to attempt fallback.
+   * If remaining budget is less than this threshold, the router returns
+   * an error immediately without attempting fallback.
+   * Default: 500.
+   */
+  min_remaining_budget_ms?: number;
 }
 
 // ---------------------------------------------------------------------------

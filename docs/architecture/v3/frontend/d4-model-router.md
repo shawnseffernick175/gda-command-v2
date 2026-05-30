@@ -90,6 +90,11 @@ type Task =
 
 Each task has strongly typed `TaskInputMap[T]` and `TaskOutputMap[T]` interfaces defined in `llm-router.types.ts`.
 
+### 3.1 Type contract notes
+
+- `capture_plan` output type is `CoachOutput` as defined in D3 §5.5. The shape must be identical to D3 — this types file is a consumer of D3's authoritative schema, not a redefinition of it.
+- `daily_briefing` input shape matches D3 §7.4 Commander input requirements — full structured arrays, not pre-aggregated strings.
+
 ---
 
 ## 4. Routing Table (initial — binding)
@@ -106,6 +111,14 @@ Model versions are pins, not "latest." Bumping a model is an explicit PR.
 | `doctrine_score` | anthropic | `claude-sonnet-4-5` | 8 s | `claude-haiku-4-5` | anthropic |
 | `semantic_embed` | openai | `text-embedding-3-large` | 10 s | none | — |
 | `source_research` | perplexity | `sonar-pro` | 20 s | none | — |
+
+### 4.1 Utility task callers
+
+| Task | Caller | Purpose |
+|---|---|---|
+| `doctrine_score` | Capture surface, Sentinel | Score opportunity against doctrine alignment |
+| `semantic_embed` | Ingestion pipeline | Generate vector embeddings for semantic search |
+| `source_research` | Scout (background) | Deep-pull a discovered source URL for indexing |
 
 ### Routing table type (enforced at build time)
 
@@ -132,10 +145,11 @@ interface RouteRequest<T extends Task> {
   task: T;
   input: TaskInputMap[T];
   opts?: {
-    timeout_ms?: number;       // override default
-    mock?: boolean;            // CI test seam
-    operator_id?: string;      // for audit log
-    object_ref?: string;       // e.g., "opp:SAM-W912PM-26-R-0042"
+    timeout_ms?: number;          // override default
+    mock?: boolean;               // CI test seam
+    operator_id?: string;         // for audit log
+    object_ref?: string;          // e.g., "opp:SAM-W912PM-26-R-0042"
+    disable_router_retry?: boolean; // pg-boss async tasks own retry
   };
 }
 ```
@@ -219,7 +233,11 @@ type RouteResponse<T extends Task> = RouteResponseOk<T> | RouteResponseErr<T>;
 5. Fallback to Haiku is allowed but sets `quality_flag: 'degraded'` — UI shows muted indicator.
 6. The 10 s timeout is the **total wall-clock** including retries and fallback.
 
-### 6.3 Frontend contract
+### 6.3 Fallback wall-clock behavior
+
+The fallback model executes within the **remaining** wall-clock budget of the primary task, not a fresh timeout. If the primary times out at 8 s of a 10 s `opportunity_analysis` budget, the fallback has 2 s. If the remaining budget is less than 500 ms when fallback is triggered, the router returns 503 `ANALYSIS_TIMEOUT` immediately without attempting fallback. The fallback never extends the R2 budget — R2's 10 s ceiling is absolute.
+
+### 6.4 Frontend contract
 
 The V3 API handler for opportunity detail:
 - Calls `route({ task: 'opportunity_analysis', ... })`.
@@ -256,6 +274,10 @@ const DEFAULT_RETRY: RetryPolicy = {
 ### 7.3 Wall-clock constraint
 
 Total wall-clock (all retries + fallback attempt) never exceeds the task's `timeout_ms`. The retry loop checks remaining time before each attempt.
+
+### 7.4a Async task retry interaction
+
+For tasks invoked via pg-boss jobs (Scout `fast_track_triage`, Commander `daily_briefing`, Sentinel background `sentinel_summary`), the router's internal retry loop is **disabled** by passing `{ disable_router_retry: true }` in `RouteRequestOpts`. The pg-boss job owns retry semantics for async work (5s / 15s / 45s backoff, max 3 retries per D3 §3.9 / §7.5). Router retry remains enabled by default for synchronous tasks (`opportunity_analysis`, `capture_plan` triggered from UI). This prevents multiplicative retry behavior (up to 9 total attempts) under rate-limit scenarios.
 
 ### 7.4 State machine — retry + fallback
 
@@ -622,4 +644,8 @@ These capabilities are accommodated by the type system and routing table design 
 - [x] Mock-mode design specified
 - [x] Cost-rollup read path documented
 - [x] PR is docs + types only (no impl)
+- [x] `CapturePlanOutput` matches D3 §5.5 `CoachOutput` exactly
+- [x] `DailyBriefingInput` shape matches D3 §7.4 Commander input requirements
+- [x] All 8 task types use the exact `RouterTask` enum string values from D3 §13.1
+- [x] Frontend `SourceKind` enum used in chip-renderable outputs matches D3 §13.1 `FrontendSourceKind`
 - [ ] CI green
