@@ -242,7 +242,7 @@ describe('[Contract] Source-kinds enum parity', () => {
 });
 ```
 
-Acceptable source kinds (per `product_rules.md` + D3 §13.1 — 14 total): `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `sbir_sttr`, `darpa_baa`, `afwerx`, `sofwerx`, `edu_rfi`, `orangeslices`.
+Acceptable source kinds (per `product_rules.md` + D3 §13.1 — 15 total): `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `sbir_sttr`, `darpa_baa`, `afwerx`, `sofwerx`, `edu_rfi`, `orangeslices`.
 
 The parity test compares frontend's `SourceKind` enum against D3 `FrontendSourceKind` — they must be identical.
 
@@ -408,7 +408,7 @@ Extends the existing Visual Token Guardrail pattern:
 | R1 runtime: DOM-level anchor | Render each surface, assert every `data-point-*` contains a clickable `<a href>` with `target="_blank"` and `rel="noopener"` | Yes |
 | R2 runtime: detail contract | Vitest against mocked V3 API — 200-with-analysis or 503, no third state | Yes |
 | Forbidden-shape scan | grep for `analysis_status`, `stale`, `analysis: null`, polling fields | Yes |
-| Source-kinds enum parity | Frontend `SourceKind` === V3 API `SourceKind` (14 kinds per D3 §13.1) | Yes |
+| Source-kinds enum parity | Frontend `SourceKind` === V3 API `SourceKind` (15 kinds per D3 §13.1) | Yes |
 
 ### 7.6 `frontend-v3-agent-trace.yml.disabled`
 
@@ -474,7 +474,7 @@ Every fixture set must cover:
 
 | Dimension | Values covered |
 |---|---|
-| Source kinds | `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `sbir_sttr`, `darpa_baa`, `afwerx`, `sofwerx`, `edu_rfi`, `orangeslices` (14 total per D3 §13.1) |
+| Source kinds | `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `sbir_sttr`, `darpa_baa`, `afwerx`, `sofwerx`, `edu_rfi`, `orangeslices` (15 total per D3 §13.1) |
 | Status states | Every opportunity/pipeline/capture status enum value |
 | Shipley stages | All 7 stages (Long Range Planning through Post-Submittal) |
 | Agent recommendation types | Approve, Reject, Defer, Escalate |
