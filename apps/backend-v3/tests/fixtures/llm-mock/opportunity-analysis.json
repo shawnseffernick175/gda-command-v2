@@ -1,27 +1,162 @@
 {
   "output": {
-    "pwin": 68,
-    "pwin_rationale": "Strong technical alignment with Envision's logistics and sustainment expertise. Existing relationship with Army Sustainment Command via RS3 provides incumbency advantage for TACOM-adjacent work. SDB set-aside narrows competition to qualified small businesses. However, incomplete understanding of incumbent performance creates uncertainty. CMMI-DEV ML3 certification (expiring 8/7/2026) is a differentiator but expiration risk noted.",
-    "incumbent_analysis": "Current work appears held by a mid-tier defense contractor under predecessor IDIQ. FPDS data shows $4.2M in annual obligations to this NAICS/agency pair. Performance ratings from CPAR show satisfactory ratings with no adverse findings.",
-    "competitor_landscape": "Expected 3-5 competitive bids from qualified SDB firms. Key competitors include mid-tier logistics firms with Army experience. Envision's RS3 vehicle and CASCOM relationship provide competitive positioning.",
-    "blackhat_assessment": "Primary competitor likely to emphasize deeper TACOM-specific past performance. Their probable approach: highlight continuity of service and existing cleared workforce. Counter: Envision's broader sustainment portfolio and OASIS+ access provide multi-vehicle flexibility.",
-    "wargame_summary": "Scenario analysis suggests Envision wins on technical approach and vehicle flexibility. Risk factors: incumbent re-compete advantage and potential workforce transition challenges. Mitigation: propose key personnel from existing Army contracts.",
-    "timeline_analysis": "Response deadline allows 45 days for proposal preparation. Adequate for Shipley-compliant Pink/Red/Gold review cycle. Recommend immediate team formation and customer engagement.",
-    "strengths": [
-      "Direct RS3 vehicle access eliminates re-compete risk",
-      "Existing CASCOM/TRADOC relationships provide customer intelligence",
-      "SDB certification qualifies for set-aside preference",
-      "CMMI-DEV ML3 demonstrates process maturity",
-      "ISO 9001:2015 quality management system"
+    "win_probability": 68,
+    "win_probability_reasoning": "Strong technical alignment with Envision's logistics and sustainment expertise. Existing relationship with Army Sustainment Command via RS3 provides incumbency advantage for TACOM-adjacent work. SDB set-aside narrows competition to qualified small businesses. However, incomplete understanding of incumbent performance creates uncertainty. CMMI-DEV ML3 certification (expiring 8/7/2026) is a differentiator but expiration risk noted.",
+    "shipley_bid_no_bid": {
+      "overall": "Bid",
+      "customer_knowledge": {
+        "score": 7,
+        "reasoning": "Existing CASCOM/TRADOC relationship provides good customer intel, but limited direct TACOM PEO C3T engagement reduces score.",
+        "evidence": [
+          "RS3 contract with Army Sustainment Command active since 2022",
+          "CASCOM program office site visit conducted Q2 2025"
+        ]
+      },
+      "solution_match": {
+        "score": 8,
+        "reasoning": "Core logistics and sustainment capabilities directly aligned with SOW requirements. C5ISR integration adds unique value.",
+        "evidence": [
+          "ISO 9001:2015 quality management certified",
+          "CMMI-DEV ML3 process maturity demonstrated",
+          "3 active Army sustainment contracts in similar NAICS"
+        ]
+      },
+      "competitive_position": {
+        "score": 7,
+        "reasoning": "SDB certification provides set-aside advantage. RS3 and OASIS SB+ vehicle access reduces barrier to entry. However, incumbent has continuity advantage.",
+        "evidence": [
+          "SDB and Minority-Owned certifications active",
+          "OASIS SB+ holder with Army task orders",
+          "DCAA-approved accounting system"
+        ]
+      },
+      "past_performance": {
+        "score": 6,
+        "reasoning": "Strong Army sustainment track record but limited TACOM-specific references. Need to bridge with adjacent programs.",
+        "evidence": [
+          "4 Exceptional CPAR ratings on Army logistics contracts",
+          "SeaPort-NxG USN Special Warfare support"
+        ]
+      }
+    },
+    "incumbent": {
+      "name": "Apex Defense Solutions LLC",
+      "contract_number": "W56HZV-21-D-0034",
+      "contract_value": 4200000,
+      "expiration_date": "2026-03-15",
+      "performance_signals": [
+        "CPAR: Satisfactory across all criteria",
+        "No adverse findings in past 3 years",
+        "Recompete expected per FPDS lifecycle indicator"
+      ],
+      "source_url": "https://www.fpds.gov/ezsearch/search.do?q=W56HZV-21-D-0034"
+    },
+    "competitive_landscape": [
+      {
+        "name": "Apex Defense Solutions LLC",
+        "positioning": "Will leverage incumbent advantage and existing cleared workforce to emphasize continuity of service.",
+        "strengths": [
+          "Current incumbent with institutional knowledge",
+          "Cleared workforce already in place",
+          "Satisfactory CPAR ratings"
+        ],
+        "weaknesses": [
+          "Limited innovation in current performance period",
+          "No CMMI certification",
+          "Single-vehicle dependency"
+        ],
+        "our_differentiator": "Multi-vehicle flexibility (RS3 + OASIS SB+ + GSA MAS) and CMMI-DEV ML3 process maturity vs. no formal process certification.",
+        "source_url": "https://www.fpds.gov/ezsearch/search.do?q=Apex+Defense+Solutions"
+      },
+      {
+        "name": "Meridian Logistics Group",
+        "positioning": "Will highlight HUBZone and SDVOSB dual certification for maximum socioeconomic scoring advantage.",
+        "strengths": [
+          "HUBZone and SDVOSB dual certified",
+          "TACOM past performance on adjacent contract",
+          "Army ITES-3S vehicle holder"
+        ],
+        "weaknesses": [
+          "Smaller workforce limits surge capacity",
+          "No DCAA-approved accounting system",
+          "Limited C5ISR integration experience"
+        ],
+        "our_differentiator": "DCAA-approved accounting system and broader sustainment portfolio across Army, USCG, and USN Special Warfare.",
+        "source_url": "https://www.sam.gov/entity/MERIDIANLOGISTICS"
+      }
     ],
-    "weaknesses": [
-      "Limited direct TACOM PEO C3T past performance",
-      "CMMI-DEV ML3 certification expiring 8/7/2026 — renewal must be prioritized",
-      "Workforce transition plan needed if displacing incumbent"
+    "doctrine_alignment": [
+      {
+        "principle_number": 1,
+        "principle_name": "Source Everything",
+        "alignment_score": "Strong",
+        "reasoning": "All opportunity data sourced from SAM.gov, FPDS, and USAspending with traceable URLs."
+      },
+      {
+        "principle_number": 2,
+        "principle_name": "Automate Analysis",
+        "alignment_score": "Strong",
+        "reasoning": "R2 contract enforces automatic analysis on opportunity open — no manual triggers."
+      },
+      {
+        "principle_number": 3,
+        "principle_name": "Envision-First",
+        "alignment_score": "Strong",
+        "reasoning": "Analysis calibrated to Envision's specific capabilities, vehicles, and certifications."
+      },
+      {
+        "principle_number": 4,
+        "principle_name": "Shipley Discipline",
+        "alignment_score": "Strong",
+        "reasoning": "Full Shipley bid/no-bid assessment with 4-dimension scoring and evidence-based reasoning."
+      },
+      {
+        "principle_number": 5,
+        "principle_name": "Pipeline Velocity",
+        "alignment_score": "Moderate",
+        "reasoning": "45-day response window allows standard Shipley review cycle but leaves limited margin for delays."
+      },
+      {
+        "principle_number": 6,
+        "principle_name": "Partner Leverage",
+        "alignment_score": "Moderate",
+        "reasoning": "Teaming opportunities identified but no confirmed partner commitments yet."
+      },
+      {
+        "principle_number": 7,
+        "principle_name": "Continuous Learning",
+        "alignment_score": "Weak",
+        "reasoning": "First opportunity in this specific TACOM sub-domain — limited historical win/loss data to inform strategy."
+      }
     ],
-    "recommended_teaming": [
-      "Consider Riverstone Solutions for HUBZone value-add if prime-sub arrangement strengthens bid"
+    "source_chips": [
+      {
+        "label": "SAM.gov Opportunity Listing",
+        "url": "https://sam.gov/opp/abc123/view",
+        "kind": "sam_gov",
+        "retrieved_at": "2026-05-30T12:00:00Z"
+      },
+      {
+        "label": "FPDS Contract History — W56HZV-21-D-0034",
+        "url": "https://www.fpds.gov/ezsearch/search.do?q=W56HZV-21-D-0034",
+        "kind": "fpds",
+        "retrieved_at": "2026-05-30T12:01:00Z"
+      },
+      {
+        "label": "USAspending — TACOM Obligations FY2025",
+        "url": "https://www.usaspending.gov/search/?hash=tacom2025",
+        "kind": "usaspending",
+        "retrieved_at": "2026-05-30T12:02:00Z"
+      },
+      {
+        "label": "GovWin — Apex Defense Solutions Profile",
+        "url": "https://govwin.com/entity/apex-defense",
+        "kind": "govwin",
+        "retrieved_at": "2026-05-30T12:03:00Z"
+      }
     ],
-    "doctrine_alignment_score": 85
+    "generated_at": "2026-05-30T12:05:00Z",
+    "model_used": "claude-sonnet-4-5",
+    "analysis_version": "v2.1.0"
   }
 }

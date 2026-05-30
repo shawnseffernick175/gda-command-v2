@@ -34,21 +34,59 @@ export const fastTrackTriageOutputSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// OpportunityAnalysisOutput
+// OpportunityAnalysisOutput (D4-PATCH shape — mirrors D3 §4.5 AnalystOutput)
 // ---------------------------------------------------------------------------
 
-export const opportunityAnalysisOutputSchema = z.object({
-  pwin: z.number(),
-  pwin_rationale: z.string(),
-  incumbent_analysis: z.string(),
-  competitor_landscape: z.string(),
-  blackhat_assessment: z.string(),
-  wargame_summary: z.string(),
-  timeline_analysis: z.string(),
+const shipleyDimensionSchema = z.object({
+  score: z.number(),
+  reasoning: z.string(),
+  evidence: z.array(z.string()),
+});
+
+const shipleyScoreSchema = z.object({
+  overall: z.enum(['Bid', 'No Bid', 'Conditional']),
+  customer_knowledge: shipleyDimensionSchema,
+  solution_match: shipleyDimensionSchema,
+  competitive_position: shipleyDimensionSchema,
+  past_performance: shipleyDimensionSchema,
+});
+
+const incumbentProfileSchema = z.object({
+  name: z.string(),
+  contract_number: z.string().nullable(),
+  contract_value: z.number().nullable(),
+  expiration_date: z.string().nullable(),
+  performance_signals: z.array(z.string()),
+  source_url: z.string(),
+});
+
+const competitorEntrySchema = z.object({
+  name: z.string(),
+  positioning: z.string(),
   strengths: z.array(z.string()),
   weaknesses: z.array(z.string()),
-  recommended_teaming: z.array(z.string()),
-  doctrine_alignment_score: z.number(),
+  our_differentiator: z.string(),
+  source_url: z.string().nullable(),
+});
+
+const doctrineAlignmentSchema = z.object({
+  principle_number: z.number(),
+  principle_name: z.string(),
+  alignment_score: z.enum(['Strong', 'Moderate', 'Weak', 'N/A']),
+  reasoning: z.string(),
+});
+
+export const opportunityAnalysisOutputSchema = z.object({
+  win_probability: z.number(),
+  win_probability_reasoning: z.string(),
+  shipley_bid_no_bid: shipleyScoreSchema,
+  incumbent: incumbentProfileSchema.nullable(),
+  competitive_landscape: z.array(competitorEntrySchema),
+  doctrine_alignment: z.array(doctrineAlignmentSchema),
+  source_chips: z.array(sourceChipSchema),
+  generated_at: z.string(),
+  model_used: z.string(),
+  analysis_version: z.string(),
 });
 
 // ---------------------------------------------------------------------------

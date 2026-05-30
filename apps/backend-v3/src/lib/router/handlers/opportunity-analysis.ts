@@ -1,7 +1,6 @@
 /**
  * opportunity_analysis handler — Sonnet (R2-enforced, 10s wall-clock).
- * Analyst agent: comprehensive bid/no-bid analysis.
- * Prompt templates from D3 §12.3 / §12.4.
+ * Analyst agent: comprehensive bid/no-bid analysis per D3 §4.5 / D4-PATCH.
  */
 
 import type { OpportunityAnalysisInput, OpportunityAnalysisOutput } from '../../llm-router.types.js';
@@ -15,9 +14,11 @@ Your mission: provide a comprehensive bid/no-bid analysis for a government contr
 
 ## Analysis Requirements
 1. Win Probability (0-100) with detailed reasoning.
-2. Incumbent Analysis: Who currently holds this work?
-3. Competitive Landscape: Who else will bid?
-4. Doctrine Alignment: How does this opportunity align with GDA's doctrine principles?
+2. Shipley Bid/No-Bid assessment with 4 scored dimensions (customer_knowledge, solution_match, competitive_position, past_performance), each 1-10 with reasoning and evidence.
+3. Incumbent Profile: Who currently holds this work? Include contract details and CPAR signals.
+4. Competitive Landscape: Who else will bid? For each competitor, include strengths, weaknesses, and our differentiator.
+5. Doctrine Alignment: Score all 7 GDA doctrine principles (Strong/Moderate/Weak/N/A).
+6. Source Citations: Every factual claim MUST include a source chip with URL.
 
 ## Envision Profile
 - Focus: Logistics, sustainment, training, systems engineering, field services, C5ISR
