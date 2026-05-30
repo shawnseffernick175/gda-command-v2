@@ -3,13 +3,17 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
+import { API_BASE, API_VERSION } from "./api/config";
+import { initSoakReporter } from "./api/soakReporter";
+
+initSoakReporter();
 
 // Global error handler — reports uncaught errors and promise rejections to backend
 function reportError(payload: { message: string; stack?: string; type: string }) {
-  fetch("/api/errors", {
+  fetch(`${API_BASE}/errors`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, url: window.location.href, timestamp: new Date().toISOString() }),
+    body: JSON.stringify({ ...payload, url: window.location.href, timestamp: new Date().toISOString(), apiVersion: API_VERSION }),
   }).catch(() => {});
 }
 

@@ -3,6 +3,7 @@ import { config } from './config/index.js';
 import { logger } from './lib/logger.js';
 import { initBoss, stopBoss } from './lib/queue.js';
 import { startWorker } from './workers/analysis.js';
+import { startSoakDigestWorker } from './workers/soak-digest.js';
 import { pool } from './lib/db.js';
 
 async function main(): Promise<void> {
@@ -14,6 +15,7 @@ async function main(): Promise<void> {
   await initBoss();
 
   const workerBoss = await startWorker();
+  await startSoakDigestWorker();
 
   const app = await buildApp();
 
