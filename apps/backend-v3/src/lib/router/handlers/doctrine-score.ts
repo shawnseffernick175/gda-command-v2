@@ -1,5 +1,5 @@
 /**
- * doctrine_score handler — Sonnet
+ * doctrine_score handler — Haiku
  * Utility task for scoring opportunity against doctrine alignment.
  */
 
@@ -28,8 +28,14 @@ Return valid JSON matching DoctrineScoreOutput schema:
   "concerns": string[]
 }`;
 
+export interface CorrectionContext {
+  previousResponse: string;
+  validationError: string;
+}
+
 export interface HandlerResult {
   output: DoctrineScoreOutput;
+  raw_content: string;
   tokens_in: number;
   tokens_out: number;
   model_used: string;
@@ -38,6 +44,7 @@ export interface HandlerResult {
 export async function handle(
   input: DoctrineScoreInput,
   model: string,
+  correction?: CorrectionContext,
 ): Promise<HandlerResult> {
   const userPrompt = `Score this opportunity against doctrine:
 
@@ -52,10 +59,24 @@ ${input.envision_alignment_context}
 
 Return doctrine score as JSON.`;
 
+  const messages: { role: 'user' | 'assistant'; content: string }[] = [
+    { role: 'user', content: userPrompt },
+  ];
+
+  if (correction) {
+    messages.push(
+      { role: 'assistant', content: correction.previousResponse },
+      {
+        role: 'user',
+        content: `Your previous response failed schema validation with the following errors:\n\n${correction.validationError}\n\nPlease return a valid response matching the schema exactly. Do not add fields. Do not omit required fields. Return only the JSON object, no commentary.`,
+      },
+    );
+  }
+
   const response = await anthropic.chat({
     model,
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
+    messages,
     max_tokens: 2048,
     temperature: 0.2,
   });
@@ -64,6 +85,7 @@ Return doctrine score as JSON.`;
 
   return {
     output: parsed,
+    raw_content: response.content,
     tokens_in: response.tokens_in,
     tokens_out: response.tokens_out,
     model_used: response.model,

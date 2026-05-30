@@ -42,15 +42,22 @@ import { estimateCost } from './router/pricing.js';
 // Handler registry
 // ---------------------------------------------------------------------------
 
-type HandlerFn = (input: unknown, model: string) => Promise<{
+interface CorrectionContext {
+  previousResponse: string;
+  validationError: string;
+}
+
+type HandlerFn = (input: unknown, model: string, correction?: CorrectionContext) => Promise<{
   output: unknown;
+  raw_content: string;
   tokens_in: number;
   tokens_out: number;
   model_used: string;
 }>;
 
-type HandlerModule = { handle: (input: never, model: string) => Promise<{
+type HandlerModule = { handle: (input: never, model: string, correction?: CorrectionContext) => Promise<{
   output: unknown;
+  raw_content: string;
   tokens_in: number;
   tokens_out: number;
   model_used: string;
@@ -444,9 +451,13 @@ async function attemptSingle(
     // Schema validation
     const validation = validateTaskOutput(task, result.output);
     if (!validation.success) {
-      // Re-prompt once with validation error
+      // Re-prompt once with validation error included in the correction context
       try {
-        const retryResult = await withTimeout(handler(input, model), timeoutMs - (Date.now() - startTime));
+        const correction: CorrectionContext = {
+          previousResponse: result.raw_content,
+          validationError: validation.error,
+        };
+        const retryResult = await withTimeout(handler(input, model, correction), timeoutMs - (Date.now() - startTime));
         const retryValidation = validateTaskOutput(task, retryResult.output);
         if (!retryValidation.success) {
           return {

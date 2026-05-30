@@ -28,8 +28,14 @@ Every factual claim MUST include evidence. Claims without sources are forbidden.
 ## Output Requirements
 Return valid JSON matching OpportunityAnalysisOutput schema exactly.`;
 
+export interface CorrectionContext {
+  previousResponse: string;
+  validationError: string;
+}
+
 export interface HandlerResult {
   output: OpportunityAnalysisOutput;
+  raw_content: string;
   tokens_in: number;
   tokens_out: number;
   model_used: string;
@@ -38,6 +44,7 @@ export interface HandlerResult {
 export async function handle(
   input: OpportunityAnalysisInput,
   model: string,
+  correction?: CorrectionContext,
 ): Promise<HandlerResult> {
   const sourcesText = input.sources
     .map((s) => `- [${s.kind}] ${s.title}: ${s.url}`)
@@ -60,10 +67,24 @@ ${sourcesText || 'No sources provided'}
 
 Provide your complete analysis as JSON.`;
 
+  const messages: { role: 'user' | 'assistant'; content: string }[] = [
+    { role: 'user', content: userPrompt },
+  ];
+
+  if (correction) {
+    messages.push(
+      { role: 'assistant', content: correction.previousResponse },
+      {
+        role: 'user',
+        content: `Your previous response failed schema validation with the following errors:\n\n${correction.validationError}\n\nPlease return a valid response matching the schema exactly. Do not add fields. Do not omit required fields. Return only the JSON object, no commentary.`,
+      },
+    );
+  }
+
   const response = await anthropic.chat({
     model,
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
+    messages,
     max_tokens: 4096,
     temperature: 0.3,
   });
@@ -72,6 +93,7 @@ Provide your complete analysis as JSON.`;
 
   return {
     output: parsed,
+    raw_content: response.content,
     tokens_in: response.tokens_in,
     tokens_out: response.tokens_out,
     model_used: response.model,

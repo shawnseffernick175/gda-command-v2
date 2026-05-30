@@ -73,6 +73,10 @@ describe('Routing Table', () => {
     it('source_research → sonar-pro', () => {
       expect(getRoutingEntry('source_research').model).toBe('sonar-pro');
     });
+
+    it('doctrine_score → Haiku', () => {
+      expect(getRoutingEntry('doctrine_score').model).toBe('claude-haiku-4-5');
+    });
   });
 
   describe('Fallback configuration', () => {
@@ -102,6 +106,10 @@ describe('Routing Table', () => {
 
     it('source_research has no fallback', () => {
       expect(getRoutingEntry('source_research').fallback).toBeNull();
+    });
+
+    it('doctrine_score has no fallback', () => {
+      expect(getRoutingEntry('doctrine_score').fallback).toBeNull();
     });
 
     it('fallback configs have min_remaining_budget_ms = 500', () => {
