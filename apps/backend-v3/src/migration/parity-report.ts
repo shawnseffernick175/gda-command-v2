@@ -176,7 +176,17 @@ export async function generateParityReport(input: ParityReportInput): Promise<Pa
   try {
     const v3Counts = await getV3Counts(pool);
 
-    // Count DUPLICATE_KEY gaps per entity for dedup-aware pass logic
+    // Count DUPLICATE_KEY gaps per entity for dedup-aware pass logic.
+    // Gap entries use singular entity_type ('opportunity', 'capture') from
+    // transform.ts; counts table rows use plural ('opportunities', 'captures').
+    // Map plural → singular so the lookup resolves correctly.
+    const pluralToSingular: Record<string, string> = {
+      opportunities: 'opportunity',
+      captures: 'capture',
+      action_items: 'action_item',
+      sources: 'source',
+      partners: 'partner',
+    };
     const dupKeyByEntity: Record<string, number> = {};
     for (const gap of input.gaps) {
       if (gap.reason === 'DUPLICATE_KEY') {
@@ -223,7 +233,8 @@ export async function generateParityReport(input: ParityReportInput): Promise<Pa
     ];
 
     for (const row of countsTable) {
-      const dupCount = dupKeyByEntity[row.entity] ?? 0;
+      const gapKey = pluralToSingular[row.entity] ?? row.entity;
+      const dupCount = dupKeyByEntity[gapKey] ?? 0;
       if (row.delta === 0) {
         row.notes = 'exact match';
       } else if (dupCount > 0 && row.v3Count + dupCount === row.v2Count) {
@@ -238,7 +249,8 @@ export async function generateParityReport(input: ParityReportInput): Promise<Pa
 
     const countsPassed = countsTable.every((r) => {
       if (r.delta === 0) return true;
-      const dupCount = dupKeyByEntity[r.entity] ?? 0;
+      const gapKey = pluralToSingular[r.entity] ?? r.entity;
+      const dupCount = dupKeyByEntity[gapKey] ?? 0;
       return dupCount > 0 && r.v3Count + dupCount === r.v2Count;
     });
     const r2Passed = r2Audit.passed;
