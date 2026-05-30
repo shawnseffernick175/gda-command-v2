@@ -25,6 +25,7 @@ import {
   is429,
   getBackoffMs,
   sleep,
+  extractStatusFromCode,
 } from './llm-router.retry.js';
 import { isMockMode, buildMockResponse, shouldSimulateTimeout, shouldSimulatePrimaryFail } from './llm-router.mocks.js';
 import { logInvokeStart, logInvokeComplete, logInvokeFallback, logInvokeError, logInvokeTimeout } from './llm-router.logger.js';
@@ -322,7 +323,7 @@ function buildErrorResponse<T extends Task>(
 }
 
 function classifyError(err: { status?: number; code?: string }): RouterErrorKind {
-  const status = err.status;
+  const status = err.status ?? extractStatusFromCode(err.code);
   if (status === 429) return 'RATE_LIMITED';
   if (status === 401 || status === 403) return 'AUTH_ERROR';
   if (status !== undefined && status >= 400 && status < 500) return 'VALIDATION_ERROR';
@@ -332,7 +333,10 @@ function classifyError(err: { status?: number; code?: string }): RouterErrorKind
   if (['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN'].includes(code)) {
     return 'NETWORK_ERROR';
   }
-  if (code === 'ABORT_ERR' || code === 'INVALID_OUTPUT') {
+  if (code === 'ABORT_ERR') {
+    return 'ANALYSIS_TIMEOUT';
+  }
+  if (code === 'INVALID_OUTPUT') {
     return 'VALIDATION_ERROR';
   }
 

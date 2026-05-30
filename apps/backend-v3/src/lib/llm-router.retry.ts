@@ -46,7 +46,7 @@ function isNetworkError(err: RetryableError): boolean {
   return ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN'].includes(code);
 }
 
-function extractStatusFromCode(code: string | undefined): number | undefined {
+export function extractStatusFromCode(code: string | undefined): number | undefined {
   if (!code) return undefined;
   const match = /^HTTP_(\d+)$/.exec(code);
   return match ? parseInt(match[1]!, 10) : undefined;
