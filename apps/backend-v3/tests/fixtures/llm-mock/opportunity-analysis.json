@@ -1,0 +1,27 @@
+{
+  "output": {
+    "pwin": 68,
+    "pwin_rationale": "Strong technical alignment with Envision's logistics and sustainment expertise. Existing relationship with Army Sustainment Command via RS3 provides incumbency advantage for TACOM-adjacent work. SDB set-aside narrows competition to qualified small businesses. However, incomplete understanding of incumbent performance creates uncertainty. CMMI-DEV ML3 certification (expiring 8/7/2026) is a differentiator but expiration risk noted.",
+    "incumbent_analysis": "Current work appears held by a mid-tier defense contractor under predecessor IDIQ. FPDS data shows $4.2M in annual obligations to this NAICS/agency pair. Performance ratings from CPAR show satisfactory ratings with no adverse findings.",
+    "competitor_landscape": "Expected 3-5 competitive bids from qualified SDB firms. Key competitors include mid-tier logistics firms with Army experience. Envision's RS3 vehicle and CASCOM relationship provide competitive positioning.",
+    "blackhat_assessment": "Primary competitor likely to emphasize deeper TACOM-specific past performance. Their probable approach: highlight continuity of service and existing cleared workforce. Counter: Envision's broader sustainment portfolio and OASIS+ access provide multi-vehicle flexibility.",
+    "wargame_summary": "Scenario analysis suggests Envision wins on technical approach and vehicle flexibility. Risk factors: incumbent re-compete advantage and potential workforce transition challenges. Mitigation: propose key personnel from existing Army contracts.",
+    "timeline_analysis": "Response deadline allows 45 days for proposal preparation. Adequate for Shipley-compliant Pink/Red/Gold review cycle. Recommend immediate team formation and customer engagement.",
+    "strengths": [
+      "Direct RS3 vehicle access eliminates re-compete risk",
+      "Existing CASCOM/TRADOC relationships provide customer intelligence",
+      "SDB certification qualifies for set-aside preference",
+      "CMMI-DEV ML3 demonstrates process maturity",
+      "ISO 9001:2015 quality management system"
+    ],
+    "weaknesses": [
+      "Limited direct TACOM PEO C3T past performance",
+      "CMMI-DEV ML3 certification expiring 8/7/2026 — renewal must be prioritized",
+      "Workforce transition plan needed if displacing incumbent"
+    ],
+    "recommended_teaming": [
+      "Consider Riverstone Solutions for HUBZone value-add if prime-sub arrangement strengthens bid"
+    ],
+    "doctrine_alignment_score": 85
+  }
+}

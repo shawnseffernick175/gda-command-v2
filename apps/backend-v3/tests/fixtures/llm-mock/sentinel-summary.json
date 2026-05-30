@@ -1,0 +1,12 @@
+{
+  "output": {
+    "severity": "warning",
+    "root_cause": "n8n webhook endpoint /webhook/sam-ingest returning 502 errors intermittently. Root cause: memory pressure on n8n container causing garbage collection pauses exceeding health check timeout. Container restart resolves temporarily but OOM recurs under sustained ingest load.",
+    "recommended_fix": "Increase n8n container memory limit from 512MB to 1GB in docker-compose.yml. Monitor with 'docker stats' after change. If issue persists, implement batch-size throttling in SAM ingest workflow to reduce peak memory usage.",
+    "affected_components": [
+      "n8n-webhook-handler",
+      "sam-ingest-workflow",
+      "opportunity-pipeline"
+    ]
+  }
+}

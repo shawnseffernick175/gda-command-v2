@@ -1,0 +1,26 @@
+{
+  "output": {
+    "findings": [
+      {
+        "title": "Army Sustainment Command — Logistics Support Services",
+        "url": "https://www.army.mil/asc/logistics-support",
+        "snippet": "The Army Sustainment Command manages logistics and sustainment operations for deployed forces, providing integrated materiel management, distribution, and field-level maintenance support.",
+        "relevance_score": 95
+      },
+      {
+        "title": "TACOM Life Cycle Management Command — Maintenance Programs",
+        "url": "https://www.tacom.army.mil/maintenance",
+        "snippet": "TACOM manages ground combat and tactical vehicle maintenance programs, including depot and field-level sustainment for Army and joint force equipment.",
+        "relevance_score": 88
+      },
+      {
+        "title": "Federal Procurement Data System — Army Logistics Awards FY2025",
+        "url": "https://www.fpds.gov/ezsearch/search.do?q=DEPARTMENT_ID%3A97+NAICS%3A541614",
+        "snippet": "FY2025 award data for Army logistics services under NAICS 541614 showing $2.3B in total obligations across 147 actions to 43 unique vendors.",
+        "relevance_score": 82
+      }
+    ],
+    "summary": "Army Sustainment Command continues to be a major buyer of logistics support services, with TACOM playing a key role in maintenance program management. FY2025 procurement data shows strong activity in NAICS 541614 with multiple competitive opportunities for qualified small businesses.",
+    "sources_consulted": 12
+  }
+}

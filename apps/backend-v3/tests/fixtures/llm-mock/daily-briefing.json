@@ -1,0 +1,31 @@
+{
+  "output": {
+    "headline": "3 items need your attention today: 1 approaching deadline, 1 capture gap, and CMMI renewal urgency.",
+    "priority_actions": [
+      {
+        "action": "Review and submit response for W912PM-26-R-0042 (Army Sustainment Logistics) — deadline in 12 days",
+        "urgency": "immediate",
+        "related_entity": "opp:W912PM-26-R-0042"
+      },
+      {
+        "action": "Address Pink Hat blocking gap: transition plan missing for capture CAP-2026-003",
+        "urgency": "today",
+        "related_entity": "capture:CAP-2026-003"
+      },
+      {
+        "action": "Initiate CMMI-DEV ML3 renewal process — certification expires 8/7/2026 (69 days remaining)",
+        "urgency": "this_week",
+        "related_entity": "cert:cmmi-dev-ml3"
+      }
+    ],
+    "risk_flags": [
+      "CMMI-DEV ML3 expiring 8/7/2026 — affects 3 active pursuits",
+      "CIO-SP3 SB/8(a) vehicle expired 4/29/2026 — cannot bid CIO-SP3 task orders"
+    ],
+    "market_intel_summary": "2 new SAM.gov opportunities match Envision NAICS profile (541614, 561210). GovTribe signals increased Army Sustainment Command procurement activity in logistics sustainment. No new competitor activity detected against active pursuits.",
+    "cert_expiration_warnings": [
+      "CMMI-DEV ML3 expires 8/7/2026 (69 days) — CRITICAL",
+      "CIO-SP3 SB/8(a) EXPIRED 4/29/2026 — vehicle no longer available"
+    ]
+  }
+}

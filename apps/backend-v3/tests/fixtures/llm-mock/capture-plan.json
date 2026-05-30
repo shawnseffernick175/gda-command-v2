@@ -1,0 +1,121 @@
+{
+  "output": {
+    "capture_plan": {
+      "customer_profile": "Army Sustainment Command (ASC) requires integrated logistics support for TACOM maintenance operations. Key decision makers value mission reliability, process maturity, and demonstrated sustainment experience. Hot buttons: zero-defect maintenance, rapid deployment capability, and cost-predictable pricing.",
+      "requirements_summary": "Full lifecycle logistics support including supply chain management, maintenance planning, technical data management, and field service engineering. Requires SECRET clearance for key personnel. Performance period: 5 years (1 base + 4 options).",
+      "solution_strategy": "Leverage existing RS3 infrastructure and CASCOM relationships to provide turnkey logistics support. Differentiate through CMMI ML3 process maturity and ISO 9001 quality management. Propose hybrid workforce model combining cleared Envision personnel with local technical experts.",
+      "win_themes": [
+        {
+          "theme": "Mission-Ready Logistics Excellence",
+          "evidence": ["RS3 contract performance: 99.2% uptime across 3 task orders", "ISO 9001:2015 certified quality management"],
+          "customer_hot_button": "Zero-defect maintenance and rapid deployment"
+        },
+        {
+          "theme": "Process Maturity Advantage",
+          "evidence": ["CMMI-DEV ML3 certification", "DCAA-approved accounting system"],
+          "customer_hot_button": "Cost predictability and audit readiness"
+        },
+        {
+          "theme": "Proven Army Partnership",
+          "evidence": ["8 years continuous Army Sustainment Command support", "CASCOM/TRADOC training support experience"],
+          "customer_hot_button": "Continuity of service and institutional knowledge"
+        }
+      ],
+      "ghost_themes": [
+        {
+          "target_competitor": "Mid-tier incumbent",
+          "theme": "Scale without bureaucracy",
+          "rationale": "Incumbent lacks OASIS+ access — Envision offers multi-vehicle flexibility reducing contract risk for the government"
+        }
+      ],
+      "discriminators": [
+        "CMMI-DEV ML3 (only certified SDB bidder)",
+        "Active RS3 prime with proven Army task order execution",
+        "DCAA-approved accounting system for audit readiness",
+        "OASIS+ Pool 1 and 3 access for follow-on flexibility"
+      ],
+      "pricing_strategy": "Competitive fixed-price with cost-plus option years. Labor rates benchmarked against RS3 actuals. No opportunistic pricing per Doctrine §Pricing. Include 5% management reserve for transition risk.",
+      "teaming_plan": {
+        "partners": [
+          {
+            "name": "Riverstone Solutions",
+            "role": "sub",
+            "contribution": "HUBZone set-aside value-add and classified DevSecOps capability",
+            "certs_leveraged": ["HUBZone"],
+            "vehicles_leveraged": ["MDA SHIELD"]
+          }
+        ],
+        "rationale": "Riverstone's HUBZone certification strengthens SDB positioning and their classified DevSecOps capability fills C5ISR gap in Envision's direct workforce",
+        "teaming_arrangement": "prime_sub"
+      }
+    },
+    "pink_hat_gaps": [
+      {
+        "gap": "Missing direct TACOM PEO C3T past performance narratives",
+        "section": "Past Performance",
+        "severity": "significant",
+        "recommended_fix": "Draft PP narrative from adjacent ASC work emphasizing transferable logistics skills"
+      },
+      {
+        "gap": "Transition plan not yet developed",
+        "section": "Technical Approach",
+        "severity": "blocking",
+        "recommended_fix": "Develop 90-day transition plan with named key personnel and knowledge transfer milestones"
+      }
+    ],
+    "red_team_weaknesses": [
+      {
+        "weakness": "CMMI-DEV ML3 certification expiring 8/7/2026 during performance period",
+        "likelihood": "High",
+        "mitigation": "Initiate CMMI renewal process immediately; include renewal timeline in proposal"
+      },
+      {
+        "weakness": "Limited cleared workforce for immediate deployment",
+        "likelihood": "Med",
+        "mitigation": "Pre-identify 5 cleared personnel from existing Army contracts for transition team"
+      }
+    ],
+    "gold_team_readiness": {
+      "ready": false,
+      "items": [
+        { "item": "Executive summary draft", "status": "incomplete", "notes": "Awaiting win theme finalization" },
+        { "item": "Pricing volume", "status": "incomplete", "notes": "Labor rate analysis in progress" },
+        { "item": "Past performance volume", "status": "incomplete", "notes": "PP narratives being drafted" },
+        { "item": "Teaming agreement", "status": "complete", "notes": null },
+        { "item": "Compliance matrix", "status": "complete", "notes": null }
+      ]
+    },
+    "black_hat_competitor_positioning": [
+      {
+        "competitor": "Current Incumbent (Mid-tier Defense)",
+        "likely_approach": "Emphasize continuity of service, existing cleared workforce, and minimal transition risk",
+        "strengths_vs_us": ["Incumbent knowledge", "Existing cleared workforce on-site"],
+        "weaknesses_vs_us": ["No CMMI certification", "No OASIS+ access", "Higher overhead rates"],
+        "counter_strategy": "Position Envision's process maturity (CMMI ML3) as risk reducer; highlight multi-vehicle flexibility via OASIS+"
+      }
+    ],
+    "next_action": {
+      "action": "Develop 90-day transition plan with named key personnel",
+      "owner": "Shawn",
+      "deadline": "2026-06-15",
+      "priority": "high"
+    },
+    "source_chips": [
+      {
+        "label": "SAM.gov Opportunity W912PM-26-R-0042",
+        "url": "https://sam.gov/opp/example-id/view",
+        "kind": "sam_gov",
+        "retrieved_at": "2026-05-30T12:00:00.000Z"
+      },
+      {
+        "label": "FPDS Award History — Army ASC Logistics",
+        "url": "https://www.fpds.gov/ezsearch/search.do?q=DEPARTMENT_ID%3A%2297%22+NAICS%3A%22541614%22",
+        "kind": "fpds",
+        "retrieved_at": "2026-05-30T12:00:00.000Z"
+      }
+    ],
+    "generated_at": "2026-05-30T15:00:00.000Z",
+    "model_used": "claude-opus-4-5",
+    "is_partial": false
+  }
+}

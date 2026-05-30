@@ -187,6 +187,12 @@ jobs:
           NODE_ENV: test
           ANALYSIS_VERSION: v0.0.1-test
         run: npx vitest run tests/pipeline.test.ts
+      - name: V3 backend — LLM router tests (F-217)
+        working-directory: apps/backend-v3
+        env:
+          LLM_ROUTER_MODE: mock
+          NODE_ENV: test
+        run: npx vitest run tests/router/
 
   migration-parity-check:
     name: Migration Parity Check

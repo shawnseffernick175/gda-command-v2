@@ -1,0 +1,48 @@
+{
+  "output": {
+    "overall_score": 82,
+    "principle_scores": [
+      {
+        "principle": "Alignment",
+        "score": 90,
+        "rationale": "Opportunity directly aligns with Envision's logistics and sustainment strategic focus. Army customer is within target customer set."
+      },
+      {
+        "principle": "Ethics Always",
+        "score": 95,
+        "rationale": "Standard government contract with no ethical concerns. Full and open competition ensures fair pursuit."
+      },
+      {
+        "principle": "Teamwork",
+        "score": 75,
+        "rationale": "Potential teaming with Riverstone (HUBZone) strengthens bid but requires coordination. Cross-OU collaboration opportunity."
+      },
+      {
+        "principle": "Data First",
+        "score": 80,
+        "rationale": "Sufficient FPDS and SAM.gov data to make evidence-based pursuit decision. Some gaps in incumbent performance data."
+      },
+      {
+        "principle": "Relentless Execution",
+        "score": 85,
+        "rationale": "45-day response timeline is executable within 90-day milestone framework. Adequate time for Shipley process."
+      },
+      {
+        "principle": "Relationships",
+        "score": 78,
+        "rationale": "Strengthens existing Army Sustainment Command positioning. Builds on RS3 relationship but extends to new PEO."
+      },
+      {
+        "principle": "Market/Mission/Brand Focus",
+        "score": 72,
+        "rationale": "Within Envision's lane but slightly adjacent to core C5ISR focus. Logistics sustainment is core capability."
+      }
+    ],
+    "alignment_summary": "Strong doctrine alignment at 82/100. Opportunity fits squarely within Envision's logistics and sustainment wheelhouse with existing Army relationships as a foundation. Minor concerns around new PEO relationship building and CMMI certification timeline.",
+    "concerns": [
+      "CMMI-DEV ML3 certification expiring during potential performance period",
+      "Limited direct experience with this specific PEO",
+      "Requires investment in transition planning for workforce"
+    ]
+  }
+}
