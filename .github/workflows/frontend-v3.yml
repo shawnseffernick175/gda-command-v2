@@ -1,0 +1,38 @@
+name: frontend-v3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/frontend-v3/**'
+      - '.github/workflows/frontend-v3.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/frontend-v3/**'
+      - '.github/workflows/frontend-v3.yml'
+
+jobs:
+  frontend-v3:
+    name: Frontend V3 Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck --workspace=packages/frontend-v3
+      - name: Lint
+        run: npm run lint --workspace=packages/frontend-v3
+      - name: Build
+        run: npm run build --workspace=packages/frontend-v3
+      - name: Guard — no V2 imports in V3
+        run: |
+          if grep -rn "packages/frontend/" packages/frontend-v3/src/ 2>/dev/null | grep -v "frontend-v3"; then
+            echo "::error::V3 source files must not import from packages/frontend/ (V2)"
+            exit 1
+          fi
+          echo "No V2 imports detected in frontend-v3"

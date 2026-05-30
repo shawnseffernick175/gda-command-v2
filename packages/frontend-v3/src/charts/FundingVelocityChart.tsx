@@ -27,7 +27,8 @@ export function FundingVelocityChart({ data }: Props) {
         const cur = items.find((i) => i.seriesName === 'Current FY')?.value ?? 0;
         const prev = items.find((i) => i.seriesName === 'Prior FY')?.value ?? 0;
         const delta = prev !== 0 ? (((cur - prev) / prev) * 100).toFixed(1) : 'N/A';
-        return `${items[0].name}: $${(cur / 1e6).toFixed(1)}M (Current) / $${(prev / 1e6).toFixed(1)}M (Prior) — ${delta}% change`;
+        const label = items[0]?.name ?? '';
+        return `${label}: $${(cur / 1e6).toFixed(1)}M (Current) / $${(prev / 1e6).toFixed(1)}M (Prior) — ${delta}% change`;
       },
     },
     legend: { data: ['Current FY', 'Prior FY'] },

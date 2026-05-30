@@ -1,16 +1,30 @@
-import { AppShell } from './components/AppShell/AppShell';
-import { LeftRail } from './components/LeftRail/LeftRail';
-import { MainCanvas } from './components/MainCanvas/MainCanvas';
-import { useState } from 'react';
+import { Routes, Route, Navigate } from "react-router-dom";
+import { AppShell } from "./components/AppShell/AppShell";
+import { LeftRail } from "./components/LeftRail/LeftRail";
+import { MainCanvas } from "./components/MainCanvas/MainCanvas";
+import { PlaceholderSurface } from "./components/PlaceholderSurface/PlaceholderSurface";
+import { useUiStore } from "./stores/ui-store";
 
 export function App() {
-  const [collapsed, setCollapsed] = useState(false);
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+
   return (
     <AppShell>
-      <LeftRail collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      <LeftRail collapsed={!sidebarOpen} onToggle={toggleSidebar} />
       <MainCanvas>
-        <h1 className="text-2xl font-semibold text-ink-primary">GDA Command V3</h1>
-        <p className="text-sm text-ink-muted mt-2">Design system loaded. Surfaces are scaffolded in F-219 through F-225.</p>
+        <Routes>
+          <Route index element={<Navigate to="/launchpad" replace />} />
+          <Route path="/launchpad" element={<PlaceholderSurface name="Launchpad" />} />
+          <Route path="/fast-track" element={<PlaceholderSurface name="Fast Track" />} />
+          <Route path="/opportunities" element={<PlaceholderSurface name="Opportunities" />} />
+          <Route path="/opp/:notice_id" element={<PlaceholderSurface name="Opportunity Detail" />} />
+          <Route path="/capture" element={<PlaceholderSurface name="Capture" />} />
+          <Route path="/capture/:opp_id" element={<PlaceholderSurface name="Capture Detail" />} />
+          <Route path="/pipeline" element={<PlaceholderSurface name="Pipeline" />} />
+          <Route path="/action-items" element={<PlaceholderSurface name="Action Items" />} />
+          <Route path="/settings/*" element={<PlaceholderSurface name="Settings" />} />
+        </Routes>
       </MainCanvas>
     </AppShell>
   );

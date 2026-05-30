@@ -26,7 +26,9 @@ export function PipelineAgingChart({ data }: Props) {
       trigger: 'axis',
       formatter: (params: unknown) => {
         const items = params as { name: string; value: number }[];
-        const item = data.items.find((i) => i.title.slice(0, 40) === items[0].name);
+        const first = items[0];
+        if (!first) return '';
+        const item = data.items.find((i) => i.title.slice(0, 40) === first.name);
         if (!item) return '';
         return `${item.title} — Stage ${item.stage}: ${item.daysInStage} days (threshold: ${item.threshold}d) — est. $${(item.value / 1e6).toFixed(1)}M`;
       },

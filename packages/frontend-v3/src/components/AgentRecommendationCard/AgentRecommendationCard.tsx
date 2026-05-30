@@ -42,7 +42,7 @@ export function AgentRecommendationCard({
           <span className="text-xs text-ink-muted block mb-2">Sources:</span>
           <div className="flex flex-wrap gap-2">
             {sources.map((src, i) => (
-              <SourceUrlChip key={i} url={src.url} source_kind={src.kind} retrieved_at={new Date().toISOString()} label={src.label} />
+              <SourceUrlChip key={i} url={src.url} source_kind={src.kind} retrieved_at={new Date().toISOString()} {...(src.label !== undefined ? { label: src.label } : {})} />
             ))}
           </div>
         </div>
