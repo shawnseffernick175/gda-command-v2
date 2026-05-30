@@ -87,11 +87,11 @@ Each of the 6 frontend surfaces renders correctly against mocked V3 API response
 | Surface | Mock fixture | Key assertions |
 |---|---|---|
 | **Launchpad** | `v3-api/launchpad.json` | Today-actionable counts render, critical flags display with source URLs |
+| **Fast Track** | `v3-api/fast-track.json` | Signal cards render, R2 auto-analysis triggers on promote, grade badges correct |
 | **Opportunities** | `v3-api/opportunities.json` | Opportunity list renders, R2 auto-analysis response handled, grade badges correct |
-| **Pipeline** | `v3-api/pipeline.json` | Stage columns render, drag-drop handlers fire, teaming flags visible |
 | **Capture** | `v3-api/capture.json` | Color review cards render, compliance matrix populates, pricing guardrails shown |
-| **Performance** | `v3-api/performance.json` | Active contract burn renders, CPAR trends display |
-| **Partner Intel** | `v3-api/partner-intel.json` | Partner cards render, teaming triggers display, cert expiration badges correct |
+| **Pipeline** | `v3-api/pipeline.json` | Stage columns render, drag-drop handlers fire, teaming flags visible |
+| **Action Items** | `v3-api/action-items.json` | Task list renders, click navigates to source surface (opp/capture/pipeline), AI drafts display |
 
 ### 3.2 Agent recommendation card flows
 
@@ -135,26 +135,34 @@ Expand reasoning -> reasoning-trace panel opens with model_used, trace_id, sourc
 
 **Rule:** Every data point in rendered DOM has a clickable source URL (per `product_rules.md`).
 
-**Mechanism:**
-- Static analysis: every `<Stat>`, `<Metric>`, `<Field>` component requires a `sourceUrl` prop (TypeScript enforces at compile time)
-- Runtime test: render each surface, query all `[data-source]` elements, assert each has a valid URL
+**Mechanism — two-layer check:**
+
+1. **Static prop presence (compile time):** Every `<Stat>`, `<Metric>`, `<Field>` component requires a `sourceUrl` prop. TypeScript enforces at compile time — missing `sourceUrl` is a type error.
+
+2. **DOM-rendered anchor (runtime — the actual R1 enforcement):** Render each surface, query all `[data-testid^="data-point-"]` elements, assert each contains a **clickable `<a>` tag** with a valid `href`, `target="_blank"`, and `rel="noopener"`. Prop presence alone is insufficient — the data point must be rendered as a clickable anchor in the DOM.
 
 ```typescript
 // Example: r1-source-enforcement.contract.test.ts
-describe('[R1] Source URL enforcement', () => {
+describe('[R1] Source URL enforcement — DOM level', () => {
   SURFACES.forEach((surface) => {
-    it(`${surface.name} — every data point has a source URL`, () => {
+    it(`${surface.name} — every data point renders a clickable source link`, () => {
       render(<Surface {...surface.mockProps} />);
       const dataPoints = screen.getAllByTestId(/^data-point-/);
+      expect(dataPoints.length).toBeGreaterThan(0);
       dataPoints.forEach((el) => {
-        const sourceUrl = el.getAttribute('data-source-url');
-        expect(sourceUrl).toBeTruthy();
-        expect(sourceUrl).toMatch(/^https?:\/\//);
+        // The data point element itself, or a descendant, must be an anchor with valid href
+        const anchor = el.tagName === 'A' ? el : el.querySelector('a[href]');
+        expect(anchor).not.toBeNull();
+        expect(anchor!.getAttribute('href')).toMatch(/^https?:\/\//);
+        expect(anchor!.getAttribute('target')).toBe('_blank');
+        expect(anchor!.getAttribute('rel')).toContain('noopener');
       });
     });
   });
 });
 ```
+
+Both layers must pass. The static check prevents omitting the prop; the DOM-level check prevents rendering the prop as a non-clickable attribute.
 
 ### 4.2 R2: Opportunity detail contract
 
@@ -201,15 +209,42 @@ Frontend `SourceKind` enum must exactly match V3 API `SourceKind` enum:
 import { SourceKind as FrontendSourceKind } from '../src/types/sources';
 import { SourceKind as ApiSourceKind } from '../../shared/src/v3/source-kinds';
 
+const ACCEPTABLE_SOURCE_KINDS = [
+  'sam_gov',
+  'fpds',
+  'usaspending',
+  'govwin',
+  'govtribe',
+  'news',
+  'doctrine',
+  'partner_site',
+  'internal',
+  'sbir_sttr',
+  'darpa_baa',
+  'afwerx',
+  'sofwerx',
+  'edu_rfi',
+  'orangeslices',
+] as const;
+
 describe('[Contract] Source-kinds enum parity', () => {
   it('frontend enum values match V3 API enum values', () => {
     expect(Object.values(FrontendSourceKind).sort())
       .toEqual(Object.values(ApiSourceKind).sort());
   });
+
+  it('all acceptable source kinds are present', () => {
+    const frontendValues = Object.values(FrontendSourceKind);
+    ACCEPTABLE_SOURCE_KINDS.forEach((kind) => {
+      expect(frontendValues).toContain(kind);
+    });
+  });
 });
 ```
 
-Acceptable source kinds (per `product_rules.md`): `sam_gov`, `fpds`, `usaspending`, `govwin`, `news`, `doctrine`, `partner_site`, `internal`.
+Acceptable source kinds (per `product_rules.md` + D3 §13.1 — 14 total): `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `sbir_sttr`, `darpa_baa`, `afwerx`, `sofwerx`, `edu_rfi`, `orangeslices`.
+
+The parity test compares frontend's `SourceKind` enum against D3 `FrontendSourceKind` — they must be identical.
 
 ### 4.4 Forbidden response shapes
 
@@ -226,6 +261,25 @@ CI scans all mock fixtures and frontend types for forbidden V3 patterns:
 
 Every write action surface exposes Approve and Reject buttons. CI renders each write-action component and asserts both buttons are present and wired.
 
+### 4.6 5-Chart contract tests
+
+D2 §7 specifies 5 named charts with data contracts. For each chart, the contract test:
+
+| Chart | Fixture | Key assertions |
+|---|---|---|
+| **Funding velocity** | `tests/fixtures/charts/funding-velocity.json` | ECharts renders, data series matches D2 §7 schema, R1 source links on data points |
+| **Pipeline aging** | `tests/fixtures/charts/pipeline-aging.json` | ECharts renders, data series matches D2 §7 schema, R1 source links on data points |
+| **Win-probability distribution** | `tests/fixtures/charts/win-probability.json` | ECharts renders, data series matches D2 §7 schema, R1 source links on data points |
+| **Source-kind contribution** | `tests/fixtures/charts/source-kind-contribution.json` | ECharts renders, data series matches D2 §7 schema, R1 source links on data points |
+| **Capture-stage funnel** | `tests/fixtures/charts/capture-stage-funnel.json` | ECharts renders, data series matches D2 §7 schema, R1 source links on data points |
+
+Each test:
+- Renders the chart with a canonical fixture (`tests/fixtures/charts/<chart-name>.json`)
+- Asserts the chart uses ECharts (no other chart libraries — enforced by forbidden-tokens scanner against `recharts`, `chart.js`, `nivo`, `victory`, etc.)
+- Asserts the chart's data series matches the schema in D2 §7
+- Asserts every data point has a clickable source link (R1 — covered by the DOM-level R1 test if data points use `data-point-*` testid pattern)
+- Asserts the chart renders in dark theme by default with D2 token-defined colors (no raw hex in the chart consumer code)
+
 ---
 
 ## 5. E2E Tests (every PR + merge, on staging deploy)
@@ -240,8 +294,10 @@ Every write action surface exposes Approve and Reject buttons. CI renders each w
 
 | Journey | Steps | Key assertions |
 |---|---|---|
-| **Fast Track signal to Capture** | Land on Launchpad -> click Fast Track signal -> view Opportunity -> Promote to Pipeline -> open Pipeline -> advance to Capture | Each surface loads without error, item state persists across surfaces |
+| **Fast Track R2 trigger path** | Land on Launchpad -> open Fast Track -> click signal -> Promote to Opportunity -> R2 fires -> analyst output renders | R2 auto-analysis triggers on promote, analysis panel renders with source URLs, no loading/pending states |
+| **Fast Track signal to Capture** | Fast Track -> Promote -> Opportunity -> Promote to Pipeline -> advance to Capture | Each surface loads without error, item state persists across surfaces |
 | **Full capture workflow** | Open Capture item -> view color review -> check compliance -> review pricing -> approve | All panels render, approval persists |
+| **Action Items navigation** | Open Action Items -> click action item -> navigates to source surface (opp / capture / pipeline) | Source surface loads with correct item, back-navigation returns to Action Items |
 | **Keyboard-only journey** | Navigate entire app using only keyboard (J/K/O/P/Cmd+K/Escape) — no mouse clicks | Every surface reachable, all actions executable |
 | **Theme switch** | Toggle dark/light mode, verify all surfaces render correctly in both themes | No broken tokens, all text readable, contrast ratios pass |
 | **Cmd+K command palette** | Open palette -> type search -> select result -> navigate to target | Palette opens, results filter, navigation works |
@@ -336,7 +392,7 @@ Extends the existing Visual Token Guardrail pattern:
 | Check | Rule | Failure = red |
 |---|---|---|
 | Raw hex outside `tokens.json` | No `#0f1117`, `#1a1d27`, `#3b82f6` or any raw hex not in tokens | Yes |
-| `box-shadow` in source | Only the canonical 1px card shadow allowed | Yes |
+| `box-shadow` in source | No `box-shadow` declarations permitted (D2 — depth via 1px borders and surface elevation tokens, never shadows). Allowlisted: token-definition files (`echarts-theme.ts`, `design-tokens/**`) | Yes |
 | Gradients | `linear-gradient`, `radial-gradient` forbidden | Yes |
 | Inline color styles | `style={{...color...}}` forbidden | Yes |
 | Emoji in production components | No emoji in `src/` (test files exempt) | Yes |
@@ -349,9 +405,10 @@ Extends the existing Visual Token Guardrail pattern:
 | Check | Mechanism | Failure = red |
 |---|---|---|
 | R1 static: `sourceUrl` prop | AST scan — every `<Stat>`, `<Metric>`, `<Field>` has `sourceUrl` | Yes |
+| R1 runtime: DOM-level anchor | Render each surface, assert every `data-point-*` contains a clickable `<a href>` with `target="_blank"` and `rel="noopener"` | Yes |
 | R2 runtime: detail contract | Vitest against mocked V3 API — 200-with-analysis or 503, no third state | Yes |
 | Forbidden-shape scan | grep for `analysis_status`, `stale`, `analysis: null`, polling fields | Yes |
-| Source-kinds enum parity | Frontend `SourceKind` === V3 API `SourceKind` | Yes |
+| Source-kinds enum parity | Frontend `SourceKind` === V3 API `SourceKind` (14 kinds per D3 §13.1) | Yes |
 
 ### 7.6 `frontend-v3-agent-trace.yml.disabled`
 
@@ -378,13 +435,12 @@ All V3 API mock fixtures live in:
 ```
 packages/frontend-v3/test/fixtures/v3-api/
   launchpad.json
+  fast-track.json
   opportunities.json
   opportunities-detail-200.json
   opportunities-detail-503.json
   pipeline.json
   capture.json
-  performance.json
-  partner-intel.json
   action-items.json
   agent-recommendations.json
 ```
@@ -418,7 +474,7 @@ Every fixture set must cover:
 
 | Dimension | Values covered |
 |---|---|
-| Source kinds | `sam_gov`, `fpds`, `usaspending`, `govwin`, `news`, `doctrine`, `partner_site`, `internal` |
+| Source kinds | `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `sbir_sttr`, `darpa_baa`, `afwerx`, `sofwerx`, `edu_rfi`, `orangeslices` (14 total per D3 §13.1) |
 | Status states | Every opportunity/pipeline/capture status enum value |
 | Shipley stages | All 7 stages (Long Range Planning through Post-Submittal) |
 | Agent recommendation types | Approve, Reject, Defer, Escalate |
@@ -477,15 +533,18 @@ All CI runs set `MOCK_LLM=1`. No real API keys in CI ever.
 
 ### 11.2 Mock response coverage
 
-Mock responses cover every agent task type:
+Mock responses cover all 8 D4 task types:
 
-| Task | Mock response shape |
-|---|---|
-| Opportunity analysis (pwin, incumbent, competitors) | Full analysis object with realistic scores and citations |
-| Blackhat/wargame analysis | Competitor strategies with source URLs |
-| Capture coach recommendations | Approve/Reject/Defer with reasoning trace |
-| RFP shredder extraction | Parsed requirements with compliance matrix |
-| Color review (Pink/Red/Gold) | Review scores with evaluator comments |
+| D4 Task Type | Mock fixture path | Schema validation | Coverage scope |
+|---|---|---|---|
+| `fast_track_triage` | `tests/fixtures/llm-mock/fast_track_triage.json` | `FastTrackTriageOutput` from `d4_types.ts` | Fast Track surface — signal scoring and filtering |
+| `opportunity_analysis` | `tests/fixtures/llm-mock/opportunity_analysis.json` | `OpportunityAnalysisOutput` from `d4_types.ts` | Opportunity detail — R2 auto-analysis (pwin, incumbent, competitors, blackhat) |
+| `capture_plan` | `tests/fixtures/llm-mock/capture_plan.json` | `CapturePlanOutput` from `d4_types.ts` | Capture surface — win themes, pricing, teaming |
+| `daily_briefing` | `tests/fixtures/llm-mock/daily_briefing.json` | `DailyBriefingOutput` from `d4_types.ts` | Launchpad — today-actionable summary |
+| `sentinel_summary` | `tests/fixtures/llm-mock/sentinel_summary.json` | `SentinelSummaryOutput` from `d4_types.ts` | Sentinel door — system health narrative |
+| `doctrine_score` | `tests/fixtures/llm-mock/doctrine_score.json` | `DoctrineScoreOutput` from `d4_types.ts` | Cross-surface — doctrine alignment scoring |
+| `semantic_embed` | `tests/fixtures/llm-mock/semantic_embed.json` | `SemanticEmbedOutput` from `d4_types.ts` | Knowledge base — embedding generation |
+| `source_research` | `tests/fixtures/llm-mock/source_research.json` | `SourceResearchOutput` from `d4_types.ts` | Agent surface — source discovery and citation |
 
 ### 11.3 Mock parity test
 

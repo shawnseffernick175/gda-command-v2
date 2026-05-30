@@ -47,6 +47,8 @@ jobs:
               | grep -v '\.contract\.' \
               | grep -v 'tokens\.json' \
               | grep -v 'tailwind\.config' \
+              | grep -v 'echarts-theme' \
+              | grep -v 'design-tokens/' \
               | grep -v '// allowed-hex' \
               || true)
 
@@ -56,13 +58,15 @@ jobs:
             VIOLATIONS=$((VIOLATIONS + 1))
           fi
 
-          # 3. box-shadow (only canonical 1px card shadow allowed)
+          # 3. box-shadow — zero shadows per D2 (depth via borders/elevation, never shadows)
+          # Allowlisted: token-definition files (echarts-theme, design-tokens)
           if grep -rn --include='*.ts' --include='*.tsx' --include='*.css' \
               'box-shadow' packages/frontend-v3/src/ \
               | grep -v '\.test\.' \
-              | grep -v '// canonical-shadow' \
+              | grep -v 'echarts-theme' \
+              | grep -v 'design-tokens/' \
               | grep -v 'tailwind\.config'; then
-            echo "::error::Non-canonical box-shadow found"
+            echo "::error::box-shadow found (forbidden per D2 — use borders and elevation tokens)"
             VIOLATIONS=$((VIOLATIONS + 1))
           fi
 
