@@ -1,0 +1,115 @@
+import { pool } from '../../lib/db.js';
+import { requireBoss, QUEUE_NAMES } from '../../lib/queue.js';
+import { logger } from '../../lib/logger.js';
+import { v4 as uuidv4 } from 'uuid';
+import type { ActionItemRow } from '../action-items/index.js';
+
+export type DraftKind = 'reply' | 'research' | 'milestone';
+export type DraftStatus = 'generating' | 'done' | 'failed';
+
+export interface DraftRow {
+  id: string;
+  action_item_id: string;
+  kind: DraftKind;
+  draft_text: string | null;
+  sources: object[] | null;
+  status: DraftStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DraftJobData {
+  draftId: string;
+  actionItemId: string;
+  kind: DraftKind;
+}
+
+const VALID_KINDS = new Set<string>(['reply', 'research', 'milestone']);
+
+export function isDraftKind(value: string): value is DraftKind {
+  return VALID_KINDS.has(value);
+}
+
+export async function requestDraft(
+  actionItem: ActionItemRow,
+  kind: DraftKind
+): Promise<DraftRow> {
+  const id = uuidv4();
+  const now = new Date().toISOString();
+
+  const res = await pool.query<DraftRow>(
+    `INSERT INTO action_item_drafts (id, action_item_id, kind, status, created_at, updated_at)
+     VALUES ($1, $2, $3, 'generating', $4, $4)
+     RETURNING *`,
+    [id, actionItem.id, kind, now]
+  );
+
+  const draft = res.rows[0]!;
+
+  const boss = requireBoss();
+  const jobData: DraftJobData = {
+    draftId: id,
+    actionItemId: actionItem.id,
+    kind,
+  };
+  await boss.send(QUEUE_NAMES.INGEST_POSTPROCESS, jobData, {
+    priority: 1,
+    retryLimit: 3,
+    retryDelay: 5,
+    retryBackoff: true,
+    singletonKey: `draft-${id}`,
+  });
+
+  logger.info({ draftId: id, actionItemId: actionItem.id, kind }, 'Draft requested');
+  return draft;
+}
+
+export async function getDraft(draftId: string): Promise<DraftRow | null> {
+  const res = await pool.query<DraftRow>(
+    'SELECT * FROM action_item_drafts WHERE id = $1',
+    [draftId]
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function getDraftsByActionItem(actionItemId: string): Promise<DraftRow[]> {
+  const res = await pool.query<DraftRow>(
+    'SELECT * FROM action_item_drafts WHERE action_item_id = $1 ORDER BY created_at DESC',
+    [actionItemId]
+  );
+  return res.rows;
+}
+
+export function buildStubDraftText(kind: DraftKind, actionItem: ActionItemRow): string {
+  switch (kind) {
+    case 'reply':
+      return `Draft reply for: ${actionItem.title}\n\nHi,\n\nFollowing up on "${actionItem.title}". ${actionItem.detail ? `Context: ${actionItem.detail}` : 'Please advise on next steps.'}\n\nBest regards`;
+    case 'research':
+      return `Research outline for: ${actionItem.title}\n\n1. Key questions:\n   - What is the current status?\n   - What resources are available?\n   - What are the risks?\n\n2. Sources to consult:\n   - Internal knowledge base\n   - SAM.gov\n   - GovTribe\n\n3. Timeline considerations:\n   - ${actionItem.due_date ? `Due by: ${actionItem.due_date}` : 'No due date set'}`;
+    case 'milestone':
+      return `Milestone summary for: ${actionItem.title}\n\nObjective: ${actionItem.title}\nStatus: ${actionItem.status}\n${actionItem.due_date ? `Target date: ${actionItem.due_date}` : ''}\n\nKey accomplishments:\n- Task identified and tracked\n\nNext steps:\n- Review and validate requirements\n- Assign resources\n- Execute and report`;
+  }
+}
+
+export function buildDraftSources(kind: DraftKind): object[] {
+  return [
+    {
+      kind: 'internal',
+      title: `AI draft (${kind}) — stub model`,
+      url: '/audit/drafts/stub',
+      retrieved_at: new Date().toISOString(),
+    },
+  ];
+}
+
+export function toDraftApiShape(row: DraftRow): object {
+  return {
+    id: row.id,
+    action_item_id: row.action_item_id,
+    kind: row.kind,
+    draft_text: row.draft_text ?? '',
+    sources: row.sources ?? [],
+    status: row.status === 'generating' ? 'generating' : row.status === 'done' ? 'approved' : 'rejected',
+    created_at: row.created_at,
+  };
+}

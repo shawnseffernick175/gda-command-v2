@@ -2,7 +2,9 @@
  * Auth client — handles login/register/refresh/logout and token storage.
  */
 
-const API_BASE = "/api/auth";
+import { AUTH_BASE } from "./config";
+import { recordFetchResult, recordFetchError } from "./soakReporter";
+const API_BASE = AUTH_BASE;
 
 interface AuthUser {
   id: string;
@@ -144,7 +146,16 @@ export async function authenticatedFetch(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  let res = await fetch(input, { ...init, headers });
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const startMs = performance.now();
+
+  let res: Response;
+  try {
+    res = await fetch(input, { ...init, headers });
+  } catch (err) {
+    recordFetchError(url, err instanceof Error ? err.message : String(err));
+    throw err;
+  }
 
   // Auto-refresh on 401
   if (res.status === 401 && token) {
@@ -165,9 +176,11 @@ export async function authenticatedFetch(
       if (window.location.pathname !== "/login") {
         window.location.href = "/";
       }
+      recordFetchResult(url, res.status, startMs);
       return res;
     }
   }
 
+  recordFetchResult(url, res.status, startMs);
   return res;
 }

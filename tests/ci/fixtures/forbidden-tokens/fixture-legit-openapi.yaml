@@ -1,0 +1,44 @@
+# Fixture: simulates an OpenAPI spec with forbidden tokens appearing
+# ONLY in description blocks and comments. The gate MUST allow this.
+
+openapi: '3.1.0'
+info:
+  title: GDA Command V3 API (fixture)
+  version: '3.0.0'
+  description: |
+    R2 contract: there is no analysis_status field, no stale flag,
+    no analysis: null in any response. If analysis is not ready within
+    10s the endpoint returns 503 ANALYSIS_TIMEOUT.
+
+paths:
+  /v3/opportunities/{id}:
+    get:
+      summary: Get opportunity detail with analysis
+      description: |
+        Returns the full opportunity record. The analysis field is always
+        present and fresh — there is no "not_yet_analyzed" or "pending"
+        state. The "running" state is internal only.
+        Forbidden tokens like "stale" are never exposed in responses.
+      responses:
+        '200':
+          description: Opportunity with fresh analysis (no analysis_status, no stale: true)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  title:
+                    type: string
+                  analysis:
+                    type: object
+                required:
+                  - id
+                  - title
+                  - analysis
+
+# NO-DEGRADATION CONTRACT (F-202 Addendum A):
+# - There is NO analysis_status field, NO stale field, NO null analysis.
+# - stale: boolean is forbidden. analysis: null is forbidden.
+# - "not_yet_analyzed", "running", "pending" are internal-only states.

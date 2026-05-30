@@ -1,6 +1,5 @@
 import { authenticatedFetch } from "./auth";
-
-const API_BASE = "/api";
+import { API_BASE } from "./config";
 
 interface GDAEnvelope<T> {
   success: boolean;

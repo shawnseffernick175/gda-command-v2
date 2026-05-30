@@ -1,0 +1,2714 @@
+openapi: 3.1.0
+info:
+  title: GDA Command V3 API
+  version: 3.0.0-draft
+  description: |
+    V3 API contract for GDA Command — Envision-only, single-tenant.
+    Every list endpoint returns R1 source siblings on every field.
+    Every detail endpoint auto-runs R2 analysis.
+
+    **Binding scope:** Envision-only. No `ou_tag` query params.
+    Partners are lookup-only (not browsable).
+  contact:
+    name: GDA Engineering
+    email: shawn@envision-is.com
+  license:
+    name: Proprietary
+    identifier: LicenseRef-GDA-Proprietary
+
+servers:
+  - url: https://gda.csr-llc.tech/api/v3
+    description: Production
+  - url: http://localhost:3001/api/v3
+    description: Local development
+
+tags:
+  - name: Opportunities
+    description: Opportunity discovery, qualification, and grading
+  - name: Pipeline
+    description: Qualified pursuits with win probability tracking
+  - name: Captures
+    description: Proposal capture management and compliance
+  - name: Action Items
+    description: Task management with LLM draft generation
+  - name: Launchpad
+    description: Daily-driver summary and flags
+  - name: Partners
+    description: Partner facts for teaming context (lookup only)
+  - name: Sources
+    description: Source registry resolution for SourceBadge component
+  - name: System
+    description: Health, readiness, and version endpoints
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ---------------------------------------------------------------------------
+  # Opportunities
+  # ---------------------------------------------------------------------------
+  /opportunities:
+    get:
+      operationId: listOpportunities
+      summary: List opportunities
+      description: |
+        Filterable, paginated list of opportunities.
+        R1 source siblings are returned on every field.
+      tags: [Opportunities]
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/CursorParam'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/OpportunityStatus'
+        - name: agency
+          in: query
+          description: Case-insensitive substring match
+          schema:
+            type: string
+        - name: naics
+          in: query
+          description: Case-insensitive substring match
+          schema:
+            type: string
+        - name: grade
+          in: query
+          schema:
+            $ref: '#/components/schemas/Grade'
+        - name: due_before
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: due_after
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: set_aside
+          in: query
+          schema:
+            type: string
+        - name: min_value
+          in: query
+          schema:
+            type: number
+        - name: max_value
+          in: query
+          schema:
+            type: number
+        - name: hot
+          in: query
+          description: "Grade A or win prob >= 70%"
+          schema:
+            type: string
+            enum: ['1']
+      responses:
+        '200':
+          description: Paginated list of opportunities with R1 sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpportunityListResponse'
+              example:
+                success: true
+                data:
+                  items:
+                    - id: "opp_001"
+                      title: "Army RS3 Task Order 47"
+                      title_sources:
+                        - kind: sam_gov
+                          title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                          url: "https://sam.gov/opp/abc123/view"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      agency: "Department of the Army"
+                      agency_sources:
+                        - kind: sam_gov
+                          title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                          url: "https://sam.gov/opp/abc123/view"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      naics: "541330"
+                      naics_sources:
+                        - kind: sam_gov
+                          title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                          url: "https://sam.gov/opp/abc123/view"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      grade: "A"
+                      status: discovery
+                      response_due_at: "2026-07-15T17:00:00.000Z"
+                      value_min: 5000000
+                      value_max: 15000000
+                      created_at: "2026-05-20T00:00:00.000Z"
+                      updated_at: "2026-05-29T10:00:00.000Z"
+                  pagination:
+                    limit: 50
+                    cursor: "eyJpZCI6Im9wcF8wMDEifQ=="
+                    hasMore: true
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_abc123
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: createOpportunity
+      summary: Create opportunity (manual entry)
+      tags: [Opportunities]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpportunityCreate'
+            example:
+              title: "USCG IT Modernization"
+              source: manual
+              agency: "United States Coast Guard"
+              naics: "541512"
+              description: "IT modernization support for USCG C5ISR systems"
+              response_due_at: "2026-08-01T17:00:00.000Z"
+              value_min: 2000000
+              value_max: 8000000
+      responses:
+        '201':
+          description: Created opportunity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                data:
+                  id: "opp_002"
+                  title: "USCG IT Modernization"
+                  source: manual
+                  agency: "United States Coast Guard"
+                  status: discovery
+                  created_at: "2026-05-29T16:05:00.000Z"
+                meta:
+                  generatedAt: "2026-05-29T16:05:00.000Z"
+                  source: v3
+                  requestId: req_def456
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /opportunities/{id}:
+    get:
+      operationId: getOpportunity
+      summary: Opportunity detail (auto-analyzes per R2)
+      description: |
+        Returns full opportunity detail with R1 source siblings on every field.
+        Automatically triggers R2 analysis (pwin, incumbent, competitors,
+        blackhat, wargame, timeline). No separate run-analysis endpoint exists.
+      tags: [Opportunities]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Opportunity detail with R2 analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpportunityDetailResponse'
+              example:
+                success: true
+                data:
+                  id: "opp_001"
+                  title: "Army RS3 Task Order 47"
+                  title_sources:
+                    - kind: sam_gov
+                      title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                      url: "https://sam.gov/opp/abc123/view"
+                      retrieved_at: "2026-05-29T10:00:00.000Z"
+                  agency: "Department of the Army"
+                  agency_sources:
+                    - kind: sam_gov
+                      title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                      url: "https://sam.gov/opp/abc123/view"
+                      retrieved_at: "2026-05-29T10:00:00.000Z"
+                  naics: "541330"
+                  grade: "A"
+                  status: discovery
+                  response_due_at: "2026-07-15T17:00:00.000Z"
+                  value_min: 5000000
+                  value_max: 15000000
+                  teaming_flags:
+                    - id: "tf_001"
+                      reason: "HUBZone set-aside"
+                      suggested_partner: "riverstone"
+                      detail: "Riverstone (HUBZone certified) unlocks the bid."
+                  analysis:
+                    pwin: 0.72
+                    pwin_sources:
+                      - kind: internal
+                        title: "ML-based Pwin model v2"
+                        url: "/audit/analysis/opp_001"
+                        retrieved_at: "2026-05-29T10:05:00.000Z"
+                    incumbent: "CACI International"
+                    incumbent_sources:
+                      - kind: fpds
+                        title: "FPDS predecessor contract"
+                        url: "https://www.fpds.gov/ezsearch/search.do?q=W52P1J"
+                        retrieved_at: "2026-05-29T10:05:00.000Z"
+                    competitors:
+                      - name: "Leidos"
+                        threat_level: high
+                    competitors_sources:
+                      - kind: govwin
+                        title: "GovWin competitive intel"
+                        url: "https://iq.govwin.com/neo/opp/123"
+                        retrieved_at: "2026-05-29T10:05:00.000Z"
+                    timeline:
+                      rfp_release: "2026-06-01"
+                      proposals_due: "2026-07-15"
+                      award_estimate: "2026-09-30"
+                    timeline_sources:
+                      - kind: sam_gov
+                        title: "SAM.gov timeline"
+                        url: "https://sam.gov/opp/abc123/view"
+                        retrieved_at: "2026-05-29T10:05:00.000Z"
+                    version: "v1.3.2"
+                    generated_at: "2026-05-29T10:05:00.000Z"
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_ghi789
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: |
+            ANALYSIS_TIMEOUT — R2 analysis could not complete within 10s.
+            Per no-degradation contract, the detail endpoint never returns
+            null/placeholder/stale analysis. Client must retry. Includes
+            estimated_seconds in error.detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                success: false
+                error:
+                  code: ANALYSIS_TIMEOUT
+                  message: "Analysis not ready, retry in a few seconds"
+                  detail: "estimated_seconds=8"
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_ghi789
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      operationId: updateOpportunity
+      summary: Update opportunity
+      tags: [Opportunities]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpportunityUpdate'
+            example:
+              agency: "U.S. Army TACOM"
+              value_max: 20000000
+      responses:
+        '200':
+          description: Updated opportunity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /opportunities/{id}/qualify:
+    post:
+      operationId: qualifyOpportunity
+      summary: Qualification action
+      description: |
+        Mark an opportunity as qualified. Sets qualified_at timestamp and
+        runs synchronous teaming flag evaluation.
+      tags: [Opportunities]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                qualified_by:
+                  type: string
+                  description: Who qualified this opportunity (defaults to current user)
+            example:
+              qualified_by: "shawn"
+      responses:
+        '200':
+          description: Qualified opportunity with teaming flags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                data:
+                  opportunity:
+                    id: "opp_001"
+                    title: "Army RS3 Task Order 47"
+                    qualified_at: "2026-05-29T16:10:00.000Z"
+                    qualified_by: "shawn"
+                  teaming_flags:
+                    - id: "tf_001"
+                      reason: "HUBZone set-aside"
+                      suggested_partner: "riverstone"
+                      detail: "Riverstone (HUBZone certified) unlocks the bid."
+                meta:
+                  generatedAt: "2026-05-29T16:10:00.000Z"
+                  source: v3
+                  requestId: req_jkl012
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ---------------------------------------------------------------------------
+  # Pipeline
+  # ---------------------------------------------------------------------------
+  /pipeline:
+    get:
+      operationId: listPipeline
+      summary: List active captures with win prob
+      description: |
+        List active pipeline items with joined opportunity data.
+        R1 source siblings on every field.
+      tags: [Pipeline]
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/CursorParam'
+        - name: capture_owner
+          in: query
+          description: Filter by capture owner (substring match)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of pipeline items with R1 sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineListResponse'
+              example:
+                success: true
+                data:
+                  items:
+                    - id: "pi_001"
+                      opportunity_id: "opp_001"
+                      opportunity_title: "Army RS3 Task Order 47"
+                      opportunity_title_sources:
+                        - kind: sam_gov
+                          title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                          url: "https://sam.gov/opp/abc123/view"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      opportunity_agency: "Department of the Army"
+                      opportunity_agency_sources:
+                        - kind: sam_gov
+                          title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                          url: "https://sam.gov/opp/abc123/view"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      capture_owner: "shawn"
+                      capture_owner_sources:
+                        - kind: internal
+                          title: "Pipeline assignment"
+                          url: "/audit/edits/pi_001"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      win_prob_pct: 65
+                      win_prob_pct_sources:
+                        - kind: internal
+                          title: "Win probability assessment"
+                          url: "/audit/edits/pi_001"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      milestones: []
+                      teaming_partners: ["riverstone"]
+                      created_at: "2026-05-25T00:00:00.000Z"
+                  pagination:
+                    limit: 50
+                    cursor: null
+                    hasMore: false
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_mno345
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: createPipelineItem
+      summary: Promote opportunity to pipeline
+      tags: [Pipeline]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PipelineCreate'
+            example:
+              opportunity_id: "opp_001"
+              capture_owner: "shawn"
+              win_prob_pct: 65
+              win_prob_evidence: "Incumbent relationship via RS3. NAICS alignment. Strong past performance on TACOM."
+              milestones:
+                - name: "Draft RFP review"
+                  due_date: "2026-06-15"
+                  status: pending
+              teaming_partners: ["riverstone"]
+      responses:
+        '201':
+          description: Created pipeline item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /pipeline/{id}:
+    patch:
+      operationId: updatePipelineItem
+      summary: Update win prob, milestones, teaming
+      description: |
+        If win_prob_pct is set, win_prob_evidence is required
+        (Data First doctrine enforcement).
+      tags: [Pipeline]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PipelineUpdate'
+            example:
+              win_prob_pct: 72
+              win_prob_evidence: "Updated after customer engagement meeting. Strong signals from TACOM PEO."
+      responses:
+        '200':
+          description: Updated pipeline item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ---------------------------------------------------------------------------
+  # Captures
+  # ---------------------------------------------------------------------------
+  /captures:
+    get:
+      operationId: listCaptures
+      summary: List captures
+      description: |
+        List captures with joined pipeline and opportunity data.
+        R1 source siblings on every field.
+      tags: [Captures]
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/CursorParam'
+        - name: stage
+          in: query
+          description: Filter by color review stage
+          schema:
+            type: string
+        - name: behind
+          in: query
+          description: Captures past due but not submitted
+          schema:
+            type: string
+            enum: ['1']
+      responses:
+        '200':
+          description: Paginated list of captures with R1 sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaptureListResponse'
+              example:
+                success: true
+                data:
+                  items:
+                    - id: "cap_001"
+                      pipeline_item_id: "pi_001"
+                      pipeline_capture_owner: "shawn"
+                      opportunity_title: "Army RS3 Task Order 47"
+                      opportunity_title_sources:
+                        - kind: sam_gov
+                          title: "SAM.gov Opportunity W52P1J-26-R-0047"
+                          url: "https://sam.gov/opp/abc123/view"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      opportunity_agency: "Department of the Army"
+                      color_review_stage: "pink"
+                      created_at: "2026-05-27T00:00:00.000Z"
+                      updated_at: "2026-05-29T10:00:00.000Z"
+                  pagination:
+                    limit: 50
+                    cursor: null
+                    hasMore: false
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_pqr678
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: createCapture
+      summary: Create capture from pipeline item
+      tags: [Captures]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureCreate'
+            example:
+              pipeline_item_id: "pi_001"
+      responses:
+        '201':
+          description: Created capture
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /captures/{id}:
+    get:
+      operationId: getCapture
+      summary: Capture detail with compliance matrix (auto-analyzes per R2)
+      description: |
+        Returns full capture detail with compliance matrix, pricing assumptions,
+        teaming worksheet, and R1 source siblings. Automatically triggers R2
+        analysis.
+      tags: [Captures]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Capture detail with R2 analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaptureDetailResponse'
+              example:
+                success: true
+                data:
+                  id: "cap_001"
+                  pipeline_item_id: "pi_001"
+                  opportunity_title: "Army RS3 Task Order 47"
+                  color_review_stage: "pink"
+                  color_review_notes: "Initial draft in progress"
+                  compliance_items:
+                    - id: "ci_001"
+                      requirement: "ISO 9001:2015 certification"
+                      status: compliant
+                      evidence: "Certificate valid through 2027"
+                  pricing_assumptions:
+                    margin_pct: 12
+                    labor_rates: {}
+                  teaming_worksheet:
+                    partners: ["riverstone"]
+                    rationale: "HUBZone set-aside requires Riverstone sub"
+                  analysis:
+                    pwin: 0.72
+                    pwin_sources:
+                      - kind: internal
+                        title: "ML-based Pwin model v2"
+                        url: "/audit/analysis/cap_001"
+                        retrieved_at: "2026-05-29T10:05:00.000Z"
+                    version: "v1.3.2"
+                    generated_at: "2026-05-29T10:05:00.000Z"
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_stu901
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          description: |
+            ANALYSIS_TIMEOUT — Capture R2 analysis (pwin) could not complete
+            within 10s. Never returns null/stale analysis. Client must retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                success: false
+                error:
+                  code: ANALYSIS_TIMEOUT
+                  message: "Analysis not ready, retry in a few seconds"
+                  detail: "estimated_seconds=6"
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_stu901
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    patch:
+      operationId: updateCapture
+      summary: Update stage, notes, pricing
+      description: |
+        If pricing_assumptions.margin_pct is provided, pricing guardrails
+        are checked and included in the response.
+      tags: [Captures]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureUpdate'
+            example:
+              color_review_notes: "Pink team feedback incorporated"
+              pricing_assumptions:
+                margin_pct: 14
+                labor_rates:
+                  senior_engineer: 185
+                  project_manager: 165
+      responses:
+        '200':
+          description: Updated capture with pricing guardrail result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ---------------------------------------------------------------------------
+  # Action Items
+  # ---------------------------------------------------------------------------
+  /action-items:
+    get:
+      operationId: listActionItems
+      summary: List action items
+      description: |
+        List action items with R1 source siblings.
+        Defaults to status != 'done'.
+      tags: [Action Items]
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/CursorParam'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ActionItemStatus'
+        - name: owner
+          in: query
+          description: Filter by owner email
+          schema:
+            type: string
+        - name: source
+          in: query
+          description: Filter by source (manual, email, system)
+          schema:
+            type: string
+        - name: linked_record_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of action items with R1 sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionItemListResponse'
+              example:
+                success: true
+                data:
+                  items:
+                    - id: "ai_001"
+                      title: "Finalize RS3 TO47 pricing"
+                      title_sources:
+                        - kind: internal
+                          title: "Manual entry"
+                          url: "/audit/edits/ai_001"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      owner: "shawn"
+                      owner_sources:
+                        - kind: internal
+                          title: "Manual entry"
+                          url: "/audit/edits/ai_001"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      status: open
+                      due_date: "2026-06-06"
+                      due_date_sources:
+                        - kind: internal
+                          title: "Manual entry"
+                          url: "/audit/edits/ai_001"
+                          retrieved_at: "2026-05-29T10:00:00.000Z"
+                      source: manual
+                      drafts: []
+                      created_at: "2026-05-29T10:00:00.000Z"
+                  pagination:
+                    limit: 50
+                    cursor: null
+                    hasMore: false
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_vwx234
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: createActionItem
+      summary: Create action item
+      description: |
+        Doctrine enforcement: individual owner is required. Team names
+        (team, all, everyone, committee, group) are rejected with a
+        validation error per Relentless Execution principle.
+      tags: [Action Items]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionItemCreate'
+            example:
+              title: "Send margin targets to Angela"
+              owner: "shawn"
+              due_date: "2026-06-06"
+              source: manual
+              linked_record_type: opportunity
+              linked_record_id: "opp_001"
+      responses:
+        '201':
+          description: Created action item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /action-items/{id}:
+    patch:
+      operationId: updateActionItem
+      summary: Update action item
+      description: Setting status to 'done' auto-sets completed_at.
+      tags: [Action Items]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionItemUpdate'
+            example:
+              status: done
+      responses:
+        '200':
+          description: Updated action item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /action-items/{id}/drafts:
+    post:
+      operationId: requestActionItemDraft
+      summary: Request LLM draft (reply/research/milestone)
+      tags: [Action Items]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftRequest'
+            example:
+              kind: reply
+      responses:
+        '201':
+          description: Generated draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+              example:
+                success: true
+                data:
+                  id: "draft_002"
+                  action_item_id: "ai_001"
+                  kind: reply
+                  draft_text: "Hi Angela, following up on RS3 TO47 pricing..."
+                  status: pending
+                  created_at: "2026-05-29T16:15:00.000Z"
+                meta:
+                  generatedAt: "2026-05-29T16:15:00.000Z"
+                  source: v3
+                  requestId: req_yza567
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ---------------------------------------------------------------------------
+  # Launchpad
+  # ---------------------------------------------------------------------------
+  /launchpad/summary:
+    get:
+      operationId: getLaunchpadSummary
+      summary: Today-actionable counts
+      tags: [Launchpad]
+      responses:
+        '200':
+          description: Summary counts for the launchpad grid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaunchpadSummaryResponse'
+              example:
+                success: true
+                data:
+                  action_items_due_today: 3
+                  opportunities_hot: 7
+                  capture_behind: 1
+                  partner_new_awards_7d: 2
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_bcd890
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /launchpad/flags:
+    get:
+      operationId: getLaunchpadFlags
+      summary: List active flags
+      description: |
+        Returns active (non-dismissed) flags ordered by severity
+        (critical > warning > info). R1 source siblings on source_url.
+      tags: [Launchpad]
+      responses:
+        '200':
+          description: Active flags list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaunchpadFlagsResponse'
+              example:
+                success: true
+                data:
+                  flags:
+                    - id: "flag_001"
+                      flag_key: cmmi_expiring
+                      severity: critical
+                      title: "CMMI ML3 expires Aug 7, 2026"
+                      detail: "Schedule assessment before expiration"
+                      due_date: "2026-08-07"
+                      doctrine_anchor: "Ethics Always"
+                      source_url: "https://sam.gov/entity/VNMLXFMQD976"
+                      source_url_sources:
+                        - kind: sam_gov
+                          title: "SAM.gov Envision Profile"
+                          url: "https://sam.gov/entity/VNMLXFMQD976"
+                          retrieved_at: "2026-05-29T06:00:00.000Z"
+                      created_at: "2026-05-01T00:00:00.000Z"
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_efg123
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ---------------------------------------------------------------------------
+  # Partners (lookup only — no list endpoint)
+  # ---------------------------------------------------------------------------
+  /partners/{id}:
+    get:
+      operationId: getPartner
+      summary: Fetch partner facts for teaming context
+      description: |
+        Lookup-only endpoint for partner teaming data. Partners are NOT
+        browsable — there is no list endpoint. The id parameter is a
+        partner tag (riverstone or pd_systems).
+      tags: [Partners]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: "Partner tag: riverstone or pd_systems"
+          schema:
+            type: string
+            enum: [riverstone, pd_systems]
+      responses:
+        '200':
+          description: Partner profile with R1 sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PartnerDetailResponse'
+              example:
+                success: true
+                data:
+                  id: riverstone
+                  display_name: "Riverstone Solutions"
+                  anchor_company: "Riverstone Solutions (RSI)"
+                  anchor_company_sources:
+                    - kind: sam_gov
+                      title: "SAM.gov Entity VNMLXFMQD976"
+                      url: "https://sam.gov/entity/71WX3"
+                      retrieved_at: "2026-05-29T06:00:00.000Z"
+                  uei: null
+                  cage: "71WX3"
+                  cage_sources:
+                    - kind: sam_gov
+                      title: "SAM.gov Entity"
+                      url: "https://sam.gov/entity/71WX3"
+                      retrieved_at: "2026-05-29T06:00:00.000Z"
+                  certifications:
+                    - name: HUBZone
+                      status: active
+                    - name: WOSB
+                      status: active
+                  certifications_sources:
+                    - kind: sam_gov
+                      title: "SAM.gov Certifications"
+                      url: "https://sam.gov/entity/71WX3"
+                      retrieved_at: "2026-05-29T06:00:00.000Z"
+                  vehicles:
+                    - name: "MDA SHIELD IDIQ"
+                      contract: "HQ085926DF469"
+                  vehicles_sources:
+                    - kind: fpds
+                      title: "FPDS SHIELD Award"
+                      url: "https://www.fpds.gov/ezsearch/search.do?q=HQ085926DF469"
+                      retrieved_at: "2026-05-29T06:00:00.000Z"
+                  recent_awards: []
+                  teaming_history: []
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_hij456
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ---------------------------------------------------------------------------
+  # Sources
+  # ---------------------------------------------------------------------------
+  /sources/{id}:
+    get:
+      operationId: getSource
+      summary: Resolve source by ID
+      description: |
+        Returns source URL and metadata for a given source registry entry.
+        Used by the SourceBadge frontend component.
+      tags: [Sources]
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Source detail with recent sync runs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceDetailResponse'
+              example:
+                success: true
+                data:
+                  source:
+                    id: "src_001"
+                    name: "SAM.gov"
+                    source_type: api
+                    category: opportunities
+                    base_url: "https://sam.gov"
+                    enabled: true
+                    last_sync_at: "2026-05-29T06:00:00.000Z"
+                    last_sync_status: success
+                    total_synced: 1247
+                  recent_runs:
+                    - id: "run_001"
+                      started_at: "2026-05-29T06:00:00.000Z"
+                      completed_at: "2026-05-29T06:02:30.000Z"
+                      status: success
+                      records_fetched: 45
+                      records_upserted: 12
+                      records_errored: 0
+                      duration_ms: 150000
+                meta:
+                  generatedAt: "2026-05-29T16:00:00.000Z"
+                  source: v3
+                  requestId: req_klm789
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ---------------------------------------------------------------------------
+  # System
+  # ---------------------------------------------------------------------------
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Liveness probe
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  timestamp:
+                    type: string
+                    format: date-time
+              example:
+                status: ok
+                timestamp: "2026-05-29T16:00:00.000Z"
+
+  /ready:
+    get:
+      operationId: readinessCheck
+      summary: Readiness probe (DB connectivity)
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ready]
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [connected, disconnected]
+                      migrations:
+                        type: string
+                        enum: [current, behind, unknown]
+                  timestamp:
+                    type: string
+                    format: date-time
+              example:
+                status: ready
+                checks:
+                  database: connected
+                  migrations: current
+                timestamp: "2026-05-29T16:00:00.000Z"
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [not_ready]
+                  checks:
+                    type: object
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /version:
+    get:
+      operationId: getVersion
+      summary: Build info
+      tags: [System]
+      security: []
+      responses:
+        '200':
+          description: Build version information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  commit:
+                    type: string
+                  built_at:
+                    type: string
+                    format: date-time
+                  node_version:
+                    type: string
+              example:
+                version: "3.0.0"
+                commit: "a1b2c3d"
+                built_at: "2026-05-29T15:00:00.000Z"
+                node_version: "20.14.0"
+
+  # ---------------------------------------------------------------------------
+  # Webhooks (n8n inbound — routable paths)
+  # ---------------------------------------------------------------------------
+  /webhooks/sam-opportunity:
+    post:
+      operationId: webhookSamOpportunity
+      summary: n8n posts SAM.gov findings
+      description: |
+        Receives SAM.gov opportunity data from n8n scheduled crawl.
+        Upserts opportunities into the database.
+      tags: [System]
+      security:
+        - WebhookKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SamWebhookPayload'
+      responses:
+        '200':
+          description: Upsert result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /webhooks/fpds-award:
+    post:
+      operationId: webhookFpdsAward
+      summary: n8n posts FPDS award data
+      description: Receives FPDS award data from n8n scheduled crawl.
+      tags: [System]
+      security:
+        - WebhookKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FpdsWebhookPayload'
+      responses:
+        '200':
+          description: Upsert result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /webhooks/email-action-item:
+    post:
+      operationId: webhookEmailActionItem
+      summary: n8n posts email-derived action items
+      description: |
+        Receives raw email content. Backend extracts action item via LLM,
+        creates the item, and generates an initial draft.
+      tags: [System]
+      security:
+        - WebhookKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailWebhookPayload'
+      responses:
+        '201':
+          description: Created action item with draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  # -------------------------------------------------------------------------
+  # Security Schemes
+  # -------------------------------------------------------------------------
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT bearer token (preserved from V2)
+
+    WebhookKeyAuth:
+      type: apiKey
+      in: header
+      name: x-gda-key
+      description: Shared webhook secret from GDA_WEBHOOK_KEY env var
+
+  # -------------------------------------------------------------------------
+  # Parameters
+  # -------------------------------------------------------------------------
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+
+    LimitParam:
+      name: limit
+      in: query
+      description: "Page size (default 50, max 200)"
+      schema:
+        type: integer
+        default: 50
+        minimum: 1
+        maximum: 200
+
+    CursorParam:
+      name: cursor
+      in: query
+      description: Opaque pagination cursor from previous response
+      schema:
+        type: string
+
+  # -------------------------------------------------------------------------
+  # Responses
+  # -------------------------------------------------------------------------
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: "title is required"
+              detail: null
+            meta:
+              generatedAt: "2026-05-29T16:00:00.000Z"
+              requestId: req_err001
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: "Missing or invalid authorization"
+              detail: null
+            meta:
+              generatedAt: "2026-05-29T16:00:00.000Z"
+              requestId: req_err002
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: "Resource not found"
+              detail: null
+            meta:
+              generatedAt: "2026-05-29T16:00:00.000Z"
+              requestId: req_err003
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: RATE_LIMITED
+              message: "Too many requests"
+              detail: null
+            meta:
+              generatedAt: "2026-05-29T16:00:00.000Z"
+              requestId: req_err004
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            success: false
+            error:
+              code: INTERNAL_ERROR
+              message: "An unexpected error occurred"
+              detail: null
+            meta:
+              generatedAt: "2026-05-29T16:00:00.000Z"
+              requestId: req_err005
+
+  # -------------------------------------------------------------------------
+  # Schemas
+  # -------------------------------------------------------------------------
+  schemas:
+    # -- Envelopes ----------------------------------------------------------
+    SuccessEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          description: Endpoint-specific payload
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    ErrorEnvelope:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          $ref: '#/components/schemas/ApiError'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    Meta:
+      type: object
+      required: [generatedAt]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        source:
+          type: string
+          default: v3
+        requestId:
+          type: string
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        detail:
+          type: string
+          nullable: true
+
+    # -- Source citation (R1) -----------------------------------------------
+    SourceRef:
+      type: object
+      required: [kind, title, url, retrieved_at]
+      properties:
+        kind:
+          type: string
+          enum: [sam_gov, fpds, usaspending, govwin, news, doctrine, partner_site, internal]
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        retrieved_at:
+          type: string
+          format: date-time
+
+    # -- Pagination ---------------------------------------------------------
+    Pagination:
+      type: object
+      required: [limit, hasMore]
+      properties:
+        limit:
+          type: integer
+        cursor:
+          type: string
+          nullable: true
+        hasMore:
+          type: boolean
+
+    # -- Enums --------------------------------------------------------------
+    OpportunityStatus:
+      type: string
+      enum: [discovery, qualified, pipeline, lost, won]
+
+    Grade:
+      type: string
+      enum: [A, B, C]
+
+    ActionItemStatus:
+      type: string
+      enum: [open, in_progress, done]
+
+    DraftKind:
+      type: string
+      enum: [reply, research, milestone]
+
+    FlagSeverity:
+      type: string
+      enum: [critical, warning, info]
+
+    # -- Opportunities ------------------------------------------------------
+    OpportunityListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, pagination]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/OpportunitySummary'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+
+    OpportunityDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/OpportunityDetail'
+
+    OpportunitySummary:
+      type: object
+      required: [id, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        title_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        agency:
+          type: string
+        agency_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        naics:
+          type: string
+        naics_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        set_aside:
+          type: string
+        set_aside_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        grade:
+          $ref: '#/components/schemas/Grade'
+        grade_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        status:
+          $ref: '#/components/schemas/OpportunityStatus'
+        response_due_at:
+          type: string
+          format: date-time
+          nullable: true
+        response_due_at_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        value_min:
+          type: number
+          nullable: true
+        value_min_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        value_max:
+          type: number
+          nullable: true
+        value_max_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        teaming_flags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamingFlag'
+        ai_analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Timestamp of most recent successful R2 analysis. Used by list views
+            to signal freshness without including the full analysis block.
+            null only if analysis has never been computed (transient — pre-warm
+            policy ensures coverage on ingest). See F-201 Addendum A.
+        analysis_version:
+          type: string
+          nullable: true
+          description: Model version of most recent successful analysis (e.g. "v1.3.2").
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OpportunityDetail:
+      allOf:
+        - $ref: '#/components/schemas/OpportunitySummary'
+        - type: object
+          properties:
+            sam_notice_id:
+              type: string
+              nullable: true
+            sub_agency:
+              type: string
+              nullable: true
+            description:
+              type: string
+              nullable: true
+            description_sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceRef'
+            posted_at:
+              type: string
+              format: date-time
+              nullable: true
+            qualified_at:
+              type: string
+              format: date-time
+              nullable: true
+            qualified_by:
+              type: string
+              nullable: true
+            grade_evidence:
+              type: string
+              nullable: true
+            analysis:
+              $ref: '#/components/schemas/Analysis'
+              description: |
+                R2 contract invariant: when this response is returned (HTTP 200),
+                analysis is ALWAYS present, fresh, and non-null. If analysis is
+                not ready within 10s the endpoint returns 503 ANALYSIS_TIMEOUT.
+                There is no third state (no analysis_status, no stale flag, no
+                placeholder, no polling). See phase-1-api-contract.md Addendum A.
+          required:
+            - analysis
+
+    OpportunityCreate:
+      type: object
+      required: [title, source]
+      properties:
+        title:
+          type: string
+        source:
+          type: string
+        sam_notice_id:
+          type: string
+        naics:
+          type: string
+        agency:
+          type: string
+        sub_agency:
+          type: string
+        description:
+          type: string
+        set_aside:
+          type: string
+        response_due_at:
+          type: string
+          format: date-time
+        posted_at:
+          type: string
+          format: date-time
+        value_min:
+          type: number
+        value_max:
+          type: number
+
+    OpportunityUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        naics:
+          type: string
+        agency:
+          type: string
+        sub_agency:
+          type: string
+        description:
+          type: string
+        set_aside:
+          type: string
+        response_due_at:
+          type: string
+          format: date-time
+        value_min:
+          type: number
+        value_max:
+          type: number
+
+    TeamingFlag:
+      type: object
+      properties:
+        id:
+          type: string
+        reason:
+          type: string
+        suggested_partner:
+          type: string
+        detail:
+          type: string
+
+    # -- Analysis (R2) -----------------------------------------------------
+    # NO-DEGRADATION CONTRACT (F-202 Addendum A):
+    # - Endpoints returning this block ALWAYS return it fresh and complete.
+    # - There is NO analysis_status field, NO stale field, NO null analysis.
+    # - If analysis cannot be returned fresh within 10s, the endpoint returns
+    #   503 ANALYSIS_TIMEOUT instead. Client must retry.
+    Analysis:
+      type: object
+      required: [pwin, version, generated_at]
+      properties:
+        version:
+          type: string
+          description: Analysis model version, e.g. "v1.3.2"
+        pwin:
+          type: number
+          minimum: 0
+          maximum: 1
+        pwin_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        incumbent:
+          type: string
+          nullable: true
+        incumbent_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        competitors:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              threat_level:
+                type: string
+                enum: [low, medium, high]
+        competitors_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        blackhat:
+          type: object
+          nullable: true
+          description: Competitor strategy assessment
+        blackhat_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        wargame:
+          type: object
+          nullable: true
+          description: Win strategy wargame output
+        wargame_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        timeline:
+          type: object
+          nullable: true
+          properties:
+            rfp_release:
+              type: string
+              format: date
+            proposals_due:
+              type: string
+              format: date
+            award_estimate:
+              type: string
+              format: date
+        timeline_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        generated_at:
+          type: string
+          format: date-time
+          description: Timestamp analysis was computed (UTC). Required.
+
+    # -- Pipeline -----------------------------------------------------------
+    PipelineListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, pagination]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PipelineItem'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+
+    PipelineItem:
+      type: object
+      required: [id, opportunity_id, capture_owner, created_at]
+      properties:
+        id:
+          type: string
+        opportunity_id:
+          type: string
+        opportunity_title:
+          type: string
+        opportunity_title_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_agency:
+          type: string
+        opportunity_agency_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_naics:
+          type: string
+        opportunity_naics_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_set_aside:
+          type: string
+        opportunity_set_aside_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_due_at:
+          type: string
+          format: date-time
+          nullable: true
+        opportunity_due_at_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_value_min:
+          type: number
+          nullable: true
+        opportunity_value_min_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_value_max:
+          type: number
+          nullable: true
+        opportunity_value_max_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_grade:
+          $ref: '#/components/schemas/Grade'
+        opportunity_grade_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        capture_owner:
+          type: string
+        capture_owner_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        win_prob_pct:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+        win_prob_pct_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        win_prob_evidence:
+          type: string
+          nullable: true
+        win_prob_evidence_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Milestone'
+        teaming_partners:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PipelineCreate:
+      type: object
+      required: [opportunity_id, capture_owner]
+      properties:
+        opportunity_id:
+          type: string
+        capture_owner:
+          type: string
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Milestone'
+        win_prob_pct:
+          type: integer
+          minimum: 0
+          maximum: 100
+        win_prob_evidence:
+          type: string
+          description: Required when win_prob_pct is provided
+        teaming_partners:
+          type: array
+          items:
+            type: string
+
+    PipelineUpdate:
+      type: object
+      properties:
+        capture_owner:
+          type: string
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Milestone'
+        win_prob_pct:
+          type: integer
+          minimum: 0
+          maximum: 100
+        win_prob_evidence:
+          type: string
+          description: Required when win_prob_pct is provided
+        teaming_partners:
+          type: array
+          items:
+            type: string
+
+    Milestone:
+      type: object
+      properties:
+        name:
+          type: string
+        due_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [pending, in_progress, completed]
+
+    # -- Captures -----------------------------------------------------------
+    CaptureListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, pagination]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CaptureSummary'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+
+    CaptureDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/CaptureDetail'
+
+    CaptureSummary:
+      type: object
+      required: [id, pipeline_item_id, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        pipeline_item_id:
+          type: string
+        pipeline_capture_owner:
+          type: string
+        opportunity_title:
+          type: string
+        opportunity_title_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        opportunity_agency:
+          type: string
+        opportunity_agency_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        color_review_stage:
+          type: string
+        ai_analyzed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Timestamp of most recent successful R2 analysis (pwin). Used by
+            list views for freshness signal without full analysis block.
+        analysis_version:
+          type: string
+          nullable: true
+          description: Model version of most recent successful analysis.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CaptureDetail:
+      allOf:
+        - $ref: '#/components/schemas/CaptureSummary'
+        - type: object
+          properties:
+            color_review_notes:
+              type: string
+              nullable: true
+            compliance_items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ComplianceItem'
+            compliance_items_sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceRef'
+            pricing_assumptions:
+              type: object
+              nullable: true
+              properties:
+                margin_pct:
+                  type: number
+                labor_rates:
+                  type: object
+                  additionalProperties:
+                    type: number
+            pricing_assumptions_sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceRef'
+            teaming_worksheet:
+              type: object
+              nullable: true
+              properties:
+                partners:
+                  type: array
+                  items:
+                    type: string
+                rationale:
+                  type: string
+            teaming_worksheet_sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/SourceRef'
+            rfp_uploaded_at:
+              type: string
+              format: date-time
+              nullable: true
+            pricing_guardrail:
+              type: object
+              nullable: true
+              description: Pricing guardrail check result (included on update when margin_pct is set)
+            analysis:
+              $ref: '#/components/schemas/Analysis'
+              description: |
+                R2 contract invariant: when CaptureDetail returns 200, analysis is
+                always fresh and non-null. If not ready within 10s the endpoint
+                returns 503 ANALYSIS_TIMEOUT. See phase-1-api-contract.md Addendum A.
+          required:
+            - analysis
+
+    CaptureCreate:
+      type: object
+      required: [pipeline_item_id]
+      properties:
+        pipeline_item_id:
+          type: string
+
+    CaptureUpdate:
+      type: object
+      properties:
+        color_review_stage:
+          type: string
+        color_review_notes:
+          type: string
+        pricing_assumptions:
+          type: object
+          properties:
+            margin_pct:
+              type: number
+            labor_rates:
+              type: object
+              additionalProperties:
+                type: number
+        teaming_worksheet:
+          type: object
+          properties:
+            partners:
+              type: array
+              items:
+                type: string
+            rationale:
+              type: string
+
+    ComplianceItem:
+      type: object
+      properties:
+        id:
+          type: string
+        requirement:
+          type: string
+        status:
+          type: string
+          enum: [compliant, non_compliant, partial, unknown]
+        evidence:
+          type: string
+          nullable: true
+
+    # -- Action Items -------------------------------------------------------
+    ActionItemListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, pagination]
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ActionItem'
+                pagination:
+                  $ref: '#/components/schemas/Pagination'
+
+    ActionItem:
+      type: object
+      required: [id, title, owner, status, created_at]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        title_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        detail:
+          type: string
+          nullable: true
+        detail_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        owner:
+          type: string
+        owner_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        status:
+          $ref: '#/components/schemas/ActionItemStatus'
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        due_date_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        source:
+          type: string
+          description: "Origin of the action item: manual, email, system"
+        linked_record_type:
+          type: string
+          nullable: true
+        linked_record_id:
+          type: string
+          nullable: true
+        drafts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Draft'
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ActionItemCreate:
+      type: object
+      required: [title, owner]
+      properties:
+        title:
+          type: string
+        detail:
+          type: string
+        owner:
+          type: string
+          description: "Individual owner required. Team names are rejected."
+        source:
+          type: string
+          default: manual
+        source_id:
+          type: string
+        due_date:
+          type: string
+          format: date
+        linked_record_type:
+          type: string
+        linked_record_id:
+          type: string
+
+    ActionItemUpdate:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/ActionItemStatus'
+        owner:
+          type: string
+          description: "Individual owner required. Team names are rejected."
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        linked_record_type:
+          type: string
+          nullable: true
+        linked_record_id:
+          type: string
+          nullable: true
+
+    DraftRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          $ref: '#/components/schemas/DraftKind'
+
+    Draft:
+      type: object
+      properties:
+        id:
+          type: string
+        action_item_id:
+          type: string
+        kind:
+          $ref: '#/components/schemas/DraftKind'
+        draft_text:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        created_at:
+          type: string
+          format: date-time
+
+    # -- Launchpad ----------------------------------------------------------
+    LaunchpadSummaryResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [action_items_due_today, opportunities_hot, capture_behind, partner_new_awards_7d]
+              properties:
+                action_items_due_today:
+                  type: integer
+                opportunities_hot:
+                  type: integer
+                capture_behind:
+                  type: integer
+                partner_new_awards_7d:
+                  type: integer
+
+    LaunchpadFlagsResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [flags]
+              properties:
+                flags:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/LaunchpadFlag'
+
+    LaunchpadFlag:
+      type: object
+      required: [id, flag_key, severity, title]
+      properties:
+        id:
+          type: string
+        flag_key:
+          type: string
+        severity:
+          $ref: '#/components/schemas/FlagSeverity'
+        title:
+          type: string
+        detail:
+          type: string
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        doctrine_anchor:
+          type: string
+          nullable: true
+        source_url:
+          type: string
+          nullable: true
+        source_url_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        created_at:
+          type: string
+          format: date-time
+
+    # -- Partners -----------------------------------------------------------
+    PartnerDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/PartnerProfile'
+
+    PartnerProfile:
+      type: object
+      required: [id, display_name]
+      properties:
+        id:
+          type: string
+          enum: [riverstone, pd_systems]
+        display_name:
+          type: string
+        anchor_company:
+          type: string
+        anchor_company_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        uei:
+          type: string
+          nullable: true
+        uei_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        cage:
+          type: string
+          nullable: true
+        cage_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        primary_naics:
+          type: string
+          nullable: true
+        primary_naics_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        certifications:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [active, expired, pending]
+              expiration_date:
+                type: string
+                format: date
+                nullable: true
+        certifications_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        vehicles:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              contract:
+                type: string
+              ceiling_remaining:
+                type: number
+                nullable: true
+        vehicles_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        recent_awards:
+          type: array
+          items:
+            type: object
+            properties:
+              contract_number:
+                type: string
+              agency:
+                type: string
+              award_date:
+                type: string
+                format: date
+              obligated_amount:
+                type: number
+        recent_awards_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+        teaming_history:
+          type: array
+          items:
+            type: object
+            properties:
+              pursuit_name:
+                type: string
+              outcome:
+                type: string
+                enum: [win, loss, pending]
+              value:
+                type: number
+                nullable: true
+        teaming_history_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceRef'
+
+    # -- Sources ------------------------------------------------------------
+    SourceDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [source, recent_runs]
+              properties:
+                source:
+                  $ref: '#/components/schemas/SourceRegistryEntry'
+                recent_runs:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SourceSyncRun'
+
+    SourceRegistryEntry:
+      type: object
+      required: [id, name, source_type, enabled]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        source_type:
+          type: string
+          enum: [api, rss, manual, webhook]
+        category:
+          type: string
+        base_url:
+          type: string
+          format: uri
+        enabled:
+          type: boolean
+        sync_frequency:
+          type: string
+        last_sync_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_sync_status:
+          type: string
+          enum: [success, error, running]
+          nullable: true
+        last_sync_count:
+          type: integer
+          nullable: true
+        total_synced:
+          type: integer
+          nullable: true
+        error_count:
+          type: integer
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+
+    SourceSyncRun:
+      type: object
+      properties:
+        id:
+          type: string
+        source_id:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [success, error, running]
+        records_fetched:
+          type: integer
+        records_upserted:
+          type: integer
+        records_errored:
+          type: integer
+        duration_ms:
+          type: integer
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    # -- Webhook payloads ---------------------------------------------------
+    SamWebhookPayload:
+      type: object
+      required: [opportunities]
+      properties:
+        opportunities:
+          type: array
+          items:
+            type: object
+            required: [sam_notice_id, title]
+            properties:
+              sam_notice_id:
+                type: string
+              title:
+                type: string
+              agency:
+                type: string
+              department:
+                type: string
+              naics:
+                type: string
+              set_aside:
+                type: string
+              response_due_at:
+                type: string
+                format: date-time
+              posted_at:
+                type: string
+                format: date-time
+              value_min:
+                type: number
+              value_max:
+                type: number
+              raw_source_url:
+                type: string
+                format: uri
+              solicitation_number:
+                type: string
+              psc:
+                type: string
+              place_of_performance:
+                type: string
+              incumbent:
+                type: string
+
+    FpdsWebhookPayload:
+      type: object
+      required: [awards]
+      properties:
+        awards:
+          type: array
+          items:
+            type: object
+            required: [contract_number, vendor_name]
+            properties:
+              contract_number:
+                type: string
+              vendor_name:
+                type: string
+              vendor_cage:
+                type: string
+              agency:
+                type: string
+              award_date:
+                type: string
+                format: date
+              obligated_amount:
+                type: number
+              base_and_all_options:
+                type: number
+              naics:
+                type: string
+              psc:
+                type: string
+              fpds_url:
+                type: string
+                format: uri
+
+    EmailWebhookPayload:
+      type: object
+      required: [from, to, body_text]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        subject:
+          type: string
+        body_text:
+          type: string
+
+    WebhookResult:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [upserted, errors]
+              properties:
+                upserted:
+                  type: integer
+                errors:
+                  type: integer

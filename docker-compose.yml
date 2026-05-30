@@ -19,5 +19,24 @@ services:
       timeout: 3s
       retries: 5
 
+  backend-v3:
+    build:
+      context: .
+      dockerfile: Dockerfile.v3
+    container_name: gda-backend-v3
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: "4000"
+      DATABASE_URL: postgresql://gda:gda_dev_password@postgres:5432/gda
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      GDA_WEBHOOK_KEY: dev-webhook-key
+      NODE_ENV: development
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:

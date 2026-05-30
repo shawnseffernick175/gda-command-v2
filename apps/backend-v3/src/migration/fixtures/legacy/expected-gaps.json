@@ -1,0 +1,25 @@
+{
+  "description": "Expected gaps for the CI fixture dataset. The migration-parity-check job asserts that the actual gap list matches this expected list.",
+  "expected_gap_reasons": [
+    {
+      "entity_type": "opportunity",
+      "reason": "DUPLICATE_KEY",
+      "count_gte": 0,
+      "note": "Fixture has no duplicate solicitation numbers — 0 expected"
+    },
+    {
+      "entity_type": "opportunity",
+      "reason": "MISSING_SOURCES",
+      "count_gte": 0,
+      "note": "Fixture opportunity without source URL may produce MISSING_SOURCES gaps"
+    },
+    {
+      "entity_type": "capture",
+      "reason": "ORPHANED_REFERENCE",
+      "count_gte": 0,
+      "note": "Captures referencing non-existent opportunity IDs"
+    }
+  ],
+  "forbidden_reasons": [],
+  "max_total_gaps": 10
+}

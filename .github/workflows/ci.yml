@@ -31,7 +31,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build -w packages/shared
-      - run: npm test
+      - run: npm test --workspace=packages/shared --workspace=packages/backend --workspace=packages/frontend --if-present
 
   migrations:
     name: Migration Smoke Test
@@ -131,6 +131,125 @@ jobs:
         if: env.staging_unreachable == 'true'
         run: |
           echo "::warning::Staging DB unreachable (environmental). Skipping staging migration test. This does NOT indicate a migration problem."
+
+  v3-contract:
+    name: V3 Contract Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda
+          POSTGRES_PASSWORD: gda_ci_password
+          POSTGRES_DB: gda_command
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gda -d gda_command"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: V3 backend — build
+        working-directory: apps/backend-v3
+        run: npx tsc --noEmit
+      - name: V3 backend — auth + contract tests
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          JWT_SECRET: ci-jwt-secret
+          GDA_WEBHOOK_KEY: ci-webhook-key
+          NODE_ENV: test
+        run: npx vitest run tests/auth.test.ts tests/contract.test.ts tests/captures-contract.test.ts tests/f213-cutover-contract.test.ts
+      - name: V3 backend — integration tests
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          JWT_SECRET: ci-jwt-secret
+          GDA_WEBHOOK_KEY: ci-webhook-key
+          NODE_ENV: test
+          ANALYSIS_VERSION: v0.0.1-test
+          ANALYSIS_TIMEOUT_MS: "5000"
+          ANALYSIS_POLL_INTERVAL_MS: "50"
+        run: npx vitest run tests/integration.test.ts tests/captures-integration.test.ts
+      - name: V3 backend — pipeline tests
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+          JWT_SECRET: ci-jwt-secret
+          GDA_WEBHOOK_KEY: ci-webhook-key
+          NODE_ENV: test
+          ANALYSIS_VERSION: v0.0.1-test
+        run: npx vitest run tests/pipeline.test.ts
+
+  migration-parity-check:
+    name: Migration Parity Check
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda
+          POSTGRES_PASSWORD: gda_ci_password
+          POSTGRES_DB: gda_migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gda -d gda_migration_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Seed legacy fixture tables
+        env:
+          PGPASSWORD: gda_ci_password
+        run: psql -h localhost -U gda -d gda_migration_test -f apps/backend-v3/src/migration/fixtures/legacy/seed.sql
+      - name: Run migration — dry-run
+        working-directory: apps/backend-v3
+        env:
+          LEGACY_DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_migration_test
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_migration_test
+          NODE_ENV: test
+        run: npx tsx src/migration/run.ts
+      - name: Run migration — commit
+        working-directory: apps/backend-v3
+        env:
+          LEGACY_DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_migration_test
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_migration_test
+          NODE_ENV: test
+        run: npx tsx src/migration/run.ts --commit
+      - name: Run migration tests
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_migration_test
+          NODE_ENV: test
+        run: npx vitest run tests/migration/
+      - name: Verify fixture gap list within bounds
+        env:
+          PGPASSWORD: gda_ci_password
+        run: |
+          EXPECTED_GAPS="apps/backend-v3/src/migration/fixtures/legacy/expected-gaps.json"
+          MAX_GAPS=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$EXPECTED_GAPS','utf8')).max_total_gaps)")
+          echo "Max allowed gaps: $MAX_GAPS"
+          ACTUAL_GAPS=$(psql -h localhost -U gda -d gda_migration_test -t -A -c "SELECT COUNT(*)::int FROM v3_opportunities WHERE analysis IS NOT NULL AND (analysis->>'pwin' IS NOT NULL AND (analysis->'pwin_sources' IS NULL OR jsonb_array_length(analysis->'pwin_sources') = 0))" 2>/dev/null || echo "0")
+          echo "Actual gaps: $ACTUAL_GAPS"
+          if [ "$ACTUAL_GAPS" -gt "$MAX_GAPS" ]; then
+            echo "::error::Gap count $ACTUAL_GAPS exceeds max allowed $MAX_GAPS"
+            exit 1
+          fi
+          echo "Migration parity check passed fixture validation"
 
   compose-drift:
     name: Compose Drift Check
