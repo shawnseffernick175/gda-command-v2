@@ -1,4 +1,5 @@
 import PgBoss from 'pg-boss';
+import pg from 'pg';
 import { config } from '../config/index.js';
 import { logger } from './logger.js';
 
@@ -9,6 +10,31 @@ export const QUEUE_NAMES = {
   ANALYSIS_PERIODIC_REFRESH: 'analysis-periodic-refresh',
   ANALYSIS_MODEL_VERSION_SWEEP: 'analysis-model-version-sweep',
 } as const;
+
+/**
+ * Register all QUEUE_NAMES via boss.createQueue() under an advisory lock
+ * with deterministic insertion order. The advisory lock serializes
+ * registration across concurrent processes (e.g. parallel test files
+ * calling initBoss() against a shared CI database), preventing deadlocks.
+ * boss.createQueue() is used (not raw INSERT) because pg-boss v10+
+ * partitions the job table by queue name — createQueue handles both the
+ * queue registry entry and the partition DDL.
+ */
+export async function registerQueues(b: PgBoss): Promise<void> {
+  const lockPool = new pg.Pool({ connectionString: config.databaseUrl, max: 1 });
+  const client = await lockPool.connect();
+  try {
+    await client.query('SELECT pg_advisory_lock(737068)');
+    const queues = Object.values(QUEUE_NAMES).slice().sort();
+    for (const name of queues) {
+      await b.createQueue(name);
+    }
+    await client.query('SELECT pg_advisory_unlock(737068)');
+  } finally {
+    client.release();
+    await lockPool.end();
+  }
+}
 
 let boss: PgBoss | null = null;
 
@@ -38,9 +64,7 @@ export async function initBoss(): Promise<PgBoss> {
 
   await boss.start();
 
-  for (const name of Object.values(QUEUE_NAMES)) {
-    await boss.createQueue(name);
-  }
+  await registerQueues(boss);
 
   logger.info({ queues: Object.values(QUEUE_NAMES) }, 'pg-boss started, queues registered');
   return boss;

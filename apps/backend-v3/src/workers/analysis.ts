@@ -28,7 +28,7 @@ import PgBoss from 'pg-boss';
 import pg from 'pg';
 import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
-import { QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js';
+import { QUEUE_NAMES, registerQueues, type AnalysisJobData } from '../lib/queue.js';
 import type { SourceRef } from '../lib/sources.js';
 import {
   buildStubDraftText,
@@ -767,9 +767,7 @@ export async function startWorker(): Promise<PgBoss> {
   await boss.start();
   workerBossRef = boss;
 
-  for (const name of Object.values(QUEUE_NAMES)) {
-    await boss.createQueue(name);
-  }
+  await registerQueues(boss);
 
   logger.info({ queues: Object.values(QUEUE_NAMES) }, 'Worker pg-boss started, queues registered');
 
