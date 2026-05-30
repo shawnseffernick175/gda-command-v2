@@ -129,7 +129,7 @@ All URLs are object-centric. Each URL identifies either a surface (collection) o
 | `/opp/:notice_id` | Opportunities | Opportunity | Detail view; opening fires R2 auto-analysis |
 | `/capture` | Capture | — | Capture plan list |
 | `/capture/:opp_id` | Capture | Capture Plan | Linked to the parent opportunity |
-| `/pipeline` | Pipeline | — | Qualified pursuit list |
+| `/pipeline` | Pipeline | — | Qualified pursuit list. Pipeline items do not have standalone permalinks. The canonical permalink for any pipeline item is its parent opportunity (`/opp/:notice_id`) or its capture (`/capture/:opp_id`). Deep-linking directly to a pipeline-row state is out of scope for V3. |
 | `/action-items` | Action Items | — | Task list |
 | `/settings/:section` | Settings | — | Section slug (see §8) |
 
@@ -147,7 +147,7 @@ All URLs are object-centric. Each URL identifies either a surface (collection) o
 |---|---|
 | **List → Detail** | Browser back returns to the list at the previous scroll position. Scroll position is preserved in session memory (not URL). *(Ref: Linear — scroll restoration on back.)* |
 | **Promote action (redirect)** | After a promote redirect (e.g., Fast Track → `/opp/:notice_id`), back returns to the originating surface, not the intermediate API call. The redirect replaces history (`history.replaceState`) so back skips the transient state. |
-| **Settings sidecar** | Back returns to the surface the operator was on before opening Settings. Settings does not push multiple history entries for section changes within the sidecar. |
+| **Settings sidecar** | Back returns to the surface the operator was on before opening Settings. Settings section changes use `history.replaceState()` to update the URL slug (e.g., `/settings/sources` → `/settings/sentinel-rules`) without pushing a new history entry. The browser back button from any Settings section returns to the surface the operator opened Settings from, not to a previous Settings section. |
 | **Cmd+K palette** | Opening the palette does not push a history entry. Esc or clicking outside closes it. Back button is unaffected. |
 
 ### 2.4 Refresh Semantics
@@ -192,7 +192,7 @@ The top bar is a thin, persistent horizontal strip above the canvas. *(Ref: Line
 |---|---|---|
 | Left | **Current OU badge** | Displays "Envision" (static — single-tenant). Visually anchors the operator to the workspace identity. |
 | Center | **Cmd+K search trigger** | Click or `Cmd+K` opens the command palette overlay. Placeholder text: "Search or jump to…" |
-| Right | **Approval count badge** | Shows pending approval count (if > 0). Click opens `/launchpad` scrolled to "What Needs Me Today" section. |
+| Right | **Approval count badge** | Shows pending approval count (if > 0). Clicking the approval count badge navigates to `/launchpad#what-needs-me`. The Launchpad surface reads the URL fragment on mount and scrolls the `#what-needs-me` section into view (`scrollIntoView({ behavior: 'smooth', block: 'start' })`). If no fragment is present, Launchpad renders top-aligned. |
 | Far right | **User menu** | Displays operator name. Dropdown: Theme, Sign out. |
 
 ### 3.3 Right Inspector
@@ -206,7 +206,7 @@ The right inspector is a contextual panel that appears on object detail pages. I
 | `/fast-track/signal/:signal_id` | Signal metadata, source link, promote action |
 | All list surfaces | Inspector hidden; full-width canvas |
 
-**Width:** Fixed 360px. Not resizable. Scrolls independently from the canvas. *(Ref: Foundry — fixed inspector width.)*
+**Width:** 400px default width, resizable between 320px and 560px via drag handle on the left edge. Width persisted in `localStorage` under key `gda-inspector-width`. Scrolls independently from the canvas. *(Ref: Foundry — inspector panel with adjustable width.)*
 
 ### 3.4 No Top Tabs
 
@@ -576,7 +576,7 @@ On any object detail page (`/opp/:notice_id`, `/capture/:opp_id`), if the curren
 
 The top bar shows a count badge next to the approval indicator (right side). If pending count is 0, the badge is hidden. If > 0, badge shows the count with accent-color background and white text.
 
-Click navigates to `/launchpad`, scrolled to the "What Needs Me Today" section.
+Click navigates to `/launchpad#what-needs-me` (see §3.2 for scroll-to-anchor mechanism).
 
 ### 7.4 What the Approval Queue is NOT
 
@@ -599,7 +599,7 @@ Settings is a sidecar with a left-side section nav and a content pane. The URL p
 | **OU Tags** | `/settings/ou-tags` | Manage organizational unit tags for records. Default is Envision; tags exist for future federation. | Internal config |
 | **Sentinel Rules** | `/settings/sentinel-rules` | Configure Sentinel gate rules (S-007, S-008). Set thresholds for pipeline promotion, compliance checks. | Internal config |
 | **Agent Preferences** | `/settings/agent-preferences` | Configure AI agent behavior: auto-analysis aggressiveness, LLM model selection, draft tone. | Internal config |
-| **Theme** | `/settings/theme` | Typography scale, density preference. No dark mode in this build. *(Ref: aesthetics canonical — "No dark mode in this build.")* | Internal config |
+| **Theme** | `/settings/theme` | Dark mode is the primary theme. Light mode is opt-in via the `data-theme="light"` attribute on `<html>`. The toggle in Settings → Appearance switches between `dark` (default) and `light`. Theme preference is persisted in `localStorage` under key `gda-theme`. See D2 §10 for full light-mode token table. | Internal config |
 | **Health** | `/settings/health` | Former QA Center. Sentinel system health dashboard: endpoint status, sync state, last-run timestamps, one-click fix for stale data. *(Ref: Lattice — system health as a first-class view.)* | `GET /api/v3/health`, `GET /api/v3/ready` |
 
 ### 8.2 Section Navigation
@@ -607,7 +607,7 @@ Settings is a sidecar with a left-side section nav and a content pane. The URL p
 - Left nav within Settings lists all sections vertically.
 - Active section has accent-color text; inactive sections use `muted` color.
 - Clicking a section updates the URL slug and renders the section content in the right pane.
-- Section changes within Settings do **not** push separate browser history entries. Only the initial Settings entry is a history entry.
+- Section changes within Settings use `history.replaceState()` to update the URL slug without pushing a new history entry. The browser back button from any Settings section returns to the surface the operator opened Settings from, not to a previous Settings section.
 - Default section on first visit: Sources (`/settings/sources`).
 
 ---
