@@ -1228,7 +1228,7 @@ interface SourceChip {
 /**
  * Frontend visibility. All SourceKind values listed here are frontend-visible —
  * agents may emit any of them, and the UI must render any of them in a
- * SourceUrlChip. D5's parity test (§4.3) must check against this full list of 14.
+ * SourceUrlChip. D5's parity test (§4.3) must check against this full list of 15.
  */
 
 /** Agent identifiers */
