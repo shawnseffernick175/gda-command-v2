@@ -200,40 +200,63 @@ export interface OpportunityAnalysisOutput {
 // ---------------------------------------------------------------------------
 
 export interface CapturePlanOutput {
-  capture_plan: CapturePlan;
+  capture_plan: {
+    customer_profile: string;
+    requirements_summary: string;
+    solution_strategy: string;
+    win_themes: WinTheme[];
+    ghost_themes: GhostTheme[];
+    discriminators: string[];
+    pricing_strategy: string;
+    teaming_plan: TeamingPlan | null;
+  };
   pink_hat_gaps: PinkHatGap[];
   red_team_weaknesses: RedTeamWeakness[];
   gold_team_readiness: GoldTeamChecklist;
-  black_hat_competitor_positioning: CompetitorPosition[];
+  black_hat_competitor_positioning: BlackHatEntry[];
   next_action: NextAction;
   source_chips: SourceChip[];
-  is_partial: boolean;
   generated_at: string;
   model_used: string;
+  is_partial: boolean;
 }
 
-export interface CapturePlan {
-  customer_profile: string;
-  requirements_summary: string;
-  solution_strategy: string;
-  win_themes: string[];
-  ghost_themes: string[];
-  discriminators: string[];
-  pricing_strategy: string;
-  teaming_plan: string;
+export interface WinTheme {
+  theme: string;
+  evidence: string[];
+  customer_hot_button: string;
+}
+
+export interface GhostTheme {
+  target_competitor: string;
+  theme: string;
+  rationale: string;
+}
+
+export interface TeamingPlan {
+  partners: TeamingPartner[];
+  rationale: string;
+  teaming_arrangement: 'prime_sub' | 'joint_venture' | 'mentor_protege';
+}
+
+export interface TeamingPartner {
+  name: string;
+  role: 'sub' | 'prime' | 'jv_partner';
+  contribution: string;
+  certs_leveraged: string[];
+  vehicles_leveraged: string[];
 }
 
 export interface PinkHatGap {
-  requirement_ref: string;
-  gap_description: string;
+  gap: string;
+  section: string;
   severity: 'blocking' | 'significant' | 'minor';
-  suggested_fix: string;
+  recommended_fix: string;
 }
 
 export interface RedTeamWeakness {
-  area: string;
   weakness: string;
-  competitor_advantage: string | null;
+  likelihood: 'High' | 'Med' | 'Low';
   mitigation: string;
 }
 
@@ -243,30 +266,49 @@ export interface GoldTeamChecklist {
 }
 
 export interface GoldTeamItem {
-  area: string;
-  status: 'pass' | 'fail' | 'warning';
-  note: string;
+  item: string;
+  status: 'complete' | 'incomplete' | 'not_applicable';
+  notes: string | null;
 }
 
-export interface CompetitorPosition {
-  competitor_name: string;
-  likely_strategy: string;
-  strengths: string[];
-  weaknesses: string[];
+export interface BlackHatEntry {
+  competitor: string;
+  likely_approach: string;
+  strengths_vs_us: string[];
+  weaknesses_vs_us: string[];
   counter_strategy: string;
 }
 
 export interface NextAction {
   action: string;
   owner: string;
-  deadline: string | null;
+  deadline: string;
   priority: 'high' | 'medium' | 'low';
 }
 
+/** Source citation — R1 compliance. Matches D3 §13.1. */
+export type SourceKind =
+  | 'sam_gov'
+  | 'fpds'
+  | 'usaspending'
+  | 'govwin'
+  | 'govtribe'
+  | 'sbir_sttr'
+  | 'darpa_baa'
+  | 'afwerx'
+  | 'sofwerx'
+  | 'edu_rfi'
+  | 'orangeslices'
+  | 'news'
+  | 'doctrine'
+  | 'partner_site'
+  | 'internal';
+
 export interface SourceChip {
-  kind: string;
-  title: string;
+  label: string;
   url: string;
+  kind: SourceKind;
+  retrieved_at: string;
 }
 
 export interface DailyBriefingOutput {
