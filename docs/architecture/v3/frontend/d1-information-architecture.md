@@ -659,7 +659,6 @@ This document defines **structure and flow only**. The following are explicitly 
 | Agent behavior (LLM prompts, analysis logic, draft generation) | D3 — Agent Behavior Spec |
 | Backend changes (schema, API implementation, migration) | V3 API contract (`openapi-v3.yaml`) |
 | Mobile-specific layouts | Not in scope — responsive desktop only |
-| Dark mode | Forbidden per aesthetics canonical |
 | Component library implementation | D2 → engineering handoff |
 | Test strategy | Separate test plan document |
 
