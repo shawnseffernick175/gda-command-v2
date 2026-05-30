@@ -1,0 +1,8 @@
+{
+  "buckets": [
+    { "range": "0-10%", "rangeMin": 0, "rangeMax": 10, "items": [{ "stage": 0, "count": 3, "totalValue": 1500000 }] },
+    { "range": "30-40%", "rangeMin": 30, "rangeMax": 40, "items": [{ "stage": 2, "count": 5, "totalValue": 8000000 }] },
+    { "range": "70-80%", "rangeMin": 70, "rangeMax": 80, "items": [{ "stage": 4, "count": 2, "totalValue": 4000000 }] }
+  ],
+  "sourceRefs": [{ "url": "https://govtribe.com/opp/wp1", "kind": "govwin" }]
+}

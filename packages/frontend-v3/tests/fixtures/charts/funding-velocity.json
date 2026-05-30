@@ -1,0 +1,8 @@
+{
+  "periods": [
+    { "label": "Q1", "currentFY": 5200000, "priorFY": 4800000 },
+    { "label": "Q2", "currentFY": 6100000, "priorFY": 5500000 }
+  ],
+  "naicsFilter": ["541330", "541512"],
+  "sourceRefs": [{ "url": "https://usaspending.gov/search/1", "kind": "usaspending", "label": "USASpending" }]
+}

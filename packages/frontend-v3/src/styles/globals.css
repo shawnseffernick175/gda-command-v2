@@ -1,0 +1,117 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme {
+  /* Colors */
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-ink-primary: var(--color-ink-primary);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-dim: var(--color-ink-dim);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-pressed: var(--color-accent-pressed);
+  --color-critical: var(--color-critical);
+  --color-critical-hover: var(--color-critical-hover);
+  --color-success: var(--color-success);
+  --color-success-hover: var(--color-success-hover);
+  --color-warning: var(--color-warning);
+  --color-warning-hover: var(--color-warning-hover);
+  --color-stage-0: var(--color-stage-0);
+  --color-stage-1: var(--color-stage-1);
+  --color-stage-2: var(--color-stage-2);
+  --color-stage-3: var(--color-stage-3);
+  --color-stage-4: var(--color-stage-4);
+  --color-stage-5: var(--color-stage-5);
+  --color-stage-6: var(--color-stage-6);
+
+  /* Spacing — 4px micro-grid, 8px primary */
+  --spacing-0: 0px;
+  --spacing-0_5: 2px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-full: 999px;
+
+  /* Font families */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-numeric: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Font sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 1rem;
+  --text-md: 1.067rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.333rem;
+  --text-2xl: 1.6rem;
+  --text-3xl: 2rem;
+
+  /* Line heights */
+  --leading-xs: 1.0;
+  --leading-sm: 1.25;
+  --leading-base: 1.375;
+  --leading-md: 1.5;
+  --leading-lg: 1.5;
+  --leading-xl: 1.5;
+  --leading-2xl: 1.375;
+  --leading-3xl: 1.25;
+
+  /* Font weights */
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Motion */
+  --duration-reveal: 120ms;
+  --duration-state: 80ms;
+  --duration-hover: 0ms;
+  --ease-reveal: ease-out;
+
+  /* Zero shadows — per D2 §3.4 no box-shadow */
+  --shadow-sm: 0 0 0 transparent;
+  --shadow: 0 0 0 transparent;
+  --shadow-md: 0 0 0 transparent;
+  --shadow-lg: 0 0 0 transparent;
+  --shadow-xl: 0 0 0 transparent;
+  --shadow-2xl: 0 0 0 transparent;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/Inter-roman.var.woff2") format("woff2");
+}
+
+html {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  background-color: var(--color-canvas);
+  color: var(--color-ink-primary);
+}
+
+table,
+td,
+th,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum', 'ss01';
+}

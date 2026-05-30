@@ -1,0 +1,23 @@
+import { type ReactNode } from "react";
+
+export interface StatProps {
+  label: string;
+  value: ReactNode;
+  sourceUrl: string;
+}
+
+export function Stat({ label, value, sourceUrl }: StatProps) {
+  return (
+    <a
+      href={sourceUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex flex-col gap-0.5 group"
+    >
+      <span className="text-xs text-ink-muted">{label}</span>
+      <span className="text-lg font-semibold text-ink-primary group-hover:text-accent transition-colors duration-[var(--duration-state)]">
+        {value}
+      </span>
+    </a>
+  );
+}

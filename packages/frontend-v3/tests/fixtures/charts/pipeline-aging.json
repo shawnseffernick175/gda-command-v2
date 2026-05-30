@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "id": "1", "title": "Army RS3 Task Order 42", "stage": 2, "daysInStage": 45, "threshold": 30, "value": 2500000 },
+    { "id": "2", "title": "OASIS SB Pool 1 - Cyber", "stage": 1, "daysInStage": 12, "threshold": 60, "value": 8000000 }
+  ],
+  "sourceRefs": [{ "url": "https://sam.gov/opp/aging1", "kind": "sam_gov" }]
+}
