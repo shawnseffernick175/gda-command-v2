@@ -1,0 +1,23 @@
+import type { Meta, StoryObj } from '@storybook/react';
+import { CaptureStageFunnelChart } from './CaptureStageFunnelChart';
+
+const meta: Meta<typeof CaptureStageFunnelChart> = { component: CaptureStageFunnelChart, title: 'Charts/CaptureStageFunnelChart' };
+export default meta;
+type Story = StoryObj<typeof CaptureStageFunnelChart>;
+
+export const Default: Story = {
+  args: {
+    data: {
+      stages: [
+        { stage: 0, label: 'Long Term Positioning', count: 120, totalValue: 500000000, conversionRate: 100 },
+        { stage: 1, label: 'Opp Assessment', count: 80, totalValue: 350000000, conversionRate: 67 },
+        { stage: 2, label: 'Capture Planning', count: 45, totalValue: 200000000, conversionRate: 56 },
+        { stage: 3, label: 'Proposal Planning', count: 25, totalValue: 120000000, conversionRate: 56 },
+        { stage: 4, label: 'Proposal Dev', count: 15, totalValue: 80000000, conversionRate: 60 },
+        { stage: 5, label: 'Post-Submittal', count: 10, totalValue: 55000000, conversionRate: 67 },
+        { stage: 6, label: 'Post-Award', count: 6, totalValue: 35000000, conversionRate: 60 },
+      ],
+      sourceRefs: [{ url: 'https://sam.gov/opp/pipeline-funnel', kind: 'sam_gov' }],
+    },
+  },
+};

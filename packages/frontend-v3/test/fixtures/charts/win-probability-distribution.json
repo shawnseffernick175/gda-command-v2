@@ -1,0 +1,7 @@
+{
+  "buckets": [
+    { "range": "0-10%", "rangeMin": 0, "rangeMax": 10, "items": [{ "stage": 0, "count": 5, "totalValue": 3000000 }] },
+    { "range": "10-20%", "rangeMin": 10, "rangeMax": 20, "items": [{ "stage": 1, "count": 8, "totalValue": 12000000 }] }
+  ],
+  "sourceRefs": [{ "url": "https://sam.gov/opp/pwin", "kind": "sam_gov" }]
+}
