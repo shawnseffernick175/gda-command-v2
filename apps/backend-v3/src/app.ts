@@ -15,6 +15,7 @@ import { launchpadRoutes } from './routes/launchpad.js';
 import { sourceRoutes } from './routes/sources.js';
 import { partnerRoutes } from './routes/partners.js';
 import { actionItemRoutes } from './routes/action-items.js';
+import { soakRoutes } from './routes/soak.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -104,6 +105,7 @@ export async function buildApp() {
   await app.register(sourceRoutes);
   await app.register(partnerRoutes);
   await app.register(actionItemRoutes);
+  await app.register(soakRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });
