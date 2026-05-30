@@ -8,6 +8,11 @@
  * Adding a new task = adding a Task type + routing table entry.
  */
 
+// AGENT OUTPUT TYPES BELOW ARE ZERO-DIFF MIRRORS OF D3 §4.5 AND §5.5.
+// DO NOT EDIT WITHOUT UPDATING D3 FIRST. The acceptance bar is zero structural diff.
+// docs/architecture/v3/frontend/d3-agent-behavior.md §4.5 (AnalystOutput)
+// docs/architecture/v3/frontend/d3-agent-behavior.md §5.5 (CoachOutput → CapturePlanOutput)
+
 import type { SourceRef } from './sources.js';
 
 // ---------------------------------------------------------------------------
@@ -178,18 +183,63 @@ export interface FastTrackTriageOutput {
   recommended_action: 'pursue' | 'watch' | 'skip';
 }
 
+// ---------------------------------------------------------------------------
+// MIRROR OF D3 §4.5 AnalystOutput — DO NOT EDIT WITHOUT UPDATING D3
+// docs/architecture/v3/frontend/d3-agent-behavior.md §4.5
+// When the shared @gda/shared-types/agents package exists, replace
+// these definitions with: export type OpportunityAnalysisOutput = AnalystOutput;
+// ---------------------------------------------------------------------------
+
 export interface OpportunityAnalysisOutput {
-  pwin: number;
-  pwin_rationale: string;
-  incumbent_analysis: string;
-  competitor_landscape: string;
-  blackhat_assessment: string;
-  wargame_summary: string;
-  timeline_analysis: string;
+  win_probability: number;                    // 0-100
+  win_probability_reasoning: string;          // plain-English explanation
+  shipley_bid_no_bid: ShipleyScore;
+  incumbent: IncumbentProfile | null;
+  competitive_landscape: CompetitorEntry[];
+  doctrine_alignment: DoctrineAlignment[];
+  source_chips: SourceChip[];                 // R1: every claim has a clickable URL
+  generated_at: string;                       // ISO 8601
+  model_used: string;                         // e.g. 'claude-sonnet-4-5'
+  analysis_version: string;                   // cache key version
+}
+
+export interface ShipleyScore {
+  overall: 'Bid' | 'No Bid' | 'Conditional';
+  customer_knowledge: ShipleyDimension;
+  solution_match: ShipleyDimension;
+  competitive_position: ShipleyDimension;
+  past_performance: ShipleyDimension;
+}
+
+export interface ShipleyDimension {
+  score: number;                              // 1-10
+  reasoning: string;
+  evidence: string[];                         // specific facts supporting score
+}
+
+export interface IncumbentProfile {
+  name: string;
+  contract_number: string | null;
+  contract_value: number | null;
+  expiration_date: string | null;             // ISO 8601
+  performance_signals: string[];              // CPAR indicators, recompete signals
+  source_url: string;                         // R1
+}
+
+export interface CompetitorEntry {
+  name: string;
+  positioning: string;                        // how they would approach this opp
   strengths: string[];
   weaknesses: string[];
-  recommended_teaming: string[];
-  doctrine_alignment_score: number;
+  our_differentiator: string;                 // Envision's advantage vs. this competitor
+  source_url: string | null;                  // R1
+}
+
+export interface DoctrineAlignment {
+  principle_number: number;                   // 1-7
+  principle_name: string;
+  alignment_score: 'Strong' | 'Moderate' | 'Weak' | 'N/A';
+  reasoning: string;
 }
 
 // ---------------------------------------------------------------------------

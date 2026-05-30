@@ -108,7 +108,7 @@ Model versions are pins, not "latest." Bumping a model is an explicit PR.
 | `capture_plan` | anthropic | `claude-opus-4-5` | 60 s | `claude-sonnet-4-5` | anthropic |
 | `daily_briefing` | anthropic | `claude-sonnet-4-5` | 30 s | `claude-haiku-4-5` | anthropic |
 | `sentinel_summary` | anthropic | `claude-haiku-4-5` | 5 s | none | — |
-| `doctrine_score` | anthropic | `claude-sonnet-4-5` | 8 s | `claude-haiku-4-5` | anthropic |
+| `doctrine_score` | anthropic | `claude-haiku-4-5` | 8 s | none | — |
 | `semantic_embed` | openai | `text-embedding-3-large` | 10 s | none | — |
 | `source_research` | perplexity | `sonar-pro` | 20 s | none | — |
 
@@ -353,7 +353,7 @@ For `opportunity_analysis`: fallback to Haiku is allowed, but `quality_flag: 'de
 
 ### 8.3 Tasks with no fallback
 
-`fast_track_triage`, `sentinel_summary`, `semantic_embed`, `source_research` — these fail loud. No fallback, no degraded mode.
+`fast_track_triage`, `sentinel_summary`, `doctrine_score`, `semantic_embed`, `source_research` — these fail loud. No fallback, no degraded mode.
 
 ---
 
@@ -645,6 +645,8 @@ These capabilities are accommodated by the type system and routing table design 
 - [x] Cost-rollup read path documented
 - [x] PR is docs + types only (no impl)
 - [x] `CapturePlanOutput` matches D3 §5.5 `CoachOutput` exactly
+- [ ] `OpportunityAnalysisOutput` matches D3 §4.5 `AnalystOutput` exactly (zero structural diff).
+- [ ] All sub-interfaces (`ShipleyScore`, `ShipleyDimension`, `IncumbentProfile`, `CompetitorEntry`, `DoctrineAlignment`) match D3 §4.5 exactly.
 - [x] `DailyBriefingInput` shape matches D3 §7.4 Commander input requirements
 - [x] All 8 task types use the exact `RouterTask` enum string values from D3 §13.1
 - [x] Frontend `SourceKind` enum used in chip-renderable outputs matches D3 §13.1 `FrontendSourceKind`
