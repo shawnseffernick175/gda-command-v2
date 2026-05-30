@@ -453,7 +453,6 @@ async function attemptSingle(
             ok: false,
             error: `Schema validation failed after re-prompt: ${retryValidation.error}`,
             classification: 'validation',
-            status: 502,
           };
         }
         return {
@@ -467,7 +466,6 @@ async function attemptSingle(
           ok: false,
           error: `Schema validation failed: ${validation.error}`,
           classification: 'validation',
-          status: 502,
         };
       }
     }
