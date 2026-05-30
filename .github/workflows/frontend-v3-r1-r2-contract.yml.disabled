@@ -1,0 +1,158 @@
+# Frontend V3 R1/R2 Contract — binding product rule enforcement
+#
+# Draft workflow (F-215-D5). Disabled until F-218 enables it by removing .disabled extension.
+# Enforces R1 (every data point has a source URL) and R2 (200-with-analysis or 503, no third
+# state) from docs/canonical/product_rules.md.
+
+name: Frontend V3 R1/R2 Contract
+
+on:
+  pull_request:
+    paths:
+      - 'packages/frontend-v3/**'
+      - '.github/workflows/frontend-v3-r1-r2-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  r1-static-analysis:
+    name: R1 — sourceUrl prop enforcement
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Verify sourceUrl prop on data display components
+        shell: bash
+        run: |
+          set -euo pipefail
+          VIOLATIONS=0
+
+          echo "=== R1 Static Analysis: sourceUrl prop enforcement ==="
+
+          # Scan for Stat/Metric/Field components without sourceUrl prop
+          # Pattern: <Stat ... /> or <Metric ... /> or <Field ... /> without sourceUrl
+          for component in Stat Metric Field DataPoint; do
+            MISSING=$(grep -rn --include='*.tsx' \
+              "<${component}\b" packages/frontend-v3/src/ \
+              | grep -v 'sourceUrl' \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.' \
+              || true)
+
+            if [ -n "$MISSING" ]; then
+              echo "::error::${component} component(s) missing sourceUrl prop:"
+              echo "$MISSING"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::error::R1 violation: $VIOLATIONS component type(s) missing sourceUrl"
+            exit 1
+          fi
+
+          echo "R1 static analysis passed. All data display components have sourceUrl."
+
+  r2-contract-test:
+    name: R2 — opportunity detail contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/shared
+
+      - name: Run R2 contract tests
+        working-directory: packages/frontend-v3
+        env:
+          MOCK_LLM: '1'
+        run: |
+          npx vitest run --config vitest.contract.config.ts \
+            --testPathPattern='r2-.*\.contract\.test'
+
+  forbidden-shapes:
+    name: Forbidden response shapes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Scan for forbidden V3 response shapes
+        shell: bash
+        run: |
+          set -euo pipefail
+          VIOLATIONS=0
+
+          echo "=== Forbidden Response Shape Scan ==="
+
+          # Scan source + fixture files (not test files that verify the contract)
+          SCAN_DIRS="packages/frontend-v3/src packages/frontend-v3/test/fixtures"
+
+          # 1. analysis_status (as field, type, or enum)
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.json' \
+              'analysis_status' $SCAN_DIRS 2>/dev/null \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.' \
+              | grep -v '// forbidden-shape-test'; then
+            echo "::error::Forbidden token 'analysis_status' found"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 2. stale as analysis flag
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.json' \
+              -E '"stale"\s*:\s*(true|false|boolean)' $SCAN_DIRS 2>/dev/null \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.'; then
+            echo "::error::Forbidden token 'stale' as analysis flag found"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 3. analysis: null
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.json' \
+              -E '"?analysis"?\s*:\s*null' $SCAN_DIRS 2>/dev/null \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.'; then
+            echo "::error::Forbidden token 'analysis: null' found"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 4. Forbidden analysis state strings
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.json' \
+              -E '"(not_yet_analyzed|running|pending)"' $SCAN_DIRS 2>/dev/null \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.'; then
+            echo "::error::Forbidden analysis state strings found"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::error::$VIOLATIONS forbidden response shape(s) found"
+            exit 1
+          fi
+
+          echo "No forbidden response shapes found. All checks passed."
+
+  source-kinds-parity:
+    name: Source-kinds enum parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build -w packages/shared
+
+      - name: Run source-kinds parity test
+        working-directory: packages/frontend-v3
+        run: |
+          npx vitest run --config vitest.contract.config.ts \
+            --testPathPattern='source-kinds.*\.contract\.test'

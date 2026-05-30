@@ -1,0 +1,133 @@
+# Frontend V3 Forbidden Tokens — extends Visual Token Guardrail for frontend-v3
+#
+# Draft workflow (F-215-D5). Disabled until F-218 enables it by removing .disabled extension.
+# Scans packages/frontend-v3/ for forbidden visual tokens per D2 and aesthetics canonical.
+# Extends the existing visual-guardrail.yml pattern to the V3 frontend.
+
+name: Frontend V3 Forbidden Tokens
+
+on:
+  pull_request:
+    paths:
+      - 'packages/frontend-v3/**'
+      - '.github/workflows/frontend-v3-forbidden-tokens.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  forbidden-tokens:
+    name: Forbidden Token Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Scan for raw hex colors outside tokens.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          VIOLATIONS=0
+
+          echo "=== Scanning packages/frontend-v3/src/ for forbidden tokens ==="
+
+          # 1. Forbidden hex values (aesthetics canonical + hard rules)
+          FORBIDDEN_HEX="#0f1117|#1a1d27|#3b82f6"
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.css' \
+              -E "$FORBIDDEN_HEX" packages/frontend-v3/src/; then
+            echo "::error::Forbidden hex tokens found (per hard rules)"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 2. Raw hex colors not in tokens.json (excluding comments and test files)
+          # Allow: tokens.json itself, tailwind.config, test files
+          RAW_HEX=$(grep -rn --include='*.ts' --include='*.tsx' \
+              -E "'#[0-9a-fA-F]{3,8}'|\"#[0-9a-fA-F]{3,8}\"" \
+              packages/frontend-v3/src/ \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.' \
+              | grep -v 'tokens\.json' \
+              | grep -v 'tailwind\.config' \
+              | grep -v 'echarts-theme' \
+              | grep -v 'design-tokens/' \
+              | grep -v '// allowed-hex' \
+              || true)
+
+          if [ -n "$RAW_HEX" ]; then
+            echo "::error::Raw hex values found outside tokens.json:"
+            echo "$RAW_HEX"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 3. box-shadow — zero shadows per D2 (depth via borders/elevation, never shadows)
+          # Allowlisted: token-definition files (echarts-theme, design-tokens)
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.css' \
+              'box-shadow' packages/frontend-v3/src/ \
+              | grep -v '\.test\.' \
+              | grep -v 'echarts-theme' \
+              | grep -v 'design-tokens/' \
+              | grep -v 'tailwind\.config'; then
+            echo "::error::box-shadow found (forbidden per D2 — use borders and elevation tokens)"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 4. Gradients
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.css' \
+              -E 'linear-gradient|radial-gradient|conic-gradient' \
+              packages/frontend-v3/src/ \
+              | grep -v '\.test\.'; then
+            echo "::error::Gradient usage found (forbidden per aesthetics canonical)"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 5. Inline color styles (style={{...color...}})
+          if grep -rn --include='*.tsx' \
+              -E 'style=\{\{[^}]*(color|background|border)[^}]*\}\}' \
+              packages/frontend-v3/src/ \
+              | grep -v '\.test\.'; then
+            echo "::error::Inline color styles found (use Tailwind classes instead)"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 6. Emoji in production component code
+          if grep -rn --include='*.ts' --include='*.tsx' \
+              -P '[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F1E0}-\x{1F1FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]' \
+              packages/frontend-v3/src/ \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.' \
+              || true | head -20; then
+            # Only fail if matches found in non-test production code
+            EMOJI_COUNT=$(grep -rn --include='*.ts' --include='*.tsx' \
+              -P '[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F1E0}-\x{1F1FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]' \
+              packages/frontend-v3/src/ \
+              | grep -v '\.test\.' \
+              | grep -v '\.contract\.' \
+              | wc -l || true)
+            if [ "$EMOJI_COUNT" -gt 0 ]; then
+              echo "::error::Emoji found in production component code"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          fi
+
+          # 7. Chart library imports (only ECharts allowed)
+          CHART_LIBS="from 'chart.js'|from 'recharts'|from 'victory'|from 'react-chartjs'|from '@nivo'|from 'chartjs'"
+          if grep -rn --include='*.ts' --include='*.tsx' \
+              -iE "$CHART_LIBS" packages/frontend-v3/src/ \
+              | grep -v '\.test\.'; then
+            echo "::error::Forbidden chart library import found (only ECharts allowed)"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          # 8. JetBrains Mono font (forbidden per hard rules)
+          if grep -rn --include='*.ts' --include='*.tsx' --include='*.css' \
+              -i 'JetBrains Mono' packages/frontend-v3/src/; then
+            echo "::error::JetBrains Mono font reference found (forbidden per hard rules)"
+            VIOLATIONS=$((VIOLATIONS + 1))
+          fi
+
+          echo ""
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "::error::$VIOLATIONS forbidden token violation(s) found"
+            exit 1
+          fi
+
+          echo "No forbidden tokens found. All checks passed."
