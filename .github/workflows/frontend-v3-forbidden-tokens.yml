@@ -39,13 +39,15 @@ jobs:
           fi
 
           # 2. Raw hex colors not in tokens.json (excluding comments and test files)
-          # Allow: tokens.json itself, tailwind.config, test files
+          # Allow: tokens.json itself, tailwind.config, test files, generated token outputs
           RAW_HEX=$(grep -rn --include='*.ts' --include='*.tsx' \
               -E "'#[0-9a-fA-F]{3,8}'|\"#[0-9a-fA-F]{3,8}\"" \
               packages/frontend-v3/src/ \
               | grep -v '\.test\.' \
               | grep -v '\.contract\.' \
               | grep -v 'tokens\.json' \
+              | grep -v 'tokens\.ts' \
+              | grep -v 'tokens\.css' \
               | grep -v 'tailwind\.config' \
               | grep -v 'echarts-theme' \
               | grep -v 'design-tokens/' \
