@@ -1,6 +1,9 @@
 /**
  * Shared helper: parse LLM text as JSON and validate against zod schema.
  * On validation failure, returns the error for re-prompt.
+ *
+ * Uses a structural schema interface decoupled from zod's internal
+ * type parameters to avoid Zod v4 assignability issues.
  */
 
 export interface ParseResult<T> {
@@ -13,23 +16,17 @@ export interface ParseError {
   error: string;
 }
 
-interface SafeParseSuccess<T> {
-  success: true;
-  data: T;
-}
-
-interface SafeParseError {
-  success: false;
-  error: { issues: Array<{ path: PropertyKey[]; message: string }> };
-}
-
-interface ZodLikeSchema<T> {
-  safeParse(data: unknown): SafeParseSuccess<T> | SafeParseError;
+interface ZodSafeParseable {
+  safeParse(data: unknown): {
+    success: boolean;
+    data?: unknown;
+    error?: { issues: Array<{ path: PropertyKey[]; message: string }> };
+  };
 }
 
 export function parseAndValidate<T>(
   text: string,
-  schema: ZodLikeSchema<T>,
+  schema: ZodSafeParseable,
 ): ParseResult<T> | ParseError {
   let parsed: unknown;
   try {
@@ -42,10 +39,10 @@ export function parseAndValidate<T>(
 
   const result = schema.safeParse(parsed);
   if (result.success) {
-    return { ok: true, data: result.data };
+    return { ok: true, data: result.data as T };
   }
 
-  const issues = result.error.issues
+  const issues = (result.error?.issues ?? [])
     .map((i) => `${i.path.map(String).join('.')}: ${i.message}`)
     .join('; ');
   return { ok: false, error: `Schema validation failed: ${issues}` };
