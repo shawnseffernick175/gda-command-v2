@@ -98,6 +98,40 @@ services:
       - traefik
       - n8n-internal
 
+  backend-v3:
+    build:
+      context: .
+      dockerfile: apps/backend-v3/Dockerfile
+      args:
+        DEPLOY_COMMIT_SHA: ${DEPLOY_COMMIT_SHA:-unknown}
+    container_name: gda-backend-v3
+    restart: unless-stopped
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${STAGING_POSTGRES_USER:-gda_staging}:${STAGING_POSTGRES_PASSWORD}@postgres-staging:5432/${STAGING_POSTGRES_DB:-gda_staging}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      GDA_WEBHOOK_KEY: ${GDA_WEBHOOK_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANALYSIS_VERSION: ${ANALYSIS_VERSION:-v0.0.1-stub}
+      ANALYSIS_TIMEOUT_MS: ${ANALYSIS_TIMEOUT_MS:-10000}
+      LOG_LEVEL: ${LOG_LEVEL_V3:-info}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gda-v3.rule=Host(`gda-v3.csr-llc.tech`)"
+      - "traefik.http.routers.gda-v3.tls=true"
+      - "traefik.http.routers.gda-v3.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.gda-v3.loadbalancer.server.port=4000"
+      - "traefik.docker.network=n8n_default"
+    networks:
+      - gda
+      - traefik
+
   frontend:
     build:
       context: .
