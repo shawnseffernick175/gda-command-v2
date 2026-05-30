@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* Token import stub — F-218 will wire design tokens here */
+/* @import "./tokens.css"; */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/Inter-roman.var.woff2") format("woff2");
+}
+
+html {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-feature-settings: "ss01";
+}
+
+table,
+td,
+th,
+.num,
+.nums {
+  font-variant-numeric: tabular-nums;
+}

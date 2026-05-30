@@ -5,6 +5,7 @@
     "packages/shared",
     "packages/backend",
     "packages/frontend",
+    "packages/frontend-v3",
     "apps/backend-v3"
   ],
   "scripts": {
