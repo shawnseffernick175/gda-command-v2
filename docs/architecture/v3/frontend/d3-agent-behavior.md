@@ -39,11 +39,9 @@ Product rules (binding):
 - **R1:** Every data point has a searchable source. Agent outputs include `source_chips[]` with clickable URLs.
 - **R2:** Analysis is automatic on opportunity open (Analyst agent). No "Run Analysis" button.
 
-Aesthetic constraints (from `aesthetics_canonical_v1.md`):
-- Agent cards render in the standard `.card` container (white background, 1px `border` border, 4px radius).
-- Agent accent uses `accent` (#01696F) only. Critical flags use `critical` (#A12C7B) only.
-- No icons beyond severity dots and dismiss "x". No animations beyond 120ms ease transitions.
-- Font: Inter only. No monospace for agent output display.
+Aesthetic constraints:
+
+All agent UI styling is defined in D2 (Design System Spec, PR #435). Agent cards use D2 tokens: `bg-surface` (`#13161A`), `border-default` (`#2A2F35`), `radius-md` (6px), zero shadows. Do not reference legacy V2 canonicals — D2 is the single source of styling truth for V3.
 
 ---
 
@@ -56,6 +54,18 @@ Aesthetic constraints (from `aesthetics_canonical_v1.md`):
 | **Coach** | Capture (F-222) | Opus | `capture_plan` | Manual (operator opens capture) | Async + streaming | Draft only — operator redlines |
 | **Sentinel** | Launchpad health strip (F-219) + Pipeline gate | Haiku | `sentinel_summary` | Continuous (health-check tick) | <1s real-time | Qualification gate (overridable) |
 | **Commander** | Launchpad top tile (F-219) | Sonnet | `daily_briefing` | Daily 06:00 ET cron + manual | Async (background) | None (briefing is read-only) |
+
+### 2.1 Utility Router Tasks (Not Tied to a Named Agent)
+
+D4 specifies 3 additional router tasks that are utility-level and not owned by a named agent:
+
+| Task | Caller | Purpose | Model Tier |
+|---|---|---|---|
+| `doctrine_score` | Capture surface, Sentinel | Score an opportunity against doctrine alignment | Haiku |
+| `semantic_embed` | Ingestion pipeline | Generate vector embeddings for sources and opportunities | OpenAI `text-embedding-3-small` |
+| `source_research` | Scout (background) | Deep-pull a discovered source URL for full-text indexing | Perplexity `sonar-large` |
+
+These tasks are routed through the same router as agent tasks but are not surfaced as agent recommendations to the operator. They have no `agent_id`, no approval flow, no reasoning trace in the UI.
 
 ---
 
@@ -300,6 +310,8 @@ Rationale: Capture strategy is the highest-value agent output. It requires deep 
 
 **Manual.** Operator opens capture for an opportunity. Coach does not auto-fire — capture strategy requires deliberate operator engagement.
 
+Coach can be triggered from any capture regardless of whether the parent opportunity has been opened in the current session. The router will pull the cached Analyst output for the parent opportunity from the database. If no Analyst output exists in cache (the opp has never been opened by any operator), Coach returns 422 `ANALYSIS_REQUIRED` with a deep link to `/opp/:notice_id`. The operator must open the opp once (which fires R2) before Coach can run.
+
 ### 5.4 Inputs
 
 | Input | Source |
@@ -313,6 +325,8 @@ Rationale: Capture strategy is the highest-value agent output. It requires deep 
 | Partner Intel (if teaming) | `partners` table (Riverstone / PD Systems profiles) |
 
 ### 5.5 Output Schema
+
+**Authoritative schema.** This `CoachOutput` interface is the single source of truth for Coach output. D4's `CapturePlanOutput` in `llm-router.types.ts` must import this type from a shared types package and re-export, not redefine. F-217 implementation must use this exact shape.
 
 ```typescript
 interface CoachOutput {
@@ -1211,16 +1225,25 @@ interface SourceChip {
   retrieved_at: string;                       // ISO 8601
 }
 
+/**
+ * Frontend visibility. All SourceKind values listed here are frontend-visible —
+ * agents may emit any of them, and the UI must render any of them in a
+ * SourceUrlChip. D5's parity test (§4.3) must check against this full list of 14.
+ */
+
 /** Agent identifiers */
 type AgentName = 'scout' | 'analyst' | 'coach' | 'sentinel' | 'commander';
 
-/** Model Router task identifiers */
+/** Model Router task identifiers — ground-truth taxonomy (keep aligned with D4) */
 type RouterTask =
   | 'fast_track_triage'
   | 'opportunity_analysis'
   | 'capture_plan'
+  | 'daily_briefing'
   | 'sentinel_summary'
-  | 'daily_briefing';
+  | 'doctrine_score'
+  | 'semantic_embed'
+  | 'source_research';
 ```
 
 ### 13.2 Schema Index
