@@ -23,13 +23,14 @@ CREATE TABLE IF NOT EXISTS pgboss.queue (
   updated_on        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
--- Backfill the four canonical queues (idempotent)
+-- Backfill all canonical queues (idempotent)
 INSERT INTO pgboss.queue (name, policy, retry_limit, retry_delay)
 VALUES
   ('analysis-opportunity',       'standard', 3, 60),
   ('analysis-capture',           'standard', 3, 60),
   ('ingest-postprocess',         'standard', 2, 30),
-  ('analysis-periodic-refresh',  'standard', 3, 60)
+  ('analysis-periodic-refresh',  'standard', 3, 60),
+  ('analysis-model-version-sweep', 'standard', 1, 60)
 ON CONFLICT (name) DO NOTHING;
 
 -- Ensure pgboss.schedule has the FK to pgboss.queue (if not already there).
