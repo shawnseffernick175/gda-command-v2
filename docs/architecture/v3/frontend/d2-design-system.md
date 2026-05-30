@@ -95,18 +95,20 @@ Every component uses these semantic aliases, never raw hex:
 
 **Loading:** Inter from Google Fonts (weights 400, 500, 600, 700). JetBrains Mono from Google Fonts (weights 400, 500).
 
-### 2.2 Type Scale (rem, 16px base)
+### 2.2 Type Scale (rem, 15px base)
 
-| Token | Size (rem) | Line Height | Weight | Usage |
-|---|---|---|---|---|
-| `text-xs` | 0.75 | 1.0 | 400 | Badges, micro-labels |
-| `text-sm` | 0.8125 | 1.25 | 400 | Default UI text, table cells, form labels |
-| `text-base` | 0.875 | 1.375 | 400 | Body paragraphs, descriptions |
-| `text-md` | 1.0 | 1.5 | 500 | Section sub-headers, card titles |
-| `text-lg` | 1.125 | 1.5 | 600 | Section headers |
-| `text-xl` | 1.25 | 1.5 | 600 | Page sub-titles |
-| `text-2xl` | 1.5 | 1.375 | 600 | Page titles |
-| `text-3xl` | 1.875 | 1.25 | 700 | Display headings (rare) |
+> Root font size is set to **15px** (`html { font-size: 15px; }`) to align with operator-density targets. All `rem` values in this spec are relative to 15px. Tailwind base ring is adjusted accordingly (D5 forbidden-tokens scanner allowlists this override).
+
+| Token | Size (rem) | Computed (px) | Line Height | Weight | Usage |
+|---|---|---|---|---|---|
+| `text-xs` | 0.75 | 11.25px | 1.0 | 400 | Badges, micro-labels |
+| `text-sm` | 0.8125 | 12.19px | 1.25 | 400 | Default UI text, table cells, form labels |
+| `text-base` | 1.0 | 15px | 1.375 | 400 | Body paragraphs, descriptions |
+| `text-md` | 1.067 | 16px | 1.5 | 500 | Section sub-headers, card titles |
+| `text-lg` | 1.2 | 18px | 1.5 | 600 | Section headers |
+| `text-xl` | 1.333 | 20px | 1.5 | 600 | Page sub-titles |
+| `text-2xl` | 1.6 | 24px | 1.375 | 600 | Page titles |
+| `text-3xl` | 2.0 | 30px | 1.25 | 700 | Display headings (rare) |
 
 ### 2.3 Font Weight Tokens
 
@@ -181,7 +183,7 @@ No `box-shadow` of any kind. No `filter: drop-shadow()`. No glow effects.
 
 - Page wrapper: `max-width: 1440px; margin: 0 auto; padding: 0 32px;`
 - Sidebar width: 240px collapsed-capable to 52px icon rail
-- Inspector panel: 400px default, resizable 320-560px
+- Inspector panel: 400px default, resizable 320-560px. Width persisted via `localStorage` key `gda-inspector-width`.
 - Minimum viewport: 1024px (operator tool, not consumer web)
 
 ---
@@ -802,6 +804,15 @@ Binding pattern from F-215 section 6: plain English recommendation with confiden
 
 **Props:**
 ```typescript
+/**
+ * status semantics:
+ *   - 'pending'  = awaiting operator approval action (NOT analysis state — analysis is always 200 or 503 per R2)
+ *   - 'approved' = operator clicked Approve
+ *   - 'rejected' = operator clicked Reject (sent to learning loop per D3 §8.4)
+ *
+ * This status is independent of R2 analysis status. R2 is enforced at the data
+ * fetch layer (TanStack Query), not at this component.
+ */
 interface AgentRecommendationCardProps {
   recommendation: string;       // plain English
   confidence: 'high' | 'medium' | 'low';
@@ -1065,11 +1076,14 @@ R1 binding: every data point has a searchable source.
 - `partner_site` — link icon
 - `internal` — lock icon
 
+**Binding rule (R1 DOM enforcement):** `url` must always be rendered as a clickable anchor element: `<a href={url} target="_blank" rel="noopener noreferrer">`. Rendering `url` only as a `data-*` attribute on a non-anchor element (e.g., `<span data-source-url={url}>`) is a contract violation and will be flagged by the D5 R1 DOM-level test.
+
 **Props:**
 ```typescript
 interface SourceUrlChipProps {
   url: string;
-  kind: SourceKind;
+  source_kind: SourceKind;
+  retrieved_at: string;         // ISO 8601, rendered as relative time tooltip ("Retrieved 2 hours ago")
   label?: string;               // override auto-extracted domain
 }
 
@@ -1513,6 +1527,8 @@ Scan targets:
 
 Allowlist:
   - packages/frontend-v3/design-tokens/tokens.json (token definitions)
+  - packages/frontend-v3/design-tokens/** (all token definition files)
+  - packages/frontend-v3/src/lib/echarts-theme.ts (ECharts theme export — hex values are token references)
   - Files with VISUAL_GUARDRAIL_IGNORE marker (first 5 lines)
   - Test files (*.test.ts, *.spec.ts, __tests__/)
 
@@ -1547,7 +1563,7 @@ See the companion file for the complete token JSON. The structure follows:
   },
   "space": { "0": "0px", "0.5": "2px", "1": "4px", "2": "8px", ... },
   "radius": { "sm": "4px", "md": "6px", "full": "999px" },
-  "fontSize": { "xs": "0.75rem", "sm": "0.8125rem", ... },
+  "fontSize": { "$root": "15px", "xs": "0.75rem", "sm": "0.8125rem", "base": "1rem", ... },
   "lineHeight": { "xs": "1.0", "sm": "1.25", ... },
   "fontFamily": { "ui": "'Inter', ...", "numeric": "'Inter', ...", "mono": "'JetBrains Mono', ..." },
   "fontWeight": { "regular": 400, "medium": 500, "semibold": 600, "bold": 700 },
@@ -1621,15 +1637,15 @@ F-218 will add the following to `packages/frontend-v3/src/app.css`:
   --font-numeric: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Font sizes */
+  /* Font sizes (relative to 15px root) */
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
-  --text-base: 0.875rem;
-  --text-md: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
+  --text-base: 1rem;
+  --text-md: 1.067rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.333rem;
+  --text-2xl: 1.6rem;
+  --text-3xl: 2rem;
 
   /* Line heights */
   --leading-xs: 1.0;
@@ -1702,7 +1718,7 @@ Font utilities: `font-ui`, `font-numeric`, `font-mono`.
 /* Applied globally in app.css */
 html {
   font-family: var(--font-ui);
-  font-size: 16px;
+  font-size: 15px; /* Operator-density base — aligns with D1 §9.1 (15px body target) */
   background-color: var(--color-canvas);
   color: var(--color-ink-primary);
 }
