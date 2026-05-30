@@ -1,6 +1,35 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
 
+/* Self-hosted Inter variable font (replaces Google Fonts CDN) */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/Inter-roman.var.woff2") format("woff2");
+  font-feature-settings: "tnum", "ss01";
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/Inter-italic.var.woff2") format("woff2");
+  font-feature-settings: "tnum", "ss01";
+}
+
+/* Self-hosted JetBrains Mono variable font */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("/fonts/JetBrainsMono.var.woff2") format("woff2-variations"),
+       url("/fonts/JetBrainsMono.var.woff2") format("woff2");
+}
+
 @theme {
   /* Colors — Dark (default) */
   --color-canvas: var(--color-canvas, #0B0D0F);
