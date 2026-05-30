@@ -192,25 +192,41 @@ export interface OpportunityAnalysisOutput {
   doctrine_alignment_score: number;
 }
 
-/**
- * `capture_plan` output type is `CoachOutput` as defined in D3 §5.5.
- * The shape must be identical to D3 — this types file is a consumer of
- * D3's authoritative schema, not a redefinition of it.
- */
+// ---------------------------------------------------------------------------
+// MIRROR OF D3 §5.5 CoachOutput — DO NOT EDIT WITHOUT UPDATING D3
+// docs/architecture/v3/frontend/d3-agent-behavior.md §5.5
+// When the shared @gda/shared-types/agents package exists, replace
+// these definitions with: export type CapturePlanOutput = CoachOutput;
+// ---------------------------------------------------------------------------
+
 export interface CapturePlanOutput {
+  capture_plan: CapturePlan;
   pink_hat_gaps: PinkHatGap[];
   red_team_weaknesses: RedTeamWeakness[];
-  gold_team_readiness: GoldTeamReadiness;
+  gold_team_readiness: GoldTeamChecklist;
   black_hat_competitor_positioning: CompetitorPosition[];
   next_action: NextAction;
   source_chips: SourceChip[];
   is_partial: boolean;
+  generated_at: string;
+  model_used: string;
+}
+
+export interface CapturePlan {
+  customer_profile: string;
+  requirements_summary: string;
+  solution_strategy: string;
+  win_themes: string[];
+  ghost_themes: string[];
+  discriminators: string[];
+  pricing_strategy: string;
+  teaming_plan: string;
 }
 
 export interface PinkHatGap {
   requirement_ref: string;
   gap_description: string;
-  severity: 'critical' | 'major' | 'minor';
+  severity: 'blocking' | 'significant' | 'minor';
   suggested_fix: string;
 }
 
@@ -221,11 +237,15 @@ export interface RedTeamWeakness {
   mitigation: string;
 }
 
-export interface GoldTeamReadiness {
-  overall_score: number;
-  strengths: string[];
-  remaining_gaps: string[];
-  recommendation: 'submit' | 'revise' | 'no_bid';
+export interface GoldTeamChecklist {
+  ready: boolean;
+  items: GoldTeamItem[];
+}
+
+export interface GoldTeamItem {
+  area: string;
+  status: 'pass' | 'fail' | 'warning';
+  note: string;
 }
 
 export interface CompetitorPosition {
@@ -240,7 +260,7 @@ export interface NextAction {
   action: string;
   owner: string;
   deadline: string | null;
-  priority: 'immediate' | 'this_week' | 'next_milestone';
+  priority: 'high' | 'medium' | 'low';
 }
 
 export interface SourceChip {
