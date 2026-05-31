@@ -1,36 +1,24 @@
+/**
+ * F-234: Action Items integration tests (migrated from tests/).
+ *
+ * No CREATE TABLE — tests use the real migration runner (v3_001–v3_008).
+ */
+
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import jwt from 'jsonwebtoken';
 import { createHmac } from 'node:crypto';
 import pg from 'pg';
 import type PgBoss from 'pg-boss';
 import type { FastifyInstance } from 'fastify';
+import { getDbUrl, authHeader, getApp, closeApp, WEBHOOK_KEY } from './helpers.js';
 
-process.env['JWT_SECRET'] = 'test-jwt-secret';
-process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
-process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
-process.env['NODE_ENV'] = 'test';
-process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
-process.env['ANALYSIS_TIMEOUT_MS'] ??= '5000';
-process.env['ANALYSIS_POLL_INTERVAL_MS'] ??= '50';
-
-const DB_URL = process.env['DATABASE_URL'];
 const { Pool } = pg;
 
 let pool: InstanceType<typeof Pool>;
 let app: FastifyInstance;
 let boss: PgBoss;
 
-function authHeader(): Record<string, string> {
-  const token = jwt.sign(
-    { sub: 'test-user', email: 'test@gda.local', role: 'admin' },
-    'test-jwt-secret',
-    { algorithm: 'HS256', expiresIn: '1h' }
-  );
-  return { authorization: `Bearer ${token}` };
-}
-
 function webhookHeaders(payload: string): Record<string, string> {
-  const signature = createHmac('sha256', 'test-webhook-key')
+  const signature = createHmac('sha256', WEBHOOK_KEY)
     .update(payload)
     .digest('hex');
   return {
@@ -39,85 +27,22 @@ function webhookHeaders(payload: string): Record<string, string> {
   };
 }
 
-async function ensureTestSchema(): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS sources (
-        id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, url TEXT, title TEXT,
-        retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), confidence TEXT NOT NULL DEFAULT 'high',
-        meta JSONB NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      INSERT INTO sources (id, kind, title, retrieved_at)
-      VALUES (1, 'internal', 'Test source', NOW()) ON CONFLICT (id) DO NOTHING
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS action_items (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        detail TEXT,
-        owner TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'open',
-        due_date TEXT,
-        source TEXT NOT NULL DEFAULT 'manual',
-        source_id TEXT,
-        linked_record_type TEXT,
-        linked_record_id TEXT,
-        completed_at TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS action_item_audit (
-        id TEXT PRIMARY KEY,
-        action_item_id TEXT NOT NULL,
-        field TEXT NOT NULL,
-        old_value TEXT,
-        new_value TEXT,
-        actor TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS action_item_drafts (
-        id BIGSERIAL PRIMARY KEY,
-        action_item_id TEXT NOT NULL,
-        kind TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'generating',
-        content TEXT NOT NULL DEFAULT '',
-        model_used TEXT,
-        approved_by TEXT,
-        approved_at TIMESTAMPTZ,
-        source_id BIGINT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-  } finally {
-    client.release();
-  }
-}
-
 beforeAll(async () => {
-  pool = new Pool({ connectionString: DB_URL, max: 5 });
-  await ensureTestSchema();
+  const dbUrl = getDbUrl();
+  pool = new Pool({ connectionString: dbUrl, max: 5 });
 
-  const { initBoss } = await import('../src/lib/queue.js');
+  const { initBoss } = await import('../../src/lib/queue.js');
   boss = await initBoss();
 
-  const { buildApp } = await import('../src/app.js');
-  app = await buildApp();
-  await app.ready();
-});
+  app = await getApp();
+}, 120_000);
 
 afterAll(async () => {
-  await app.close();
-  const { stopBoss } = await import('../src/lib/queue.js');
+  const { stopBoss } = await import('../../src/lib/queue.js');
   await stopBoss();
-  await pool.end();
-});
+  await closeApp();
+  if (pool) await pool.end();
+}, 30_000);
 
 beforeEach(async () => {
   await pool.query('DELETE FROM action_item_drafts');
@@ -494,7 +419,7 @@ describe('Integration: Draft endpoint full flow', () => {
     const draftId = draftData.id;
     expect(draftId).toBeTruthy();
 
-    const { buildStubDraftText } = await import('../src/services/drafts/index.js');
+    const { buildStubDraftText } = await import('../../src/services/drafts/index.js');
     const actionItem = (await pool.query('SELECT * FROM action_items WHERE id = $1', [id])).rows[0]!;
     const draftText = buildStubDraftText('reply', actionItem);
     await pool.query(
@@ -525,7 +450,7 @@ describe('Integration: Draft endpoint full flow', () => {
   });
 
   it('all three draft kinds produce valid output', async () => {
-    const { buildStubDraftText } = await import('../src/services/drafts/index.js');
+    const { buildStubDraftText } = await import('../../src/services/drafts/index.js');
     const kinds = ['reply', 'research', 'milestone'] as const;
 
     for (const kind of kinds) {
@@ -637,7 +562,7 @@ describe('Integration: Email webhook creates action item', () => {
       payload,
       headers: {
         'content-type': 'application/json',
-        'x-gda-key': 'test-webhook-key',
+        'x-gda-key': WEBHOOK_KEY,
       },
     });
 

@@ -1,57 +1,27 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+/**
+ * F-234: Fast-track worker tests (migrated from tests/workers/).
+ *
+ * No CREATE TABLE — tests use the real migration runner (v3_001–v3_008).
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import pg from 'pg';
+import { getDbUrl } from './helpers.js';
 
-process.env['JWT_SECRET'] = 'test-jwt-secret';
-process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
-process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
-process.env['NODE_ENV'] = 'test';
-process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
-
-const DB_URL = process.env['DATABASE_URL'];
 const { Pool } = pg;
 
 let pool: InstanceType<typeof Pool>;
 
 beforeAll(async () => {
-  pool = new Pool({ connectionString: DB_URL, max: 2 });
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS fast_track_assessments (
-        id              BIGSERIAL     PRIMARY KEY,
-        input_hash      TEXT          NOT NULL,
-        title           TEXT          NOT NULL,
-        description     TEXT          NOT NULL,
-        naics_codes     TEXT[]        NOT NULL DEFAULT '{}',
-        set_aside       TEXT,
-        place_of_performance TEXT,
-        grade           TEXT          NOT NULL CHECK (grade IN ('A', 'B', 'C')),
-        rationale       TEXT          NOT NULL,
-        naics_match_score NUMERIC     NOT NULL CHECK (naics_match_score >= 0 AND naics_match_score <= 100),
-        recommended_action TEXT       NOT NULL CHECK (recommended_action IN ('pursue', 'watch', 'skip')),
-        source_chips    JSONB         NOT NULL DEFAULT '[]',
-        model_used      TEXT          NOT NULL,
-        analysis_version TEXT         NOT NULL,
-        generated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        UNIQUE (input_hash, analysis_version)
-      )
-    `);
-    await client.query('DELETE FROM fast_track_assessments');
-  } finally {
-    client.release();
-  }
-});
+  const dbUrl = getDbUrl();
+  pool = new Pool({ connectionString: dbUrl, max: 5 });
+  await pool.query('DELETE FROM fast_track_assessments');
+}, 120_000);
 
 afterAll(async () => {
-  const client = await pool.connect();
-  try {
-    await client.query('DELETE FROM fast_track_assessments');
-  } finally {
-    client.release();
-  }
-  await pool.end();
-});
+  await pool.query('DELETE FROM fast_track_assessments');
+  if (pool) await pool.end();
+}, 30_000);
 
 describe('Fast Track Worker', () => {
   it('should write assessment row with correct shape when router succeeds', async () => {
@@ -65,7 +35,6 @@ describe('Fast Track Worker', () => {
     };
     const analysisVersion = process.env['ANALYSIS_VERSION']!;
 
-    // Simulate what the worker does: call router + write row
     const { llmRouter } = await import('../../src/lib/llm-router.js');
     const result = await llmRouter.route({
       task: 'fast_track_triage',
@@ -101,12 +70,12 @@ describe('Fast Track Worker', () => {
       ],
     );
 
-    const { rows } = await pool.query(
+    const { rows } = await pool.query<Record<string, unknown>>(
       'SELECT * FROM fast_track_assessments WHERE input_hash = $1',
       [inputHash],
     );
     expect(rows).toHaveLength(1);
-    const row = rows[0];
+    const row = rows[0]!;
     expect(row.grade).toMatch(/^[ABC]$/);
     expect(row.recommended_action).toMatch(/^(pursue|watch|skip)$/);
     expect(Number(row.naics_match_score)).toBeGreaterThanOrEqual(0);
@@ -119,7 +88,6 @@ describe('Fast Track Worker', () => {
     const inputHash = 'test-hash-unique-' + Date.now();
     const analysisVersion = process.env['ANALYSIS_VERSION']!;
 
-    // Insert first row
     await pool.query(
       `INSERT INTO fast_track_assessments
          (input_hash, title, description, grade, rationale, naics_match_score,
@@ -128,7 +96,6 @@ describe('Fast Track Worker', () => {
       [inputHash, 'T1', 'D1', 'B', 'ok', 50, 'watch', '[]', 'model1', analysisVersion],
     );
 
-    // Second insert with ON CONFLICT DO NOTHING (mirrors worker behavior)
     const result = await pool.query(
       `INSERT INTO fast_track_assessments
          (input_hash, title, description, grade, rationale, naics_match_score,
@@ -138,23 +105,19 @@ describe('Fast Track Worker', () => {
       [inputHash, 'T2', 'D2', 'A', 'better', 80, 'pursue', '[]', 'model2', analysisVersion],
     );
 
-    // No error thrown, rowCount is 0
     expect(result.rowCount).toBe(0);
 
-    // Original row is preserved
-    const { rows } = await pool.query(
+    const { rows } = await pool.query<{ title: string }>(
       'SELECT * FROM fast_track_assessments WHERE input_hash = $1',
       [inputHash],
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0].title).toBe('T1');
+    expect(rows[0]!.title).toBe('T1');
   });
 
   it('should throw on router error for pg-boss retry', async () => {
-    // Test that a router error results in a thrown error (pg-boss retries)
     const { llmRouter } = await import('../../src/lib/llm-router.js');
 
-    // The stub router returns error for unknown tasks — we can verify the error path
     const result = await llmRouter.route({
       task: 'fast_track_triage',
       input: {
@@ -166,13 +129,11 @@ describe('Fast Track Worker', () => {
       },
     });
 
-    // Stub returns ok for fast_track_triage, verify the worker would throw on !ok
     if (!result.ok) {
       expect(() => {
         throw new Error(`Router error: ${result.error_kind} — ${result.error_message}`);
       }).toThrow();
     } else {
-      // ok=true means we can verify worker would proceed normally
       expect(result.output).toBeDefined();
       expect(result.output.grade).toBeTruthy();
     }
