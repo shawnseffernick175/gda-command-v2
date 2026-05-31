@@ -17,6 +17,7 @@ import { partnerRoutes } from './routes/partners.js';
 import { actionItemRoutes } from './routes/action-items.js';
 import { soakRoutes } from './routes/soak.js';
 import { fastTrackRoutes } from './routes/fast-track.js';
+import { authRoutes } from './routes/auth.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -98,6 +99,7 @@ export async function buildApp() {
     return reply.status(statusCode).send(body);
   });
 
+  await app.register(authRoutes);
   await app.register(systemRoutes);
   await app.register(opportunityRoutes);
   await app.register(captureRoutes);

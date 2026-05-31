@@ -10,28 +10,40 @@ import { OpportunitiesList } from "./surfaces/opportunities/OpportunitiesList";
 import { CaptureList } from "./surfaces/capture/CaptureList";
 import { CaptureDetail } from "./surfaces/capture/CaptureDetail";
 import { useUiStore } from "./stores/ui-store";
+import { RequireAuth } from "./components/RequireAuth";
+import { Login } from "./surfaces/auth/Login";
 
 export function App() {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
 
   return (
-    <AppShell>
-      <LeftRail collapsed={!sidebarOpen} onToggle={toggleSidebar} />
-      <MainCanvas>
-        <Routes>
-          <Route index element={<Navigate to="/launchpad" replace />} />
-          <Route path="/launchpad" element={<Launchpad />} />
-          <Route path="/fast-track" element={<PlaceholderSurface name="Fast Track" />} />
-          <Route path="/opportunities" element={<OpportunitiesList />} />
-          <Route path="/opp/:notice_id" element={<OpportunitiesList />} />
-          <Route path="/capture" element={<CaptureList />} />
-          <Route path="/capture/:opp_id" element={<CaptureDetail />} />
-          <Route path="/pipeline" element={<PipelineSurface />} />
-          <Route path="/action-items" element={<ActionItemsList />} />
-          <Route path="/settings/*" element={<PlaceholderSurface name="Settings" />} />
-        </Routes>
-      </MainCanvas>
-    </AppShell>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="*"
+        element={
+          <RequireAuth>
+            <AppShell>
+              <LeftRail collapsed={!sidebarOpen} onToggle={toggleSidebar} />
+              <MainCanvas>
+                <Routes>
+                  <Route index element={<Navigate to="/launchpad" replace />} />
+                  <Route path="/launchpad" element={<Launchpad />} />
+                  <Route path="/fast-track" element={<PlaceholderSurface name="Fast Track" />} />
+                  <Route path="/opportunities" element={<OpportunitiesList />} />
+                  <Route path="/opp/:notice_id" element={<OpportunitiesList />} />
+                  <Route path="/capture" element={<CaptureList />} />
+                  <Route path="/capture/:opp_id" element={<CaptureDetail />} />
+                  <Route path="/pipeline" element={<PipelineSurface />} />
+                  <Route path="/action-items" element={<ActionItemsList />} />
+                  <Route path="/settings/*" element={<PlaceholderSurface name="Settings" />} />
+                </Routes>
+              </MainCanvas>
+            </AppShell>
+          </RequireAuth>
+        }
+      />
+    </Routes>
   );
 }
