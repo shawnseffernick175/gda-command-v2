@@ -123,16 +123,19 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
       try {
         const decoded = JSON.parse(
           Buffer.from(filters.cursor, 'base64').toString('utf-8'),
-        ) as { id: number };
-        conditions.push(`a.id < $${paramIdx++}`);
+        ) as { award_date: string; id: number };
+        conditions.push(`(a.award_date < $${paramIdx} OR (a.award_date = $${paramIdx} AND a.id < $${paramIdx + 1}))`);
+        params.push(decoded.award_date);
+        paramIdx++;
         params.push(decoded.id);
+        paramIdx++;
       } catch {
         // invalid cursor, ignore
       }
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
-    const sql = `SELECT a.id, a.piid, a.awardee_name, a.agency_name, a.contract_type, a.value_obligated, a.award_date, a.fpds_url, a.data_source, s.kind AS source_kind, s.title AS source_title, s.url AS source_url, s.retrieved_at AS source_retrieved_at FROM awards a LEFT JOIN sources s ON s.id = a.source_id ${where} ORDER BY a.id DESC LIMIT $${paramIdx}`;
+    const sql = `SELECT a.id, a.piid, a.awardee_name, a.agency_name, a.contract_type, a.value_obligated, a.award_date, a.fpds_url, a.data_source, s.kind AS source_kind, s.title AS source_title, s.url AS source_url, s.retrieved_at AS source_retrieved_at FROM awards a LEFT JOIN sources s ON s.id = a.source_id ${where} ORDER BY a.award_date DESC, a.id DESC LIMIT $${paramIdx}`;
     params.push(filters.limit + 1);
 
     const res = await pool.query<AwardRow>(sql, params);
@@ -144,7 +147,7 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
     let nextCursor: string | null = null;
     if (hasMore && items.length > 0) {
       const lastItem = items[items.length - 1]!;
-      nextCursor = Buffer.from(JSON.stringify({ id: Number(lastItem.id) })).toString('base64');
+      nextCursor = Buffer.from(JSON.stringify({ award_date: lastItem.award_date, id: Number(lastItem.id) })).toString('base64');
     }
 
     return reply.status(200).send(

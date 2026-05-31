@@ -1,6 +1,7 @@
-import type { AwardListFilters, AwardsListResponse, SuccessEnvelope } from './types';
+import { apiFetch } from '../../lib/api-client';
+import type { AwardListFilters, AwardsListResponse } from './types';
 
-const API_BASE = '/v3/awards';
+const API_PATH = '/v3/awards';
 
 function buildQueryString(filters: AwardListFilters): string {
   const params = new URLSearchParams();
@@ -15,18 +16,11 @@ function buildQueryString(filters: AwardListFilters): string {
 
 export async function fetchAwards(filters: AwardListFilters): Promise<AwardsListResponse> {
   const qs = buildQueryString(filters);
-  const url = qs ? `${API_BASE}?${qs}` : API_BASE;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch awards: ${res.status}`);
-  }
-  const envelope = (await res.json()) as SuccessEnvelope<AwardsListResponse>;
-  return envelope.data;
+  const path = qs ? `${API_PATH}?${qs}` : API_PATH;
+  return apiFetch<AwardsListResponse>(path);
 }
 
 export async function fetchAwardsCount(): Promise<number> {
-  const res = await fetch(`${API_BASE}/count`);
-  if (!res.ok) return 0;
-  const envelope = (await res.json()) as SuccessEnvelope<{ count: number }>;
-  return envelope.data.count;
+  const data = await apiFetch<{ count: number }>(`${API_PATH}/count`);
+  return data.count;
 }

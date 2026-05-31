@@ -35,12 +35,4 @@ export interface AwardsListResponse {
   next_cursor: string | null;
 }
 
-export interface SuccessEnvelope<T> {
-  success: true;
-  data: T;
-  meta: {
-    generatedAt: string;
-    source: string;
-    requestId: string;
-  };
-}
+
