@@ -60,8 +60,9 @@ async function ensureTestSchema(): Promise<void> {
         await client.query(sql);
       } catch {
         // Migration may fail if prerequisite tables already exist from
-        // other test suites sharing the CI database. Fall through to
-        // verify the required tables exist with correct constraints.
+        // other test suites sharing the CI database. Clean up any
+        // aborted transaction state before continuing.
+        try { await client.query('ROLLBACK'); } catch { /* no active tx */ }
       }
     }
 
