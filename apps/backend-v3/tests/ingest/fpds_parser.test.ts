@@ -34,6 +34,8 @@ describe('parseFPDSPage', () => {
     expect(r.solicitationId).toBe('W912DY-26-R-0001');
     expect(r.placeOfPerformanceState).toBe('NC');
     expect(r.placeOfPerformanceCountry).toBe('USA');
+    // lastModDate comes from ATOM <modified>, NOT contract dates
+    expect(r.lastModDate).toBe('2026-05-28');
   });
 
   it('parses an IDV vehicle entry', () => {
@@ -57,6 +59,7 @@ describe('parseFPDSPage', () => {
     expect(records).toHaveLength(1);
     expect(records[0].setAside).toBe('HUBZone Set-Aside');
     expect(records[0].piid).toBe('FA860126C0015');
+    expect(records[0].lastModDate).toBe('2026-05-26');
   });
 
   it('handles blank UEI gracefully', () => {
@@ -79,6 +82,7 @@ describe('parseFPDSPage', () => {
     expect(r.piid).toBe('W912DY26C0042');
     expect(r.obligatedAmount).toBe(6500000);
     expect(r.signedDate).toBe('2026-05-29');
+    expect(r.lastModDate).toBe('2026-05-30');
   });
 
   it('returns empty array for empty feed', () => {
@@ -93,5 +97,15 @@ describe('parseFPDSPage', () => {
     </feed>`;
     const records = parseFPDSPage(xml);
     expect(records).toHaveLength(0);
+  });
+
+  it('uses ATOM modified date, not contract completion date, for lastModDate', () => {
+    const xml = loadFixture('standard_award.xml');
+    const records = parseFPDSPage(xml);
+    const r = records[0];
+    // ATOM <modified> is 2026-05-28; contract <currentCompletionDate> is 2027-05-14
+    // Parser must use the ATOM date for idempotency
+    expect(r.lastModDate).toBe('2026-05-28');
+    expect(r.lastModDate).not.toBe('2027-05-14');
   });
 });

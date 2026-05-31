@@ -37,7 +37,7 @@ CREATE TABLE awards (
   updated_at                    TIMESTAMPTZ     DEFAULT now()
 );
 
-CREATE UNIQUE INDEX awards_piid_modnum_unique ON awards(piid, last_mod_date);
+CREATE UNIQUE INDEX awards_piid_modnum_unique ON awards(piid, last_mod_date) NULLS NOT DISTINCT;
 CREATE INDEX awards_awardee_uei_idx ON awards(awardee_uei);
 CREATE INDEX awards_naics_idx ON awards(naics);
 CREATE INDEX awards_award_date_idx ON awards(award_date DESC);

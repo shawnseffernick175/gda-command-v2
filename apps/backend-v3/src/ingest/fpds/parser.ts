@@ -103,15 +103,13 @@ function extractAward(content: Record<string, unknown>): FPDSAwardRaw | null {
     awardeeDUNS: text(vendorSiteDetails?.['DUNSNumber']),
     obligatedAmount: num(dollars?.['obligatedAmount']),
     baseAndAllOptionsValue: num(dollars?.['baseAndAllOptionsValue']),
-    naicsCode: text(contractData?.['nationalInterestActionCode']) === null
-      ? text(contractData?.['NAICS'] ?? (contractData?.['NAICSCode'] as Record<string, unknown> | undefined)?.['@_code'])
-      : text(contractData?.['NAICS'] ?? (contractData?.['NAICSCode'] as Record<string, unknown> | undefined)?.['@_code']),
+    naicsCode: text(contractData?.['NAICS'] ?? (contractData?.['NAICSCode'] as Record<string, unknown> | undefined)?.['@_code']),
     pscCode: text(productOrServiceInfo?.['productOrServiceCode'] ?? (productOrServiceInfo?.['productOrServiceCode'] as Record<string, unknown> | undefined)?.['@_code']),
     setAside: attrDesc(competition?.['typeOfSetAside']),
     placeOfPerformanceState: text(popAddress?.['stateCode'] ?? (popAddress?.['stateCode'] as Record<string, unknown> | undefined)?.['@_name']),
     placeOfPerformanceCountry: text(popAddress?.['countryCode'] ?? (popAddress?.['countryCode'] as Record<string, unknown> | undefined)?.['@_name']),
     signedDate: text(dates?.['signedDate']),
-    lastModDate: text(dates?.['lastDateToOrder'] ?? dates?.['currentCompletionDate']),
+    lastModDate: null,
     contractType: attrDesc(contractData?.['typeOfContractPricing']),
     parentAwardId: text(referencedIdvId?.['PIID']),
     solicitationId: text(contractData?.['solicitationID']),
@@ -148,12 +146,10 @@ export function parseFPDSPage(xml: string): FPDSAwardRaw[] {
       if (!record) continue;
 
       record.fpdsUrl = linkHref;
-      // Use lastModifiedDate from the entry if available and our extraction missed it
-      if (!record.lastModDate) {
-        const lastMod = text(entryObj['modified'] ?? entryObj['updated']);
-        if (lastMod) {
-          record.lastModDate = lastMod.slice(0, 10);
-        }
+      // ATOM entry modification date is the canonical last-mod timestamp
+      const lastMod = text(entryObj['modified'] ?? entryObj['updated']);
+      if (lastMod) {
+        record.lastModDate = lastMod.slice(0, 10);
       }
 
       results.push(record);
