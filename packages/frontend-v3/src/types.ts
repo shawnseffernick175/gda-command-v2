@@ -315,7 +315,7 @@ export interface SidebarNavItemProps {
   label: string;
   href: string;
   active?: boolean;
-  badge?: number;
+  badge?: number | undefined;
   collapsed?: boolean;
 }
 
