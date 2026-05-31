@@ -84,6 +84,7 @@ export interface ActionItemUpdatePayload {
   due_date?: string | null;
   linked_record_type?: string | null;
   linked_record_id?: string | null;
+  suggestedResponse?: string;
   force?: boolean;
 }
 

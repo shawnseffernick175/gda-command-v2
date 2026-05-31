@@ -32,8 +32,9 @@ BEGIN
     RAISE NOTICE 'F-020: role "%" already exists (idempotent)', runtime;
   END IF;
 
-  -- 2. Grant CONNECT on the database
-  EXECUTE format('GRANT CONNECT ON DATABASE %I TO %I', dbname, runtime);
+  -- 2. Grant CONNECT + CREATE on the database
+  -- CREATE is required for pg-boss to self-bootstrap the pgboss schema (F-220.1).
+  EXECUTE format('GRANT CONNECT, CREATE ON DATABASE %I TO %I', dbname, runtime);
 
   -- 3. Grant schema usage
   EXECUTE format('GRANT USAGE ON SCHEMA public TO %I', runtime);
@@ -80,6 +81,21 @@ BEGIN
       'GRANT EXECUTE ON FUNCTIONS TO %I', runtime);
     ALTER ROLE gda_app NOCREATEDB;
     RAISE NOTICE 'F-020: default privileges configured for gda_app → %', runtime;
+  END IF;
+
+  -- 9. Grant full access to pgboss schema (created by pg-boss at runtime, F-220.1)
+  -- The schema may not exist yet; guard with IF EXISTS.
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'pgboss') THEN
+    EXECUTE format('GRANT USAGE ON SCHEMA pgboss TO %I', runtime);
+    EXECUTE format(
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA pgboss TO %I',
+      runtime);
+    EXECUTE format(
+      'GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA pgboss TO %I',
+      runtime);
+    RAISE NOTICE 'F-020: pgboss schema privileges granted to "%"', runtime;
+  ELSE
+    RAISE NOTICE 'F-020: pgboss schema does not exist yet (will be created on V3 boot)';
   END IF;
 
   RAISE NOTICE 'F-020: runtime role "%" is ready', runtime;

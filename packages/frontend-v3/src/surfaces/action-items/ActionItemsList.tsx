@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { DataTable, Button, EmptyState, ErrorState, Select } from '../../components';
+import { DataTable, Button, EmptyState, ErrorState, Select, SourceUrlChip } from '../../components';
 import type { TableColumn } from '../../types';
 import type { ActionItem, ActionItemStatus, ActionItemFilters, SortField, SortDir } from './types';
 import { StatusChip } from './components/StatusChip';
@@ -112,7 +112,18 @@ export function ActionItemsList() {
       key: 'title',
       header: 'Title',
       sortable: true,
-      render: (row) => <span className="text-sm text-ink-primary font-medium">{row.title}</span>,
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          <span className="text-sm text-ink-primary font-medium">{row.title}</span>
+          {row.title_sources.length > 0 && (
+            <SourceUrlChip
+              url={row.title_sources[0]!.url}
+              source_kind={row.title_sources[0]!.kind as 'sam_gov' | 'fpds' | 'usaspending' | 'govwin' | 'news' | 'doctrine' | 'partner_site' | 'internal'}
+              retrieved_at={row.title_sources[0]!.retrieved_at}
+            />
+          )}
+        </div>
+      ),
     },
     {
       key: 'source',
@@ -219,6 +230,7 @@ export function ActionItemsList() {
       )}
 
       <ActionItemDetailDrawer
+        key={selectedItem?.id}
         item={selectedItem}
         open={selectedItem !== null}
         onClose={() => setSelectedItem(null)}

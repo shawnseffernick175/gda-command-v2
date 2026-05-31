@@ -9,6 +9,7 @@ export const QUEUE_NAMES = {
   INGEST_POSTPROCESS: 'ingest-postprocess',
   ANALYSIS_PERIODIC_REFRESH: 'analysis-periodic-refresh',
   ANALYSIS_MODEL_VERSION_SWEEP: 'analysis-model-version-sweep',
+  ANALYSIS_FAST_TRACK: 'analysis-fast-track',
 } as const;
 
 /**

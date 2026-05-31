@@ -617,7 +617,7 @@ The following migration files in `db/v3/migrations/` materialize this schema:
 | `v3_001_initial.sql` | Core tables: `sources`, `users`, `opportunities`, `pipeline_items`, `captures`, `compliance_items`, `action_items`, `action_item_drafts`, `partners`, `teaming_attachments`, `launchpad_flags`, `audit_log` + all indexes (§2.1–§2.12) |
 | `v3_002_analysis_cache.sql` | R2 contract: `opportunity_analysis_cache`, `capture_analysis_cache` (Addendum A) |
 | `v3_003_source_siblings.sql` | R1 per-field source join tables for analysis and opportunity data fields (F-202 OpenAPI spec) |
-| `v3_004_pgboss_bootstrap.sql` | pg-boss `pgboss` schema + `analysis_jobs` table + queue seeding (Addendum A.4) |
+| `v3_004_pgboss_bootstrap.sql` | `analysis_jobs` table (pg-boss companion). pg-boss schema is self-managed at runtime via `boss.start()` — see `db/v3/README.md` (Strategy B, F-220.1) |
 
 CI enforcement: `.github/workflows/v3-schema-drift.yml` runs the drift detector (`scripts/v3-schema-diff.ts`) on every PR to ensure the live schema matches this document.
 

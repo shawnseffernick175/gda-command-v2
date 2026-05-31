@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Inspector, Select, Button } from '../../components';
-import type { ActionItem, ActionItemStatus } from './types';
+import { Inspector, Select, Button, SourceUrlChip } from '../../components';
+import type { ActionItem, ActionItemStatus, SourceRef } from './types';
 import { StatusChip } from './components/StatusChip';
 import { SourceChip } from './components/SourceChip';
 import { SourceLink } from './components/SourceLink';
@@ -28,6 +28,18 @@ function formatDate(iso: string | null): string {
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+function SourceRefs({ sources }: { sources: SourceRef[] }) {
+  if (!sources.length) return null;
+  const s = sources[0]!;
+  return (
+    <SourceUrlChip
+      url={s.url}
+      source_kind={s.kind as 'sam_gov' | 'fpds' | 'usaspending' | 'govwin' | 'news' | 'doctrine' | 'partner_site' | 'internal'}
+      retrieved_at={s.retrieved_at}
+    />
+  );
 }
 
 export function ActionItemDetailDrawer({ item, open, onClose }: ActionItemDetailDrawerProps) {
@@ -66,9 +78,15 @@ export function ActionItemDetailDrawer({ item, open, onClose }: ActionItemDetail
       <Inspector open={open} onClose={onClose} title="Action Item Detail">
         <div className="flex flex-col gap-6" data-testid="action-item-detail">
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-ink-primary">{item.title}</h3>
+            <div className="flex items-center gap-1">
+              <h3 className="text-sm font-semibold text-ink-primary">{item.title}</h3>
+              <SourceRefs sources={item.title_sources} />
+            </div>
             {item.detail && (
-              <p className="text-sm text-ink-muted">{item.detail}</p>
+              <div className="flex items-center gap-1">
+                <p className="text-sm text-ink-muted">{item.detail}</p>
+                <SourceRefs sources={item.detail_sources} />
+              </div>
             )}
           </div>
 
@@ -92,10 +110,12 @@ export function ActionItemDetailDrawer({ item, open, onClose }: ActionItemDetail
             <div className="flex items-center gap-2">
               <span className="text-xs text-ink-muted w-20">Owner</span>
               <span className="text-sm text-ink-primary">{item.owner}</span>
+              <SourceRefs sources={item.owner_sources} />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-ink-muted w-20">Due</span>
               <span className="text-sm text-ink-primary">{formatDate(item.due_date)}</span>
+              <SourceRefs sources={item.due_date_sources} />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-ink-muted w-20">Created</span>

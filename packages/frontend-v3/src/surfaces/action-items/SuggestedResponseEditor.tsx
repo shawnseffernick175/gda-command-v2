@@ -23,8 +23,10 @@ export function SuggestedResponseEditor({ item, draft }: SuggestedResponseEditor
   };
 
   const handleSave = () => {
-    updateMutation.mutate({ id: item.id, payload: {} });
-    setDirty(false);
+    updateMutation.mutate(
+      { id: item.id, payload: { suggestedResponse: text } },
+      { onSuccess: () => setDirty(false) },
+    );
   };
 
   const handleUseResponse = async () => {
