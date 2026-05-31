@@ -31,10 +31,12 @@ beforeAll(async () => {
   const dbUrl = getDbUrl();
   pool = new Pool({ connectionString: dbUrl, max: 5 });
 
+  // getApp() must run before initBoss() so that process.env['JWT_SECRET']
+  // is set before queue.ts imports config (config reads env at import time).
+  app = await getApp();
+
   const { initBoss } = await import('../../src/lib/queue.js');
   boss = await initBoss();
-
-  app = await getApp();
 }, 120_000);
 
 afterAll(async () => {

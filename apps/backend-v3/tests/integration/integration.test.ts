@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import pg from 'pg';
 import type PgBoss from 'pg-boss';
 import type { FastifyInstance } from 'fastify';
-import { getDbUrl, authHeader, getApp, closeApp } from './helpers.js';
+import { getDbUrl, authHeader, getApp, closeApp, WEBHOOK_KEY } from './helpers.js';
 
 const { Pool } = pg;
 
@@ -48,10 +48,12 @@ beforeAll(async () => {
   const dbUrl = getDbUrl();
   pool = new Pool({ connectionString: dbUrl, max: 5 });
 
+  // getApp() must run before initBoss() so that process.env['JWT_SECRET']
+  // is set before queue.ts imports config (config reads env at import time).
+  app = await getApp();
+
   const { initBoss } = await import('../../src/lib/queue.js');
   boss = await initBoss();
-
-  app = await getApp();
 }, 120_000);
 
 afterAll(async () => {
@@ -259,7 +261,7 @@ describe('Integration: pre-warm triggers', () => {
       url: '/v3/webhooks/sam-opportunity',
       headers: {
         'content-type': 'application/json',
-        'x-gda-key': 'test-webhook-key',
+        'x-gda-key': WEBHOOK_KEY,
       },
       payload: JSON.stringify({
         title: 'Test SAM Webhook Opp',
