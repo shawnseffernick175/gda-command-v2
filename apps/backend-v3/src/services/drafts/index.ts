@@ -4,7 +4,8 @@ import { logger } from '../../lib/logger.js';
 import type { ActionItemRow } from '../action-items/index.js';
 
 export type DraftKind = 'reply' | 'research' | 'milestone';
-export type DraftStatus = 'generating' | 'done' | 'failed';
+export type DraftDbStatus = 'pending' | 'approved' | 'rejected';
+export type DraftLifecycleStatus = 'generating' | 'done' | 'failed';
 
 export interface DraftRow {
   id: number;
@@ -14,8 +15,8 @@ export interface DraftRow {
   model_used: string | null;
   approved_by: string | null;
   approved_at: string | null;
-  source_id: number | null;
-  status: DraftStatus;
+  source_id: number;
+  status: DraftDbStatus;
   created_at: string;
 }
 
@@ -36,10 +37,10 @@ export async function requestDraft(
   kind: DraftKind
 ): Promise<DraftRow> {
   const res = await pool.query<DraftRow>(
-    `INSERT INTO action_item_drafts (action_item_id, kind, status, content, created_at)
-     VALUES ($1, $2, 'generating', '', NOW())
+    `INSERT INTO action_item_drafts (action_item_id, kind, status, content, source_id, created_at)
+     VALUES ($1, $2, 'pending', '', $3, NOW())
      RETURNING *`,
-    [actionItem.id, kind]
+    [actionItem.id, kind, actionItem.source_id]
   );
 
   const draft = res.rows[0]!;
@@ -100,6 +101,12 @@ export function buildDraftSources(kind: DraftKind): object[] {
   ];
 }
 
+export function lifecycleStatus(row: DraftRow): DraftLifecycleStatus {
+  if (row.status === 'rejected') return 'failed';
+  if (row.content && row.content.length > 0) return 'done';
+  return 'generating';
+}
+
 export function toDraftApiShape(row: DraftRow): object {
   return {
     id: row.id,
@@ -107,7 +114,7 @@ export function toDraftApiShape(row: DraftRow): object {
     kind: row.kind,
     content: row.content,
     model_used: row.model_used,
-    status: row.status === 'generating' ? 'generating' : row.status === 'done' ? 'approved' : 'rejected',
+    status: lifecycleStatus(row),
     created_at: row.created_at,
   };
 }

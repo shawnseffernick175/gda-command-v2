@@ -662,7 +662,7 @@ async function handleIngestPostprocess(jobs: PgBoss.Job<Record<string, unknown>>
       if (!actionItem) {
         logger.warn({ actionItemId: draftData.actionItemId }, 'Action item not found for draft');
         await pool.query(
-          `UPDATE action_item_drafts SET status = 'failed' WHERE id = $1`,
+          `UPDATE action_item_drafts SET status = 'rejected' WHERE id = $1`,
           [draftData.draftId]
         );
         continue;
@@ -673,7 +673,6 @@ async function handleIngestPostprocess(jobs: PgBoss.Job<Record<string, unknown>>
       await pool.query(
         `UPDATE action_item_drafts
          SET content    = $1,
-             status     = 'done',
              model_used = $2
          WHERE id = $3`,
         [draftText, 'stub', draftData.draftId]
