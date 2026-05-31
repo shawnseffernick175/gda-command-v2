@@ -170,9 +170,7 @@ async function upsertSBIRTopic(
         topic.branch,
         topic.title,
         topic.description,
-        topic.technology_areas.length > 0
-          ? `{${topic.technology_areas.map((a) => `"${a.replace(/"/g, '\\"')}"`).join(',')}}`
-          : '{}',
+        topic.technology_areas,
         topic.open_date,
         topic.close_date,
         topic.pre_release_date,
