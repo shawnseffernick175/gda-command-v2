@@ -377,8 +377,8 @@ function compareSchemas(
       if (!liveFkDefs.has(fk)) {
         drift.push({
           kind: 'missing_fk',
-          table: tableName,
-          detail: `Foreign key \`${fk}\` missing from \`${tableName}\``,
+          table: docTableName,
+          detail: `Foreign key \`${fk}\` missing from \`${docTableName}\``,
         });
       }
     }
