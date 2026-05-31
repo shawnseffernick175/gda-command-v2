@@ -28,7 +28,7 @@ export function Dialog({ open, onClose, title, size = 'md', children, footer }: 
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 id="dialog-title" className="text-md font-semibold text-ink-primary">{title}</h2>
-          <button type="button" className="text-ink-muted hover:text-ink-primary text-lg" onClick={onClose} aria-label="Close">&times;</button>
+          <button type="button" className="text-ink-muted hover:text-ink-primary text-lg" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="px-6 py-4">{children}</div>
         {footer && <div className="flex justify-end gap-2 px-6 py-4 border-t border-border">{footer}</div>}

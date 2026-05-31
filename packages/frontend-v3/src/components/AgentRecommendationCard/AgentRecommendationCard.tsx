@@ -35,7 +35,7 @@ export function AgentRecommendationCard({
         </span>
       </div>
 
-      <p className="text-sm text-ink-primary mb-4">&ldquo;{recommendation}&rdquo;</p>
+      <p className="text-sm text-ink-primary mb-4">{'\u201C'}{recommendation}{'\u201D'}</p>
 
       {sources.length > 0 && (
         <div className="mb-4">

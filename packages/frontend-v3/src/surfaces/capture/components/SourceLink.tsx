@@ -18,7 +18,7 @@ export function SourceLink({ sources }: SourceLinkProps) {
       title={primary.title}
     >
       <span className="text-ink-muted">{primary.kind}</span>
-      <span className="text-ink-dim">&rarr;</span>
+      <span className="text-ink-dim">→</span>
     </a>
   );
 }

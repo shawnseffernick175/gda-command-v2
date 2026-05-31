@@ -44,7 +44,7 @@ export function Inspector({ open, onClose, title, children, defaultWidth = 400 }
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="text-sm font-semibold text-ink-primary">{title}</h3>
-          <button type="button" className="text-ink-muted hover:text-ink-primary" onClick={onClose} aria-label="Close inspector">&times;</button>
+          <button type="button" className="text-ink-muted hover:text-ink-primary" onClick={onClose} aria-label="Close inspector">×</button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
       </div>

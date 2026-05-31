@@ -193,8 +193,8 @@ export function FlagsPanel({ data, isLoading, isError, error, refetch }: FlagsPa
 
       {data.flags.length === 0 ? (
         <div className="flex items-center gap-2 py-6 justify-center text-sm text-ink-muted">
-          <span aria-hidden="true">&check;</span>
-          <span>All clear &mdash; no open flags.</span>
+          <span aria-hidden="true">✓</span>
+          <span>All clear — no open flags.</span>
         </div>
       ) : (
         <ul className="list-none p-0 m-0" aria-label="Launchpad flags">

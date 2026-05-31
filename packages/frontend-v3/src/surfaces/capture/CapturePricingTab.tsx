@@ -100,7 +100,7 @@ export function CapturePricingTab({ capture }: CapturePricingTabProps) {
                 data-testid="data-point-benchmark-band"
                 className="text-sm text-ink-primary hover:text-accent transition-colors"
               >
-                ${pricing.benchmark_band_low.toLocaleString()} &ndash; ${pricing.benchmark_band_high.toLocaleString()}
+                ${pricing.benchmark_band_low.toLocaleString()} – ${pricing.benchmark_band_high.toLocaleString()}
               </a>
               <SourceLink sources={pricing.benchmark_sources ?? []} />
             </span>

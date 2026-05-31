@@ -102,7 +102,7 @@ export function TeamingEditor({
                   className="ml-2 text-xs text-ink-muted hover:text-accent"
                   data-source-url={p.source_url}
                 >
-                  source &rarr;
+                  source →
                 </a>
               )}
             </span>
@@ -113,7 +113,7 @@ export function TeamingEditor({
               aria-label={`Remove ${p.name}`}
               disabled={disabled}
             >
-              &times;
+              ×
             </button>
           </div>
         ))}

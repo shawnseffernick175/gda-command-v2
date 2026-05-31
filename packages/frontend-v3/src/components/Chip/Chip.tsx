@@ -25,7 +25,7 @@ export function Chip({ label, variant = 'default', level, status, sourceUrl, onR
     return (
       <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className={`${base} border-border bg-surface-raised text-ink-primary hover:text-accent transition-colors`}>
         {label}
-        <span className="text-ink-dim">&rarr;</span>
+        <span className="text-ink-dim">→</span>
       </a>
     );
   }
@@ -36,7 +36,7 @@ export function Chip({ label, variant = 'default', level, status, sourceUrl, onR
       {label}
       {onRemove && (
         <button type="button" className="ml-1 text-ink-dim hover:text-ink-primary" onClick={(e) => { e.stopPropagation(); onRemove(); }} aria-label={`Remove ${label}`}>
-          &times;
+          ×
         </button>
       )}
     </Tag>
