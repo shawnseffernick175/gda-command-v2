@@ -80,7 +80,7 @@ export function CaptureDetail() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Agency</span>
-          <span className="text-sm text-ink-primary" data-source-url={capture.source_url}>{capture.agency}</span>
+          <a href={capture.source_url} target="_blank" rel="noopener noreferrer" className="text-sm text-ink-primary hover:text-accent transition-colors" data-source-url={capture.source_url}>{capture.agency}</a>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Response Date</span>

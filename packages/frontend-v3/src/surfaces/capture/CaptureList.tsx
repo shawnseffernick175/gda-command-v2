@@ -58,14 +58,14 @@ export function CaptureList() {
       header: 'Agency',
       sortable: true,
       width: 160,
-      render: (row) => <span className="text-ink-muted">{row.agency}</span>,
+      render: (row) => <a href={row.source_url} target="_blank" rel="noopener noreferrer" data-source-url={row.source_url} className="text-ink-muted hover:text-accent transition-colors">{row.agency}</a>,
     },
     {
       key: 'response_date',
       header: 'Response Date',
       sortable: true,
       width: 140,
-      render: (row) => formatDate(row.response_date),
+      render: (row) => <a href={row.source_url} target="_blank" rel="noopener noreferrer" data-source-url={row.source_url} className="hover:text-accent transition-colors">{formatDate(row.response_date)}</a>,
     },
     {
       key: 'color_review_phase',
@@ -107,7 +107,7 @@ export function CaptureList() {
       sortable: true,
       width: 140,
       render: (row) => (
-        <span className="text-ink-muted">{formatDate(row.last_analyzed)}</span>
+        <a href={row.source_url} target="_blank" rel="noopener noreferrer" data-source-url={row.source_url} className="text-ink-muted hover:text-accent transition-colors">{formatDate(row.last_analyzed)}</a>
       ),
     },
     {
