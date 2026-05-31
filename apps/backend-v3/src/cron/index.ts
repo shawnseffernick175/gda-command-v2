@@ -22,10 +22,12 @@ import { registerNECOSource } from '../ingest/neco/index.js';
 import { registerUSASpendingSource } from '../ingest/usaspending/index.js';
 import { registerFederalRegisterSource } from '../ingest/federal_register/index.js';
 import { registerSBIRSource } from '../ingest/sbir/index.js';
+import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
+const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
 
 const tasks: ScheduledTask[] = [];
 
@@ -48,6 +50,14 @@ const JOBS: CronJob[] = [
   ...(sbirEnabled
     ? [{ sourceKey: 'sbir.gov', schedule: '45 */12 * * *', label: 'SBIR/STTR awards + open topics (twice daily)' }]
     : []),
+  ...(govtribeEnabled
+    ? [
+        { sourceKey: 'govtribe', schedule: '0 */8 * * *', label: 'GovTribe opps poll (every 8h)' },
+        { sourceKey: 'govtribe.contacts', schedule: '0 9 * * 1', label: 'GovTribe contacts poll (weekly Mon 05:00 ET)' },
+        { sourceKey: 'govtribe.vehicles', schedule: '0 6 1 * *', label: 'GovTribe vehicles poll (monthly)' },
+        { sourceKey: 'govtribe.budget', schedule: '55 3 * * *', label: 'GovTribe budget rollup (nightly 23:55 ET)' },
+      ]
+    : []),
 ];
 
 export function startCronScheduler(): void {
@@ -59,6 +69,7 @@ export function startCronScheduler(): void {
   registerNECOSource();
   registerFederalRegisterSource();
   registerSBIRSource();
+  registerGovTribeSource();
 
   const registeredSources = getRegisteredSources();
   logger.info({ sources: registeredSources }, '[ingest] framework ready');
@@ -94,6 +105,10 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'neco' ? 'neco.6h'
       : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
       : job.sourceKey === 'sbir.gov' ? 'sbir.12h'
+      : job.sourceKey === 'govtribe' ? 'govtribe.opps.8h'
+      : job.sourceKey === 'govtribe.contacts' ? 'govtribe.contacts.weekly'
+      : job.sourceKey === 'govtribe.vehicles' ? 'govtribe.vehicles.monthly'
+      : job.sourceKey === 'govtribe.budget' ? 'govtribe.budget.nightly'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },

@@ -20,6 +20,8 @@ import { fastTrackRoutes } from './routes/fast-track.js';
 import { regulatoryRoutes } from './routes/regulatory.js';
 import { authRoutes } from './routes/auth.js';
 import { adminIngestRoutes } from './routes/admin/ingest.js';
+import { govtribeRoutes } from './routes/govtribe.js';
+import { sentinelRoutes } from './routes/sentinel.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -114,6 +116,8 @@ export async function buildApp() {
   await app.register(soakRoutes);
   await app.register(regulatoryRoutes);
   await app.register(adminIngestRoutes);
+  await app.register(govtribeRoutes);
+  await app.register(sentinelRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });
