@@ -257,6 +257,7 @@ CREATE TABLE pipeline_items (
                                     'qualifying', 'pursuit', 'proposal', 'submitted',
                                     'evaluation', 'won', 'lost'
                                   )),
+  capture_kickoff_at TIMESTAMPTZ,              -- when capture was kicked off for this pipeline item
   source_id         BIGINT        NOT NULL REFERENCES sources(id),
   created_by        BIGINT        REFERENCES users(id),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -295,7 +296,20 @@ CREATE TABLE captures (
                                   CHECK (compliance_status IN ('incomplete', 'partial', 'complete')),
   win_themes        TEXT[],                    -- key win themes for this pursuit
   ghost_team        JSONB,                     -- competitor "black hat" analysis
-  source_id         BIGINT        NOT NULL REFERENCES sources(id),
+  opportunity_id    BIGINT,                    -- FK to opportunity (V3 code path)
+  color_review_stage TEXT         DEFAULT 'white',
+  color_review_notes TEXT,
+  color_review_audit JSONB        NOT NULL DEFAULT '[]',
+  compliance_items  JSONB         NOT NULL DEFAULT '[]',
+  compliance_items_sources JSONB  NOT NULL DEFAULT '[]',
+  pricing_assumptions JSONB,
+  pricing_assumptions_sources JSONB NOT NULL DEFAULT '[]',
+  teaming_worksheet  JSONB,
+  teaming_worksheet_sources JSONB NOT NULL DEFAULT '[]',
+  analysis           JSONB,                    -- inline analysis JSONB for fast reads
+  analysis_version   TEXT,
+  ai_analyzed_at     TIMESTAMPTZ,
+  source_id         BIGINT        REFERENCES sources(id),
   created_by        BIGINT        REFERENCES users(id),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
@@ -356,21 +370,25 @@ CREATE INDEX idx_compliance_source   ON compliance_items (source_id);
 
 ```sql
 CREATE TABLE action_items (
-  id              BIGSERIAL     PRIMARY KEY,
+  id              TEXT          PRIMARY KEY,   -- UUID (V3 uses text UUIDs)
   title           TEXT          NOT NULL,
   body            TEXT,
-  owner_email     TEXT          NOT NULL,      -- individual accountability (not committee)
+  detail          TEXT,                        -- extended detail text
+  owner           TEXT,                        -- owner name (V3 code path)
+  owner_email     TEXT,                        -- individual accountability
   status          TEXT          NOT NULL DEFAULT 'open'
-                                CHECK (status IN ('open', 'done', 'blocked')),
+                                CHECK (status IN ('open', 'in_progress', 'done', 'blocked')),
   priority        TEXT          NOT NULL DEFAULT 'normal'
                                 CHECK (priority IN ('critical', 'high', 'normal', 'low')),
   due_date        TIMESTAMPTZ,
-  origin          TEXT          NOT NULL DEFAULT 'manual'
-                                CHECK (origin IN ('email', 'manual', 'sentinel', 'launchpad', 'n8n')),
+  origin          TEXT          DEFAULT 'manual',
   origin_ref      TEXT,                        -- reference ID from the origin system
+  source          TEXT          DEFAULT 'manual',  -- V3 source discriminator
+  linked_record_type TEXT,                     -- type of linked record (opportunity, capture, etc.)
+  linked_record_id   TEXT,                     -- ID of linked record
   opportunity_id  BIGINT        REFERENCES opportunities(id),
-  partner_context TEXT,                        -- e.g., "ask Angela about SHIELD task order capacity"
-  source_id       BIGINT        NOT NULL REFERENCES sources(id),
+  partner_context TEXT,
+  source_id       BIGINT        REFERENCES sources(id),
   created_by      BIGINT        REFERENCES users(id),
   completed_at    TIMESTAMPTZ,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -403,18 +421,21 @@ CREATE INDEX idx_actions_source      ON action_items (source_id);
 
 ```sql
 CREATE TABLE action_item_drafts (
-  id              BIGSERIAL     PRIMARY KEY,
-  action_item_id  BIGINT        NOT NULL REFERENCES action_items(id) ON DELETE CASCADE,
+  id              TEXT          PRIMARY KEY,   -- UUID (V3 uses text UUIDs)
+  action_item_id  TEXT          NOT NULL,      -- FK to action_items (text id)
   kind            TEXT          NOT NULL
                                 CHECK (kind IN ('reply', 'research', 'milestone')),
   status          TEXT          NOT NULL DEFAULT 'pending'
-                                CHECK (status IN ('pending', 'approved', 'rejected')),
-  content         TEXT          NOT NULL,      -- the LLM-generated draft
+                                CHECK (status IN ('generating', 'done', 'failed', 'pending', 'approved', 'rejected')),
+  content         TEXT,                        -- the LLM-generated draft
+  draft_text      TEXT,                        -- V3 draft text (replaces content)
+  sources         JSONB,                       -- R1 source references for the draft
   model_used      TEXT,                        -- e.g., "gpt-4o", "claude-3.5-sonnet"
   approved_by     BIGINT        REFERENCES users(id),
   approved_at     TIMESTAMPTZ,
-  source_id       BIGINT        NOT NULL REFERENCES sources(id),
-  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  source_id       BIGINT        REFERENCES sources(id),
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ   DEFAULT NOW()
 );
 
 CREATE INDEX idx_drafts_action       ON action_item_drafts (action_item_id);

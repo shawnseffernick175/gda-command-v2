@@ -39,7 +39,8 @@ const TABLE_NAMES = new Set([
   'opportunity_naics_sources',
   'opportunity_set_aside_sources',
   'opportunity_response_due_at_sources',
-  'opportunity_value_sources',
+  'opportunity_value_min_sources',
+  'opportunity_value_max_sources',
 ]);
 
 const KNOWN_ALIASES = new Set([
