@@ -139,16 +139,19 @@ CREATE UNIQUE INDEX sources_legacy_id_uniq ON sources(legacy_id) WHERE legacy_id
 
 ```sql
 CREATE TABLE users (
-  id            BIGSERIAL     PRIMARY KEY,
-  email         TEXT          NOT NULL UNIQUE,
-  display_name  TEXT          NOT NULL,
-  role          TEXT          NOT NULL DEFAULT 'operator'
-                              CHECK (role IN ('admin', 'operator', 'viewer')),
-  is_active     BOOLEAN       NOT NULL DEFAULT TRUE,
-  password_hash TEXT,                          -- bcrypt hash; NULL = SSO-only
-  last_login_at TIMESTAMPTZ,
-  created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+  id                 BIGSERIAL     PRIMARY KEY,
+  email              TEXT          NOT NULL UNIQUE,
+  display_name       TEXT          NOT NULL,
+  role               TEXT          NOT NULL DEFAULT 'operator'
+                                   CHECK (role IN ('admin', 'operator', 'viewer')),
+  is_active          BOOLEAN       NOT NULL DEFAULT TRUE,
+  password_hash      TEXT,                          -- bcrypt hash; NULL = SSO-only
+  failed_login_count INT           NOT NULL DEFAULT 0,
+  locked_until       TIMESTAMPTZ,
+  password_set_at    TIMESTAMPTZ,
+  last_login_at      TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 ```
 
@@ -160,11 +163,39 @@ CREATE TABLE users (
 | `role` | RBAC: `admin` (Shawn — full access), `operator` (daily users), `viewer` (read-only) |
 | `is_active` | Soft-disable without deleting (preserves audit trail) |
 | `password_hash` | bcrypt hash for local auth; NULL when using external SSO |
+| `failed_login_count` | Consecutive failed login attempts; resets on success |
+| `locked_until` | Account lockout expiry (5 failures → 15 min lock) |
+| `password_set_at` | Timestamp when password was last set/changed |
 | `last_login_at` | Session tracking for security audit |
 
 **No indexes beyond PK + unique on email** — small table, full scans are negligible.
 
 **Why this choice:** Legacy `users` table had 8 columns plus role extensions added in migration 019. V3 simplifies to a clean schema with explicit role CHECK constraint (no enum type needed for 3 values). Envision-only means no OU-scoped permissions — just admin/operator/viewer.
+
+### 2.2b `auth_audit` — Authentication event log
+
+```sql
+CREATE TABLE auth_audit (
+  id          BIGSERIAL PRIMARY KEY,
+  user_id     BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  email       TEXT NOT NULL,
+  event       TEXT NOT NULL CHECK (event IN ('login_success','login_failure','lockout','token_refresh','logout')),
+  ip          INET,
+  user_agent  TEXT,
+  request_id  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX auth_audit_user_idx ON auth_audit(user_id, created_at DESC);
+CREATE INDEX auth_audit_email_idx ON auth_audit(email, created_at DESC);
+```
+
+| Column | Purpose |
+|---|---|
+| `user_id` | FK to users; NULL if login attempt for non-existent email |
+| `email` | Email used in auth attempt (always recorded even if user doesn't exist) |
+| `event` | Auth event type for security auditing |
+| `ip` | Client IP address for forensics |
+| `request_id` | Correlation ID for tracing |
 
 ### 2.3 `opportunities` — Envision pursuits
 

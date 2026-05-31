@@ -13,23 +13,18 @@ export const Default: Story = {
   render: () => <TopBar />,
 };
 
-export const WithActions: Story = {
-  render: () => (
-    <TopBar>
-      <button type="button" className="text-sm text-ink-muted hover:text-ink-primary px-2">Help</button>
-      <button type="button" className="text-sm text-ink-muted hover:text-ink-primary px-2">Settings</button>
-      <span className="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-xs font-medium text-ink-primary">JS</span>
-    </TopBar>
-  ),
+export const WithUser: Story = {
+  render: () => {
+    localStorage.setItem('gda_v3_user', JSON.stringify({
+      id: 1, email: 'admin@gda.local', display_name: 'Jane Smith', role: 'admin',
+    }));
+    return <TopBar />;
+  },
 };
 
 export const LightTheme: Story = {
   render: () => {
     document.documentElement.setAttribute('data-theme', 'light');
-    return (
-      <TopBar>
-        <span className="text-sm text-ink-muted">Light Mode</span>
-      </TopBar>
-    );
+    return <TopBar />;
   },
 };
