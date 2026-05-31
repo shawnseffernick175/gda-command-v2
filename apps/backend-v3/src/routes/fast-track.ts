@@ -237,6 +237,12 @@ export async function fastTrackRoutes(app: FastifyInstance): Promise<void> {
       ? new Date(query.since)
       : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+    if (Number.isNaN(since.getTime())) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'since must be a valid ISO-8601 date', req.requestId),
+      );
+    }
+
     const cursor = query.cursor ? String(query.cursor) : null;
 
     let sql: string;
