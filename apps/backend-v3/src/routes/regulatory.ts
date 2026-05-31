@@ -78,9 +78,14 @@ export async function regulatoryRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (cursor) {
-      conditions.push(`id < $${paramIdx}`);
-      params.push(Number(cursor));
-      paramIdx++;
+      const sep = cursor.indexOf('::');
+      if (sep !== -1) {
+        const cursorDate = cursor.substring(0, sep);
+        const cursorId = Number(cursor.substring(sep + 2));
+        conditions.push(`(publication_date, id) < ($${paramIdx}, $${paramIdx + 1})`);
+        params.push(cursorDate, cursorId);
+        paramIdx += 2;
+      }
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -95,7 +100,8 @@ export async function regulatoryRoutes(app: FastifyInstance): Promise<void> {
 
     const hasMore = rows.length > limit;
     const items = (hasMore ? rows.slice(0, limit) : rows).map(rowToItem);
-    const nextCursor = hasMore && items.length > 0 ? String(items[items.length - 1].id) : null;
+    const lastItem = items[items.length - 1];
+    const nextCursor = hasMore && lastItem ? `${lastItem.publication_date}::${lastItem.id}` : null;
 
     return reply.status(200).send(
       successEnvelope(
