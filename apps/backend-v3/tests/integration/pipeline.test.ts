@@ -68,6 +68,14 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await pool.query("DELETE FROM teaming_attachments WHERE reason LIKE 'Pipeline%' OR reason LIKE 'Test%'");
+  await pool.query(`
+    DELETE FROM captures WHERE pipeline_item_id IN (
+      SELECT id FROM pipeline_items WHERE opportunity_id IN (
+        SELECT id FROM opportunities WHERE title LIKE 'Test Pipeline%'
+      )
+    )
+  `);
+  await pool.query("DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE title LIKE 'Test Pipeline%')");
   await pool.query("DELETE FROM pipeline_items WHERE capture_owner LIKE 'test-%'");
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test Pipeline%'");
 });

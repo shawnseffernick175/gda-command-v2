@@ -62,6 +62,14 @@ afterAll(async () => {
 }, 30_000);
 
 beforeEach(async () => {
+  await pool.query(`
+    DELETE FROM captures WHERE pipeline_item_id IN (
+      SELECT id FROM pipeline_items WHERE opportunity_id IN (
+        SELECT id FROM opportunities WHERE title LIKE 'Test %'
+      )
+    )
+  `);
+  await pool.query("DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE title LIKE 'Test %')");
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test %'");
 });
 

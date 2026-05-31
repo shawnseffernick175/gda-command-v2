@@ -159,34 +159,20 @@ jobs:
       - name: V3 backend — build
         working-directory: apps/backend-v3
         run: npx tsc --noEmit
-      - name: V3 backend — auth + contract tests
+      - name: V3 backend — auth tests (unit-level, standalone DB)
         working-directory: apps/backend-v3
         env:
           DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
           JWT_SECRET: ci-jwt-secret
           GDA_WEBHOOK_KEY: ci-webhook-key
           NODE_ENV: test
-        run: npx vitest run tests/auth.test.ts tests/contract.test.ts tests/captures-contract.test.ts tests/f213-cutover-contract.test.ts
-      - name: V3 backend — integration tests
+        run: npx vitest run tests/auth.test.ts
+      - name: V3 backend — contract + integration tests (testcontainer)
         working-directory: apps/backend-v3
         env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
-          JWT_SECRET: ci-jwt-secret
-          GDA_WEBHOOK_KEY: ci-webhook-key
           NODE_ENV: test
-          ANALYSIS_VERSION: v0.0.1-test
-          ANALYSIS_TIMEOUT_MS: "5000"
-          ANALYSIS_POLL_INTERVAL_MS: "50"
-        run: npx vitest run tests/integration.test.ts tests/captures-integration.test.ts
-      - name: V3 backend — pipeline tests
-        working-directory: apps/backend-v3
-        env:
-          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
-          JWT_SECRET: ci-jwt-secret
-          GDA_WEBHOOK_KEY: ci-webhook-key
-          NODE_ENV: test
-          ANALYSIS_VERSION: v0.0.1-test
-        run: npx vitest run tests/pipeline.test.ts
+          LLM_ROUTER_MODE: mock
+        run: npx vitest run --config vitest.integration.config.ts tests/integration/contract.test.ts tests/integration/captures-contract.test.ts tests/integration/f213-cutover-contract.test.ts tests/integration/integration.test.ts tests/integration/captures-integration.test.ts tests/integration/pipeline.test.ts
 
   migration-parity-check:
     name: Migration Parity Check
