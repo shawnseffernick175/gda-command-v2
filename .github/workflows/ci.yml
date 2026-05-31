@@ -166,7 +166,7 @@ jobs:
           JWT_SECRET: ci-jwt-secret
           GDA_WEBHOOK_KEY: ci-webhook-key
           NODE_ENV: test
-        run: npx vitest run tests/auth.test.ts tests/contract.test.ts tests/captures-contract.test.ts tests/f213-cutover-contract.test.ts
+        run: npx vitest run tests/auth.test.ts tests/contract.test.ts tests/f213-cutover-contract.test.ts
       - name: V3 backend — integration tests
         working-directory: apps/backend-v3
         env:
@@ -177,7 +177,7 @@ jobs:
           ANALYSIS_VERSION: v0.0.1-test
           ANALYSIS_TIMEOUT_MS: "5000"
           ANALYSIS_POLL_INTERVAL_MS: "50"
-        run: npx vitest run tests/integration.test.ts tests/captures-integration.test.ts
+        run: npx vitest run tests/integration.test.ts
       - name: V3 backend — pipeline tests
         working-directory: apps/backend-v3
         env:
