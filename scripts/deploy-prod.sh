@@ -73,7 +73,7 @@ fi
 # Show migration plan (informational)
 echo "--- migration plan ---"
 docker run --rm --network gda-command-v2_gda \
-  -e PGPASSWORD="${DB_URL##*:}" \
+  -e PGPASSWORD=unused \
   -v "${DEPLOY_DIR}:/work" -w /work \
   postgres:16-alpine \
   psql "$DB_URL" -c "SELECT filename, applied_at FROM v3_schema_migrations ORDER BY id DESC LIMIT 10;" 2>/dev/null || echo "(no existing migration table — first run)"
@@ -108,6 +108,8 @@ if grep -qE "Applied [0-9]+ V3 migration\(s\) successfully" "$MIGRATE_LOG"; then
   echo "MIGRATE_OK: ${APPLIED_LINE}"
 elif grep -q "V3 schema is up to date" "$MIGRATE_LOG"; then
   echo "MIGRATE_OK: no pending migrations"
+elif grep -q "No V3 migrations found" "$MIGRATE_LOG"; then
+  echo "MIGRATE_OK: no migration files present"
 else
   echo "DEPLOY_FAILED migrate.ts output did not match expected success pattern"
   tail -20 "$MIGRATE_LOG"
