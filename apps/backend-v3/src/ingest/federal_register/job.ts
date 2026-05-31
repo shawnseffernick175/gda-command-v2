@@ -57,16 +57,16 @@ async function upsertRegulatoryNoticeWithSources(
         notice.abstract,
         notice.document_type,
         notice.agency_names.length > 0
-          ? `{${notice.agency_names.map((a) => `"${a.replace(/"/g, '\\"')}"`).join(',')}}`
+          ? `{${notice.agency_names.map((a) => `"${a.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')}}`
           : '{}',
         notice.publication_date,
         notice.effective_date,
         notice.comments_close_date,
         notice.cfr_references.length > 0
-          ? `{${notice.cfr_references.map((r) => `"${r.replace(/"/g, '\\"')}"`).join(',')}}`
+          ? `{${notice.cfr_references.map((r) => `"${r.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')}}`
           : '{}',
         notice.topics.length > 0
-          ? `{${notice.topics.map((t) => `"${t.replace(/"/g, '\\"')}"`).join(',')}}`
+          ? `{${notice.topics.map((t) => `"${t.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')}}`
           : '{}',
         notice.html_url,
         notice.pdf_url,
