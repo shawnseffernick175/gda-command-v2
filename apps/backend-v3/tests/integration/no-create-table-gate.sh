@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# F-232 gate: no CREATE TABLE in integration test files.
+# F-234 gate: no CREATE TABLE in ANY test file.
 # Real migrations are the only schema source.
+# Scans all apps/backend-v3/tests/**/*.test.ts files.
 set -euo pipefail
 
-DIR="$(cd "$(dirname "$0")" && pwd)"
-VIOLATIONS=$(grep -rn 'CREATE TABLE' "$DIR"/*.test.ts --include='*.test.ts' \
+TESTS_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VIOLATIONS=$(grep -rn 'CREATE TABLE' "$TESTS_ROOT" --include='*.test.ts' \
   | grep -v '^\s*//' \
   | grep -v '^\s*\*' \
   | grep -v 'No CREATE TABLE' \
   || true)
 
 if [ -n "$VIOLATIONS" ]; then
-  echo "❌ CREATE TABLE found in integration test files:"
+  echo "❌ CREATE TABLE found in test files:"
   echo "$VIOLATIONS"
   echo ""
   echo "Tests must use the real migration runner (globalSetup → migrate.ts)."
@@ -19,4 +20,4 @@ if [ -n "$VIOLATIONS" ]; then
   exit 1
 fi
 
-echo "✓ No CREATE TABLE in integration tests."
+echo "✓ No CREATE TABLE in any test file."

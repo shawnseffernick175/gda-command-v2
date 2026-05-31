@@ -1,32 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import jwt from 'jsonwebtoken';
+/**
+ * F-234: Fast-track route tests (migrated from tests/routes/).
+ *
+ * No CREATE TABLE — tests use the real migration runner (v3_001–v3_008).
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import pg from 'pg';
 import type { FastifyInstance } from 'fastify';
+import { getDbUrl, authHeader, getApp, closeApp } from './helpers.js';
 
-process.env['JWT_SECRET'] = 'test-jwt-secret';
-process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
-process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
-process.env['NODE_ENV'] = 'test';
-process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
-process.env['ANALYSIS_TIMEOUT_MS'] = '2000';
-process.env['ANALYSIS_POLL_INTERVAL_MS'] = '50';
-
-const DB_URL = process.env['DATABASE_URL'];
 const { Pool } = pg;
-
-const { buildApp } = await import('../../src/app.js');
 
 let app: FastifyInstance;
 let pool: InstanceType<typeof Pool>;
-
-function authHeader(): Record<string, string> {
-  const token = jwt.sign(
-    { sub: 'test-user', email: 'test@gda.local', role: 'admin' },
-    'test-jwt-secret',
-    { algorithm: 'HS256', expiresIn: '1h' },
-  );
-  return { authorization: `Bearer ${token}` };
-}
 
 const validInput = {
   title: 'Army RS3 Task Order',
@@ -37,48 +23,17 @@ const validInput = {
 };
 
 beforeAll(async () => {
-  pool = new Pool({ connectionString: DB_URL, max: 2 });
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS fast_track_assessments (
-        id              BIGSERIAL     PRIMARY KEY,
-        input_hash      TEXT          NOT NULL,
-        title           TEXT          NOT NULL,
-        description     TEXT          NOT NULL,
-        naics_codes     TEXT[]        NOT NULL DEFAULT '{}',
-        set_aside       TEXT,
-        place_of_performance TEXT,
-        grade           TEXT          NOT NULL CHECK (grade IN ('A', 'B', 'C')),
-        rationale       TEXT          NOT NULL,
-        naics_match_score NUMERIC     NOT NULL CHECK (naics_match_score >= 0 AND naics_match_score <= 100),
-        recommended_action TEXT       NOT NULL CHECK (recommended_action IN ('pursue', 'watch', 'skip')),
-        source_chips    JSONB         NOT NULL DEFAULT '[]',
-        model_used      TEXT          NOT NULL,
-        analysis_version TEXT         NOT NULL,
-        generated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        UNIQUE (input_hash, analysis_version)
-      )
-    `);
-    await client.query('DELETE FROM fast_track_assessments');
-  } finally {
-    client.release();
-  }
-  app = await buildApp();
-  await app.ready();
-});
+  const dbUrl = getDbUrl();
+  pool = new Pool({ connectionString: dbUrl, max: 5 });
+  await pool.query('DELETE FROM fast_track_assessments');
+  app = await getApp();
+}, 120_000);
 
 afterAll(async () => {
-  await app.close();
-  const client = await pool.connect();
-  try {
-    await client.query('DELETE FROM fast_track_assessments');
-  } finally {
-    client.release();
-  }
-  await pool.end();
-});
+  await pool.query('DELETE FROM fast_track_assessments');
+  await closeApp();
+  if (pool) await pool.end();
+}, 30_000);
 
 describe('POST /v3/fast-track', () => {
   it('should return 401 without auth', async () => {
@@ -98,7 +53,7 @@ describe('POST /v3/fast-track', () => {
       payload: { ...validInput, title: '' },
     });
     expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { success: boolean; error: { code: string } };
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
@@ -111,7 +66,7 @@ describe('POST /v3/fast-track', () => {
       payload: { ...validInput, naics_codes: ['12345'] },
     });
     expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { error: { code: string } };
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
@@ -123,7 +78,7 @@ describe('POST /v3/fast-track', () => {
       payload: { ...validInput, description: 'x'.repeat(50001) },
     });
     expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { error: { code: string } };
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
@@ -145,9 +100,8 @@ describe('POST /v3/fast-track', () => {
       headers: authHeader(),
       payload: validInput,
     });
-    // Without pg-boss running, no worker writes the row → timeout
     expect(res.statusCode).toBe(503);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { success: boolean; error: { code: string }; meta: { source: string; requestId: string } };
     expect(body.success).toBe(false);
     expect(body.error.code).toBe('ANALYSIS_TIMEOUT');
     expect(body.meta.source).toBe('v3');
@@ -165,7 +119,6 @@ describe('POST /v3/fast-track', () => {
     });
     const inputHash = createHash('sha256').update(canonical).digest('hex');
 
-    // Pre-seed a row
     await pool.query(
       `INSERT INTO fast_track_assessments
          (input_hash, title, description, naics_codes, set_aside, place_of_performance,
@@ -197,7 +150,15 @@ describe('POST /v3/fast-track', () => {
       payload: validInput,
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as {
+      success: boolean;
+      data: {
+        cache_hit: boolean; grade: string; rationale: string;
+        naics_match_score: number; recommended_action: string;
+        source_chips: unknown[]; model_used: string; id: string;
+      };
+      meta: { source: string };
+    };
     expect(body.success).toBe(true);
     expect(body.data.cache_hit).toBe(true);
     expect(body.data.grade).toBe('A');
@@ -205,7 +166,7 @@ describe('POST /v3/fast-track', () => {
     expect(body.data.naics_match_score).toBe(85);
     expect(body.data.recommended_action).toBe('pursue');
     expect(body.data.source_chips).toBeInstanceOf(Array);
-    expect(body.data.source_chips.length).toBeGreaterThan(0);
+    expect((body.data.source_chips as unknown[]).length).toBeGreaterThan(0);
     expect(body.data.model_used).toBe('test-model');
     expect(body.data.id).toBeTruthy();
     expect(body.meta.source).toBe('v3');
@@ -219,16 +180,16 @@ describe('POST /v3/fast-track', () => {
       payload: validInput,
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { data: { cache_hit: boolean } };
     expect(body.data.cache_hit).toBe(true);
   });
 });
 
 describe('GET /v3/fast-track/:id', () => {
   it('should return 200 for existing assessment', async () => {
-    const rows = await pool.query('SELECT id FROM fast_track_assessments LIMIT 1');
+    const rows = await pool.query<{ id: string }>('SELECT id FROM fast_track_assessments LIMIT 1');
     const id = rows.rows[0]?.id;
-    if (!id) return; // skip if no rows
+    if (!id) return;
 
     const res = await app.inject({
       method: 'GET',
@@ -236,7 +197,7 @@ describe('GET /v3/fast-track/:id', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { success: boolean; data: { id: string; grade: string; source_chips: unknown[] } };
     expect(body.success).toBe(true);
     expect(body.data.id).toBe(String(id));
     expect(body.data.grade).toBeTruthy();
@@ -250,7 +211,7 @@ describe('GET /v3/fast-track/:id', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(404);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { error: { code: string } };
     expect(body.error.code).toBe('NOT_FOUND');
   });
 });
@@ -263,7 +224,7 @@ describe('GET /v3/fast-track (list)', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { success: boolean; data: { items: unknown[]; next_cursor: unknown } };
     expect(body.success).toBe(true);
     expect(body.data.items).toBeInstanceOf(Array);
     expect(body.data).toHaveProperty('next_cursor');
@@ -277,7 +238,7 @@ describe('GET /v3/fast-track (list)', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { data: { items: unknown[] } };
     expect(body.data.items).toHaveLength(0);
   });
 
@@ -288,7 +249,7 @@ describe('GET /v3/fast-track (list)', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body) as { data: { items: unknown[] } };
     expect(body.data.items.length).toBeLessThanOrEqual(1);
   });
 });

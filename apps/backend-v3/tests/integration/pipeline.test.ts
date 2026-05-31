@@ -1,138 +1,20 @@
+/**
+ * F-234: Pipeline tests (migrated from tests/).
+ *
+ * No CREATE TABLE — tests use the real migration runner (v3_001–v3_008).
+ */
+
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import jwt from 'jsonwebtoken';
 import pg from 'pg';
 import type PgBoss from 'pg-boss';
 import type { FastifyInstance } from 'fastify';
+import { getDbUrl, authHeader, getApp, closeApp } from './helpers.js';
 
-process.env['JWT_SECRET'] = 'test-jwt-secret';
-process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
-process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
-process.env['NODE_ENV'] = 'test';
-process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
-
-const DB_URL = process.env['DATABASE_URL'];
 const { Pool } = pg;
 
 let pool: InstanceType<typeof Pool>;
 let app: FastifyInstance;
 let boss: PgBoss;
-
-function authHeader(): Record<string, string> {
-  const token = jwt.sign(
-    { sub: 'test-user', email: 'test@gda.local', role: 'admin' },
-    'test-jwt-secret',
-    { algorithm: 'HS256', expiresIn: '1h' },
-  );
-  return { authorization: `Bearer ${token}` };
-}
-
-async function ensureTestSchema(): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS sources (
-        id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, url TEXT, title TEXT,
-        retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), confidence TEXT NOT NULL DEFAULT 'high',
-        meta JSONB NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      INSERT INTO sources (id, kind, title, retrieved_at)
-      VALUES (1, 'internal', 'Test source', NOW()) ON CONFLICT (id) DO NOTHING
-    `);
-    await client.query(`SELECT setval('sources_id_seq', GREATEST((SELECT MAX(id) FROM sources), 1))`);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS opportunities (
-        id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, agency TEXT, sub_agency TEXT,
-        solicitation_number TEXT, sam_notice_id TEXT UNIQUE,
-        status TEXT NOT NULL DEFAULT 'discovery',
-        grade TEXT, grade_evidence TEXT, value_min NUMERIC, value_max NUMERIC,
-        naics TEXT, psc TEXT, set_aside TEXT, place_of_performance TEXT,
-        response_due_at TIMESTAMPTZ, posted_at TIMESTAMPTZ, incumbent TEXT,
-        incumbent_confidence TEXT, incumbent_source TEXT, description TEXT,
-        tags TEXT[] NOT NULL DEFAULT '{}', data_source TEXT NOT NULL DEFAULT 'manual',
-        analysis JSONB, analysis_version TEXT, ai_analyzed_at TIMESTAMPTZ,
-        is_teaming_required BOOLEAN NOT NULL DEFAULT FALSE,
-        source_id BIGINT NOT NULL DEFAULT 1, created_by BIGINT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        deleted_at TIMESTAMPTZ
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS pipeline_items (
-        id BIGSERIAL PRIMARY KEY,
-        opportunity_id BIGINT NOT NULL REFERENCES opportunities(id),
-        capture_owner TEXT NOT NULL,
-        win_probability NUMERIC CHECK (win_probability >= 0 AND win_probability <= 100),
-        win_prob_evidence TEXT,
-        milestone_90day TEXT,
-        estimated_value NUMERIC,
-        stage TEXT NOT NULL DEFAULT 'qualifying',
-        source_id BIGINT NOT NULL REFERENCES sources(id),
-        created_by BIGINT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS partners (
-        id BIGSERIAL PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        anchor_company TEXT NOT NULL,
-        ceo TEXT, hq_location TEXT, founded_year INTEGER,
-        uei TEXT, cage TEXT, duns TEXT,
-        naics_codes TEXT[] NOT NULL DEFAULT '{}',
-        certifications JSONB NOT NULL DEFAULT '[]',
-        vehicles JSONB NOT NULL DEFAULT '[]',
-        capabilities TEXT[],
-        contact_info JSONB NOT NULL DEFAULT '{}',
-        notes TEXT,
-        source_id BIGINT NOT NULL REFERENCES sources(id),
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS teaming_attachments (
-        id BIGSERIAL PRIMARY KEY,
-        opportunity_id BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
-        partner_id BIGINT NOT NULL REFERENCES partners(id),
-        reason TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'subcontractor',
-        status TEXT NOT NULL DEFAULT 'proposed',
-        source_id BIGINT NOT NULL REFERENCES sources(id),
-        created_by BIGINT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (opportunity_id, partner_id)
-      )
-    `);
-
-    // Source sibling tables for R1 compliance
-    const siblingTables = [
-      'opportunity_title_sources',
-      'opportunity_agency_sources',
-      'opportunity_naics_sources',
-      'opportunity_set_aside_sources',
-      'opportunity_response_due_at_sources',
-      'opportunity_value_min_sources',
-      'opportunity_value_max_sources',
-      'opportunity_grade_sources',
-    ];
-    for (const table of siblingTables) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS ${table} (
-          id BIGSERIAL PRIMARY KEY,
-          opportunity_id BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
-          source_id BIGINT NOT NULL REFERENCES sources(id),
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          UNIQUE (opportunity_id, source_id)
-        )
-      `);
-    }
-  } finally {
-    client.release();
-  }
-}
 
 async function insertQualifiedOpportunity(overrides: Record<string, unknown> = {}): Promise<string> {
   const defaults = {
@@ -168,26 +50,34 @@ async function insertSourceSiblings(opportunityId: string): Promise<void> {
 }
 
 beforeAll(async () => {
-  pool = new Pool({ connectionString: DB_URL, max: 5 });
-  await ensureTestSchema();
+  const dbUrl = getDbUrl();
+  pool = new Pool({ connectionString: dbUrl, max: 5 });
 
-  const { initBoss } = await import('../src/lib/queue.js');
+  // getApp() must run before initBoss() so that process.env['JWT_SECRET']
+  // is set before queue.ts imports config (config reads env at import time).
+  app = await getApp();
+
+  const { initBoss } = await import('../../src/lib/queue.js');
   boss = await initBoss();
-
-  const { buildApp } = await import('../src/app.js');
-  app = await buildApp();
-  await app.ready();
-});
+}, 120_000);
 
 afterAll(async () => {
-  await app.close();
-  const { stopBoss } = await import('../src/lib/queue.js');
+  const { stopBoss } = await import('../../src/lib/queue.js');
   await stopBoss();
-  await pool.end();
-});
+  await closeApp();
+  if (pool) await pool.end();
+}, 30_000);
 
 beforeEach(async () => {
   await pool.query("DELETE FROM teaming_attachments WHERE reason LIKE 'Pipeline%' OR reason LIKE 'Test%'");
+  await pool.query(`
+    DELETE FROM captures WHERE pipeline_item_id IN (
+      SELECT id FROM pipeline_items WHERE opportunity_id IN (
+        SELECT id FROM opportunities WHERE title LIKE 'Test Pipeline%'
+      )
+    )
+  `);
+  await pool.query("DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE title LIKE 'Test Pipeline%')");
   await pool.query("DELETE FROM pipeline_items WHERE capture_owner LIKE 'test-%'");
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test Pipeline%'");
 });
@@ -491,8 +381,6 @@ describe('Integration: PATCH non-analysis field does NOT enqueue analysis job', 
     expect(patchBody.success).toBe(true);
     expect(patchBody.data.capture_owner).toBe('test-new-owner');
 
-    // Verify no analysis job was enqueued by checking the opportunity analysis
-    // fields remain unchanged (no analysis queue interaction)
     const oppRes = await pool.query<{ ai_analyzed_at: string | null }>(
       'SELECT ai_analyzed_at FROM opportunities WHERE id = $1',
       [oppId],
@@ -565,13 +453,13 @@ describe('Integration: pipeline list filters', () => {
   });
 });
 
-describe('Forbidden token gate 1', () => {
+describe('Forbidden token gate', () => {
   it('pipeline module does not contain analysis_status or stale tokens', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
 
-    const pipelineDir = path.resolve(import.meta.dirname ?? '.', '..', 'src', 'services', 'pipeline');
-    const routeFile = path.resolve(import.meta.dirname ?? '.', '..', 'src', 'routes', 'pipeline.ts');
+    const pipelineDir = path.resolve(import.meta.dirname, '../../src/services/pipeline');
+    const routeFile = path.resolve(import.meta.dirname, '../../src/routes/pipeline.ts');
 
     const forbidden = ['analysis_status', 'stale: true', 'not_yet_analyzed'];
 

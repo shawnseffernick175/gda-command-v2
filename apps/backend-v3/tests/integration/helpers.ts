@@ -31,9 +31,9 @@ export function getSeedIds(): SeedIds {
   return JSON.parse(readFileSync(filePath, 'utf-8')) as SeedIds;
 }
 
-export function authHeader(): Record<string, string> {
+export function authHeader(sub?: string): Record<string, string> {
   const token = jwt.sign(
-    { sub: 'test-user', email: 'test@gda.local', role: 'admin' },
+    { sub: sub ?? 'test-user', email: 'test@gda.local', role: 'admin' },
     JWT_SECRET,
     { algorithm: 'HS256', expiresIn: '1h' },
   );

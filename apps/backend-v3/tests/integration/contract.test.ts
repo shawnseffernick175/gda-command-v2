@@ -1,129 +1,29 @@
+/**
+ * F-234: Contract tests (migrated from tests/).
+ *
+ * No CREATE TABLE — tests use the real migration runner (v3_001–v3_008).
+ */
+
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import jwt from 'jsonwebtoken';
 import pg from 'pg';
 import type { FastifyInstance } from 'fastify';
-
-process.env['JWT_SECRET'] = 'test-jwt-secret';
-process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
-process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
-process.env['NODE_ENV'] = 'test';
-process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
-
-const DB_URL = process.env['DATABASE_URL'];
+import { getDbUrl, authHeader, getApp, closeApp } from './helpers.js';
 
 const { Pool } = pg;
-const { buildApp } = await import('../src/app.js');
 
 let app: FastifyInstance;
 let pool: InstanceType<typeof Pool>;
 
-function authHeader(): Record<string, string> {
-  const token = jwt.sign(
-    { sub: 'test-user', email: 'test@gda.local', role: 'admin' },
-    'test-jwt-secret',
-    { algorithm: 'HS256', expiresIn: '1h' },
-  );
-  return { authorization: `Bearer ${token}` };
-}
-
 beforeAll(async () => {
-  pool = new Pool({ connectionString: DB_URL, max: 2 });
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS sources (
-        id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, url TEXT, title TEXT,
-        retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), confidence TEXT NOT NULL DEFAULT 'high',
-        meta JSONB NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      INSERT INTO sources (id, kind, title, retrieved_at)
-      VALUES (1, 'internal', 'Test source', NOW()) ON CONFLICT (id) DO NOTHING
-    `);
-    await client.query(`SELECT setval('sources_id_seq', GREATEST((SELECT MAX(id) FROM sources), 1))`);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS opportunities (
-        id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, agency TEXT, sub_agency TEXT,
-        solicitation_number TEXT, sam_notice_id TEXT UNIQUE, status TEXT NOT NULL DEFAULT 'discovery',
-        grade TEXT, grade_evidence TEXT, value_min NUMERIC, value_max NUMERIC,
-        naics TEXT, psc TEXT, set_aside TEXT, place_of_performance TEXT,
-        response_due_at TIMESTAMPTZ, posted_at TIMESTAMPTZ, incumbent TEXT,
-        incumbent_confidence TEXT, incumbent_source TEXT, description TEXT,
-        tags TEXT[] NOT NULL DEFAULT '{}', data_source TEXT NOT NULL DEFAULT 'manual',
-        analysis JSONB, analysis_version TEXT, ai_analyzed_at TIMESTAMPTZ,
-        is_teaming_required BOOLEAN NOT NULL DEFAULT FALSE,
-        qualified_at TIMESTAMPTZ, qualified_by TEXT,
-        source_id BIGINT NOT NULL DEFAULT 1, created_by BIGINT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        deleted_at TIMESTAMPTZ
-      )
-    `);
-    // Ensure qualified columns exist on pre-existing tables
-    await client.query('ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ');
-    await client.query('ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS qualified_by TEXT');
-
-    // Create source sibling tables if missing
-    const siblingTables = [
-      'opportunity_title_sources', 'opportunity_agency_sources', 'opportunity_naics_sources',
-      'opportunity_set_aside_sources', 'opportunity_grade_sources',
-      'opportunity_response_due_at_sources', 'opportunity_value_min_sources',
-      'opportunity_value_max_sources', 'opportunity_description_sources',
-    ];
-    for (const t of siblingTables) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${t}" (
-          id BIGSERIAL PRIMARY KEY,
-          opportunity_id BIGINT NOT NULL,
-          source_id BIGINT NOT NULL DEFAULT 1,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          UNIQUE (opportunity_id, source_id)
-        )
-      `);
-    }
-
-    // Create analysis cache tables
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS opportunity_analysis_cache (
-        id BIGSERIAL PRIMARY KEY,
-        opportunity_id BIGINT NOT NULL,
-        version TEXT NOT NULL,
-        generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        pwin NUMERIC, incumbent TEXT, competitors JSONB DEFAULT '[]',
-        blackhat JSONB, wargame JSONB, timeline JSONB,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (opportunity_id, version)
-      )
-    `);
-
-    // Analysis source sibling tables
-    const analysisSiblingTables = [
-      'opportunity_analysis_pwin_sources', 'opportunity_analysis_incumbent_sources',
-      'opportunity_analysis_competitors_sources', 'opportunity_analysis_blackhat_sources',
-      'opportunity_analysis_wargame_sources', 'opportunity_analysis_timeline_sources',
-    ];
-    for (const t of analysisSiblingTables) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${t}" (
-          id BIGSERIAL PRIMARY KEY,
-          opportunity_analysis_id BIGINT NOT NULL,
-          source_id BIGINT NOT NULL DEFAULT 1,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          UNIQUE (opportunity_analysis_id, source_id)
-        )
-      `);
-    }
-  } finally {
-    client.release();
-  }
-  app = await buildApp();
-  await app.ready();
-});
+  const dbUrl = getDbUrl();
+  pool = new Pool({ connectionString: dbUrl, max: 5 });
+  app = await getApp();
+}, 120_000);
 
 afterAll(async () => {
-  await app.close();
-  await pool.end();
-});
+  await closeApp();
+  if (pool) await pool.end();
+}, 30_000);
 
 interface SuccessBody {
   success: true;
@@ -279,7 +179,6 @@ describe('Contract: GET /v3/opportunities list endpoint', () => {
   });
 
   it('list items include ai_analyzed_at and analysis_version', async () => {
-    // Insert a test opportunity with analysis
     const now = new Date().toISOString();
     await pool.query(
       `INSERT INTO opportunities (title, status, source_id, analysis, analysis_version, ai_analyzed_at, updated_at)
@@ -433,7 +332,6 @@ describe('Contract: POST /v3/opportunities/:id/qualify endpoint', () => {
 });
 
 describe('Contract: Forbidden tokens', () => {
-  // FORBIDDEN token gate — test verifies no banned tokens leak into responses
   const BANNED_FIELD = ['analysis', 'status'].join('_');
 
   it(`no response contains banned field ${BANNED_FIELD}`, async () => {

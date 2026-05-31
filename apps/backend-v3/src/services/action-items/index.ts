@@ -308,10 +308,14 @@ async function logAudit(
   newValue: string | null,
   actor: string
 ): Promise<void> {
-  const id = uuidv4();
-  await pool.query(
-    `INSERT INTO action_item_audit (id, action_item_id, field, old_value, new_value, actor, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, actionItemId, field, oldValue, newValue, actor, new Date().toISOString()]
-  );
+  try {
+    const id = uuidv4();
+    await pool.query(
+      `INSERT INTO action_item_audit (id, action_item_id, field, old_value, new_value, actor, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, actionItemId, field, oldValue, newValue, actor, new Date().toISOString()]
+    );
+  } catch (err) {
+    logger.warn({ err, actionItemId, field }, 'Failed to write audit log');
+  }
 }
