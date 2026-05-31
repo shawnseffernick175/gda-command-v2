@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>FPDS Search Results</title>
+  <entry>
+    <title>AWARD: FA860126C0015</title>
+    <link href="https://www.fpds.gov/ezsearch/search.do?q=FA860126C0015" rel="alternate" type="text/html"/>
+    <modified>2026-05-26</modified>
+    <content>
+      <award xmlns:ns1="https://www.fpds.gov/FPDS">
+        <awardID>
+          <awardContractID>
+            <PIID>FA860126C0015</PIID>
+          </awardContractID>
+        </awardID>
+        <contractingOfficeAgencyID agencyID="057" name="DEPT OF THE AIR FORCE"/>
+        <contractingOfficeID name="AFLCMC HANSCOM"/>
+        <relevantContractDates>
+          <signedDate>2026-05-20</signedDate>
+        </relevantContractDates>
+        <dollarValues>
+          <obligatedAmount>875000.00</obligatedAmount>
+          <baseAndAllOptionsValue>875000.00</baseAndAllOptionsValue>
+        </dollarValues>
+        <vendor>
+          <vendorHeader>
+            <vendorName>HUBZONE CYBER DEFENDERS LLC</vendorName>
+          </vendorHeader>
+          <vendorSiteDetails>
+            <uniqueEntityIdSam>HZCYB1234567</uniqueEntityIdSam>
+            <DUNSNumber>987654321</DUNSNumber>
+          </vendorSiteDetails>
+        </vendor>
+        <contractData>
+          <NAICS>541519</NAICS>
+          <typeOfContractPricing description="Firm Fixed Price"/>
+        </contractData>
+        <competition>
+          <typeOfSetAside description="HUBZone Set-Aside"/>
+        </competition>
+        <productOrServiceInformation>
+          <productOrServiceCode>D399</productOrServiceCode>
+        </productOrServiceInformation>
+        <placeOfPerformance>
+          <principalPlaceOfPerformance>
+            <stateCode name="Massachusetts">MA</stateCode>
+            <countryCode name="UNITED STATES">USA</countryCode>
+          </principalPlaceOfPerformance>
+        </placeOfPerformance>
+      </award>
+    </content>
+  </entry>
+</feed>
