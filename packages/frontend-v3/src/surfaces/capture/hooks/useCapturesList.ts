@@ -10,14 +10,14 @@ interface UseCapturesListParams {
   filter: string;
 }
 
-async function fetchCaptures(params: UseCapturesListParams): Promise<CaptureListResponse> {
+async function fetchCaptures(params: UseCapturesListParams): Promise<CaptureListResponse['data']> {
   const qs = new URLSearchParams({
     limit: String(params.limit),
     offset: String(params.offset),
     sort: `${params.sort}:${params.sortDir}`,
     ...(params.filter ? { filter: params.filter } : {}),
   });
-  return apiFetch<CaptureListResponse>(`/v3/captures?${qs.toString()}`);
+  return apiFetch<CaptureListResponse['data']>(`/v3/captures?${qs.toString()}`);
 }
 
 export function useCapturesList(params: UseCapturesListParams) {

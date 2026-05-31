@@ -93,7 +93,7 @@ export function CaptureList() {
     },
   ];
 
-  const total = data?.data?.total ?? data?.data?.items?.length ?? 0;
+  const total = data?.total ?? data?.items?.length ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   if (isError) {
@@ -126,7 +126,7 @@ export function CaptureList() {
 
       <DataTable
         columns={columns}
-        data={data?.data?.items ?? []}
+        data={data?.items ?? []}
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}
