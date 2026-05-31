@@ -16,6 +16,7 @@ import { sourceRoutes } from './routes/sources.js';
 import { partnerRoutes } from './routes/partners.js';
 import { actionItemRoutes } from './routes/action-items.js';
 import { soakRoutes } from './routes/soak.js';
+import { fastTrackRoutes } from './routes/fast-track.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -102,6 +103,7 @@ export async function buildApp() {
   await app.register(captureRoutes);
   await app.register(pipelineRoutes);
   await app.register(launchpadRoutes);
+  await app.register(fastTrackRoutes);
   await app.register(sourceRoutes);
   await app.register(partnerRoutes);
   await app.register(actionItemRoutes);
