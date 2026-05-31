@@ -23,7 +23,7 @@ export function Toast({ severity, message, action, dismissible = true, duration:
       )}
       {dismissible && (
         <button type="button" className="text-ink-muted hover:text-ink-primary pr-3 text-sm" aria-label="Dismiss" onClick={onDismiss}>
-          &times;
+          ×
         </button>
       )}
     </div>

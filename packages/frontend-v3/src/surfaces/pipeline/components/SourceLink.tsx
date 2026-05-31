@@ -22,7 +22,7 @@ export function SourceLink({ url, label }: SourceLinkProps) {
       data-testid="source-link"
     >
       <span>{display}</span>
-      <span className="text-ink-dim">&rarr;</span>
+      <span className="text-ink-dim">→</span>
     </a>
   );
 }

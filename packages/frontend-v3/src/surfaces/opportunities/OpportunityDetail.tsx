@@ -123,7 +123,7 @@ export function OpportunityDetailPanel({ opportunityId, onBack }: OpportunityDet
           className="text-sm text-ink-muted hover:text-ink-primary transition-colors"
           onClick={onBack}
         >
-          &larr; Back to list
+          ← Back to list
         </button>
         <div className="flex items-center gap-2">
           <StatusChip status={detail.status} />

@@ -51,7 +51,7 @@ export function PricingRow({ item, onChange, onRemove }: PricingRowProps) {
           className="text-ink-muted hover:text-ink-primary text-sm"
           aria-label={`Remove ${item.category}`}
         >
-          &times;
+          ×
         </button>
       </td>
     </tr>

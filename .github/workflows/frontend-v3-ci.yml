@@ -134,6 +134,15 @@ jobs:
           MOCK_LLM: '1'
         run: npx vitest run --config vitest.contract.config.ts --passWithNoTests
 
+  jsx-entity-lint:
+    name: JSX Entity Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Scan for HTML entities in JSX
+        run: bash scripts/lint-jsx-entities.sh
+
   build-and-bundle:
     name: Build + Bundle Size + Lighthouse
     runs-on: ubuntu-latest

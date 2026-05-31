@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/AppShell/AppShell";
 import { LeftRail } from "./components/LeftRail/LeftRail";
 import { MainCanvas } from "./components/MainCanvas/MainCanvas";
+import { NavItems } from "./components/NavItems/NavItems";
 import { PlaceholderSurface } from "./components/PlaceholderSurface/PlaceholderSurface";
 import { Launchpad } from "./surfaces/launchpad/Launchpad";
 import { ActionItemsList } from "./surfaces/action-items/ActionItemsList";
@@ -25,7 +26,9 @@ export function App() {
         element={
           <RequireAuth>
             <AppShell>
-              <LeftRail collapsed={!sidebarOpen} onToggle={toggleSidebar} />
+              <LeftRail collapsed={!sidebarOpen} onToggle={toggleSidebar}>
+                <NavItems collapsed={!sidebarOpen} />
+              </LeftRail>
               <MainCanvas>
                 <Routes>
                   <Route index element={<Navigate to="/launchpad" replace />} />

@@ -53,7 +53,7 @@ export function CaptureDetail() {
     <div className="flex flex-col gap-6 py-6">
       <div className="flex items-center gap-4">
         <Button variant="secondary" size="sm" onClick={() => navigate('/capture')}>
-          &larr; Back
+          ← Back
         </Button>
         <h1 className="text-xl font-semibold text-ink-primary">{capture.opportunity_title}</h1>
       </div>

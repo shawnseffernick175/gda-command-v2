@@ -1,9 +1,10 @@
+import { Link } from 'react-router-dom';
 import type { SidebarNavItemProps } from '../../types';
 
 export function SidebarNavItem({ icon, label, href, active = false, badge, collapsed = false }: SidebarNavItemProps) {
   return (
-    <a
-      href={href}
+    <Link
+      to={href}
       className={`flex items-center gap-3 h-9 rounded-sm px-3 text-sm font-medium transition-colors ${
         active
           ? 'bg-surface-raised text-ink-primary border-l-2 border-l-accent'
@@ -20,6 +21,6 @@ export function SidebarNavItem({ icon, label, href, active = false, badge, colla
           )}
         </>
       )}
-    </a>
+    </Link>
   );
 }

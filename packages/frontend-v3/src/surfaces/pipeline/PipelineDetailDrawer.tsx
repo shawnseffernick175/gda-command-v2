@@ -78,7 +78,7 @@ export function PipelineDetailDrawer({
 
           <section className="flex flex-col gap-2">
             <h4 className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold">
-              Stage &amp; Pwin
+              Stage & Pwin
             </h4>
             <div className="flex items-center gap-2">
               <StageChip stage={row.stage} />
@@ -154,7 +154,7 @@ export function PipelineDetailDrawer({
                           className="text-ink-muted hover:text-accent"
                           data-source-url={entry.source_url}
                         >
-                          &rarr;
+                          →
                         </a>
                       </>
                     )}

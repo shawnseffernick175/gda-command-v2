@@ -30,7 +30,7 @@ export function SourceUrlChip({ url, source_kind, retrieved_at, label, ...rest }
       data-testid={(rest['data-testid'] as string) || 'data-point-source-url-chip'}
     >
       <span className="text-ink-muted">{label || extractDomain(url)}</span>
-      <span className="text-ink-dim">&rarr;</span>
+      <span className="text-ink-dim">→</span>
     </a>
   );
 }

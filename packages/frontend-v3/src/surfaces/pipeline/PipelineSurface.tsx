@@ -214,7 +214,7 @@ export function PipelineSurface() {
           {total > PAGE_SIZE && (
             <div className="flex items-center justify-between pt-2">
               <span className="text-xs text-ink-muted">
-                {offset + 1}&ndash;{Math.min(offset + PAGE_SIZE, total)} of{' '}
+                {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of{' '}
                 {total}
               </span>
               <div className="flex gap-2">
