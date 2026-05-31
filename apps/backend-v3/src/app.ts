@@ -27,6 +27,7 @@ import { sentinelRoutes } from './routes/sentinel.js';
 import { doctrineRoutes } from './routes/doctrine.js';
 import { memoryRoutes } from './routes/memory.js';
 import { pwinRoutes } from './routes/pwin.js';
+import { awardRoutes } from './routes/awards.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -130,6 +131,7 @@ export async function buildApp() {
   await app.register(sentinelRoutes);
   await app.register(memoryRoutes);
   await app.register(pwinRoutes);
+  await app.register(awardRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

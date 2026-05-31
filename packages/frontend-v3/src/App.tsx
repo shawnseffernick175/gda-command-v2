@@ -11,6 +11,7 @@ import { PipelineSurface } from "./surfaces/pipeline/PipelineSurface";
 import { OpportunitiesList } from "./surfaces/opportunities/OpportunitiesList";
 import { CaptureList } from "./surfaces/capture/CaptureList";
 import { CaptureDetail } from "./surfaces/capture/CaptureDetail";
+import { AwardsSurface } from "./surfaces/awards/AwardsSurface";
 import { useUiStore } from "./stores/ui-store";
 import { RequireAuth } from "./components/RequireAuth";
 import { Login } from "./surfaces/auth/Login";
@@ -39,6 +40,7 @@ export function App() {
                   <Route path="/launchpad" element={<Launchpad />} />
                   <Route path="/fast-track" element={<FastTrack />} />
                   <Route path="/opportunities" element={<OpportunitiesList />} />
+                  <Route path="/awards" element={<AwardsSurface />} />
                   <Route path="/opp/:notice_id" element={<OpportunitiesList />} />
                   <Route path="/capture" element={<CaptureList />} />
                   <Route path="/capture/:opp_id" element={<CaptureDetail />} />

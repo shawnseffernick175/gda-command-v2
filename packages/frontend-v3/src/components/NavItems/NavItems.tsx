@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { SidebarNavItem } from '../SidebarNavItem/SidebarNavItem';
+import { apiFetch } from '../../lib/api-client';
 import { fetchRegulatoryCount } from '../../surfaces/regulatory/api';
 import type { ReactNode } from 'react';
 
@@ -28,6 +29,12 @@ const NAV_ITEMS: NavEntry[] = [
     label: 'Opportunities',
     href: '/opportunities',
     icon: <svg {...svgProps}><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 7V5a4 4 0 0 0-8 0v2" /></svg>,
+  },
+  {
+    label: 'Awards',
+    href: '/awards',
+    icon: <svg {...svgProps}><path d="M12 15l-3 5 1-6-5-1 5-3-1-6 3 5 3-5-1 6 5 3-5 1 1 6z" /></svg>,
+    badgeKey: 'awards',
   },
   {
     label: 'Capture',
@@ -66,8 +73,19 @@ interface NavItemsProps {
   collapsed: boolean;
 }
 
+async function fetchAwardsCount(): Promise<number> {
+  const data = await apiFetch<{ count: number }>('/v3/awards/count');
+  return data.count;
+}
+
 export function NavItems({ collapsed }: NavItemsProps) {
   const location = useLocation();
+
+  const { data: awardsCount } = useQuery({
+    queryKey: ['awards-count'],
+    queryFn: fetchAwardsCount,
+    staleTime: 60_000,
+  });
 
   const { data: regulatoryCount } = useQuery({
     queryKey: ['regulatory-count'],
@@ -76,22 +94,26 @@ export function NavItems({ collapsed }: NavItemsProps) {
   });
 
   const badges: Record<string, number | undefined> = {
+    awards: awardsCount,
     regulatory: regulatoryCount,
   };
 
   return (
     <>
-      {NAV_ITEMS.map((item) => (
-        <SidebarNavItem
-          key={item.href}
-          icon={item.icon}
-          label={item.label}
-          href={item.href}
-          active={location.pathname === item.href || location.pathname.startsWith(item.href + '/')}
-          badge={item.badgeKey ? badges[item.badgeKey] : undefined}
-          collapsed={collapsed}
-        />
-      ))}
+      {NAV_ITEMS.map((item) => {
+        const badge = item.badgeKey ? badges[item.badgeKey] : undefined;
+        return (
+          <SidebarNavItem
+            key={item.href}
+            icon={item.icon}
+            label={item.label}
+            href={item.href}
+            active={location.pathname === item.href || location.pathname.startsWith(item.href + '/')}
+            collapsed={collapsed}
+            {...(badge != null ? { badge } : {})}
+          />
+        );
+      })}
     </>
   );
 }
