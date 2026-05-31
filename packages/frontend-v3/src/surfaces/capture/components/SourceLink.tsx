@@ -1,7 +1,7 @@
-import type { SourceCitation } from '../types';
+import type { Source } from '../types';
 
 interface SourceLinkProps {
-  sources: SourceCitation[];
+  sources: Source[];
 }
 
 export function SourceLink({ sources }: SourceLinkProps) {

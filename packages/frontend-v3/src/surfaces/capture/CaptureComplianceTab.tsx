@@ -6,22 +6,24 @@ interface CaptureComplianceTabProps {
 }
 
 export function CaptureComplianceTab({ capture }: CaptureComplianceTabProps) {
-  const met = capture.compliance_requirements.filter((r) => r.met).length;
-  const total = capture.compliance_requirements.length;
+  const items = capture.compliance_items ?? [];
+  const met = items.filter((r) => r.status === 'compliant').length;
+  const total = items.length;
+  const sources = capture.compliance_sources ?? [];
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
         <span className="text-sm text-ink-muted">Coverage:</span>
         <a
-          href={capture.compliance_sources[0]?.url ?? capture.source_url}
+          href={sources[0]?.url ?? capture.source_url ?? '#'}
           target="_blank"
           rel="noopener noreferrer"
-          data-source-url={capture.compliance_sources[0]?.url ?? capture.source_url}
+          data-source-url={sources[0]?.url ?? capture.source_url ?? '#'}
           data-testid="data-point-compliance-coverage"
           className="text-sm font-medium text-ink-primary hover:text-accent transition-colors"
         >
-          {Math.round(capture.compliance_coverage * 100)}% ({met}/{total})
+          {Math.round((capture.compliance_coverage ?? 0) * 100)}% ({met}/{total})
         </a>
       </div>
 
@@ -33,12 +35,12 @@ export function CaptureComplianceTab({ capture }: CaptureComplianceTabProps) {
             <tr>
               <th className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold px-2 py-2 text-left border-b border-border">Requirement</th>
               <th className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold px-2 py-2 text-center border-b border-border w-24">Status</th>
-              <th className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold px-2 py-2 text-left border-b border-border">Citation</th>
+              <th className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold px-2 py-2 text-left border-b border-border">Evidence</th>
               <th className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold px-2 py-2 text-left border-b border-border w-24">Source</th>
             </tr>
           </thead>
           <tbody>
-            {capture.compliance_requirements.map((req) => (
+            {items.map((req) => (
               <ComplianceRow key={req.id} requirement={req} />
             ))}
           </tbody>

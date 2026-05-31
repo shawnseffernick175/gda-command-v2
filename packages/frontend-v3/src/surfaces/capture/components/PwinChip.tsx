@@ -10,26 +10,16 @@ function getLevel(pwin: number): string {
 }
 
 export function PwinChip({ pwin, sourceUrl }: PwinChipProps) {
-  const className = `inline-flex items-center h-6 px-2 rounded-full text-xs font-medium border border-transparent ${getLevel(pwin)}`;
-
-  if (sourceUrl) {
-    return (
-      <a
-        href={sourceUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        data-source-url={sourceUrl}
-        data-testid="data-point-pwin"
-        className={`${className} hover:opacity-80 transition-opacity`}
-      >
-        {Math.round(pwin * 100)}%
-      </a>
-    );
-  }
-
   return (
-    <span data-testid="data-point-pwin" className={className}>
+    <a
+      href={sourceUrl ?? '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-source-url={sourceUrl ?? '#'}
+      data-testid="data-point-pwin"
+      className={`inline-flex items-center h-6 px-2 rounded-full text-xs font-medium border border-transparent ${getLevel(pwin)} hover:opacity-80 transition-opacity`}
+    >
       {Math.round(pwin * 100)}%
-    </span>
+    </a>
   );
 }

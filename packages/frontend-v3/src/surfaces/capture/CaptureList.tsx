@@ -126,7 +126,7 @@ export function CaptureList() {
 
       <DataTable
         columns={columns}
-        data={data?.items ?? []}
+        data={data?.data?.items ?? []}
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={handleSort}

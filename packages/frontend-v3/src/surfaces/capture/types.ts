@@ -48,7 +48,19 @@ export interface ComplianceRequirement {
   status: string;
   response_notes: string | null;
   assigned_to: string | null;
+  evidence: string | null;
   source_id: string;
+  source_url?: string;
+  source_url_sources?: Source[];
+}
+
+export type SourceCitation = Source;
+
+export interface LaborCategory {
+  id?: string;
+  category: string;
+  hours: number;
+  rate: number;
 }
 
 export interface PricingData {
@@ -63,7 +75,7 @@ export interface PricingData {
 export interface TeamingPartner {
   id?: string;
   name: string;
-  role: 'prime' | 'sub' | 'mentor';
+  role: 'prime' | 'sub' | 'mentor' | 'protege' | 'teaming';
   source_url?: string;
   source_url_sources?: Source[];
 }
