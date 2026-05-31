@@ -41,7 +41,8 @@ function authHeader(): Record<string, string> {
 
 const VALID_SOURCE_KINDS = [
   'sam_gov', 'fpds', 'usaspending', 'govwin',
-  'news', 'doctrine', 'partner_site', 'internal',
+  'govtribe', 'news', 'doctrine', 'partner_site',
+  'internal', 'manual', 'n8n_workflow',
 ] as const;
 
 beforeAll(async () => {
