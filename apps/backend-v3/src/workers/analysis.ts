@@ -541,7 +541,9 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
     // Re-analyze any captures linked to this opportunity
     try {
       const captureRes = await pool.query<{ id: string }>(
-        'SELECT id FROM captures WHERE opportunity_id = $1',
+        `SELECT c.id FROM captures c
+         JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
+         WHERE pi.opportunity_id = $1`,
         [entityId],
       );
       if (captureRes.rows.length > 0 && workerBossRef) {
@@ -576,11 +578,11 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
 
 interface CaptureDbRow {
   id: string;
+  pipeline_item_id: string;
+  color_stage: ColorReviewStage;
+  capture_plan: Record<string, unknown> | null;
+  ghost_team: Record<string, unknown> | null;
   opportunity_id: string | null;
-  color_review_stage: ColorReviewStage;
-  compliance_items: ComplianceItem[];
-  pricing_assumptions: { margin_pct?: number; labor_rates?: Record<string, number> } | null;
-  teaming_worksheet: { partners: string[]; rationale: string } | null;
 }
 
 async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promise<void> {
@@ -589,7 +591,11 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
     logger.info({ entityId, jobId: job.id }, 'Processing capture analysis');
 
     const captureRes = await pool.query<CaptureDbRow>(
-      'SELECT id, opportunity_id, color_review_stage, compliance_items, pricing_assumptions, teaming_worksheet FROM captures WHERE id = $1',
+      `SELECT c.id, c.pipeline_item_id, c.color_stage, c.capture_plan, c.ghost_team,
+              pi.opportunity_id
+       FROM captures c
+       LEFT JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
+       WHERE c.id = $1`,
       [entityId],
     );
     const capture = captureRes.rows[0];
@@ -610,16 +616,19 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
       }
     }
 
-    const complianceItems = Array.isArray(capture.compliance_items) ? capture.compliance_items : [];
-    const marginPct = capture.pricing_assumptions?.margin_pct ?? null;
-    const hasTeamingPartners = Array.isArray(capture.teaming_worksheet?.partners) &&
-      capture.teaming_worksheet!.partners.length > 0;
+    const compItemsRes = await pool.query<ComplianceItem>(
+      'SELECT id, requirement, status, evidence FROM compliance_items WHERE capture_id = $1',
+      [entityId],
+    );
+    const complianceItems = compItemsRes.rows;
+    const ghostTeam = capture.ghost_team as { partners?: string[] } | null;
+    const hasTeamingPartners = Array.isArray(ghostTeam?.partners) && ghostTeam!.partners.length > 0;
 
     const analysis = computeCaptureAnalysis({
       captureId: String(entityId),
-      colorReviewStage: capture.color_review_stage,
+      colorReviewStage: capture.color_stage,
       complianceItems,
-      pricingMarginPct: marginPct,
+      pricingMarginPct: null,
       hasTeamingPartners,
       opportunityAnalysis: oppAnalysis,
     });
@@ -627,13 +636,11 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
     const now = new Date().toISOString();
 
     await pool.query(
-      `UPDATE captures
-       SET analysis = $1,
-           analysis_version = $2,
-           ai_analyzed_at = $3,
-           updated_at = updated_at
-       WHERE id = $4`,
-      [JSON.stringify(analysis), config.analysisVersion, now, entityId],
+      `INSERT INTO capture_analysis_cache (capture_id, version, generated_at, pwin)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (capture_id, version)
+       DO UPDATE SET generated_at = EXCLUDED.generated_at, pwin = EXCLUDED.pwin`,
+      [entityId, config.analysisVersion, now, analysis.pwin],
     );
 
     logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin }, 'Capture analysis written');

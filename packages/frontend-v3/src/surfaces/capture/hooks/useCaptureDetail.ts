@@ -31,7 +31,7 @@ export function useCaptureDetail(id: string) {
           ...old,
           pwin: result.pwin,
           pwin_sources: result.pwin_sources,
-          color_review_phase: result.color_review_phase,
+          color_stage: result.color_stage,
           compliance_coverage: result.compliance_coverage,
           compliance_sources: result.compliance_sources,
         };

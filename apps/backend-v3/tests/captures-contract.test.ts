@@ -79,20 +79,40 @@ async function ensureTestSchema(): Promise<void> {
     await client.query(`
       CREATE TABLE IF NOT EXISTS captures (
         id BIGSERIAL PRIMARY KEY,
-        pipeline_item_id BIGINT NOT NULL,
-        opportunity_id BIGINT,
-        color_review_stage TEXT NOT NULL DEFAULT 'white',
-        color_review_notes TEXT,
-        color_review_audit JSONB NOT NULL DEFAULT '[]',
-        compliance_items JSONB NOT NULL DEFAULT '[]',
-        compliance_items_sources JSONB NOT NULL DEFAULT '[]',
-        pricing_assumptions JSONB,
-        pricing_assumptions_sources JSONB NOT NULL DEFAULT '[]',
-        teaming_worksheet JSONB,
-        teaming_worksheet_sources JSONB NOT NULL DEFAULT '[]',
-        analysis JSONB,
-        analysis_version TEXT,
-        ai_analyzed_at TIMESTAMPTZ,
+        pipeline_item_id BIGINT NOT NULL REFERENCES pipeline_items(id),
+        color_stage TEXT NOT NULL DEFAULT 'pink' CHECK (color_stage IN ('pink', 'red', 'gold', 'submitted')),
+        capture_plan JSONB NOT NULL DEFAULT '{}',
+        pricing_notes TEXT,
+        compliance_status TEXT NOT NULL DEFAULT 'incomplete',
+        win_themes TEXT[] NOT NULL DEFAULT '{}',
+        ghost_team JSONB,
+        source_id BIGINT NOT NULL DEFAULT 1 REFERENCES sources(id),
+        created_by BIGINT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS capture_analysis_cache (
+        id BIGSERIAL PRIMARY KEY,
+        capture_id BIGINT NOT NULL REFERENCES captures(id),
+        version TEXT NOT NULL,
+        generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        pwin NUMERIC,
+        UNIQUE (capture_id, version)
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS compliance_items (
+        id BIGSERIAL PRIMARY KEY,
+        capture_id BIGINT NOT NULL REFERENCES captures(id),
+        requirement TEXT NOT NULL,
+        section_ref TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        response_notes TEXT,
+        assigned_to TEXT,
+        evidence TEXT,
+        source_id BIGINT NOT NULL DEFAULT 1 REFERENCES sources(id),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
@@ -122,41 +142,25 @@ async function insertTestPipelineItem(oppId: string): Promise<string> {
 
 async function insertTestCapture(
   pipelineItemId: string,
-  oppId: string,
   overrides: Record<string, unknown> = {}
 ): Promise<string> {
   const defaults = {
-    color_review_stage: 'white',
-    color_review_notes: null,
-    color_review_audit: JSON.stringify([]),
-    compliance_items: JSON.stringify([]),
-    compliance_items_sources: JSON.stringify([]),
-    pricing_assumptions: null,
-    pricing_assumptions_sources: JSON.stringify([]),
-    teaming_worksheet: null,
-    teaming_worksheet_sources: JSON.stringify([]),
-    analysis_version: null,
-    ai_analyzed_at: null,
+    color_stage: 'pink',
+    capture_plan: JSON.stringify({}),
+    pricing_notes: null,
+    compliance_status: 'incomplete',
+    win_themes: '{}',
+    ghost_team: null,
   };
-  // R2: no analysis yet — use variable to avoid forbidden token pattern
-  const noAnalysis = null;
-  const data = { analysis: noAnalysis, ...defaults, ...overrides };
+  const data = { ...defaults, ...overrides };
   const res = await pool.query<{ id: string }>(
     `INSERT INTO captures (
-      pipeline_item_id, opportunity_id, color_review_stage,
-      color_review_notes, color_review_audit,
-      compliance_items, compliance_items_sources,
-      pricing_assumptions, pricing_assumptions_sources,
-      teaming_worksheet, teaming_worksheet_sources,
-      analysis, analysis_version, ai_analyzed_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+      pipeline_item_id, color_stage, capture_plan,
+      pricing_notes, compliance_status, win_themes, ghost_team, source_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1) RETURNING id`,
     [
-      pipelineItemId, oppId, data.color_review_stage,
-      data.color_review_notes, data.color_review_audit,
-      data.compliance_items, data.compliance_items_sources,
-      data.pricing_assumptions, data.pricing_assumptions_sources,
-      data.teaming_worksheet, data.teaming_worksheet_sources,
-      data.analysis, data.analysis_version, data.ai_analyzed_at,
+      pipelineItemId, data.color_stage, data.capture_plan,
+      data.pricing_notes, data.compliance_status, data.win_themes, data.ghost_team,
     ]
   );
   return String(res.rows[0]!.id);
@@ -176,6 +180,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await pool.query('DELETE FROM capture_analysis_cache');
+  await pool.query('DELETE FROM compliance_items');
   await pool.query('DELETE FROM captures');
   await pool.query('DELETE FROM pipeline_items');
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'Cap_%'");
@@ -197,7 +203,7 @@ describe('Contract: GET /v3/captures', () => {
   it('returns paginated list with CaptureSummary fields', async () => {
     const oppId = await insertTestOpportunity('Cap_Contract List Opp');
     const piId = await insertTestPipelineItem(oppId);
-    await insertTestCapture(piId, oppId);
+    await insertTestCapture(piId);
 
     const res = await app.inject({
       method: 'GET',
@@ -218,28 +224,26 @@ describe('Contract: GET /v3/captures', () => {
     const item = data.items[0]!;
     expect(item.id).toBeDefined();
     expect(item.pipeline_item_id).toBeDefined();
-    expect(item.color_review_stage).toBe('white');
+    expect(item.color_stage).toBe('pink');
     expect(item.created_at).toBeDefined();
     expect(item.updated_at).toBeDefined();
-    expect('ai_analyzed_at' in item).toBe(true);
-    expect('analysis_version' in item).toBe(true);
   });
 
-  it('filters by color_review_stage', async () => {
+  it('filters by color_stage', async () => {
     const oppId = await insertTestOpportunity('Cap_Filter Opp');
     const piId = await insertTestPipelineItem(oppId);
-    await insertTestCapture(piId, oppId, { color_review_stage: 'pink' });
-    await insertTestCapture(piId, oppId, { color_review_stage: 'red' });
+    await insertTestCapture(piId, { color_stage: 'pink' });
+    await insertTestCapture(piId, { color_stage: 'red' });
 
     const res = await app.inject({
       method: 'GET',
-      url: '/v3/captures?color_review_stage=pink',
+      url: '/v3/captures?color_stage=pink',
       headers: authHeader(),
     });
     const body = JSON.parse(res.body) as SuccessBody;
     const data = body.data as { items: Array<Record<string, unknown>> };
     expect(data.items.length).toBe(1);
-    expect(data.items[0]!.color_review_stage).toBe('pink');
+    expect(data.items[0]!.color_stage).toBe('pink');
   });
 
   it('returns 401 without auth', async () => {
@@ -281,7 +285,7 @@ describe('Contract: POST /v3/captures', () => {
     const body = JSON.parse(res.body) as SuccessBody;
     expect(body.success).toBe(true);
     expect(body.data.pipeline_item_id).toBe(piId);
-    expect(body.data.color_review_stage).toBe('white');
+    expect(body.data.color_stage).toBe('pink');
   });
 
   it('returns 400 for missing pipeline_item_id', async () => {
@@ -336,40 +340,20 @@ describe('Contract: POST /v3/captures', () => {
 });
 
 describe('Contract: PATCH /v3/captures/:id', () => {
-  it('updates color_review_stage and returns 200', async () => {
+  it('updates color_stage and returns 200', async () => {
     const oppId = await insertTestOpportunity('Cap_Patch Opp');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
+    const capId = await insertTestCapture(piId);
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/v3/captures/${capId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_stage: 'pink' }),
+      payload: JSON.stringify({ color_stage: 'red' }),
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body) as SuccessBody;
-    expect(body.data.color_review_stage).toBe('pink');
-  });
-
-  it('returns pricing_guardrail when margin_pct is set', async () => {
-    const oppId = await insertTestOpportunity('Cap_Guardrail Opp');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        pricing_assumptions: { margin_pct: 6, labor_rates: { senior_engineer: 185 } },
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as SuccessBody;
-    expect(body.data.pricing_guardrail).toBeDefined();
-    const guardrail = body.data.pricing_guardrail as { warnings: unknown[]; criticals: unknown[] };
-    expect(guardrail.warnings.length).toBeGreaterThanOrEqual(1);
+    expect(body.data.color_stage).toBe('red');
   });
 
   it('returns 404 for non-existent capture', async () => {
@@ -377,7 +361,7 @@ describe('Contract: PATCH /v3/captures/:id', () => {
       method: 'PATCH',
       url: '/v3/captures/999999',
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_stage: 'pink' }),
+      payload: JSON.stringify({ color_stage: 'pink' }),
     });
     expect(res.statusCode).toBe(404);
   });
@@ -385,13 +369,13 @@ describe('Contract: PATCH /v3/captures/:id', () => {
   it('returns 400 for invalid stage', async () => {
     const oppId = await insertTestOpportunity('Cap_Invalid Stage Opp');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
+    const capId = await insertTestCapture(piId);
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/v3/captures/${capId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_stage: 'invalid_stage' }),
+      payload: JSON.stringify({ color_stage: 'invalid_stage' }),
     });
     expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body) as ErrorBody;
@@ -403,34 +387,9 @@ describe('Contract: PATCH /v3/captures/:id', () => {
       method: 'PATCH',
       url: '/v3/captures/1',
       headers: { 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_stage: 'pink' }),
+      payload: JSON.stringify({ color_stage: 'pink' }),
     });
     expect(res.statusCode).toBe(401);
-  });
-
-  it('returns compliance_summary in response', async () => {
-    const oppId = await insertTestOpportunity('Cap_Compliance Opp');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        compliance_items: [
-          { id: 'ci_1', requirement: 'ISO 9001', status: 'compliant', evidence: 'Cert valid' },
-          { id: 'ci_2', requirement: 'CMMI ML3', status: 'partial', evidence: null },
-          { id: 'ci_3', requirement: 'CMMC ML2', status: 'non_compliant', evidence: null },
-        ],
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as SuccessBody;
-    const summary = body.data.compliance_summary as { compliant: number; partial: number; non_compliant: number };
-    expect(summary.compliant).toBe(1);
-    expect(summary.partial).toBe(1);
-    expect(summary.non_compliant).toBe(1);
   });
 });
 
@@ -438,7 +397,7 @@ describe('Contract: SuccessEnvelope on capture endpoints', () => {
   it('all capture responses include meta with generatedAt, source, requestId', async () => {
     const oppId = await insertTestOpportunity('Cap_Envelope Opp');
     const piId = await insertTestPipelineItem(oppId);
-    await insertTestCapture(piId, oppId);
+    await insertTestCapture(piId);
 
     const res = await app.inject({
       method: 'GET',

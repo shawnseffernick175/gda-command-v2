@@ -56,11 +56,10 @@ interface CaptureAnalysisResult {
 }
 
 const STAGE_WEIGHTS: Record<ColorReviewStage, number> = {
-  white: 0.6,
   pink: 0.75,
   red: 0.85,
   gold: 0.95,
-  final: 1.0,
+  submitted: 1.0,
 };
 
 function computeComplianceFactor(items: ComplianceItem[]): number {

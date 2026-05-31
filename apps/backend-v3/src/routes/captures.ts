@@ -11,34 +11,18 @@ import {
   isValidStage,
   validateStageTransition,
 } from '../services/captures/color-review.js';
-import {
-  evaluatePricingGuardrails,
-  type PricingAssumptions,
-  type PricingGuardrailResult,
-} from '../services/captures/pricing-guardrails.js';
-import {
-  computeComplianceSummary,
-  isValidComplianceStatus,
-  type ComplianceItem,
-} from '../services/captures/compliance.js';
-import { validateTeamingWorksheet, type TeamingWorksheet } from '../services/captures/teaming.js';
 
 interface CaptureRow {
   id: string;
   pipeline_item_id: string;
-  opportunity_id: string | null;
-  color_review_stage: ColorReviewStage;
-  color_review_notes: string | null;
-  color_review_audit: Array<{ stage: string; actor: string; timestamp: string }>;
-  compliance_items: ComplianceItem[];
-  compliance_items_sources: Array<Record<string, unknown>>;
-  pricing_assumptions: PricingAssumptions | null;
-  pricing_assumptions_sources: Array<Record<string, unknown>>;
-  teaming_worksheet: TeamingWorksheet | null;
-  teaming_worksheet_sources: Array<Record<string, unknown>>;
-  analysis: Record<string, unknown> | null;
-  analysis_version: string | null;
-  ai_analyzed_at: string | null;
+  color_stage: ColorReviewStage;
+  capture_plan: Record<string, unknown>;
+  pricing_notes: string | null;
+  compliance_status: string;
+  win_themes: string[] | null;
+  ghost_team: Record<string, unknown> | null;
+  source_id: string;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +32,7 @@ interface PipelineItemRow {
   opportunity_id: string;
   capture_owner: string;
   capture_kickoff_at: string | null;
+  source_id: string;
 }
 
 interface OpportunityMinimal {
@@ -55,33 +40,50 @@ interface OpportunityMinimal {
   agency: string | null;
 }
 
+interface CacheRow {
+  pwin: number | null;
+  version: string;
+  generated_at: string;
+}
+
+interface ComplianceItemRow {
+  id: string;
+  requirement: string;
+  section_ref: string | null;
+  status: string;
+  response_notes: string | null;
+  assigned_to: string | null;
+  source_id: string;
+}
+
 const ANALYSIS_AFFECTING_FIELDS = new Set([
-  'pricing_assumptions',
-  'compliance_items',
-  'teaming_worksheet',
-  'color_review_stage',
+  'color_stage',
+  'compliance_status',
+  'capture_plan',
+  'ghost_team',
 ]);
 
 const NON_ANALYSIS_FIELDS = new Set([
-  'color_review_notes',
+  'pricing_notes',
+  'win_themes',
 ]);
 
-function isCacheFresh(row: CaptureRow): boolean {
-  if (!row.analysis || !row.analysis_version || !row.ai_analyzed_at) return false;
-  if (row.analysis_version !== config.analysisVersion) return false;
-  return new Date(row.ai_analyzed_at) >= new Date(row.updated_at);
+function isCacheFresh(cache: CacheRow | null): boolean {
+  if (!cache || cache.pwin === null) return false;
+  if (cache.version !== config.analysisVersion) return false;
+  return true;
 }
 
 async function waitForAnalysis(
   captureId: string,
   timeoutMs: number,
   pollMs: number
-): Promise<CaptureRow | null> {
+): Promise<CacheRow | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const res = await pool.query<CaptureRow>(
-      'SELECT * FROM captures WHERE id = $1',
-      [captureId]
+    const res = await pool.query<CacheRow>(
+      'SELECT pwin, version, generated_at FROM capture_analysis_cache WHERE capture_id = $1 AND version = $2',
+      [captureId, config.analysisVersion]
     );
     const row = res.rows[0];
     if (row && isCacheFresh(row)) return row;
@@ -90,25 +92,13 @@ async function waitForAnalysis(
   return null;
 }
 
-function computePricingGuardrailBlock(
-  assumptions: PricingAssumptions | null
-): PricingGuardrailResult | null {
-  if (!assumptions) return null;
-  if (
-    assumptions.margin_pct === undefined &&
-    (!assumptions.labor_rates || Object.keys(assumptions.labor_rates).length === 0)
-  ) {
-    return null;
-  }
-  return evaluatePricingGuardrails(assumptions);
-}
-
 function buildDetailResponse(
   row: CaptureRow,
   opp: OpportunityMinimal | null,
-  captureOwner: string | null
+  captureOwner: string | null,
+  complianceItems: ComplianceItemRow[],
+  cache: CacheRow | null,
 ): Record<string, unknown> {
-  const complianceItems = Array.isArray(row.compliance_items) ? row.compliance_items : [];
   return {
     id: row.id,
     pipeline_item_id: row.pipeline_item_id,
@@ -117,19 +107,16 @@ function buildDetailResponse(
     opportunity_title_sources: [],
     opportunity_agency: opp?.agency ?? null,
     opportunity_agency_sources: [],
-    color_review_stage: row.color_review_stage,
-    color_review_notes: row.color_review_notes,
+    color_stage: row.color_stage,
+    capture_plan: row.capture_plan,
+    pricing_notes: row.pricing_notes,
+    compliance_status: row.compliance_status,
+    win_themes: row.win_themes ?? [],
+    ghost_team: row.ghost_team,
     compliance_items: complianceItems,
-    compliance_items_sources: Array.isArray(row.compliance_items_sources) ? row.compliance_items_sources : [],
-    compliance_summary: computeComplianceSummary(complianceItems),
-    pricing_assumptions: row.pricing_assumptions,
-    pricing_assumptions_sources: Array.isArray(row.pricing_assumptions_sources) ? row.pricing_assumptions_sources : [],
-    pricing_guardrail: computePricingGuardrailBlock(row.pricing_assumptions),
-    teaming_worksheet: row.teaming_worksheet,
-    teaming_worksheet_sources: Array.isArray(row.teaming_worksheet_sources) ? row.teaming_worksheet_sources : [],
-    analysis: row.analysis,
-    ai_analyzed_at: row.ai_analyzed_at,
-    analysis_version: row.analysis_version,
+    pwin: cache?.pwin ?? null,
+    ai_analyzed_at: cache?.generated_at ?? null,
+    analysis_version: cache?.version ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -162,7 +149,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     Querystring: {
       limit?: string;
       cursor?: string;
-      color_review_stage?: string;
+      color_stage?: string;
       capture_owner?: string;
       opportunity_agency?: string;
       behind?: string;
@@ -170,7 +157,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
   }>('/v3/captures', async (req, reply) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit ?? '50', 10) || 50, 1), 200);
     const cursor = req.query.cursor ?? null;
-    const stage = req.query.color_review_stage;
+    const stage = req.query.color_stage;
     const captureOwner = req.query.capture_owner;
     const agency = req.query.opportunity_agency;
 
@@ -179,7 +166,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     let paramIdx = 1;
 
     if (stage) {
-      conditions.push(`c.color_review_stage = $${paramIdx++}`);
+      conditions.push(`c.color_stage = $${paramIdx++}`);
       params.push(stage);
     }
 
@@ -205,15 +192,19 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
 
     const sql = `
       SELECT
-        c.id, c.pipeline_item_id, c.color_review_stage,
-        c.ai_analyzed_at, c.analysis_version,
+        c.id, c.pipeline_item_id, c.color_stage,
         c.created_at, c.updated_at,
         pi.capture_owner AS pipeline_capture_owner,
         o.title AS opportunity_title,
-        o.agency AS opportunity_agency
+        o.agency AS opportunity_agency,
+        cac.pwin AS cached_pwin,
+        cac.generated_at AS ai_analyzed_at,
+        cac.version AS analysis_version
       FROM captures c
       LEFT JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
       LEFT JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
+      LEFT JOIN capture_analysis_cache cac
+        ON cac.capture_id = c.id AND cac.version = '${config.analysisVersion}'
       ${whereClause}
       ORDER BY c.id DESC
       LIMIT ${limitParam}
@@ -236,7 +227,8 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
             opportunity_title_sources: [],
             opportunity_agency: r.opportunity_agency ?? null,
             opportunity_agency_sources: [],
-            color_review_stage: r.color_review_stage,
+            color_stage: r.color_stage,
+            pwin: r.cached_pwin ?? null,
             ai_analyzed_at: r.ai_analyzed_at ?? null,
             analysis_version: r.analysis_version ?? null,
             created_at: r.created_at,
@@ -266,7 +258,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const piRes = await pool.query<PipelineItemRow>(
-      'SELECT id, opportunity_id, capture_owner, capture_kickoff_at FROM pipeline_items WHERE id = $1',
+      'SELECT id, opportunity_id, capture_owner, capture_kickoff_at, source_id FROM pipeline_items WHERE id = $1',
       [row.pipeline_item_id]
     );
     const pi = piRes.rows[0] ?? null;
@@ -280,10 +272,22 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
       opp = oppRes.rows[0] ?? null;
     }
 
-    if (isCacheFresh(row)) {
+    const compItemsRes = await pool.query<ComplianceItemRow>(
+      'SELECT id, requirement, section_ref, status, response_notes, assigned_to, source_id FROM compliance_items WHERE capture_id = $1 ORDER BY id',
+      [id]
+    );
+    const complianceItems = compItemsRes.rows;
+
+    const cacheRes = await pool.query<CacheRow>(
+      'SELECT pwin, version, generated_at FROM capture_analysis_cache WHERE capture_id = $1 AND version = $2',
+      [id, config.analysisVersion]
+    );
+    const cache = cacheRes.rows[0] ?? null;
+
+    if (isCacheFresh(cache)) {
       analysisCacheHits.inc();
       return reply.status(200).send(
-        successEnvelope(buildDetailResponse(row, opp, pi?.capture_owner ?? null), req.requestId)
+        successEnvelope(buildDetailResponse(row, opp, pi?.capture_owner ?? null, complianceItems, cache), req.requestId)
       );
     }
 
@@ -293,7 +297,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     if (fresh) {
       analysisCacheHits.inc();
       return reply.status(200).send(
-        successEnvelope(buildDetailResponse(fresh, opp, pi?.capture_owner ?? null), req.requestId)
+        successEnvelope(buildDetailResponse(row, opp, pi?.capture_owner ?? null, complianceItems, fresh), req.requestId)
       );
     }
 
@@ -322,7 +326,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const piRes = await pool.query<PipelineItemRow>(
-      'SELECT id, opportunity_id, capture_owner, capture_kickoff_at FROM pipeline_items WHERE id = $1',
+      'SELECT id, opportunity_id, capture_owner, capture_kickoff_at, source_id FROM pipeline_items WHERE id = $1',
       [pipelineItemId]
     );
     const pi = piRes.rows[0];
@@ -336,29 +340,14 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
 
     const insertRes = await pool.query<{ id: string }>(
       `INSERT INTO captures (
-        pipeline_item_id, opportunity_id, color_review_stage,
-        color_review_notes, color_review_audit,
-        compliance_items, compliance_items_sources,
-        pricing_assumptions, pricing_assumptions_sources,
-        teaming_worksheet, teaming_worksheet_sources,
-        analysis, analysis_version, ai_analyzed_at,
+        pipeline_item_id, color_stage, source_id, created_by,
         created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id`,
       [
         pipelineItemId,
-        pi.opportunity_id,
-        'white',
-        null,
-        JSON.stringify([{ stage: 'white', actor: 'system', timestamp: now }]),
-        JSON.stringify([]),
-        JSON.stringify([]),
-        null,
-        JSON.stringify([]),
-        null,
-        JSON.stringify([]),
-        null,
-        null,
+        'pink',
+        pi.source_id,
         null,
         now,
         now,
@@ -376,19 +365,14 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
 
     await enqueueCaptureAnalysis(String(captureId), 'pre-warm');
 
-    const newRow = await pool.query<CaptureRow>(
-      'SELECT * FROM captures WHERE id = $1',
-      [captureId]
-    );
-
     return reply.status(201).send(
       successEnvelope(
         {
           id: String(captureId),
           pipeline_item_id: pipelineItemId,
-          color_review_stage: 'white',
-          created_at: newRow.rows[0]?.created_at ?? now,
-          updated_at: newRow.rows[0]?.updated_at ?? now,
+          color_stage: 'pink',
+          created_at: now,
+          updated_at: now,
         },
         req.requestId
       )
@@ -399,11 +383,12 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{
     Params: { id: string };
     Body: {
-      color_review_stage?: string;
-      color_review_notes?: string;
-      compliance_items?: ComplianceItem[];
-      pricing_assumptions?: PricingAssumptions;
-      teaming_worksheet?: TeamingWorksheet;
+      color_stage?: string;
+      capture_plan?: Record<string, unknown>;
+      pricing_notes?: string;
+      compliance_status?: string;
+      win_themes?: string[];
+      ghost_team?: Record<string, unknown>;
       force?: boolean;
     };
   }>('/v3/captures/:id', async (req, reply) => {
@@ -430,25 +415,23 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     const params: unknown[] = [];
     let paramIdx = 1;
     let shouldEnqueue = false;
-    let pricingGuardrail: PricingGuardrailResult | null = null;
     const now = new Date().toISOString();
-    const actor = ((req as unknown as Record<string, unknown>).user as { sub?: string } | undefined)?.sub ?? 'unknown';
 
-    // Color review stage
-    if (body.color_review_stage !== undefined) {
-      const nextStage = body.color_review_stage as string;
+    // Color stage
+    if (body.color_stage !== undefined) {
+      const nextStage = body.color_stage as string;
       if (!isValidStage(nextStage)) {
         return reply.status(400).send(
           errorEnvelope(
             'VALIDATION_ERROR',
-            `Invalid color_review_stage '${nextStage}'. Valid stages: ${COLOR_REVIEW_STAGES.join(', ')}`,
+            `Invalid color_stage '${nextStage}'. Valid stages: ${COLOR_REVIEW_STAGES.join(', ')}`,
             req.requestId
           )
         );
       }
 
       const transition = validateStageTransition(
-        existing.color_review_stage,
+        existing.color_stage,
         nextStage,
         body.force === true
       );
@@ -459,79 +442,56 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
-      updates.push(`color_review_stage = $${paramIdx++}`);
+      updates.push(`color_stage = $${paramIdx++}`);
       params.push(nextStage);
-
-      const audit = Array.isArray(existing.color_review_audit) ? [...existing.color_review_audit] : [];
-      audit.push({ stage: nextStage, actor, timestamp: now });
-      updates.push(`color_review_audit = $${paramIdx++}`);
-      params.push(JSON.stringify(audit));
-
       shouldEnqueue = true;
     }
 
-    // Color review notes (stage-scoped — only mutable while in the current stage)
-    if (body.color_review_notes !== undefined) {
-      updates.push(`color_review_notes = $${paramIdx++}`);
-      params.push(body.color_review_notes);
+    // Capture plan (jsonb)
+    if (body.capture_plan !== undefined) {
+      updates.push(`capture_plan = $${paramIdx++}`);
+      params.push(JSON.stringify(body.capture_plan));
+      shouldEnqueue = true;
     }
 
-    // Compliance items
-    if (body.compliance_items !== undefined) {
-      const items = body.compliance_items as ComplianceItem[];
-      if (!Array.isArray(items)) {
+    // Pricing notes (text)
+    if (body.pricing_notes !== undefined) {
+      updates.push(`pricing_notes = $${paramIdx++}`);
+      params.push(body.pricing_notes);
+    }
+
+    // Compliance status
+    if (body.compliance_status !== undefined) {
+      const validStatuses = ['incomplete', 'partial', 'complete'];
+      if (!validStatuses.includes(body.compliance_status as string)) {
         return reply.status(400).send(
-          errorEnvelope('VALIDATION_ERROR', 'compliance_items must be an array', req.requestId)
+          errorEnvelope(
+            'VALIDATION_ERROR',
+            `Invalid compliance_status '${body.compliance_status}'. Valid: ${validStatuses.join(', ')}`,
+            req.requestId
+          )
         );
       }
-      for (const item of items) {
-        if (item.status && !isValidComplianceStatus(item.status)) {
-          return reply.status(400).send(
-            errorEnvelope(
-              'VALIDATION_ERROR',
-              `Invalid compliance status '${item.status}'. Valid: compliant, partial, non_compliant`,
-              req.requestId
-            )
-          );
-        }
-      }
-      updates.push(`compliance_items = $${paramIdx++}`);
-      params.push(JSON.stringify(items));
+      updates.push(`compliance_status = $${paramIdx++}`);
+      params.push(body.compliance_status);
       shouldEnqueue = true;
     }
 
-    // Pricing assumptions
-    if (body.pricing_assumptions !== undefined) {
-      const assumptions = body.pricing_assumptions as PricingAssumptions;
-
-      if (assumptions.labor_rates && typeof assumptions.labor_rates === 'object') {
-        const missingRates = Object.keys(assumptions.labor_rates).length === 0
-          && assumptions.margin_pct !== undefined;
-        if (!missingRates) {
-          pricingGuardrail = evaluatePricingGuardrails(assumptions);
-        }
-      } else if (assumptions.margin_pct !== undefined) {
-        pricingGuardrail = evaluatePricingGuardrails(assumptions);
+    // Win themes (text[])
+    if (body.win_themes !== undefined) {
+      if (!Array.isArray(body.win_themes)) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', 'win_themes must be an array', req.requestId)
+        );
       }
-
-      updates.push(`pricing_assumptions = $${paramIdx++}`);
-      params.push(JSON.stringify(assumptions));
-      shouldEnqueue = true;
+      updates.push(`win_themes = $${paramIdx++}`);
+      params.push(body.win_themes);
     }
 
-    // Teaming worksheet
-    if (body.teaming_worksheet !== undefined) {
-      const worksheet = body.teaming_worksheet as TeamingWorksheet;
-      if (worksheet.partners && Array.isArray(worksheet.partners)) {
-        const validation = validateTeamingWorksheet(worksheet);
-        if (!validation.valid) {
-          return reply.status(400).send(
-            errorEnvelope('VALIDATION_ERROR', validation.errors.join('; '), req.requestId)
-          );
-        }
-      }
-      updates.push(`teaming_worksheet = $${paramIdx++}`);
-      params.push(JSON.stringify(worksheet));
+    // Ghost team (jsonb)
+    if (body.ghost_team !== undefined) {
+      updates.push(`ghost_team = $${paramIdx++}`);
+      params.push(JSON.stringify(body.ghost_team));
       shouldEnqueue = true;
     }
 
@@ -562,26 +522,18 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
       await enqueueCaptureAnalysis(String(id), 'pre-warm');
     }
 
-    const complianceItems = Array.isArray(updated.compliance_items) ? updated.compliance_items : [];
-
     const responseData: Record<string, unknown> = {
       id: updated.id,
       pipeline_item_id: updated.pipeline_item_id,
-      color_review_stage: updated.color_review_stage,
-      color_review_notes: updated.color_review_notes,
-      compliance_items: complianceItems,
-      compliance_summary: computeComplianceSummary(complianceItems),
-      pricing_assumptions: updated.pricing_assumptions,
-      teaming_worksheet: updated.teaming_worksheet,
-      ai_analyzed_at: updated.ai_analyzed_at,
-      analysis_version: updated.analysis_version,
+      color_stage: updated.color_stage,
+      capture_plan: updated.capture_plan,
+      pricing_notes: updated.pricing_notes,
+      compliance_status: updated.compliance_status,
+      win_themes: updated.win_themes ?? [],
+      ghost_team: updated.ghost_team,
       created_at: updated.created_at,
       updated_at: updated.updated_at,
     };
-
-    if (pricingGuardrail) {
-      responseData.pricing_guardrail = pricingGuardrail;
-    }
 
     return reply.status(200).send(
       successEnvelope(responseData, req.requestId)

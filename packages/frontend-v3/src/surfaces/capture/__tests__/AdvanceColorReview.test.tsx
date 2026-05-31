@@ -7,19 +7,27 @@ import { CaptureDetail } from '../CaptureDetail';
 
 const mockCapture = {
   id: 'cap-1',
+  pipeline_item_id: 'pi-1',
+  pipeline_capture_owner: 'shawn',
   opportunity_title: 'Army RS3 Sustainment',
-  agency: 'US Army',
-  response_date: '2026-07-15T00:00:00Z',
-  color_review_phase: 'blue' as const,
-  compliance_coverage: 0.75,
+  opportunity_title_sources: [],
+  opportunity_agency: 'US Army',
+  opportunity_agency_sources: [],
+  color_stage: 'pink' as const,
+  capture_plan: {},
+  pricing_notes: null,
+  compliance_status: 'incomplete',
+  win_themes: [],
+  ghost_team: null,
+  compliance_items: [],
   pwin: 0.62,
-  last_analyzed: '2026-05-30T14:00:00Z',
+  ai_analyzed_at: '2026-05-30T14:00:00Z',
+  analysis_version: 'v0.0.1',
   source_url: 'https://sam.gov/opp/rs3',
   source_url_sources: [{ kind: 'sam_gov', title: 'SAM.gov', url: 'https://sam.gov/opp/rs3', retrieved_at: '2026-05-30T12:00:00Z' }],
   pwin_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/pwin', retrieved_at: '2026-05-30T12:00:00Z' }],
   compliance_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/compliance', retrieved_at: '2026-05-30T12:00:00Z' }],
-  color_review_findings: [],
-  compliance_requirements: [],
+  compliance_coverage: 0.75,
   pricing: {
     labor_categories: [],
     total: 0,
@@ -29,12 +37,14 @@ const mockCapture = {
     benchmark_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/benchmark', retrieved_at: '2026-05-30T12:00:00Z' }],
   },
   teaming_partners: [],
+  created_at: '2026-05-30T12:00:00Z',
+  updated_at: '2026-05-30T14:00:00Z',
 };
 
 const mockAnalysis = {
   pwin: 0.65,
   pwin_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/pwin', retrieved_at: '2026-05-30T14:00:00Z' }],
-  color_review_phase: 'blue',
+  color_stage: 'pink',
   compliance_coverage: 0.8,
   compliance_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/compliance', retrieved_at: '2026-05-30T14:00:00Z' }],
   pricing_band: '$0-$0',
@@ -73,7 +83,7 @@ describe('AdvanceColorReview', () => {
       if (urlStr.includes('/captures/cap-1/advance-color-review') && init?.method === 'POST') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ success: true, data: { phase: 'pink' }, meta: { generatedAt: '2026-05-30T14:00:00Z', source: 'v3', requestId: 'r3' } }),
+          json: () => Promise.resolve({ success: true, data: { phase: 'red' }, meta: { generatedAt: '2026-05-30T14:00:00Z', source: 'v3', requestId: 'r3' } }),
         } as Response);
       }
       if (urlStr.includes('/captures/cap-1')) {
@@ -98,7 +108,7 @@ describe('AdvanceColorReview', () => {
     expect(await screen.findByText('Advance Color Review')).toBeInTheDocument();
     expect(screen.getByText(/This will advance the color review/)).toBeInTheDocument();
 
-    const confirmBtn = screen.getByRole('button', { name: /Advance to Pink/ });
+    const confirmBtn = screen.getByRole('button', { name: /Advance to Red/ });
     await user.click(confirmBtn);
 
     await waitFor(() => {

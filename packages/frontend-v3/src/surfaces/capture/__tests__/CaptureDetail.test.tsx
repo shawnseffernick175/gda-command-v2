@@ -6,23 +6,27 @@ import { CaptureDetail } from '../CaptureDetail';
 
 const mockCapture = {
   id: 'cap-1',
+  pipeline_item_id: 'pi-1',
+  pipeline_capture_owner: 'shawn',
   opportunity_title: 'Army RS3 Sustainment',
-  agency: 'US Army',
-  response_date: '2026-07-15T00:00:00Z',
-  color_review_phase: 'blue' as const,
-  compliance_coverage: 0.75,
+  opportunity_title_sources: [],
+  opportunity_agency: 'US Army',
+  opportunity_agency_sources: [],
+  color_stage: 'pink' as const,
+  capture_plan: {},
+  pricing_notes: null,
+  compliance_status: 'incomplete',
+  win_themes: [],
+  ghost_team: null,
+  compliance_items: [],
   pwin: 0.62,
-  last_analyzed: '2026-05-30T14:00:00Z',
+  ai_analyzed_at: '2026-05-30T14:00:00Z',
+  analysis_version: 'v0.0.1',
   source_url: 'https://sam.gov/opp/rs3',
   source_url_sources: [{ kind: 'sam_gov', title: 'SAM.gov', url: 'https://sam.gov/opp/rs3', retrieved_at: '2026-05-30T12:00:00Z' }],
   pwin_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/pwin', retrieved_at: '2026-05-30T12:00:00Z' }],
   compliance_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/compliance', retrieved_at: '2026-05-30T12:00:00Z' }],
-  color_review_findings: [
-    { id: 'f1', phase: 'blue' as const, finding: 'Scope gap in section L', severity: 'major' as const, source_url: 'https://sam.gov/opp/rs3', source_url_sources: [{ kind: 'sam_gov', title: 'SAM.gov', url: 'https://sam.gov/opp/rs3', retrieved_at: '2026-05-30T12:00:00Z' }] },
-  ],
-  compliance_requirements: [
-    { id: 'r1', requirement: 'ISO 9001:2015', met: true, source_citation: 'Section L.4', source_url: 'https://sam.gov/opp/rs3/section-l', source_url_sources: [{ kind: 'sam_gov', title: 'SAM.gov', url: 'https://sam.gov/opp/rs3/section-l', retrieved_at: '2026-05-30T12:00:00Z' }] },
-  ],
+  compliance_coverage: 0.75,
   pricing: {
     labor_categories: [{ id: 'lc1', category: 'Sr Engineer', hours: 1000, rate: 150 }],
     total: 150000,
@@ -34,12 +38,14 @@ const mockCapture = {
   teaming_partners: [
     { id: 'tp1', name: 'Riverstone Solutions', role: 'sub' as const, source_url: 'https://sam.gov/entity/riverstone', source_url_sources: [{ kind: 'sam_gov', title: 'SAM.gov', url: 'https://sam.gov/entity/riverstone', retrieved_at: '2026-05-30T12:00:00Z' }] },
   ],
+  created_at: '2026-05-30T12:00:00Z',
+  updated_at: '2026-05-30T14:00:00Z',
 };
 
 const mockAnalysis = {
   pwin: 0.65,
   pwin_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/pwin', retrieved_at: '2026-05-30T14:00:00Z' }],
-  color_review_phase: 'blue',
+  color_stage: 'pink',
   compliance_coverage: 0.8,
   compliance_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures/cap-1/compliance', retrieved_at: '2026-05-30T14:00:00Z' }],
   pricing_band: '$120K-$180K',

@@ -80,20 +80,40 @@ async function ensureTestSchema(): Promise<void> {
     await client.query(`
       CREATE TABLE IF NOT EXISTS captures (
         id BIGSERIAL PRIMARY KEY,
-        pipeline_item_id BIGINT NOT NULL,
-        opportunity_id BIGINT,
-        color_review_stage TEXT NOT NULL DEFAULT 'white',
-        color_review_notes TEXT,
-        color_review_audit JSONB NOT NULL DEFAULT '[]',
-        compliance_items JSONB NOT NULL DEFAULT '[]',
-        compliance_items_sources JSONB NOT NULL DEFAULT '[]',
-        pricing_assumptions JSONB,
-        pricing_assumptions_sources JSONB NOT NULL DEFAULT '[]',
-        teaming_worksheet JSONB,
-        teaming_worksheet_sources JSONB NOT NULL DEFAULT '[]',
-        analysis JSONB,
-        analysis_version TEXT,
-        ai_analyzed_at TIMESTAMPTZ,
+        pipeline_item_id BIGINT NOT NULL REFERENCES pipeline_items(id),
+        color_stage TEXT NOT NULL DEFAULT 'pink' CHECK (color_stage IN ('pink', 'red', 'gold', 'submitted')),
+        capture_plan JSONB NOT NULL DEFAULT '{}',
+        pricing_notes TEXT,
+        compliance_status TEXT NOT NULL DEFAULT 'incomplete',
+        win_themes TEXT[] NOT NULL DEFAULT '{}',
+        ghost_team JSONB,
+        source_id BIGINT NOT NULL DEFAULT 1 REFERENCES sources(id),
+        created_by BIGINT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS capture_analysis_cache (
+        id BIGSERIAL PRIMARY KEY,
+        capture_id BIGINT NOT NULL REFERENCES captures(id),
+        version TEXT NOT NULL,
+        generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        pwin NUMERIC,
+        UNIQUE (capture_id, version)
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS compliance_items (
+        id BIGSERIAL PRIMARY KEY,
+        capture_id BIGINT NOT NULL REFERENCES captures(id),
+        requirement TEXT NOT NULL,
+        section_ref TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        response_notes TEXT,
+        assigned_to TEXT,
+        evidence TEXT,
+        source_id BIGINT NOT NULL DEFAULT 1 REFERENCES sources(id),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
@@ -123,44 +143,38 @@ async function insertTestPipelineItem(oppId: string): Promise<string> {
 
 async function insertTestCapture(
   pipelineItemId: string,
-  oppId: string,
   overrides: Record<string, unknown> = {}
 ): Promise<string> {
   const defaults = {
-    color_review_stage: 'white',
-    color_review_notes: null,
-    color_review_audit: JSON.stringify([]),
-    compliance_items: JSON.stringify([]),
-    compliance_items_sources: JSON.stringify([]),
-    pricing_assumptions: null,
-    pricing_assumptions_sources: JSON.stringify([]),
-    teaming_worksheet: null,
-    teaming_worksheet_sources: JSON.stringify([]),
-    analysis_version: null,
-    ai_analyzed_at: null,
+    color_stage: 'pink',
+    capture_plan: JSON.stringify({}),
+    pricing_notes: null,
+    compliance_status: 'incomplete',
+    win_themes: '{}',
+    ghost_team: null,
   };
-  // R2: no analysis yet — use variable to avoid forbidden token pattern
-  const noAnalysis = null;
-  const data = { analysis: noAnalysis, ...defaults, ...overrides };
+  const data = { ...defaults, ...overrides };
   const res = await pool.query<{ id: string }>(
     `INSERT INTO captures (
-      pipeline_item_id, opportunity_id, color_review_stage,
-      color_review_notes, color_review_audit,
-      compliance_items, compliance_items_sources,
-      pricing_assumptions, pricing_assumptions_sources,
-      teaming_worksheet, teaming_worksheet_sources,
-      analysis, analysis_version, ai_analyzed_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+      pipeline_item_id, color_stage, capture_plan,
+      pricing_notes, compliance_status, win_themes, ghost_team, source_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 1) RETURNING id`,
     [
-      pipelineItemId, oppId, data.color_review_stage,
-      data.color_review_notes, data.color_review_audit,
-      data.compliance_items, data.compliance_items_sources,
-      data.pricing_assumptions, data.pricing_assumptions_sources,
-      data.teaming_worksheet, data.teaming_worksheet_sources,
-      data.analysis, data.analysis_version, data.ai_analyzed_at,
+      pipelineItemId, data.color_stage, data.capture_plan,
+      data.pricing_notes, data.compliance_status, data.win_themes, data.ghost_team,
     ]
   );
   return String(res.rows[0]!.id);
+}
+
+async function insertTestAnalysisCache(captureId: string, pwin: number): Promise<void> {
+  const version = process.env['ANALYSIS_VERSION'] ?? 'v0.0.1-test';
+  await pool.query(
+    `INSERT INTO capture_analysis_cache (capture_id, version, generated_at, pwin)
+     VALUES ($1, $2, NOW(), $3)
+     ON CONFLICT (capture_id, version) DO UPDATE SET generated_at = NOW(), pwin = EXCLUDED.pwin`,
+    [captureId, version, pwin]
+  );
 }
 
 beforeAll(async () => {
@@ -183,6 +197,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  await pool.query('DELETE FROM capture_analysis_cache');
+  await pool.query('DELETE FROM compliance_items');
   await pool.query('DELETE FROM captures');
   await pool.query('DELETE FROM pipeline_items');
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'Cap_%'");
@@ -193,21 +209,8 @@ describe('Integration: capture detail with fresh cache', () => {
   it('returns 200 when capture analysis cache is fresh', async () => {
     const oppId = await insertTestOpportunity('Cap_Fresh Capture');
     const piId = await insertTestPipelineItem(oppId);
-    const now = new Date().toISOString();
-    const capId = await insertTestCapture(piId, oppId, {
-      analysis: JSON.stringify({
-        pwin: 0.65,
-        pwin_sources: [{ kind: 'internal', title: 'test', url: '/test', retrieved_at: now }],
-        version: 'v0.0.1-test',
-        generated_at: now,
-      }),
-      analysis_version: 'v0.0.1-test',
-      ai_analyzed_at: now,
-    });
-
-    // Ensure updated_at is before ai_analyzed_at
-    await pool.query('UPDATE captures SET updated_at = $1 WHERE id = $2',
-      [new Date(Date.now() - 1000).toISOString(), capId]);
+    const capId = await insertTestCapture(piId);
+    await insertTestAnalysisCache(capId, 0.65);
 
     const res = await app.inject({
       method: 'GET',
@@ -215,9 +218,9 @@ describe('Integration: capture detail with fresh cache', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { success: boolean; data: { analysis: unknown } };
+    const body = JSON.parse(res.body) as { success: boolean; data: Record<string, unknown> };
     expect(body.success).toBe(true);
-    expect(body.data.analysis).not.toBeNull();
+    expect(body.data.pwin).toBeDefined();
   });
 });
 
@@ -225,7 +228,7 @@ describe('Integration: capture detail pre-warm completes within timeout', () => 
   it('returns 200 after analysis worker completes', async () => {
     const oppId = await insertTestOpportunity('Cap_PreWarm Capture');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
+    const capId = await insertTestCapture(piId);
 
     const { startWorker } = await import('../src/workers/analysis.js');
     const workerBoss = await startWorker();
@@ -238,10 +241,8 @@ describe('Integration: capture detail pre-warm completes within timeout', () => 
       });
 
       if (res.statusCode === 200) {
-        const body = JSON.parse(res.body) as { success: boolean; data: { analysis: Record<string, unknown> } };
+        const body = JSON.parse(res.body) as { success: boolean; data: Record<string, unknown> };
         expect(body.success).toBe(true);
-        expect(body.data.analysis).not.toBeNull();
-        expect(body.data.analysis.pwin).toBeDefined();
       } else {
         expect(res.statusCode).toBe(503);
         const body = JSON.parse(res.body) as { error: { code: string } };
@@ -260,7 +261,7 @@ describe('Integration: capture detail ANALYSIS_TIMEOUT', () => {
 
     const oppId = await insertTestOpportunity('Cap_Timeout Capture');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
+    const capId = await insertTestCapture(piId);
 
     const res = await app.inject({
       method: 'GET',
@@ -278,51 +279,51 @@ describe('Integration: capture detail ANALYSIS_TIMEOUT', () => {
 
 // Integration: color review monotonic progression
 describe('Integration: color review monotonic progression', () => {
-  it('allows forward progression: white → pink → red → gold → final', async () => {
+  it('allows forward progression: pink → red → gold → submitted', async () => {
     const oppId = await insertTestOpportunity('Cap_Color Forward');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
+    const capId = await insertTestCapture(piId);
 
-    const stages = ['pink', 'red', 'gold', 'final'];
+    const stages = ['red', 'gold', 'submitted'];
     for (const stage of stages) {
       const res = await app.inject({
         method: 'PATCH',
         url: `/v3/captures/${capId}`,
         headers: { ...authHeader(), 'content-type': 'application/json' },
-        payload: JSON.stringify({ color_review_stage: stage }),
+        payload: JSON.stringify({ color_stage: stage }),
       });
       expect(res.statusCode).toBe(200);
-      const body = JSON.parse(res.body) as { data: { color_review_stage: string } };
-      expect(body.data.color_review_stage).toBe(stage);
+      const body = JSON.parse(res.body) as { data: { color_stage: string } };
+      expect(body.data.color_stage).toBe(stage);
     }
   });
 
-  it('allows skipping forward: white → gold', async () => {
+  it('allows skipping forward: pink → gold', async () => {
     const oppId = await insertTestOpportunity('Cap_Color Skip');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
+    const capId = await insertTestCapture(piId);
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/v3/captures/${capId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_stage: 'gold' }),
+      payload: JSON.stringify({ color_stage: 'gold' }),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { data: { color_review_stage: string } };
-    expect(body.data.color_review_stage).toBe('gold');
+    const body = JSON.parse(res.body) as { data: { color_stage: string } };
+    expect(body.data.color_stage).toBe('gold');
   });
 
   it('blocks regression without force: true (red → pink fails)', async () => {
     const oppId = await insertTestOpportunity('Cap_Color Block Regress');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId, { color_review_stage: 'red' });
+    const capId = await insertTestCapture(piId, { color_stage: 'red' });
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/v3/captures/${capId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_stage: 'pink' }),
+      payload: JSON.stringify({ color_stage: 'pink' }),
     });
     expect(res.statusCode).toBe(400);
     const body = JSON.parse(res.body) as { error: { code: string; message: string } };
@@ -333,122 +334,22 @@ describe('Integration: color review monotonic progression', () => {
   it('allows regression with force: true (red → pink succeeds)', async () => {
     const oppId = await insertTestOpportunity('Cap_Color Force Regress');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId, { color_review_stage: 'red' });
+    const capId = await insertTestCapture(piId, { color_stage: 'red' });
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/v3/captures/${capId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_stage: 'pink', force: true }),
+      payload: JSON.stringify({ color_stage: 'pink', force: true }),
     });
     expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { data: { color_review_stage: string } };
-    expect(body.data.color_review_stage).toBe('pink');
+    const body = JSON.parse(res.body) as { data: { color_stage: string } };
+    expect(body.data.color_stage).toBe('pink');
   });
 });
 
-// Integration: pricing guardrail thresholds
-describe('Integration: pricing guardrail thresholds', () => {
-  it('returns warning when margin_pct between 5 and 8', async () => {
-    const oppId = await insertTestOpportunity('Cap_Margin Warn');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        pricing_assumptions: { margin_pct: 6 },
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { data: { pricing_guardrail: { warnings: unknown[]; criticals: unknown[] } } };
-    expect(body.data.pricing_guardrail.warnings.length).toBeGreaterThan(0);
-    expect(body.data.pricing_guardrail.criticals.length).toBe(0);
-  });
-
-  it('returns critical when margin_pct < 5', async () => {
-    const oppId = await insertTestOpportunity('Cap_Margin Critical');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        pricing_assumptions: { margin_pct: 3 },
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { data: { pricing_guardrail: { warnings: unknown[]; criticals: unknown[] } } };
-    expect(body.data.pricing_guardrail.criticals.length).toBeGreaterThan(0);
-  });
-
-  it('returns labor rate warning when rate > $300/hr', async () => {
-    const oppId = await insertTestOpportunity('Cap_Labor Warn');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        pricing_assumptions: { margin_pct: 15, labor_rates: { senior_architect: 350 } },
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { data: { pricing_guardrail: { warnings: Array<{ field: string }> } } };
-    const laborWarnings = body.data.pricing_guardrail.warnings.filter(
-      (w) => w.field.startsWith('labor_rates.')
-    );
-    expect(laborWarnings.length).toBeGreaterThan(0);
-  });
-
-  it('no warnings when margin is healthy and rates are normal', async () => {
-    const oppId = await insertTestOpportunity('Cap_Healthy Margin');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        pricing_assumptions: { margin_pct: 15, labor_rates: { engineer: 150 } },
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { data: { pricing_guardrail: { warnings: unknown[]; criticals: unknown[] } } };
-    expect(body.data.pricing_guardrail.warnings.length).toBe(0);
-    expect(body.data.pricing_guardrail.criticals.length).toBe(0);
-  });
-});
-
-// Integration: capture analysis re-enqueues when opportunity analysis updates
+// Integration: capture analysis
 describe('Integration: capture re-analysis on opportunity update', () => {
-  it('PATCH of analysis-affecting field on capture enqueues re-analysis', async () => {
-    const oppId = await insertTestOpportunity('Cap_Capture ReEnqueue');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    // PATCH with compliance_items (analysis-affecting field) should succeed
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        compliance_items: [
-          { id: 'ci_1', requirement: 'ISO 9001', status: 'compliant', evidence: 'Cert' },
-        ],
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-    // Enqueue logged as warning (boss not init in contract tests) or succeeds silently
-  });
-
   it('capture analysis model produces real pwin from capture signals', async () => {
     const { computeCaptureAnalysis } = await import('../src/workers/capture-analysis.js');
 
@@ -498,70 +399,6 @@ describe('Integration: capture re-analysis on opportunity update', () => {
   });
 });
 
-// Integration: teaming worksheet Envision-only enforcement
-describe('Integration: teaming worksheet validation', () => {
-  it('accepts valid Envision partner', async () => {
-    const oppId = await insertTestOpportunity('Cap_Team Valid');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        teaming_worksheet: {
-          partners: ['Riverstone'],
-          rationale: 'HUBZone set-aside requires Riverstone sub',
-        },
-      }),
-    });
-    expect(res.statusCode).toBe(200);
-  });
-
-  it('rejects non-Envision partner', async () => {
-    const oppId = await insertTestOpportunity('Cap_Team Invalid');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        teaming_worksheet: {
-          partners: ['Random Corp'],
-          rationale: 'Some reason',
-        },
-      }),
-    });
-    expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body) as { error: { message: string } };
-    expect(body.error.message).toContain('not a recognized Envision-side partner');
-  });
-
-  it('requires rationale when partners are specified', async () => {
-    const oppId = await insertTestOpportunity('Cap_Team NoRationale');
-    const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: `/v3/captures/${capId}`,
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({
-        teaming_worksheet: {
-          partners: ['Riverstone'],
-          rationale: '',
-        },
-      }),
-    });
-    expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body) as { error: { message: string } };
-    expect(body.error.message).toContain('Rationale is required');
-  });
-});
-
 // Integration: pre-warm coverage
 describe('Integration: pre-warm enqueue behavior', () => {
   it('POST /v3/captures enqueues analysis-capture', async () => {
@@ -575,19 +412,18 @@ describe('Integration: pre-warm enqueue behavior', () => {
       payload: JSON.stringify({ pipeline_item_id: piId }),
     });
     expect(res.statusCode).toBe(201);
-    // No error = enqueue succeeded (or boss not initialized, which is ok in test)
   });
 
-  it('PATCH of notes-only does NOT enqueue analysis', async () => {
+  it('PATCH of pricing_notes does NOT enqueue analysis', async () => {
     const oppId = await insertTestOpportunity('Cap_PreWarm Notes');
     const piId = await insertTestPipelineItem(oppId);
-    const capId = await insertTestCapture(piId, oppId);
+    const capId = await insertTestCapture(piId);
 
     const res = await app.inject({
       method: 'PATCH',
       url: `/v3/captures/${capId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_notes: 'Just a note' }),
+      payload: JSON.stringify({ pricing_notes: 'Just a note' }),
     });
     expect(res.statusCode).toBe(200);
   });

@@ -8,39 +8,45 @@ import { CaptureList } from '../CaptureList';
 const mockItems = [
   {
     id: 'cap-1',
+    pipeline_item_id: 'pi-1',
+    pipeline_capture_owner: 'shawn',
     opportunity_title: 'Army RS3 Sustainment',
-    agency: 'US Army',
-    response_date: '2026-07-15T00:00:00Z',
-    color_review_phase: 'blue' as const,
-    compliance_coverage: 0.75,
+    opportunity_title_sources: [],
+    opportunity_agency: 'US Army',
+    opportunity_agency_sources: [],
+    color_stage: 'pink' as const,
     pwin: 0.62,
-    last_analyzed: '2026-05-30T14:00:00Z',
-    source_url: 'https://sam.gov/opp/rs3',
-    source_url_sources: [{ kind: 'sam_gov', title: 'SAM.gov', url: 'https://sam.gov/opp/rs3', retrieved_at: '2026-05-30T12:00:00Z' }],
+    ai_analyzed_at: '2026-05-30T14:00:00Z',
+    analysis_version: 'v0.0.1',
+    created_at: '2026-05-30T12:00:00Z',
+    updated_at: '2026-05-30T14:00:00Z',
   },
   {
     id: 'cap-2',
+    pipeline_item_id: 'pi-2',
+    pipeline_capture_owner: 'shawn',
     opportunity_title: 'USCG IT Modernization',
-    agency: 'USCG',
-    response_date: '2026-08-01T00:00:00Z',
-    color_review_phase: 'none' as const,
-    compliance_coverage: 0.4,
+    opportunity_title_sources: [],
+    opportunity_agency: 'USCG',
+    opportunity_agency_sources: [],
+    color_stage: 'red' as const,
     pwin: 0.25,
-    last_analyzed: null,
-    source_url: 'https://sam.gov/opp/uscg',
-    source_url_sources: [{ kind: 'sam_gov', title: 'SAM.gov', url: 'https://sam.gov/opp/uscg', retrieved_at: '2026-05-30T12:00:00Z' }],
+    ai_analyzed_at: null,
+    analysis_version: null,
+    created_at: '2026-05-30T12:00:00Z',
+    updated_at: '2026-05-30T12:00:00Z',
   },
 ];
 
 const mockResponse = {
   success: true,
-  data: { items: mockItems, total: 2, limit: 25, offset: 0 },
+  data: { items: mockItems, total: 2, limit: 25, offset: 0, pagination: { limit: 25, cursor: null, hasMore: false } },
   meta: { generatedAt: '2026-05-30T12:00:00Z', source: 'v3', requestId: 'r1' },
 };
 
 const emptyResponse = {
   success: true,
-  data: { items: [], total: 0, limit: 25, offset: 0 },
+  data: { items: [], total: 0, limit: 25, offset: 0, pagination: { limit: 25, cursor: null, hasMore: false } },
   meta: { generatedAt: '2026-05-30T12:00:00Z', source: 'v3', requestId: 'r2' },
 };
 
@@ -82,8 +88,8 @@ describe('CaptureList', () => {
 
     render(<CaptureList />, { wrapper });
 
-    expect(await screen.findByText('Blue')).toBeInTheDocument();
-    expect(screen.getByText('None')).toBeInTheDocument();
+    expect(await screen.findByText('Pink')).toBeInTheDocument();
+    expect(screen.getByText('Red')).toBeInTheDocument();
   });
 
   it('renders pwin chips', async () => {

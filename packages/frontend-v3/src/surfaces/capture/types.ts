@@ -1,101 +1,106 @@
-export interface SourceCitation {
+import type { SourceRef } from '../../lib/api-client';
+
+export type ColorStage = 'pink' | 'red' | 'gold' | 'submitted';
+
+export interface Source {
   kind: string;
   title: string;
   url: string;
   retrieved_at: string;
 }
 
-export type ColorReviewPhase = 'none' | 'blue' | 'pink' | 'red' | 'gold';
-
 export interface CaptureListItem {
   id: string;
-  opportunity_title: string;
-  agency: string;
-  response_date: string;
-  color_review_phase: ColorReviewPhase;
-  compliance_coverage: number;
-  pwin: number;
-  last_analyzed: string | null;
-  source_url: string;
-  source_url_sources: SourceCitation[];
+  pipeline_item_id: string;
+  pipeline_capture_owner: string | null;
+  opportunity_title: string | null;
+  opportunity_title_sources: Source[];
+  opportunity_agency: string | null;
+  opportunity_agency_sources: Source[];
+  color_stage: ColorStage;
+  pwin: number | null;
+  ai_analyzed_at: string | null;
+  analysis_version: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CaptureListResponse {
-  items: CaptureListItem[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-export interface ColorReviewFinding {
-  id: string;
-  phase: ColorReviewPhase;
-  finding: string;
-  severity: 'critical' | 'major' | 'minor';
-  source_url: string;
-  source_url_sources: SourceCitation[];
+  success: boolean;
+  data: {
+    items: CaptureListItem[];
+    pagination: {
+      limit: number;
+      cursor: string | null;
+      hasMore: boolean;
+    };
+    total?: number;
+    limit?: number;
+    offset?: number;
+  };
+  meta: { generatedAt: string; source: string; requestId: string };
 }
 
 export interface ComplianceRequirement {
   id: string;
   requirement: string;
-  met: boolean;
-  source_citation: string;
-  source_url: string;
-  source_url_sources: SourceCitation[];
-}
-
-export interface LaborCategory {
-  id: string;
-  category: string;
-  hours: number;
-  rate: number;
+  section_ref: string | null;
+  status: string;
+  response_notes: string | null;
+  assigned_to: string | null;
+  source_id: string;
 }
 
 export interface PricingData {
-  labor_categories: LaborCategory[];
+  labor_categories: { id?: string; category: string; hours: number; rate: number }[];
   total: number;
   benchmark_band_low: number;
   benchmark_band_high: number;
-  total_sources: SourceCitation[];
-  benchmark_sources: SourceCitation[];
+  total_sources: Source[];
+  benchmark_sources: Source[];
 }
 
 export interface TeamingPartner {
-  id: string;
+  id?: string;
   name: string;
-  role: 'prime' | 'sub' | 'mentor' | 'protege' | 'teaming';
-  source_url: string;
-  source_url_sources: SourceCitation[];
+  role: 'prime' | 'sub' | 'mentor';
+  source_url?: string;
+  source_url_sources?: Source[];
 }
 
 export interface CaptureDetail {
   id: string;
-  opportunity_title: string;
-  agency: string;
-  response_date: string;
-  color_review_phase: ColorReviewPhase;
-  compliance_coverage: number;
-  pwin: number;
-  last_analyzed: string | null;
-  source_url: string;
-  source_url_sources: SourceCitation[];
-  pwin_sources: SourceCitation[];
-  compliance_sources: SourceCitation[];
-  color_review_findings: ColorReviewFinding[];
-  compliance_requirements: ComplianceRequirement[];
-  pricing: PricingData;
-  teaming_partners: TeamingPartner[];
+  pipeline_item_id: string;
+  pipeline_capture_owner: string | null;
+  opportunity_title: string | null;
+  opportunity_title_sources: Source[];
+  opportunity_agency: string | null;
+  opportunity_agency_sources: Source[];
+  color_stage: ColorStage;
+  capture_plan: Record<string, unknown>;
+  pricing_notes: string | null;
+  compliance_status: string;
+  win_themes: string[];
+  ghost_team: Record<string, unknown> | null;
+  compliance_items: ComplianceRequirement[];
+  pwin: number | null;
+  ai_analyzed_at: string | null;
+  analysis_version: string | null;
+  source_url?: string;
+  source_url_sources?: Source[];
+  pwin_sources?: Source[];
+  compliance_sources?: Source[];
+  compliance_coverage?: number;
+  pricing?: PricingData;
+  teaming_partners?: TeamingPartner[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AnalysisResult {
   pwin: number;
-  pwin_sources: SourceCitation[];
-  color_review_phase: ColorReviewPhase;
+  pwin_sources: SourceRef[];
+  color_stage: ColorStage;
   compliance_coverage: number;
-  compliance_sources: SourceCitation[];
-  pricing_band: string;
-  pricing_band_sources: SourceCitation[];
-  teaming_recommendation: string;
-  teaming_recommendation_sources: SourceCitation[];
+  compliance_sources: SourceRef[];
 }
