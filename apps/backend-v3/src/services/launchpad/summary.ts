@@ -1,7 +1,9 @@
 import { pool } from '../../lib/db.js';
 
+export type CitationKind = 'internal_query' | 'internal_event' | 'external_upstream';
+
 export interface SourceCitation {
-  kind: string;
+  kind: CitationKind;
   title: string;
   url: string;
   retrieved_at: string;
@@ -20,18 +22,9 @@ export interface LaunchpadSummary {
   action_items_overdue_sources: SourceCitation[];
 }
 
-const INTERNAL_SOURCE: SourceCitation = {
-  kind: 'internal',
-  title: 'GDA Command V3 — computed count',
-  url: '/v3/launchpad/summary',
-  retrieved_at: new Date().toISOString(),
-};
-
-function internalCitation(filterUrl: string): SourceCitation[] {
-  return [{ ...INTERNAL_SOURCE, url: filterUrl, retrieved_at: new Date().toISOString() }];
-}
-
 export async function computeSummary(): Promise<LaunchpadSummary> {
+  const retrievedAt = new Date().toISOString();
+
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
@@ -75,14 +68,39 @@ export async function computeSummary(): Promise<LaunchpadSummary> {
 
   return {
     qualified_due_this_week: parseInt(qualifiedRes.rows[0]?.count ?? '0', 10),
-    qualified_due_this_week_sources: internalCitation('/v3/opportunities?status=qualified&due_before=' + endOfWeek.toISOString().split('T')[0]),
+    qualified_due_this_week_sources: [{
+      kind: 'internal_query',
+      title: 'Opportunities (qualified, due this week)',
+      url: '/opportunities?status=qualified&due=this_week',
+      retrieved_at: retrievedAt,
+    }],
     pipeline_no_capture: parseInt(pipelineNoCaptureRes.rows[0]?.count ?? '0', 10),
-    pipeline_no_capture_sources: internalCitation('/v3/pipeline?no_capture=1'),
+    pipeline_no_capture_sources: [{
+      kind: 'internal_query',
+      title: 'Pipeline items missing a capture record',
+      url: '/pipeline?missing_capture=1',
+      retrieved_at: retrievedAt,
+    }],
     captures_color_review_stale: parseInt(staleReviewRes.rows[0]?.count ?? '0', 10),
-    captures_color_review_stale_sources: internalCitation('/v3/captures?stale_review=1'),
+    captures_color_review_stale_sources: [{
+      kind: 'internal_query',
+      title: 'Captures with color review > 14 days old',
+      url: '/capture?stale=1',
+      retrieved_at: retrievedAt,
+    }],
     action_items_open_today: parseInt(openTodayRes.rows[0]?.count ?? '0', 10),
-    action_items_open_today_sources: internalCitation('/v3/action-items?status=open&due=today'),
+    action_items_open_today_sources: [{
+      kind: 'internal_query',
+      title: 'Action items open with due_date = today',
+      url: '/action-items?due=today',
+      retrieved_at: retrievedAt,
+    }],
     action_items_overdue: parseInt(overdueRes.rows[0]?.count ?? '0', 10),
-    action_items_overdue_sources: internalCitation('/v3/action-items?status=open&overdue=1'),
+    action_items_overdue_sources: [{
+      kind: 'internal_query',
+      title: 'Action items open and past due',
+      url: '/action-items?overdue=1',
+      retrieved_at: retrievedAt,
+    }],
   };
 }

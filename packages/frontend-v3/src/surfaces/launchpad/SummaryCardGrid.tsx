@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import type { LaunchpadSummary, SourceCitation } from './types';
+import type { MouseEvent } from 'react';
 
 interface CardDef {
   key: keyof Pick<LaunchpadSummary, 'qualified_due_this_week' | 'pipeline_no_capture' | 'captures_color_review_stale' | 'action_items_open_today' | 'action_items_overdue'>;
@@ -53,18 +54,33 @@ const severityBorder: Record<string, string> = {
   info: 'border-l-4 border-l-accent',
 };
 
-function SourcePill({ citation }: { citation: SourceCitation }) {
-  const isExternal = citation.url.startsWith('http');
-  const indicator = isExternal ? '\u2197' : '#';
+function SourcePill({ citation, navigate }: { citation: SourceCitation; navigate: (to: string) => void }) {
+  const isExternal = citation.kind === 'external_upstream' || citation.url.startsWith('http');
+  const indicator = isExternal ? '\u2197' : '\u2192';
+
+  function handleClick(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isExternal) {
+      window.open(citation.url, '_blank', 'noopener,noreferrer');
+    } else {
+      navigate(citation.url);
+    }
+  }
+
   return (
-    <span
-      className="inline-flex items-center gap-1 h-5 px-2 rounded-full border border-border bg-surface-raised text-xs text-ink-muted"
+    <a
+      href={citation.url}
+      onClick={handleClick}
+      target={isExternal ? '_blank' : undefined}
+      rel={isExternal ? 'noopener noreferrer' : undefined}
+      className="inline-flex items-center gap-1 h-5 px-2 rounded-full border border-border bg-surface-raised text-xs text-ink-muted hover:text-accent transition-colors"
       title={`${citation.title} \u2014 Retrieved: ${new Date(citation.retrieved_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}`}
       data-testid="source-pill"
     >
       <span>{citation.title}</span>
       <span>{indicator}</span>
-    </span>
+    </a>
   );
 }
 
@@ -143,7 +159,7 @@ export function SummaryCardGrid({ data, isLoading, isError, error, refetch }: Su
             {sources.length > 0 && (
               <span className="flex flex-wrap gap-1 mt-3">
                 {sources.map((src, i) => (
-                  <SourcePill key={i} citation={src} />
+                  <SourcePill key={i} citation={src} navigate={navigate} />
                 ))}
               </span>
             )}
