@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { InputForm } from './InputForm';
 import { ResultPanel } from './ResultPanel';
@@ -19,10 +19,23 @@ export function FastTrack() {
   const [viewState, setViewState] = useState<ViewState>({ kind: 'empty' });
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));
   const [lastInput, setLastInput] = useState<FastTrackInput | null>(null);
+  const [accumulatedItems, setAccumulatedItems] = useState<FastTrackResult[]>([]);
+  const prevCursorRef = useRef<string | null>(null);
 
   const submitMutation = useFastTrackSubmit();
   const history = useRecentHistory(cursor);
   const byIdQuery = useFastTrackById(selectedId);
+
+  useEffect(() => {
+    if (history.data) {
+      if (cursor === null) {
+        setAccumulatedItems(history.data.items);
+      } else if (cursor !== prevCursorRef.current) {
+        setAccumulatedItems((prev) => [...prev, ...history.data!.items]);
+      }
+      prevCursorRef.current = cursor;
+    }
+  }, [history.data, cursor]);
 
   useEffect(() => {
     if (byIdQuery.data) {
@@ -92,7 +105,7 @@ export function FastTrack() {
 
           {viewState.kind === 'empty' && (
             <HistoryList
-              items={history.data?.items || []}
+              items={accumulatedItems}
               isLoading={history.isLoading}
               nextCursor={history.data?.next_cursor || null}
               onLoadMore={handleLoadMore}

@@ -33,43 +33,49 @@ export function ResultPanel({ result }: ResultPanelProps) {
     navigator.clipboard.writeText(url);
   }
 
-  const sourceUrl = result.source_chips.length > 0 ? result.source_chips[0]!.url : '';
+  const primarySourceUrl = result.source_chips.length > 0 ? result.source_chips[0]!.url : undefined;
 
   return (
     <div className="flex flex-col gap-4 rounded-sm border border-border bg-white p-6" data-testid="result-panel">
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-ink-muted">Grade:</span>
-          <span
-            className={`inline-flex items-center h-6 px-2 rounded-full border text-xs font-semibold ${gradeClasses[result.grade] || ''}`}
-            data-grade={result.grade}
-            data-source-url={sourceUrl}
-          >
-            {result.grade}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-ink-muted">Recommended:</span>
-          <span
-            className={`inline-flex items-center h-6 px-2 rounded-full border text-xs font-semibold capitalize ${actionClasses[result.recommended_action] || ''}`}
-            data-recommended-action={result.recommended_action}
-            data-source-url={sourceUrl}
-          >
-            {result.recommended_action}
-          </span>
-        </div>
+        {primarySourceUrl && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-ink-muted">Grade:</span>
+            <span
+              className={`inline-flex items-center h-6 px-2 rounded-full border text-xs font-semibold ${gradeClasses[result.grade] || ''}`}
+              data-grade={result.grade}
+              data-source-url={primarySourceUrl}
+            >
+              {result.grade}
+            </span>
+          </div>
+        )}
+        {primarySourceUrl && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-ink-muted">Recommended:</span>
+            <span
+              className={`inline-flex items-center h-6 px-2 rounded-full border text-xs font-semibold capitalize ${actionClasses[result.recommended_action] || ''}`}
+              data-recommended-action={result.recommended_action}
+              data-source-url={primarySourceUrl}
+            >
+              {result.recommended_action}
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-ink-muted">NAICS match score:</span>
-        <span
-          className="text-sm font-medium text-ink-primary nums"
-          data-stat="naics-match-score"
-          data-source-url={sourceUrl}
-        >
-          {result.naics_match_score} / 100
-        </span>
-      </div>
+      {primarySourceUrl && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-ink-muted">NAICS match score:</span>
+          <span
+            className="text-sm font-medium text-ink-primary nums"
+            data-stat="naics-match-score"
+            data-source-url={primarySourceUrl}
+          >
+            {result.naics_match_score} / 100
+          </span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1">
         <span className="text-xs text-ink-muted">Rationale:</span>
