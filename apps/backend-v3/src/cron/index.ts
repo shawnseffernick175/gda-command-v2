@@ -15,7 +15,7 @@ import { runIngest, getRegisteredSources } from '../ingest/framework/registry.js
 import { registerSAMSource } from '../ingest/sam/index.js';
 import { registerDIBBSSource } from '../ingest/dibbs/index.js';
 import { registerNECOSource } from '../ingest/neco/index.js';
-import { registerFPDSSource } from '../ingest/fpds/index.js';
+import { registerUSASpendingSource } from '../ingest/usaspending/index.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
@@ -30,7 +30,7 @@ interface CronJob {
 
 const JOBS: CronJob[] = [
   { sourceKey: 'sam.gov', schedule: '0 */4 * * *', label: 'SAM.gov ingest (every 4 hours)' },
-  { sourceKey: 'fpds.gov', schedule: '0 7 * * *', label: 'FPDS daily awards ingest (03:00 ET)' },
+  { sourceKey: 'usaspending.gov', schedule: '0 7 * * *', label: 'USAspending daily awards ingest (03:00 ET)' },
   ...(dibbsEnabled
     ? [{ sourceKey: 'dibbs', schedule: '0 */6 * * *', label: 'DIBBS ingest (every 6 hours)' }]
     : []),
@@ -41,7 +41,7 @@ const JOBS: CronJob[] = [
 
 export function startCronScheduler(): void {
   registerSAMSource();
-  registerFPDSSource();
+  registerUSASpendingSource();
   // Source registration kept unconditionally so manual POST /v3/admin/ingest/run/dibbs|neco
   // still resolves. Only the cron schedule is gated by the env flags above.
   registerDIBBSSource();
@@ -72,7 +72,7 @@ export function startCronScheduler(): void {
 
     tasks.push(task);
     const cronLabel = job.sourceKey === 'sam.gov' ? 'sam.4h'
-      : job.sourceKey === 'fpds.gov' ? 'fpds.daily'
+      : job.sourceKey === 'usaspending.gov' ? 'usaspending.daily'
       : job.sourceKey === 'dibbs' ? 'dibbs.6h'
       : job.sourceKey === 'neco' ? 'neco.6h'
       : job.sourceKey;

@@ -1,16 +1,16 @@
 /**
- * FPDS ingest job — pulls the last 48 hours of award modifications,
- * parses ATOM XML, maps to award rows, and upserts with source citations.
+ * USAspending ingest job — pulls the last 48 hours of DoD contract award
+ * modifications, maps to award rows, and upserts with per-field source
+ * citations (R1 compliant).
  *
  * Idempotency: UNIQUE on (piid, last_mod_date), ON CONFLICT DO NOTHING.
- * Parse errors are logged and skipped — the job never crashes.
+ * Row-level errors are logged and skipped — the job never crashes.
  */
 
 import { logger } from '../../lib/logger.js';
 import { pool } from '../../lib/db.js';
-import { fetchFPDSPages } from './client.js';
-import { parseFPDSPage } from './parser.js';
-import { mapFPDSAward } from './mapper.js';
+import { fetchUSASpendingAwards } from './client.js';
+import { mapUSASpendingAward } from './mapper.js';
 import type { AwardRow, AwardSourceCitation } from './mapper.js';
 import type { IngestResult } from '../framework/registry.js';
 
@@ -32,12 +32,12 @@ async function upsertAwardWithSources(
   try {
     await client.query('BEGIN');
 
-    const sourceUrl = award.fpds_url ?? `https://www.fpds.gov`;
+    const sourceUrl = award.fpds_url ?? 'https://www.usaspending.gov';
     const { rows: sourceRows } = await client.query(
       `INSERT INTO sources (kind, url, title, confidence, meta)
-       VALUES ('fpds', $1, $2, 'high', '{}')
+       VALUES ('usaspending', $1, $2, 'high', '{}')
        RETURNING id`,
-      [sourceUrl, `FPDS Award ${award.piid}`],
+      [sourceUrl, `USA Spending award detail ${award.piid}`],
     );
     const sourceId = sourceRows[0].id;
 
@@ -46,13 +46,13 @@ async function upsertAwardWithSources(
          piid, agency_id, agency_name, contracting_office,
          awardee_name, awardee_uei, awardee_duns,
          value_obligated, value_base_and_all_options,
-         naics, psc, set_aside,
+         naics, psc,
          place_of_performance_state, place_of_performance_country,
          award_date, last_mod_date, contract_type,
-         parent_award_id, sam_notice_id,
+         sam_notice_id,
          data_source, source_id, fpds_url
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        ON CONFLICT (piid, last_mod_date) DO NOTHING
        RETURNING id`,
       [
@@ -67,13 +67,11 @@ async function upsertAwardWithSources(
         award.value_base_and_all_options,
         award.naics,
         award.psc,
-        award.set_aside,
         award.place_of_performance_state,
         award.place_of_performance_country,
         award.award_date,
         award.last_mod_date,
         award.contract_type,
-        award.parent_award_id,
         award.sam_notice_id,
         award.data_source,
         sourceId,
@@ -110,61 +108,49 @@ async function upsertAwardWithSources(
   }
 }
 
-export async function runFPDSIngest(): Promise<IngestResult> {
+export async function runUSASpendingIngest(): Promise<IngestResult> {
   const toDate = new Date();
   const fromDate = new Date(toDate.getTime() - LOOKBACK_HOURS * 60 * 60 * 1000);
 
   logger.info(
-    { source: 'fpds.gov', fromDate: fromDate.toISOString(), toDate: toDate.toISOString() },
-    'fpds_ingest_job_start',
+    { source: 'usaspending', fromDate: fromDate.toISOString(), toDate: toDate.toISOString() },
+    'usaspending_ingest_job_start',
   );
 
-  const xmlPages = await fetchFPDSPages(fromDate, toDate);
+  const records = await fetchUSASpendingAwards(fromDate, toDate);
 
-  let totalParsed = 0;
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
 
-  for (const xml of xmlPages) {
-    let records;
+  for (const raw of records) {
     try {
-      records = parseFPDSPage(xml);
-    } catch (err) {
-      logger.error(
-        { error: err instanceof Error ? err.message : String(err) },
-        'fpds_parse_page_error',
-      );
-      skipped++;
-      continue;
-    }
-
-    totalParsed += records.length;
-
-    for (const raw of records) {
-      try {
-        const { award, citations } = mapFPDSAward(raw);
-        const outcome = await upsertAwardWithSources(award, citations);
-
-        if (outcome === 'inserted') inserted++;
-        else skipped++;
-      } catch (err) {
+      const mapped = mapUSASpendingAward(raw);
+      if (!mapped) {
         skipped++;
-        logger.error(
-          {
-            source: 'fpds.gov',
-            piid: raw.piid,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          'fpds_ingest_row_error',
-        );
+        continue;
       }
+
+      const outcome = await upsertAwardWithSources(mapped.award, mapped.citations);
+
+      if (outcome === 'inserted') inserted++;
+      else skipped++;
+    } catch (err) {
+      skipped++;
+      logger.error(
+        {
+          source: 'usaspending',
+          awardId: raw['Award ID'],
+          error: err instanceof Error ? err.message : String(err),
+        },
+        'usaspending_ingest_row_error',
+      );
     }
   }
 
   logger.info(
-    { source: 'fpds.gov', totalParsed, inserted, skipped },
-    'fpds_ingest_fetched',
+    { source: 'usaspending', totalFetched: records.length, inserted, skipped },
+    'usaspending_ingest_fetched',
   );
 
   return { inserted, updated, skipped };
