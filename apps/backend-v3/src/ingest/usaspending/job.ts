@@ -25,7 +25,7 @@ const FIELD_TO_TABLE: Record<string, string> = {
   agency: 'award_agency_sources',
 };
 
-async function upsertAwardWithSources(
+export async function upsertAwardWithSources(
   award: AwardRow,
   citations: AwardSourceCitation[],
 ): Promise<'inserted' | 'skipped'> {
