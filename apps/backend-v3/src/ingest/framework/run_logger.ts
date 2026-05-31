@@ -86,8 +86,8 @@ export interface IngestStatusRow {
 export async function getIngestStatus(): Promise<IngestStatusRow[]> {
   const { rows } = await pool.query(
     `SELECT source_key,
-            MAX(finished_at) FILTER (WHERE status = 'success') AS last_success_at,
-            EXTRACT(EPOCH FROM (NOW() - MAX(finished_at) FILTER (WHERE status = 'success')))::INT AS lag_seconds
+            MAX(finished_at) FILTER (WHERE status IN ('success', 'degraded')) AS last_success_at,
+            EXTRACT(EPOCH FROM (NOW() - MAX(finished_at) FILTER (WHERE status IN ('success', 'degraded'))))::INT AS lag_seconds
      FROM ingest_runs
      GROUP BY source_key
      ORDER BY source_key`,
