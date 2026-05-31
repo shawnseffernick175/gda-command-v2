@@ -1,6 +1,6 @@
 interface PwinChipProps {
   pwin: number;
-  sourceUrl: string;
+  sourceUrl?: string;
 }
 
 function getLevel(pwin: number): string {
@@ -12,10 +12,10 @@ function getLevel(pwin: number): string {
 export function PwinChip({ pwin, sourceUrl }: PwinChipProps) {
   return (
     <a
-      href={sourceUrl}
+      href={sourceUrl ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
-      data-source-url={sourceUrl}
+      data-source-url={sourceUrl ?? '#'}
       data-testid="data-point-pwin"
       className={`inline-flex items-center h-6 px-2 rounded-full text-xs font-medium border border-transparent ${getLevel(pwin)} hover:opacity-80 transition-opacity`}
     >

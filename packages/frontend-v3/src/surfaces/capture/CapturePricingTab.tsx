@@ -12,7 +12,8 @@ interface CapturePricingTabProps {
 let nextTempId = 1;
 
 export function CapturePricingTab({ capture }: CapturePricingTabProps) {
-  const [rows, setRows] = useState<LaborCategory[]>(capture.pricing.labor_categories);
+  const initialRows = capture.pricing?.labor_categories ?? [];
+  const [rows, setRows] = useState<LaborCategory[]>(initialRows);
   const update = useUpdateCapture(capture.id);
 
   const addRow = () => {
@@ -73,37 +74,39 @@ export function CapturePricingTab({ capture }: CapturePricingTabProps) {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-sm border border-border p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-ink-muted">Computed Total:</span>
-          <a
-            href={pricing.total_sources[0]?.url ?? capture.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-source-url={pricing.total_sources[0]?.url ?? capture.source_url}
-            data-testid="data-point-pricing-total"
-            className="text-sm font-semibold text-ink-primary hover:text-accent transition-colors"
-          >
-            ${computedTotal.toLocaleString()}
-          </a>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-ink-muted">NAICS Benchmark Band:</span>
-          <span className="flex items-center gap-2">
+      {pricing && (
+        <div className="flex flex-col gap-2 rounded-sm border border-border p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-ink-muted">Computed Total:</span>
             <a
-              href={pricing.benchmark_sources[0]?.url ?? capture.source_url}
+              href={pricing.total_sources?.[0]?.url ?? capture.source_url ?? '#'}
               target="_blank"
               rel="noopener noreferrer"
-              data-source-url={pricing.benchmark_sources[0]?.url ?? capture.source_url}
-              data-testid="data-point-benchmark-band"
-              className="text-sm text-ink-primary hover:text-accent transition-colors"
+              data-source-url={pricing.total_sources?.[0]?.url ?? capture.source_url ?? '#'}
+              data-testid="data-point-pricing-total"
+              className="text-sm font-semibold text-ink-primary hover:text-accent transition-colors"
             >
-              ${pricing.benchmark_band_low.toLocaleString()} &ndash; ${pricing.benchmark_band_high.toLocaleString()}
+              ${computedTotal.toLocaleString()}
             </a>
-            <SourceLink sources={pricing.benchmark_sources} />
-          </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-ink-muted">NAICS Benchmark Band:</span>
+            <span className="flex items-center gap-2">
+              <a
+                href={pricing.benchmark_sources?.[0]?.url ?? capture.source_url ?? '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-source-url={pricing.benchmark_sources?.[0]?.url ?? capture.source_url ?? '#'}
+                data-testid="data-point-benchmark-band"
+                className="text-sm text-ink-primary hover:text-accent transition-colors"
+              >
+                ${pricing.benchmark_band_low.toLocaleString()} &ndash; ${pricing.benchmark_band_high.toLocaleString()}
+              </a>
+              <SourceLink sources={pricing.benchmark_sources ?? []} />
+            </span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

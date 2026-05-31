@@ -1,11 +1,12 @@
 /**
  * Color review stage management.
  *
- * Stages: white → pink → red → gold → final (monotonic progression).
+ * Stages: pink → red → gold → submitted (monotonic progression).
+ * Matches DB CHECK constraint on captures.color_stage.
  * Skipping forward is allowed; regression requires explicit `force: true`.
  */
 
-export const COLOR_REVIEW_STAGES = ['white', 'pink', 'red', 'gold', 'final'] as const;
+export const COLOR_REVIEW_STAGES = ['pink', 'red', 'gold', 'submitted'] as const;
 export type ColorReviewStage = (typeof COLOR_REVIEW_STAGES)[number];
 
 export function isValidStage(stage: string): stage is ColorReviewStage {

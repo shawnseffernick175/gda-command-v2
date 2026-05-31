@@ -80,30 +80,22 @@ export function CaptureDetail() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Agency</span>
-          <a href={capture.source_url} target="_blank" rel="noopener noreferrer" className="text-sm text-ink-primary hover:text-accent transition-colors" data-source-url={capture.source_url}>{capture.agency}</a>
+          <span className="text-sm text-ink-primary">{capture.opportunity_agency ?? '\u2014'}</span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Response Date</span>
-          <a
-            href={capture.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-source-url={capture.source_url}
-            className="text-sm text-ink-primary hover:text-accent transition-colors"
-          >
-            {formatDate(capture.response_date)}
-          </a>
+          <span className="text-sm text-ink-primary">{formatDate(capture.created_at)}</span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Pwin</span>
-          <PwinChip
-            pwin={capture.pwin}
-            sourceUrl={capture.pwin_sources[0]?.url ?? capture.source_url}
-          />
+          {capture.pwin !== null
+            ? <PwinChip pwin={capture.pwin} sourceUrl={capture.pwin_sources?.[0]?.url ?? capture.source_url ?? '#'} />
+            : <span className="text-sm text-ink-muted">—</span>
+          }
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Color Review</span>
-          <ColorReviewChip phase={capture.color_review_phase} sourceUrl={capture.source_url} />
+          <ColorReviewChip phase={capture.color_stage} />
         </div>
       </div>
 

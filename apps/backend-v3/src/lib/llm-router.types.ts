@@ -97,7 +97,7 @@ export interface OpportunitySummary {
 export interface CaptureSummary {
   capture_id: string;
   opportunity_title: string;
-  color_review_stage: 'pink' | 'red' | 'gold' | 'none';
+  color_stage: 'pink' | 'red' | 'gold' | 'submitted';
   gaps: string[];
   next_milestone: string | null;
 }

@@ -582,7 +582,7 @@ paths:
                           url: "https://sam.gov/opp/abc123/view"
                           retrieved_at: "2026-05-29T10:00:00.000Z"
                       opportunity_agency: "Department of the Army"
-                      color_review_stage: "pink"
+                      color_stage: "pink"
                       created_at: "2026-05-27T00:00:00.000Z"
                       updated_at: "2026-05-29T10:00:00.000Z"
                   pagination:
@@ -650,8 +650,8 @@ paths:
                   id: "cap_001"
                   pipeline_item_id: "pi_001"
                   opportunity_title: "Army RS3 Task Order 47"
-                  color_review_stage: "pink"
-                  color_review_notes: "Initial draft in progress"
+                  color_stage: "pink"
+                  pricing_notes: "Initial draft in progress"
                   compliance_items:
                     - id: "ci_001"
                       requirement: "ISO 9001:2015 certification"
@@ -717,7 +717,7 @@ paths:
             schema:
               $ref: '#/components/schemas/CaptureUpdate'
             example:
-              color_review_notes: "Pink team feedback incorporated"
+              pricing_notes: "Pink team feedback incorporated"
               pricing_assumptions:
                 margin_pct: 14
                 labor_rates:
@@ -2159,7 +2159,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SourceRef'
-        color_review_stage:
+        color_stage:
           type: string
         ai_analyzed_at:
           type: string
@@ -2184,7 +2184,7 @@ components:
         - $ref: '#/components/schemas/CaptureSummary'
         - type: object
           properties:
-            color_review_notes:
+            pricing_notes:
               type: string
               nullable: true
             compliance_items:
@@ -2250,9 +2250,9 @@ components:
     CaptureUpdate:
       type: object
       properties:
-        color_review_stage:
+        color_stage:
           type: string
-        color_review_notes:
+        pricing_notes:
           type: string
         pricing_assumptions:
           type: object

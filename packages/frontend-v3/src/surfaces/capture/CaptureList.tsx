@@ -8,7 +8,6 @@ import { Button } from '../../components/Button/Button';
 import { useCapturesList } from './hooks/useCapturesList';
 import { ColorReviewChip } from './components/ColorReviewChip';
 import { PwinChip } from './components/PwinChip';
-import { SourceLink } from './components/SourceLink';
 import type { CaptureListItem } from './types';
 import type { TableColumn } from '../../types';
 
@@ -50,48 +49,30 @@ export function CaptureList() {
       header: 'Opportunity',
       sortable: true,
       render: (row) => (
-        <span data-source-url={row.source_url}>{row.opportunity_title}</span>
+        <span>{row.opportunity_title ?? '\u2014'}</span>
       ),
     },
     {
-      key: 'agency',
+      key: 'opportunity_agency',
       header: 'Agency',
       sortable: true,
       width: 160,
-      render: (row) => <a href={row.source_url} target="_blank" rel="noopener noreferrer" data-source-url={row.source_url} className="text-ink-muted hover:text-accent transition-colors">{row.agency}</a>,
+      render: (row) => <span className="text-ink-muted">{row.opportunity_agency ?? '\u2014'}</span>,
     },
     {
       key: 'response_date',
       header: 'Response Date',
       sortable: true,
       width: 140,
-      render: (row) => <a href={row.source_url} target="_blank" rel="noopener noreferrer" data-source-url={row.source_url} className="hover:text-accent transition-colors">{formatDate(row.response_date)}</a>,
+      render: (row) => <span>{formatDate(row.created_at)}</span>,
     },
     {
-      key: 'color_review_phase',
+      key: 'color_stage',
       header: 'Color Review',
       sortable: true,
       width: 110,
       render: (row) => (
-        <ColorReviewChip phase={row.color_review_phase} sourceUrl={row.source_url} />
-      ),
-    },
-    {
-      key: 'compliance_coverage',
-      header: 'Compliance',
-      sortable: true,
-      width: 100,
-      align: 'right',
-      render: (row) => (
-        <a
-          href={row.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-source-url={row.source_url}
-          className="hover:text-accent transition-colors"
-        >
-          {Math.round(row.compliance_coverage * 100)}%
-        </a>
+        <ColorReviewChip phase={row.color_stage} />
       ),
     },
     {
@@ -99,26 +80,22 @@ export function CaptureList() {
       header: 'Pwin',
       sortable: true,
       width: 80,
-      render: (row) => <PwinChip pwin={row.pwin} sourceUrl={row.source_url} />,
+      render: (row) => row.pwin !== null
+        ? <PwinChip pwin={row.pwin} sourceUrl={row.pwin_sources[0]?.url ?? row.source_url} />
+        : <span className="text-ink-muted">—</span>,
     },
     {
-      key: 'last_analyzed',
-      header: 'Last Analyzed',
+      key: 'updated_at',
+      header: 'Updated',
       sortable: true,
       width: 140,
       render: (row) => (
-        <a href={row.source_url} target="_blank" rel="noopener noreferrer" data-source-url={row.source_url} className="text-ink-muted hover:text-accent transition-colors">{formatDate(row.last_analyzed)}</a>
+        <span className="text-ink-muted">{formatDate(row.updated_at)}</span>
       ),
-    },
-    {
-      key: 'source',
-      header: 'Source',
-      width: 80,
-      render: (row) => <SourceLink sources={row.source_url_sources} />,
     },
   ];
 
-  const total = data?.total ?? 0;
+  const total = data?.total ?? data?.items?.length ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   if (isError) {

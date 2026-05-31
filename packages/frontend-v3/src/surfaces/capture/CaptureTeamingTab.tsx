@@ -6,9 +6,11 @@ interface CaptureTeamingTabProps {
 }
 
 export function CaptureTeamingTab({ capture }: CaptureTeamingTabProps) {
+  const partners = capture.teaming_partners ?? [];
+
   return (
     <div className="flex flex-col gap-6">
-      {capture.teaming_partners.length === 0 ? (
+      {partners.length === 0 ? (
         <p className="text-sm text-ink-muted">No teaming partners assigned.</p>
       ) : (
         <table className="w-full border-collapse">
@@ -20,7 +22,7 @@ export function CaptureTeamingTab({ capture }: CaptureTeamingTabProps) {
             </tr>
           </thead>
           <tbody>
-            {capture.teaming_partners.map((partner) => (
+            {partners.map((partner) => (
               <TeamingRow key={partner.id} partner={partner} />
             ))}
           </tbody>

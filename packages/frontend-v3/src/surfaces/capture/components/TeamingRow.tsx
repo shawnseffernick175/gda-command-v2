@@ -31,17 +31,18 @@ export function TeamingRow({ partner, onOpenPipelineEditor }: TeamingRowProps) {
         )}
       </td>
       <td className="px-2 py-1.5">
-        <span
-          data-source-url={partner.source_url}
+        <a
+          href={partner.source_url ?? '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-source-url={partner.source_url ?? '#'}
           className={`inline-flex items-center h-6 px-2 rounded-full text-xs font-medium border border-transparent ${roleConfig[partner.role]}`}
         >
-          <a href={partner.source_url} target="_blank" rel="noopener noreferrer">
-            {partner.role}
-          </a>
-        </span>
+          {partner.role}
+        </a>
       </td>
       <td className="px-2 py-1.5">
-        <SourceLink sources={partner.source_url_sources} />
+        <SourceLink sources={partner.source_url_sources ?? []} />
       </td>
     </tr>
   );

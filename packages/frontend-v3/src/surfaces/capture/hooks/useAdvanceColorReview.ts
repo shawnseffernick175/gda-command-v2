@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../../lib/api-client';
-import type { CaptureDetail, ColorReviewPhase } from '../types';
+import type { CaptureDetail, ColorStage } from '../types';
 
 interface AdvanceResult {
-  phase: ColorReviewPhase;
+  phase: ColorStage;
 }
 
 async function advanceColorReview(id: string): Promise<AdvanceResult> {
@@ -18,7 +18,7 @@ export function useAdvanceColorReview(captureId: string) {
     onSuccess: (result) => {
       queryClient.setQueryData<CaptureDetail>(['captures', 'detail', captureId], (old) => {
         if (!old) return old;
-        return { ...old, color_review_phase: result.phase };
+        return { ...old, color_stage: result.phase };
       });
       queryClient.invalidateQueries({ queryKey: ['captures', 'list'] });
     },
