@@ -4,6 +4,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public code?: string,
     public requestId?: string,
   ) {
     super(message);
@@ -20,12 +21,19 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     },
   });
 
-  const json = await res.json() as { success: boolean; data: T; error?: string; meta?: { requestId?: string } };
+  const json = await res.json() as {
+    success: boolean;
+    data: T;
+    error?: string;
+    code?: string;
+    meta?: { requestId?: string };
+  };
 
   if (!res.ok || !json.success) {
     throw new ApiError(
       json.error || `Request failed with status ${res.status}`,
       res.status,
+      json.code,
       json.meta?.requestId,
     );
   }
