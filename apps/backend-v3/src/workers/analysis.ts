@@ -32,7 +32,6 @@ import { QUEUE_NAMES, registerQueues, type AnalysisJobData } from '../lib/queue.
 import type { SourceRef } from '../lib/sources.js';
 import {
   buildStubDraftText,
-  buildDraftSources,
   type DraftJobData,
   type DraftKind,
 } from '../services/drafts/index.js';
@@ -663,21 +662,21 @@ async function handleIngestPostprocess(jobs: PgBoss.Job<Record<string, unknown>>
       if (!actionItem) {
         logger.warn({ actionItemId: draftData.actionItemId }, 'Action item not found for draft');
         await pool.query(
-          `UPDATE action_item_drafts SET status = 'failed', updated_at = $1 WHERE id = $2`,
-          [new Date().toISOString(), draftData.draftId]
+          `UPDATE action_item_drafts SET status = 'failed' WHERE id = $1`,
+          [draftData.draftId]
         );
         continue;
       }
 
       const draftText = buildStubDraftText(draftData.kind as DraftKind, actionItem);
-      const sources = buildDraftSources(draftData.kind as DraftKind);
-      const now = new Date().toISOString();
 
       await pool.query(
         `UPDATE action_item_drafts
-         SET draft_text = $1, sources = $2, status = 'done', updated_at = $3
-         WHERE id = $4`,
-        [draftText, JSON.stringify(sources), now, draftData.draftId]
+         SET content    = $1,
+             status     = 'done',
+             model_used = $2
+         WHERE id = $3`,
+        [draftText, 'stub', draftData.draftId]
       );
 
       logger.info({ draftId: draftData.draftId }, 'Draft generation complete');

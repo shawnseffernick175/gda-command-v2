@@ -83,14 +83,16 @@ async function ensureTestSchema(): Promise<void> {
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS action_item_drafts (
-        id TEXT PRIMARY KEY,
+        id BIGSERIAL PRIMARY KEY,
         action_item_id TEXT NOT NULL,
         kind TEXT NOT NULL,
-        draft_text TEXT,
-        sources JSONB,
         status TEXT NOT NULL DEFAULT 'generating',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        content TEXT NOT NULL DEFAULT '',
+        model_used TEXT,
+        approved_by TEXT,
+        approved_at TIMESTAMPTZ,
+        source_id BIGINT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
   } finally {
@@ -472,7 +474,7 @@ describe('Integration: Action item status transitions', () => {
 // Integration: draft full flow (request → poll → result)
 // --------------------------------------------------------------------------
 describe('Integration: Draft endpoint full flow', () => {
-  it('request → worker processes → draft has text + sources', async () => {
+  it('request → worker processes → draft has content', async () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/v3/action-items',
@@ -489,16 +491,15 @@ describe('Integration: Draft endpoint full flow', () => {
     });
     expect(draftRes.statusCode).toBe(201);
     const draftData = (JSON.parse(draftRes.body) as SuccessBody).data as Record<string, unknown>;
-    const draftId = draftData.id as string;
+    const draftId = draftData.id;
     expect(draftId).toBeTruthy();
 
-    const { buildStubDraftText, buildDraftSources } = await import('../src/services/drafts/index.js');
+    const { buildStubDraftText } = await import('../src/services/drafts/index.js');
     const actionItem = (await pool.query('SELECT * FROM action_items WHERE id = $1', [id])).rows[0]!;
     const draftText = buildStubDraftText('reply', actionItem);
-    const sources = buildDraftSources('reply');
     await pool.query(
-      `UPDATE action_item_drafts SET draft_text = $1, sources = $2, status = 'done', updated_at = $3 WHERE id = $4`,
-      [draftText, JSON.stringify(sources), new Date().toISOString(), draftId]
+      `UPDATE action_item_drafts SET content = $1, status = 'done', model_used = $2 WHERE id = $3`,
+      [draftText, 'stub', draftId]
     );
 
     const pollRes = await pool.query(
@@ -507,11 +508,8 @@ describe('Integration: Draft endpoint full flow', () => {
     );
     const row = pollRes.rows[0] as Record<string, unknown>;
     expect(row.status).toBe('done');
-    expect(row.draft_text).toBeTruthy();
-    expect(typeof row.draft_text).toBe('string');
-    const parsedSources = typeof row.sources === 'string' ? JSON.parse(row.sources as string) : row.sources;
-    expect(Array.isArray(parsedSources)).toBe(true);
-    expect((parsedSources as unknown[]).length).toBeGreaterThanOrEqual(1);
+    expect(row.content).toBeTruthy();
+    expect(typeof row.content).toBe('string');
 
     const listRes = await app.inject({
       method: 'GET',
@@ -523,12 +521,11 @@ describe('Integration: Draft endpoint full flow', () => {
     expect(found).toBeDefined();
     const foundDrafts = found!.drafts as Record<string, unknown>[];
     expect(foundDrafts.length).toBeGreaterThanOrEqual(1);
-    expect(foundDrafts[0].draft_text).toBeTruthy();
-    expect(foundDrafts[0].sources).toBeDefined();
+    expect(foundDrafts[0].content).toBeTruthy();
   });
 
   it('all three draft kinds produce valid output', async () => {
-    const { buildStubDraftText, buildDraftSources } = await import('../src/services/drafts/index.js');
+    const { buildStubDraftText } = await import('../src/services/drafts/index.js');
     const kinds = ['reply', 'research', 'milestone'] as const;
 
     for (const kind of kinds) {
@@ -549,23 +546,19 @@ describe('Integration: Draft endpoint full flow', () => {
       expect(draftRes.statusCode).toBe(201);
       const draftData = (JSON.parse(draftRes.body) as SuccessBody).data as Record<string, unknown>;
       expect(draftData.kind).toBe(kind);
-      const draftId = draftData.id as string;
+      const draftId = draftData.id;
 
       const actionItem = (await pool.query('SELECT * FROM action_items WHERE id = $1', [id])).rows[0]!;
       const draftText = buildStubDraftText(kind, actionItem);
-      const sources = buildDraftSources(kind);
       await pool.query(
-        `UPDATE action_item_drafts SET draft_text = $1, sources = $2, status = 'done', updated_at = $3 WHERE id = $4`,
-        [draftText, JSON.stringify(sources), new Date().toISOString(), draftId]
+        `UPDATE action_item_drafts SET content = $1, status = 'done', model_used = $2 WHERE id = $3`,
+        [draftText, 'stub', draftId]
       );
 
       const result = await pool.query('SELECT * FROM action_item_drafts WHERE id = $1', [draftId]);
       const row = result.rows[0] as Record<string, unknown>;
-      expect(row.draft_text).toBeTruthy();
-      expect((row.draft_text as string).length).toBeGreaterThan(0);
-      const parsedSources = typeof row.sources === 'string' ? JSON.parse(row.sources as string) : row.sources;
-      expect(Array.isArray(parsedSources)).toBe(true);
-      expect((parsedSources as unknown[]).length).toBeGreaterThanOrEqual(1);
+      expect(row.content).toBeTruthy();
+      expect((row.content as string).length).toBeGreaterThan(0);
     }
   });
 });

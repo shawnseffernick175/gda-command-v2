@@ -10,7 +10,7 @@ interface SuggestedResponseEditorProps {
 }
 
 export function SuggestedResponseEditor({ item, draft }: SuggestedResponseEditorProps) {
-  const [text, setText] = useState(draft?.draft_text ?? '');
+  const [text, setText] = useState(draft?.content ?? '');
   const [dirty, setDirty] = useState(false);
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
 
@@ -46,7 +46,7 @@ export function SuggestedResponseEditor({ item, draft }: SuggestedResponseEditor
       { actionItemId: item.id, kind: draft?.kind ?? 'reply' },
       {
         onSuccess: (newDraft) => {
-          setText(newDraft.draft_text);
+          setText(newDraft.content);
           setDirty(false);
         },
         onError: (err) => {
