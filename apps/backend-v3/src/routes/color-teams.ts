@@ -248,7 +248,7 @@ export async function colorTeamRoutes(app: FastifyInstance): Promise<void> {
         `[${finding.color.toUpperCase()}] ${finding.finding.slice(0, 120)}`,
         `${finding.finding}\n\nRecommended fix: ${finding.recommended_fix ?? 'N/A'}\n\nSection: ${finding.section_ref ?? 'N/A'}`,
         user.sub,
-        finding.severity === 'blocker' || finding.severity === 'critical' ? 'high' : 'medium',
+        finding.severity === 'blocker' || finding.severity === 'critical' ? 'high' : 'normal',
         sourceId,
       ]
     );
