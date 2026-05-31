@@ -12,6 +12,7 @@ export interface IngestResult {
   skipped: number;
   degraded?: boolean;
   degradedReason?: string;
+  stats?: Record<string, unknown>;
 }
 
 export type IngestFn = () => Promise<IngestResult>;
