@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -46,58 +44,6 @@ services:
       - gda
       - traefik
 
-  backend:
-    build:
-      context: .
-      dockerfile: packages/backend/Dockerfile
-      args:
-        DEPLOY_COMMIT_SHA: ${DEPLOY_COMMIT_SHA:-unknown}
-    container_name: gda-backend
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-gda}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gda}}
-      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-}
-      AUTH_REQUIRED: "true"
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
-      N8N_DATABASE_URL: ${N8N_DATABASE_URL:-}
-      N8N_BASE_URL: ${N8N_BASE_URL:-}
-      N8N_API_BASE: ${N8N_API_BASE:-}
-      N8N_API_KEY: ${N8N_API_KEY:-}
-      GDA_WEBHOOK_KEY: ${GDA_WEBHOOK_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      SAM_API_KEY: ${SAM_API_KEY:-}
-      GOVTRIBE_API_KEY: ${GOVTRIBE_API_KEY:-}
-      GOVWIN_CLIENT_ID: ${GOVWIN_CLIENT_ID:-}
-      GOVWIN_CLIENT_SECRET: ${GOVWIN_CLIENT_SECRET:-}
-      GOVWIN_USERNAME: ${GOVWIN_USERNAME:-}
-      GOVWIN_PASSWORD: ${GOVWIN_PASSWORD:-}
-      GOVWIN_SAVED_SEARCH_IDS: ${GOVWIN_SAVED_SEARCH_IDS:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      FEED_SYNC_INTERVAL_HOURS: ${FEED_SYNC_INTERVAL_HOURS:-6}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
-      APP_URL: ${APP_URL:-https://gda.csr-llc.tech}
-      BACKUP_DIR: /var/backups/gda
-      UPLOAD_DIR: /var/uploads/gda
-      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
-      PINECONE_HOST: ${PINECONE_HOST:-}
-    volumes:
-      - gda-backups:/var/backups/gda
-      - gda-uploads:/var/uploads/gda
-    networks:
-      - gda
-      - traefik
-      - n8n-internal
-
   backend-v3:
     build:
       context: .
@@ -132,41 +78,23 @@ services:
       - gda
       - traefik
 
-  frontend:
-    build:
-      context: .
-      dockerfile: packages/frontend/Dockerfile
-    container_name: gda-frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.gda-app.rule=Host(`app.csr-llc.tech`) || Host(`gda.csr-llc.tech`)"
-      - "traefik.http.routers.gda-app.tls=true"
-      - "traefik.http.routers.gda-app.tls.certresolver=mytlschallenge"
-      - "traefik.http.services.gda-app.loadbalancer.server.port=80"
-      - "traefik.docker.network=n8n_default"
-    networks:
-      - gda
-      - traefik
-
   frontend-v3:
     build:
       context: .
       dockerfile: packages/frontend-v3/Dockerfile
       args:
-        VITE_V3_API_URL: https://gda-v3.csr-llc.tech
+        VITE_V3_API_URL: https://gda.csr-llc.tech
     container_name: gda-frontend-v3
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gda-v3-ui.rule=Host(`gda-v3-ui.csr-llc.tech`)"
+      - "traefik.http.routers.gda-v3-ui.rule=Host(`gda.csr-llc.tech`) || Host(`app.csr-llc.tech`) || Host(`gda-v3-ui.csr-llc.tech`)"
       - "traefik.http.routers.gda-v3-ui.tls=true"
       - "traefik.http.routers.gda-v3-ui.tls.certresolver=mytlschallenge"
       - "traefik.http.services.gda-v3-ui.loadbalancer.server.port=80"
       - "traefik.docker.network=n8n_default"
     networks:
+      - gda
       - traefik
 
 networks:
@@ -175,12 +103,7 @@ networks:
   traefik:
     external: true
     name: n8n_default
-  n8n-internal:
-    external: true
-    name: n8n-envision_envision-internal
 
 volumes:
   pgdata:
   pgdata-staging:
-  gda-backups:
-  gda-uploads:

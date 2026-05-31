@@ -7,12 +7,9 @@ set -euo pipefail
 DRY_RUN="${1:-false}"
 DEPLOY_DIR="/root/gda-command-v2"
 COMPOSE_FILE="docker-compose.prod.yml"
-COMPOSE_SERVICE="backend"
-CONTAINER_NAME="gda-backend"
-BACKEND_PORT="3001"
-HEALTH_ENDPOINT="http://localhost:${BACKEND_PORT}/api/sentinel/current"
-HEALTH_MAX_ATTEMPTS=30
-HEALTH_INTERVAL=3
+SERVICES="backend-v3 frontend-v3"
+BACKEND_CONTAINER="gda-backend-v3"
+FRONTEND_CONTAINER="gda-frontend-v3"
 
 cd "$DEPLOY_DIR"
 
@@ -32,6 +29,10 @@ if [ "$DRY_RUN" = "true" ]; then
   exit 0
 fi
 
+# ---------- Record workflow start time for verification ----------
+DEPLOY_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+echo "deploy_start=${DEPLOY_START}"
+
 # ---------- Drift check: n8n compose ----------
 N8N_COMPOSE="/root/n8n-envision/docker-compose.yml"
 REPO_N8N_COMPOSE="docker-compose.n8n.yml"
@@ -45,47 +46,67 @@ if [ -f "$N8N_COMPOSE" ] && [ -f "$REPO_N8N_COMPOSE" ]; then
   fi
 fi
 
-# ---------- Record previous image for rollback ----------
-echo "--- recording previous image ---"
-docker inspect "$CONTAINER_NAME" --format '{{.Image}}' > /tmp/prev_image.txt 2>/dev/null \
-  || echo "no-prev" > /tmp/prev_image.txt
-echo "prev_image=$(cat /tmp/prev_image.txt)"
+# ---------- Stop and remove V2 containers if still running ----------
+echo "--- removing V2 containers (if present) ---"
+docker rm -f gda-backend gda-frontend 2>/dev/null || true
+docker rmi gda-command-v2-backend:latest gda-command-v2-frontend:latest 2>/dev/null || true
 
-# ---------- Build and deploy ----------
-echo "--- docker compose build + up ---"
-docker compose -f "$COMPOSE_FILE" up -d --build "$COMPOSE_SERVICE"
+# ---------- Build and deploy V3 ----------
+echo "--- docker compose build + force-recreate ---"
+docker compose -f "$COMPOSE_FILE" build $SERVICES
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps $SERVICES
 
-# ---------- Wait for container healthy ----------
-echo "--- waiting for container health ---"
+# ---------- Clean dangling images ----------
+echo "--- pruning dangling images ---"
+docker image prune -f
+
+# ---------- Wait for backend-v3 container healthy ----------
+echo "--- waiting for backend-v3 health ---"
 for i in $(seq 1 20); do
-  status=$(docker inspect "$CONTAINER_NAME" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+  status=$(docker inspect "$BACKEND_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
   if [ "$status" = "healthy" ]; then
-    echo "container healthy (attempt ${i})"
+    echo "backend-v3 healthy (attempt ${i})"
     break
   fi
   if [ "$i" -eq 20 ]; then
-    echo "prev_image=$(cat /tmp/prev_image.txt)"
-    echo "DEPLOY_FAILED container not healthy after 60s (status: ${status})"
+    echo "DEPLOY_FAILED backend-v3 not healthy after 60s (status: ${status})"
     exit 1
   fi
   sleep 3
 done
 
-# ---------- Health check — Sentinel endpoint ----------
-echo "--- health check: ${HEALTH_ENDPOINT} ---"
-for i in $(seq 1 "$HEALTH_MAX_ATTEMPTS"); do
-  http_code=$(docker exec "$CONTAINER_NAME" \
-    wget -qO /dev/null -S "$HEALTH_ENDPOINT" 2>&1 \
-    | grep -i "HTTP/" | tail -1 | awk '{print $2}') || http_code="000"
-  if [ "$http_code" = "200" ]; then
-    echo "health check passed (attempt ${i})"
-    echo "DEPLOY_OK ${DEPLOY_SHA}"
-    exit 0
+# ---------- Wait for frontend-v3 container healthy ----------
+echo "--- waiting for frontend-v3 health ---"
+for i in $(seq 1 20); do
+  status=$(docker inspect "$FRONTEND_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+  if [ "$status" = "healthy" ]; then
+    echo "frontend-v3 healthy (attempt ${i})"
+    break
   fi
-  echo "attempt ${i}/${HEALTH_MAX_ATTEMPTS}: HTTP ${http_code}"
-  sleep "$HEALTH_INTERVAL"
+  if [ "$i" -eq 20 ]; then
+    echo "DEPLOY_FAILED frontend-v3 not healthy after 60s (status: ${status})"
+    exit 1
+  fi
+  sleep 3
 done
 
-echo "prev_image=$(cat /tmp/prev_image.txt)"
-echo "DEPLOY_FAILED health check failed after ${HEALTH_MAX_ATTEMPTS} attempts — manual rollback required"
-exit 1
+# ---------- Verification: StartedAt must be after deploy start ----------
+echo "--- verifying container recreation ---"
+BACKEND_STARTED=$(docker inspect "$BACKEND_CONTAINER" --format '{{.State.StartedAt}}')
+echo "backend-v3 StartedAt: ${BACKEND_STARTED}"
+if [[ "$BACKEND_STARTED" < "$DEPLOY_START" ]]; then
+  echo "DEPLOY_FAILED backend-v3 StartedAt (${BACKEND_STARTED}) is before deploy start (${DEPLOY_START}) — container was not recreated"
+  exit 1
+fi
+
+# ---------- Verification: auth route exists in built code ----------
+echo "--- verifying auth/login route in backend-v3 ---"
+AUTH_CHECK=$(docker exec "$BACKEND_CONTAINER" grep -r 'auth/login' /app/apps/backend-v3/dist/ 2>/dev/null | head -1 || true)
+if [ -z "$AUTH_CHECK" ]; then
+  echo "DEPLOY_FAILED auth/login route not found in backend-v3 dist — image may be stale"
+  exit 1
+fi
+echo "auth route verified: ${AUTH_CHECK}"
+
+echo "DEPLOY_OK ${DEPLOY_SHA}"
+exit 0
