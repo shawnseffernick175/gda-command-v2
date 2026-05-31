@@ -142,11 +142,4 @@ ALTER TABLE sources ADD CONSTRAINT sources_kind_check CHECK (kind IN (
   'dibbs', 'neco', 'sbir'
 ));
 
--- ============================================================================
--- 14.5  Seed SBIR.gov source row
--- ============================================================================
-INSERT INTO sources (kind, url, title, confidence, meta)
-VALUES ('sbir', 'https://www.sbir.gov', 'SBIR.gov', 'high', '{}')
-ON CONFLICT DO NOTHING;
-
 COMMIT;
