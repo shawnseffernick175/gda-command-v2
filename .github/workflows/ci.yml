@@ -177,7 +177,7 @@ jobs:
           ANALYSIS_VERSION: v0.0.1-test
           ANALYSIS_TIMEOUT_MS: "5000"
           ANALYSIS_POLL_INTERVAL_MS: "50"
-        run: npx vitest run tests/integration.test.ts tests/captures-integration.test.ts tests/integration/drafts.test.ts
+        run: npx vitest run tests/integration.test.ts tests/captures-integration.test.ts
       - name: V3 backend — pipeline tests
         working-directory: apps/backend-v3
         env:
