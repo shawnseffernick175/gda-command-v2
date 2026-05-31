@@ -97,6 +97,13 @@ export async function memoryRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
+    const VALID_OUTCOMES = new Set(['won', 'lost', 'withdrawn', 'no_award']);
+    if (!VALID_OUTCOMES.has(body.outcome)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', `Invalid outcome value '${body.outcome}'. Must be one of: won, lost, withdrawn, no_award`, req.requestId),
+      );
+    }
+
     const updated = await recordOutcome(id, body);
     if (!updated) {
       const existing = await getDecisionById(id);

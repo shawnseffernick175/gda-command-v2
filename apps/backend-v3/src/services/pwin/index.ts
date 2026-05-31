@@ -210,15 +210,23 @@ export async function trainIfReady(): Promise<RetrainResult | null> {
   );
 
   if (shouldPromote) {
-    // Demote current active
-    await pool.query(
-      'UPDATE pwin_model_versions SET is_active = FALSE WHERE is_active = TRUE',
-    );
-    // Promote new
-    await pool.query(
-      'UPDATE pwin_model_versions SET is_active = TRUE WHERE version = $1',
-      [newVersion],
-    );
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'UPDATE pwin_model_versions SET is_active = FALSE WHERE is_active = TRUE',
+      );
+      await client.query(
+        'UPDATE pwin_model_versions SET is_active = TRUE WHERE version = $1',
+        [newVersion],
+      );
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
     logger.info(
       { version: newVersion, metrics, modelKind },
       '[pwin] New model promoted to active',

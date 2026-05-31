@@ -5,8 +5,10 @@
 
 import { Skeleton } from '../../components/Skeleton/Skeleton';
 import { ErrorState } from '../../components/ErrorState/ErrorState';
+import { SourceLink } from '../opportunities/components/SourceLink';
 import { usePwinScore, usePwinModel } from './hooks/useDecisions';
 import type { RuleContribution } from './types';
+import type { SourceRef } from '../opportunities/types';
 
 function ScoreGauge({ score }: { score: number }) {
   const color =
@@ -102,10 +104,21 @@ export function PwinBreakdown({ opportunityId }: PwinBreakdownProps) {
 
   const narrative = buildNarrative(pwinScore, top_drivers);
 
+  const modelSourceRef: SourceRef[] = [{
+    kind: 'internal',
+    title: `PWin model ${model_version}`,
+    url: `/v3/pwin/model`,
+    retrieved_at: new Date().toISOString(),
+  }];
+
   return (
     <div className="flex flex-col gap-4" data-testid="pwin-breakdown">
       <div className="flex items-start justify-between">
-        <ScoreGauge score={pwinScore} />
+        <SourceLink
+          value={<ScoreGauge score={pwinScore} />}
+          sources={modelSourceRef}
+          data-testid="source-link-pwin-score"
+        />
         {confidence != null && (
           <span className="text-xs text-ink-muted mt-1">
             Confidence: {Math.round(confidence * 100)}%
@@ -113,9 +126,11 @@ export function PwinBreakdown({ opportunityId }: PwinBreakdownProps) {
         )}
       </div>
 
-      <p className="text-sm text-ink-primary" data-testid="pwin-narrative">
-        {narrative}
-      </p>
+      <SourceLink
+        value={<p className="text-sm text-ink-primary" data-testid="pwin-narrative">{narrative}</p>}
+        sources={modelSourceRef}
+        data-testid="source-link-pwin-narrative"
+      />
 
       <DriversList drivers={top_drivers} />
 
@@ -131,7 +146,11 @@ export function PwinBreakdown({ opportunityId }: PwinBreakdownProps) {
       </div>
 
       <div className="flex items-center gap-2 text-xs text-ink-muted" data-testid="pwin-model-info">
-        <span>Scored by {model_version}</span>
+        <SourceLink
+          value={<span>Scored by {model_version}</span>}
+          sources={modelSourceRef}
+          data-testid="source-link-pwin-model"
+        />
         {model.data && (
           <>
             <span>|</span>
