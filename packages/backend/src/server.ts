@@ -79,6 +79,8 @@ import { ensureUploadDir } from "./lib/storage";
 import { startScheduledSync, stopScheduledSync } from "./lib/feed-sync";
 import { startAgentScheduler, stopAgentScheduler } from "./lib/agent-scheduler";
 import { startVerifyScheduler, stopVerifyScheduler } from "./lib/sam-verify-scheduler";
+import { startCronScheduler, stopCronScheduler } from "./cron";
+import adminIngestRouter from "./routes/admin/ingest";
 import { getPool } from "./lib/db";
 import { auditMiddleware } from "./middleware/audit-middleware";
 import { authLimiter, sessionLimiter, apiLimiter, ingestLimiter } from "./middleware/rate-limit";
@@ -227,6 +229,9 @@ app.use("/api/captures", capturesRouter);
 app.use("/api/action-items", actionItemsRouter);
 app.use("/api/compliance-items", complianceItemsRouter);
 
+// --- V3 Admin ingest routes (auth-protected, admin-only) ---
+app.use("/api/v3/admin/ingest", adminIngestRouter);
+
 // --- n8n webhook proxy (generic pass-through to any n8n workflow) ---
 app.use("/api/n8n", n8nProxyRouter);
 
@@ -362,6 +367,9 @@ const server = app.listen(PORT, async () => {
   // Start daily SAM verification + auto-backfill (F-004 guard rail)
   startVerifyScheduler(24);
 
+  // Start cron scheduler for ingest jobs (F-240)
+  startCronScheduler();
+
   startAutoNoBidCheck();
 });
 
@@ -371,6 +379,7 @@ function shutdown(signal: string) {
   stopScheduledSync();
   stopAgentScheduler();
   stopVerifyScheduler();
+  stopCronScheduler();
   stopAutoNoBidCheck();
   server.close(() => {
     log.info("server_closed");
