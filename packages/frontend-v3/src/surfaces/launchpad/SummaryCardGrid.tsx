@@ -60,7 +60,7 @@ function SourcePill({ citation }: { citation: SourceCitation }) {
     <span
       className="inline-flex items-center gap-1 h-5 px-2 rounded-full border border-border bg-surface-raised text-xs text-ink-muted"
       title={`${citation.title} \u2014 Retrieved: ${new Date(citation.retrieved_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}`}
-      data-testid="data-point-source-pill"
+      data-testid="source-pill"
     >
       <span>{citation.title}</span>
       <span>{indicator}</span>

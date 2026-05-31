@@ -82,7 +82,7 @@ describe('SummaryCardGrid', () => {
 
   it('renders source pills with data-testid', () => {
     const { container } = renderGrid();
-    const pills = container.querySelectorAll('[data-testid="data-point-source-pill"]');
+    const pills = container.querySelectorAll('[data-testid="source-pill"]');
     expect(pills.length).toBeGreaterThanOrEqual(5);
   });
 });
