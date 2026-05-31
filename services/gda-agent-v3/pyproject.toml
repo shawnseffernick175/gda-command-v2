@@ -1,0 +1,9 @@
+[project]
+name = "gda-agent-v3"
+version = "1.0.0"
+description = "GDA Command V3 Agent Runtime"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,263 @@
+"""Unit tests for all 11 tools (mock external APIs)."""
+from __future__ import annotations
+
+import json
+
+import httpx
+import pytest
+import respx
+
+from src.tools.sam_search import sam_search
+from src.tools.usaspending_search import usaspending_search
+from src.tools.federal_register_search import federal_register_search
+from src.tools.db_query import db_query
+from src.tools.rag_search import rag_search
+from src.tools.web_search import web_search
+from src.tools.doctrine_check import doctrine_check
+from src.tools.decision_memory import decision_memory_lookup
+from src.tools.file_read import file_read
+from src.tools.pwin_score import pwin_score
+from src.tools.govwin_search import govwin_search
+
+from src.tools.schemas import (
+    SamSearchInput,
+    UsaSpendingSearchInput,
+    FederalRegisterSearchInput,
+    DbQueryInput,
+    RagSearchInput,
+    WebSearchInput,
+    DoctrineCheckInput,
+    DecisionMemoryLookupInput,
+    FileReadInput,
+    PwinScoreInput,
+    GovwinSearchInput,
+)
+from src.tools.registry import TOOL_REGISTRY, list_tools, get_tool, get_tool_schemas
+
+
+class TestToolRegistry:
+    def test_all_11_tools_registered(self):
+        assert len(TOOL_REGISTRY) == 11
+
+    def test_list_tools(self):
+        names = list_tools()
+        assert len(names) == 11
+        assert "sam_search" in names
+        assert "govwin_search" in names
+
+    def test_get_tool(self):
+        t = get_tool("sam_search")
+        assert t is not None
+        assert t.name == "sam_search"
+
+    def test_get_tool_not_found(self):
+        assert get_tool("nonexistent") is None
+
+    def test_get_tool_schemas(self):
+        schemas = get_tool_schemas()
+        assert len(schemas) == 11
+        for s in schemas:
+            assert "name" in s
+            assert "input_schema" in s
+            assert "output_schema" in s
+
+
+@pytest.mark.anyio
+class TestSamSearch:
+    @respx.mock
+    async def test_sam_search_returns_opportunities(self):
+        respx.get("https://api.sam.gov/opportunities/v2/search").mock(
+            return_value=httpx.Response(200, json={
+                "opportunitiesData": [
+                    {
+                        "noticeId": "SAM-001",
+                        "title": "Army IT Services",
+                        "fullParentPathName": "Department of the Army",
+                        "postedDate": "2026-05-01",
+                        "responseDeadLine": "2026-06-01",
+                        "naicsCode": "541512",
+                        "typeOfSetAside": "SBA",
+                        "description": "IT modernization services",
+                    }
+                ]
+            })
+        )
+        result = await sam_search(SamSearchInput(query="Army IT"))
+        assert len(result.results) == 1
+        opp = result.results[0]
+        assert opp.notice_id == "SAM-001"
+        assert "sam.gov" in opp.source_url
+
+    @respx.mock
+    async def test_sam_search_empty(self):
+        respx.get("https://api.sam.gov/opportunities/v2/search").mock(
+            return_value=httpx.Response(200, json={"opportunitiesData": []})
+        )
+        result = await sam_search(SamSearchInput(query="nonexistent"))
+        assert len(result.results) == 0
+
+
+@pytest.mark.anyio
+class TestUsaSpendingSearch:
+    @respx.mock
+    async def test_usaspending_returns_awards(self):
+        respx.post("https://api.usaspending.gov/api/v2/search/spending_by_award/").mock(
+            return_value=httpx.Response(200, json={
+                "results": [
+                    {
+                        "Award ID": "AWD-001",
+                        "Recipient Name": "Envision",
+                        "Awarding Agency": "Army",
+                        "Award Amount": 1000000,
+                        "Start Date": "2026-01-01",
+                        "NAICS Code": "541512",
+                        "Description": "IT services contract",
+                    }
+                ]
+            })
+        )
+        result = await usaspending_search(UsaSpendingSearchInput(agency="Army"))
+        assert len(result.results) == 1
+        assert "usaspending.gov" in result.results[0].source_url
+
+
+@pytest.mark.anyio
+class TestFederalRegisterSearch:
+    @respx.mock
+    async def test_fr_search_returns_notices(self):
+        respx.get("https://www.federalregister.gov/api/v1/documents.json").mock(
+            return_value=httpx.Response(200, json={
+                "results": [
+                    {
+                        "document_number": "2026-12345",
+                        "title": "Notice of Proposed Rulemaking",
+                        "agencies": [{"name": "DOD"}],
+                        "publication_date": "2026-05-01",
+                        "type": "Rule",
+                        "abstract": "Defense procurement rule",
+                        "html_url": "https://www.federalregister.gov/d/2026-12345",
+                    }
+                ]
+            })
+        )
+        result = await federal_register_search(
+            FederalRegisterSearchInput(query="defense procurement")
+        )
+        assert len(result.results) == 1
+        assert "federalregister.gov" in result.results[0].source_url
+
+
+@pytest.mark.anyio
+class TestDbQuery:
+    async def test_write_rejected(self):
+        from src.db import run_readonly_query
+        with pytest.raises(PermissionError, match="Only SELECT"):
+            await run_readonly_query("DELETE FROM users")
+
+    async def test_insert_rejected(self):
+        from src.db import run_readonly_query
+        with pytest.raises(PermissionError, match="Only SELECT"):
+            await run_readonly_query("INSERT INTO users VALUES (1)")
+
+    async def test_update_rejected(self):
+        from src.db import run_readonly_query
+        with pytest.raises(PermissionError, match="Only SELECT"):
+            await run_readonly_query("UPDATE users SET name='x'")
+
+
+@pytest.mark.anyio
+class TestRagSearch:
+    async def test_rag_stub_returns_pending(self):
+        result = await rag_search(RagSearchInput(query="test"))
+        assert len(result.results) == 1
+        assert "F-301" in result.results[0].chunk
+        assert result.results[0].source_url
+
+
+@pytest.mark.anyio
+class TestWebSearch:
+    async def test_web_search_no_keys(self, monkeypatch):
+        import src.tools.web_search as ws
+        monkeypatch.setattr(ws, "TAVILY_API_KEY", "")
+        monkeypatch.setattr(ws, "PERPLEXITY_API_KEY", "")
+        result = await web_search(WebSearchInput(query="test"))
+        assert len(result.results) == 1
+        assert "unavailable" in result.results[0].title.lower()
+        assert result.results[0].url
+
+    @respx.mock
+    async def test_web_search_tavily(self, monkeypatch):
+        import src.tools.web_search as ws
+        monkeypatch.setattr(ws, "TAVILY_API_KEY", "test-key")
+        respx.post("https://api.tavily.com/search").mock(
+            return_value=httpx.Response(200, json={
+                "results": [
+                    {"title": "Result 1", "url": "https://example.com", "content": "snippet"}
+                ]
+            })
+        )
+        result = await web_search(WebSearchInput(query="test"))
+        assert len(result.results) == 1
+        assert result.results[0].url == "https://example.com"
+
+
+@pytest.mark.anyio
+class TestDoctrineCheck:
+    async def test_doctrine_stub(self):
+        result = await doctrine_check(
+            DoctrineCheckInput(claim_text="We should pursue this Army contract")
+        )
+        assert len(result.evaluation.alignment_score_by_principle) == 7
+        assert result.evaluation.source_url
+
+
+@pytest.mark.anyio
+class TestDecisionMemory:
+    async def test_decision_memory_stub(self):
+        result = await decision_memory_lookup(
+            DecisionMemoryLookupInput(entity_kind="opportunity", entity_id="123")
+        )
+        assert result.results == []
+
+
+@pytest.mark.anyio
+class TestFileRead:
+    @respx.mock
+    async def test_file_read_not_found(self):
+        respx.get("http://localhost:4000/v3/files/doc-999").mock(
+            return_value=httpx.Response(404)
+        )
+        result = await file_read(FileReadInput(doc_id="doc-999"))
+        assert result.doc_text == ""
+        assert "not found" in result.doc_meta.get("error", "")
+
+    @respx.mock
+    async def test_file_read_success(self):
+        respx.get("http://localhost:4000/v3/files/doc-001").mock(
+            return_value=httpx.Response(200, json={
+                "text": "Contract document content",
+                "meta": {"type": "pdf"},
+                "source_url": "https://files.gda/doc-001",
+            })
+        )
+        result = await file_read(FileReadInput(doc_id="doc-001"))
+        assert result.doc_text == "Contract document content"
+        assert result.source_url == "https://files.gda/doc-001"
+
+
+@pytest.mark.anyio
+class TestPwinScore:
+    async def test_pwin_stub(self):
+        result = await pwin_score(PwinScoreInput(opp_id="opp-123"))
+        assert result.result.score == 50
+        assert result.result.model_version == "v0.0.1-stub"
+        assert result.result.source_url
+
+
+@pytest.mark.anyio
+class TestGovwinSearch:
+    async def test_govwin_stub_returns_empty_with_warning(self):
+        result = await govwin_search(GovwinSearchInput(query="Army"))
+        assert result.results == []
+        assert result.warning is not None
+        assert "not configured" in result.warning

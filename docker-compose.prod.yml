@@ -79,6 +79,37 @@ services:
       - gda
       - traefik
 
+  gda-agent-v3:
+    build:
+      context: .
+      dockerfile: services/gda-agent-v3/Dockerfile
+    container_name: gda-agent-v3
+    restart: unless-stopped
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AGENT_DB_URL: postgresql://${STAGING_POSTGRES_USER:-gda_staging}:${STAGING_POSTGRES_PASSWORD}@postgres-staging:5432/${STAGING_POSTGRES_DB:-gda_staging}
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
+      SAM_GOV_API_KEY: ${SAM_GOV_API_KEY:-}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      BACKEND_V3_URL: http://gda-backend-v3:4000
+      AGENT_DEFAULT_MODEL: ${AGENT_DEFAULT_MODEL:-openai:gpt-4o}
+      AGENT_MAX_STEPS: ${AGENT_MAX_STEPS:-12}
+      AGENT_WALL_TIMEOUT_S: ${AGENT_WALL_TIMEOUT_S:-30}
+      AGENT_HOURLY_COST_LIMIT_USD: ${AGENT_HOURLY_COST_LIMIT_USD:-5}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/healthz"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - gda
+
   frontend-v3:
     build:
       context: .
