@@ -28,12 +28,6 @@ CREATE INDEX idx_ingest_runs_status  ON ingest_runs (status);
 CREATE INDEX idx_ingest_runs_started ON ingest_runs (started_at DESC);
 
 -- ============================================================================
--- 10.2  Seed SAM.gov source registry row
--- ============================================================================
-INSERT INTO sources (kind, url, title, confidence, meta)
-VALUES ('sam_gov', 'https://sam.gov', 'SAM.gov', 'high', '{"registry": true}');
-
--- ============================================================================
 -- 10.3  opportunity_posted_at_sources — R1 per-field source sibling
 -- ============================================================================
 CREATE TABLE opportunity_posted_at_sources (
