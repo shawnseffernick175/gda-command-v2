@@ -21,6 +21,7 @@ import { regulatoryRoutes } from './routes/regulatory.js';
 import { authRoutes } from './routes/auth.js';
 import { adminIngestRoutes } from './routes/admin/ingest.js';
 import { govtribeRoutes } from './routes/govtribe.js';
+import { govwinRoutes } from './routes/govwin.js';
 import { sentinelRoutes } from './routes/sentinel.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
@@ -117,6 +118,9 @@ export async function buildApp() {
   await app.register(regulatoryRoutes);
   await app.register(adminIngestRoutes);
   await app.register(govtribeRoutes);
+  if (process.env['GOVWIN_CONNECTOR_V1'] === 'true') {
+    await app.register(govwinRoutes);
+  }
   await app.register(sentinelRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
