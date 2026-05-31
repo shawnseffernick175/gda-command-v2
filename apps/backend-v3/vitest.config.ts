@@ -9,6 +9,7 @@ export default defineConfig({
       'tests/integration/endpoints.test.ts',
       'tests/integration/workers.test.ts',
       'tests/integration/audit-schema.test.ts',
+      'tests/integration/drafts.test.ts',
       'tests/integration/setup.ts',
     ],
     testTimeout: 30_000,

@@ -55,24 +55,16 @@ export async function seed(databaseUrl: string): Promise<SeedIds> {
     );
     const pipelineItemId = piRes.rows[0]!.id;
 
-    // Capture (uses V3-era columns from v3_009 migration)
+    // Capture (uses v3_001 columns — F-230 unified code to match this schema)
     const captureRes = await pool.query<{ id: string }>(
       `INSERT INTO captures (
-         pipeline_item_id, opportunity_id, color_review_stage,
-         color_review_audit, compliance_items, compliance_items_sources,
-         pricing_assumptions_sources, teaming_worksheet_sources,
+         pipeline_item_id, color_stage, source_id,
          created_at, updated_at
        ) VALUES (
-         $1, $2, 'white',
-         $3, '[]'::jsonb, '[]'::jsonb,
-         '[]'::jsonb, '[]'::jsonb,
+         $1, 'pink', $2,
          NOW(), NOW()
        ) RETURNING id::text`,
-      [
-        pipelineItemId,
-        opportunityId,
-        JSON.stringify([{ stage: 'white', actor: 'system', timestamp: new Date().toISOString() }]),
-      ],
+      [pipelineItemId, sourceId],
     );
     const captureId = captureRes.rows[0]!.id;
 

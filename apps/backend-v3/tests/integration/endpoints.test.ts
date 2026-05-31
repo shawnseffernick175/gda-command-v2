@@ -161,7 +161,7 @@ describe('PATCH /v3/captures/:id', () => {
       method: 'PATCH',
       url: `/v3/captures/${ids.captureId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ color_review_notes: 'Integration test note' }),
+      payload: JSON.stringify({ pricing_notes: 'Integration test note' }),
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body) as { success: boolean };

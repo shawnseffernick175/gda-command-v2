@@ -296,20 +296,7 @@ CREATE TABLE captures (
                                   CHECK (compliance_status IN ('incomplete', 'partial', 'complete')),
   win_themes        TEXT[],                    -- key win themes for this pursuit
   ghost_team        JSONB,                     -- competitor "black hat" analysis
-  opportunity_id    BIGINT,                    -- FK to opportunity (V3 code path)
-  color_review_stage TEXT         DEFAULT 'white',
-  color_review_notes TEXT,
-  color_review_audit JSONB        NOT NULL DEFAULT '[]',
-  compliance_items  JSONB         NOT NULL DEFAULT '[]',
-  compliance_items_sources JSONB  NOT NULL DEFAULT '[]',
-  pricing_assumptions JSONB,
-  pricing_assumptions_sources JSONB NOT NULL DEFAULT '[]',
-  teaming_worksheet  JSONB,
-  teaming_worksheet_sources JSONB NOT NULL DEFAULT '[]',
-  analysis           JSONB,                    -- inline analysis JSONB for fast reads
-  analysis_version   TEXT,
-  ai_analyzed_at     TIMESTAMPTZ,
-  source_id         BIGINT        REFERENCES sources(id),
+  source_id         BIGINT        NOT NULL REFERENCES sources(id),
   created_by        BIGINT        REFERENCES users(id),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
@@ -421,21 +408,18 @@ CREATE INDEX idx_actions_source      ON action_items (source_id);
 
 ```sql
 CREATE TABLE action_item_drafts (
-  id              TEXT          PRIMARY KEY,   -- UUID (V3 uses text UUIDs)
+  id              BIGSERIAL     PRIMARY KEY,
   action_item_id  TEXT          NOT NULL,      -- FK to action_items (text id)
   kind            TEXT          NOT NULL
                                 CHECK (kind IN ('reply', 'research', 'milestone')),
   status          TEXT          NOT NULL DEFAULT 'pending'
                                 CHECK (status IN ('generating', 'done', 'failed', 'pending', 'approved', 'rejected')),
-  content         TEXT,                        -- the LLM-generated draft
-  draft_text      TEXT,                        -- V3 draft text (replaces content)
-  sources         JSONB,                       -- R1 source references for the draft
+  content         TEXT          NOT NULL,      -- the LLM-generated draft
   model_used      TEXT,                        -- e.g., "gpt-4o", "claude-3.5-sonnet"
   approved_by     BIGINT        REFERENCES users(id),
   approved_at     TIMESTAMPTZ,
   source_id       BIGINT        REFERENCES sources(id),
-  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ   DEFAULT NOW()
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_drafts_action       ON action_item_drafts (action_item_id);
