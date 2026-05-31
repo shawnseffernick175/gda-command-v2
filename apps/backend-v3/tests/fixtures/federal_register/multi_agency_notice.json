@@ -1,0 +1,21 @@
+{
+  "document_number": "2026-34567",
+  "title": "Notice of Intent: Joint Industry Day for Next-Generation Logistics Platform",
+  "abstract": "The Army and GSA announce a joint industry day to discuss requirements for a next-generation logistics and supply chain management platform.",
+  "type": "Notice",
+  "agencies": [
+    { "name": "Defense Department", "raw_name": "DEFENSE DEPARTMENT" },
+    { "name": "General Services Administration", "raw_name": "GENERAL SERVICES ADMINISTRATION" }
+  ],
+  "publication_date": "2026-05-22",
+  "effective_on": null,
+  "comments_close_on": null,
+  "cfr_references": [],
+  "topics": ["procurement"],
+  "html_url": "https://www.federalregister.gov/documents/2026/05/22/2026-34567/joint-industry-day-logistics",
+  "pdf_url": null,
+  "regulation_id_number_info": {},
+  "regulations_dot_gov_info": null,
+  "significant": false,
+  "docket_ids": []
+}
