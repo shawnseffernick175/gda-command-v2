@@ -20,11 +20,17 @@ const TOPIC_CONDITIONS = [
   'acquisition-regulations',
 ];
 
-const AGENCY_CONDITIONS = [
+export const FR_AGENCY_SLUGS = [
   'defense-department',
   'general-services-administration',
-  'federal-acquisition-regulation',
-];
+  'homeland-security-department',
+  'small-business-administration',
+  'office-of-federal-procurement-policy',
+  'national-aeronautics-and-space-administration',
+  'energy-department',
+  'health-and-human-services-department',
+  'office-of-management-and-budget',
+] as const;
 
 export interface FederalRegisterDocumentRaw {
   document_number: string;
@@ -56,7 +62,7 @@ function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function buildSearchUrl(fromDate: Date, page: number): string {
+export function buildSearchUrl(fromDate: Date, page: number): string {
   const params = new URLSearchParams();
   params.set('conditions[publication_date][gte]', formatDate(fromDate));
   params.set('per_page', String(PER_PAGE));
@@ -66,7 +72,7 @@ function buildSearchUrl(fromDate: Date, page: number): string {
   for (const topic of TOPIC_CONDITIONS) {
     params.append('conditions[topics][]', topic);
   }
-  for (const agency of AGENCY_CONDITIONS) {
+  for (const agency of FR_AGENCY_SLUGS) {
     params.append('conditions[agencies][]', agency);
   }
 
