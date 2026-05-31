@@ -21,6 +21,7 @@ const PUBLIC_PATHS = new Set([
   '/v3/docs',
   '/v3/docs/',
   '/v3/soak-metrics',
+  '/v3/auth/login',
 ]);
 
 function isPublicPath(url: string): boolean {

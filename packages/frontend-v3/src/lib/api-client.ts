@@ -1,3 +1,5 @@
+import { getToken, clearAuth } from './auth';
+
 const API_BASE = import.meta.env.VITE_V3_API_URL || 'https://gda-v3.csr-llc.tech';
 
 export class ApiError extends Error {
@@ -13,13 +15,21 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
+
+  if (res.status === 401) {
+    clearAuth();
+    window.location.href = '/login?reason=expired';
+    throw new ApiError('Session expired', 401, 'UNAUTHORIZED');
+  }
 
   const json = await res.json() as {
     success: boolean;
