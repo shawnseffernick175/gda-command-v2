@@ -10,11 +10,11 @@ export interface DraftSource {
 }
 
 export interface Draft {
-  id: string;
-  action_item_id: string;
+  id: number;
+  action_item_id: number;
   kind: 'reply' | 'research' | 'milestone';
-  draft_text: string;
-  sources: DraftSource[];
+  content: string;
+  model_used: string | null;
   status: 'generating' | 'approved' | 'rejected';
   created_at: string;
 }

@@ -1,25 +1,26 @@
 import { pool } from '../../lib/db.js';
 import { requireBoss, QUEUE_NAMES } from '../../lib/queue.js';
 import { logger } from '../../lib/logger.js';
-import { v4 as uuidv4 } from 'uuid';
 import type { ActionItemRow } from '../action-items/index.js';
 
 export type DraftKind = 'reply' | 'research' | 'milestone';
 export type DraftStatus = 'generating' | 'done' | 'failed';
 
 export interface DraftRow {
-  id: string;
-  action_item_id: string;
+  id: number;
+  action_item_id: number;
   kind: DraftKind;
-  draft_text: string | null;
-  sources: object[] | null;
+  content: string;
+  model_used: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  source_id: number | null;
   status: DraftStatus;
   created_at: string;
-  updated_at: string;
 }
 
 export interface DraftJobData {
-  draftId: string;
+  draftId: number;
   actionItemId: string;
   kind: DraftKind;
 }
@@ -34,21 +35,18 @@ export async function requestDraft(
   actionItem: ActionItemRow,
   kind: DraftKind
 ): Promise<DraftRow> {
-  const id = uuidv4();
-  const now = new Date().toISOString();
-
   const res = await pool.query<DraftRow>(
-    `INSERT INTO action_item_drafts (id, action_item_id, kind, status, created_at, updated_at)
-     VALUES ($1, $2, $3, 'generating', $4, $4)
+    `INSERT INTO action_item_drafts (action_item_id, kind, status, content, created_at)
+     VALUES ($1, $2, 'generating', '', NOW())
      RETURNING *`,
-    [id, actionItem.id, kind, now]
+    [actionItem.id, kind]
   );
 
   const draft = res.rows[0]!;
 
   const boss = requireBoss();
   const jobData: DraftJobData = {
-    draftId: id,
+    draftId: draft.id,
     actionItemId: actionItem.id,
     kind,
   };
@@ -57,10 +55,10 @@ export async function requestDraft(
     retryLimit: 3,
     retryDelay: 5,
     retryBackoff: true,
-    singletonKey: `draft-${id}`,
+    singletonKey: `draft-${draft.id}`,
   });
 
-  logger.info({ draftId: id, actionItemId: actionItem.id, kind }, 'Draft requested');
+  logger.info({ draftId: draft.id, actionItemId: actionItem.id, kind }, 'Draft requested');
   return draft;
 }
 
@@ -107,8 +105,8 @@ export function toDraftApiShape(row: DraftRow): object {
     id: row.id,
     action_item_id: row.action_item_id,
     kind: row.kind,
-    draft_text: row.draft_text ?? '',
-    sources: row.sources ?? [],
+    content: row.content,
+    model_used: row.model_used,
     status: row.status === 'generating' ? 'generating' : row.status === 'done' ? 'approved' : 'rejected',
     created_at: row.created_at,
   };

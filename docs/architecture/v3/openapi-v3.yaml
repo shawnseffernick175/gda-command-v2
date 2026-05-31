@@ -913,7 +913,7 @@ paths:
                   id: "draft_002"
                   action_item_id: "ai_001"
                   kind: reply
-                  draft_text: "Hi Angela, following up on RS3 TO47 pricing..."
+                  content: "Hi Angela, following up on RS3 TO47 pricing..."
                   status: pending
                   created_at: "2026-05-29T16:15:00.000Z"
                 meta:
@@ -2422,8 +2422,11 @@ components:
           type: string
         kind:
           $ref: '#/components/schemas/DraftKind'
-        draft_text:
+        content:
           type: string
+        model_used:
+          type: string
+          nullable: true
         status:
           type: string
           enum: [pending, approved, rejected]
