@@ -14,6 +14,7 @@ import { CaptureDetail } from "./surfaces/capture/CaptureDetail";
 import { useUiStore } from "./stores/ui-store";
 import { RequireAuth } from "./components/RequireAuth";
 import { Login } from "./surfaces/auth/Login";
+import { RegulatorySurface } from "./surfaces/regulatory/RegulatorySurface";
 
 export function App() {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
@@ -41,6 +42,7 @@ export function App() {
                   <Route path="/capture/:opp_id" element={<CaptureDetail />} />
                   <Route path="/pipeline" element={<PipelineSurface />} />
                   <Route path="/action-items" element={<ActionItemsList />} />
+                  <Route path="/regulatory" element={<RegulatorySurface />} />
                   <Route path="/settings/*" element={<PlaceholderSurface name="Settings" />} />
                 </Routes>
               </MainCanvas>

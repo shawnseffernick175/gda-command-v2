@@ -17,6 +17,7 @@ import { partnerRoutes } from './routes/partners.js';
 import { actionItemRoutes } from './routes/action-items.js';
 import { soakRoutes } from './routes/soak.js';
 import { fastTrackRoutes } from './routes/fast-track.js';
+import { regulatoryRoutes } from './routes/regulatory.js';
 import { authRoutes } from './routes/auth.js';
 import { adminIngestRoutes } from './routes/admin/ingest.js';
 import { errorEnvelope } from './lib/envelope.js';
@@ -111,6 +112,7 @@ export async function buildApp() {
   await app.register(partnerRoutes);
   await app.register(actionItemRoutes);
   await app.register(soakRoutes);
+  await app.register(regulatoryRoutes);
   await app.register(adminIngestRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
