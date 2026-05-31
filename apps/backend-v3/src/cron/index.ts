@@ -1,6 +1,12 @@
 /**
  * Cron scheduler — uses node-cron to schedule periodic ingest jobs.
  * Boots with the backend and logs registered jobs at startup.
+ *
+ * DIBBS + NECO crons are gated behind ENABLE_DIBBS_INGEST / ENABLE_NECO_INGEST
+ * env flags (default OFF). Both .mil sites firewall commercial VPS IPs, so
+ * crons fail with TCP connect timeouts from Hostinger. The ingest code is
+ * correct — only the transport is blocked. Re-enable once egress proxy or
+ * alternative infra is in place. See GitHub issue #513.
  */
 
 import cron, { type ScheduledTask } from 'node-cron';
@@ -10,6 +16,9 @@ import { registerSAMSource } from '../ingest/sam/index.js';
 import { registerDIBBSSource } from '../ingest/dibbs/index.js';
 import { registerNECOSource } from '../ingest/neco/index.js';
 import { registerFPDSSource } from '../ingest/fpds/index.js';
+
+const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
+const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
 
 const tasks: ScheduledTask[] = [];
 
@@ -22,13 +31,19 @@ interface CronJob {
 const JOBS: CronJob[] = [
   { sourceKey: 'sam.gov', schedule: '0 */4 * * *', label: 'SAM.gov ingest (every 4 hours)' },
   { sourceKey: 'fpds.gov', schedule: '0 7 * * *', label: 'FPDS daily awards ingest (03:00 ET)' },
-  { sourceKey: 'dibbs', schedule: '0 */6 * * *', label: 'DIBBS ingest (every 6 hours)' },
-  { sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' },
+  ...(dibbsEnabled
+    ? [{ sourceKey: 'dibbs', schedule: '0 */6 * * *', label: 'DIBBS ingest (every 6 hours)' }]
+    : []),
+  ...(necoEnabled
+    ? [{ sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' }]
+    : []),
 ];
 
 export function startCronScheduler(): void {
   registerSAMSource();
   registerFPDSSource();
+  // Source registration kept unconditionally so manual POST /v3/admin/ingest/run/dibbs|neco
+  // still resolves. Only the cron schedule is gated by the env flags above.
   registerDIBBSSource();
   registerNECOSource();
 
