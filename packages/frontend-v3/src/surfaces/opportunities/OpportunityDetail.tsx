@@ -9,6 +9,8 @@ import { SourceLink } from './components/SourceLink';
 import { QualifyConfirmModal } from './QualifyConfirmModal';
 import { DoctrineAlignmentPanel } from '../doctrine/DoctrineAlignmentPanel';
 import { DoctrineQualifyGate } from '../doctrine/DoctrineQualifyGate';
+import { DecisionHistory } from '../decisions/DecisionHistory';
+import { PwinBreakdown } from '../decisions/PwinBreakdown';
 import type { OpportunityDetail as OpportunityDetailType } from './types';
 
 interface OpportunityDetailPanelProps {
@@ -221,6 +223,16 @@ export function OpportunityDetailPanel({ opportunityId, onBack }: OpportunityDet
       {detail.analysis && !analysisTimeout && <AnalysisSection detail={detail} />}
 
       <DoctrineAlignmentPanel entityKind="opportunity" entityId={detail.id} />
+
+      <div className="border-t border-border pt-6">
+        <h3 className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold mb-3">PWin Score</h3>
+        <PwinBreakdown opportunityId={detail.id} />
+      </div>
+
+      <div className="border-t border-border pt-6">
+        <h3 className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold mb-3">Decision History</h3>
+        <DecisionHistory entityKind="opportunity" entityId={detail.id} />
+      </div>
 
       <QualifyConfirmModal
         open={qualifyOpen}

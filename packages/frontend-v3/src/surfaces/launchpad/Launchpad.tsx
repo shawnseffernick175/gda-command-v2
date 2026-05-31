@@ -1,6 +1,7 @@
 import { useLaunchpadSummary, useLaunchpadFlags } from './api';
 import { SummaryCardGrid } from './SummaryCardGrid';
 import { FlagsPanel } from './FlagsPanel';
+import { RecentDecisions } from '../decisions/RecentDecisions';
 
 export function Launchpad() {
   const summary = useLaunchpadSummary();
@@ -27,6 +28,8 @@ export function Launchpad() {
           refetch={flags.refetch}
         />
       </div>
+
+      <RecentDecisions />
     </div>
   );
 }
