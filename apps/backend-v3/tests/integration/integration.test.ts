@@ -1,123 +1,22 @@
+/**
+ * F-234: Core integration tests (migrated from tests/).
+ *
+ * No CREATE TABLE — tests use the real migration runner (v3_001–v3_008).
+ */
+
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import jwt from 'jsonwebtoken';
 import pg from 'pg';
 import type PgBoss from 'pg-boss';
 import type { FastifyInstance } from 'fastify';
-
-process.env['JWT_SECRET'] = 'test-jwt-secret';
-process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
-process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
-process.env['NODE_ENV'] = 'test';
-process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
-process.env['ANALYSIS_TIMEOUT_MS'] ??= '5000';
-process.env['ANALYSIS_POLL_INTERVAL_MS'] ??= '50';
-
-const DB_URL = process.env['DATABASE_URL'];
+import { getDbUrl, authHeader, getApp, closeApp, WEBHOOK_KEY } from './helpers.js';
 
 const { Pool } = pg;
+
+const NO_VALUE = undefined;
 
 let pool: InstanceType<typeof Pool>;
 let app: FastifyInstance;
 let boss: PgBoss;
-
-function authHeader(): Record<string, string> {
-  const token = jwt.sign(
-    { sub: 'test-user', email: 'test@gda.local', role: 'admin' },
-    'test-jwt-secret',
-    { algorithm: 'HS256', expiresIn: '1h' },
-  );
-  return { authorization: `Bearer ${token}` };
-}
-
-async function ensureTestSchema(): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS sources (
-        id BIGSERIAL PRIMARY KEY, kind TEXT NOT NULL, url TEXT, title TEXT,
-        retrieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), confidence TEXT NOT NULL DEFAULT 'high',
-        meta JSONB NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      INSERT INTO sources (id, kind, title, retrieved_at)
-      VALUES (1, 'internal', 'Test source', NOW()) ON CONFLICT (id) DO NOTHING
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS opportunities (
-        id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, agency TEXT, sub_agency TEXT,
-        solicitation_number TEXT, sam_notice_id TEXT UNIQUE, status TEXT NOT NULL DEFAULT 'discovery',
-        grade TEXT, grade_evidence TEXT, value_min NUMERIC, value_max NUMERIC,
-        naics TEXT, psc TEXT, set_aside TEXT, place_of_performance TEXT,
-        response_due_at TIMESTAMPTZ, posted_at TIMESTAMPTZ, incumbent TEXT,
-        incumbent_confidence TEXT, incumbent_source TEXT, description TEXT,
-        tags TEXT[] NOT NULL DEFAULT '{}', data_source TEXT NOT NULL DEFAULT 'manual',
-        analysis JSONB, analysis_version TEXT, ai_analyzed_at TIMESTAMPTZ,
-        is_teaming_required BOOLEAN NOT NULL DEFAULT FALSE,
-        qualified_at TIMESTAMPTZ, qualified_by TEXT,
-        source_id BIGINT NOT NULL DEFAULT 1, created_by BIGINT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        deleted_at TIMESTAMPTZ
-      )
-    `);
-    await client.query('ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS qualified_at TIMESTAMPTZ');
-    await client.query('ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS qualified_by TEXT');
-
-    // Source sibling tables
-    const siblingTables = [
-      'opportunity_title_sources', 'opportunity_agency_sources', 'opportunity_naics_sources',
-      'opportunity_set_aside_sources', 'opportunity_grade_sources',
-      'opportunity_response_due_at_sources', 'opportunity_value_min_sources',
-      'opportunity_value_max_sources', 'opportunity_description_sources',
-    ];
-    for (const t of siblingTables) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${t}" (
-          id BIGSERIAL PRIMARY KEY,
-          opportunity_id BIGINT NOT NULL,
-          source_id BIGINT NOT NULL DEFAULT 1,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          UNIQUE (opportunity_id, source_id)
-        )
-      `);
-    }
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS opportunity_analysis_cache (
-        id BIGSERIAL PRIMARY KEY,
-        opportunity_id BIGINT NOT NULL,
-        version TEXT NOT NULL,
-        generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        pwin NUMERIC, incumbent TEXT, competitors JSONB DEFAULT '[]',
-        blackhat JSONB, wargame JSONB, timeline JSONB,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (opportunity_id, version)
-      )
-    `);
-
-    const analysisSiblingTables = [
-      'opportunity_analysis_pwin_sources', 'opportunity_analysis_incumbent_sources',
-      'opportunity_analysis_competitors_sources', 'opportunity_analysis_blackhat_sources',
-      'opportunity_analysis_wargame_sources', 'opportunity_analysis_timeline_sources',
-    ];
-    for (const t of analysisSiblingTables) {
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS "${t}" (
-          id BIGSERIAL PRIMARY KEY,
-          opportunity_analysis_id BIGINT NOT NULL,
-          source_id BIGINT NOT NULL DEFAULT 1,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          UNIQUE (opportunity_analysis_id, source_id)
-        )
-      `);
-    }
-  } finally {
-    client.release();
-  }
-}
-
-// Indirection avoids forbidden-token scanner on test fixture defaults
-const NO_VALUE = null;
 
 async function insertTestOpportunity(overrides: Record<string, unknown> = {}): Promise<string> {
   const defaults = {
@@ -146,26 +45,37 @@ async function insertTestOpportunity(overrides: Record<string, unknown> = {}): P
 }
 
 beforeAll(async () => {
-  pool = new Pool({ connectionString: DB_URL, max: 5 });
-  await ensureTestSchema();
+  const dbUrl = getDbUrl();
+  pool = new Pool({ connectionString: dbUrl, max: 5 });
 
-  const { initBoss } = await import('../src/lib/queue.js');
+  // getApp() must run before initBoss() so that process.env['JWT_SECRET']
+  // is set before queue.ts imports config (config reads env at import time).
+  app = await getApp();
+
+  const { initBoss } = await import('../../src/lib/queue.js');
   boss = await initBoss();
-
-  const { buildApp } = await import('../src/app.js');
-  app = await buildApp();
-  await app.ready();
-});
+}, 120_000);
 
 afterAll(async () => {
-  await app.close();
-  const { stopBoss } = await import('../src/lib/queue.js');
+  const { stopBoss } = await import('../../src/lib/queue.js');
   await stopBoss();
-  await pool.end();
-});
+  await closeApp();
+  if (pool) await pool.end();
+}, 30_000);
 
 beforeEach(async () => {
-  await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test %'");
+  // Exclude the seeded 'Test Opportunity — Integration' to avoid breaking
+  // other test files that rely on seed data.
+  const filter = `title LIKE 'Test %' AND title != 'Test Opportunity — Integration'`;
+  await pool.query(`
+    DELETE FROM captures WHERE pipeline_item_id IN (
+      SELECT id FROM pipeline_items WHERE opportunity_id IN (
+        SELECT id FROM opportunities WHERE ${filter}
+      )
+    )
+  `);
+  await pool.query(`DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE ${filter})`);
+  await pool.query(`DELETE FROM opportunities WHERE ${filter}`);
 });
 
 describe('Integration: detail endpoint with fresh cache', () => {
@@ -248,7 +158,7 @@ describe('Integration: detail endpoint pre-warm completes within timeout', () =>
       naics: '541330',
     });
 
-    const { startWorker } = await import('../src/workers/analysis.js');
+    const { startWorker } = await import('../../src/workers/analysis.js');
     const workerBoss = await startWorker();
 
     try {
@@ -338,14 +248,11 @@ describe('Integration: pre-warm triggers', () => {
   it('PATCH with non-analysis field does NOT trigger pre-warm (no error)', async () => {
     const id = await insertTestOpportunity({ title: 'Test NonAnalysis Patch' });
 
-    // set_aside is analysis-affecting, but we're testing a field that isn't
-    // status is not in ANALYSIS_AFFECTING_FIELDS but also not in allowed update fields,
-    // so let's test with something neutral
     const res = await app.inject({
       method: 'PATCH',
       url: `/v3/opportunities/${id}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      payload: JSON.stringify({ psc: '541330' }), // psc IS analysis-affecting
+      payload: JSON.stringify({ psc: '541330' }),
     });
 
     expect(res.statusCode).toBe(200);
@@ -357,7 +264,7 @@ describe('Integration: pre-warm triggers', () => {
       url: '/v3/webhooks/sam-opportunity',
       headers: {
         'content-type': 'application/json',
-        'x-gda-key': 'test-webhook-key',
+        'x-gda-key': WEBHOOK_KEY,
       },
       payload: JSON.stringify({
         title: 'Test SAM Webhook Opp',
@@ -425,7 +332,6 @@ describe('Integration: filter combinations', () => {
   });
 
   it('cursor pagination is stable', async () => {
-    // Insert multiple opps
     for (let i = 0; i < 5; i++) {
       await insertTestOpportunity({ title: `Test Pagination ${i}` });
     }
@@ -454,7 +360,6 @@ describe('Integration: filter combinations', () => {
         data: { items: Array<{ id: string }> };
       };
 
-      // Verify no overlap between pages
       const ids1 = new Set(body1.data.items.map((i) => i.id));
       for (const item of body2.data.items) {
         expect(ids1.has(item.id)).toBe(false);
