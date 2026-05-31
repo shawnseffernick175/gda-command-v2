@@ -3,6 +3,7 @@ import { AppShell } from "./components/AppShell/AppShell";
 import { LeftRail } from "./components/LeftRail/LeftRail";
 import { MainCanvas } from "./components/MainCanvas/MainCanvas";
 import { PlaceholderSurface } from "./components/PlaceholderSurface/PlaceholderSurface";
+import { Launchpad } from "./surfaces/launchpad/Launchpad";
 import { useUiStore } from "./stores/ui-store";
 
 export function App() {
@@ -15,7 +16,7 @@ export function App() {
       <MainCanvas>
         <Routes>
           <Route index element={<Navigate to="/launchpad" replace />} />
-          <Route path="/launchpad" element={<PlaceholderSurface name="Launchpad" />} />
+          <Route path="/launchpad" element={<Launchpad />} />
           <Route path="/fast-track" element={<PlaceholderSurface name="Fast Track" />} />
           <Route path="/opportunities" element={<PlaceholderSurface name="Opportunities" />} />
           <Route path="/opp/:notice_id" element={<PlaceholderSurface name="Opportunity Detail" />} />
