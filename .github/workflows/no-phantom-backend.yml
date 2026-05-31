@@ -36,3 +36,12 @@ jobs:
             echo "ERROR: n8n/ directory resurrected. V3 is Postgres-only — no n8n workflows in V3 repo."
             exit 1
           fi
+
+      - name: Fail if pre-V3 doc dirs resurrect outside archive/
+        run: |
+          for d in "Build Docs" "New Build Folder" "New Build for GDA" "New GDA CMD Platform" "All Perplexity" "Extract"; do
+            if [ -d "$d" ]; then
+              echo "ERROR: '$d' resurrected at repo root. Must live under archive/2026-pre-v3/."
+              exit 1
+            fi
+          done

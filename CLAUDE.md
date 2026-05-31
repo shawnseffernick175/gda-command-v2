@@ -16,6 +16,13 @@ All canonical documentation lives in `docs/canonical/`. Read these before making
 - `docs/canonical/doctrine_to_doors_map.md` — doctrine-to-door enforcement
 - `docs/canonical/partner_intel_spec_v1.md` — Partner Intel door spec
 
+## Where docs live
+
+- Live V3 architecture: `docs/architecture/v3/`
+- Canonical agent instructions: `CLAUDE.md`
+- Pre-V3 historical artifacts: `archive/2026-pre-v3/` (read-only)
+- Active F-issue specs: GitHub Issues (search `is:issue label:devin-ready`)
+
 ## Product Rules
 
 See `docs/canonical/product_rules.md` for non-negotiable product rules:

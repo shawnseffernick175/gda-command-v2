@@ -313,7 +313,7 @@ All deletions executed post-F-026 Step 2 (network bridge closed green).
 | GDA.util.gist-update | `3ewzE1DpagLYFiyf` | Cat B (ORPHAN) | Inactive duplicate. Active replacement `t2209zk3c9x0OS9S` serves same webhook path. |
 | GDA.event.opp-cross-wire | `pkhbZBYzr6O93XAs` | Cat B (ORPHAN) | Active webhook, zero executions. Calls pwin-calculator (WIRED) but also calls non-existent `/webhook/gda-ooda-loop` (real path is `/webhook/gda-ooda`). Dead scaffolding. |
 
-**Grep pre-check:** "white-glove", "white-glove-upload", "/form/white-glove-upload" — only matches in `All Perplexity/` baseline snapshots (historical). No active code, docs, or external references.
+**Grep pre-check:** "white-glove", "white-glove-upload", "/form/white-glove-upload" — only matches in `archive/2026-pre-v3/all-perplexity/` baseline snapshots (historical). No active code, docs, or external references.
 
 **Cat A comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513007362)
 **Cat B comment:** [#257](https://github.com/shawnseffernick175/gda-command-v2/issues/257#issuecomment-4513111854)
