@@ -220,7 +220,7 @@ function SearchPanel() {
                 ) : (
                   r.source_filename
                 )}
-                {r.section_title && <span> &middot; {r.section_title}</span>}
+                {r.section_title && <span> · {r.section_title}</span>}
               </div>
             </div>
           ))}

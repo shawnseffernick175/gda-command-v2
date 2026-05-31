@@ -1,7 +1,7 @@
 import { logger } from '../../lib/logger.js';
 
 const EMBED_MODEL = 'text-embedding-3-large';
-const EMBED_DIMENSIONS = 3072;
+const EMBED_DIMENSIONS = 2000;
 const BATCH_SIZE = 100;
 
 interface EmbeddingResponse {

@@ -9,7 +9,7 @@ The RAG (Retrieval-Augmented Generation) knowledge base provides vector-search g
 | Component | Technology |
 |---|---|
 | Storage | pgvector extension on `gda-postgres-staging` |
-| Embeddings | `text-embedding-3-large` (3072 dims) via OpenAI API |
+| Embeddings | `text-embedding-3-large` (2000 dims) via OpenAI API |
 | Chunking | Semantic chunking with 400-600 token targets, 50-token overlap |
 | Backend | Fastify routes in `apps/backend-v3/src/routes/rag.ts` |
 | Frontend | React surface at `/knowledge-base` |
@@ -19,7 +19,7 @@ The RAG (Retrieval-Augmented Generation) knowledge base provides vector-search g
 Two tables in the V3 database:
 
 - **`kb_documents`** — Source documents (PDF, DOCX, PPTX, etc.) with doc_type, OU tag, evidence grade, SHA256 dedup.
-- **`kb_chunks`** — Embedded text chunks with `vector(3072)` column and HNSW index for fast cosine similarity search.
+- **`kb_chunks`** — Embedded text chunks with `vector(2000)` column and HNSW index for fast cosine similarity search.
 
 Migration: `db/v3/migrations/v3_017_kb_documents_and_chunks.sql`
 

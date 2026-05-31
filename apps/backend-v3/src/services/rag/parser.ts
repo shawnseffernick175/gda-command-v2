@@ -147,18 +147,23 @@ async function parsePptx(buffer: Buffer): Promise<ParsedContent> {
 
 async function parseXlsx(buffer: Buffer): Promise<ParsedContent> {
   try {
-    const XLSX = await import('xlsx');
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
     const texts: string[] = [];
 
-    for (const sheetName of workbook.SheetNames) {
-      const sheet = workbook.Sheets[sheetName];
-      if (!sheet) continue;
-      const csv = XLSX.utils.sheet_to_csv(sheet);
-      if (csv.trim()) {
-        texts.push(`[Sheet: ${sheetName}]\n${csv}`);
+    workbook.eachSheet((sheet) => {
+      const rows: string[] = [];
+      sheet.eachRow((row) => {
+        const values = (row.values as unknown[])
+          .slice(1) // ExcelJS row.values is 1-indexed with empty [0]
+          .map((v) => (v != null ? String(v) : ''));
+        rows.push(values.join(','));
+      });
+      if (rows.length > 0) {
+        texts.push(`[Sheet: ${sheet.name}]\n${rows.join('\n')}`);
       }
-    }
+    });
 
     return { text: texts.join('\n\n') };
   } catch (err) {

@@ -2,20 +2,25 @@
 --
 -- Creates the vector-search knowledge base for grounding agent analysis
 -- in retrievable, citable, OU-tagged, evidence-graded chunks.
--- Requires pgvector extension (already available on pgvector/pgvector:pg16 image).
+-- Uses pgvector when available; gracefully skips vector objects otherwise
+-- (e.g. in integration-test containers that run plain Postgres).
 -- Forward-only.
 
 BEGIN;
 
 -- ============================================================================
--- 17.0  Enable pgvector extension
+-- 17.0  Enable pgvector extension (skip gracefully if not installed)
 -- ============================================================================
-CREATE EXTENSION IF NOT EXISTS vector;
+DO $$ BEGIN
+  CREATE EXTENSION IF NOT EXISTS vector;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pgvector extension not available — vector columns and indexes will be skipped';
+END $$;
 
 -- ============================================================================
 -- 17.1  kb_documents — source documents in the RAG corpus
 -- ============================================================================
-CREATE TABLE kb_documents (
+CREATE TABLE IF NOT EXISTS kb_documents (
   id                  UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
   source_filename     TEXT            NOT NULL,
   source_url          TEXT,
@@ -45,29 +50,39 @@ CREATE TABLE kb_documents (
   ]))
 );
 
-CREATE INDEX kb_documents_type_ou ON kb_documents(doc_type, ou_tag);
-CREATE INDEX kb_documents_sha256_idx ON kb_documents(sha256);
+CREATE INDEX IF NOT EXISTS kb_documents_type_ou ON kb_documents(doc_type, ou_tag);
+CREATE INDEX IF NOT EXISTS kb_documents_sha256_idx ON kb_documents(sha256);
 
 -- ============================================================================
 -- 17.2  kb_chunks — embeddings for semantic search
+--       Uses 2000 dimensions (text-embedding-3-large supports native dim
+--       reduction via the `dimensions` API param; 2000 dims stays within
+--       pgvector HNSW limit while preserving high retrieval quality).
 -- ============================================================================
-CREATE TABLE kb_chunks (
-  id                UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-  document_id       UUID            NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
-  chunk_index       INT             NOT NULL,
-  chunk_text        TEXT            NOT NULL,
-  embedding         vector(3072)    NOT NULL,
-  token_count       INT,
-  page_number       INT,
-  section_title     TEXT,
-  created_at        TIMESTAMPTZ     NOT NULL DEFAULT now(),
-  UNIQUE (document_id, chunk_index)
-);
+DO $$ BEGIN
+  -- Only create the vector table if the extension loaded successfully
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+    CREATE TABLE IF NOT EXISTS kb_chunks (
+      id                UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+      document_id       UUID            NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
+      chunk_index       INT             NOT NULL,
+      chunk_text        TEXT            NOT NULL,
+      embedding         vector(2000)    NOT NULL,
+      token_count       INT,
+      page_number       INT,
+      section_title     TEXT,
+      created_at        TIMESTAMPTZ     NOT NULL DEFAULT now(),
+      UNIQUE (document_id, chunk_index)
+    );
 
-CREATE INDEX kb_chunks_embedding_idx ON kb_chunks
-  USING hnsw (embedding vector_cosine_ops)
-  WITH (m = 16, ef_construction = 64);
+    CREATE INDEX IF NOT EXISTS kb_chunks_embedding_idx ON kb_chunks
+      USING hnsw (embedding vector_cosine_ops)
+      WITH (m = 16, ef_construction = 64);
 
-CREATE INDEX kb_chunks_doc_idx ON kb_chunks(document_id);
+    CREATE INDEX IF NOT EXISTS kb_chunks_doc_idx ON kb_chunks(document_id);
+  ELSE
+    RAISE NOTICE 'pgvector not available — kb_chunks table (with vector column) not created';
+  END IF;
+END $$;
 
 COMMIT;
