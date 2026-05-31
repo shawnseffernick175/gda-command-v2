@@ -49,7 +49,8 @@ Sandboxed agent runtime service for GDA Command V3 — the "brain" that every ag
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | OpenAI API key |
 | `ANTHROPIC_API_KEY` | No | Anthropic API key (fallback) |
-| `AGENT_DB_URL` | Yes | Postgres connection (gda_agent_ro role) |
+| `AGENT_DB_URL` | Yes | Postgres connection for audit writes |
+| `AGENT_DB_RO_URL` | Yes | Read-only Postgres connection (gda_agent_ro role) for db_query tool |
 | `AGENT_SERVICE_TOKEN` | Yes (prod) | Auth token for protected endpoints |
 | `SAM_GOV_API_KEY` | No | SAM.gov API key |
 | `PERPLEXITY_API_KEY` | No | Perplexity API key |
@@ -63,7 +64,7 @@ Sandboxed agent runtime service for GDA Command V3 — the "brain" that every ag
 ## Development
 
 ```bash
-cd services/gda-agent-v3
+cd apps/gda-agent-v3
 pip install -r requirements.txt -r requirements-dev.txt
 pytest
 ```

@@ -164,6 +164,23 @@ class TestDbQuery:
         with pytest.raises(PermissionError, match="Only SELECT"):
             await run_readonly_query("UPDATE users SET name='x'")
 
+    async def test_writable_cte_rejected(self):
+        from src.db import run_readonly_query
+        with pytest.raises(PermissionError, match="disallowed DML keyword"):
+            await run_readonly_query(
+                "WITH d AS (DELETE FROM agent_runs RETURNING *) SELECT * FROM d"
+            )
+
+    async def test_drop_rejected(self):
+        from src.db import run_readonly_query
+        with pytest.raises(PermissionError, match="Only SELECT"):
+            await run_readonly_query("DROP TABLE agent_runs")
+
+    async def test_truncate_rejected(self):
+        from src.db import run_readonly_query
+        with pytest.raises(PermissionError, match="Only SELECT"):
+            await run_readonly_query("TRUNCATE agent_runs")
+
 
 @pytest.mark.anyio
 class TestRagSearch:

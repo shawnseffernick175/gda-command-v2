@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -8,9 +9,11 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
-from src.config import AGENT_DB_URL
+from src.config import AGENT_DB_URL, AGENT_DB_RO_URL
 
+# Two pools: _pool (read-write, for audit tables) and _ro_pool (read-only, for db_query tool)
 _pool: AsyncConnectionPool | None = None
+_ro_pool: AsyncConnectionPool | None = None
 
 
 async def get_pool() -> AsyncConnectionPool:
@@ -27,11 +30,28 @@ async def get_pool() -> AsyncConnectionPool:
     return _pool
 
 
+async def get_ro_pool() -> AsyncConnectionPool:
+    global _ro_pool
+    if _ro_pool is None:
+        _ro_pool = AsyncConnectionPool(
+            conninfo=AGENT_DB_RO_URL,
+            min_size=1,
+            max_size=3,
+            open=False,
+            kwargs={"row_factory": dict_row},
+        )
+        await _ro_pool.open()
+    return _ro_pool
+
+
 async def close_pool() -> None:
-    global _pool
+    global _pool, _ro_pool
     if _pool is not None:
         await _pool.close()
         _pool = None
+    if _ro_pool is not None:
+        await _ro_pool.close()
+        _ro_pool = None
 
 
 async def check_db() -> bool:
@@ -188,11 +208,26 @@ async def get_hourly_cost() -> float:
         return float(result["cost"]) if result else 0.0
 
 
-async def run_readonly_query(sql: str) -> list[dict[str, Any]]:
+# DML keywords that must not appear anywhere in agent-submitted SQL
+_DML_PATTERN = re.compile(
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|EXECUTE|COPY)\b",
+    re.IGNORECASE,
+)
+
+
+def _validate_readonly_sql(sql: str) -> None:
     upper = sql.strip().upper()
     if not upper.startswith("SELECT") and not upper.startswith("WITH"):
         raise PermissionError("Only SELECT / WITH queries allowed via db_query tool")
-    pool = await get_pool()
+    if _DML_PATTERN.search(sql):
+        raise PermissionError(
+            "Query contains disallowed DML keyword — only pure SELECT queries are permitted"
+        )
+
+
+async def run_readonly_query(sql: str) -> list[dict[str, Any]]:
+    _validate_readonly_sql(sql)
+    pool = await get_ro_pool()
     async with pool.connection() as conn:
         rows = await conn.execute(sql)
         return [dict(r) for r in await rows.fetchall()]

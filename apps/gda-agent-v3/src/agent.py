@@ -82,7 +82,7 @@ def _build_langchain_tools(
     tools = []
     registry_items = (
         {k: v for k, v in TOOL_REGISTRY.items() if k in allowed}
-        if allowed
+        if allowed is not None
         else TOOL_REGISTRY
     )
 
@@ -256,7 +256,6 @@ async def run_agent(
             elif kind == "on_tool_end":
                 tool_output = event.get("data", {}).get("output")
                 tool_name = event.get("name", "")
-                step_count += 1
 
                 output_data = str(tool_output) if tool_output else ""
                 yield {

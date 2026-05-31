@@ -5,10 +5,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY apps/gda-agent-v3/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ src/
+COPY apps/gda-agent-v3/src/ src/
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

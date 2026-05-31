@@ -82,7 +82,7 @@ services:
   gda-agent-v3:
     build:
       context: .
-      dockerfile: services/gda-agent-v3/Dockerfile
+      dockerfile: apps/gda-agent-v3/Dockerfile
     container_name: gda-agent-v3
     restart: unless-stopped
     depends_on:
@@ -92,6 +92,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AGENT_DB_URL: postgresql://${STAGING_POSTGRES_USER:-gda_staging}:${STAGING_POSTGRES_PASSWORD}@postgres-staging:5432/${STAGING_POSTGRES_DB:-gda_staging}
+      AGENT_DB_RO_URL: postgresql://${AGENT_RO_USER:-gda_agent_ro}:${AGENT_RO_PASSWORD:-agent_ro_default}@postgres-staging:5432/${STAGING_POSTGRES_DB:-gda_staging}
       AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
       SAM_GOV_API_KEY: ${SAM_GOV_API_KEY:-}
       PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}

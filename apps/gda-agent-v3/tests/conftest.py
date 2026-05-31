@@ -7,6 +7,7 @@ import os
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ.setdefault("AGENT_DB_URL", "postgresql://test:test@localhost:5432/test")
+os.environ.setdefault("AGENT_DB_RO_URL", "postgresql://test:test@localhost:5432/test")
 os.environ.setdefault("AGENT_SERVICE_TOKEN", "test-token")
 os.environ.setdefault("SAM_GOV_API_KEY", "test-sam-key")
 os.environ.setdefault("BACKEND_V3_URL", "http://localhost:4000")

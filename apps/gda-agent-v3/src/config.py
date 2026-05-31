@@ -35,6 +35,10 @@ AGENT_DB_URL: str = _env(
     "AGENT_DB_URL",
     "postgresql://gda_agent_ro:agent_ro_default@postgres-staging:5432/gda_staging",
 )
+AGENT_DB_RO_URL: str = _env(
+    "AGENT_DB_RO_URL",
+    "postgresql://gda_agent_ro:agent_ro_default@postgres-staging:5432/gda_staging",
+)
 
 AGENT_SERVICE_TOKEN: str = _env("AGENT_SERVICE_TOKEN", "")
 
