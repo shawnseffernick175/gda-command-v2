@@ -1,4 +1,4 @@
-import type { SuccessEnvelope } from '../opportunities/types';
+import { apiFetch } from '../../lib/api-client';
 import type { RegulatoryListResult, RegulatoryListFilters } from './types';
 
 const API_BASE = '/v3/regulatory-notices';
@@ -17,18 +17,15 @@ export async function fetchRegulatoryNotices(
   filters: RegulatoryListFilters,
 ): Promise<RegulatoryListResult> {
   const qs = buildQueryString(filters);
-  const url = qs ? `${API_BASE}?${qs}` : API_BASE;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch regulatory notices: ${res.status}`);
-  }
-  const envelope = (await res.json()) as SuccessEnvelope<RegulatoryListResult>;
-  return envelope.data;
+  const path = qs ? `${API_BASE}?${qs}` : API_BASE;
+  return apiFetch<RegulatoryListResult>(path);
 }
 
 export async function fetchRegulatoryCount(): Promise<number> {
-  const res = await fetch(`${API_BASE}/count`);
-  if (!res.ok) return 0;
-  const envelope = (await res.json()) as SuccessEnvelope<{ count: number }>;
-  return envelope.data.count;
+  try {
+    const data = await apiFetch<{ count: number }>(`${API_BASE}/count`);
+    return data.count;
+  } catch {
+    return 0;
+  }
 }
