@@ -74,13 +74,6 @@ const columns: TableColumn<OpportunitySummary>[] = [
     ),
   },
   {
-    key: 'created_at',
-    header: 'Posted',
-    sortable: true,
-    width: 110,
-    render: (row) => <span className="text-sm text-ink-muted">{formatDate(row.created_at)}</span>,
-  },
-  {
     key: 'grade',
     header: 'Grade',
     sortable: true,

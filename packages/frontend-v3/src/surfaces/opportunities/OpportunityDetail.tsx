@@ -59,29 +59,35 @@ function AnalysisSection({ detail }: { detail: OpportunityDetailType }) {
       {analysis.wargame && (
         <div>
           <h4 className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold mb-1">Recommended Action</h4>
-          <p className="text-sm text-ink-primary">{analysis.wargame.strategy}</p>
+          <SourceLink value={<span className="text-sm text-ink-primary">{analysis.wargame.strategy}</span>} sources={analysis.wargame_sources} data-testid="source-link-wargame" />
         </div>
       )}
 
       {analysis.competitors.length > 0 && (
         <div>
           <h4 className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold mb-1">Competitors</h4>
-          <div className="flex flex-wrap gap-2">
-            {analysis.competitors.map((c) => (
-              <span
-                key={c.name}
-                className={`inline-flex items-center h-6 px-2 rounded-full text-xs font-medium border ${
-                  c.threat_level === 'high'
-                    ? 'bg-critical/15 text-critical border-critical/30'
-                    : c.threat_level === 'medium'
-                      ? 'bg-warning/15 text-warning border-warning/30'
-                      : 'bg-ink-dim/15 text-ink-muted border-border'
-                }`}
-              >
-                {c.name}
-              </span>
-            ))}
-          </div>
+          <SourceLink
+            value={
+              <div className="flex flex-wrap gap-2">
+                {analysis.competitors.map((c) => (
+                  <span
+                    key={c.name}
+                    className={`inline-flex items-center h-6 px-2 rounded-full text-xs font-medium border ${
+                      c.threat_level === 'high'
+                        ? 'bg-critical/15 text-critical border-critical/30'
+                        : c.threat_level === 'medium'
+                          ? 'bg-warning/15 text-warning border-warning/30'
+                          : 'bg-ink-dim/15 text-ink-muted border-border'
+                    }`}
+                  >
+                    {c.name}
+                  </span>
+                ))}
+              </div>
+            }
+            sources={analysis.competitors_sources}
+            data-testid="source-link-competitors"
+          />
         </div>
       )}
     </div>
@@ -89,7 +95,7 @@ function AnalysisSection({ detail }: { detail: OpportunityDetailType }) {
 }
 
 export function OpportunityDetailPanel({ opportunityId, onBack }: OpportunityDetailPanelProps) {
-  const { detail, isLoading, isError, error, analysisTimeout, analysisLoading, retryAnalysis } =
+  const { detail, isLoading, isError, error, analysisTimeout, analysisLoading } =
     useOpportunityDetail(opportunityId);
   const qualifyMutation = useQualifyOpportunity();
   const [qualifyOpen, setQualifyOpen] = useState(false);
@@ -164,10 +170,12 @@ export function OpportunityDetailPanel({ opportunityId, onBack }: OpportunityDet
             />
           </p>
         </div>
-        <div>
-          <span className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold">Posted</span>
-          <p className="text-sm text-ink-primary mt-1">{formatDate(detail.posted_at)}</p>
-        </div>
+        {detail.posted_at && (
+          <div>
+            <span className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold">Posted</span>
+            <p className="text-sm text-ink-primary mt-1">{formatDate(detail.posted_at)}</p>
+          </div>
+        )}
         <div>
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold">Value Range</span>
           <p className="text-sm text-ink-primary mt-1">
@@ -195,13 +203,10 @@ export function OpportunityDetailPanel({ opportunityId, onBack }: OpportunityDet
 
       {analysisTimeout && (
         <div
-          className="rounded-sm border border-l-4 border-l-warning border-border bg-surface p-4 flex items-center justify-between"
+          className="rounded-sm border border-l-4 border-l-warning border-border bg-surface p-4"
           data-testid="retry-banner"
         >
-          <p className="text-sm text-ink-primary">Analysis timed out. Results may still be processing.</p>
-          <Button variant="secondary" onClick={retryAnalysis} loading={analysisLoading}>
-            Retry
-          </Button>
+          <p className="text-sm text-ink-primary">Analysis timed out. Retrying automatically…</p>
         </div>
       )}
 

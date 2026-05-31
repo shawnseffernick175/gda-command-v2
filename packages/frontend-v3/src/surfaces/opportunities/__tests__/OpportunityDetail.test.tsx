@@ -1,6 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { OpportunityDetailPanel } from '../OpportunityDetail';
@@ -85,6 +84,10 @@ describe('OpportunityDetail (R2 auto-analysis)', () => {
     vi.restoreAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('on mount, fires GET /:id for auto-analysis (at least once beyond initial detail fetch)', async () => {
     const detail = makeDetail();
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
@@ -119,7 +122,8 @@ describe('OpportunityDetail (R2 auto-analysis)', () => {
     expect(screen.getByText('Pursue as prime')).toBeInTheDocument();
   });
 
-  it('503 ANALYSIS_TIMEOUT renders retry banner, clicking retry re-fires', async () => {
+  it('503 ANALYSIS_TIMEOUT renders retry banner and auto-retries (no manual button per R2)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const detail = makeDetail();
     const timeoutEnvelope: ErrorEnvelope = {
       success: false,
@@ -130,15 +134,12 @@ describe('OpportunityDetail (R2 auto-analysis)', () => {
     let callCount = 0;
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
       callCount++;
-      // First call is the detail query - succeed
       if (callCount === 1) {
         return { ok: true, json: async () => makeEnvelope(detail) } as Response;
       }
-      // Second call is auto-analysis - return 503
       if (callCount === 2) {
         return { ok: false, status: 503, json: async () => timeoutEnvelope } as Response;
       }
-      // Subsequent calls (retry) - succeed
       return { ok: true, json: async () => makeEnvelope(detail) } as Response;
     });
 
@@ -146,11 +147,18 @@ describe('OpportunityDetail (R2 auto-analysis)', () => {
 
     const retryBanner = await screen.findByTestId('retry-banner');
     expect(retryBanner).toBeInTheDocument();
+    expect(retryBanner.textContent).toContain('Retrying automatically');
 
-    const retryBtn = screen.getByRole('button', { name: /retry/i });
-    await userEvent.click(retryBtn);
+    // No manual retry button per R2
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
 
-    expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
+    // Auto-retry fires after interval
+    await vi.advanceTimersByTimeAsync(5_500);
+    await waitFor(() => {
+      expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    vi.useRealTimers();
   });
 
   it('never renders a still_processing or pending state', async () => {
