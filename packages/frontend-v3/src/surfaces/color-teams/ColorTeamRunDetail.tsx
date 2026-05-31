@@ -61,7 +61,7 @@ export function ColorTeamRunDetail() {
           </p>
         </div>
         <a href="/color-teams" className="text-sm text-accent hover:underline">
-          &larr; Back
+          ← Back
         </a>
       </div>
 

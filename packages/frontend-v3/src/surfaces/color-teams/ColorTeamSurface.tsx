@@ -131,7 +131,7 @@ export function ColorTeamSurface() {
                     {doc.filename}
                   </p>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    {doc.doc_type.replace(/_/g, ' ')} &middot; {new Date(doc.created_at).toLocaleDateString()}
+                    {doc.doc_type.replace(/_/g, ' ')} · {new Date(doc.created_at).toLocaleDateString()}
                   </p>
                 </button>
               ))}
@@ -151,7 +151,7 @@ export function ColorTeamSurface() {
                 <div>
                   <h2 className="text-lg font-semibold text-ink-primary">{selectedDoc.filename}</h2>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    {selectedDoc.doc_type.replace(/_/g, ' ')} &middot; Uploaded {new Date(selectedDoc.created_at).toLocaleDateString()}
+                    {selectedDoc.doc_type.replace(/_/g, ' ')} · Uploaded {new Date(selectedDoc.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <Button variant="primary" onClick={() => setModalOpen(true)}>
@@ -162,7 +162,7 @@ export function ColorTeamSurface() {
               {runs.length === 0 ? (
                 <div className="border border-border rounded-sm p-6 bg-surface text-center">
                   <p className="text-sm text-ink-muted">
-                    No reviews yet. Click &ldquo;Run Color Team&rdquo; to start.
+                    No reviews yet. Click “Run Color Team” to start.
                   </p>
                 </div>
               ) : (
