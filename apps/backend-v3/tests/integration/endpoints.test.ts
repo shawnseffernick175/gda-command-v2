@@ -192,10 +192,7 @@ describe('GET /v3/action-items', () => {
 });
 
 describe('POST /v3/action-items/:id/drafts', () => {
-  it('returns 500 — schema drift: requestDraft inserts status=generating (not in CHECK) and omits source_id (NOT NULL)', async () => {
-    // Known schema drift: code inserts status='generating' but CHECK only
-    // allows 'pending','approved','rejected'; code omits source_id (NOT NULL).
-    // This test documents the drift; fix belongs in a separate schema PR.
+  it('returns 201 — F-231 fixed the schema drift', async () => {
     const { initBoss, stopBoss } = await import('../../src/lib/queue.js');
     const boss = await initBoss();
 
@@ -206,7 +203,7 @@ describe('POST /v3/action-items/:id/drafts', () => {
         headers: { ...authHeader(), 'content-type': 'application/json' },
         payload: JSON.stringify({ kind: 'reply' }),
       });
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(201);
     } finally {
       await stopBoss();
     }

@@ -56,7 +56,7 @@ describe('F-231 Drafts Integration (real Postgres, canonical v3_001–v3_008 sch
     expect(res.statusCode).toBe(500);
   });
 
-  it('POST /v3/action-items/:id/drafts returns 500 — schema drift: status CHECK rejects "generating"', async () => {
+  it('POST /v3/action-items/:id/drafts returns 201 — F-231 fixed the drift', async () => {
     // Seed an action item directly using v3_001 columns
     const srcRes = await pool.query<{ id: string }>(
       "SELECT id::text FROM sources LIMIT 1",
@@ -81,8 +81,8 @@ describe('F-231 Drafts Integration (real Postgres, canonical v3_001–v3_008 sch
         headers: { ...authHeader(), 'content-type': 'application/json' },
         payload: JSON.stringify({ kind: 'reply' }),
       });
-      // requestDraft inserts status='generating' (not in CHECK) and omits source_id (NOT NULL)
-      expect(res.statusCode).toBe(500);
+      // F-231 fixed the schema drift — requestDraft now uses valid status + source_id
+      expect(res.statusCode).toBe(201);
     } finally {
       await stopBoss();
     }
