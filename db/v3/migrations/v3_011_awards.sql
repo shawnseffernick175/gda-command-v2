@@ -97,10 +97,4 @@ CREATE TABLE award_agency_sources (
 );
 CREATE INDEX idx_aags_award ON award_agency_sources (award_id);
 
--- ============================================================================
--- 11.3  Seed FPDS source row
--- ============================================================================
-INSERT INTO sources (kind, url, title, confidence, meta)
-VALUES ('fpds', 'https://www.fpds.gov', 'FPDS', 'high', '{}');
-
 COMMIT;
