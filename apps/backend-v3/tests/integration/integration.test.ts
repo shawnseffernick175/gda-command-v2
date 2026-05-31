@@ -64,15 +64,18 @@ afterAll(async () => {
 }, 30_000);
 
 beforeEach(async () => {
+  // Exclude the seeded 'Test Opportunity — Integration' to avoid breaking
+  // other test files that rely on seed data.
+  const filter = `title LIKE 'Test %' AND title != 'Test Opportunity — Integration'`;
   await pool.query(`
     DELETE FROM captures WHERE pipeline_item_id IN (
       SELECT id FROM pipeline_items WHERE opportunity_id IN (
-        SELECT id FROM opportunities WHERE title LIKE 'Test %'
+        SELECT id FROM opportunities WHERE ${filter}
       )
     )
   `);
-  await pool.query("DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE title LIKE 'Test %')");
-  await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test %'");
+  await pool.query(`DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE ${filter})`);
+  await pool.query(`DELETE FROM opportunities WHERE ${filter}`);
 });
 
 describe('Integration: detail endpoint with fresh cache', () => {
