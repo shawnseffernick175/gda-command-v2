@@ -8,3 +8,12 @@ dist/
 .DS_Store
 uploads/
 migration-manifest.json
+
+# ── Root-level binary guard (F-252) ──────────────────────────
+# Prevent accidental commit of binary snapshots at repo root.
+# The_One_and_Only_Master_Build_v_30.xlsx is the sole exception.
+/*.zip
+/*.xlsx
+/*.docx
+/*.pdf
+!/The_One_and_Only_Master_Build_v_30.xlsx
