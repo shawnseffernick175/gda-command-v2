@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getApp, getPool, authHeader, closeApp } from './helpers.js';
+import { registerGovTribeSource } from '../../src/ingest/govtribe/index.js';
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 
@@ -16,6 +17,7 @@ let pool: ReturnType<typeof getPool>;
 beforeAll(async () => {
   app = await getApp();
   pool = getPool();
+  registerGovTribeSource();
 });
 
 afterAll(async () => {
