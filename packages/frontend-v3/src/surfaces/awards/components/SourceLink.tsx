@@ -1,22 +1,34 @@
+import type { ReactNode } from 'react';
+import type { SourceRef } from '../types';
+
 interface SourceLinkProps {
-  url: string | null;
-  label?: string;
+  value: ReactNode;
+  sources?: SourceRef[];
+  'data-testid'?: string;
 }
 
-export function SourceLink({ url, label = 'USAspending.gov' }: SourceLinkProps) {
-  if (!url) {
-    return <span className="text-ink-muted">—</span>;
+export function SourceLink({ value, sources, ...rest }: SourceLinkProps) {
+  const sourceUrl = sources?.[0]?.url;
+  const testId = rest['data-testid'] ?? 'source-link';
+
+  if (sourceUrl) {
+    return (
+      <a
+        href={sourceUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-ink-primary hover:text-accent transition-colors"
+        data-source-url={sourceUrl}
+        data-testid={testId}
+      >
+        {value}
+      </a>
+    );
   }
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-accent hover:underline transition-colors"
-      data-testid="source-link"
-    >
-      {label}
-    </a>
+    <span data-testid={testId}>
+      {value}
+    </span>
   );
 }

@@ -8,7 +8,8 @@
 
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
-import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
+import { successEnvelope } from '../lib/envelope.js';
+import type { SourceRef } from '../lib/sources.js';
 
 interface AwardRow {
   id: string;
@@ -20,15 +21,24 @@ interface AwardRow {
   award_date: string | null;
   fpds_url: string | null;
   data_source: string;
+  source_kind: string | null;
+  source_title: string | null;
+  source_url: string | null;
+  source_retrieved_at: string | null;
 }
 
 interface AwardItem {
   id: string;
   recipient_name: string | null;
+  recipient_name_sources: SourceRef[];
   agency: string | null;
+  agency_sources: SourceRef[];
   contract_type: string | null;
+  contract_type_sources: SourceRef[];
   awarded_amount: number | null;
+  awarded_amount_sources: SourceRef[];
   awarded_at: string | null;
+  awarded_at_sources: SourceRef[];
   fpds_url: string | null;
   data_source: string;
 }
@@ -42,14 +52,33 @@ interface AwardListFilters {
   cursor?: string;
 }
 
+function buildSourceRef(row: AwardRow): SourceRef[] {
+  const url = row.fpds_url ?? row.source_url;
+  if (!url) return [];
+  return [{
+    kind: (row.source_kind as SourceRef['kind']) ?? 'usaspending',
+    title: row.source_title ?? 'USAspending.gov',
+    url,
+    retrieved_at: row.source_retrieved_at
+      ? new Date(row.source_retrieved_at).toISOString()
+      : new Date().toISOString(),
+  }];
+}
+
 function rowToItem(row: AwardRow): AwardItem {
+  const sources = buildSourceRef(row);
   return {
     id: String(row.id),
     recipient_name: row.awardee_name,
+    recipient_name_sources: sources,
     agency: row.agency_name,
+    agency_sources: sources,
     contract_type: row.contract_type,
+    contract_type_sources: sources,
     awarded_amount: row.value_obligated !== null ? Number(row.value_obligated) : null,
+    awarded_amount_sources: sources,
     awarded_at: row.award_date,
+    awarded_at_sources: sources,
     fpds_url: row.fpds_url,
     data_source: row.data_source,
   };
@@ -69,24 +98,24 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
       cursor: query.cursor,
     };
 
-    const conditions: string[] = ["data_source = 'usaspending'"];
+    const conditions: string[] = ["a.data_source = 'usaspending'"];
     const params: unknown[] = [];
     let paramIdx = 1;
 
     if (filters.agency) {
-      conditions.push(`agency_name ILIKE $${paramIdx++}`);
+      conditions.push(`a.agency_name ILIKE $${paramIdx++}`);
       params.push(`%${filters.agency}%`);
     }
     if (filters.contract_type) {
-      conditions.push(`contract_type ILIKE $${paramIdx++}`);
+      conditions.push(`a.contract_type ILIKE $${paramIdx++}`);
       params.push(`%${filters.contract_type}%`);
     }
     if (filters.awarded_after) {
-      conditions.push(`award_date >= $${paramIdx++}`);
+      conditions.push(`a.award_date >= $${paramIdx++}`);
       params.push(filters.awarded_after);
     }
     if (filters.awarded_before) {
-      conditions.push(`award_date <= $${paramIdx++}`);
+      conditions.push(`a.award_date <= $${paramIdx++}`);
       params.push(filters.awarded_before);
     }
 
@@ -95,7 +124,7 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
         const decoded = JSON.parse(
           Buffer.from(filters.cursor, 'base64').toString('utf-8'),
         ) as { id: number };
-        conditions.push(`id < $${paramIdx++}`);
+        conditions.push(`a.id < $${paramIdx++}`);
         params.push(decoded.id);
       } catch {
         // invalid cursor, ignore
@@ -103,7 +132,7 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
-    const sql = `SELECT id, piid, awardee_name, agency_name, contract_type, value_obligated, award_date, fpds_url, data_source FROM awards ${where} ORDER BY award_date DESC, id DESC LIMIT $${paramIdx}`;
+    const sql = `SELECT a.id, a.piid, a.awardee_name, a.agency_name, a.contract_type, a.value_obligated, a.award_date, a.fpds_url, a.data_source, s.kind AS source_kind, s.title AS source_title, s.url AS source_url, s.retrieved_at AS source_retrieved_at FROM awards a LEFT JOIN sources s ON s.id = a.source_id ${where} ORDER BY a.id DESC LIMIT $${paramIdx}`;
     params.push(filters.limit + 1);
 
     const res = await pool.query<AwardRow>(sql, params);

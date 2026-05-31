@@ -29,7 +29,11 @@ const columns: TableColumn<AwardItem>[] = [
     key: 'recipient_name',
     header: 'Recipient',
     render: (row) => (
-      <span className="text-ink-primary">{row.recipient_name ?? '—'}</span>
+      <SourceLink
+        value={row.recipient_name ?? '—'}
+        sources={row.recipient_name_sources}
+        data-testid="source-link-recipient"
+      />
     ),
   },
   {
@@ -37,7 +41,11 @@ const columns: TableColumn<AwardItem>[] = [
     header: 'Agency',
     width: 180,
     render: (row) => (
-      <span className="text-ink-primary">{row.agency ?? '—'}</span>
+      <SourceLink
+        value={row.agency ?? '—'}
+        sources={row.agency_sources}
+        data-testid="source-link-agency"
+      />
     ),
   },
   {
@@ -45,7 +53,11 @@ const columns: TableColumn<AwardItem>[] = [
     header: 'Contract Type',
     width: 130,
     render: (row) => (
-      <span className="text-ink-primary">{row.contract_type ?? '—'}</span>
+      <SourceLink
+        value={row.contract_type ?? '—'}
+        sources={row.contract_type_sources}
+        data-testid="source-link-contract-type"
+      />
     ),
   },
   {
@@ -54,7 +66,11 @@ const columns: TableColumn<AwardItem>[] = [
     width: 130,
     align: 'right',
     render: (row) => (
-      <span>{formatCurrency(row.awarded_amount)}</span>
+      <SourceLink
+        value={formatCurrency(row.awarded_amount)}
+        sources={row.awarded_amount_sources}
+        data-testid="source-link-amount"
+      />
     ),
   },
   {
@@ -62,14 +78,32 @@ const columns: TableColumn<AwardItem>[] = [
     header: 'Awarded Date',
     width: 120,
     render: (row) => (
-      <span className="text-ink-primary">{formatDate(row.awarded_at)}</span>
+      <SourceLink
+        value={formatDate(row.awarded_at)}
+        sources={row.awarded_at_sources}
+        data-testid="source-link-date"
+      />
     ),
   },
   {
     key: 'source',
     header: 'Source',
     width: 140,
-    render: (row) => <SourceLink url={row.fpds_url} />,
+    render: (row) => {
+      const url = row.fpds_url;
+      if (!url) return <span className="text-ink-muted">—</span>;
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent hover:underline transition-colors"
+          data-testid="source-link-usaspending"
+        >
+          USAspending.gov
+        </a>
+      );
+    },
   },
 ];
 
