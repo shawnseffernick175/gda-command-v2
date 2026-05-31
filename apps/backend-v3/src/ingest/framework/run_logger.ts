@@ -18,7 +18,7 @@ export async function startRun(sourceKey: string): Promise<bigint> {
 
 export async function finishRun(
   runId: bigint,
-  status: 'success' | 'error',
+  status: 'success' | 'error' | 'degraded',
   result: IngestResult,
   errorText?: string,
 ): Promise<void> {

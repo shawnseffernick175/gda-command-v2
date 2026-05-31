@@ -7,6 +7,8 @@ import cron, { type ScheduledTask } from 'node-cron';
 import { logger } from '../lib/logger.js';
 import { runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
 import { registerSAMSource } from '../ingest/sam/index.js';
+import { registerDIBBSSource } from '../ingest/dibbs/index.js';
+import { registerNECOSource } from '../ingest/neco/index.js';
 
 const tasks: ScheduledTask[] = [];
 
@@ -18,10 +20,14 @@ interface CronJob {
 
 const JOBS: CronJob[] = [
   { sourceKey: 'sam.gov', schedule: '0 */4 * * *', label: 'SAM.gov ingest (every 4 hours)' },
+  { sourceKey: 'dibbs', schedule: '0 */6 * * *', label: 'DIBBS ingest (every 6 hours)' },
+  { sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' },
 ];
 
 export function startCronScheduler(): void {
   registerSAMSource();
+  registerDIBBSSource();
+  registerNECOSource();
 
   const registeredSources = getRegisteredSources();
   logger.info({ sources: registeredSources }, '[ingest] framework ready');
@@ -47,9 +53,14 @@ export function startCronScheduler(): void {
     });
 
     tasks.push(task);
+    const cronLabel =
+      job.sourceKey === 'sam.gov' ? 'sam.4h'
+      : job.sourceKey === 'dibbs' ? 'dibbs.6h'
+      : job.sourceKey === 'neco' ? 'neco.6h'
+      : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
-      `[cron] registered: ${job.sourceKey === 'sam.gov' ? 'sam.4h' : job.sourceKey}`,
+      `[cron] registered: ${cronLabel}`,
     );
   }
 }
