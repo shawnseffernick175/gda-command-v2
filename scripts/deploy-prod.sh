@@ -33,19 +33,6 @@ fi
 DEPLOY_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "deploy_start=${DEPLOY_START}"
 
-# ---------- Drift check: n8n compose ----------
-N8N_COMPOSE="/root/n8n-envision/docker-compose.yml"
-REPO_N8N_COMPOSE="docker-compose.n8n.yml"
-if [ -f "$N8N_COMPOSE" ] && [ -f "$REPO_N8N_COMPOSE" ]; then
-  VPS_HASH=$(sha256sum "$N8N_COMPOSE" | awk '{print $1}')
-  REPO_HASH=$(sha256sum "$REPO_N8N_COMPOSE" | awk '{print $1}')
-  if [ "$VPS_HASH" != "$REPO_HASH" ]; then
-    echo "::warning::COMPOSE DRIFT: VPS $N8N_COMPOSE hash ($VPS_HASH) != repo $REPO_N8N_COMPOSE hash ($REPO_HASH). Reconcile before next n8n restart."
-  else
-    echo "n8n compose: no drift (hash match)"
-  fi
-fi
-
 # ---------- Stop and remove V2 containers if still running ----------
 echo "--- removing V2 containers (if present) ---"
 docker rm -f gda-backend gda-frontend 2>/dev/null || true

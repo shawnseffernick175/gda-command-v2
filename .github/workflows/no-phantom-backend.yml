@@ -11,3 +11,28 @@ jobs:
             echo "ERROR: packages/backend phantom tree resurrected. The only backend is apps/backend-v3/."
             exit 1
           fi
+
+      - name: Fail if root-level Dockerfile resurrects
+        run: |
+          for f in Dockerfile Dockerfile.v3 Dockerfile.v2 Dockerfile.dev; do
+            if [ -f "$f" ]; then
+              echo "ERROR: Root-level $f resurrected. Dockerfiles must live under apps/<app>/ or packages/<pkg>/"
+              exit 1
+            fi
+          done
+
+      - name: Fail if non-prod docker-compose resurrects
+        run: |
+          for f in docker-compose.yml docker-compose.n8n.yml docker-compose.dev.yml; do
+            if [ -f "$f" ]; then
+              echo "ERROR: Forbidden compose file $f. The only allowed compose is docker-compose.prod.yml"
+              exit 1
+            fi
+          done
+
+      - name: Fail if n8n/ dir resurrects
+        run: |
+          if [ -d n8n ]; then
+            echo "ERROR: n8n/ directory resurrected. V3 is Postgres-only — no n8n workflows in V3 repo."
+            exit 1
+          fi
