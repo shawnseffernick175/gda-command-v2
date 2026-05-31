@@ -4,6 +4,7 @@ import { LeftRail } from "./components/LeftRail/LeftRail";
 import { MainCanvas } from "./components/MainCanvas/MainCanvas";
 import { PlaceholderSurface } from "./components/PlaceholderSurface/PlaceholderSurface";
 import { Launchpad } from "./surfaces/launchpad/Launchpad";
+import { PipelineSurface } from "./surfaces/pipeline/PipelineSurface";
 import { OpportunitiesList } from "./surfaces/opportunities/OpportunitiesList";
 import { CaptureList } from "./surfaces/capture/CaptureList";
 import { CaptureDetail } from "./surfaces/capture/CaptureDetail";
@@ -25,7 +26,7 @@ export function App() {
           <Route path="/opp/:notice_id" element={<OpportunitiesList />} />
           <Route path="/capture" element={<CaptureList />} />
           <Route path="/capture/:opp_id" element={<CaptureDetail />} />
-          <Route path="/pipeline" element={<PlaceholderSurface name="Pipeline" />} />
+          <Route path="/pipeline" element={<PipelineSurface />} />
           <Route path="/action-items" element={<PlaceholderSurface name="Action Items" />} />
           <Route path="/settings/*" element={<PlaceholderSurface name="Settings" />} />
         </Routes>
