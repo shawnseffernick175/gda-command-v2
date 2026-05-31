@@ -1,0 +1,25 @@
+name: No root binaries
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject root-level binary files
+        run: |
+          ALLOWED="The_One_and_Only_Master_Build_v_30.xlsx"
+          FOUND=$(find . -maxdepth 1 -type f \
+            \( -name '*.zip' -o -name '*.xlsx' -o -name '*.docx' -o -name '*.pdf' \) \
+            ! -name "$ALLOWED" | sort)
+          if [ -n "$FOUND" ]; then
+            echo "::error::Root-level binary files detected (blocked by F-252):"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "No prohibited root-level binaries found."
