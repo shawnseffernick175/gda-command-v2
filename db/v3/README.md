@@ -5,6 +5,54 @@
 V3 migrations live in `db/v3/migrations/` and are applied by `db/v3/migrate.ts`.
 The runner tracks applied files in the `v3_schema_migrations` table.
 
+## Migration Contract
+
+### Direction
+
+Migrations are **forward-only**. There are no down/rollback migrations.
+If a migration introduces a bug, ship a new forward migration to fix it.
+
+### File naming
+
+```
+v3_NNN_short_name.sql
+```
+
+Files are sorted lexicographically. Use zero-padded three-digit sequence
+numbers (`001`, `002`, …). Keep names short and descriptive.
+
+### Bootstrap vs. application migrations
+
+`v3_000_schema_migrations.sql` uses `IF NOT EXISTS` to create the tracker
+table idempotently. **All other migrations must NOT use `IF NOT EXISTS`
+for `CREATE TABLE`** (F-234 enforces this in CI). This ensures a failed
+migration is caught immediately rather than silently skipped.
+
+### Deploy integration
+
+Migrations are applied automatically on every prod deploy via
+`scripts/deploy-prod.sh`. The deploy script runs `db/v3/migrate.ts`
+**before** recreating `backend-v3`, so the new backend always starts
+against the expected schema.
+
+- If migrations succeed (or none are pending), deploy continues normally.
+- If a migration fails, deploy aborts **before** recreating the backend.
+  The old (working) backend stays running.
+
+Manual migration application is reserved for hotfix / recovery scenarios.
+
+### Idempotency
+
+The runner is idempotent — re-running deploy (or `migrate.ts` directly)
+is safe. Applied migrations are tracked by filename and SHA-256 hash in
+`v3_schema_migrations`. Already-applied files are skipped.
+
+### CI coverage
+
+The `V3 Migration Smoke Test` job (`.github/workflows/v3-schema-drift.yml`)
+runs all migrations from scratch on every PR and push to `main`. It
+verifies the tracker is populated and all expected tables exist.
+
 ## pg-boss Schema (Strategy B — F-220.1)
 
 **The `pgboss` schema is created and managed by the pg-boss library at boot time.**

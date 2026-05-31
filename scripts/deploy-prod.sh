@@ -51,6 +51,72 @@ echo "--- removing V2 containers (if present) ---"
 docker rm -f gda-backend gda-frontend 2>/dev/null || true
 docker rmi gda-command-v2-backend:latest gda-command-v2-frontend:latest 2>/dev/null || true
 
+# ---------- Apply V3 migrations (BEFORE recreating backend) ----------
+echo "--- applying V3 migrations ---"
+
+# Read staging DATABASE_URL from currently-running backend-v3 (it has the staging creds)
+# Fall back to env file if container is missing (first deploy).
+DB_URL=$(docker inspect gda-backend-v3 --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+  | grep '^DATABASE_URL=' | head -1 | cut -d= -f2- || true)
+
+if [ -z "$DB_URL" ]; then
+  if [ -f /root/gda-command-v2/.env.prod ]; then
+    DB_URL=$(grep '^DATABASE_URL=' /root/gda-command-v2/.env.prod | head -1 | cut -d= -f2-)
+  fi
+fi
+
+if [ -z "$DB_URL" ]; then
+  echo "DEPLOY_FAILED could not resolve DATABASE_URL for migration step"
+  exit 1
+fi
+
+# Show migration plan (informational)
+echo "--- migration plan ---"
+docker run --rm --network gda-command-v2_gda \
+  -e PGPASSWORD="${DB_URL##*:}" \
+  -v "${DEPLOY_DIR}:/work" -w /work \
+  postgres:16-alpine \
+  psql "$DB_URL" -c "SELECT filename, applied_at FROM v3_schema_migrations ORDER BY id DESC LIMIT 10;" 2>/dev/null || echo "(no existing migration table — first run)"
+find db/v3/migrations/ -maxdepth 1 -name 'v3_[0-9][0-9][0-9]_*.sql' -printf '%f\n' | sort | tail -20
+
+# Run migrate.ts in an ephemeral node:20-alpine container mounted at /work.
+# Network: gda-command-v2_gda so it can reach gda-postgres-staging by service name.
+MIGRATE_LOG=$(mktemp)
+set +e
+docker run --rm --network gda-command-v2_gda \
+  -v "${DEPLOY_DIR}:/work" -w /work \
+  -e V3_DATABASE_URL="$DB_URL" \
+  node:20-alpine sh -c "
+    set -e
+    npm install --no-audit --no-fund --silent --prefix /tmp/migrate-deps tsx pg >/dev/null 2>&1
+    NODE_PATH=/tmp/migrate-deps/node_modules npx --prefix /tmp/migrate-deps tsx db/v3/migrate.ts
+  " 2>&1 | tee "$MIGRATE_LOG"
+MIGRATE_RC=${PIPESTATUS[0]}
+set -e
+
+if [ "$MIGRATE_RC" -ne 0 ]; then
+  echo "DEPLOY_FAILED migrate.ts exited with code ${MIGRATE_RC}"
+  echo "--- last 40 lines of migrate output ---"
+  tail -40 "$MIGRATE_LOG"
+  rm -f "$MIGRATE_LOG"
+  exit 1
+fi
+
+# Detect "applied X migration(s)" or "up to date" from output
+if grep -qE "Applied [0-9]+ V3 migration\(s\) successfully" "$MIGRATE_LOG"; then
+  APPLIED_LINE=$(grep -E "Applied [0-9]+ V3 migration\(s\)" "$MIGRATE_LOG" | tail -1)
+  echo "MIGRATE_OK: ${APPLIED_LINE}"
+elif grep -q "V3 schema is up to date" "$MIGRATE_LOG"; then
+  echo "MIGRATE_OK: no pending migrations"
+else
+  echo "DEPLOY_FAILED migrate.ts output did not match expected success pattern"
+  tail -20 "$MIGRATE_LOG"
+  rm -f "$MIGRATE_LOG"
+  exit 1
+fi
+
+rm -f "$MIGRATE_LOG"
+
 # ---------- Build and deploy V3 ----------
 echo "--- docker compose build + force-recreate ---"
 docker compose -f "$COMPOSE_FILE" build $SERVICES
