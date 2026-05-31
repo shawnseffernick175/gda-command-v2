@@ -98,7 +98,8 @@ CREATE TABLE sources (
                               CHECK (kind IN (
                                 'sam_gov', 'fpds', 'usaspending', 'govwin',
                                 'govtribe', 'news', 'doctrine', 'partner_site',
-                                'internal', 'manual', 'n8n_workflow'
+                                'internal', 'manual', 'n8n_workflow',
+                                'dibbs', 'neco'
                               )),
   url           TEXT,                          -- clickable link to original record (NULL for internal/manual)
   title         TEXT,                          -- human-readable label ("SAM.gov W56HZV-24-R-0033")
@@ -119,7 +120,7 @@ CREATE UNIQUE INDEX sources_legacy_id_uniq ON sources(legacy_id) WHERE legacy_id
 | Column | Purpose |
 |---|---|
 | `id` | Surrogate PK referenced by all fact tables via `source_id` FK |
-| `kind` | Typed source origin per R1 spec (`product_rules.md`): `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `manual`, `n8n_workflow` |
+| `kind` | Typed source origin per R1 spec (`product_rules.md`): `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`, `manual`, `n8n_workflow`, `dibbs`, `neco` |
 | `url` | Clickable link back to the original record. NULL only for `internal`/`manual` kinds where no URL exists |
 | `title` | Human-readable label rendered in the UI next to the source badge |
 | `retrieved_at` | When the data was fetched from the source — staleness detection |
@@ -228,7 +229,12 @@ CREATE TABLE opportunities (
   incumbent_source    TEXT,
   description         TEXT,
   tags                TEXT[]        NOT NULL DEFAULT '{}',
-  data_source         TEXT          NOT NULL DEFAULT 'manual',  -- ingest origin: 'sam', 'govtribe', 'govwin', 'manual'
+  data_source         TEXT          NOT NULL DEFAULT 'manual',  -- ingest origin: 'sam', 'govtribe', 'govwin', 'dibbs', 'neco', 'manual'
+  agency_subtype      TEXT,                    -- sub-classification: 'DLA', 'Navy', etc.
+  opportunity_type    TEXT,                    -- e.g., 'RFQ', 'Synopsis'
+  part_number         TEXT,                    -- DIBBS-specific part/NSN tracking
+  quantity            NUMERIC,                 -- requested quantity (DIBBS/NECO)
+  external_id         TEXT,                    -- non-SAM unique ID for dedup (DIBBS sol#, NECO RFQ#)
   analysis            JSONB,                   -- R2: cached auto-analysis result
   analysis_version    TEXT,                    -- analysis model version for cache invalidation
   ai_analyzed_at      TIMESTAMPTZ,             -- when analysis last ran
@@ -249,6 +255,9 @@ CREATE INDEX idx_opps_set_aside      ON opportunities (set_aside) WHERE deleted_
 CREATE INDEX idx_opps_response_due   ON opportunities (response_due_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_opps_grade          ON opportunities (grade) WHERE deleted_at IS NULL;
 CREATE INDEX idx_opps_sam_notice     ON opportunities (sam_notice_id) WHERE sam_notice_id IS NOT NULL;
+CREATE INDEX idx_opps_agency_subtype ON opportunities (agency_subtype) WHERE agency_subtype IS NOT NULL;
+CREATE INDEX idx_opps_part_number    ON opportunities (part_number) WHERE part_number IS NOT NULL;
+CREATE UNIQUE INDEX idx_opps_ext_id  ON opportunities (data_source, external_id) WHERE external_id IS NOT NULL;
 CREATE INDEX idx_opps_source         ON opportunities (source_id);
 CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted_at IS NOT NULL;
 ```
