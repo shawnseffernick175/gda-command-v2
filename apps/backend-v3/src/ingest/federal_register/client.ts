@@ -25,11 +25,11 @@ export const FR_AGENCY_SLUGS = [
   'general-services-administration',
   'homeland-security-department',
   'small-business-administration',
-  'office-of-federal-procurement-policy',
+  'federal-procurement-policy-office',
   'national-aeronautics-and-space-administration',
   'energy-department',
   'health-and-human-services-department',
-  'office-of-management-and-budget',
+  'management-and-budget-office',
 ] as const;
 
 export interface FederalRegisterDocumentRaw {
