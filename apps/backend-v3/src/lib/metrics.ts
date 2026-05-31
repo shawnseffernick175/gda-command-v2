@@ -30,3 +30,29 @@ export const queueDepth = new client.Gauge({
   labelNames: ['queue'] as const,
   registers: [register],
 });
+
+export const fastTrackAssessmentsCompleted = new client.Counter({
+  name: 'fast_track_assessments_completed_total',
+  help: 'Total fast track assessments completed',
+  labelNames: ['grade', 'recommended_action'] as const,
+  registers: [register],
+});
+
+export const fastTrackAssessmentDuration = new client.Histogram({
+  name: 'fast_track_assessment_duration_seconds',
+  help: 'Duration of fast track assessment processing',
+  buckets: [0.5, 1, 2, 5, 10, 20, 30],
+  registers: [register],
+});
+
+export const fastTrackCacheHits = new client.Counter({
+  name: 'fast_track_cache_hits',
+  help: 'Number of fast track requests served from cache',
+  registers: [register],
+});
+
+export const fastTrackTimeoutCount = new client.Counter({
+  name: 'fast_track_timeout_count',
+  help: 'Number of fast track 503 ANALYSIS_TIMEOUT responses',
+  registers: [register],
+});

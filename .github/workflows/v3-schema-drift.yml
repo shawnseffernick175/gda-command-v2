@@ -78,21 +78,12 @@ jobs:
             exit 1
           fi
 
-      - name: Verify pg-boss queues seeded
+      - name: Verify pg-boss bootstrap (Strategy B — F-220.1)
         env:
-          V3_DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
+          DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
         run: |
-          QUEUES=$(PGPASSWORD=gda_v3_ci psql -h localhost -p 5433 -U gda_v3 -d gda_v3 -tAc "
-            SELECT string_agg(name, ', ' ORDER BY name) FROM pgboss.schedule
-          ")
-          echo "Seeded queues: $QUEUES"
-          for q in "analysis-capture" "analysis-opportunity" "ingest-postprocess"; do
-            if ! echo "$QUEUES" | grep -q "$q"; then
-              echo "::error::Missing pg-boss queue: $q"
-              exit 1
-            fi
-          done
-          echo "All required pg-boss queues present."
+          cd apps/backend-v3
+          npx vitest run tests/integration/pgboss-bootstrap.test.ts --reporter=verbose
 
       - name: Verify core table structure
         env:

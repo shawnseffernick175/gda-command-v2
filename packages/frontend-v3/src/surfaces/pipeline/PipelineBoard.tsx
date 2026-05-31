@@ -67,8 +67,8 @@ export function PipelineBoard({
                 <div className="text-sm font-medium text-ink-primary mb-1 line-clamp-2">
                   {row.title}
                 </div>
-                <div className="text-xs text-ink-muted mb-2">{row.agency}</div>
-                <div className="text-xs text-ink-dim mb-2">
+                <div className="text-xs text-ink-muted mb-2" data-source-url={row.source_url}>{row.agency}</div>
+                <div className="text-xs text-ink-dim mb-2" data-source-url={row.source_url}>
                   Response: {formatDate(row.response_date)}
                 </div>
                 <div className="flex flex-wrap gap-1 mb-2">

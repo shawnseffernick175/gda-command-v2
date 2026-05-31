@@ -65,6 +65,7 @@ export function PipelineSurface() {
         setSortKey(key);
         setSortDir('asc');
       }
+      setOffset(0);
     },
     [sortKey],
   );

@@ -4,6 +4,7 @@ import { logger } from './lib/logger.js';
 import { initBoss, stopBoss } from './lib/queue.js';
 import { startWorker } from './workers/analysis.js';
 import { startSoakDigestWorker } from './workers/soak-digest.js';
+import { subscribeFastTrack } from './workers/fast-track.js';
 import { pool } from './lib/db.js';
 
 async function main(): Promise<void> {
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
 
   const workerBoss = await startWorker();
   await startSoakDigestWorker();
+  await subscribeFastTrack();
 
   const app = await buildApp();
 

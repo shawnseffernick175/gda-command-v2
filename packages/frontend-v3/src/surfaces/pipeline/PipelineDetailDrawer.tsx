@@ -1,5 +1,6 @@
 import { Inspector } from '../../components/Inspector/Inspector';
 import { Skeleton } from '../../components/Skeleton/Skeleton';
+import { Field } from '../../components/Field/Field';
 import { StageChip } from './components/StageChip';
 import { TeamingChip } from './components/TeamingChip';
 import { PwinChip } from './components/PwinChip';
@@ -63,28 +64,28 @@ export function PipelineDetailDrawer({
               Metadata
             </h4>
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-xs text-ink-muted">Agency</span>
-                <p className="text-sm text-ink-primary">{row.agency}</p>
-              </div>
-              <div>
-                <span className="text-xs text-ink-muted">NAICS</span>
-                <p className="text-sm text-ink-primary">
-                  {row.naics ?? '---'}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-ink-muted">Response Date</span>
-                <p className="text-sm text-ink-primary">
-                  {formatDate(row.response_date)}
-                </p>
-              </div>
-              <div>
-                <span className="text-xs text-ink-muted">Last Updated</span>
-                <p className="text-sm text-ink-primary">
-                  {formatDate(row.updated_at)}
-                </p>
-              </div>
+              <Field
+                label="Agency"
+                value={row.agency}
+                sourceUrl={row.source_url ?? ''}
+              />
+              {row.naics && (
+                <Field
+                  label="NAICS"
+                  value={row.naics}
+                  sourceUrl={row.source_url ?? ''}
+                />
+              )}
+              <Field
+                label="Response Date"
+                value={formatDate(row.response_date)}
+                sourceUrl={row.source_url ?? ''}
+              />
+              <Field
+                label="Last Updated"
+                value={formatDate(row.updated_at)}
+                sourceUrl={row.source_url ?? ''}
+              />
             </div>
             {row.source_url && (
               <SourceLink url={row.source_url} label="Source" />

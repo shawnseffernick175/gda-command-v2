@@ -54,7 +54,7 @@ export function PipelineList({
       header: 'Agency',
       sortable: true,
       render: (row) => (
-        <span className="text-sm text-ink-primary">{row.agency}</span>
+        <span className="text-sm text-ink-primary" data-source-url={row.source_url}>{row.agency}</span>
       ),
     },
     {
@@ -92,7 +92,7 @@ export function PipelineList({
       header: 'Response Date',
       sortable: true,
       render: (row) => (
-        <span className="text-sm text-ink-primary">
+        <span className="text-sm text-ink-primary" data-source-url={row.source_url}>
           {formatDate(row.response_date)}
         </span>
       ),
@@ -102,7 +102,7 @@ export function PipelineList({
       header: 'Last Updated',
       sortable: true,
       render: (row) => (
-        <span className="text-sm text-ink-muted">
+        <span className="text-sm text-ink-muted" data-source-url={row.source_url}>
           {formatDate(row.updated_at)}
         </span>
       ),
