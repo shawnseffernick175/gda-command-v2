@@ -93,17 +93,4 @@ ALTER TABLE sources ADD CONSTRAINT sources_kind_check CHECK (kind IN (
   'dibbs', 'neco', 'federal_register'
 ));
 
--- ============================================================================
--- 13.4  Seed federalregister.gov source row
--- ============================================================================
-INSERT INTO sources (kind, url, title, confidence, meta)
-VALUES (
-  'federal_register',
-  'https://www.federalregister.gov',
-  'Federal Register',
-  'high',
-  '{}'
-)
-ON CONFLICT DO NOTHING;
-
 COMMIT;
