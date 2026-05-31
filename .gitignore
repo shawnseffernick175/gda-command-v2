@@ -16,4 +16,7 @@ migration-manifest.json
 /*.xlsx
 /*.docx
 /*.pdf
+/*.txt
 !/The_One_and_Only_Master_Build_v_30.xlsx
+!README.md
+!CLAUDE.md
