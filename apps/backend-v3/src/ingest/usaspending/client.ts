@@ -25,8 +25,8 @@ const DOD_AGENCY_FILTER = [
  * USAspending enforces single-group constraint on award_type_codes.
  * Each group requires its own paginated request.
  */
-const CONTRACT_TYPE_CODES = ['A', 'B', 'C', 'D'];
-const IDV_TYPE_CODES = [
+export const CONTRACT_TYPE_CODES = ['A', 'B', 'C', 'D'];
+export const IDV_TYPE_CODES = [
   'IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E',
 ];
 
@@ -86,7 +86,7 @@ interface SpendingByAwardResponse {
   };
 }
 
-function formatDate(d: Date): string {
+export function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
@@ -152,7 +152,7 @@ export interface USASpendingFetchResult {
   degradedReason?: string;
 }
 
-async function fetchGroup(
+export async function fetchGroup(
   groupLabel: string,
   typeCodes: string[],
   startDate: string,

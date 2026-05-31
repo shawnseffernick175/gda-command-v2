@@ -8,6 +8,7 @@ import { successEnvelope, errorEnvelope } from '../../lib/envelope.js';
 import { logger } from '../../lib/logger.js';
 import { runIngest, getRegisteredSources } from '../../ingest/framework/registry.js';
 import { getRecentRuns, getIngestStatus } from '../../ingest/framework/run_logger.js';
+import { runBackfill } from '../../ingest/usaspending/backfill.js';
 import type { JwtPayload } from '../../middleware/auth.js';
 
 function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
@@ -101,6 +102,36 @@ export async function adminIngestRoutes(app: FastifyInstance): Promise<void> {
       logger.error({ error: (err as Error).message }, 'admin_ingest_status_error');
       return reply.status(500).send(
         errorEnvelope('INTERNAL_ERROR', (err as Error).message, req.requestId),
+      );
+    }
+  });
+
+  // POST /v3/admin/ingest/backfill/usaspending.gov — one-shot N-day backfill
+  app.post('/v3/admin/ingest/backfill/usaspending.gov', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+
+    const { days: daysStr } = req.query as { days?: string };
+    const days = daysStr ? parseInt(daysStr, 10) : 30;
+
+    if (isNaN(days) || days < 1 || days > 90) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'days must be between 1 and 90', req.requestId),
+      );
+    }
+
+    try {
+      const user = (req as FastifyRequest & { user?: JwtPayload }).user;
+      logger.info({ days, triggeredBy: user?.sub }, 'admin_backfill_usaspending_trigger');
+
+      const result = await runBackfill({ days });
+
+      return reply.send(successEnvelope(result, req.requestId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ error: message }, 'admin_backfill_usaspending_error');
+
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', message, req.requestId),
       );
     }
   });
