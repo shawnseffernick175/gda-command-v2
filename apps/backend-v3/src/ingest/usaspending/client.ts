@@ -12,7 +12,7 @@ const BASE_URL =
 
 const PAGE_LIMIT = 100;
 const REQUEST_TIMEOUT_MS = 60_000;
-const REQUEST_DELAY_MS = 500;
+const REQUEST_DELAY_MS = 250;
 const MAX_RETRIES = 5;
 const INITIAL_BACKOFF_MS = 1_000;
 
@@ -21,9 +21,12 @@ const DOD_AGENCY_FILTER = [
   { type: 'awarding' as const, tier: 'toptier' as const, name: 'Department of Defense' },
 ];
 
-/** All federal contract & IDV award type codes. */
-const CONTRACT_AWARD_TYPE_CODES = [
-  'A', 'B', 'C', 'D',
+/**
+ * USAspending enforces single-group constraint on award_type_codes.
+ * Each group requires its own paginated request.
+ */
+const CONTRACT_TYPE_CODES = ['A', 'B', 'C', 'D'];
+const IDV_TYPE_CODES = [
   'IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E',
 ];
 
@@ -141,29 +144,28 @@ async function fetchWithRetry(
   throw lastError ?? new Error('USAspending API: max retries exhausted');
 }
 
-/**
- * Fetch all DoD contract awards modified in the given time window.
- * Returns flat array of raw records, automatically paginated.
- */
-export async function fetchUSASpendingAwards(
-  fromDate: Date,
-  toDate: Date,
-): Promise<USASpendingAwardRaw[]> {
-  const startDate = formatDate(fromDate);
-  const endDate = formatDate(toDate);
-  const allResults: USASpendingAwardRaw[] = [];
-  let page = 1;
+export interface USASpendingFetchResult {
+  records: USASpendingAwardRaw[];
+  contracts_rows: number;
+  idvs_rows: number;
+  degraded: boolean;
+  degradedReason?: string;
+}
 
-  logger.info(
-    { source: 'usaspending', startDate, endDate },
-    'usaspending_ingest_start',
-  );
+async function fetchGroup(
+  groupLabel: string,
+  typeCodes: string[],
+  startDate: string,
+  endDate: string,
+): Promise<USASpendingAwardRaw[]> {
+  const results: USASpendingAwardRaw[] = [];
+  let page = 1;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const body = {
       filters: {
-        award_type_codes: CONTRACT_AWARD_TYPE_CODES,
+        award_type_codes: typeCodes,
         time_period: [{ start_date: startDate, end_date: endDate }],
         agencies: DOD_AGENCY_FILTER,
       },
@@ -175,15 +177,15 @@ export async function fetchUSASpendingAwards(
     };
 
     logger.info(
-      { source: 'usaspending', page, startDate, endDate },
+      { source: 'usaspending', group: groupLabel, page, startDate, endDate },
       'usaspending_ingest_fetch',
     );
 
     const resp = await fetchWithRetry(body);
-    allResults.push(...resp.results);
+    results.push(...resp.results);
 
     logger.info(
-      { source: 'usaspending', page, count: resp.results.length, total: resp.page_metadata.total },
+      { source: 'usaspending', group: groupLabel, page, count: resp.results.length, total: resp.page_metadata.total },
       'usaspending_ingest_page',
     );
 
@@ -193,5 +195,69 @@ export async function fetchUSASpendingAwards(
     await new Promise((r) => setTimeout(r, REQUEST_DELAY_MS));
   }
 
-  return allResults;
+  return results;
+}
+
+/**
+ * Fetch all DoD contract awards modified in the given time window.
+ * Sends two separate paginated requests (contracts + IDVs) because
+ * USAspending rejects mixed award_type_codes with HTTP 422.
+ */
+export async function fetchUSASpendingAwards(
+  fromDate: Date,
+  toDate: Date,
+): Promise<USASpendingFetchResult> {
+  const startDate = formatDate(fromDate);
+  const endDate = formatDate(toDate);
+
+  logger.info(
+    { source: 'usaspending', startDate, endDate },
+    'usaspending_ingest_start',
+  );
+
+  let contractRecords: USASpendingAwardRaw[] = [];
+  let idvRecords: USASpendingAwardRaw[] = [];
+  let contractError: string | null = null;
+  let idvError: string | null = null;
+
+  try {
+    contractRecords = await fetchGroup('contracts', CONTRACT_TYPE_CODES, startDate, endDate);
+  } catch (err) {
+    contractError = err instanceof Error ? err.message : String(err);
+    logger.error(
+      { source: 'usaspending', group: 'contracts', error: contractError },
+      'usaspending_group_fetch_error',
+    );
+  }
+
+  try {
+    idvRecords = await fetchGroup('idvs', IDV_TYPE_CODES, startDate, endDate);
+  } catch (err) {
+    idvError = err instanceof Error ? err.message : String(err);
+    logger.error(
+      { source: 'usaspending', group: 'idvs', error: idvError },
+      'usaspending_group_fetch_error',
+    );
+  }
+
+  if (contractError && idvError) {
+    throw new Error(
+      `Both award groups failed — contracts: ${contractError}; idvs: ${idvError}`,
+    );
+  }
+
+  const degraded = !!(contractError || idvError);
+  const degradedReason = contractError
+    ? `contracts group failed: ${contractError}`
+    : idvError
+      ? `idvs group failed: ${idvError}`
+      : undefined;
+
+  return {
+    records: [...contractRecords, ...idvRecords],
+    contracts_rows: contractRecords.length,
+    idvs_rows: idvRecords.length,
+    degraded,
+    degradedReason,
+  };
 }

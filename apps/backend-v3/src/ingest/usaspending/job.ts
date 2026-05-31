@@ -10,6 +10,7 @@
 import { logger } from '../../lib/logger.js';
 import { pool } from '../../lib/db.js';
 import { fetchUSASpendingAwards } from './client.js';
+import type { USASpendingFetchResult } from './client.js';
 import { mapUSASpendingAward } from './mapper.js';
 import type { AwardRow, AwardSourceCitation } from './mapper.js';
 import type { IngestResult } from '../framework/registry.js';
@@ -117,13 +118,13 @@ export async function runUSASpendingIngest(): Promise<IngestResult> {
     'usaspending_ingest_job_start',
   );
 
-  const records = await fetchUSASpendingAwards(fromDate, toDate);
+  const fetchResult: USASpendingFetchResult = await fetchUSASpendingAwards(fromDate, toDate);
 
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
 
-  for (const raw of records) {
+  for (const raw of fetchResult.records) {
     try {
       const mapped = mapUSASpendingAward(raw);
       if (!mapped) {
@@ -149,9 +150,26 @@ export async function runUSASpendingIngest(): Promise<IngestResult> {
   }
 
   logger.info(
-    { source: 'usaspending', totalFetched: records.length, inserted, skipped },
+    {
+      source: 'usaspending',
+      totalFetched: fetchResult.records.length,
+      contracts_rows: fetchResult.contracts_rows,
+      idvs_rows: fetchResult.idvs_rows,
+      inserted,
+      skipped,
+    },
     'usaspending_ingest_fetched',
   );
 
-  return { inserted, updated, skipped };
+  return {
+    inserted,
+    updated,
+    skipped,
+    degraded: fetchResult.degraded,
+    degradedReason: fetchResult.degradedReason,
+    stats: {
+      contracts_rows: fetchResult.contracts_rows,
+      idvs_rows: fetchResult.idvs_rows,
+    },
+  };
 }
