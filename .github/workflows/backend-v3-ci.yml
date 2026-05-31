@@ -1,0 +1,49 @@
+name: Backend V3 CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/**'
+      - 'db/v3/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/**'
+      - 'db/v3/**'
+
+jobs:
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run unit tests
+        working-directory: apps/backend-v3
+        env:
+          NODE_ENV: test
+          LLM_ROUTER_MODE: mock
+        run: npx vitest run --config vitest.config.ts
+
+  integration:
+    name: Integration Tests (Postgres testcontainer)
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run integration tests + schema audit
+        working-directory: apps/backend-v3
+        env:
+          NODE_ENV: test
+          LLM_ROUTER_MODE: mock
+        run: npm run test:integration
