@@ -1,5 +1,21 @@
+export type CitationKind =
+  | 'internal_query'
+  | 'internal_event'
+  | 'external_upstream'
+  | 'sam_gov'
+  | 'fpds'
+  | 'usaspending'
+  | 'govwin'
+  | 'govtribe'
+  | 'news'
+  | 'doctrine'
+  | 'partner_site'
+  | 'internal'
+  | 'manual'
+  | 'n8n_workflow';
+
 export interface SourceCitation {
-  kind: string;
+  kind: CitationKind;
   title: string;
   url: string;
   retrieved_at: string;

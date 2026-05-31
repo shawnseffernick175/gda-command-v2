@@ -31,8 +31,8 @@ const severityLabel: Record<string, string> = {
 };
 
 function SourcePill({ citation }: { citation: SourceCitation }) {
-  const isExternal = citation.url.startsWith('http');
-  const indicator = isExternal ? '\u2197' : '#';
+  const isExternal = citation.kind === 'external_upstream' || citation.url.startsWith('http');
+  const indicator = isExternal ? '\u2197' : '\u2192';
   return (
     <a
       href={citation.url}
@@ -89,7 +89,7 @@ function FlagRow({ flag }: { flag: LaunchpadFlag }) {
               className="text-xs text-accent hover:underline"
               data-testid="flag-source-link"
             >
-              Source {sourceUrl.startsWith('http') ? '\u2197' : '#'}
+              Source {sourceUrl.startsWith('http') ? '\u2197' : '\u2192'}
             </a>
           )}
           {!sourceUrl && flag.source_url_sources.length > 0 && (

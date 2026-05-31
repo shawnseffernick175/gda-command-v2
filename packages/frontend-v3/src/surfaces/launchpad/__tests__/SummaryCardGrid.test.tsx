@@ -6,15 +6,15 @@ import type { LaunchpadSummary } from '../types';
 
 const mockData: LaunchpadSummary = {
   qualified_due_this_week: 7,
-  qualified_due_this_week_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/opportunities?status=qualified', retrieved_at: '2026-05-30T12:00:00Z' }],
+  qualified_due_this_week_sources: [{ kind: 'internal_query', title: 'Opportunities (qualified, due this week)', url: '/opportunities?status=qualified&due=this_week', retrieved_at: '2026-05-30T12:00:00Z' }],
   pipeline_no_capture: 0,
-  pipeline_no_capture_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/pipeline?no_capture=1', retrieved_at: '2026-05-30T12:00:00Z' }],
+  pipeline_no_capture_sources: [{ kind: 'internal_query', title: 'Pipeline items missing a capture record', url: '/pipeline?missing_capture=1', retrieved_at: '2026-05-30T12:00:00Z' }],
   captures_color_review_stale: 2,
-  captures_color_review_stale_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/captures?stale_review=1', retrieved_at: '2026-05-30T12:00:00Z' }],
+  captures_color_review_stale_sources: [{ kind: 'internal_query', title: 'Captures with color review > 14 days old', url: '/capture?stale=1', retrieved_at: '2026-05-30T12:00:00Z' }],
   action_items_open_today: 4,
-  action_items_open_today_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/action-items?status=open&due=today', retrieved_at: '2026-05-30T12:00:00Z' }],
+  action_items_open_today_sources: [{ kind: 'internal_query', title: 'Action items open with due_date = today', url: '/action-items?due=today', retrieved_at: '2026-05-30T12:00:00Z' }],
   action_items_overdue: 1,
-  action_items_overdue_sources: [{ kind: 'internal', title: 'GDA V3', url: '/v3/action-items?status=open&overdue=1', retrieved_at: '2026-05-30T12:00:00Z' }],
+  action_items_overdue_sources: [{ kind: 'internal_query', title: 'Action items open and past due', url: '/action-items?overdue=1', retrieved_at: '2026-05-30T12:00:00Z' }],
 };
 
 function renderGrid(props?: Partial<Parameters<typeof SummaryCardGrid>[0]>) {
