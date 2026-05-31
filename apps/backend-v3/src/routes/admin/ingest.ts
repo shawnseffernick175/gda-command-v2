@@ -1,0 +1,105 @@
+/**
+ * Admin ingest routes — manual trigger, recent runs, and status.
+ * Auth: requires JWT with role=admin.
+ */
+
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { successEnvelope, errorEnvelope } from '../../lib/envelope.js';
+import { logger } from '../../lib/logger.js';
+import { runIngest, getRegisteredSources } from '../../ingest/framework/registry.js';
+import { getRecentRuns, getIngestStatus } from '../../ingest/framework/run_logger.js';
+import type { JwtPayload } from '../../middleware/auth.js';
+
+function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
+  const user = (req as FastifyRequest & { user?: JwtPayload }).user;
+  if (!user || user.role !== 'admin') {
+    void reply.status(403).send(
+      errorEnvelope('UNAUTHORIZED', 'Admin role required', req.requestId),
+    );
+    return false;
+  }
+  return true;
+}
+
+export async function adminIngestRoutes(app: FastifyInstance): Promise<void> {
+  // POST /v3/admin/ingest/run/:source — manual trigger
+  app.post('/v3/admin/ingest/run/:source', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+
+    const { source } = req.params as { source: string };
+    const registered = getRegisteredSources();
+
+    if (!registered.includes(source)) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', `Unknown source: ${source}. Available: ${registered.join(', ')}`, req.requestId),
+      );
+    }
+
+    try {
+      const user = (req as FastifyRequest & { user?: JwtPayload }).user;
+      logger.info({ source, triggeredBy: user?.sub }, 'admin_ingest_trigger');
+
+      const { runId, result, durationMs } = await runIngest(source);
+
+      return reply.send(
+        successEnvelope(
+          {
+            run_id: String(runId),
+            source_key: source,
+            rows_inserted: result.inserted,
+            rows_updated: result.updated,
+            rows_skipped: result.skipped,
+            status: 'success',
+            duration_ms: durationMs,
+          },
+          req.requestId,
+        ),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ source, error: message }, 'admin_ingest_trigger_error');
+
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', message, req.requestId),
+      );
+    }
+  });
+
+  // GET /v3/admin/ingest/runs — recent runs
+  app.get('/v3/admin/ingest/runs', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+
+    try {
+      const { source, limit: limitStr } = req.query as { source?: string; limit?: string };
+      const limit = limitStr ? parseInt(limitStr, 10) : 50;
+
+      const runs = await getRecentRuns(source, isNaN(limit) ? 50 : limit);
+
+      return reply.send(successEnvelope({ runs }, req.requestId));
+    } catch (err) {
+      logger.error({ error: (err as Error).message }, 'admin_ingest_runs_error');
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', (err as Error).message, req.requestId),
+      );
+    }
+  });
+
+  // GET /v3/admin/ingest/status — last successful run per source
+  app.get('/v3/admin/ingest/status', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+
+    try {
+      const status = await getIngestStatus();
+      const registered = getRegisteredSources();
+
+      return reply.send(
+        successEnvelope({ registered_sources: registered, status }, req.requestId),
+      );
+    } catch (err) {
+      logger.error({ error: (err as Error).message }, 'admin_ingest_status_error');
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', (err as Error).message, req.requestId),
+      );
+    }
+  });
+}

@@ -1,0 +1,13 @@
+name: No Phantom Backend
+on: [pull_request, push]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if packages/backend exists
+        run: |
+          if [ -d packages/backend ]; then
+            echo "ERROR: packages/backend phantom tree resurrected. The only backend is apps/backend-v3/."
+            exit 1
+          fi

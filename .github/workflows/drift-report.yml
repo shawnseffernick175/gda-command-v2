@@ -22,8 +22,8 @@ jobs:
       - name: Typecheck
         run: |
           npm run build -w packages/shared
-          npx tsc --noEmit -p packages/backend/tsconfig.json 2>&1 | tee /tmp/typecheck.txt
-          npx tsc --noEmit -p packages/frontend/tsconfig.json 2>&1 | tee -a /tmp/typecheck.txt
+          npx tsc --noEmit -p apps/backend-v3/tsconfig.json 2>&1 | tee /tmp/typecheck.txt
+          npx tsc --noEmit -p packages/frontend-v3/tsconfig.json 2>&1 | tee -a /tmp/typecheck.txt
 
       - name: Dependency audit
         run: npm audit --audit-level=high 2>&1 | tee /tmp/audit.txt || true
@@ -31,9 +31,9 @@ jobs:
       - name: Inventory counts
         run: |
           echo "## Source File Counts" > /tmp/drift.md
-          echo "Backend routes: $(ls packages/backend/src/routes/*.ts 2>/dev/null | wc -l)" >> /tmp/drift.md
-          echo "Frontend pages: $(ls packages/frontend/src/pages/*.tsx 2>/dev/null | wc -l)" >> /tmp/drift.md
-          echo "Migrations: $(ls packages/backend/src/db/migrations/*.sql 2>/dev/null | wc -l)" >> /tmp/drift.md
+          echo "Backend routes: $(ls apps/backend-v3/src/routes/*.ts 2>/dev/null | wc -l)" >> /tmp/drift.md
+          echo "Frontend pages: $(ls packages/frontend-v3/src/pages/*.tsx 2>/dev/null | wc -l)" >> /tmp/drift.md
+          echo "Migrations: $(ls apps/backend-v3/src/migration/entities/*.ts 2>/dev/null | wc -l)" >> /tmp/drift.md
           echo "" >> /tmp/drift.md
 
           echo "## Typecheck Results" >> /tmp/drift.md
@@ -56,7 +56,7 @@ jobs:
         run: |
           echo "" >> /tmp/drift.md
           echo "## Migration Schema Drift (F-019)" >> /tmp/drift.md
-          npx tsx packages/backend/src/db/check-migration-drift.ts 2>&1 | tee /tmp/migration-drift.txt
+          echo "Legacy migration drift check removed — V3 uses apps/backend-v3/src/migration/" | tee /tmp/migration-drift.txt
           if [ -s /tmp/migration-drift.txt ]; then
             echo '```' >> /tmp/drift.md
             cat /tmp/migration-drift.txt >> /tmp/drift.md
