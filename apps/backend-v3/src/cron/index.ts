@@ -17,6 +17,7 @@ import { registerDIBBSSource } from '../ingest/dibbs/index.js';
 import { registerNECOSource } from '../ingest/neco/index.js';
 import { registerUSASpendingSource } from '../ingest/usaspending/index.js';
 import { registerFederalRegisterSource } from '../ingest/federal_register/index.js';
+import { registerSBIRSource } from '../ingest/sbir/index.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
@@ -39,6 +40,7 @@ const JOBS: CronJob[] = [
     ? [{ sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' }]
     : []),
   { sourceKey: 'federalregister.gov', schedule: '15 */6 * * *', label: 'Federal Register ingest (every 6 hours)' },
+  { sourceKey: 'sbir.gov', schedule: '45 */12 * * *', label: 'SBIR/STTR awards + open topics (twice daily)' },
 ];
 
 export function startCronScheduler(): void {
@@ -49,6 +51,7 @@ export function startCronScheduler(): void {
   registerDIBBSSource();
   registerNECOSource();
   registerFederalRegisterSource();
+  registerSBIRSource();
 
   const registeredSources = getRegisteredSources();
   logger.info({ sources: registeredSources }, '[ingest] framework ready');
@@ -79,6 +82,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'dibbs' ? 'dibbs.6h'
       : job.sourceKey === 'neco' ? 'neco.6h'
       : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
+      : job.sourceKey === 'sbir.gov' ? 'sbir.12h'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
