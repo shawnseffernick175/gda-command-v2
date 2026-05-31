@@ -11,10 +11,6 @@
 
 BEGIN;
 
-INSERT INTO schema_migrations (version, name, applied_at)
-VALUES ('017', 'agent_decisions_and_pwin', now())
-ON CONFLICT (version) DO NOTHING;
-
 -- 1. agent_decisions
 CREATE TABLE IF NOT EXISTS agent_decisions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -167,5 +163,4 @@ COMMIT;
 -- DROP TABLE IF EXISTS pwin_model_versions;
 -- DROP TABLE IF EXISTS pwin_features;
 -- DROP TABLE IF EXISTS agent_decisions;
--- DELETE FROM schema_migrations WHERE version = '017';
 -- COMMIT;
