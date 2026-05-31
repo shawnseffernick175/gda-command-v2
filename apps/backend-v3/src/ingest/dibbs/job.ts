@@ -33,7 +33,7 @@ export async function runDIBBSIngest(): Promise<IngestResult> {
       { source: 'dibbs', reason: degradedReason, htmlLength: html.length },
       'dibbs_ingest_degraded',
     );
-    return { inserted: 0, updated: 0, skipped: 0 };
+    return { inserted: 0, updated: 0, skipped: 0, degraded: true, degradedReason: degradedReason ?? undefined };
   }
 
   logger.info({ source: 'dibbs', totalParsed: records.length }, 'dibbs_ingest_parsed');

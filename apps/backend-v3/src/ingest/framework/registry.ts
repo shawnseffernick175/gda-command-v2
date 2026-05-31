@@ -10,6 +10,8 @@ export interface IngestResult {
   inserted: number;
   updated: number;
   skipped: number;
+  degraded?: boolean;
+  degradedReason?: string;
 }
 
 export type IngestFn = () => Promise<IngestResult>;
@@ -49,7 +51,8 @@ export async function runIngest(sourceKey: string): Promise<{
     const result = await source.ingest();
 
     const durationMs = Date.now() - start;
-    await finishRun(runId, 'success', result);
+    const status = result.degraded ? 'degraded' : 'success';
+    await finishRun(runId, status, result, result.degradedReason);
 
     logger.info(
       {

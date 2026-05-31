@@ -42,7 +42,7 @@ export async function runNECOIngest(): Promise<IngestResult> {
       { source: 'neco', reason: degradedReason, htmlLength: html.length },
       'neco_ingest_degraded',
     );
-    return { inserted: 0, updated: 0, skipped: 0 };
+    return { inserted: 0, updated: 0, skipped: 0, degraded: true, degradedReason: degradedReason ?? undefined };
   }
 
   logger.info({ source: 'neco', totalParsed: records.length }, 'neco_ingest_parsed');
