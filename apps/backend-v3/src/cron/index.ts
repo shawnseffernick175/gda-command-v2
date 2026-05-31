@@ -16,6 +16,7 @@ import { registerSAMSource } from '../ingest/sam/index.js';
 import { registerDIBBSSource } from '../ingest/dibbs/index.js';
 import { registerNECOSource } from '../ingest/neco/index.js';
 import { registerUSASpendingSource } from '../ingest/usaspending/index.js';
+import { registerFederalRegisterSource } from '../ingest/federal_register/index.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
@@ -37,6 +38,7 @@ const JOBS: CronJob[] = [
   ...(necoEnabled
     ? [{ sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' }]
     : []),
+  { sourceKey: 'federalregister.gov', schedule: '15 */6 * * *', label: 'Federal Register ingest (every 6 hours)' },
 ];
 
 export function startCronScheduler(): void {
@@ -46,6 +48,7 @@ export function startCronScheduler(): void {
   // still resolves. Only the cron schedule is gated by the env flags above.
   registerDIBBSSource();
   registerNECOSource();
+  registerFederalRegisterSource();
 
   const registeredSources = getRegisteredSources();
   logger.info({ sources: registeredSources }, '[ingest] framework ready');
@@ -75,6 +78,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'usaspending.gov' ? 'usaspending.daily'
       : job.sourceKey === 'dibbs' ? 'dibbs.6h'
       : job.sourceKey === 'neco' ? 'neco.6h'
+      : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },

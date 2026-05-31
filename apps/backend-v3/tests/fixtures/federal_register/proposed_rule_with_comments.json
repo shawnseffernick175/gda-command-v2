@@ -1,0 +1,22 @@
+{
+  "document_number": "2026-23456",
+  "title": "Defense Federal Acquisition Regulation Supplement: Proposed Changes to DFARS 252.204 Cybersecurity Requirements",
+  "abstract": "DoD is proposing to amend DFARS to require CMMC Level 2 certification for all defense contractors handling CUI.",
+  "type": "Proposed Rule",
+  "agencies": [
+    { "name": "Defense Department", "raw_name": "DEFENSE DEPARTMENT" }
+  ],
+  "publication_date": "2026-05-20",
+  "effective_on": null,
+  "comments_close_on": "2026-07-20",
+  "cfr_references": [
+    { "title": 48, "part": 252 }
+  ],
+  "topics": ["procurement", "acquisition-regulations", "government-contracts"],
+  "html_url": "https://www.federalregister.gov/documents/2026/05/20/2026-23456/dfars-cybersecurity-cmmc",
+  "pdf_url": "https://www.govinfo.gov/content/pkg/FR-2026-05-20/pdf/2026-23456.pdf",
+  "regulation_id_number_info": {},
+  "regulations_dot_gov_info": { "document_id": "DFARS-2026-D012" },
+  "significant": false,
+  "docket_ids": ["DFARS-2026-D012"]
+}
