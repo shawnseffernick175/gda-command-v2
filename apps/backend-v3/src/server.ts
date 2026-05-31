@@ -6,6 +6,7 @@ import { startWorker } from './workers/analysis.js';
 import { startSoakDigestWorker } from './workers/soak-digest.js';
 import { subscribeFastTrack } from './workers/fast-track.js';
 import { pool } from './lib/db.js';
+import { startCronScheduler, stopCronScheduler } from './cron/index.js';
 
 async function main(): Promise<void> {
   logger.info(
@@ -19,11 +20,14 @@ async function main(): Promise<void> {
   await startSoakDigestWorker();
   await subscribeFastTrack();
 
+  startCronScheduler();
+
   const app = await buildApp();
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutting down');
     await app.close();
+    stopCronScheduler();
     await workerBoss.stop({ graceful: true, timeout: 10_000 });
     await stopBoss();
     await pool.end();
