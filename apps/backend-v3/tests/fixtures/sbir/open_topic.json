@@ -1,0 +1,16 @@
+{
+  "topic_number": "AF26A-D016",
+  "solicitation_number": "DOD_SBIR_2026.3",
+  "agency": "DOD",
+  "branch": "AFWERX",
+  "program": "SBIR",
+  "phase": "Phase I",
+  "topic_title": "Autonomous Drone Swarm Coordination for ISR Missions",
+  "description": "Develop algorithms for coordinating 50+ UAVs in contested airspace for ISR collection.",
+  "technology_areas": ["Autonomy", "AI/ML", "ISR"],
+  "open_date": "2026-06-01",
+  "close_date": "2026-08-15",
+  "pre_release_date": "2026-05-15",
+  "url": "https://www.sbir.gov/topic/AF26A-D016",
+  "status": "Open"
+}
