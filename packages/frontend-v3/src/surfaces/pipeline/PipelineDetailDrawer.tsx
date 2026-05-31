@@ -64,28 +64,12 @@ export function PipelineDetailDrawer({
               Metadata
             </h4>
             <div className="grid grid-cols-2 gap-2">
-              <Field
-                label="Agency"
-                value={row.agency}
-                sourceUrl={row.source_url ?? ''}
-              />
+              <Field label="Agency" value={row.agency} sourceUrl={row.source_url ?? ''} />
               {row.naics && (
-                <Field
-                  label="NAICS"
-                  value={row.naics}
-                  sourceUrl={row.source_url ?? ''}
-                />
+                <Field label="NAICS" value={row.naics} sourceUrl={row.source_url ?? ''} />
               )}
-              <Field
-                label="Response Date"
-                value={formatDate(row.response_date)}
-                sourceUrl={row.source_url ?? ''}
-              />
-              <Field
-                label="Last Updated"
-                value={formatDate(row.updated_at)}
-                sourceUrl={row.source_url ?? ''}
-              />
+              <Field label="Response Date" value={formatDate(row.response_date)} sourceUrl={row.source_url ?? ''} />
+              <Field label="Last Updated" value={formatDate(row.updated_at)} sourceUrl={row.source_url ?? ''} />
             </div>
             {row.source_url && (
               <SourceLink url={row.source_url} label="Source" />
