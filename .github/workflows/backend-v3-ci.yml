@@ -1,0 +1,34 @@
+name: Backend V3 CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/**'
+      - 'db/v3/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/**'
+      - 'db/v3/**'
+
+jobs:
+  integration:
+    name: Integration Tests (Postgres testcontainer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Gate — no CREATE TABLE in integration tests
+        working-directory: apps/backend-v3
+        run: bash tests/integration/no-create-table-gate.sh
+      - name: Run integration tests + schema audit
+        working-directory: apps/backend-v3
+        env:
+          NODE_ENV: test
+          LLM_ROUTER_MODE: mock
+        run: npm run test:integration

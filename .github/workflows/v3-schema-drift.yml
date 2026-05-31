@@ -83,7 +83,7 @@ jobs:
           DATABASE_URL: postgresql://gda_v3:gda_v3_ci@localhost:5433/gda_v3
         run: |
           cd apps/backend-v3
-          npx vitest run tests/integration/pgboss-bootstrap.test.ts --reporter=verbose
+          npx vitest run tests/integration/pgboss-bootstrap.test.ts --config vitest.integration.config.ts --reporter=verbose
 
       - name: Verify core table structure
         env:
