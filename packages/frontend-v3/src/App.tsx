@@ -5,6 +5,7 @@ import { MainCanvas } from "./components/MainCanvas/MainCanvas";
 import { NavItems } from "./components/NavItems/NavItems";
 import { PlaceholderSurface } from "./components/PlaceholderSurface/PlaceholderSurface";
 import { Launchpad } from "./surfaces/launchpad/Launchpad";
+import { FastTrack } from "./surfaces/fast-track/FastTrack";
 import { ActionItemsList } from "./surfaces/action-items/ActionItemsList";
 import { PipelineSurface } from "./surfaces/pipeline/PipelineSurface";
 import { OpportunitiesList } from "./surfaces/opportunities/OpportunitiesList";
@@ -33,7 +34,7 @@ export function App() {
                 <Routes>
                   <Route index element={<Navigate to="/launchpad" replace />} />
                   <Route path="/launchpad" element={<Launchpad />} />
-                  <Route path="/fast-track" element={<PlaceholderSurface name="Fast Track" />} />
+                  <Route path="/fast-track" element={<FastTrack />} />
                   <Route path="/opportunities" element={<OpportunitiesList />} />
                   <Route path="/opp/:notice_id" element={<OpportunitiesList />} />
                   <Route path="/capture" element={<CaptureList />} />
