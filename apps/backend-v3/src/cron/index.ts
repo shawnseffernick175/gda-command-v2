@@ -9,6 +9,7 @@ import { runIngest, getRegisteredSources } from '../ingest/framework/registry.js
 import { registerSAMSource } from '../ingest/sam/index.js';
 import { registerDIBBSSource } from '../ingest/dibbs/index.js';
 import { registerNECOSource } from '../ingest/neco/index.js';
+import { registerFPDSSource } from '../ingest/fpds/index.js';
 
 const tasks: ScheduledTask[] = [];
 
@@ -20,12 +21,14 @@ interface CronJob {
 
 const JOBS: CronJob[] = [
   { sourceKey: 'sam.gov', schedule: '0 */4 * * *', label: 'SAM.gov ingest (every 4 hours)' },
+  { sourceKey: 'fpds.gov', schedule: '0 7 * * *', label: 'FPDS daily awards ingest (03:00 ET)' },
   { sourceKey: 'dibbs', schedule: '0 */6 * * *', label: 'DIBBS ingest (every 6 hours)' },
   { sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' },
 ];
 
 export function startCronScheduler(): void {
   registerSAMSource();
+  registerFPDSSource();
   registerDIBBSSource();
   registerNECOSource();
 
@@ -53,14 +56,14 @@ export function startCronScheduler(): void {
     });
 
     tasks.push(task);
-    const cronLabel =
-      job.sourceKey === 'sam.gov' ? 'sam.4h'
+    const cronLabel = job.sourceKey === 'sam.gov' ? 'sam.4h'
+      : job.sourceKey === 'fpds.gov' ? 'fpds.daily'
       : job.sourceKey === 'dibbs' ? 'dibbs.6h'
       : job.sourceKey === 'neco' ? 'neco.6h'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
-      `[cron] registered: ${cronLabel}`,
+      `[cron] registered: ${cronLabel} (${job.schedule})`,
     );
   }
 }
