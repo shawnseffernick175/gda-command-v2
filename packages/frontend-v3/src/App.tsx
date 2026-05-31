@@ -3,6 +3,7 @@ import { AppShell } from "./components/AppShell/AppShell";
 import { LeftRail } from "./components/LeftRail/LeftRail";
 import { MainCanvas } from "./components/MainCanvas/MainCanvas";
 import { PlaceholderSurface } from "./components/PlaceholderSurface/PlaceholderSurface";
+import { ActionItemsList } from "./surfaces/action-items/ActionItemsList";
 import { useUiStore } from "./stores/ui-store";
 
 export function App() {
@@ -22,7 +23,7 @@ export function App() {
           <Route path="/capture" element={<PlaceholderSurface name="Capture" />} />
           <Route path="/capture/:opp_id" element={<PlaceholderSurface name="Capture Detail" />} />
           <Route path="/pipeline" element={<PlaceholderSurface name="Pipeline" />} />
-          <Route path="/action-items" element={<PlaceholderSurface name="Action Items" />} />
+          <Route path="/action-items" element={<ActionItemsList />} />
           <Route path="/settings/*" element={<PlaceholderSurface name="Settings" />} />
         </Routes>
       </MainCanvas>
