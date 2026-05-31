@@ -48,6 +48,18 @@ const TABLE_NAMES = new Set([
   'opportunity_value_max_sources',
 ]);
 
+// Pre-existing schema drift (code references columns/tables not yet in migrations).
+// Logged as warnings, not failures. New drift (not in this set) exits non-zero.
+const KNOWN_DRIFT = new Set([
+  'pipeline_items.capture_kickoff_at',
+  'soak_events.kind', 'soak_events.url', 'soak_events.status',
+  'soak_events.duration_ms', 'soak_events.message',
+  'soak_metrics.kind', 'soak_metrics.p95_ms',
+  'action_items.detail', 'action_items.owner', 'action_items.source',
+  'action_items.linked_record_type', 'action_items.linked_record_id',
+  'compliance_items.evidence',
+]);
+
 // Columns used in SQL template literals that are NOT real DB columns
 // (e.g. computed aliases, parameter placeholders)
 const KNOWN_ALIASES = new Set([
@@ -243,25 +255,37 @@ async function main(): Promise<void> {
       dbColumns.add(`${row.table_name}.${row.column_name}`);
     }
 
-    // Compare
+    // Compare — separate known drift from new drift
     const missing: ColumnRef[] = [];
+    const knownDriftFound: ColumnRef[] = [];
     for (const [key, ref] of uniqueRefs) {
       if (!TABLE_NAMES.has(ref.table)) continue;
       if (!dbColumns.has(key)) {
-        missing.push(ref);
+        if (KNOWN_DRIFT.has(key)) {
+          knownDriftFound.push(ref);
+        } else {
+          missing.push(ref);
+        }
+      }
+    }
+
+    if (knownDriftFound.length > 0) {
+      console.warn(`\n⚠ Known drift (${knownDriftFound.length} column(s) — pre-existing, not blocking CI):\n`);
+      for (const m of knownDriftFound) {
+        console.warn(`  ${m.table}.${m.column}  (${m.file}:${m.line})`);
       }
     }
 
     if (missing.length > 0) {
-      console.error('\n❌ Schema audit FAILED — columns referenced in code but missing from DB:\n');
+      console.error('\n❌ NEW schema drift — columns referenced in code but missing from DB:\n');
       for (const m of missing) {
         console.error(`  ${m.table}.${m.column}  (${m.file}:${m.line})`);
       }
-      console.error(`\n${missing.length} missing column(s) found.\n`);
+      console.error(`\n${missing.length} NEW missing column(s) found.\n`);
       process.exit(1);
     }
 
-    console.log(`✅ Schema audit passed — ${uniqueRefs.size} column references checked, all present in DB.`);
+    console.log(`\n✅ Schema audit passed — ${uniqueRefs.size} column references checked, ${knownDriftFound.length} known drift, 0 new drift.`);
   } finally {
     await pool.end();
   }

@@ -7,7 +7,6 @@
  */
 
 import pg from 'pg';
-import { v4 as uuidv4 } from 'uuid';
 
 const { Pool } = pg;
 
@@ -68,19 +67,20 @@ export async function seed(databaseUrl: string): Promise<SeedIds> {
     );
     const captureId = captureRes.rows[0]!.id;
 
-    // Action item (UUID id)
-    const actionItemId = uuidv4();
-    await pool.query(
+    // Action item (canonical v3_001 schema — BIGSERIAL id, owner_email NOT NULL, source_id NOT NULL)
+    const aiRes = await pool.query<{ id: string }>(
       `INSERT INTO action_items (
-         id, title, detail, owner, status, source, due_date, created_at, updated_at
-       ) VALUES ($1, $2, $3, $4, 'open', 'manual', NULL, NOW(), NOW())`,
+         title, body, owner_email, status, source_id, created_at, updated_at
+       ) VALUES ($1, $2, $3, 'open', $4, NOW(), NOW())
+       RETURNING id::text`,
       [
-        actionItemId,
         'Test action item — Integration',
         'Review opportunity analysis for Army sustainment contract',
         'shawn@envision.test',
+        sourceId,
       ],
     );
+    const actionItemId = aiRes.rows[0]!.id;
 
     // Partner (static Riverstone profile already served from code, but ensure
     // a DB partner row for tests that might query the table directly)

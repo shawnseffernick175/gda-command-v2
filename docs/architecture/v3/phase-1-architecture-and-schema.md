@@ -257,7 +257,6 @@ CREATE TABLE pipeline_items (
                                     'qualifying', 'pursuit', 'proposal', 'submitted',
                                     'evaluation', 'won', 'lost'
                                   )),
-  capture_kickoff_at TIMESTAMPTZ,              -- when capture was kicked off for this pipeline item
   source_id         BIGINT        NOT NULL REFERENCES sources(id),
   created_by        BIGINT        REFERENCES users(id),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -357,25 +356,21 @@ CREATE INDEX idx_compliance_source   ON compliance_items (source_id);
 
 ```sql
 CREATE TABLE action_items (
-  id              TEXT          PRIMARY KEY,   -- UUID (V3 uses text UUIDs)
+  id              BIGSERIAL     PRIMARY KEY,
   title           TEXT          NOT NULL,
   body            TEXT,
-  detail          TEXT,                        -- extended detail text
-  owner           TEXT,                        -- owner name (V3 code path)
-  owner_email     TEXT,                        -- individual accountability
+  owner_email     TEXT          NOT NULL,      -- individual accountability (not committee)
   status          TEXT          NOT NULL DEFAULT 'open'
-                                CHECK (status IN ('open', 'in_progress', 'done', 'blocked')),
+                                CHECK (status IN ('open', 'done', 'blocked')),
   priority        TEXT          NOT NULL DEFAULT 'normal'
                                 CHECK (priority IN ('critical', 'high', 'normal', 'low')),
   due_date        TIMESTAMPTZ,
-  origin          TEXT          DEFAULT 'manual',
+  origin          TEXT          NOT NULL DEFAULT 'manual'
+                                CHECK (origin IN ('email', 'manual', 'sentinel', 'launchpad', 'n8n')),
   origin_ref      TEXT,                        -- reference ID from the origin system
-  source          TEXT          DEFAULT 'manual',  -- V3 source discriminator
-  linked_record_type TEXT,                     -- type of linked record (opportunity, capture, etc.)
-  linked_record_id   TEXT,                     -- ID of linked record
   opportunity_id  BIGINT        REFERENCES opportunities(id),
-  partner_context TEXT,
-  source_id       BIGINT        REFERENCES sources(id),
+  partner_context TEXT,                        -- e.g., "ask Angela about SHIELD task order capacity"
+  source_id       BIGINT        NOT NULL REFERENCES sources(id),
   created_by      BIGINT        REFERENCES users(id),
   completed_at    TIMESTAMPTZ,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -409,16 +404,16 @@ CREATE INDEX idx_actions_source      ON action_items (source_id);
 ```sql
 CREATE TABLE action_item_drafts (
   id              BIGSERIAL     PRIMARY KEY,
-  action_item_id  TEXT          NOT NULL,      -- FK to action_items (text id)
+  action_item_id  BIGINT        NOT NULL REFERENCES action_items(id) ON DELETE CASCADE,
   kind            TEXT          NOT NULL
                                 CHECK (kind IN ('reply', 'research', 'milestone')),
   status          TEXT          NOT NULL DEFAULT 'pending'
-                                CHECK (status IN ('generating', 'done', 'failed', 'pending', 'approved', 'rejected')),
+                                CHECK (status IN ('pending', 'approved', 'rejected')),
   content         TEXT          NOT NULL,      -- the LLM-generated draft
   model_used      TEXT,                        -- e.g., "gpt-4o", "claude-3.5-sonnet"
   approved_by     BIGINT        REFERENCES users(id),
   approved_at     TIMESTAMPTZ,
-  source_id       BIGINT        REFERENCES sources(id),
+  source_id       BIGINT        NOT NULL REFERENCES sources(id),
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
