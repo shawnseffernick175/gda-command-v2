@@ -30,7 +30,7 @@ function deriveSentinelMessage(
   pct: number,
   lagSeconds: number | null,
 ): string {
-  if (sourceKey !== 'govtribe') {
+  if (sourceKey !== 'govtribe' && !sourceKey.startsWith('govtribe.')) {
     if (lagSeconds === null) return 'No data yet';
     if (lagSeconds > 3600 * 12) return `Stale — last success ${Math.round(lagSeconds / 3600)}h ago`;
     return `Healthy — last poll ${Math.round(lagSeconds / 60)} min ago`;

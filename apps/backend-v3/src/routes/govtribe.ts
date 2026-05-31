@@ -12,7 +12,6 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import {
-  checkGovTribeReachable,
   getCreditBudgetStatus,
   govtribeFetch,
 } from '../ingest/govtribe/client.js';
@@ -34,29 +33,29 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
 export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
   /**
    * GET /v3/govtribe/health
-   * Returns API reachability, last poll, credit pct — no API call burned.
+   * Returns API reachability (inferred from last ingest run), last poll,
+   * credit pct — no live API call, no credits burned.
    */
   app.get('/v3/govtribe/health', async (req, reply) => {
-    const [reachability, budgetStatus] = await Promise.all([
-      checkGovTribeReachable(),
-      getCreditBudgetStatus(),
-    ]);
+    const budgetStatus = await getCreditBudgetStatus();
 
     const { rows: lastPollRows } = await pool.query(
-      `SELECT finished_at::text AS last_poll_at, error_text AS last_error
+      `SELECT finished_at::text AS last_poll_at, status, error_text AS last_error
        FROM ingest_runs
        WHERE source_key = 'govtribe'
        ORDER BY started_at DESC LIMIT 1`,
     );
 
     const lastPoll = lastPollRows[0] ?? null;
+    const apiReachable = lastPoll ? lastPoll.status === 'success' || lastPoll.status === 'degraded' : false;
+    const lastError = lastPoll?.last_error ?? null;
 
     return reply.send(
       successEnvelope(
         {
-          api_reachable: reachability.reachable,
+          api_reachable: apiReachable,
           last_poll_at: lastPoll?.last_poll_at ?? null,
-          last_error: reachability.error ?? lastPoll?.last_error ?? null,
+          last_error: lastError,
           credits: {
             used: budgetStatus.credits_used,
             budget: budgetStatus.credits_budget,
