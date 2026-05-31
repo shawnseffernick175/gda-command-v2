@@ -1,5 +1,3 @@
-import type { SourceRef } from '../../lib/api-client';
-
 export type ColorStage = 'pink' | 'red' | 'gold' | 'submitted';
 
 export interface Source {
@@ -111,8 +109,8 @@ export interface CaptureDetail {
 
 export interface AnalysisResult {
   pwin: number;
-  pwin_sources: SourceRef[];
+  pwin_sources: Source[];
   color_stage: ColorStage;
   compliance_coverage: number;
-  compliance_sources: SourceRef[];
+  compliance_sources: Source[];
 }
