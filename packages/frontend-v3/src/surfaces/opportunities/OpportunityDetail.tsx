@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Button } from '../../components/Button/Button';
 import { Skeleton } from '../../components/Skeleton/Skeleton';
 import { ErrorState } from '../../components/ErrorState/ErrorState';
 import { useOpportunityDetail } from './hooks/useOpportunityDetail';
@@ -8,6 +7,8 @@ import { GradeChip } from './components/GradeChip';
 import { StatusChip } from './components/StatusChip';
 import { SourceLink } from './components/SourceLink';
 import { QualifyConfirmModal } from './QualifyConfirmModal';
+import { DoctrineAlignmentPanel } from '../doctrine/DoctrineAlignmentPanel';
+import { DoctrineQualifyGate } from '../doctrine/DoctrineQualifyGate';
 import type { OpportunityDetail as OpportunityDetailType } from './types';
 
 interface OpportunityDetailPanelProps {
@@ -127,11 +128,11 @@ export function OpportunityDetailPanel({ opportunityId, onBack }: OpportunityDet
         </button>
         <div className="flex items-center gap-2">
           <StatusChip status={detail.status} />
-          {detail.status !== 'qualified' && (
-            <Button variant="primary" onClick={() => setQualifyOpen(true)}>
-              Qualify
-            </Button>
-          )}
+          <DoctrineQualifyGate
+            opportunityId={detail.id}
+            status={detail.status}
+            onQualify={() => setQualifyOpen(true)}
+          />
         </div>
       </div>
 
@@ -218,6 +219,8 @@ export function OpportunityDetailPanel({ opportunityId, onBack }: OpportunityDet
       )}
 
       {detail.analysis && !analysisTimeout && <AnalysisSection detail={detail} />}
+
+      <DoctrineAlignmentPanel entityKind="opportunity" entityId={detail.id} />
 
       <QualifyConfirmModal
         open={qualifyOpen}
