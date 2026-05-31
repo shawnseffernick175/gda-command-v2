@@ -17,6 +17,8 @@ export interface CaptureListItem {
   opportunity_agency_sources: Source[];
   color_stage: ColorStage;
   pwin: number | null;
+  pwin_sources: Source[];
+  source_url: string;
   ai_analyzed_at: string | null;
   analysis_version: string | null;
   created_at: string;

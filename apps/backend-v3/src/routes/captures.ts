@@ -68,14 +68,15 @@ const NON_ANALYSIS_FIELDS = new Set([
   'win_themes',
 ]);
 
-function isCacheFresh(cache: CacheRow | null): boolean {
+function isCacheFresh(cache: CacheRow | null, captureUpdatedAt: string): boolean {
   if (!cache || cache.pwin === null) return false;
   if (cache.version !== config.analysisVersion) return false;
-  return true;
+  return new Date(cache.generated_at) >= new Date(captureUpdatedAt);
 }
 
 async function waitForAnalysis(
   captureId: string,
+  captureUpdatedAt: string,
   timeoutMs: number,
   pollMs: number
 ): Promise<CacheRow | null> {
@@ -86,7 +87,7 @@ async function waitForAnalysis(
       [captureId, config.analysisVersion]
     );
     const row = res.rows[0];
-    if (row && isCacheFresh(row)) return row;
+    if (row && isCacheFresh(row, captureUpdatedAt)) return row;
     await new Promise((resolve) => setTimeout(resolve, pollMs));
   }
   return null;
@@ -115,6 +116,10 @@ function buildDetailResponse(
     ghost_team: row.ghost_team,
     compliance_items: complianceItems,
     pwin: cache?.pwin ?? null,
+    pwin_sources: cache?.pwin !== null && cache?.pwin !== undefined
+      ? [{ kind: 'internal', title: 'GDA Capture Analysis', url: `/v3/captures/${row.id}`, retrieved_at: cache.generated_at }]
+      : [],
+    source_url: `/v3/captures/${row.id}`,
     ai_analyzed_at: cache?.generated_at ?? null,
     analysis_version: cache?.version ?? null,
     created_at: row.created_at,
@@ -187,6 +192,9 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
+    params.push(config.analysisVersion);
+    const versionParam = `$${paramIdx++}`;
+
     params.push(limit + 1);
     const limitParam = `$${paramIdx}`;
 
@@ -204,7 +212,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
       LEFT JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
       LEFT JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
       LEFT JOIN capture_analysis_cache cac
-        ON cac.capture_id = c.id AND cac.version = '${config.analysisVersion}'
+        ON cac.capture_id = c.id AND cac.version = ${versionParam}
       ${whereClause}
       ORDER BY c.id DESC
       LIMIT ${limitParam}
@@ -229,6 +237,10 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
             opportunity_agency_sources: [],
             color_stage: r.color_stage,
             pwin: r.cached_pwin ?? null,
+            pwin_sources: r.cached_pwin != null
+              ? [{ kind: 'internal', title: 'GDA Capture Analysis', url: `/v3/captures/${r.id as string}`, retrieved_at: r.ai_analyzed_at as string }]
+              : [],
+            source_url: `/v3/captures/${r.id as string}`,
             ai_analyzed_at: r.ai_analyzed_at ?? null,
             analysis_version: r.analysis_version ?? null,
             created_at: r.created_at,
@@ -284,7 +296,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     );
     const cache = cacheRes.rows[0] ?? null;
 
-    if (isCacheFresh(cache)) {
+    if (isCacheFresh(cache, row.updated_at)) {
       analysisCacheHits.inc();
       return reply.status(200).send(
         successEnvelope(buildDetailResponse(row, opp, pi?.capture_owner ?? null, complianceItems, cache), req.requestId)
@@ -293,7 +305,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
 
     await enqueueCaptureAnalysis(id, 'detail-endpoint');
 
-    const fresh = await waitForAnalysis(id, config.analysisTimeoutMs, config.analysisPollIntervalMs);
+    const fresh = await waitForAnalysis(id, row.updated_at, config.analysisTimeoutMs, config.analysisPollIntervalMs);
     if (fresh) {
       analysisCacheHits.inc();
       return reply.status(200).send(

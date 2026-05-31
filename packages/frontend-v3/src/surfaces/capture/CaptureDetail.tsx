@@ -88,9 +88,10 @@ export function CaptureDetail() {
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Pwin</span>
-          <PwinChip
-            pwin={capture.pwin ?? 0}
-          />
+          {capture.pwin !== null
+            ? <PwinChip pwin={capture.pwin} sourceUrl={capture.pwin_sources?.[0]?.url ?? capture.source_url ?? '#'} />
+            : <span className="text-sm text-ink-muted">—</span>
+          }
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-[0.04em] text-ink-muted">Color Review</span>

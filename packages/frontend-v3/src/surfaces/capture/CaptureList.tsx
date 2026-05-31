@@ -80,7 +80,9 @@ export function CaptureList() {
       header: 'Pwin',
       sortable: true,
       width: 80,
-      render: (row) => <PwinChip pwin={row.pwin ?? 0} />,
+      render: (row) => row.pwin !== null
+        ? <PwinChip pwin={row.pwin} sourceUrl={row.pwin_sources[0]?.url ?? row.source_url} />
+        : <span className="text-ink-muted">—</span>,
     },
     {
       key: 'updated_at',
