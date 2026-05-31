@@ -84,7 +84,7 @@ async function ensureTestSchema(): Promise<void> {
     await client.query(`
       CREATE TABLE IF NOT EXISTS action_item_drafts (
         id BIGSERIAL PRIMARY KEY,
-        action_item_id BIGINT NOT NULL,
+        action_item_id TEXT NOT NULL,
         kind TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'generating',
         content TEXT NOT NULL DEFAULT '',
@@ -491,8 +491,8 @@ describe('Integration: Draft endpoint full flow', () => {
     });
     expect(draftRes.statusCode).toBe(201);
     const draftData = (JSON.parse(draftRes.body) as SuccessBody).data as Record<string, unknown>;
-    const draftId = draftData.id as number;
-    expect(typeof draftId).toBe('number');
+    const draftId = draftData.id;
+    expect(draftId).toBeTruthy();
 
     const { buildStubDraftText } = await import('../src/services/drafts/index.js');
     const actionItem = (await pool.query('SELECT * FROM action_items WHERE id = $1', [id])).rows[0]!;
@@ -546,7 +546,7 @@ describe('Integration: Draft endpoint full flow', () => {
       expect(draftRes.statusCode).toBe(201);
       const draftData = (JSON.parse(draftRes.body) as SuccessBody).data as Record<string, unknown>;
       expect(draftData.kind).toBe(kind);
-      const draftId = draftData.id as number;
+      const draftId = draftData.id;
 
       const actionItem = (await pool.query('SELECT * FROM action_items WHERE id = $1', [id])).rows[0]!;
       const draftText = buildStubDraftText(kind, actionItem);

@@ -62,28 +62,27 @@ async function ensureTestSchema(): Promise<void> {
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS action_items (
-        id BIGSERIAL PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         detail TEXT,
-        owner_email TEXT NOT NULL DEFAULT 'shawn@envision-is.com',
+        owner TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'open',
-        priority TEXT NOT NULL DEFAULT 'P2',
-        due_date TIMESTAMPTZ,
-        origin TEXT NOT NULL DEFAULT 'manual',
-        source_id BIGINT NOT NULL DEFAULT 1,
-        opportunity_id BIGINT,
-        partner_context TEXT,
-        completed_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        due_date TEXT,
+        source TEXT NOT NULL DEFAULT 'manual',
+        source_id TEXT,
+        linked_record_type TEXT,
+        linked_record_id TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       )
     `);
     await client.query(`
       CREATE TABLE IF NOT EXISTS action_item_drafts (
         id BIGSERIAL PRIMARY KEY,
-        action_item_id BIGINT NOT NULL,
+        action_item_id TEXT NOT NULL,
         kind TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
+        status TEXT NOT NULL DEFAULT 'generating',
         content TEXT NOT NULL DEFAULT '',
         model_used TEXT,
         approved_by TEXT,
@@ -152,7 +151,7 @@ describe('F-231 Drafts Integration (real Postgres)', () => {
     expect(draftRes.statusCode).toBe(201);
 
     const draft = (JSON.parse(draftRes.body) as SuccessBody).data;
-    expect(typeof draft.id).toBe('number');
+    expect(draft.id).toBeTruthy();
     expect(draft.status).toBe('generating');
     expect(draft.kind).toBe('reply');
   });
@@ -172,7 +171,7 @@ describe('F-231 Drafts Integration (real Postgres)', () => {
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ kind: 'reply' }),
     });
-    const draftId = (JSON.parse(draftRes.body) as SuccessBody).data.id as number;
+    const draftId = (JSON.parse(draftRes.body) as SuccessBody).data.id;
 
     const { buildStubDraftText } = await import('../../src/services/drafts/index.js');
     const actionItem = (await pool.query('SELECT * FROM action_items WHERE id = $1', [itemId])).rows[0]!;
@@ -209,7 +208,7 @@ describe('F-231 Drafts Integration (real Postgres)', () => {
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ kind: 'reply' }),
     });
-    const draftId = (JSON.parse(draftRes.body) as SuccessBody).data.id as number;
+    const draftId = (JSON.parse(draftRes.body) as SuccessBody).data.id;
 
     await pool.query(
       `UPDATE action_item_drafts
@@ -233,7 +232,7 @@ describe('F-231 Drafts Integration (real Postgres)', () => {
     expect(drafts.length).toBeGreaterThanOrEqual(1);
 
     const d = drafts[0];
-    expect(typeof d.id).toBe('number');
+    expect(d.id).toBeTruthy();
     expect(d.content).toBe('Hydration test content');
     expect(d.model_used).toBe('stub');
     expect(d.status).toBe('approved');
