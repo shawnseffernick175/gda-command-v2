@@ -23,6 +23,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Gate — no CREATE TABLE in integration tests
+        working-directory: apps/backend-v3
+        run: bash tests/integration/no-create-table-gate.sh
       - name: Run integration tests + schema audit
         working-directory: apps/backend-v3
         env:
