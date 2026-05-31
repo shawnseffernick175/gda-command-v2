@@ -7,6 +7,10 @@
  * crons fail with TCP connect timeouts from Hostinger. The ingest code is
  * correct — only the transport is blocked. Re-enable once egress proxy or
  * alternative infra is in place. See GitHub issue #513.
+ *
+ * SBIR cron is gated behind ENABLE_SBIR_INGEST (default OFF).
+ * api.www.sbir.gov returns HTTP 429 for all requests from VPS egress IP.
+ * See GitHub issue #527.
  */
 
 import cron, { type ScheduledTask } from 'node-cron';
@@ -21,6 +25,7 @@ import { registerSBIRSource } from '../ingest/sbir/index.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
+const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 
 const tasks: ScheduledTask[] = [];
 
@@ -40,7 +45,9 @@ const JOBS: CronJob[] = [
     ? [{ sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' }]
     : []),
   { sourceKey: 'federalregister.gov', schedule: '15 */6 * * *', label: 'Federal Register ingest (every 6 hours)' },
-  { sourceKey: 'sbir.gov', schedule: '45 */12 * * *', label: 'SBIR/STTR awards + open topics (twice daily)' },
+  ...(sbirEnabled
+    ? [{ sourceKey: 'sbir.gov', schedule: '45 */12 * * *', label: 'SBIR/STTR awards + open topics (twice daily)' }]
+    : []),
 ];
 
 export function startCronScheduler(): void {
@@ -55,6 +62,10 @@ export function startCronScheduler(): void {
 
   const registeredSources = getRegisteredSources();
   logger.info({ sources: registeredSources }, '[ingest] framework ready');
+
+  if (!sbirEnabled) {
+    logger.info({ flag: 'ENABLE_SBIR_INGEST' }, '[cron] sbir.12h skipped — gated behind env flag (default off due to api.www.sbir.gov 429 block on VPS egress)');
+  }
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {
