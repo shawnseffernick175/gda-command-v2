@@ -10,6 +10,7 @@
  */
 
 import { pool } from '../../lib/db.js';
+import type { PoolClient } from 'pg';
 import { logger } from '../../lib/logger.js';
 import {
   discoverRecentOpportunityIds,
@@ -47,9 +48,9 @@ async function upsertGovWinCache(opp: GovWinOpportunity): Promise<void> {
   );
 }
 
-async function findExistingSAMOpp(opp: GovWinOpportunity): Promise<string | null> {
+async function findExistingSAMOpp(db: PoolClient, opp: GovWinOpportunity): Promise<string | null> {
   if (opp.solicitationNumber) {
-    const { rows } = await pool.query(
+    const { rows } = await db.query(
       `SELECT id FROM opportunities
        WHERE solicitation_number = $1 AND data_source != 'govwin'
        LIMIT 1`,
@@ -59,7 +60,7 @@ async function findExistingSAMOpp(opp: GovWinOpportunity): Promise<string | null
   }
 
   if (opp.agency && opp.title && opp.responseDueAt) {
-    const { rows } = await pool.query(
+    const { rows } = await db.query(
       `SELECT id FROM opportunities
        WHERE agency = $1
          AND LOWER(title) = LOWER($2)
@@ -90,16 +91,9 @@ async function upsertOpportunity(
     );
     const sourceId = sourceRows[0].id;
 
-    const existingSamId = await findExistingSAMOpp(opp);
+    const existingSamId = await findExistingSAMOpp(client, opp);
 
     if (existingSamId) {
-      const metaJson = JSON.stringify({
-        govwin_id: opp.govwinId,
-        incumbent: opp.incumbent,
-        competitors: opp.competitors,
-        govwin_source_uri: opp.sourceUri,
-      });
-
       await client.query(
         `UPDATE opportunities
          SET tags = array_append(
@@ -107,11 +101,15 @@ async function upsertOpportunity(
                'govwin_enriched'
              ),
              description = COALESCE(NULLIF($1, ''), description),
+             incumbent = COALESCE($3, incumbent),
+             incumbent_confidence = CASE WHEN $3 IS NOT NULL THEN 'high' ELSE incumbent_confidence END,
+             incumbent_source = CASE WHEN $3 IS NOT NULL THEN 'govwin' ELSE incumbent_source END,
              updated_at = NOW()
          WHERE id = $2`,
         [
           opp.description,
           existingSamId,
+          opp.incumbent,
         ],
       );
 
@@ -127,20 +125,16 @@ async function upsertOpportunity(
     }
 
     const samNoticeId = `govwin-${opp.govwinId}`;
-    const metaJson = JSON.stringify({
-      govwin_id: opp.govwinId,
-      incumbent: opp.incumbent,
-      competitors: opp.competitors,
-    });
 
     const { rows: upsertRows } = await client.query(
       `INSERT INTO opportunities (
          title, agency, sub_agency, solicitation_number,
          sam_notice_id, status, value_min, value_max, naics,
          set_aside, response_due_at, posted_at,
-         description, data_source, tags, source_id
+         description, data_source, tags, source_id,
+         incumbent, incumbent_confidence, incumbent_source
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        ON CONFLICT (sam_notice_id) DO UPDATE SET
          title               = EXCLUDED.title,
          agency              = EXCLUDED.agency,
@@ -155,6 +149,9 @@ async function upsertOpportunity(
          description         = EXCLUDED.description,
          data_source         = EXCLUDED.data_source,
          source_id           = EXCLUDED.source_id,
+         incumbent           = COALESCE(EXCLUDED.incumbent, opportunities.incumbent),
+         incumbent_confidence = CASE WHEN EXCLUDED.incumbent IS NOT NULL THEN 'high' ELSE opportunities.incumbent_confidence END,
+         incumbent_source    = CASE WHEN EXCLUDED.incumbent IS NOT NULL THEN 'govwin' ELSE opportunities.incumbent_source END,
          updated_at          = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
@@ -163,7 +160,7 @@ async function upsertOpportunity(
         opp.subAgency,
         opp.solicitationNumber,
         samNoticeId,
-        opp.status ?? 'active',
+        'discovery',
         opp.valueMin,
         opp.valueMax,
         opp.naics,
@@ -174,6 +171,9 @@ async function upsertOpportunity(
         'govwin',
         '{govwin}',
         sourceId,
+        opp.incumbent,
+        opp.incumbent ? 'high' : null,
+        opp.incumbent ? 'govwin' : null,
       ],
     );
 
