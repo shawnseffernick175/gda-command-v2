@@ -12,8 +12,4 @@ ALTER TABLE govtribe_credit_ledger
 CREATE INDEX IF NOT EXISTS idx_govtribe_ledger_caller
   ON govtribe_credit_ledger (caller);
 
-INSERT INTO schema_migrations (version, name)
-VALUES ('v3_026', 'govtribe_search_caller')
-ON CONFLICT DO NOTHING;
-
 COMMIT;
