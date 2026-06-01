@@ -22,7 +22,7 @@ export function registerGovTribeSource(): void {
     new GovTribeSolicitationAdapter(),
     'GovTribe Opportunities',
     runGovTribeOppsIngest,
-    'govtribe',
+    { frameworkKey: 'govtribe' },
   );
 
   // Sub-sources use the framework directly — they are not adapters

@@ -21,34 +21,33 @@ interface RegisteredAdapter {
 
 const adapters = new Map<string, RegisteredAdapter>();
 
+interface RegisterAdapterOpts {
+  frameworkKey?: string;
+  adapterKey?: string;
+  /** Skip the framework registerSource() bridge. Use when multiple adapters
+   *  share one framework source key (e.g. GovWin forecast + solicitation). */
+  skipFramework?: boolean;
+}
+
 /**
- * Register an adapter and bridge it into the framework registry.
- *
- * @param adapter       Concrete SourceAdapter instance
- * @param label         Human-readable label for logging
- * @param ingestFn      The existing job function that handles fetch+normalize+upsert.
- *                      Passed through to the framework so runIngest(key) still works.
- * @param frameworkKey  Override the framework registry key (e.g. 'sam.gov' vs 'sam').
- *                      Defaults to adapter.source.
- * @param adapterKey    Override the adapter map key when multiple adapters share a source
- *                      (e.g. 'govwin.forecast' vs 'govwin.solicitation').
- *                      Defaults to adapter.source.
+ * Register an adapter and (optionally) bridge it into the framework registry.
  */
 export function registerAdapter(
   adapter: SourceAdapter,
   label: string,
   ingestFn: IngestFn,
-  frameworkKey?: string,
-  adapterKey?: string,
+  opts?: RegisterAdapterOpts,
 ): void {
-  const mapKey = adapterKey ?? adapter.source;
+  const mapKey = opts?.adapterKey ?? adapter.source;
   adapters.set(mapKey, { adapter, label });
 
-  const fwKey = frameworkKey ?? adapter.source;
-  registerSource(fwKey, label, ingestFn);
+  if (!opts?.skipFramework) {
+    const fwKey = opts?.frameworkKey ?? adapter.source;
+    registerSource(fwKey, label, ingestFn);
+  }
 
   logger.debug(
-    { source: adapter.source, stage: adapter.defaultStage, frameworkKey: fwKey, adapterKey: mapKey },
+    { source: adapter.source, stage: adapter.defaultStage, adapterKey: mapKey },
     'adapter_registered',
   );
 }

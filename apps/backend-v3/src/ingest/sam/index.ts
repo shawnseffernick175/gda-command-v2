@@ -11,6 +11,6 @@ export function registerSAMSource(): void {
     new SamSolicitationAdapter(),
     'SAM.gov Solicitations',
     runSAMIngest,
-    'sam.gov',
+    { frameworkKey: 'sam.gov' },
   );
 }

@@ -16,17 +16,13 @@ export function registerGovWinSource(): void {
     new GovWinForecastAdapter(),
     'GovWin IQ Forecasts',
     runGovWinIngest,
-    'govwin',
-    'govwin.forecast',
+    { frameworkKey: 'govwin', adapterKey: 'govwin.forecast' },
   );
 
-  // Solicitation adapter shares the same framework job — register it
-  // in the adapter map only, under a separate key.
   registerAdapter(
     new GovWinSolicitationAdapter(),
     'GovWin IQ Solicitations',
     runGovWinIngest,
-    'govwin.solicitations',
-    'govwin.solicitation',
+    { adapterKey: 'govwin.solicitation', skipFramework: true },
   );
 }
