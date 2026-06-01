@@ -145,6 +145,29 @@ Output: { results: [{ title, agency, status, source_url }], warning? }
 | `AGENT_WALL_TIMEOUT_S` | agent-v3 | Wall-clock timeout per run in seconds (default: 30) |
 | `AGENT_HOURLY_COST_LIMIT_USD` | agent-v3 | Hourly cost limit in USD (default: $5) |
 
+## Dependency Pinning
+
+**Rule:** Every transitive dependency of `langgraph` must be explicitly pinned in `apps/gda-agent-v3/requirements.txt`. Floating transitive deps cause silent breakage on rebuild when PyPI publishes a new major version.
+
+### F-317 Incident (2026-06-01)
+
+**Symptom:** `gda-agent-v3` crash-looped on VPS with `ModuleNotFoundError: No module named 'langgraph._internal'`. Container restarted 12 times in 15 minutes.
+
+**Root cause:** `requirements.txt` pinned `langgraph==0.4.7` but left its transitive dependency `langgraph-prebuilt` floating. A Docker rebuild resolved `langgraph-prebuilt==1.0.1` (latest on PyPI), which imports `langgraph._internal` — a module only present in `langgraph>=0.6.x`. The 0.4.7 distribution does not contain `langgraph._internal`, so the import fails at container startup.
+
+**Fix:** Pin the four langgraph transitive deps to known-good versions verified against a local `pip install` + import test:
+
+| Package | Pinned | Reason |
+|---------|--------|--------|
+| `langgraph-prebuilt` | `==0.5.2` | Last version compatible with langgraph 0.4.7 (0.6.x+ imports `langgraph._internal`) |
+| `langgraph-checkpoint` | `==4.1.1` | Resolved from known-good build |
+| `langgraph-sdk` | `==0.3.15` | Resolved from known-good build |
+| `langchain-core` | `==0.3.86` | Resolved from known-good build |
+
+**"Say something" enforcement:** `/healthz` now reports `langgraph`, `langgraph_prebuilt`, and `langchain_core` versions in its JSON response. Monitoring can alert on version mismatches before they become user-visible crashes.
+
+**Future upgrade:** When upgrading `langgraph` to 0.6.x+, re-resolve all transitive deps, update the pins, and verify the import test passes. Consider adopting `pip-tools` or `uv` for lockfile-based dependency management (separate refactor).
+
 ## Docker Compose
 
 The `gda-agent-v3` service is defined in `docker-compose.prod.yml`:

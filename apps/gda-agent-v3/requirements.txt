@@ -2,10 +2,12 @@ fastapi==0.115.12
 uvicorn[standard]==0.34.2
 pydantic==2.11.3
 langgraph==0.4.7
-langgraph-prebuilt==0.2.3
+# --- langgraph transitive deps (pinned to prevent drift — see F-317) ---
+langgraph-prebuilt==0.5.2
 langgraph-checkpoint==4.1.1
 langgraph-sdk==0.3.15
 langchain-core==0.3.86
+# --- end langgraph transitive deps ---
 langchain-openai==0.3.18
 langchain-anthropic==0.3.18
 openai>=1.82.0

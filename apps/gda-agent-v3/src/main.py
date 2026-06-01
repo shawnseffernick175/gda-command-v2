@@ -21,6 +21,7 @@ from src.tools.registry import get_tool_schemas, list_tools
 
 
 def _pkg_version(name: str) -> str:
+    """Return installed version of *name*, or 'unknown' if missing."""
     try:
         return importlib.metadata.version(name)
     except importlib.metadata.PackageNotFoundError:
@@ -80,6 +81,7 @@ class HealthResponse(BaseModel):
     db_ready: bool
     langgraph: str
     langgraph_prebuilt: str
+    langchain_core: str
 
 
 class CancelResponse(BaseModel):
@@ -108,6 +110,7 @@ async def healthz() -> HealthResponse:
         db_ready=db_ready,
         langgraph=_pkg_version("langgraph"),
         langgraph_prebuilt=_pkg_version("langgraph-prebuilt"),
+        langchain_core=_pkg_version("langchain-core"),
     )
 
 
