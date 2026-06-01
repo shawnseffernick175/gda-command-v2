@@ -86,8 +86,16 @@ describe('MCP endpoint auth', () => {
   });
 });
 
+const EXPECTED_TOOL_NAMES = [
+  'gda_search_opportunities',
+  'gda_get_opportunity',
+  'gda_score_doctrine',
+  'gda_get_pwin',
+  'gda_query_rag',
+];
+
 describe('MCP tools/list', () => {
-  it('returns empty tools list with valid JWT via MCP client', async () => {
+  it('returns exactly 5 tools with correct names via MCP client', async () => {
     const token = makeToken();
     const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
       requestInit: {
@@ -98,7 +106,13 @@ describe('MCP tools/list', () => {
     const client = new Client({ name: 'test-client', version: '1.0.0' });
     await client.connect(transport);
     const { tools } = await client.listTools();
-    expect(tools).toEqual([]);
+    expect(tools).toHaveLength(5);
+    const names = tools.map((t) => t.name);
+    expect(names).toEqual(EXPECTED_TOOL_NAMES);
+    for (const tool of tools) {
+      expect(tool.description).toBeTruthy();
+      expect(tool.inputSchema).toBeTruthy();
+    }
     await client.close();
   });
 });
