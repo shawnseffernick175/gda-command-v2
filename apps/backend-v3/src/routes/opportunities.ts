@@ -7,6 +7,11 @@
  *   POST   /v3/opportunities       — create (manual entry, triggers pre-warm)
  *   PATCH  /v3/opportunities/:id   — update (pre-warm on analysis-affecting fields)
  *   POST   /v3/opportunities/:id/qualify — qualification with teaming flags
+ *
+ * TODO(F-405): When a route is added to write unified_opportunity_field_overrides
+ * (e.g. PATCH /v3/unified/:internal_id/override), call
+ * `invalidateMergeCache(internal_id)` from `../../services/opportunities/merge.js`
+ * after the override is persisted to keep the merge cache consistent.
  */
 
 import type { FastifyInstance } from 'fastify';

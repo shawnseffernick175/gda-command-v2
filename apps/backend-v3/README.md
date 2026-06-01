@@ -60,6 +60,39 @@ signal → forecast → pre_sol → solicitation → awarded → post_award → 
 - **Field overrides** — user corrections persist without mutating the base record.
 - **Existing per-source tables are untouched** — backfill happens in F-404.
 
+### Field Merge — Precedence Stack (F-405)
+
+`src/services/opportunities/merge.ts` exports `getMergedOpportunity(pool, internal_id)` which combines all linked source records into a single canonical view.
+
+#### Precedence stack (highest wins)
+
+| Priority | Source |
+|----------|--------|
+| 1 | `unified_opportunity_field_overrides` (human edits) |
+| 2 | GovWin source data |
+| 3 | SAM source data |
+| 4 | GovTribe source data |
+| 5 | Fast Track source data |
+
+#### Per-field rules
+
+| Field | Rule |
+|-------|------|
+| `title`, `agency`, `office`, `naics`, `psc`, `set_aside`, `award_at` | First non-null per precedence |
+| `estimated_value_cents` | GovWin > SAM > GovTribe (Fast Track skipped — unreliable for sols) |
+| `response_due_at` | SAM > GovWin > GovTribe (SAM authoritative for federal) |
+| `posted_at` | Earliest non-null across all sources |
+| `pwin` | Always from `unified_opportunities` row (never merged from sources) |
+| `doctrine_status` | Always from `unified_opportunities` row (never merged from sources) |
+
+#### Cache behavior
+
+- In-memory LRU cache with 60-second TTL per `internal_id`.
+- Cache key: `internal_id` only (merged view is global, not user-scoped).
+- Max size: 500 entries; evicts expired + LRU when exceeded.
+- `invalidateMergeCache(internal_id)` — call after writing to `unified_opportunity_field_overrides`.
+- `clearMergeCache()` — clears all entries (testing/admin use).
+
 ### Repository
 
 `src/db/repos/OpportunityRepo.ts` provides:
@@ -70,6 +103,7 @@ signal → forecast → pre_sol → solicitation → awarded → post_award → 
 - `createLink` / `findLinksByInternalId` — link management
 - `setFieldOverride` / `getFieldOverrides` — upsert overrides
 - `addSignal` / `getSignals` — signal associations
+- `getMerged(internalId)` — returns the merged opportunity view (F-405)
 
 ### TypeScript Types
 

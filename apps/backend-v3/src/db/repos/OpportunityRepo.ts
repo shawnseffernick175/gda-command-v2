@@ -19,6 +19,10 @@ import type {
   LifecycleStage,
   FindStageOptions,
 } from '../types/opportunity.js';
+import {
+  getMergedOpportunity,
+  type MergedOpportunity,
+} from '../../services/opportunities/merge.js';
 
 const UPDATABLE_FIELDS = new Set([
   'lifecycle_stage',
@@ -270,5 +274,12 @@ export class OpportunityRepo {
       [internalId],
     );
     return result.rows as OpportunitySignal[];
+  }
+
+  // ─── Merged view (F-405) ────────────────────────────────────────────────
+
+  /** Returns the merged opportunity view, combining all linked sources. */
+  async getMerged(internalId: string): Promise<MergedOpportunity | null> {
+    return getMergedOpportunity(this.pool, internalId);
   }
 }
