@@ -95,33 +95,9 @@ export async function listActionItems(
   }>;
 }
 
-export function toApiShape(row: ActionItemRow, drafts: object[] = []): object {
-  // Synchronous — thin re-export to keep tool files decoupled from backend-v3
-  const sourceRef = {
-    kind: 'internal' as const,
-    title: row.source === 'email' ? 'Email ingest' : 'Manual entry',
-    url: `/audit/edits/${row.id}`,
-    retrieved_at: new Date().toISOString(),
-  };
-  return {
-    id: row.id,
-    title: row.title,
-    title_sources: [sourceRef],
-    detail: row.detail,
-    detail_sources: row.detail ? [sourceRef] : [],
-    owner: row.owner,
-    owner_sources: [sourceRef],
-    status: row.status,
-    due_date: row.due_date,
-    due_date_sources: row.due_date ? [sourceRef] : [],
-    source: row.source,
-    linked_record_type: row.linked_record_type,
-    linked_record_id: row.linked_record_id,
-    drafts,
-    completed_at: row.completed_at,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  };
+export async function toApiShape(row: ActionItemRow, drafts: object[] = []): Promise<object> {
+  const mod = await load(ACTION_ITEMS_MODULE);
+  return mod.toApiShape(row, drafts) as object;
 }
 
 // ─── Drafts service ─────────────────────────────────────────────────────────
@@ -174,10 +150,11 @@ export async function computeLaunchpadSummary(): Promise<LaunchpadSummary> {
 
 export async function lookupSimilarDecisions(
   entityKind: string,
+  kind: string,
   limit: number,
 ): Promise<AgentDecisionRow[]> {
   const mod = await load(MEMORY_MODULE);
-  return mod.lookupSimilarDecisions(entityKind, entityKind, limit) as Promise<AgentDecisionRow[]>;
+  return mod.lookupSimilarDecisions(entityKind, kind, limit) as Promise<AgentDecisionRow[]>;
 }
 
 export async function getRecentDecisionsSummary(
