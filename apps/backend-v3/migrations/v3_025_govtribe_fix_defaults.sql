@@ -1,4 +1,4 @@
--- V3 Migration 023: GovTribe Fix Defaults (F-Govtribe-Fix #563)
+-- V3 Migration 025: GovTribe Fix Defaults (F-Govtribe-Fix #563)
 --
 -- Corrects credit_budget default from 5000 to 1200 (Shawn's actual plan).
 -- Adds 'skipped_cycle_cap' to the decision CHECK constraint.
