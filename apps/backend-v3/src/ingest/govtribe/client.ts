@@ -31,9 +31,9 @@ const ENDPOINT_CREDITS: Record<string, number> = {
   'opportunities_detail': 1,
   'agencies_contacts': 2,
   'vehicles': 1,
-  'search_opportunities': 3,
-  'search_awards': 4,
-  'search_forecasts': 3,
+  'search_opportunities': 15,
+  'search_awards': 20,
+  'search_forecasts': 15,
 };
 
 /** Cycle-level credit accumulator (reset each poll run). */
