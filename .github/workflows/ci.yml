@@ -175,6 +175,67 @@ jobs:
           fi
           echo "All compose file hashes match — no drift detected"
 
+      - name: Env-name parity — code env reads vs compose passthroughs
+        run: |
+          FAIL=0
+
+          # Extract env var names read by backend-v3 connector code (GOVTRIBE_* / GOVWIN_*)
+          CODE_ENVS_BACKEND=$(grep -rEoh "process\.env\[?['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?\]?" \
+            apps/backend-v3/src/ 2>/dev/null \
+            | grep -oE '(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)' \
+            | sort -u)
+
+          # Extract env var names read by gda-agent-v3 connector code
+          CODE_ENVS_AGENT=$(grep -rEoh "process\.env\[?['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?\]?|os\.environ\[?['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?\]?|os\.environ\.get\(['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?" \
+            apps/gda-agent-v3/src/ 2>/dev/null \
+            | grep -oE '(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)' \
+            | sort -u)
+
+          # Combine unique env names from both services
+          ALL_CODE_ENVS=$(echo -e "${CODE_ENVS_BACKEND}\n${CODE_ENVS_AGENT}" | sort -u | grep -v '^$')
+
+          if [ -z "$ALL_CODE_ENVS" ]; then
+            echo "No GOVTRIBE_*/GOVWIN_* env reads found in connector code — skipping parity check"
+            exit 0
+          fi
+
+          echo "=== Env vars read by connector code ==="
+          echo "$ALL_CODE_ENVS"
+          echo ""
+
+          # Check backend-v3 compose environment block
+          echo "=== Checking backend-v3 compose block ==="
+          for var in $ALL_CODE_ENVS; do
+            if ! grep -qE "^\s+${var}:" docker-compose.prod.yml; then
+              echo "::error::backend-v3 missing compose passthrough for ${var} (read in code but not in docker-compose.prod.yml)"
+              FAIL=1
+            else
+              echo "OK: ${var} present in compose"
+            fi
+          done
+
+          # Check gda-agent-v3 compose environment block
+          echo ""
+          echo "=== Checking gda-agent-v3 compose block ==="
+          for var in $ALL_CODE_ENVS; do
+            if ! grep -qE "^\s+${var}:" docker-compose.prod.yml; then
+              echo "::error::gda-agent-v3 missing compose passthrough for ${var} (read in code but not in docker-compose.prod.yml)"
+              FAIL=1
+            else
+              echo "OK: ${var} present in compose"
+            fi
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo ""
+            echo "::error::Connector env vars are read in code but not passed through docker-compose.prod.yml."
+            echo "Add missing vars to the environment: block of the consuming service(s)."
+            echo "See docs/v3-cognition/connector-secrets.md for the checklist."
+            exit 1
+          fi
+          echo ""
+          echo "Env-name parity check passed — all connector env vars are wired through compose"
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
