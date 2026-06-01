@@ -45,6 +45,13 @@ export async function runMigrations(opts?: {
   await client.connect();
 
   try {
+    // Bootstrap: if v3_schema_migrations exists but pgmigrations doesn't,
+    // this is a first deploy of node-pg-migrate to an existing DB.
+    // Seed pgmigrations so the runner doesn't re-apply existing migrations.
+    if (!dryRun) {
+      await bootstrapExistingDb(client);
+    }
+
     const log = (msg: string) => console.log(`  [migrate] ${msg}`);
     const warnLog = (msg: string) => {
       if (!msg.includes("Can't determine timestamp")) log(msg);
@@ -76,6 +83,57 @@ export async function runMigrations(opts?: {
   } finally {
     await client.end();
   }
+}
+
+/**
+ * First-deploy bootstrap for existing databases.
+ *
+ * Detects when node-pg-migrate is being deployed to a DB that already has
+ * v3_schema_migrations (i.e., migrations were applied manually before the
+ * managed runner existed). Creates pgmigrations and seeds it with all
+ * v3_000–v3_024 entries so `runner()` treats them as already applied.
+ */
+async function bootstrapExistingDb(client: pg.Client): Promise<void> {
+  const hasPgMigrations = await client.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'pgmigrations'
+     ) AS exists`
+  );
+  if ((hasPgMigrations.rows[0] as { exists: boolean }).exists) return;
+
+  const hasLegacy = await client.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'v3_schema_migrations'
+     ) AS exists`
+  );
+  if (!(hasLegacy.rows[0] as { exists: boolean }).exists) return;
+
+  console.log('  [migrate] Bootstrap: existing DB detected (v3_schema_migrations present, pgmigrations absent)');
+  console.log('  [migrate] Seeding pgmigrations with v3_000–v3_024 as already-applied...');
+
+  await client.query(`
+    CREATE TABLE pgmigrations (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      run_on TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.sql') && f.startsWith('v3_'))
+    .sort();
+
+  for (const file of files) {
+    const name = file.replace(/\.sql$/, '');
+    await client.query(
+      `INSERT INTO pgmigrations (name, run_on) VALUES ($1, NOW())`,
+      [name]
+    );
+  }
+
+  console.log(`  [migrate] Bootstrap complete: seeded ${files.length} entries into pgmigrations.`);
 }
 
 async function syncLegacyTracker(client: pg.Client): Promise<void> {

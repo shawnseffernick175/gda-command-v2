@@ -177,6 +177,39 @@ ensures `v3_schema_migrations` is populated for all prior versions.
 
 ---
 
+## First-Deploy Bootstrap (Staging Reconciliation)
+
+When the runner is deployed to an existing database for the first time
+(e.g., gda-postgres-staging), it auto-detects the situation:
+
+1. Checks if `pgmigrations` exists (node-pg-migrate's tracker).
+2. If **absent** but `v3_schema_migrations` **exists**, this is an existing DB.
+3. Creates `pgmigrations` and seeds all `v3_000`→`v3_024` as already-applied.
+4. The subsequent `runner()` call finds 0 pending migrations — **no-op**.
+
+This is fully automatic and idempotent. No manual SQL needed on staging.
+
+### Staging Schema Reconciliation (2026-06-01)
+
+Cross-referenced `pg_dump --schema-only` from `gda-postgres-staging` against
+all 25 canonical migrations. Results:
+
+- **89 tables** in public schema on staging.
+- **All V3 Cognition tables present**: `agent_decisions`, `agent_runs`,
+  `agent_tool_calls`, `doctrine_rules_config`, `govtribe_cache`,
+  `govtribe_credit_ledger`, `govtribe_credit_monthly`, `govwin_auth_state`,
+  `govwin_cache`, `kb_chunks`, `kb_documents`, `pwin_features`, `pwin_outcomes`,
+  `color_team_runs`, `color_team_findings`.
+- **Zero table-level drift**: every `CREATE TABLE` in the migrations has a
+  matching table on staging.
+- **Naming note**: migration file `v3_019_doctrine_rules.sql` creates
+  `doctrine_rules_config` (not `doctrine_rules`). The table name is correct;
+  only the filename is potentially misleading.
+- **`v3_schema_migrations` already existed** on staging — the original issue
+  queried for `schema_migrations` (wrong name).
+
+---
+
 ## Legacy Migration Runner
 
 The original custom runner at `db/v3/migrate.ts` is preserved but deprecated.
