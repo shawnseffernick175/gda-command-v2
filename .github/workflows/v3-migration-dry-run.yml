@@ -1,0 +1,108 @@
+name: V3 Schema Migration Dry-Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/migrations/**'
+      - 'apps/backend-v3/src/lib/migrate.ts'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/backend-v3/migrations/**'
+      - 'apps/backend-v3/src/lib/migrate.ts'
+      - 'db/v3/**'
+
+permissions:
+  contents: read
+
+jobs:
+  migration-dry-run:
+    name: Schema Migration Dry-Run
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda_ci
+          POSTGRES_PASSWORD: gda_ci_pass
+          POSTGRES_DB: gda_ci
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gda_ci -d gda_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply all migrations from scratch
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda_ci:gda_ci_pass@localhost:5433/gda_ci
+        run: npx tsx src/lib/migrate.ts
+
+      - name: Verify dry-run is clean (no pending migrations)
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda_ci:gda_ci_pass@localhost:5433/gda_ci
+        run: |
+          OUTPUT=$(npx tsx src/lib/migrate.ts --dry-run 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q "0 pending"; then
+            echo "Dry-run clean — no pending migrations."
+          else
+            echo "::error::Dry-run detected pending migrations after full apply"
+            exit 1
+          fi
+
+      - name: Verify v3_schema_migrations populated
+        env:
+          PGPASSWORD: gda_ci_pass
+        run: |
+          COUNT=$(psql -h localhost -p 5433 -U gda_ci -d gda_ci -tAc \
+            "SELECT count(*) FROM v3_schema_migrations")
+          echo "v3_schema_migrations rows: $COUNT"
+          if [ "$COUNT" -lt 24 ]; then
+            echo "::error::Expected at least 24 rows in v3_schema_migrations, got $COUNT"
+            exit 1
+          fi
+
+      - name: Verify pgmigrations populated
+        env:
+          PGPASSWORD: gda_ci_pass
+        run: |
+          COUNT=$(psql -h localhost -p 5433 -U gda_ci -d gda_ci -tAc \
+            "SELECT count(*) FROM pgmigrations")
+          echo "pgmigrations rows: $COUNT"
+          if [ "$COUNT" -lt 24 ]; then
+            echo "::error::Expected at least 24 rows in pgmigrations, got $COUNT"
+            exit 1
+          fi
+
+      - name: Verify core V3 tables exist
+        env:
+          PGPASSWORD: gda_ci_pass
+        run: |
+          TABLES=$(psql -h localhost -p 5433 -U gda_ci -d gda_ci -tAc "
+            SELECT string_agg(table_name, ',' ORDER BY table_name)
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+          ")
+          echo "Tables: $TABLES"
+          EXPECTED="sources users opportunities pipeline_items captures v3_schema_migrations pgmigrations agent_runs kb_documents color_team_runs doctrine_rules_config"
+          for t in $EXPECTED; do
+            if ! echo "$TABLES" | grep -q "$t"; then
+              echo "::error::Missing expected table: $t"
+              exit 1
+            fi
+          done
+          echo "All expected V3 tables present."

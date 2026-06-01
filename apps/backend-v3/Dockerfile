@@ -31,6 +31,13 @@ RUN npm ci --workspace=@gda/backend-v3 --include-workspace-root --omit=dev
 # Copy built artifacts
 COPY --from=builder /app/apps/backend-v3/dist/ apps/backend-v3/dist/
 
+# Copy SQL migrations (read at runtime by node-pg-migrate)
+COPY apps/backend-v3/migrations/ apps/backend-v3/migrations/
+
+# Copy entrypoint
+COPY apps/backend-v3/entrypoint.sh apps/backend-v3/entrypoint.sh
+RUN chmod +x apps/backend-v3/entrypoint.sh
+
 # Bake deploy commit SHA into image
 ARG DEPLOY_COMMIT_SHA=unknown
 ENV GIT_SHA=$DEPLOY_COMMIT_SHA
@@ -40,4 +47,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 \
   CMD wget -qO- http://127.0.0.1:4000/v3/health || exit 1
 
-CMD ["node", "apps/backend-v3/dist/server.js"]
+ENTRYPOINT ["apps/backend-v3/entrypoint.sh"]
