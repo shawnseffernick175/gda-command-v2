@@ -1,27 +1,39 @@
 /**
- * GovTribe ingest jobs — opportunities poll, contacts poll, vehicles poll,
- * and daily credit budget rollup.
+ * GovTribe ingest jobs — opportunities poll (7 saved searches), contacts poll,
+ * vehicles poll, and daily credit budget rollup.
  *
+ * Cadence: Mon + Thu 6am ET (10:00 UTC) — configured in cron/index.ts.
  * All jobs are credit-budget-aware via the govtribeFetch() client.
+ * Per-cycle cap (GOVTRIBE_CYCLE_CREDIT_CAP=150) stops mid-cycle if exceeded.
  */
 
 import { logger } from '../../lib/logger.js';
 import { pool } from '../../lib/db.js';
-import { govtribeFetch, purgeExpiredCache } from './client.js';
+import {
+  govtribeFetch,
+  purgeExpiredCache,
+  resetCycleCredits,
+  isCycleCapExceeded,
+  getCycleCreditsUsed,
+  getCycleCreditCap,
+} from './client.js';
 import { mapGovTribeOpportunity } from './mapper.js';
 import { upsertExternalOpportunity } from '../framework/source_writer.js';
+import { ingestGovTribeToRag } from './rag_sink.js';
 import type { IngestResult } from '../framework/registry.js';
 import type { GovTribeOpportunityRaw, GovTribeListResponse } from './types.js';
+import { GOVTRIBE_SAVED_SEARCHES, endpointKeyForCategory } from './saved_searches.js';
 
 const OPPS_PAGE_LIMIT = 50;
-const MAX_PAGES = 10;
 
 /**
- * govtribe.opps.poll — Pull modified opps since last run.
- * Cadence: every 8h. Credit cost: ~3-5 credits per run.
+ * govtribe.opps.poll — Runs all 7 saved searches against GovTribe MCP.
+ * Cadence: Mon + Thu 6am ET (10:00 UTC). Credit cost: ~115 credits/cycle.
  */
 export async function runGovTribeOppsIngest(): Promise<IngestResult> {
-  logger.info({ source: 'govtribe' }, 'govtribe_opps_ingest_start');
+  logger.info({ source: 'govtribe', searches: GOVTRIBE_SAVED_SEARCHES.length }, 'govtribe_opps_ingest_start');
+
+  resetCycleCredits();
 
   let inserted = 0;
   let updated = 0;
@@ -30,26 +42,41 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
   let degraded = false;
   let degradedReason: string | undefined;
 
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const cacheId = `opps_list_page_${page}`;
+  for (const search of GOVTRIBE_SAVED_SEARCHES) {
+    if (isCycleCapExceeded()) {
+      degraded = true;
+      degradedReason = `Cycle cap ${getCycleCreditCap()} exceeded (used ${getCycleCreditsUsed()}) — remaining searches skipped`;
+      logger.warn(
+        { source: 'govtribe', search: search.name, cycleUsed: getCycleCreditsUsed(), cycleCap: getCycleCreditCap() },
+        'govtribe_opps_cycle_cap_skip',
+      );
+      break;
+    }
+
+    const endpointKey = endpointKeyForCategory(search.category);
+    const queryParam = encodeURIComponent(search.keywords.join(' | '));
+    const naicsParam = encodeURIComponent(search.naicsFilter.join(','));
+    const path = `/search?tool=${search.mcpTool}&q=${queryParam}&naics=${naicsParam}&limit=${OPPS_PAGE_LIMIT}`;
+    const cacheId = `saved_search_${search.id}`;
+
     const result = await govtribeFetch<GovTribeListResponse<GovTribeOpportunityRaw>>(
-      'opportunities',
-      `/opportunities?limit=${OPPS_PAGE_LIMIT}&page=${page}`,
+      endpointKey,
+      path,
       cacheId,
     );
 
-    if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted') {
+    if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted' || result.decision === 'skipped_cycle_cap') {
       degraded = true;
-      degradedReason = `Credit budget ${result.budget_status.pct}% — ${result.decision}`;
+      degradedReason = `${search.name}: ${result.decision} (budget ${result.budget_status.pct}%, cycle ${getCycleCreditsUsed()}/${getCycleCreditCap()})`;
       logger.warn(
-        { source: 'govtribe', decision: result.decision, pct: result.budget_status.pct },
+        { source: 'govtribe', search: search.name, decision: result.decision },
         'govtribe_opps_budget_skip',
       );
       break;
     }
 
     const opps = result.data?.data ?? [];
-    if (opps.length === 0) break;
+    if (opps.length === 0) continue;
 
     totalFetched += opps.length;
 
@@ -65,6 +92,14 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
         if (outcome === 'inserted') inserted++;
         else if (outcome === 'updated') updated++;
         else skipped++;
+
+        // RAG sink: write to kb_documents with doc_kind='govtribe', evidence_grade='B'
+        await ingestGovTribeToRag(raw, search.name).catch((err) => {
+          logger.error(
+            { source: 'govtribe', govtribeId: raw._id ?? raw.id, error: err instanceof Error ? err.message : String(err) },
+            'govtribe_rag_sink_error',
+          );
+        });
       } catch (err) {
         skipped++;
         logger.error(
@@ -77,13 +112,10 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
         );
       }
     }
-
-    const hasMore = result.data?.meta?.hasMore ?? (opps.length === OPPS_PAGE_LIMIT);
-    if (!hasMore) break;
   }
 
   logger.info(
-    { source: 'govtribe', totalFetched, inserted, updated, skipped },
+    { source: 'govtribe', totalFetched, inserted, updated, skipped, cycleCredits: getCycleCreditsUsed() },
     'govtribe_opps_ingest_complete',
   );
 
@@ -110,7 +142,7 @@ async function upsertGovTribeOpp(
 
 /**
  * govtribe.contacts.poll — Per-agency contact moves for OU3 target list.
- * Cadence: weekly Mon 05:00 ET. Credit cost: ~20 credits.
+ * Cadence: weekly Mon 09:00 UTC. Credit cost: ~20 credits.
  */
 export async function runGovTribeContactsIngest(): Promise<IngestResult> {
   logger.info({ source: 'govtribe' }, 'govtribe_contacts_ingest_start');
@@ -134,7 +166,7 @@ export async function runGovTribeContactsIngest(): Promise<IngestResult> {
       cacheId,
     );
 
-    if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted') {
+    if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted' || result.decision === 'skipped_cycle_cap') {
       logger.warn(
         { source: 'govtribe', agency: agencyName, decision: result.decision },
         'govtribe_contacts_budget_skip',
@@ -172,7 +204,7 @@ export async function runGovTribeVehiclesIngest(): Promise<IngestResult> {
     cacheId,
   );
 
-  if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted') {
+  if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted' || result.decision === 'skipped_cycle_cap') {
     logger.warn(
       { source: 'govtribe', decision: result.decision },
       'govtribe_vehicles_budget_skip',

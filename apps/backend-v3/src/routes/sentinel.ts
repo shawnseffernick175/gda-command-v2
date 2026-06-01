@@ -41,18 +41,18 @@ function deriveSentinelMessage(
     : 'No polls yet.';
 
   if (pct >= 95) {
-    return `GovTribe at ${pct}% of budget — STOPPED auto-polling. Only opp detail on user request. ${lagMsg}`;
+    return `GovTribe at ${pct}% of 1200/mo budget — STOPPED auto-polling. Only opp detail on user request. ${lagMsg}`;
   }
   if (pct >= 80) {
     const now = new Date();
     const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
-    return `GovTribe at ${pct}% of budget — ${daysLeft} days left in month. Restricting to on-demand calls only. ${lagMsg}`;
+    return `GovTribe at ${pct}% of 1200/mo budget — ${daysLeft} days left in month. Restricting to on-demand calls only. ${lagMsg}`;
   }
   if (pct >= 50) {
-    return `GovTribe at ${pct}% of monthly credit budget — pacing on track. ${lagMsg}`;
+    return `GovTribe at ${pct}% of 1200/mo credit budget — pacing on track. ${lagMsg}`;
   }
 
-  return `GovTribe at ${pct}% of monthly credit budget. ${lagMsg}`;
+  return `GovTribe at ${pct}% of 1200/mo credit budget. ${lagMsg}`;
 }
 
 function deriveSeverity(pct: number): 'ok' | 'warning' | 'critical' {
@@ -68,7 +68,7 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
 
     const ingestMap = new Map(ingestStatus.map((s) => [s.source_key, s]));
 
-    let govtribeBudget = { credits_used: 0, credits_budget: 5000, pct: 0, last_call_at: null as string | null };
+    let govtribeBudget = { credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null as string | null };
     try {
       govtribeBudget = await getCreditBudgetStatus();
     } catch {

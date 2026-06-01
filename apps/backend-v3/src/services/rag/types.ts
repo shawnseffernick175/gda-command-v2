@@ -14,6 +14,7 @@ export type DocType =
   | 'meeting_transcript'
   | 'sow'
   | 'awarded_contract'
+  | 'govtribe'
   | 'other';
 
 export type OuTag = 'gda' | 'envision' | 'pds' | 'riverstone';
