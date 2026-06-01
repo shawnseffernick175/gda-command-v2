@@ -1,4 +1,4 @@
--- V3 Migration 017: Decision Memory + PWin Model tables (F-302)
+-- V3 Migration 019: Decision Memory + PWin Model tables (F-302)
 --
 -- Creates:
 --   1. agent_decisions — every qualify/kill/team/win/loss decision with rationale
