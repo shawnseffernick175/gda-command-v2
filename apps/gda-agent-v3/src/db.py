@@ -64,6 +64,34 @@ async def check_db() -> bool:
         return False
 
 
+async def check_rag() -> tuple[bool, int]:
+    """Return (rag_ready, chunk_count).
+
+    rag_ready is True when the pgvector extension is installed AND
+    the v3_rag_chunks table contains at least one row.
+    """
+    try:
+        pool = await get_pool()
+        async with pool.connection() as conn:
+            row = await conn.execute(
+                "SELECT EXISTS("
+                "  SELECT 1 FROM pg_extension WHERE extname = 'vector'"
+                ") AS pgvector_ok"
+            )
+            ext = await row.fetchone()
+            pgvector_ok: bool = ext["pgvector_ok"] if ext else False
+
+            row = await conn.execute(
+                "SELECT COUNT(*)::int AS cnt FROM v3_rag_chunks"
+            )
+            cnt_row = await row.fetchone()
+            chunk_count: int = cnt_row["cnt"] if cnt_row else 0
+
+            return (pgvector_ok and chunk_count >= 1, chunk_count)
+    except Exception:
+        return (False, 0)
+
+
 async def insert_agent_run(
     run_id: uuid.UUID,
     task: str,

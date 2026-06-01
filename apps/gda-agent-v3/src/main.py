@@ -15,7 +15,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from src.agent import cancel_run, run_agent
 from src.config import OPENAI_API_KEY, ANTHROPIC_API_KEY
-from src.db import check_db, close_pool, get_daily_usage, get_run_trace
+from src.db import check_db, check_rag, close_pool, get_daily_usage, get_run_trace
 from src.middleware.auth import require_service_token
 from src.tools.registry import get_tool_schemas, list_tools
 
@@ -77,6 +77,7 @@ class HealthResponse(BaseModel):
     tools: list[str]
     models_available: list[str]
     rag_ready: bool
+    rag_chunk_count: int
     db_ready: bool
     langgraph: str
     langgraph_prebuilt: str
@@ -93,6 +94,7 @@ class CancelResponse(BaseModel):
 @app.get("/healthz", response_model=HealthResponse)
 async def healthz() -> HealthResponse:
     db_ready = await check_db()
+    rag_ready, rag_chunk_count = await check_rag()
     models: list[str] = []
     if OPENAI_API_KEY:
         models.extend(["openai:gpt-4o", "openai:gpt-5"])
@@ -104,7 +106,8 @@ async def healthz() -> HealthResponse:
         ready=db_ready,
         tools=list_tools(),
         models_available=models,
-        rag_ready=False,  # F-301 not yet deployed
+        rag_ready=rag_ready,
+        rag_chunk_count=rag_chunk_count,
         db_ready=db_ready,
         langgraph=_pkg_version("langgraph"),
         langgraph_prebuilt=_pkg_version("langgraph-prebuilt"),
