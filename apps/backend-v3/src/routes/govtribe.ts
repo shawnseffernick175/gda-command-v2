@@ -265,4 +265,76 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
       );
     },
   );
+
+  /**
+   * POST /v3/govtribe/search
+   * Agent-facing search proxy. Calls Search_Federal_Contract_Opportunities MCP tool.
+   * Credit-budget + cache + cycle cap enforced via mcpCallTool.
+   * Body: { query, agency?, naics?, posted_within?, max_results? }
+   */
+  app.post('/v3/govtribe/search', async (req, reply) => {
+    const body = req.body as {
+      query?: string;
+      agency?: string;
+      naics?: string[];
+      posted_within?: string;
+      max_results?: number;
+    };
+
+    const query = body.query ?? '';
+    if (!query) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'query is required', req.requestId),
+      );
+    }
+
+    const maxResults = Math.min(body.max_results ?? 25, 100);
+
+    const mcpArgs: Record<string, unknown> = {
+      query,
+      per_page: maxResults,
+    };
+
+    if (body.posted_within) {
+      const match = body.posted_within.match(/^(\d+)d$/);
+      if (match) {
+        const days = parseInt(match[1], 10);
+        const from = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+        mcpArgs['posted_date'] = { from };
+      }
+    }
+
+    if (body.naics && body.naics.length > 0) {
+      mcpArgs['naics_category_ids'] = body.naics;
+    }
+
+    const cacheId = `agent_search_${Buffer.from(JSON.stringify({ query, agency: body.agency, naics: body.naics, posted_within: body.posted_within, max_results: maxResults })).toString('base64').slice(0, 64)}`;
+
+    try {
+      const result = await mcpCallTool(
+        'Search_Federal_Contract_Opportunities',
+        mcpArgs,
+        cacheId,
+      );
+
+      return reply.send(
+        successEnvelope(
+          {
+            results: result.data,
+            from_cache: result.from_cache,
+            decision: result.decision,
+            credits_used: result.credits_used,
+            budget: result.budget_status,
+          },
+          req.requestId,
+        ),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ source: 'govtribe', error: message }, 'govtribe_search_error');
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', `GovTribe search failed: ${message}`, req.requestId),
+      );
+    }
+  });
 }

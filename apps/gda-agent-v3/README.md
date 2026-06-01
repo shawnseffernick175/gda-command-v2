@@ -27,7 +27,7 @@ Sandboxed agent runtime service for GDA Command V3 — the "brain" that every ag
 | POST | `/agent/cancel/{run_id}` | `AGENT_SERVICE_TOKEN` | Cancel running task |
 | GET | `/agent/usage/daily` | `AGENT_SERVICE_TOKEN` | Daily cost rollup |
 
-## Tool Registry (11 tools)
+## Tool Registry (12 tools)
 
 | Tool | Backing System | Status |
 |------|---------------|--------|
@@ -42,6 +42,7 @@ Sandboxed agent runtime service for GDA Command V3 — the "brain" that every ag
 | `file_read` | gda-backend-v3 file store | Live |
 | `pwin_score` | F-302 PWin model | Stub |
 | `govwin_search` | GovWin IQ | Stub (no crash) |
+| `govtribe_search` | GovTribe MCP (F-323) | Live (credit-budgeted) |
 
 ## Environment Variables
 
