@@ -1,50 +1,74 @@
 -- V3 Migration 019: Decision Memory + PWin Model tables (F-302)
 --
+-- Extends:
+--   1. agent_decisions (created by v3_018) — adds entity_kind/entity_id, outcome columns,
+--      decision-memory fields, constraints, and indices for F-302 decision memory.
 -- Creates:
---   1. agent_decisions — every qualify/kill/team/win/loss decision with rationale
 --   2. pwin_features   — feature vector snapshots for scored opportunities
 --   3. pwin_outcomes   — win/loss labels joined to features for training
 --   4. pwin_model_versions — versioned PWin models (rules → logistic → XGB)
 --
--- Idempotent: uses IF NOT EXISTS on tables and indices.
+-- Idempotent: uses IF NOT EXISTS / ADD COLUMN IF NOT EXISTS throughout.
 -- Reversible: see DOWN section at bottom (commented).
 
--- 1. agent_decisions
-CREATE TABLE IF NOT EXISTS agent_decisions (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  kind          TEXT NOT NULL,
-  entity_kind   TEXT NOT NULL,
-  entity_id     UUID NOT NULL,
-  rationale     TEXT NOT NULL CHECK (rationale <> ''),
-  evidence_refs JSONB NOT NULL DEFAULT '[]',
-  doctrine_alignment_score INT,
-  exclusion_triggers       JSONB,
-  margin_check             JSONB,
-  made_by       TEXT NOT NULL,
-  made_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  outcome       TEXT,
-  outcome_recorded_at   TIMESTAMPTZ,
-  outcome_evidence_refs JSONB,
-  parent_decision_id UUID REFERENCES agent_decisions(id),
-  agent_run_id       UUID,
-  CONSTRAINT agent_decisions_kind_check CHECK (
-    kind = ANY (ARRAY[
-      'qualify','kill','pass','bid','no_bid',
-      'team_with','avoid_team','win','loss',
-      'withdraw','exclusion_override'
-    ])
-  ),
-  CONSTRAINT agent_decisions_entity_kind_check CHECK (
-    entity_kind = ANY (ARRAY[
-      'opportunity','pursuit','capture','partner',
-      'document','pipeline_item'
-    ])
-  ),
-  CONSTRAINT agent_decisions_outcome_check CHECK (
-    outcome IS NULL OR outcome = ANY (ARRAY['won','lost','withdrawn','no_award'])
-  )
-);
+-- 1. Extend agent_decisions (already created by v3_018_doctrine_rules.sql)
+--    v3_018 schema: id, opportunity_id, kind, rationale, evidence_refs, decided_by, decided_at
+--    F-302 adds: entity_kind, entity_id, made_by, made_at, outcome tracking, constraints, etc.
 
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS entity_kind TEXT;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS entity_id UUID;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS made_by TEXT;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS made_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS doctrine_alignment_score INT;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS exclusion_triggers JSONB;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS margin_check JSONB;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS outcome TEXT;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS outcome_recorded_at TIMESTAMPTZ;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS outcome_evidence_refs JSONB;
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS parent_decision_id UUID REFERENCES agent_decisions(id);
+ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS agent_run_id UUID;
+
+-- Backfill entity_kind/entity_id from opportunity_id for existing rows
+UPDATE agent_decisions
+  SET entity_kind = 'opportunity',
+      entity_id = opportunity_id,
+      made_by = decided_by,
+      made_at = decided_at
+WHERE entity_kind IS NULL AND opportunity_id IS NOT NULL;
+
+-- Add constraints (use DO block to make idempotent)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agent_decisions_kind_check') THEN
+    ALTER TABLE agent_decisions ADD CONSTRAINT agent_decisions_kind_check CHECK (
+      kind = ANY (ARRAY[
+        'qualify','kill','pass','bid','no_bid',
+        'team_with','avoid_team','win','loss',
+        'withdraw','exclusion_override'
+      ])
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agent_decisions_entity_kind_check') THEN
+    ALTER TABLE agent_decisions ADD CONSTRAINT agent_decisions_entity_kind_check CHECK (
+      entity_kind IS NULL OR entity_kind = ANY (ARRAY[
+        'opportunity','pursuit','capture','partner',
+        'document','pipeline_item'
+      ])
+    );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agent_decisions_outcome_check') THEN
+    ALTER TABLE agent_decisions ADD CONSTRAINT agent_decisions_outcome_check CHECK (
+      outcome IS NULL OR outcome = ANY (ARRAY['won','lost','withdrawn','no_award'])
+    );
+  END IF;
+END $$;
+
+-- Indices
 CREATE INDEX IF NOT EXISTS agent_decisions_entity
   ON agent_decisions(entity_kind, entity_id);
 CREATE INDEX IF NOT EXISTS agent_decisions_made_at
@@ -154,9 +178,18 @@ VALUES (
 ON CONFLICT (version) DO NOTHING;
 
 -- === DOWN (rollback) ===
--- BEGIN;
 -- DROP TABLE IF EXISTS pwin_outcomes;
 -- DROP TABLE IF EXISTS pwin_model_versions;
 -- DROP TABLE IF EXISTS pwin_features;
--- DROP TABLE IF EXISTS agent_decisions;
--- COMMIT;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS entity_kind;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS entity_id;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS made_by;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS made_at;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS doctrine_alignment_score;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS exclusion_triggers;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS margin_check;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS outcome;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS outcome_recorded_at;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS outcome_evidence_refs;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS parent_decision_id;
+-- ALTER TABLE agent_decisions DROP COLUMN IF EXISTS agent_run_id;
