@@ -9,8 +9,6 @@
 -- Idempotent: uses IF NOT EXISTS on tables and indices.
 -- Reversible: see DOWN section at bottom (commented).
 
-BEGIN;
-
 -- 1. agent_decisions
 CREATE TABLE IF NOT EXISTS agent_decisions (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -154,8 +152,6 @@ VALUES (
   'Initial rules-based PWin scorer — F-302'
 )
 ON CONFLICT (version) DO NOTHING;
-
-COMMIT;
 
 -- === DOWN (rollback) ===
 -- BEGIN;
