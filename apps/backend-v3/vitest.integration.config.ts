@@ -10,9 +10,7 @@ export default defineConfig({
     hookTimeout: 120_000,
     globalSetup: ['tests/integration/setup.ts'],
     pool: 'forks',
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    maxWorkers: 1,
     sequence: { concurrent: false },
   },
 });

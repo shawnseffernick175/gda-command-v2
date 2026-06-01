@@ -102,7 +102,7 @@ export function PwinBreakdown({ opportunityId }: PwinBreakdownProps) {
 
   const { score: pwinScore, model_version, feature_weights, top_drivers, confidence } = score.data;
 
-  const narrative = buildNarrative(pwinScore, top_drivers);
+  const narrative = buildNarrative(pwinScore, top_drivers ?? []);
 
   const modelSourceRef: SourceRef[] = [{
     kind: 'internal',
@@ -132,13 +132,13 @@ export function PwinBreakdown({ opportunityId }: PwinBreakdownProps) {
         data-testid="source-link-pwin-narrative"
       />
 
-      <DriversList drivers={top_drivers} />
+      <DriversList drivers={top_drivers ?? []} />
 
       <div className="flex flex-col gap-0.5" data-testid="pwin-contributions">
         <h4 className="text-xs uppercase tracking-[0.04em] text-ink-muted font-semibold mb-1">
           Score Breakdown
         </h4>
-        {feature_weights
+        {(feature_weights ?? [])
           .filter((c) => c.name !== 'base')
           .map((c) => (
             <ContributionBar key={c.name} contribution={c} />
