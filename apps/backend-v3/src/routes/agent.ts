@@ -77,7 +77,11 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         bodyTimeout: 10_000,
       });
       const body = await res.body.json();
-      return reply.status(res.statusCode).send(successEnvelope(body, traceId));
+      return reply.status(res.statusCode).send(
+        res.statusCode === 200
+          ? successEnvelope(body, traceId)
+          : errorEnvelope('INTERNAL_ERROR', 'Agent tools request failed', traceId),
+      );
     } catch (err) {
       logger.error({ err }, 'agent-v3 /agent/tools proxy failed');
       return reply.status(502).send(
@@ -118,7 +122,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       reply.raw.end();
     } catch (err) {
       logger.error({ err }, 'agent-v3 /agent/run proxy failed');
-      if (!reply.sent) {
+      if (!reply.raw.headersSent) {
         return reply.status(502).send(
           errorEnvelope('INTERNAL_ERROR', 'Agent runtime unreachable', traceId),
         );
