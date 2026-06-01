@@ -59,6 +59,9 @@ jobs:
           echo "$OUTPUT"
           if echo "$OUTPUT" | grep -q "0 pending"; then
             echo "Dry-run clean — no pending migrations."
+          else
+            echo "::error::Dry-run detected pending migrations after full apply"
+            exit 1
           fi
 
       - name: Verify v3_schema_migrations populated
@@ -95,7 +98,7 @@ jobs:
             WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
           ")
           echo "Tables: $TABLES"
-          EXPECTED="sources users opportunities pipeline_items captures v3_schema_migrations pgmigrations agent_runs kb_documents color_team_runs doctrine_rules"
+          EXPECTED="sources users opportunities pipeline_items captures v3_schema_migrations pgmigrations agent_runs kb_documents color_team_runs doctrine_rules_config"
           for t in $EXPECTED; do
             if ! echo "$TABLES" | grep -q "$t"; then
               echo "::error::Missing expected table: $t"
