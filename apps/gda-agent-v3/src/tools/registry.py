@@ -17,6 +17,7 @@ from src.tools.schemas import (
     FileReadInput, FileReadOutput,
     PwinScoreInput, PwinScoreOutput,
     GovwinSearchInput, GovwinSearchOutput,
+    GovtribeSearchInput, GovtribeSearchOutput,
 )
 from src.tools.sam_search import sam_search
 from src.tools.usaspending_search import usaspending_search
@@ -29,6 +30,7 @@ from src.tools.decision_memory import decision_memory_lookup
 from src.tools.file_read import file_read
 from src.tools.pwin_score import pwin_score
 from src.tools.govwin_search import govwin_search
+from src.tools.govtribe_search import govtribe_search
 
 
 class ToolDef:
@@ -124,6 +126,11 @@ _register(
     "govwin_search",
     "Search GovWin IQ for government contract intelligence",
     GovwinSearchInput, GovwinSearchOutput, govwin_search,
+)
+_register(
+    "govtribe_search",
+    "Search GovTribe for federal contract opportunities (MCP-backed, credit-budgeted)",
+    GovtribeSearchInput, GovtribeSearchOutput, govtribe_search,
 )
 
 
