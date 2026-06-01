@@ -15,6 +15,8 @@ class TestHealthz:
         assert len(body["tools"]) == 11
         assert "models_available" in body
         assert "rag_ready" in body
+        assert "rag_chunk_count" in body
+        assert isinstance(body["rag_chunk_count"], int)
         assert "db_ready" in body
         assert body["langgraph"] == "0.4.7"
         assert body["langgraph_prebuilt"] == "0.2.3"
