@@ -12,6 +12,14 @@ import type {
   DoctrineEvaluation,
   PwinScoreResult,
   SearchResult,
+  ActionItemRow,
+  ActionItemListFilters,
+  PipelineResult,
+  PipelineListFilters,
+  ColorTeamRunRow,
+  AgentDecisionRow,
+  LaunchpadSummary,
+  DraftRow,
 } from './service-types.js';
 
 /**
@@ -29,6 +37,12 @@ const MERGE_MODULE = '@gda/backend-v3/dist/services/opportunities/merge.js';
 const DOCTRINE_MODULE = '@gda/backend-v3/dist/services/doctrine/evaluate.js';
 const PWIN_MODULE = '@gda/backend-v3/dist/services/pwin/index.js';
 const RAG_MODULE = '@gda/backend-v3/dist/services/rag/index.js';
+const ACTION_ITEMS_MODULE = '@gda/backend-v3/dist/services/action-items/index.js';
+const DRAFTS_MODULE = '@gda/backend-v3/dist/services/drafts/index.js';
+const PIPELINE_MODULE = '@gda/backend-v3/dist/services/pipeline/index.js';
+const COLOR_TEAMS_MODULE = '@gda/backend-v3/dist/services/color-teams/index.js';
+const LAUNCHPAD_MODULE = '@gda/backend-v3/dist/services/launchpad/summary.js';
+const MEMORY_MODULE = '@gda/backend-v3/dist/services/memory/index.js';
 
 // ─── Merge service (F-405) ──────────────────────────────────────────────────
 
@@ -65,4 +79,88 @@ export async function ragSearch(opts: {
 }): Promise<SearchResult[]> {
   const mod = await load(RAG_MODULE);
   return mod.search(opts) as Promise<SearchResult[]>;
+}
+
+// ─── Action Items service ───────────────────────────────────────────────────
+
+export async function listActionItems(
+  _pool: pg.Pool,
+  filters: ActionItemListFilters,
+): Promise<{ items: ActionItemRow[]; hasMore: boolean; cursor: string | null }> {
+  const mod = await load(ACTION_ITEMS_MODULE);
+  return mod.listActionItems(filters) as Promise<{
+    items: ActionItemRow[];
+    hasMore: boolean;
+    cursor: string | null;
+  }>;
+}
+
+export async function toApiShape(row: ActionItemRow, drafts: object[] = []): Promise<object> {
+  const mod = await load(ACTION_ITEMS_MODULE);
+  return mod.toApiShape(row, drafts) as object;
+}
+
+// ─── Drafts service ─────────────────────────────────────────────────────────
+
+export async function getDraftsByActionItem(
+  _pool: pg.Pool,
+  actionItemId: string,
+): Promise<DraftRow[]> {
+  const mod = await load(DRAFTS_MODULE);
+  return mod.getDraftsByActionItem(actionItemId) as Promise<DraftRow[]>;
+}
+
+// ─── Pipeline service ───────────────────────────────────────────────────────
+
+export async function listPipelineItems(
+  filters: PipelineListFilters,
+): Promise<PipelineResult> {
+  const mod = await load(PIPELINE_MODULE);
+  return mod.listPipelineItems(filters) as Promise<PipelineResult>;
+}
+
+// ─── Color Teams service ────────────────────────────────────────────────────
+
+export async function isColorTeamEnabled(pool: pg.Pool): Promise<boolean> {
+  const mod = await load(COLOR_TEAMS_MODULE);
+  return mod.isColorTeamEnabled(pool) as Promise<boolean>;
+}
+
+export async function createColorTeamRun(
+  pool: pg.Pool,
+  opts: { document_id: string; colors: string[]; triggered_by: string },
+): Promise<ColorTeamRunRow> {
+  const mod = await load(COLOR_TEAMS_MODULE);
+  return mod.createRun(pool, opts) as Promise<ColorTeamRunRow>;
+}
+
+export async function executeColorTeamRun(pool: pg.Pool, runId: string): Promise<void> {
+  const mod = await load(COLOR_TEAMS_MODULE);
+  return mod.executeColorTeamRun(pool, runId) as Promise<void>;
+}
+
+// ─── Launchpad service ──────────────────────────────────────────────────────
+
+export async function computeLaunchpadSummary(): Promise<LaunchpadSummary> {
+  const mod = await load(LAUNCHPAD_MODULE);
+  return mod.computeSummary() as Promise<LaunchpadSummary>;
+}
+
+// ─── Memory service ─────────────────────────────────────────────────────────
+
+export async function lookupSimilarDecisions(
+  entityKind: string,
+  kind: string,
+  limit: number,
+): Promise<AgentDecisionRow[]> {
+  const mod = await load(MEMORY_MODULE);
+  return mod.lookupSimilarDecisions(entityKind, kind, limit) as Promise<AgentDecisionRow[]>;
+}
+
+export async function getRecentDecisionsSummary(
+  days: number,
+  limit: number,
+): Promise<AgentDecisionRow[]> {
+  const mod = await load(MEMORY_MODULE);
+  return mod.getRecentDecisionsSummary(days, limit) as Promise<AgentDecisionRow[]>;
 }

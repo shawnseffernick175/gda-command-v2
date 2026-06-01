@@ -106,3 +106,119 @@ export interface SearchResult {
   section_title: string | null;
   score: number;
 }
+
+// ─── action-items/index.ts ──────────────────────────────────────────────────
+
+export interface ActionItemRow {
+  id: string;
+  title: string;
+  detail: string | null;
+  owner: string;
+  status: 'open' | 'in_progress' | 'done';
+  due_date: string | null;
+  source: string;
+  source_id: string | null;
+  linked_record_type: string | null;
+  linked_record_id: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ActionItemListFilters {
+  status?: string;
+  owner?: string;
+  source?: string;
+  linked_record_type?: string;
+  limit: number;
+  cursor?: string;
+}
+
+// ─── drafts/index.ts ────────────────────────────────────────────────────────
+
+export interface DraftRow {
+  id: number;
+  action_item_id: number;
+  kind: string;
+  content: string;
+  model_used: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  source_id: number;
+  status: string;
+  created_at: string;
+}
+
+// ─── pipeline/types.ts ──────────────────────────────────────────────────────
+
+export interface PipelineListFilters {
+  capture_owner?: string;
+  opportunity_agency?: string;
+  opportunity_naics?: string;
+  opportunity_set_aside?: string;
+  due_after?: string;
+  due_before?: string;
+  limit: number;
+  cursor?: string;
+}
+
+export interface PipelineResult {
+  items: object[];
+  pagination: {
+    limit: number;
+    cursor: string | null;
+    hasMore: boolean;
+  };
+}
+
+// ─── color-teams/types.ts ───────────────────────────────────────────────────
+
+export interface ColorTeamRunRow {
+  id: string;
+  document_id: string;
+  linked_rfp_id: string | null;
+  colors: string[];
+  status: string;
+  triggered_by: string;
+  started_at: string;
+  completed_at: string | null;
+  error_message: string | null;
+  source_id: string | null;
+  created_at: string;
+}
+
+// ─── launchpad/summary.ts ───────────────────────────────────────────────────
+
+export interface LaunchpadSummary {
+  qualified_due_this_week: number;
+  qualified_due_this_week_sources: object[];
+  pipeline_no_capture: number;
+  pipeline_no_capture_sources: object[];
+  captures_color_review_stale: number;
+  captures_color_review_stale_sources: object[];
+  action_items_open_today: number;
+  action_items_open_today_sources: object[];
+  action_items_overdue: number;
+  action_items_overdue_sources: object[];
+}
+
+// ─── memory/types.ts ────────────────────────────────────────────────────────
+
+export interface AgentDecisionRow {
+  id: string;
+  kind: string;
+  entity_kind: string;
+  entity_id: string;
+  rationale: string;
+  evidence_refs: object[];
+  doctrine_alignment_score: number | null;
+  exclusion_triggers: object[] | null;
+  margin_check: object | null;
+  made_by: string;
+  made_at: string;
+  outcome: string | null;
+  outcome_recorded_at: string | null;
+  outcome_evidence_refs: object[] | null;
+  parent_decision_id: string | null;
+  agent_run_id: string | null;
+}
