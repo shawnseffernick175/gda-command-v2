@@ -4,6 +4,7 @@
   "workspaces": [
     "packages/shared",
     "apps/backend-v3",
+    "apps/gda-mcp-server",
     "packages/frontend-v3"
   ],
   "scripts": {
