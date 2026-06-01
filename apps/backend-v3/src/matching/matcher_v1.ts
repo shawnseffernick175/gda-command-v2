@@ -108,6 +108,9 @@ export class MatcherV1 {
     if (record.sourceNativeId) {
       this.byNoticeId.set(this.normalizeKey(record.sourceNativeId), record);
     }
+    if (record.solicitationNumber) {
+      this.byNoticeId.set(this.normalizeKey(record.solicitationNumber), record);
+    }
     if (record.solicitationNumber && record.agency) {
       const key = this.solAgencyKey(record.solicitationNumber, record.agency);
       this.bySolAgency.set(key, record);
@@ -135,6 +138,7 @@ export class MatcherV1 {
   }
 
   private findHigh(n: NormalizedOpportunity): MatchCandidate | null {
+    // Match on solicitation_number shared across sources (e.g. SAM sol# = GovTribe sol#)
     if (n.solicitationNumber && n.agency) {
       const key = this.solAgencyKey(n.solicitationNumber, n.agency);
       const existing = this.bySolAgency.get(key);
@@ -143,6 +147,32 @@ export class MatcherV1 {
           internalId: existing.internalId,
           confidence: 'HIGH',
           matchMethod: 'exact_sol_agency',
+          score: 1.0,
+        };
+      }
+    }
+
+    // Match on solicitation_number appearing as another source's native ID
+    if (n.solicitationNumber) {
+      const existing = this.byNoticeId.get(this.normalizeKey(n.solicitationNumber));
+      if (existing && existing.source !== n.source) {
+        return {
+          internalId: existing.internalId,
+          confidence: 'HIGH',
+          matchMethod: 'exact_notice_id',
+          score: 1.0,
+        };
+      }
+    }
+
+    // Match on this record's native ID already indexed from another source
+    if (n.sourceNativeId) {
+      const existing = this.byNoticeId.get(this.normalizeKey(n.sourceNativeId));
+      if (existing && existing.source !== n.source) {
+        return {
+          internalId: existing.internalId,
+          confidence: 'HIGH',
+          matchMethod: 'exact_notice_id',
           score: 1.0,
         };
       }

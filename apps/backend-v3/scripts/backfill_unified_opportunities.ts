@@ -218,19 +218,28 @@ async function processRow(
     if (candidate.confidence === 'HIGH') stats.totalHighLinks++;
     else stats.totalMediumLinks++;
   } else {
-    // Create new unified opportunity + primary link
+    // Create new unified opportunity + primary link (transactional)
     const internalId = uuidv4();
-
-    await insertUnifiedOpportunity(pool, internalId, normalized);
-    await insertLink(pool, {
-      internalId,
-      source: normalized.source,
-      sourceNativeId: normalized.sourceNativeId,
-      confidence: 'HIGH',
-      matchMethod: 'new_internal',
-      confirmedBy: 'system',
-      confirmedAt: new Date().toISOString(),
-    });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await insertUnifiedOpportunity(client, internalId, normalized);
+      await insertLink(client, {
+        internalId,
+        source: normalized.source,
+        sourceNativeId: normalized.sourceNativeId,
+        confidence: 'HIGH',
+        matchMethod: 'new_internal',
+        confirmedBy: 'system',
+        confirmedAt: new Date().toISOString(),
+      });
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
 
     stats.totalUnifiedCreated++;
     stats.totalHighLinks++;
@@ -326,8 +335,10 @@ interface LinkRow {
   confirmedAt: string | null;
 }
 
-async function insertLink(pool: pg.Pool, link: LinkRow): Promise<void> {
-  await pool.query(
+type Queryable = { query: pg.Pool['query'] };
+
+async function insertLink(db: Queryable, link: LinkRow): Promise<void> {
+  await db.query(
     `INSERT INTO opportunity_links
        (internal_id, source, source_native_id, confidence, match_method,
         matched_at, confirmed_by, confirmed_at)
@@ -346,7 +357,7 @@ async function insertLink(pool: pg.Pool, link: LinkRow): Promise<void> {
 }
 
 async function insertUnifiedOpportunity(
-  pool: pg.Pool,
+  db: Queryable,
   internalId: string,
   n: {
     lifecycleStage: string;
@@ -363,7 +374,7 @@ async function insertUnifiedOpportunity(
     awardAt: string | null;
   },
 ): Promise<void> {
-  await pool.query(
+  await db.query(
     `INSERT INTO opportunities_unified
        (internal_id, lifecycle_stage, primary_source, title, agency, office,
         naics, psc, set_aside, estimated_value_cents, posted_at,
