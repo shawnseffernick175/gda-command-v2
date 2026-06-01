@@ -17,20 +17,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy backend to prod
+  # ── F-315c: Explicit CI gate ──────────────────────────────────────────
+  ci-gate:
+    name: CI gate
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      statuses: write
-    # Only deploy when CI succeeded (workflow_run) or on manual trigger
+    timeout-minutes: 2
+    outputs:
+      deploy_sha: ${{ steps.sha.outputs.sha }}
+      author: ${{ steps.meta.outputs.author }}
+      files_summary: ${{ steps.meta.outputs.files_summary }}
+    # Gate: only proceed when CI succeeded (workflow_run) or on manual trigger
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success')
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
 
       - name: Resolve deploy SHA
         id: sha
@@ -40,6 +44,34 @@ jobs:
           else
             echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Collect commit metadata
+        id: meta
+        run: |
+          AUTHOR=$(git log -1 --format='%an <%ae>')
+          echo "author=${AUTHOR}" >> "$GITHUB_OUTPUT"
+          FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | head -20 | tr '\n' ', ' || echo "(unavailable)")
+          echo "files_summary=${FILES}" >> "$GITHUB_OUTPUT"
+
+      - name: Reject — CI not green
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion != 'success'
+        run: |
+          echo "::error::CI workflow did not succeed (conclusion: ${{ github.event.workflow_run.conclusion }}). Deploy blocked."
+          exit 1
+
+  # ── Deploy (gated on CI) ──────────────────────────────────────────────
+  deploy:
+    name: Deploy backend to prod
+    needs: [ci-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v5
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
@@ -67,53 +99,202 @@ jobs:
             scripts/deploy-prod.sh "${SSH_USER}@${SSH_HOST}:/tmp/deploy-prod.sh"
           ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
             "${SSH_USER}@${SSH_HOST}" "bash /tmp/deploy-prod.sh ${DRY_RUN}" | tee /tmp/deploy-output.txt
-          # Capture last line for status (KEY=VALUE format required by GITHUB_OUTPUT)
+          # Capture last line for status
           LAST_LINE=$(tail -1 /tmp/deploy-output.txt | tr -d '\n')
           echo "last_line=${LAST_LINE}" >> "$GITHUB_OUTPUT"
 
+  # ── F-315c: Post-deploy health check via SSH ─────────────────────────
+  health-check:
+    name: Post-deploy health verification
+    needs: [ci-gate, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Verify health endpoints
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" bash -s <<'HEALTHEOF'
+          set -euo pipefail
+          echo "=== Post-deploy health verification ==="
+
+          ENDPOINTS="/v3/health /v3/ready"
+          BACKEND="gda-backend-v3"
+          ALL_PASS=true
+
+          for EP in $ENDPOINTS; do
+            BODY=$(docker exec "$BACKEND" wget -qO- "http://127.0.0.1:4000${EP}" 2>/dev/null || echo '{"status":"error"}')
+            STATUS=$(echo "$BODY" | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "unknown")
+            echo "  ${EP}: ${STATUS}"
+            if [ "$STATUS" != "ok" ] && [ "$STATUS" != "ready" ]; then
+              ALL_PASS=false
+            fi
+          done
+
+          # Check agent healthz if running
+          AGENT_STATUS=$(docker exec gda-agent-v3 wget -qO- "http://127.0.0.1:8001/healthz" 2>/dev/null || echo "skipped")
+          echo "  /healthz (agent): ${AGENT_STATUS}"
+
+          if [ "$ALL_PASS" != "true" ]; then
+            echo "::error::Health verification failed — endpoints not all passing"
+            exit 1
+          fi
+
+          echo "All health endpoints verified"
+          HEALTHEOF
+
+  # ── F-315c: Notifications ────────────────────────────────────────────
+  notify-success:
+    name: Notify — deploy succeeded
+    needs: [ci-gate, deploy, health-check]
+    if: success()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      statuses: write
+    steps:
       - name: Set commit status — success
-        if: success()
         uses: actions/github-script@v7
         with:
           script: |
+            const sha = '${{ needs.ci-gate.outputs.deploy_sha }}';
+            const author = '${{ needs.ci-gate.outputs.author }}';
+            const files = '${{ needs.ci-gate.outputs.files_summary }}';
+
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: '${{ steps.sha.outputs.sha }}',
+              sha,
               state: 'success',
               context: 'deploy/prod',
-              description: `Deployed ${{ steps.sha.outputs.sha }} at ${new Date().toISOString()}`,
+              description: `Deployed ${sha.substring(0, 7)} at ${new Date().toISOString()}`,
               target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
             });
 
+            // Post deploy summary as a commit comment
+            const body = [
+              `## Deploy Succeeded`,
+              `| Field | Value |`,
+              `|-------|-------|`,
+              `| **Commit** | \`${sha.substring(0, 7)}\` |`,
+              `| **Author** | ${author} |`,
+              `| **Time** | ${new Date().toISOString()} |`,
+              `| **Files** | ${files.substring(0, 200) || '(unavailable)'} |`,
+              `| **Workflow** | [Run #${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) |`,
+              `| **Health** | All endpoints passing |`,
+            ].join('\n');
+
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha,
+              body,
+            });
+
+      - name: Send webhook notification (if configured)
+        env:
+          WEBHOOK_URL: ${{ secrets.DEPLOY_NOTIFY_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "DEPLOY_NOTIFY_WEBHOOK_URL not configured — skipping webhook"
+            exit 0
+          fi
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event": "deploy_success",
+              "sha": "${{ needs.ci-gate.outputs.deploy_sha }}",
+              "author": "${{ needs.ci-gate.outputs.author }}",
+              "files": "${{ needs.ci-gate.outputs.files_summary }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+            }' || echo "Webhook notification failed (non-fatal)"
+
+  notify-failure:
+    name: Notify — deploy failed
+    needs: [ci-gate, deploy, health-check]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      statuses: write
+    steps:
       - name: Set commit status — failure
-        if: failure()
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            let detail = 'Deploy failed';
-            try {
-              const output = fs.readFileSync('/tmp/deploy-output.txt', 'utf8');
-              const lastLine = output.trim().split('\n').pop();
-              if (lastLine) detail = lastLine.substring(0, 140);
-            } catch {
-              const stepOutput = '${{ steps.deploy.outputs.last_line }}';
-              if (stepOutput) detail = stepOutput.substring(0, 140);
-            }
+            const sha = '${{ needs.ci-gate.outputs.deploy_sha }}' || context.sha;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: '${{ steps.sha.outputs.sha }}',
+              sha,
               state: 'failure',
               context: 'deploy/prod',
-              description: detail,
-              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              description: `Deploy failed — see logs`,
+              target_url: runUrl,
             });
 
-      - name: Skip — CI not green
-        if: >-
-          github.event_name == 'workflow_run' &&
-          github.event.workflow_run.conclusion != 'success'
+            const body = [
+              `## Deploy Failed`,
+              `| Field | Value |`,
+              `|-------|-------|`,
+              `| **Commit** | \`${sha.substring(0, 7)}\` |`,
+              `| **Time** | ${new Date().toISOString()} |`,
+              `| **Logs** | [Workflow run](${runUrl}) |`,
+              ``,
+              `> Automatic rollback attempted. Check workflow logs for details.`,
+            ].join('\n');
+
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha,
+              body,
+            });
+
+      - name: Send failure webhook (if configured)
+        env:
+          WEBHOOK_URL: ${{ secrets.DEPLOY_NOTIFY_WEBHOOK_URL }}
         run: |
-          echo "::warning::CI workflow did not succeed (conclusion: ${{ github.event.workflow_run.conclusion }}). Skipping deploy."
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "DEPLOY_NOTIFY_WEBHOOK_URL not configured — skipping webhook"
+            exit 0
+          fi
+          curl -s -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "event": "deploy_failure",
+              "sha": "${{ needs.ci-gate.outputs.deploy_sha }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+            }' || echo "Webhook notification failed (non-fatal)"
+
+  # ── Skip notification when CI was not green ──────────────────────────
+  skip-notification:
+    name: Skip — CI not green
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion != 'success'
+    steps:
+      - run: |
+          echo "::warning::CI workflow did not succeed (conclusion: ${{ github.event.workflow_run.conclusion }}). Deploy skipped."
