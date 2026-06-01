@@ -239,7 +239,13 @@ async function fetchSourceRecords(
         break;
     }
 
-    if (row) records.push(row);
+    if (row) {
+      // pg returns bigint columns as strings — coerce to number
+      if (row.estimated_value_cents != null) {
+        row.estimated_value_cents = Number(row.estimated_value_cents);
+      }
+      records.push(row);
+    }
   }
 
   return records;
