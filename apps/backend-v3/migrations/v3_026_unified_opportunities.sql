@@ -1,12 +1,13 @@
 -- V3 Migration 026: Unified Opportunities Model (F-401)
 --
 -- Creates 4 new tables backing the unified opportunity model:
---   1. opportunities          — canonical opportunity records (all lifecycle stages)
---   2. opportunity_links      — maps source-native IDs to internal_id
---   3. opportunity_field_overrides — per-field user/system overrides
---   4. opportunity_signals    — upstream signal associations
+--   1. unified_opportunities          — canonical opportunity records (all lifecycle stages)
+--   2. unified_opportunity_links      — maps source-native IDs to internal_id
+--   3. unified_opportunity_field_overrides — per-field user/system overrides
+--   4. unified_opportunity_signals    — upstream signal associations
 --
--- Existing per-source tables are NOT touched (backfill is F-404).
+-- Named "unified_*" to coexist with the legacy per-source `opportunities` table
+-- (created in v3_001). Existing per-source tables are NOT touched (backfill is F-404).
 
 -- Up Migration
 
@@ -35,10 +36,10 @@ CREATE TYPE opportunity_link_confidence AS ENUM (
 );
 
 -- ============================================================================
--- 26.2  opportunities — canonical unified opportunity records
+-- 26.2  unified_opportunities — canonical unified opportunity records
 -- ============================================================================
 
-CREATE TABLE opportunities (
+CREATE TABLE unified_opportunities (
   internal_id           UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
   lifecycle_stage       opportunity_lifecycle_stage NOT NULL,
   primary_source        TEXT,
@@ -58,19 +59,19 @@ CREATE TABLE opportunities (
   updated_at            TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_opportunities_stage_due
-  ON opportunities (lifecycle_stage, response_due_at);
+CREATE INDEX idx_unified_opps_stage_due
+  ON unified_opportunities (lifecycle_stage, response_due_at);
 
-CREATE INDEX idx_opportunities_agency_naics
-  ON opportunities (agency, naics);
+CREATE INDEX idx_unified_opps_agency_naics
+  ON unified_opportunities (agency, naics);
 
 -- ============================================================================
--- 26.3  opportunity_links — source-native ID → internal_id mapping
+-- 26.3  unified_opportunity_links — source-native ID → internal_id mapping
 -- ============================================================================
 
-CREATE TABLE opportunity_links (
+CREATE TABLE unified_opportunity_links (
   id                BIGSERIAL       PRIMARY KEY,
-  internal_id       UUID            NOT NULL REFERENCES opportunities(internal_id) ON DELETE CASCADE,
+  internal_id       UUID            NOT NULL REFERENCES unified_opportunities(internal_id) ON DELETE CASCADE,
   source            TEXT            NOT NULL,
   source_native_id  TEXT            NOT NULL,
   confidence        opportunity_link_confidence,
@@ -81,20 +82,20 @@ CREATE TABLE opportunity_links (
   UNIQUE (source, source_native_id)
 );
 
-CREATE INDEX idx_opportunity_links_internal_id
-  ON opportunity_links (internal_id);
+CREATE INDEX idx_unified_opp_links_internal_id
+  ON unified_opportunity_links (internal_id);
 
-CREATE INDEX idx_opportunity_links_review_queue
-  ON opportunity_links (confidence)
+CREATE INDEX idx_unified_opp_links_review_queue
+  ON unified_opportunity_links (confidence)
   WHERE confidence IN ('MEDIUM', 'LOW');
 
 -- ============================================================================
--- 26.4  opportunity_field_overrides — user/system per-field overrides
+-- 26.4  unified_opportunity_field_overrides — user/system per-field overrides
 -- ============================================================================
 
-CREATE TABLE opportunity_field_overrides (
+CREATE TABLE unified_opportunity_field_overrides (
   id              BIGSERIAL       PRIMARY KEY,
-  internal_id     UUID            NOT NULL REFERENCES opportunities(internal_id) ON DELETE CASCADE,
+  internal_id     UUID            NOT NULL REFERENCES unified_opportunities(internal_id) ON DELETE CASCADE,
   field_name      TEXT            NOT NULL,
   field_value_json JSONB          NOT NULL,
   set_by          TEXT            NOT NULL,
@@ -104,12 +105,12 @@ CREATE TABLE opportunity_field_overrides (
 );
 
 -- ============================================================================
--- 26.5  opportunity_signals — upstream signal associations
+-- 26.5  unified_opportunity_signals — upstream signal associations
 -- ============================================================================
 
-CREATE TABLE opportunity_signals (
+CREATE TABLE unified_opportunity_signals (
   id                  BIGSERIAL       PRIMARY KEY,
-  internal_id         UUID            NOT NULL REFERENCES opportunities(internal_id) ON DELETE CASCADE,
+  internal_id         UUID            NOT NULL REFERENCES unified_opportunities(internal_id) ON DELETE CASCADE,
   signal_type         TEXT            NOT NULL,
   signal_native_id    TEXT,
   signal_payload_json JSONB,
@@ -117,8 +118,8 @@ CREATE TABLE opportunity_signals (
   created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_opportunity_signals_internal_id
-  ON opportunity_signals (internal_id);
+CREATE INDEX idx_unified_opp_signals_internal_id
+  ON unified_opportunity_signals (internal_id);
 
 COMMIT;
 
@@ -126,10 +127,10 @@ COMMIT;
 
 BEGIN;
 
-DROP TABLE IF EXISTS opportunity_signals;
-DROP TABLE IF EXISTS opportunity_field_overrides;
-DROP TABLE IF EXISTS opportunity_links;
-DROP TABLE IF EXISTS opportunities;
+DROP TABLE IF EXISTS unified_opportunity_signals;
+DROP TABLE IF EXISTS unified_opportunity_field_overrides;
+DROP TABLE IF EXISTS unified_opportunity_links;
+DROP TABLE IF EXISTS unified_opportunities;
 DROP TYPE IF EXISTS opportunity_link_confidence;
 DROP TYPE IF EXISTS opportunity_lifecycle_stage;
 

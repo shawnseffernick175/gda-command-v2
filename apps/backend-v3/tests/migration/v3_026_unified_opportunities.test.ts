@@ -33,12 +33,12 @@ describe('v3_026_unified_opportunities migration', () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: DB_URL, max: 2 });
 
-    // Clean slate — drop everything this migration creates
+    // Clean slate — drop only the unified_* tables this migration creates
     await pool.query(`
-      DROP TABLE IF EXISTS opportunity_signals CASCADE;
-      DROP TABLE IF EXISTS opportunity_field_overrides CASCADE;
-      DROP TABLE IF EXISTS opportunity_links CASCADE;
-      DROP TABLE IF EXISTS opportunities CASCADE;
+      DROP TABLE IF EXISTS unified_opportunity_signals CASCADE;
+      DROP TABLE IF EXISTS unified_opportunity_field_overrides CASCADE;
+      DROP TABLE IF EXISTS unified_opportunity_links CASCADE;
+      DROP TABLE IF EXISTS unified_opportunities CASCADE;
       DROP TYPE IF EXISTS opportunity_link_confidence;
       DROP TYPE IF EXISTS opportunity_lifecycle_stage;
     `);
@@ -52,42 +52,42 @@ describe('v3_026_unified_opportunities migration', () => {
   });
 
   describe('UP migration', () => {
-    it('should create opportunities table', async () => {
+    it('should create unified_opportunities table', async () => {
       const { rows } = await pool.query(`
         SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'opportunities'
+        WHERE table_schema = 'public' AND table_name = 'unified_opportunities'
       `);
       expect(rows).toHaveLength(1);
     });
 
-    it('should create opportunity_links table', async () => {
+    it('should create unified_opportunity_links table', async () => {
       const { rows } = await pool.query(`
         SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'opportunity_links'
+        WHERE table_schema = 'public' AND table_name = 'unified_opportunity_links'
       `);
       expect(rows).toHaveLength(1);
     });
 
-    it('should create opportunity_field_overrides table', async () => {
+    it('should create unified_opportunity_field_overrides table', async () => {
       const { rows } = await pool.query(`
         SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'opportunity_field_overrides'
+        WHERE table_schema = 'public' AND table_name = 'unified_opportunity_field_overrides'
       `);
       expect(rows).toHaveLength(1);
     });
 
-    it('should create opportunity_signals table', async () => {
+    it('should create unified_opportunity_signals table', async () => {
       const { rows } = await pool.query(`
         SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'opportunity_signals'
+        WHERE table_schema = 'public' AND table_name = 'unified_opportunity_signals'
       `);
       expect(rows).toHaveLength(1);
     });
 
-    it('should have all expected columns on opportunities', async () => {
+    it('should have all expected columns on unified_opportunities', async () => {
       const { rows } = await pool.query(`
         SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = 'opportunities'
+        WHERE table_schema = 'public' AND table_name = 'unified_opportunities'
         ORDER BY ordinal_position
       `);
       const cols = rows.map((r) => (r as { column_name: string }).column_name);
@@ -110,24 +110,24 @@ describe('v3_026_unified_opportunities migration', () => {
       expect(cols).toContain('updated_at');
     });
 
-    it('should have expected indexes on opportunities', async () => {
+    it('should have expected indexes on unified_opportunities', async () => {
       const { rows } = await pool.query(`
         SELECT indexname FROM pg_indexes
-        WHERE tablename = 'opportunities'
+        WHERE tablename = 'unified_opportunities'
       `);
       const names = rows.map((r) => (r as { indexname: string }).indexname);
-      expect(names).toContain('idx_opportunities_stage_due');
-      expect(names).toContain('idx_opportunities_agency_naics');
+      expect(names).toContain('idx_unified_opps_stage_due');
+      expect(names).toContain('idx_unified_opps_agency_naics');
     });
 
-    it('should have expected indexes on opportunity_links', async () => {
+    it('should have expected indexes on unified_opportunity_links', async () => {
       const { rows } = await pool.query(`
         SELECT indexname FROM pg_indexes
-        WHERE tablename = 'opportunity_links'
+        WHERE tablename = 'unified_opportunity_links'
       `);
       const names = rows.map((r) => (r as { indexname: string }).indexname);
-      expect(names).toContain('idx_opportunity_links_internal_id');
-      expect(names).toContain('idx_opportunity_links_review_queue');
+      expect(names).toContain('idx_unified_opp_links_internal_id');
+      expect(names).toContain('idx_unified_opp_links_review_queue');
       // UNIQUE constraint also creates an index
       expect(names.some((n) => n.includes('source'))).toBe(true);
     });
@@ -135,7 +135,7 @@ describe('v3_026_unified_opportunities migration', () => {
     it('should enforce lifecycle_stage enum', async () => {
       await expect(
         pool.query(`
-          INSERT INTO opportunities (lifecycle_stage) VALUES ('invalid_stage')
+          INSERT INTO unified_opportunities (lifecycle_stage) VALUES ('invalid_stage')
         `),
       ).rejects.toThrow();
     });
@@ -143,13 +143,13 @@ describe('v3_026_unified_opportunities migration', () => {
     it('should enforce pwin CHECK constraint (0-100)', async () => {
       await expect(
         pool.query(`
-          INSERT INTO opportunities (lifecycle_stage, pwin) VALUES ('signal', 101)
+          INSERT INTO unified_opportunities (lifecycle_stage, pwin) VALUES ('signal', 101)
         `),
       ).rejects.toThrow();
 
       await expect(
         pool.query(`
-          INSERT INTO opportunities (lifecycle_stage, pwin) VALUES ('signal', -1)
+          INSERT INTO unified_opportunities (lifecycle_stage, pwin) VALUES ('signal', -1)
         `),
       ).rejects.toThrow();
     });
@@ -157,92 +157,89 @@ describe('v3_026_unified_opportunities migration', () => {
     it('should enforce doctrine_status CHECK constraint', async () => {
       await expect(
         pool.query(`
-          INSERT INTO opportunities (lifecycle_stage, doctrine_status)
+          INSERT INTO unified_opportunities (lifecycle_stage, doctrine_status)
           VALUES ('signal', 'invalid')
         `),
       ).rejects.toThrow();
     });
 
-    it('should enforce UNIQUE (source, source_native_id) on opportunity_links', async () => {
-      // First insert an opportunity to reference
+    it('should enforce UNIQUE (source, source_native_id) on unified_opportunity_links', async () => {
       const { rows } = await pool.query(`
-        INSERT INTO opportunities (lifecycle_stage, title)
+        INSERT INTO unified_opportunities (lifecycle_stage, title)
         VALUES ('solicitation', 'Test Opp')
         RETURNING internal_id
       `);
       const oppId = (rows[0] as { internal_id: string }).internal_id;
 
       await pool.query(`
-        INSERT INTO opportunity_links (internal_id, source, source_native_id)
+        INSERT INTO unified_opportunity_links (internal_id, source, source_native_id)
         VALUES ($1, 'sam', 'SAM-UNIQUE-TEST')
       `, [oppId]);
 
-      // Duplicate should fail
       await expect(
         pool.query(`
-          INSERT INTO opportunity_links (internal_id, source, source_native_id)
+          INSERT INTO unified_opportunity_links (internal_id, source, source_native_id)
           VALUES ($1, 'sam', 'SAM-UNIQUE-TEST')
         `, [oppId]),
       ).rejects.toThrow();
     });
 
-    it('should enforce UNIQUE (internal_id, field_name) on opportunity_field_overrides', async () => {
+    it('should enforce UNIQUE (internal_id, field_name) on unified_opportunity_field_overrides', async () => {
       const { rows } = await pool.query(`
-        INSERT INTO opportunities (lifecycle_stage, title)
+        INSERT INTO unified_opportunities (lifecycle_stage, title)
         VALUES ('forecast', 'Override Test')
         RETURNING internal_id
       `);
       const oppId = (rows[0] as { internal_id: string }).internal_id;
 
       await pool.query(`
-        INSERT INTO opportunity_field_overrides (internal_id, field_name, field_value_json, set_by)
+        INSERT INTO unified_opportunity_field_overrides (internal_id, field_name, field_value_json, set_by)
         VALUES ($1, 'title', '"Custom Title"', 'user-1')
       `, [oppId]);
 
-      // Duplicate field_name for same opportunity should fail on insert (upsert must use ON CONFLICT)
       await expect(
         pool.query(`
-          INSERT INTO opportunity_field_overrides (internal_id, field_name, field_value_json, set_by)
+          INSERT INTO unified_opportunity_field_overrides (internal_id, field_name, field_value_json, set_by)
           VALUES ($1, 'title', '"Another Title"', 'user-2')
         `, [oppId]),
       ).rejects.toThrow();
     });
 
-    it('should cascade deletes from opportunities to child tables', async () => {
+    it('should cascade deletes from unified_opportunities to child tables', async () => {
       const { rows } = await pool.query(`
-        INSERT INTO opportunities (lifecycle_stage, title)
+        INSERT INTO unified_opportunities (lifecycle_stage, title)
         VALUES ('signal', 'Cascade Test')
         RETURNING internal_id
       `);
       const oppId = (rows[0] as { internal_id: string }).internal_id;
 
       await pool.query(`
-        INSERT INTO opportunity_links (internal_id, source, source_native_id)
+        INSERT INTO unified_opportunity_links (internal_id, source, source_native_id)
         VALUES ($1, 'govtribe', 'GT-CASCADE')
       `, [oppId]);
       await pool.query(`
-        INSERT INTO opportunity_signals (internal_id, signal_type, signal_score)
+        INSERT INTO unified_opportunity_signals (internal_id, signal_type, signal_score)
         VALUES ($1, 'nsf_award', 75)
       `, [oppId]);
 
       // Delete parent
-      await pool.query(`DELETE FROM opportunities WHERE internal_id = $1`, [oppId]);
+      await pool.query(`DELETE FROM unified_opportunities WHERE internal_id = $1`, [oppId]);
 
       // Children should be gone
       const links = await pool.query(
-        `SELECT * FROM opportunity_links WHERE internal_id = $1`, [oppId],
+        `SELECT * FROM unified_opportunity_links WHERE internal_id = $1`, [oppId],
       );
       expect(links.rows).toHaveLength(0);
 
       const signals = await pool.query(
-        `SELECT * FROM opportunity_signals WHERE internal_id = $1`, [oppId],
+        `SELECT * FROM unified_opportunity_signals WHERE internal_id = $1`, [oppId],
       );
       expect(signals.rows).toHaveLength(0);
     });
 
     it('should accept valid inserts with all fields', async () => {
       const { rowCount } = await pool.query(`
-        INSERT INTO opportunities (
+        INSERT INTO unified_opportunities (
           lifecycle_stage, primary_source, title, agency, office,
           naics, psc, set_aside, estimated_value_cents,
           posted_at, response_due_at, award_at, pwin, doctrine_status
@@ -257,13 +254,13 @@ describe('v3_026_unified_opportunities migration', () => {
 
     it('should enforce signal_score CHECK constraint (0-100)', async () => {
       const { rows } = await pool.query(`
-        INSERT INTO opportunities (lifecycle_stage) VALUES ('signal') RETURNING internal_id
+        INSERT INTO unified_opportunities (lifecycle_stage) VALUES ('signal') RETURNING internal_id
       `);
       const oppId = (rows[0] as { internal_id: string }).internal_id;
 
       await expect(
         pool.query(`
-          INSERT INTO opportunity_signals (internal_id, signal_type, signal_score)
+          INSERT INTO unified_opportunity_signals (internal_id, signal_type, signal_score)
           VALUES ($1, 'nsf_award', 101)
         `, [oppId]),
       ).rejects.toThrow();
@@ -279,7 +276,7 @@ describe('v3_026_unified_opportunities migration', () => {
       const { rows } = await pool.query(`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public'
-          AND table_name IN ('opportunities', 'opportunity_links', 'opportunity_field_overrides', 'opportunity_signals')
+          AND table_name IN ('unified_opportunities', 'unified_opportunity_links', 'unified_opportunity_field_overrides', 'unified_opportunity_signals')
       `);
       expect(rows).toHaveLength(0);
 
@@ -297,7 +294,7 @@ describe('v3_026_unified_opportunities migration', () => {
 
       const { rows } = await pool.query(`
         SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'opportunities'
+        WHERE table_schema = 'public' AND table_name = 'unified_opportunities'
       `);
       expect(rows).toHaveLength(1);
 

@@ -1,8 +1,8 @@
 /**
  * OpportunityRepo — CRUD + query helpers for the unified opportunity model.
  *
- * Operates on: opportunities, opportunity_links, opportunity_field_overrides,
- * opportunity_signals tables (v3_026).
+ * Operates on: unified_opportunities, unified_opportunity_links,
+ * unified_opportunity_field_overrides, unified_opportunity_signals tables (v3_026).
  */
 
 import type pg from 'pg';
@@ -19,6 +19,23 @@ import type {
   LifecycleStage,
   FindStageOptions,
 } from '../types/opportunity.js';
+
+const UPDATABLE_FIELDS = new Set([
+  'lifecycle_stage',
+  'primary_source',
+  'title',
+  'agency',
+  'office',
+  'naics',
+  'psc',
+  'set_aside',
+  'estimated_value_cents',
+  'posted_at',
+  'response_due_at',
+  'award_at',
+  'pwin',
+  'doctrine_status',
+]);
 
 export class OpportunityRepo {
   constructor(private pool: pg.Pool) {}
@@ -57,7 +74,7 @@ export class OpportunityRepo {
 
     const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
     const sql = `
-      INSERT INTO opportunities (${fields.join(', ')})
+      INSERT INTO unified_opportunities (${fields.join(', ')})
       VALUES (${placeholders})
       RETURNING *
     `;
@@ -68,7 +85,7 @@ export class OpportunityRepo {
 
   async findById(internalId: string): Promise<Opportunity | null> {
     const result = await this.pool.query(
-      `SELECT * FROM opportunities WHERE internal_id = $1`,
+      `SELECT * FROM unified_opportunities WHERE internal_id = $1`,
       [internalId],
     );
     return (result.rows[0] as Opportunity) ?? null;
@@ -79,7 +96,9 @@ export class OpportunityRepo {
     const values: unknown[] = [];
     let idx = 1;
 
-    const entries = Object.entries(input).filter(([, v]) => v !== undefined);
+    const entries = Object.entries(input).filter(
+      ([k, v]) => v !== undefined && UPDATABLE_FIELDS.has(k),
+    );
     if (entries.length === 0) return this.findById(internalId);
 
     for (const [key, value] of entries) {
@@ -92,7 +111,7 @@ export class OpportunityRepo {
     values.push(internalId);
 
     const sql = `
-      UPDATE opportunities
+      UPDATE unified_opportunities
       SET ${setClauses.join(', ')}
       WHERE internal_id = $${idx}
       RETURNING *
@@ -104,7 +123,7 @@ export class OpportunityRepo {
 
   async delete(internalId: string): Promise<boolean> {
     const result = await this.pool.query(
-      `DELETE FROM opportunities WHERE internal_id = $1`,
+      `DELETE FROM unified_opportunities WHERE internal_id = $1`,
       [internalId],
     );
     return (result.rowCount ?? 0) > 0;
@@ -142,7 +161,7 @@ export class OpportunityRepo {
     const offset = opts?.offset ?? 0;
 
     const sql = `
-      SELECT * FROM opportunities
+      SELECT * FROM unified_opportunities
       WHERE ${conditions.join(' AND ')}
       ORDER BY response_due_at ASC NULLS LAST
       LIMIT $${idx} OFFSET $${idx + 1}
@@ -157,8 +176,8 @@ export class OpportunityRepo {
 
   async findByLink(source: string, sourceNativeId: string): Promise<Opportunity | null> {
     const sql = `
-      SELECT o.* FROM opportunities o
-      JOIN opportunity_links l ON l.internal_id = o.internal_id
+      SELECT o.* FROM unified_opportunities o
+      JOIN unified_opportunity_links l ON l.internal_id = o.internal_id
       WHERE l.source = $1 AND l.source_native_id = $2
     `;
     const result = await this.pool.query(sql, [source, sourceNativeId]);
@@ -167,7 +186,7 @@ export class OpportunityRepo {
 
   async createLink(input: OpportunityLinkInsert): Promise<OpportunityLink> {
     const sql = `
-      INSERT INTO opportunity_links
+      INSERT INTO unified_opportunity_links
         (internal_id, source, source_native_id, confidence, match_method, matched_at, confirmed_by, confirmed_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
@@ -187,7 +206,7 @@ export class OpportunityRepo {
 
   async findLinksByInternalId(internalId: string): Promise<OpportunityLink[]> {
     const result = await this.pool.query(
-      `SELECT * FROM opportunity_links WHERE internal_id = $1`,
+      `SELECT * FROM unified_opportunity_links WHERE internal_id = $1`,
       [internalId],
     );
     return result.rows as OpportunityLink[];
@@ -197,7 +216,7 @@ export class OpportunityRepo {
 
   async setFieldOverride(input: OpportunityFieldOverrideInsert): Promise<OpportunityFieldOverride> {
     const sql = `
-      INSERT INTO opportunity_field_overrides
+      INSERT INTO unified_opportunity_field_overrides
         (internal_id, field_name, field_value_json, set_by, reason)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (internal_id, field_name)
@@ -220,7 +239,7 @@ export class OpportunityRepo {
 
   async getFieldOverrides(internalId: string): Promise<OpportunityFieldOverride[]> {
     const result = await this.pool.query(
-      `SELECT * FROM opportunity_field_overrides WHERE internal_id = $1`,
+      `SELECT * FROM unified_opportunity_field_overrides WHERE internal_id = $1`,
       [internalId],
     );
     return result.rows as OpportunityFieldOverride[];
@@ -230,7 +249,7 @@ export class OpportunityRepo {
 
   async addSignal(input: OpportunitySignalInsert): Promise<OpportunitySignal> {
     const sql = `
-      INSERT INTO opportunity_signals
+      INSERT INTO unified_opportunity_signals
         (internal_id, signal_type, signal_native_id, signal_payload_json, signal_score)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
@@ -247,7 +266,7 @@ export class OpportunityRepo {
 
   async getSignals(internalId: string): Promise<OpportunitySignal[]> {
     const result = await this.pool.query(
-      `SELECT * FROM opportunity_signals WHERE internal_id = $1 ORDER BY created_at DESC`,
+      `SELECT * FROM unified_opportunity_signals WHERE internal_id = $1 ORDER BY created_at DESC`,
       [internalId],
     );
     return result.rows as OpportunitySignal[];

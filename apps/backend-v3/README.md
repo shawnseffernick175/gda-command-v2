@@ -39,10 +39,12 @@ The unified opportunity model consolidates records from all sources (SAM, GovTri
 
 | Table | Purpose |
 |-------|---------|
-| `opportunities` | Canonical opportunity records with lifecycle stage, agency, NAICS, due dates, pwin, and doctrine status. |
-| `opportunity_links` | Maps source-native IDs (e.g. SAM notice ID, GovTribe ID) to a single `internal_id`. Tracks match confidence and method. |
-| `opportunity_field_overrides` | Per-field overrides set by users or system agents. Latest override wins (UNIQUE on internal_id + field_name). |
-| `opportunity_signals` | Upstream signals (NSF awards, SBIR topics, arXiv papers, Fed Register rules) associated with an opportunity. |
+| `unified_opportunities` | Canonical opportunity records with lifecycle stage, agency, NAICS, due dates, pwin, and doctrine status. |
+| `unified_opportunity_links` | Maps source-native IDs (e.g. SAM notice ID, GovTribe ID) to a single `internal_id`. Tracks match confidence and method. |
+| `unified_opportunity_field_overrides` | Per-field overrides set by users or system agents. Latest override wins (UNIQUE on internal_id + field_name). |
+| `unified_opportunity_signals` | Upstream signals (NSF awards, SBIR topics, arXiv papers, Fed Register rules) associated with an opportunity. |
+
+> **Naming note:** Tables are prefixed `unified_` to coexist with the legacy per-source `opportunities` table (v3_001). The prefix will be removed once F-404 backfill completes and F-423 decommissions the old table.
 
 ### Lifecycle Stages
 
