@@ -21,6 +21,7 @@ import type {
 } from '../types/opportunity.js';
 import {
   getMergedOpportunity,
+  invalidateMergeCache,
   type MergedOpportunity,
 } from '../../services/opportunities/merge.js';
 
@@ -238,7 +239,9 @@ export class OpportunityRepo {
       input.set_by,
       input.reason ?? null,
     ]);
-    return result.rows[0] as OpportunityFieldOverride;
+    const row = result.rows[0] as OpportunityFieldOverride;
+    invalidateMergeCache(input.internal_id);
+    return row;
   }
 
   async getFieldOverrides(internalId: string): Promise<OpportunityFieldOverride[]> {

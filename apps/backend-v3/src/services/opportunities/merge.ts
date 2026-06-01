@@ -111,7 +111,7 @@ const cache = new Map<string, CacheEntry>();
 
 /** Evict expired + LRU entries when cache exceeds max size. */
 function evictIfNeeded(): void {
-  if (cache.size <= CACHE_MAX_SIZE) return;
+  if (cache.size < CACHE_MAX_SIZE) return;
   const now = Date.now();
   for (const [key, entry] of cache) {
     if (entry.expiresAt <= now) cache.delete(key);
@@ -225,6 +225,7 @@ async function fetchSourceRecords(
                   NULL AS posted_at, NULL AS response_due_at, NULL AS award_at
            FROM fast_track_assessments
            WHERE input_hash = $1
+           ORDER BY generated_at DESC
            LIMIT 1`,
           [link.source_native_id],
         );
