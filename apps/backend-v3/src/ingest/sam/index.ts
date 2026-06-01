@@ -1,10 +1,12 @@
 /**
- * SAM.gov ingest module — registers the SAM source with the framework.
+ * SAM.gov ingest module — registers the SAM adapter with both the
+ * adapter registry and the framework (via registerAdapter bridge).
  */
 
-import { registerSource } from '../framework/registry.js';
+import { registerAdapter } from '../adapter/registry.js';
+import { SamSolicitationAdapter } from './adapter.js';
 import { runSAMIngest } from './job.js';
 
 export function registerSAMSource(): void {
-  registerSource('sam.gov', 'SAM.gov Opportunities', runSAMIngest);
+  registerAdapter(new SamSolicitationAdapter(), runSAMIngest);
 }

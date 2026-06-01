@@ -2,6 +2,11 @@
  * Cron scheduler — uses node-cron to schedule periodic ingest jobs.
  * Boots with the backend and logs registered jobs at startup.
  *
+ * SAM, GovWin, and GovTribe ingest are registered through the adapter
+ * registry (F-402). All other sources register directly with the
+ * framework registry. The cron scheduler dispatches via runIngest()
+ * which resolves both adapter-backed and legacy sources.
+ *
  * DIBBS + NECO crons are gated behind ENABLE_DIBBS_INGEST / ENABLE_NECO_INGEST
  * env flags (default OFF). Both .mil sites firewall commercial VPS IPs, so
  * crons fail with TCP connect timeouts from Hostinger. The ingest code is
@@ -16,6 +21,7 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import { logger } from '../lib/logger.js';
 import { runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
+import { listAdapters } from '../ingest/adapter/registry.js';
 import { registerSAMSource } from '../ingest/sam/index.js';
 import { registerDIBBSSource } from '../ingest/dibbs/index.js';
 import { registerNECOSource } from '../ingest/neco/index.js';
@@ -69,21 +75,30 @@ const JOBS: CronJob[] = [
 ];
 
 export function startCronScheduler(): void {
+  // Adapter-backed sources (SAM, GovTribe, GovWin) — registered via
+  // the adapter registry, which bridges to the framework registry.
   registerSAMSource();
-  registerUSASpendingSource();
-  // Source registration kept unconditionally so manual POST /v3/admin/ingest/run/dibbs|neco
-  // still resolves. Only the cron schedule is gated by the env flags above.
-  registerDIBBSSource();
-  registerNECOSource();
-  registerFederalRegisterSource();
-  registerSBIRSource();
   registerGovTribeSource();
   if (govwinEnabled) {
     registerGovWinSource();
   }
 
+  // Legacy framework-only sources
+  registerUSASpendingSource();
+  registerDIBBSSource();
+  registerNECOSource();
+  registerFederalRegisterSource();
+  registerSBIRSource();
+
   const registeredSources = getRegisteredSources();
-  logger.info({ sources: registeredSources }, '[ingest] framework ready');
+  const registeredAdapters = listAdapters();
+  logger.info(
+    {
+      sources: registeredSources,
+      adapters: registeredAdapters.map((a) => `${a.source} (${a.defaultStage})`),
+    },
+    '[ingest] framework ready',
+  );
 
   if (!sbirEnabled) {
     logger.info({ flag: 'ENABLE_SBIR_INGEST' }, '[cron] sbir.12h skipped — gated behind env flag (default off due to api.www.sbir.gov 429 block on VPS egress)');
@@ -130,21 +145,9 @@ export function startCronScheduler(): void {
     });
 
     tasks.push(task);
-    const cronLabel = job.sourceKey === 'sam.gov' ? 'sam.4h'
-      : job.sourceKey === 'usaspending.gov' ? 'usaspending.daily'
-      : job.sourceKey === 'dibbs' ? 'dibbs.6h'
-      : job.sourceKey === 'neco' ? 'neco.6h'
-      : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
-      : job.sourceKey === 'sbir.gov' ? 'sbir.12h'
-      : job.sourceKey === 'govtribe' ? 'govtribe.opps.mon_thu'
-      : job.sourceKey === 'govtribe.contacts' ? 'govtribe.contacts.weekly'
-      : job.sourceKey === 'govtribe.vehicles' ? 'govtribe.vehicles.monthly'
-      : job.sourceKey === 'govtribe.budget' ? 'govtribe.budget.nightly'
-      : job.sourceKey === 'govwin' ? 'govwin.6h'
-      : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
-      `[cron] registered: ${cronLabel} (${job.schedule})`,
+      `[cron] registered: ${job.sourceKey} (${job.schedule})`,
     );
   }
 }
