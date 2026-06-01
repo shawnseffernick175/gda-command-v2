@@ -2,29 +2,28 @@
  * GovTribe ingest jobs — opportunities poll (7 saved searches), contacts poll,
  * vehicles poll, and daily credit budget rollup.
  *
+ * Uses MCP over Streamable HTTP (https://govtribe.com/mcp).
  * Cadence: Mon + Thu 6am ET (10:00 UTC) — configured in cron/index.ts.
- * All jobs are credit-budget-aware via the govtribeFetch() client.
+ * All jobs are credit-budget-aware via the MCP client.
  * Per-cycle cap (GOVTRIBE_CYCLE_CREDIT_CAP=150) stops mid-cycle if exceeded.
  */
 
 import { logger } from '../../lib/logger.js';
 import { pool } from '../../lib/db.js';
 import {
-  govtribeFetch,
-  purgeExpiredCache,
   resetCycleCredits,
   isCycleCapExceeded,
   getCycleCreditsUsed,
   getCycleCreditCap,
-} from './client.js';
+  purgeExpiredCache,
+} from './mcp_client.js';
+import { searchOpportunities, searchAwards, searchForecasts, searchContacts, searchVehicles } from './mcp_tools.js';
 import { mapGovTribeOpportunity } from './mapper.js';
 import { upsertExternalOpportunity } from '../framework/source_writer.js';
 import { ingestGovTribeToRag } from './rag_sink.js';
 import type { IngestResult } from '../framework/registry.js';
-import type { GovTribeOpportunityRaw, GovTribeListResponse } from './types.js';
-import { GOVTRIBE_SAVED_SEARCHES, endpointKeyForCategory } from './saved_searches.js';
-
-const OPPS_PAGE_LIMIT = 50;
+import type { GovTribeOpportunityRaw } from './types.js';
+import { GOVTRIBE_SAVED_SEARCHES } from './saved_searches.js';
 
 /**
  * govtribe.opps.poll — Runs all 7 saved searches against GovTribe MCP.
@@ -53,17 +52,30 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
       break;
     }
 
-    const endpointKey = endpointKeyForCategory(search.category);
-    const queryParam = encodeURIComponent(search.keywords.join(' | '));
-    const naicsParam = encodeURIComponent(search.naicsFilter.join(','));
-    const path = `/search?tool=${search.mcpTool}&q=${queryParam}&naics=${naicsParam}&limit=${OPPS_PAGE_LIMIT}`;
     const cacheId = `saved_search_${search.id}`;
 
-    const result = await govtribeFetch<GovTribeListResponse<GovTribeOpportunityRaw>>(
-      endpointKey,
-      path,
-      cacheId,
-    );
+    // Use the typed MCP wrapper based on category
+    let result;
+    switch (search.category) {
+      case 'opportunities':
+        result = await searchOpportunities(
+          { query: search.keywords.join(' | '), naicsCodes: search.naicsFilter, perPage: search.maxResults },
+          cacheId,
+        );
+        break;
+      case 'awards':
+        result = await searchAwards(
+          { query: search.keywords.join(' | '), naicsCodes: search.naicsFilter, perPage: search.maxResults },
+          cacheId,
+        );
+        break;
+      case 'forecasts':
+        result = await searchForecasts(
+          { query: search.keywords.join(' | '), naicsCodes: search.naicsFilter, perPage: search.maxResults },
+          cacheId,
+        );
+        break;
+    }
 
     if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted' || result.decision === 'skipped_cycle_cap') {
       degraded = true;
@@ -75,7 +87,9 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
       break;
     }
 
-    const opps = result.data?.data ?? [];
+    // MCP returns data as parsed JSON — extract rows array
+    const responseData = result.data as Record<string, unknown> | null;
+    const opps = (responseData?.data ?? responseData?.rows ?? (Array.isArray(responseData) ? responseData : [])) as GovTribeOpportunityRaw[];
     if (opps.length === 0) continue;
 
     totalFetched += opps.length;
@@ -141,7 +155,7 @@ async function upsertGovTribeOpp(
 }
 
 /**
- * govtribe.contacts.poll — Per-agency contact moves for OU3 target list.
+ * govtribe.contacts.poll — Per-agency contact search via MCP.
  * Cadence: weekly Mon 09:00 UTC. Credit cost: ~20 credits.
  */
 export async function runGovTribeContactsIngest(): Promise<IngestResult> {
@@ -160,9 +174,8 @@ export async function runGovTribeContactsIngest(): Promise<IngestResult> {
     const agencyName = row.agency as string;
     const cacheId = `contacts_${agencyName.replace(/\s+/g, '_').toLowerCase()}`;
 
-    const result = await govtribeFetch(
-      'agencies_contacts',
-      `/agencies?name=${encodeURIComponent(agencyName)}&include=contacts`,
+    const result = await searchContacts(
+      { query: agencyName, perPage: 10 },
       cacheId,
     );
 
@@ -191,16 +204,15 @@ export async function runGovTribeContactsIngest(): Promise<IngestResult> {
 }
 
 /**
- * govtribe.vehicles.poll — Contract vehicle metadata refresh.
+ * govtribe.vehicles.poll — Contract vehicle search via MCP.
  * Cadence: monthly. Credit cost: ~5 credits.
  */
 export async function runGovTribeVehiclesIngest(): Promise<IngestResult> {
   logger.info({ source: 'govtribe' }, 'govtribe_vehicles_ingest_start');
 
   const cacheId = 'vehicles_list';
-  const result = await govtribeFetch(
-    'vehicles',
-    '/vehicles?limit=50',
+  const result = await searchVehicles(
+    { query: '', perPage: 50 },
     cacheId,
   );
 
@@ -212,7 +224,9 @@ export async function runGovTribeVehiclesIngest(): Promise<IngestResult> {
     return { inserted: 0, updated: 0, skipped: 1, degraded: true, degradedReason: result.decision };
   }
 
-  const count = Array.isArray(result.data) ? (result.data as unknown[]).length : 0;
+  const responseData = result.data as Record<string, unknown> | null;
+  const items = (responseData?.data ?? responseData?.rows ?? (Array.isArray(responseData) ? responseData : [])) as unknown[];
+  const count = items.length;
 
   logger.info(
     { source: 'govtribe', vehiclesCached: count },

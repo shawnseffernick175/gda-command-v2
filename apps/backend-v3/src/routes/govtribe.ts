@@ -1,8 +1,9 @@
 /**
- * GovTribe API routes — health, credits, sync, opp proxy.
+ * GovTribe API routes — health, credits, sync, tool discovery, opp proxy.
  *
- * GET  /v3/govtribe/health  — API reachability + credit status
+ * GET  /v3/govtribe/health  — MCP reachability + credit status
  * GET  /v3/govtribe/credits — Credit usage dashboard data
+ * GET  /v3/govtribe/tools   — Discovered MCP tools (dry-run mode)
  * POST /v3/govtribe/sync    — Manual ingest trigger (admin only)
  * GET  /v3/govtribe/opp/:govtribe_id — Live detail proxy with caching
  */
@@ -13,13 +14,13 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import {
   getCreditBudgetStatus,
-  govtribeFetch,
   getCycleCreditsUsed,
   getCycleCreditCap,
-} from '../ingest/govtribe/client.js';
+  listTools,
+  mcpCallTool,
+} from '../ingest/govtribe/mcp_client.js';
 import { runIngest } from '../ingest/framework/registry.js';
 import type { JwtPayload } from '../middleware/auth.js';
-import type { GovTribeOpportunityRaw } from '../ingest/govtribe/types.js';
 
 function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
   const user = (req as FastifyRequest & { user?: JwtPayload }).user;
@@ -35,8 +36,8 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
 export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
   /**
    * GET /v3/govtribe/health
-   * Returns API reachability (inferred from last ingest run), last poll,
-   * credit pct — no live API call, no credits burned.
+   * Returns MCP reachability (inferred from last ingest run), last poll,
+   * credit pct — no live MCP call, no credits burned.
    */
   app.get('/v3/govtribe/health', async (req, reply) => {
     const budgetStatus = await getCreditBudgetStatus();
@@ -71,7 +72,7 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
 
   /**
    * GET /v3/govtribe/credits
-   * Detailed credit usage for Sentinel UI — uses local aggregates, no API call.
+   * Detailed credit usage for Sentinel UI — uses local aggregates, no MCP call.
    * Returns cycleCap, cycleUsed, monthKey, alertThreshold (960), stopThreshold (1140)
    * per V2 schema.
    */
@@ -115,6 +116,32 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
         req.requestId,
       ),
     );
+  });
+
+  /**
+   * GET /v3/govtribe/tools
+   * Dry-run mode: lists discovered MCP tools without burning credits.
+   */
+  app.get('/v3/govtribe/tools', async (req, reply) => {
+    try {
+      const tools = await listTools();
+      return reply.send(
+        successEnvelope(
+          {
+            dry_run: true,
+            tool_count: tools.length,
+            tools: tools.map((t) => ({ name: t.name, description: t.description })),
+          },
+          req.requestId,
+        ),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ source: 'govtribe', error: message }, 'govtribe_tools_list_error');
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', `Failed to list MCP tools: ${message}`, req.requestId),
+      );
+    }
   });
 
   /**
@@ -208,7 +235,7 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
 
   /**
    * GET /v3/govtribe/opp/:govtribe_id
-   * Proxy to live GovTribe detail with caching. Credit-budget enforced.
+   * Proxy to live GovTribe detail via MCP with caching. Credit-budget enforced.
    * Used by Opp-Auto-Analysis for incumbent/agency/contact intel.
    */
   app.get<{ Params: { govtribe_id: string } }>(
@@ -216,10 +243,10 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const { govtribe_id } = req.params;
 
-      const result = await govtribeFetch<GovTribeOpportunityRaw>(
-        'opportunities_detail',
-        `/opportunities/${encodeURIComponent(govtribe_id)}`,
-        govtribe_id,
+      const result = await mcpCallTool(
+        'Search_Federal_Contract_Opportunities',
+        { query: govtribe_id, per_page: 1 },
+        `opp_detail_${govtribe_id}`,
         true,
       );
 

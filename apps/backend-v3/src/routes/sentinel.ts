@@ -9,7 +9,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope } from '../lib/envelope.js';
 import { getRegisteredSources } from '../ingest/framework/registry.js';
 import { getIngestStatus } from '../ingest/framework/run_logger.js';
-import { getCreditBudgetStatus } from '../ingest/govtribe/client.js';
+import { getCreditBudgetStatus } from '../ingest/govtribe/mcp_client.js';
 
 interface SentinelSourceEntry {
   source_key: string;

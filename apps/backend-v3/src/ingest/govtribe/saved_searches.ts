@@ -96,11 +96,4 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
   },
 ];
 
-/** Compute the endpoint key for credit costing based on category. */
-export function endpointKeyForCategory(category: SearchCategory): string {
-  switch (category) {
-    case 'opportunities': return 'search_opportunities';
-    case 'awards': return 'search_awards';
-    case 'forecasts': return 'search_forecasts';
-  }
-}
+

@@ -1,5 +1,6 @@
 /**
  * GovTribe ingest module — registers GovTribe sources with the framework.
+ * Uses MCP over Streamable HTTP (https://govtribe.com/mcp).
  * Gated behind ENABLE_GOVTRIBE_INGEST env flag (default: true when
  * GOVTRIBE_API_KEY is set).
  */

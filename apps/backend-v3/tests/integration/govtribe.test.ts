@@ -2,7 +2,8 @@
  * F-Govtribe integration tests — credit-budget enforcement,
  * dedup fixture, health/credits/sentinel endpoints, dry_run.
  *
- * These tests use only local DB state (no live API calls, 0 credits burned).
+ * These tests use only local DB state (no live MCP calls, 0 credits burned).
+ * MCP client (F-323) replaced the deprecated REST client.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';

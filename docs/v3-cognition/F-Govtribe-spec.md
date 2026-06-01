@@ -17,8 +17,8 @@ A V1/V2 GovTribe poll workflow existed (`GDA.ingest.govtribe-cron`, superseded b
 ## Credentials
 
 - `GOVTRIBE_API_KEY` — Shawn pastes at deploy
-- API base: `https://api.govtribe.com/v1/` (verify against current GovTribe docs)
-- Auth: `Authorization: Bearer {api_key}` (standard; verify per docs)
+- MCP endpoint: `https://govtribe.com/mcp` (Streamable HTTP transport, F-323)
+- Auth: `Authorization: Bearer {JWT}` (scope `mcp:use`)
 
 ---
 
