@@ -184,11 +184,19 @@ class TestDbQuery:
 
 @pytest.mark.anyio
 class TestRagSearch:
-    async def test_rag_stub_returns_pending(self):
+    async def test_rag_search_handles_db_unavailable(self):
         result = await rag_search(RagSearchInput(query="test"))
         assert len(result.results) == 1
-        assert "F-301" in result.results[0].chunk
+        # When DB is unreachable, returns graceful error
+        assert result.results[0].source_doc == "system"
         assert result.results[0].source_url
+
+    async def test_rag_search_no_api_key(self, monkeypatch):
+        import src.tools.rag_search as rs
+        monkeypatch.setattr(rs, "OPENAI_API_KEY", "")
+        result = await rag_search(RagSearchInput(query="test"))
+        assert len(result.results) == 1
+        assert "OPENAI_API_KEY" in result.results[0].chunk
 
 
 @pytest.mark.anyio

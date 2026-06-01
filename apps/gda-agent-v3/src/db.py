@@ -64,6 +64,26 @@ async def check_db() -> bool:
         return False
 
 
+async def check_rag() -> tuple[bool, int]:
+    """Check RAG readiness: returns (is_ready, chunk_count).
+
+    RAG is ready when kb_chunks table exists AND has ≥1 row.
+    """
+    try:
+        pool = await get_pool()
+        async with pool.connection() as conn:
+            row = await conn.execute(
+                """
+                SELECT count(*) AS cnt FROM kb_chunks
+                """
+            )
+            result = await row.fetchone()
+            count = int(result["cnt"]) if result else 0
+            return (count > 0, count)
+    except Exception:
+        return (False, 0)
+
+
 async def insert_agent_run(
     run_id: uuid.UUID,
     task: str,
