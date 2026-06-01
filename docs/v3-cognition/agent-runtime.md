@@ -156,6 +156,27 @@ The `gda-agent-v3` service is defined in `docker-compose.prod.yml`:
 - **Healthcheck:** `curl -f localhost:8001/healthz` every 15s
 - **Restart:** `unless-stopped`
 
+## Dependency Pinning
+
+`apps/gda-agent-v3/requirements.txt` must pin **all** langgraph ecosystem packages
+to exact versions. The Dockerfile runs `pip install --no-cache-dir -r requirements.txt`
+with no constraints file, so any unpinned transitive dep resolves to latest on every
+rebuild — which can silently break the runtime when upstream packages drop or rename
+internal modules.
+
+**Pinned packages (F-317, 2026-06-01):**
+
+| Package | Pinned | Why |
+|---------|--------|-----|
+| `langgraph` | `==0.4.7` | Core graph runtime |
+| `langgraph-prebuilt` | `==0.2.3` | Last version compatible with langgraph 0.4.7 (`ToolNode`, `create_react_agent`). Versions ≥0.5.0 require `langgraph._internal` which only exists in langgraph ≥0.6.x. |
+| `langgraph-checkpoint` | `==4.1.1` | Checkpoint serialization layer |
+| `langgraph-sdk` | `==0.3.15` | SDK client utilities |
+| `langchain-core` | `==0.3.86` | Shared LangChain message/tool types |
+
+**Say-something principle:** `/healthz` now includes `langgraph` and `langgraph_prebuilt`
+version strings so drift is visible in monitoring before it becomes a user-facing crash.
+
 ## Deploy
 
 The `scripts/deploy-prod.sh` auto-deploy script builds and restarts `gda-agent-v3` alongside `backend-v3` and `frontend-v3` on every merge to `main`. The deploy workflow (`.github/workflows/deploy-prod.yml`) triggers after CI passes.

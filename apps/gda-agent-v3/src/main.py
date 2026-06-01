@@ -1,6 +1,7 @@
 """GDA Agent V3 — FastAPI HTTP surface."""
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import logging
 import uuid
@@ -17,6 +18,13 @@ from src.config import OPENAI_API_KEY, ANTHROPIC_API_KEY
 from src.db import check_db, close_pool, get_daily_usage, get_run_trace
 from src.middleware.auth import require_service_token
 from src.tools.registry import get_tool_schemas, list_tools
+
+
+def _pkg_version(name: str) -> str:
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +78,8 @@ class HealthResponse(BaseModel):
     models_available: list[str]
     rag_ready: bool
     db_ready: bool
+    langgraph: str
+    langgraph_prebuilt: str
 
 
 class CancelResponse(BaseModel):
@@ -96,6 +106,8 @@ async def healthz() -> HealthResponse:
         models_available=models,
         rag_ready=False,  # F-301 not yet deployed
         db_ready=db_ready,
+        langgraph=_pkg_version("langgraph"),
+        langgraph_prebuilt=_pkg_version("langgraph-prebuilt"),
     )
 
 
