@@ -146,5 +146,7 @@ describe('PwinBreakdown', () => {
 
     const breakdown = await screen.findByTestId('pwin-breakdown');
     expect(breakdown).toBeTruthy();
+
+    expect(screen.queryByTestId('pwin-contributions')).toBeNull();
   });
 });
