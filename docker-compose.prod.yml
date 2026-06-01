@@ -68,6 +68,8 @@ services:
       ANALYSIS_TIMEOUT_MS: ${ANALYSIS_TIMEOUT_MS:-10000}
       LOG_LEVEL: ${LOG_LEVEL_V3:-info}
       SAM_GOV_API_KEY: ${SAM_GOV_API_KEY:-}
+      AGENT_V3_URL: http://gda-agent-v3:8001
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gda-v3.rule=Host(`gda-v3.csr-llc.tech`)"

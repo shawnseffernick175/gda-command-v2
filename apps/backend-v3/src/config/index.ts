@@ -52,4 +52,7 @@ export const config = {
   logLevel: env('LOG_LEVEL', 'info'),
 
   nodeEnv: env('NODE_ENV', 'development'),
+
+  agentV3Url: env('AGENT_V3_URL', 'http://gda-agent-v3:8001'),
+  agentServiceToken: env('AGENT_SERVICE_TOKEN', ''),
 } as const;

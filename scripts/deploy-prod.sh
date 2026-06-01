@@ -7,9 +7,10 @@ set -euo pipefail
 DRY_RUN="${1:-false}"
 DEPLOY_DIR="/root/gda-command-v2"
 COMPOSE_FILE="docker-compose.prod.yml"
-SERVICES="backend-v3 frontend-v3"
+SERVICES="backend-v3 frontend-v3 gda-agent-v3"
 BACKEND_CONTAINER="gda-backend-v3"
 FRONTEND_CONTAINER="gda-frontend-v3"
+AGENT_CONTAINER="gda-agent-v3"
 
 cd "$DEPLOY_DIR"
 
@@ -140,6 +141,21 @@ for i in $(seq 1 20); do
   fi
   if [ "$i" -eq 20 ]; then
     echo "DEPLOY_FAILED frontend-v3 not healthy after 60s (status: ${status})"
+    exit 1
+  fi
+  sleep 3
+done
+
+# ---------- Wait for gda-agent-v3 container healthy ----------
+echo "--- waiting for gda-agent-v3 health ---"
+for i in $(seq 1 30); do
+  status=$(docker inspect "$AGENT_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+  if [ "$status" = "healthy" ]; then
+    echo "gda-agent-v3 healthy (attempt ${i})"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "DEPLOY_FAILED gda-agent-v3 not healthy after 90s (status: ${status})"
     exit 1
   fi
   sleep 3
