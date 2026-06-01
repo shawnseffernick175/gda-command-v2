@@ -24,6 +24,7 @@ import { registerFederalRegisterSource } from '../ingest/federal_register/index.
 import { registerSBIRSource } from '../ingest/sbir/index.js';
 import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
+import { trainIfReady } from '../services/pwin/index.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
@@ -90,6 +91,23 @@ export function startCronScheduler(): void {
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
   }
+
+  // PWin nightly retrain — runs at 02:00 UTC (10 PM ET)
+  const pwinRetrainTask = cron.schedule('0 2 * * *', async () => {
+    try {
+      logger.info('[cron] pwin.retrain starting');
+      const result = await trainIfReady();
+      if (result) {
+        logger.info({ version: result.new_version, promoted: result.promoted, metrics: result.metrics }, '[cron] pwin.retrain completed');
+      } else {
+        logger.info('[cron] pwin.retrain — no retraining needed');
+      }
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_pwin_retrain_error');
+    }
+  });
+  tasks.push(pwinRetrainTask);
+  logger.info({ schedule: '0 2 * * *' }, '[cron] registered: pwin.retrain (0 2 * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {
