@@ -17,7 +17,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 
-const MCP_ENDPOINT = process.env['GOVTRIBE_MCP_URL'] ?? 'https://govtribe.com/mcp';
+const MCP_ENDPOINT = process.env['GOVTRIBE_MCP_URL'] || 'https://govtribe.com/mcp';
 const API_KEY = process.env['GOVTRIBE_API_KEY'] ?? '';
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1_000;
