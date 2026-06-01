@@ -199,18 +199,22 @@ jobs:
           echo "${AGENT_VARS:-<none>}"
           echo ""
 
-          # Check backend-v3 vars are in compose under backend-v3 service
+          # Extract per-service environment blocks from compose
+          BACKEND_BLOCK=$(awk '/^  backend-v3:/{f=1; next} f && /^  [a-z]/{f=0} f' "$COMPOSE")
+          AGENT_BLOCK=$(awk '/^  gda-agent-v3:/{f=1; next} f && /^  [a-z]/{f=0} f' "$COMPOSE")
+
+          # Check backend-v3 vars are in the backend-v3 service block
           for var in $BACKEND_VARS; do
-            if ! grep -qP "^\s+${var}:" "$COMPOSE"; then
-              echo "::error::MISSING in compose: $var (read by apps/backend-v3/src but not in $COMPOSE environment block)"
+            if ! echo "$BACKEND_BLOCK" | grep -qP "^\s+${var}:"; then
+              echo "::error::MISSING in compose backend-v3: $var (read by apps/backend-v3/src but not in backend-v3 environment block)"
               DRIFT=1
             fi
           done
 
-          # Check agent-v3 vars are in compose under gda-agent-v3 service
+          # Check agent-v3 vars are in the gda-agent-v3 service block
           for var in $AGENT_VARS; do
-            if ! grep -qP "^\s+${var}:" "$COMPOSE"; then
-              echo "::error::MISSING in compose: $var (read by apps/gda-agent-v3/src but not in $COMPOSE environment block)"
+            if ! echo "$AGENT_BLOCK" | grep -qP "^\s+${var}:"; then
+              echo "::error::MISSING in compose gda-agent-v3: $var (read by apps/gda-agent-v3/src but not in gda-agent-v3 environment block)"
               DRIFT=1
             fi
           done
