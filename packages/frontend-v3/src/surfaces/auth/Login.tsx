@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { setToken, type AuthUser } from '../../lib/auth';
 
@@ -27,6 +27,23 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
+  // Countdown driven by useEffect — React owns the timer lifecycle,
+  // so it is properly cleaned up on unmount (fixes CI hang caused by
+  // orphaned setInterval keeping the Node event-loop alive).
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const id = setTimeout(() => {
+      setLockoutSeconds((s) => {
+        if (s <= 1) {
+          setError('');
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [lockoutSeconds]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
@@ -48,9 +65,7 @@ export function Login() {
       }
 
       if (res.status === 423) {
-        const seconds = json.retryAfter || 900;
-        setLockoutSeconds(seconds);
-        startCountdown(seconds);
+        setLockoutSeconds(json.retryAfter || 900);
         return;
       }
 
@@ -65,20 +80,6 @@ export function Login() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function startCountdown(seconds: number) {
-    let remaining = seconds;
-    const interval = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(interval);
-        setLockoutSeconds(0);
-        setError('');
-      } else {
-        setLockoutSeconds(remaining);
-      }
-    }, 1000);
   }
 
   function handleRetry() {
