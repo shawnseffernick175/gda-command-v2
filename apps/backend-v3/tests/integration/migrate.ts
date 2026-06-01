@@ -23,7 +23,10 @@ export async function runMigrations(databaseUrl: string): Promise<void> {
 
   try {
     for (const file of files) {
-      const sql = readFileSync(resolve(migrationsDir, file), 'utf-8');
+      let sql = readFileSync(resolve(migrationsDir, file), 'utf-8');
+      // Strip DOWN migration section so UP tables aren't immediately dropped
+      const downIdx = sql.indexOf('-- Down Migration');
+      if (downIdx !== -1) sql = sql.slice(0, downIdx);
       await pool.query(sql);
     }
   } finally {

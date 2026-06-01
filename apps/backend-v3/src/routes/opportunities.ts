@@ -7,6 +7,10 @@
  *   POST   /v3/opportunities       — create (manual entry, triggers pre-warm)
  *   PATCH  /v3/opportunities/:id   — update (pre-warm on analysis-affecting fields)
  *   POST   /v3/opportunities/:id/qualify — qualification with teaming flags
+ *
+ * NOTE(F-405): Cache invalidation for unified_opportunity_field_overrides is
+ * handled inside OpportunityRepo.setFieldOverride() — no manual invalidation
+ * needed from route handlers.
  */
 
 import type { FastifyInstance } from 'fastify';
