@@ -24,6 +24,7 @@ import { ragRoutes } from './routes/rag.js';
 import { govtribeRoutes } from './routes/govtribe.js';
 import { govwinRoutes } from './routes/govwin.js';
 import { sentinelRoutes } from './routes/sentinel.js';
+import { colorTeamRoutes } from './routes/color-teams.js';
 import { doctrineRoutes } from './routes/doctrine.js';
 import { memoryRoutes } from './routes/memory.js';
 import { pwinRoutes } from './routes/pwin.js';
@@ -120,6 +121,7 @@ export async function buildApp() {
   await app.register(actionItemRoutes);
   await app.register(soakRoutes);
   await app.register(regulatoryRoutes);
+  await app.register(colorTeamRoutes);
   await app.register(doctrineRoutes);
   await app.register(adminIngestRoutes);
   await app.register(ragRoutes);

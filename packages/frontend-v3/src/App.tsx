@@ -17,6 +17,8 @@ import { Login } from "./surfaces/auth/Login";
 import { RegulatorySurface } from "./surfaces/regulatory/RegulatorySurface";
 import { DoctrineSettings } from "./surfaces/doctrine/DoctrineSettings";
 import { KnowledgeBaseSurface } from "./surfaces/knowledge-base/KnowledgeBaseSurface";
+import { ColorTeamSurface } from "./surfaces/color-teams/ColorTeamSurface";
+import { ColorTeamRunDetail } from "./surfaces/color-teams/ColorTeamRunDetail";
 
 export function App() {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
@@ -47,6 +49,8 @@ export function App() {
                   <Route path="/regulatory" element={<RegulatorySurface />} />
                   <Route path="/settings/doctrine" element={<DoctrineSettings />} />
                   <Route path="/knowledge-base" element={<KnowledgeBaseSurface />} />
+                  <Route path="/color-teams" element={<ColorTeamSurface />} />
+                  <Route path="/color-teams/runs/:runId" element={<ColorTeamRunDetail />} />
                   <Route path="/settings/*" element={<PlaceholderSurface name="Settings" />} />
                 </Routes>
               </MainCanvas>

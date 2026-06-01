@@ -26,6 +26,7 @@ const VALID_SOURCE_KINDS = [
   'govtribe', 'news', 'doctrine', 'partner_site',
   'internal', 'manual', 'n8n_workflow',
   'dibbs', 'neco', 'federal_register', 'sbir',
+  'color_team',
 ] as const;
 
 beforeAll(async () => {
