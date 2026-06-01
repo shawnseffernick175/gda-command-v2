@@ -190,7 +190,7 @@ describe('GovTribe API endpoints', () => {
     expect(typeof body.data.credits.pct).toBe('number');
   });
 
-  it('GET /v3/govtribe/credits returns credit dashboard data', async () => {
+  it('GET /v3/govtribe/credits returns credit dashboard data with V2 schema fields', async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/v3/govtribe/credits',
@@ -200,9 +200,18 @@ describe('GovTribe API endpoints', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
-    expect(body.data).toHaveProperty('this_month');
+    expect(body.data).toHaveProperty('cycleCap');
+    expect(body.data).toHaveProperty('cycleUsed');
+    expect(body.data).toHaveProperty('monthlyCap');
+    expect(body.data).toHaveProperty('monthlyUsed');
+    expect(body.data).toHaveProperty('monthKey');
+    expect(body.data).toHaveProperty('alertThreshold');
+    expect(body.data).toHaveProperty('stopThreshold');
     expect(body.data).toHaveProperty('last_3_months');
     expect(body.data).toHaveProperty('top_endpoints');
+    expect(body.data.cycleCap).toBe(150);
+    expect(body.data.alertThreshold).toBe(960);
+    expect(body.data.stopThreshold).toBe(1140);
   });
 
   it('POST /v3/govtribe/sync dry_run returns count without burning credits', async () => {

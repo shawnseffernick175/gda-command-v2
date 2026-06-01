@@ -1,27 +1,111 @@
 /**
- * GovTribe ingest jobs — opportunities poll, contacts poll, vehicles poll,
- * and daily credit budget rollup.
+ * GovTribe ingest jobs — 7 named saved-search poll, contacts poll,
+ * vehicles poll, and daily credit budget rollup.
  *
  * All jobs are credit-budget-aware via the govtribeFetch() client.
+ * Per-cycle cap enforced (GOVTRIBE_CYCLE_CREDIT_CAP, default 150).
  */
 
 import { logger } from '../../lib/logger.js';
 import { pool } from '../../lib/db.js';
-import { govtribeFetch, purgeExpiredCache } from './client.js';
+import {
+  govtribeFetch,
+  purgeExpiredCache,
+  resetCycleCredits,
+  getCycleCreditsUsed,
+  getCycleCreditCap,
+} from './client.js';
 import { mapGovTribeOpportunity } from './mapper.js';
 import { upsertExternalOpportunity } from '../framework/source_writer.js';
 import type { IngestResult } from '../framework/registry.js';
 import type { GovTribeOpportunityRaw, GovTribeListResponse } from './types.js';
 
 const OPPS_PAGE_LIMIT = 50;
-const MAX_PAGES = 10;
 
 /**
- * govtribe.opps.poll — Pull modified opps since last run.
- * Cadence: every 8h. Credit cost: ~3-5 credits per run.
+ * 7 named saved-search configs from V2 production (docs/govtribe-zapier-setup.md).
+ * Each entry maps to a GovTribe MCP tool with specific keywords and NAICS filters.
+ */
+export interface SavedSearchConfig {
+  name: string;
+  mcpTool: 'search_opportunities' | 'search_awards' | 'search_forecasts';
+  keywords: string;
+  naicsFilter: string[];
+}
+
+export const GOVTRIBE_SAVED_SEARCHES: SavedSearchConfig[] = [
+  {
+    name: 'GDA-Opps-Core',
+    mcpTool: 'search_opportunities',
+    keywords: 'SETA | C5ISR | "PEO IEW&S" | "CPE IEW&S" | "PEO C3N" | "CPE C3N" | cybersecurity | "systems engineering"',
+    naicsFilter: ['541511', '541512', '541519', '541330', '541611', '541690'],
+  },
+  {
+    name: 'GDA-Opps-Growth',
+    mcpTool: 'search_opportunities',
+    keywords: 'CMMC | "AI/ML" | "XR/AR" | DEVCOM | "synthetic training"',
+    naicsFilter: ['541511', '541512', '541715', '518210'],
+  },
+  {
+    name: 'GDA-Opps-Opportunistic',
+    mcpTool: 'search_opportunities',
+    keywords: '"advisory services" | innovation | ISR | EW',
+    naicsFilter: ['541611', '541690', '541715'],
+  },
+  {
+    name: 'GDA-Awards-Core',
+    mcpTool: 'search_awards',
+    keywords: 'SETA | C5ISR | "PEO IEW&S" | "CPE IEW&S" | cybersecurity | "systems engineering"',
+    naicsFilter: ['541511', '541512', '541519', '541330'],
+  },
+  {
+    name: 'GDA-Awards-Growth',
+    mcpTool: 'search_awards',
+    keywords: 'CMMC | "AI/ML" | DEVCOM',
+    naicsFilter: ['541511', '541512', '541715'],
+  },
+  {
+    name: 'GDA-Forecasts-Core',
+    mcpTool: 'search_forecasts',
+    keywords: 'SETA | C5ISR | "PEO IEW&S" | "CPE IEW&S" | cybersecurity',
+    naicsFilter: ['541511', '541512', '541519'],
+  },
+  {
+    name: 'GDA-Forecasts-Growth',
+    mcpTool: 'search_forecasts',
+    keywords: '"AI/ML" | CMMC | DEVCOM | innovation',
+    naicsFilter: ['541715', '518210'],
+  },
+];
+
+function buildSearchPath(search: SavedSearchConfig): string {
+  const toolToEndpoint: Record<string, string> = {
+    search_opportunities: '/opportunities',
+    search_awards: '/awards',
+    search_forecasts: '/forecasts',
+  };
+  const base = toolToEndpoint[search.mcpTool] ?? '/opportunities';
+  const params = new URLSearchParams({
+    q: search.keywords,
+    naics: search.naicsFilter.join(','),
+    limit: String(OPPS_PAGE_LIMIT),
+  });
+  return `${base}?${params.toString()}`;
+}
+
+function searchEndpointKey(search: SavedSearchConfig): string {
+  return search.mcpTool;
+}
+
+/**
+ * govtribe.opps.poll — Run 7 named saved searches (Mon + Thu 6am ET).
+ * Cadence: 0 10 * * 1,4 (Mon + Thu 6am ET = 10:00 UTC).
+ * Expected credit cost: ~115 credits/cycle.
  */
 export async function runGovTribeOppsIngest(): Promise<IngestResult> {
   logger.info({ source: 'govtribe' }, 'govtribe_opps_ingest_start');
+
+  resetCycleCredits();
 
   let inserted = 0;
   let updated = 0;
@@ -30,27 +114,28 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
   let degraded = false;
   let degradedReason: string | undefined;
 
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const cacheId = `opps_list_page_${page}`;
+  for (const search of GOVTRIBE_SAVED_SEARCHES) {
+    const cacheId = `search_${search.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    const endpointKey = searchEndpointKey(search);
+    const path = buildSearchPath(search);
+
     const result = await govtribeFetch<GovTribeListResponse<GovTribeOpportunityRaw>>(
-      'opportunities',
-      `/opportunities?limit=${OPPS_PAGE_LIMIT}&page=${page}`,
+      endpointKey,
+      path,
       cacheId,
     );
 
     if (result.decision === 'skipped_low_budget' || result.decision === 'skipped_halted') {
       degraded = true;
-      degradedReason = `Credit budget ${result.budget_status.pct}% — ${result.decision}`;
+      degradedReason = `Credit budget ${result.budget_status.pct}% (cycle ${getCycleCreditsUsed()}/${getCycleCreditCap()}) — ${result.decision} at search ${search.name}`;
       logger.warn(
-        { source: 'govtribe', decision: result.decision, pct: result.budget_status.pct },
+        { source: 'govtribe', search: search.name, decision: result.decision, pct: result.budget_status.pct },
         'govtribe_opps_budget_skip',
       );
       break;
     }
 
     const opps = result.data?.data ?? [];
-    if (opps.length === 0) break;
-
     totalFetched += opps.length;
 
     for (const raw of opps) {
@@ -70,6 +155,7 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
         logger.error(
           {
             source: 'govtribe',
+            search: search.name,
             govtribeId: raw._id ?? raw.id,
             error: err instanceof Error ? err.message : String(err),
           },
@@ -77,13 +163,10 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
         );
       }
     }
-
-    const hasMore = result.data?.meta?.hasMore ?? (opps.length === OPPS_PAGE_LIMIT);
-    if (!hasMore) break;
   }
 
   logger.info(
-    { source: 'govtribe', totalFetched, inserted, updated, skipped },
+    { source: 'govtribe', totalFetched, inserted, updated, skipped, cycleCredits: getCycleCreditsUsed() },
     'govtribe_opps_ingest_complete',
   );
 
@@ -109,7 +192,7 @@ async function upsertGovTribeOpp(
 }
 
 /**
- * govtribe.contacts.poll — Per-agency contact moves for OU3 target list.
+ * govtribe.contacts.poll — Per-agency contact moves for target list.
  * Cadence: weekly Mon 05:00 ET. Credit cost: ~20 credits.
  */
 export async function runGovTribeContactsIngest(): Promise<IngestResult> {

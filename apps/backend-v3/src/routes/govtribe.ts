@@ -14,6 +14,11 @@ import { logger } from '../lib/logger.js';
 import {
   getCreditBudgetStatus,
   govtribeFetch,
+  getCycleCreditsUsed,
+  getCycleCreditCap,
+  getMonthlyCreditCap,
+  getAlertThreshold,
+  getStopThreshold,
 } from '../ingest/govtribe/client.js';
 import { runIngest } from '../ingest/framework/registry.js';
 import type { JwtPayload } from '../middleware/auth.js';
@@ -70,6 +75,8 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
   /**
    * GET /v3/govtribe/credits
    * Detailed credit usage for Sentinel UI — uses local aggregates, no API call.
+   * Response includes cycleCap, cycleUsed, monthKey, alertThreshold, stopThreshold
+   * per V2 schema (docs/govtribe-zapier-setup.md).
    */
   app.get('/v3/govtribe/credits', async (req, reply) => {
     const { rows: monthlyRows } = await pool.query(
@@ -87,12 +94,20 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY total_credits DESC`,
     );
 
-    const thisMonth = monthlyRows[0] ?? { month: null, credits_used: 0, credits_budget: 5000, last_call_at: null };
+    const budgetStatus = await getCreditBudgetStatus();
 
     return reply.send(
       successEnvelope(
         {
-          this_month: thisMonth,
+          cycleCap: getCycleCreditCap(),
+          cycleUsed: getCycleCreditsUsed(),
+          monthlyCap: getMonthlyCreditCap(),
+          monthlyUsed: budgetStatus.credits_used,
+          monthKey: budgetStatus.month,
+          alertThreshold: getAlertThreshold(),
+          stopThreshold: getStopThreshold(),
+          monthlyAlertTriggered: budgetStatus.pct >= 80,
+          monthlyStopTriggered: budgetStatus.pct >= 95,
           last_3_months: monthlyRows,
           top_endpoints: topEndpoints,
         },

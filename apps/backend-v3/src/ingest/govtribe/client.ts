@@ -21,12 +21,47 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1_000;
 
+const MONTHLY_CREDIT_CAP = parseInt(process.env['GOVTRIBE_MONTHLY_CREDIT_CAP'] ?? '1200', 10);
+const CYCLE_CREDIT_CAP = parseInt(process.env['GOVTRIBE_CYCLE_CREDIT_CAP'] ?? '150', 10);
+const ALERT_THRESHOLD_PCT = 80;
+const STOP_THRESHOLD_PCT = 95;
+
 const ENDPOINT_CREDITS: Record<string, number> = {
   'opportunities': 1,
   'opportunities_detail': 1,
   'agencies_contacts': 2,
   'vehicles': 1,
+  'search_opportunities': 3,
+  'search_awards': 4,
+  'search_forecasts': 3,
 };
+
+/** Cycle-level credit accumulator (reset each poll run). */
+let cycleCreditsUsed = 0;
+
+export function resetCycleCredits(): void {
+  cycleCreditsUsed = 0;
+}
+
+export function getCycleCreditsUsed(): number {
+  return cycleCreditsUsed;
+}
+
+export function getCycleCreditCap(): number {
+  return CYCLE_CREDIT_CAP;
+}
+
+export function getMonthlyCreditCap(): number {
+  return MONTHLY_CREDIT_CAP;
+}
+
+export function getAlertThreshold(): number {
+  return Math.floor(MONTHLY_CREDIT_CAP * (ALERT_THRESHOLD_PCT / 100));
+}
+
+export function getStopThreshold(): number {
+  return Math.floor(MONTHLY_CREDIT_CAP * (STOP_THRESHOLD_PCT / 100));
+}
 
 export type BudgetDecision = 'called' | 'skipped_low_budget' | 'skipped_halted' | 'cached';
 
@@ -54,10 +89,10 @@ export async function getCreditBudgetStatus(): Promise<CreditBudgetStatus> {
   const month = currentMonth();
   const { rows } = await pool.query(
     `INSERT INTO govtribe_credit_monthly (month, credits_used, credits_budget)
-     VALUES ($1, 0, 5000)
+     VALUES ($1, 0, $2)
      ON CONFLICT (month) DO NOTHING
      RETURNING month, credits_used, credits_budget, last_call_at::text`,
-    [month],
+    [month, MONTHLY_CREDIT_CAP],
   );
 
   if (rows.length > 0) {
@@ -88,7 +123,7 @@ export async function getCreditBudgetStatus(): Promise<CreditBudgetStatus> {
     };
   }
 
-  return { month, credits_used: 0, credits_budget: 5000, pct: 0, last_call_at: null };
+  return { month, credits_used: 0, credits_budget: MONTHLY_CREDIT_CAP, pct: 0, last_call_at: null };
 }
 
 async function logCreditUsage(
@@ -223,7 +258,25 @@ export async function govtribeFetch<T = unknown>(
   const budgetStatus = await getCreditBudgetStatus();
   const costCredits = ENDPOINT_CREDITS[endpointKey] ?? 1;
 
-  if (budgetStatus.pct >= 95 && !critical) {
+  // Per-cycle cap check (stops mid-poll if exceeded)
+  if (cycleCreditsUsed + costCredits > CYCLE_CREDIT_CAP && !critical) {
+    await logCreditUsage(endpointKey, costCredits, 'skipped_halted');
+    const cached = await getCachedResponse(endpointKey, cacheId);
+    logger.warn(
+      { source: 'govtribe', cycleCreditsUsed, cycleCap: CYCLE_CREDIT_CAP },
+      'govtribe_cycle_cap_exceeded',
+    );
+    return {
+      data: (cached as T) ?? null,
+      decision: 'skipped_halted',
+      from_cache: cached !== null,
+      credits_used: 0,
+      budget_status: budgetStatus,
+    };
+  }
+
+  // Monthly 95% hard-stop (1140 of 1200)
+  if (budgetStatus.pct >= STOP_THRESHOLD_PCT && !critical) {
     await logCreditUsage(endpointKey, costCredits, 'skipped_halted');
     const cached = await getCachedResponse(endpointKey, cacheId);
     return {
@@ -235,7 +288,8 @@ export async function govtribeFetch<T = unknown>(
     };
   }
 
-  if (budgetStatus.pct >= 80 && !critical) {
+  // Monthly 80% alert threshold (960 of 1200)
+  if (budgetStatus.pct >= ALERT_THRESHOLD_PCT && !critical) {
     await logCreditUsage(endpointKey, costCredits, 'skipped_low_budget');
     const cached = await getCachedResponse(endpointKey, cacheId);
     return {
@@ -264,6 +318,7 @@ export async function govtribeFetch<T = unknown>(
     const { statusCode, body } = await fetchWithRetry(url, endpointKey);
     await logCreditUsage(endpointKey, costCredits, 'called', statusCode);
     await setCachedResponse(endpointKey, cacheId, body);
+    cycleCreditsUsed += costCredits;
 
     const updatedBudget = await getCreditBudgetStatus();
     return {

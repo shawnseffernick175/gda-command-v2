@@ -9,7 +9,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope } from '../lib/envelope.js';
 import { getRegisteredSources } from '../ingest/framework/registry.js';
 import { getIngestStatus } from '../ingest/framework/run_logger.js';
-import { getCreditBudgetStatus } from '../ingest/govtribe/client.js';
+import { getCreditBudgetStatus, getMonthlyCreditCap } from '../ingest/govtribe/client.js';
 
 interface SentinelSourceEntry {
   source_key: string;
@@ -29,6 +29,8 @@ function deriveSentinelMessage(
   sourceKey: string,
   pct: number,
   lagSeconds: number | null,
+  creditsUsed?: number,
+  creditsBudget?: number,
 ): string {
   if (sourceKey !== 'govtribe' && !sourceKey.startsWith('govtribe.')) {
     if (lagSeconds === null) return 'No data yet';
@@ -36,23 +38,25 @@ function deriveSentinelMessage(
     return `Healthy — last poll ${Math.round(lagSeconds / 60)} min ago`;
   }
 
+  const cap = creditsBudget ?? getMonthlyCreditCap();
+  const used = creditsUsed ?? 0;
   const lagMsg = lagSeconds !== null
     ? `Last opps poll ${Math.round(lagSeconds / 60)} min ago.`
     : 'No polls yet.';
 
   if (pct >= 95) {
-    return `GovTribe at ${pct}% of budget — STOPPED auto-polling. Only opp detail on user request. ${lagMsg}`;
+    return `GovTribe at ${pct}% of budget (${used}/${cap}) — STOPPED auto-polling. Only opp detail on user request. ${lagMsg}`;
   }
   if (pct >= 80) {
     const now = new Date();
     const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
-    return `GovTribe at ${pct}% of budget — ${daysLeft} days left in month. Restricting to on-demand calls only. ${lagMsg}`;
+    return `GovTribe at ${pct}% of budget (${used}/${cap}) — ${daysLeft} days left in month. Restricting to on-demand calls only. ${lagMsg}`;
   }
   if (pct >= 50) {
-    return `GovTribe at ${pct}% of monthly credit budget — pacing on track. ${lagMsg}`;
+    return `GovTribe at ${pct}% of monthly credit budget (${used}/${cap}) — pacing on track. ${lagMsg}`;
   }
 
-  return `GovTribe at ${pct}% of monthly credit budget. ${lagMsg}`;
+  return `GovTribe at ${pct}% of monthly credit budget (${used}/${cap}). ${lagMsg}`;
 }
 
 function deriveSeverity(pct: number): 'ok' | 'warning' | 'critical' {
@@ -68,7 +72,7 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
 
     const ingestMap = new Map(ingestStatus.map((s) => [s.source_key, s]));
 
-    let govtribeBudget = { credits_used: 0, credits_budget: 5000, pct: 0, last_call_at: null as string | null };
+    let govtribeBudget = { credits_used: 0, credits_budget: getMonthlyCreditCap(), pct: 0, last_call_at: null as string | null };
     try {
       govtribeBudget = await getCreditBudgetStatus();
     } catch {
@@ -100,7 +104,7 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
 
       const pct = isGovTribe ? govtribeBudget.pct : 0;
       const message = isGovTribe
-        ? deriveSentinelMessage(sourceKey, pct, lagSeconds)
+        ? deriveSentinelMessage(sourceKey, pct, lagSeconds, govtribeBudget.credits_used, govtribeBudget.credits_budget)
         : recentError
           ? `Error: ${recentError.slice(0, 100)}`
           : deriveSentinelMessage(sourceKey, 0, lagSeconds);

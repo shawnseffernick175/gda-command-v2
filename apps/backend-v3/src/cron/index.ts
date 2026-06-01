@@ -52,7 +52,7 @@ const JOBS: CronJob[] = [
     : []),
   ...(govtribeEnabled
     ? [
-        { sourceKey: 'govtribe', schedule: '0 */8 * * *', label: 'GovTribe opps poll (every 8h)' },
+        { sourceKey: 'govtribe', schedule: '0 10 * * 1,4', label: 'GovTribe opps poll (Mon + Thu 6am ET)' },
         { sourceKey: 'govtribe.contacts', schedule: '0 9 * * 1', label: 'GovTribe contacts poll (weekly Mon 05:00 ET)' },
         { sourceKey: 'govtribe.vehicles', schedule: '0 6 1 * *', label: 'GovTribe vehicles poll (monthly)' },
         { sourceKey: 'govtribe.budget', schedule: '55 3 * * *', label: 'GovTribe budget rollup (nightly 23:55 ET)' },
@@ -105,7 +105,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'neco' ? 'neco.6h'
       : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
       : job.sourceKey === 'sbir.gov' ? 'sbir.12h'
-      : job.sourceKey === 'govtribe' ? 'govtribe.opps.8h'
+      : job.sourceKey === 'govtribe' ? 'govtribe.opps.poll'
       : job.sourceKey === 'govtribe.contacts' ? 'govtribe.contacts.weekly'
       : job.sourceKey === 'govtribe.vehicles' ? 'govtribe.vehicles.monthly'
       : job.sourceKey === 'govtribe.budget' ? 'govtribe.budget.nightly'
