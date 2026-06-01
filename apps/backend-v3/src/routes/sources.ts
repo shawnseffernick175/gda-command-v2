@@ -8,7 +8,7 @@ import { logger } from '../lib/logger.js';
 import { invalidateAllCaches } from '../services/launchpad/cache.js';
 
 const VALID_KINDS = [
-  'sam_gov', 'fpds', 'usaspending', 'govwin',
+  'sam_gov', 'fpds', 'usaspending', 'govwin', 'govtribe',
   'news', 'doctrine', 'partner_site', 'internal',
 ] as const;
 

@@ -6,7 +6,7 @@ Updated 2026-05-29 per Shawn directive.
 
 Every value rendered to the user must include a `SourceRef` with a clickable URL back to the original record. Bare numbers, AI-only claims, and unsourced strings are forbidden in the UI and the API.
 
-Acceptable source kinds: `sam_gov`, `fpds`, `usaspending`, `govwin`, `news`, `doctrine`, `partner_site`, `internal`.
+Acceptable source kinds: `sam_gov`, `fpds`, `usaspending`, `govwin`, `govtribe`, `news`, `doctrine`, `partner_site`, `internal`.
 
 If a field has no source, the API omits it from the response. The UI never renders an unsourced value.
 

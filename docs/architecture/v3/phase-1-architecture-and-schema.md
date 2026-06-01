@@ -235,6 +235,8 @@ CREATE TABLE opportunities (
   part_number         TEXT,                    -- DIBBS-specific part/NSN tracking
   quantity            NUMERIC,                 -- requested quantity (DIBBS/NECO)
   external_id         TEXT,                    -- non-SAM unique ID for dedup (DIBBS sol#, NECO RFQ#)
+  source_uri          TEXT,                    -- deep-link to source page (GovTribe, GovWin, etc.)
+  govtribe_id         TEXT,                    -- GovTribe entity ID for dedup + detail proxy
   analysis            JSONB,                   -- R2: cached auto-analysis result
   analysis_version    TEXT,                    -- analysis model version for cache invalidation
   ai_analyzed_at      TIMESTAMPTZ,             -- when analysis last ran
@@ -258,6 +260,8 @@ CREATE INDEX idx_opps_sam_notice     ON opportunities (sam_notice_id) WHERE sam_
 CREATE INDEX idx_opps_agency_subtype ON opportunities (agency_subtype) WHERE agency_subtype IS NOT NULL;
 CREATE INDEX idx_opps_part_number    ON opportunities (part_number) WHERE part_number IS NOT NULL;
 CREATE UNIQUE INDEX idx_opps_ext_id  ON opportunities (data_source, external_id) WHERE external_id IS NOT NULL;
+CREATE INDEX idx_opps_govtribe_id   ON opportunities (govtribe_id) WHERE govtribe_id IS NOT NULL;
+CREATE INDEX idx_opps_source_uri    ON opportunities (source_uri) WHERE source_uri IS NOT NULL;
 CREATE INDEX idx_opps_source         ON opportunities (source_id);
 CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted_at IS NOT NULL;
 ```
