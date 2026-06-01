@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { setToken, type AuthUser } from '../../lib/auth';
 
@@ -26,6 +26,27 @@ export function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  const lockoutEndRef = useRef<number>(0);
+  const isLockedOut = lockoutSeconds > 0;
+
+  // Countdown driven by React lifecycle — the interval is cleaned up on
+  // unmount so it can never leak an open handle that keeps the process alive.
+  useEffect(() => {
+    if (!isLockedOut) return;
+
+    const id = setInterval(() => {
+      const remaining = Math.ceil((lockoutEndRef.current - Date.now()) / 1000);
+      if (remaining <= 0) {
+        clearInterval(id);
+        setLockoutSeconds(0);
+        setError('');
+      } else {
+        setLockoutSeconds(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [isLockedOut]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -49,8 +70,8 @@ export function Login() {
 
       if (res.status === 423) {
         const seconds = json.retryAfter || 900;
+        lockoutEndRef.current = Date.now() + seconds * 1000;
         setLockoutSeconds(seconds);
-        startCountdown(seconds);
         return;
       }
 
@@ -65,20 +86,6 @@ export function Login() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function startCountdown(seconds: number) {
-    let remaining = seconds;
-    const interval = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(interval);
-        setLockoutSeconds(0);
-        setError('');
-      } else {
-        setLockoutSeconds(remaining);
-      }
-    }, 1000);
   }
 
   function handleRetry() {
