@@ -175,6 +175,59 @@ jobs:
           fi
           echo "All compose file hashes match — no drift detected"
 
+      - name: Verify connector env-var parity (code ↔ compose)
+        run: |
+          COMPOSE="docker-compose.prod.yml"
+          DRIFT=0
+
+          # Extract env var names read in backend-v3 connector code
+          BACKEND_VARS=$(grep -rhoP "process\.env[.\[]['\"']?(GOVTRIBE_\w+|GOVWIN_\w+|ENABLE_GOVTRIBE_\w+)" \
+            apps/backend-v3/src/ 2>/dev/null \
+            | grep -oP '(GOVTRIBE_\w+|GOVWIN_\w+|ENABLE_GOVTRIBE_\w+)' \
+            | sort -u || true)
+
+          # Extract env var names read in agent-v3 connector code
+          AGENT_VARS=$(grep -rhoP "(os\.getenv|os\.environ)[.(\\[]['\"']?(GOVTRIBE_\w+|GOVWIN_\w+|ENABLE_GOVTRIBE_\w+)" \
+            apps/gda-agent-v3/src/ 2>/dev/null \
+            | grep -oP '(GOVTRIBE_\w+|GOVWIN_\w+|ENABLE_GOVTRIBE_\w+)' \
+            | sort -u || true)
+
+          echo "=== backend-v3 connector env reads ==="
+          echo "$BACKEND_VARS"
+          echo ""
+          echo "=== agent-v3 connector env reads ==="
+          echo "${AGENT_VARS:-<none>}"
+          echo ""
+
+          # Extract per-service environment blocks from compose
+          BACKEND_BLOCK=$(awk '/^  backend-v3:/{f=1; next} f && /^  [a-z]/{f=0} f' "$COMPOSE")
+          AGENT_BLOCK=$(awk '/^  gda-agent-v3:/{f=1; next} f && /^  [a-z]/{f=0} f' "$COMPOSE")
+
+          # Check backend-v3 vars are in the backend-v3 service block
+          for var in $BACKEND_VARS; do
+            if ! echo "$BACKEND_BLOCK" | grep -qP "^\s+${var}:"; then
+              echo "::error::MISSING in compose backend-v3: $var (read by apps/backend-v3/src but not in backend-v3 environment block)"
+              DRIFT=1
+            fi
+          done
+
+          # Check agent-v3 vars are in the gda-agent-v3 service block
+          for var in $AGENT_VARS; do
+            if ! echo "$AGENT_BLOCK" | grep -qP "^\s+${var}:"; then
+              echo "::error::MISSING in compose gda-agent-v3: $var (read by apps/gda-agent-v3/src but not in gda-agent-v3 environment block)"
+              DRIFT=1
+            fi
+          done
+
+          if [ "$DRIFT" -ne 0 ]; then
+            echo ""
+            echo "Connector code reads env vars not passed through docker-compose.prod.yml."
+            echo "Add \${VAR:-} entries to the appropriate service environment block."
+            echo "See docs/v3-cognition/connector-secrets.md for the full checklist."
+            exit 1
+          fi
+          echo "All connector env vars have compose passthroughs — no drift"
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest

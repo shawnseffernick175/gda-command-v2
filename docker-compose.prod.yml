@@ -70,6 +70,17 @@ services:
       SAM_GOV_API_KEY: ${SAM_GOV_API_KEY:-}
       AGENT_V3_URL: http://gda-agent-v3:8001
       AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
+      # --- GovTribe connector (F-303 / #557 / #565) ---
+      GOVTRIBE_API_KEY: ${GOVTRIBE_API_KEY:-}
+      GOVTRIBE_API_BASE: ${GOVTRIBE_API_BASE:-https://api.govtribe.com/v1}
+      GOVTRIBE_CYCLE_CREDIT_CAP: ${GOVTRIBE_CYCLE_CREDIT_CAP:-150}
+      GOVTRIBE_MONTHLY_CREDIT_CAP: ${GOVTRIBE_MONTHLY_CREDIT_CAP:-1200}
+      ENABLE_GOVTRIBE_INGEST: ${ENABLE_GOVTRIBE_INGEST:-}
+      GOVTRIBE_MCP_URL: ${GOVTRIBE_MCP_URL:-}
+      # --- GovWin IQ connector — CAS auth (F-Govwin / #561) ---
+      GOVWIN_USERNAME: ${GOVWIN_USERNAME:-}
+      GOVWIN_PASSWORD: ${GOVWIN_PASSWORD:-}
+      GOVWIN_CONNECTOR_V1: ${GOVWIN_CONNECTOR_V1:-}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gda-v3.rule=Host(`gda-v3.csr-llc.tech`)"
@@ -104,6 +115,17 @@ services:
       AGENT_MAX_STEPS: ${AGENT_MAX_STEPS:-12}
       AGENT_WALL_TIMEOUT_S: ${AGENT_WALL_TIMEOUT_S:-30}
       AGENT_HOURLY_COST_LIMIT_USD: ${AGENT_HOURLY_COST_LIMIT_USD:-5}
+      # --- GovTribe connector (F-303 / #557 / #565) ---
+      GOVTRIBE_API_KEY: ${GOVTRIBE_API_KEY:-}
+      GOVTRIBE_API_BASE: ${GOVTRIBE_API_BASE:-https://api.govtribe.com/v1}
+      GOVTRIBE_CYCLE_CREDIT_CAP: ${GOVTRIBE_CYCLE_CREDIT_CAP:-150}
+      GOVTRIBE_MONTHLY_CREDIT_CAP: ${GOVTRIBE_MONTHLY_CREDIT_CAP:-1200}
+      ENABLE_GOVTRIBE_INGEST: ${ENABLE_GOVTRIBE_INGEST:-}
+      GOVTRIBE_MCP_URL: ${GOVTRIBE_MCP_URL:-}
+      # --- GovWin IQ connector — CAS auth (F-Govwin / #561) ---
+      GOVWIN_USERNAME: ${GOVWIN_USERNAME:-}
+      GOVWIN_PASSWORD: ${GOVWIN_PASSWORD:-}
+      GOVWIN_CONNECTOR_V1: ${GOVWIN_CONNECTOR_V1:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/healthz"]
       interval: 15s
