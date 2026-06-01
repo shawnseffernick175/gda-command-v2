@@ -28,6 +28,10 @@ import {
   type OpportunityUpdateInput,
   type ListFilters,
 } from '../services/opportunities/index.js';
+import {
+  getMerged,
+  setFieldOverride,
+} from '../services/opportunities/merge.js';
 
 function isCacheFresh(row: OpportunityRow): boolean {
   if (!row.analysis || !row.analysis_version || !row.ai_analyzed_at) return false;
@@ -272,5 +276,45 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         req.requestId,
       ),
     );
+  });
+
+  // GET /v3/opportunities/:id/merged — unified merged view (F-405)
+  app.get<{ Params: { id: string } }>('/v3/opportunities/:id/merged', async (req, reply) => {
+    const { id } = req.params;
+
+    const merged = await getMerged(id);
+    if (!merged) {
+      return reply
+        .status(404)
+        .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+    }
+
+    return reply.status(200).send(successEnvelope(merged, req.requestId));
+  });
+
+  // PUT /v3/opportunities/:id/overrides — set a field override (F-405)
+  app.put<{ Params: { id: string } }>('/v3/opportunities/:id/overrides', async (req, reply) => {
+    const { id } = req.params;
+    const body = req.body as Record<string, unknown> | undefined;
+
+    if (!body || typeof body.field_name !== 'string' || body.field_name.trim().length === 0) {
+      return reply
+        .status(400)
+        .send(errorEnvelope('VALIDATION_ERROR', 'field_name is required', req.requestId));
+    }
+
+    const existing = await getOpportunityById(id);
+    if (!existing) {
+      return reply
+        .status(404)
+        .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+    }
+
+    const user = (req as typeof req & { user?: { sub: string } }).user;
+    const setBy = (body.set_by as string) ?? user?.sub ?? 'manual';
+    const fieldValue = body.field_value !== undefined ? String(body.field_value) : null;
+
+    const override = await setFieldOverride(id, body.field_name as string, fieldValue, setBy);
+    return reply.status(200).send(successEnvelope(override, req.requestId));
   });
 }
