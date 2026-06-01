@@ -16,6 +16,7 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import { logger } from '../lib/logger.js';
 import { runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
+import { listAdapters } from '../ingest/adapter/registry.js';
 import { registerSAMSource } from '../ingest/sam/index.js';
 import { registerDIBBSSource } from '../ingest/dibbs/index.js';
 import { registerNECOSource } from '../ingest/neco/index.js';
@@ -83,7 +84,8 @@ export function startCronScheduler(): void {
   }
 
   const registeredSources = getRegisteredSources();
-  logger.info({ sources: registeredSources }, '[ingest] framework ready');
+  const registeredAdapters = listAdapters();
+  logger.info({ sources: registeredSources, adapters: registeredAdapters }, '[ingest] framework ready');
 
   if (!sbirEnabled) {
     logger.info({ flag: 'ENABLE_SBIR_INGEST' }, '[cron] sbir.12h skipped — gated behind env flag (default off due to api.www.sbir.gov 429 block on VPS egress)');
