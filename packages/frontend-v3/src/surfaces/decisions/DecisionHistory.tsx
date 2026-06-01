@@ -126,7 +126,7 @@ export function DecisionHistory({ entityKind, entityId }: DecisionHistoryProps) 
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
     return (
       <p className="text-sm text-ink-muted py-2" data-testid="decision-history-empty">
         No decisions recorded yet.

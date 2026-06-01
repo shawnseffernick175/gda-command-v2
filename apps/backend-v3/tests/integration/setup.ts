@@ -23,6 +23,17 @@ export async function setup(): Promise<void> {
   process.env['DATABASE_URL'] = url;
   process.env['INTEGRATION_DB_URL'] = url;
 
+  // Set test env vars in globalSetup so they are inherited by worker forks.
+  // Vitest 4's Module Runner evaluates config/index.ts eagerly on static
+  // import, so these must be in the environment before workers start.
+  process.env['JWT_SECRET'] = 'test-jwt-secret-integration';
+  process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key-integration';
+  process.env['NODE_ENV'] = 'test';
+  process.env['ANALYSIS_VERSION'] = 'v0.0.1-test';
+  process.env['ANALYSIS_TIMEOUT_MS'] = '5000';
+  process.env['ANALYSIS_POLL_INTERVAL_MS'] = '50';
+  process.env['LLM_ROUTER_MODE'] = 'mock';
+
   // Run migrations + seed once for the entire suite
   await runMigrations(url);
   const ids = await seed(url);
