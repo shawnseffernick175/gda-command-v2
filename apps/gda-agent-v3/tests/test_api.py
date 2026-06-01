@@ -16,6 +16,8 @@ class TestHealthz:
         assert "models_available" in body
         assert "rag_ready" in body
         assert "db_ready" in body
+        assert body["langgraph"] == "0.4.7"
+        assert body["langgraph_prebuilt"] == "0.2.3"
 
     async def test_healthz_no_auth_required(self, client):
         resp = await client.get("/healthz")
