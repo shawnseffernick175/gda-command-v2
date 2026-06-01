@@ -1,4 +1,4 @@
--- V3 Migration 020: RAG Knowledge Base — kb_documents + kb_chunks (F-301)
+-- V3 Migration 022: RAG Knowledge Base — kb_documents + kb_chunks (F-301)
 --
 -- Creates the vector-search knowledge base for grounding agent analysis
 -- in retrievable, citable, OU-tagged, evidence-graded chunks.

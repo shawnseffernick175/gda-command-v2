@@ -31,15 +31,62 @@ export async function checkMigrationsCurrent(): Promise<'current' | 'behind' | '
   try {
     const client = await pool.connect();
     try {
-      const res = await client.query(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sources') AS has_sources"
+      const trackerExists = await client.query(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'v3_schema_migrations') AS ok"
       );
-      const row = res.rows[0] as { has_sources: boolean } | undefined;
-      return row?.has_sources ? 'current' : 'behind';
+      const hasTracker = (trackerExists.rows[0] as { ok: boolean } | undefined)?.ok;
+      if (!hasTracker) return 'behind';
+
+      const res = await client.query(
+        'SELECT count(*)::int AS cnt FROM v3_schema_migrations'
+      );
+      const count = (res.rows[0] as { cnt: number } | undefined)?.cnt ?? 0;
+      return count > 0 ? 'current' : 'behind';
     } finally {
       client.release();
     }
   } catch {
     return 'unknown';
+  }
+}
+
+export interface SchemaStatus {
+  version: string;
+  migration_count: number;
+  last_migration_at: string | null;
+  drift_detected: boolean;
+}
+
+export async function getSchemaStatus(): Promise<SchemaStatus> {
+  const client = await pool.connect();
+  try {
+    const trackerExists = await client.query(
+      "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'v3_schema_migrations') AS ok"
+    );
+    const hasTracker = (trackerExists.rows[0] as { ok: boolean } | undefined)?.ok;
+    if (!hasTracker) {
+      return { version: 'none', migration_count: 0, last_migration_at: null, drift_detected: true };
+    }
+
+    const res = await client.query(`
+      SELECT
+        count(*)::int AS cnt,
+        max(filename) AS latest,
+        max(applied_at)::text AS last_applied
+      FROM v3_schema_migrations
+    `);
+    const row = res.rows[0] as { cnt: number; latest: string | null; last_applied: string | null };
+
+    const version = row.latest ?? 'none';
+    const driftDetected = row.cnt === 0;
+
+    return {
+      version,
+      migration_count: row.cnt,
+      last_migration_at: row.last_applied,
+      drift_detected: driftDetected,
+    };
+  } finally {
+    client.release();
   }
 }

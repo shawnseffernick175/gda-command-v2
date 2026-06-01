@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config/index.js';
-import { checkDbConnection, checkMigrationsCurrent } from '../lib/db.js';
+import { checkDbConnection, checkMigrationsCurrent, getSchemaStatus } from '../lib/db.js';
 import { getBoss, QUEUE_NAMES } from '../lib/queue.js';
 import { register } from '../lib/metrics.js';
 import { successEnvelope, buildMeta } from '../lib/envelope.js';
@@ -73,6 +73,19 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
       .header('content-type', register.contentType)
       .status(200)
       .send(metrics);
+  });
+
+  app.get('/v3/health/schema', async (req, reply) => {
+    try {
+      const status = await getSchemaStatus();
+      const body = successEnvelope(status, req.requestId);
+      return reply.status(200).send(body);
+    } catch (err) {
+      return reply.status(503).send({
+        success: false,
+        error: 'Failed to query schema status',
+      });
+    }
   });
 
   app.get('/v3/openapi.yaml', async (_req, reply) => {

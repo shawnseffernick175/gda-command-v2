@@ -1,4 +1,4 @@
--- V3 Migration 019: Decision Memory + PWin Model tables (F-302)
+-- V3 Migration 021: Decision Memory + PWin Model tables (F-302)
 --
 -- Extends:
 --   1. agent_decisions (created by v3_018) — adds entity_kind/entity_id, outcome columns,

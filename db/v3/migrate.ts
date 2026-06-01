@@ -15,13 +15,15 @@
 
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import pg from 'pg';
 
 const { Pool } = pg;
 
-const MIGRATIONS_DIR = resolve(join(import.meta.dirname ?? __dirname, 'migrations'));
+const __dir = import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = resolve(join(__dir, 'migrations'));
 
 function getCommitSha(): string | null {
   try {

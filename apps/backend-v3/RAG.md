@@ -21,7 +21,7 @@ Two tables in the V3 database:
 - **`kb_documents`** — Source documents (PDF, DOCX, PPTX, etc.) with doc_type, OU tag, evidence grade, SHA256 dedup.
 - **`kb_chunks`** — Embedded text chunks with `vector(2000)` column and HNSW index for fast cosine similarity search.
 
-Migration: `db/v3/migrations/v3_020_kb_documents_and_chunks.sql`
+Migration: `db/v3/migrations/v3_022_kb_documents_and_chunks.sql`
 
 ## API Endpoints
 

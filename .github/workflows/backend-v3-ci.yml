@@ -13,6 +13,56 @@ on:
       - 'db/v3/**'
 
 jobs:
+  schema-migration-dry-run:
+    name: Schema Migration Dry-Run
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda_ci
+          POSTGRES_PASSWORD: gda_ci_pw
+          POSTGRES_DB: gda_ci
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gda_ci -d gda_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply all migrations from scratch
+        env:
+          V3_DATABASE_URL: postgresql://gda_ci:gda_ci_pw@localhost:5433/gda_ci
+        run: npx tsx db/v3/migrate.ts
+      - name: Verify migration tracker populated
+        env:
+          PGPASSWORD: gda_ci_pw
+        run: |
+          COUNT=$(psql -h localhost -p 5433 -U gda_ci -d gda_ci -tAc \
+            "SELECT count(*) FROM v3_schema_migrations")
+          echo "Migrations recorded: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then
+            echo "::error::No migrations recorded in v3_schema_migrations"
+            exit 1
+          fi
+      - name: Verify idempotency (re-run is no-op)
+        env:
+          V3_DATABASE_URL: postgresql://gda_ci:gda_ci_pw@localhost:5433/gda_ci
+        run: |
+          OUTPUT=$(npx tsx db/v3/migrate.ts 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q "Applying:"; then
+            echo "::error::Re-run applied new migrations — runner is not idempotent"
+            exit 1
+          fi
+
   integration:
     name: Integration Tests (Postgres testcontainer)
     runs-on: ubuntu-latest
