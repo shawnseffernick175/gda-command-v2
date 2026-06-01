@@ -106,4 +106,45 @@ describe('PwinBreakdown', () => {
     const contributions = await screen.findByTestId('pwin-contributions');
     expect(contributions).toBeTruthy();
   });
+
+  it('renders without crash when top_drivers and feature_weights are missing', async () => {
+    const sparseScore = { score: 55, model_version: 'v1-rules', confidence: null };
+
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes('/pwin/score')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            success: true,
+            data: sparseScore,
+            meta: { generatedAt: '2026-06-01T00:00:00Z', source: 'v3', requestId: 'r-sparse' },
+          }),
+        });
+      }
+      if (url.includes('/pwin/model')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            success: true,
+            data: mockModel,
+            meta: { generatedAt: '2026-06-01T00:00:00Z', source: 'v3', requestId: 'r-model' },
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: null, meta: { generatedAt: '2026-06-01T00:00:00Z', source: 'v3', requestId: 'r-fallback' } }),
+      });
+    });
+
+    renderWithProviders(<PwinBreakdown opportunityId="opp-sparse" />);
+
+    expect(await screen.findByText('55%')).toBeTruthy();
+
+    const narrative = await screen.findByTestId('pwin-narrative');
+    expect(narrative.textContent).toContain('55%');
+
+    const breakdown = await screen.findByTestId('pwin-breakdown');
+    expect(breakdown).toBeTruthy();
+  });
 });

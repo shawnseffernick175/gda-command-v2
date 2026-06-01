@@ -47,8 +47,8 @@ export interface RuleContribution {
 export interface PwinScoreResult {
   score: number;
   model_version: string;
-  feature_weights: RuleContribution[];
-  top_drivers: string[];
+  feature_weights?: RuleContribution[];
+  top_drivers?: string[];
   confidence: number | null;
 }
 

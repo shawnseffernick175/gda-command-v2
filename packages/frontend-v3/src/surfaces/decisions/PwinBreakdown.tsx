@@ -100,7 +100,7 @@ export function PwinBreakdown({ opportunityId }: PwinBreakdownProps) {
 
   if (!score.data) return null;
 
-  const { score: pwinScore, model_version, feature_weights, top_drivers, confidence } = score.data;
+  const { score: pwinScore, model_version, feature_weights = [], top_drivers = [], confidence } = score.data;
 
   const narrative = buildNarrative(pwinScore, top_drivers);
 
