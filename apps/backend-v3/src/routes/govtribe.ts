@@ -19,7 +19,7 @@ import {
 } from '../ingest/govtribe/client.js';
 import { runIngest } from '../ingest/framework/registry.js';
 import type { JwtPayload } from '../middleware/auth.js';
-import type { GovTribeOpportunityRaw } from '../ingest/govtribe/types.js';
+import type { GovTribeOpportunityRaw, GovTribeListResponse } from '../ingest/govtribe/types.js';
 
 function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
   const user = (req as FastifyRequest & { user?: JwtPayload }).user;
@@ -199,6 +199,107 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error({ source: 'govtribe', endpoint, error: message }, 'govtribe_sync_error');
+
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', message, req.requestId),
+      );
+    }
+  });
+
+  /**
+   * POST /v3/govtribe/search
+   * Agent-facing search endpoint — proxies to GovTribe search API.
+   * Credit-budget enforced. Caller tracked in govtribe_credit_ledger.
+   *
+   * Body: { query, category?, naics_filter?, max_results?, caller? }
+   * category: "opportunities" (default) | "awards" | "forecasts"
+   */
+  app.post('/v3/govtribe/search', async (req, reply) => {
+    const body = req.body as {
+      query?: string;
+      category?: string;
+      naics_filter?: string;
+      max_results?: number;
+      caller?: string;
+    };
+
+    const query = body.query?.trim();
+    if (!query) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'query is required', req.requestId),
+      );
+    }
+
+    const category = body.category ?? 'opportunities';
+    const validCategories = ['opportunities', 'awards', 'forecasts'];
+    if (!validCategories.includes(category)) {
+      return reply.status(400).send(
+        errorEnvelope(
+          'VALIDATION_ERROR',
+          `Invalid category. Must be one of: ${validCategories.join(', ')}`,
+          req.requestId,
+        ),
+      );
+    }
+
+    const maxResults = Math.min(Math.max(body.max_results ?? 10, 1), 50);
+    const caller = body.caller ?? 'backend-v3';
+
+    const endpointKeyMap: Record<string, string> = {
+      opportunities: 'search_opportunities',
+      awards: 'search_awards',
+      forecasts: 'search_forecasts',
+    };
+    const endpointKey = endpointKeyMap[category]!;
+
+    const params = new URLSearchParams();
+    params.set('q', query);
+    params.set('limit', String(maxResults));
+    if (body.naics_filter) {
+      params.set('naicsCode', body.naics_filter);
+    }
+
+    const path = `/${category}?${params.toString()}`;
+    const cacheId = `search_${category}_${query}_${body.naics_filter ?? ''}_${maxResults}`;
+
+    try {
+      const result = await govtribeFetch<GovTribeListResponse<GovTribeOpportunityRaw>>(
+        endpointKey,
+        path,
+        cacheId,
+        false,
+        caller,
+      );
+
+      if (result.decision !== 'called' && !result.from_cache) {
+        return reply.status(429).send(
+          errorEnvelope(
+            'RATE_LIMITED',
+            `GovTribe credit cap: ${result.decision}`,
+            req.requestId,
+          ),
+        );
+      }
+
+      const hits = result.data?.data ?? [];
+
+      return reply.send(
+        successEnvelope(
+          {
+            results: hits,
+            total: result.data?.meta?.total ?? hits.length,
+            category,
+            decision: result.decision,
+            from_cache: result.from_cache,
+            credits_used: result.credits_used,
+            budget: result.budget_status,
+          },
+          req.requestId,
+        ),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ source: 'govtribe', endpoint: 'search', category, error: message }, 'govtribe_search_error');
 
       return reply.status(500).send(
         errorEnvelope('INTERNAL_ERROR', message, req.requestId),

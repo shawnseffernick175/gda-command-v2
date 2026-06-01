@@ -125,12 +125,13 @@ async function logCreditUsage(
   decision: BudgetDecision,
   responseStatus?: number,
   errorText?: string,
+  caller = 'backend-v3',
 ): Promise<void> {
   await pool.query(
     `INSERT INTO govtribe_credit_ledger
-       (endpoint, cost_credits, decision, response_status, error_text)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [endpoint, costCredits, decision, responseStatus ?? null, errorText ?? null],
+       (endpoint, cost_credits, decision, response_status, error_text, caller)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [endpoint, costCredits, decision, responseStatus ?? null, errorText ?? null, caller],
   );
 
   if (decision === 'called') {
@@ -247,6 +248,7 @@ export async function govtribeFetch<T = unknown>(
   path: string,
   cacheId: string,
   critical = false,
+  caller = 'backend-v3',
 ): Promise<GovTribeFetchResult<T>> {
   const budgetStatus = await getCreditBudgetStatus();
   const costCredits = ENDPOINT_CREDITS[endpointKey] ?? 1;
@@ -257,7 +259,7 @@ export async function govtribeFetch<T = unknown>(
       { source: 'govtribe', cycleUsed: cycleCreditsUsed, cycleCap: CYCLE_CREDIT_CAP },
       'govtribe_cycle_cap_exceeded',
     );
-    await logCreditUsage(endpointKey, costCredits, 'skipped_cycle_cap');
+    await logCreditUsage(endpointKey, costCredits, 'skipped_cycle_cap', undefined, undefined, caller);
     const cached = await getCachedResponse(endpointKey, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -269,7 +271,7 @@ export async function govtribeFetch<T = unknown>(
   }
 
   if (budgetStatus.pct >= 95 && !critical) {
-    await logCreditUsage(endpointKey, costCredits, 'skipped_halted');
+    await logCreditUsage(endpointKey, costCredits, 'skipped_halted', undefined, undefined, caller);
     const cached = await getCachedResponse(endpointKey, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -281,7 +283,7 @@ export async function govtribeFetch<T = unknown>(
   }
 
   if (budgetStatus.pct >= 80 && !critical) {
-    await logCreditUsage(endpointKey, costCredits, 'skipped_low_budget');
+    await logCreditUsage(endpointKey, costCredits, 'skipped_low_budget', undefined, undefined, caller);
     const cached = await getCachedResponse(endpointKey, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -307,7 +309,7 @@ export async function govtribeFetch<T = unknown>(
 
   try {
     const { statusCode, body } = await fetchWithRetry(url, endpointKey);
-    await logCreditUsage(endpointKey, costCredits, 'called', statusCode);
+    await logCreditUsage(endpointKey, costCredits, 'called', statusCode, undefined, caller);
     await setCachedResponse(endpointKey, cacheId, body);
     cycleCreditsUsed += costCredits;
 
@@ -321,7 +323,7 @@ export async function govtribeFetch<T = unknown>(
     };
   } catch (err) {
     const errorText = err instanceof Error ? err.message : String(err);
-    await logCreditUsage(endpointKey, 0, 'skipped_halted', undefined, errorText);
+    await logCreditUsage(endpointKey, 0, 'skipped_halted', undefined, errorText, caller);
     await setLastError(endpointKey, cacheId, errorText);
 
     logger.error({ source: 'govtribe', endpoint: endpointKey, error: errorText }, 'govtribe_fetch_error');

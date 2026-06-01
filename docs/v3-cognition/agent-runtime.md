@@ -24,7 +24,7 @@ Browser ──JWT──▶ backend-v3:4000/v3/agent/* ──service-token──�
 | `GET` | `/v3/agent/trace/:run_id` | Retrieve full trace for a completed run |
 | `POST` | `/v3/agent/cancel/:run_id` | Cancel an in-progress run |
 
-## Tool Registry (11 tools)
+## Tool Registry (12 tools)
 
 | # | Tool | Description | Credit burn |
 |---|------|-------------|-------------|
@@ -39,12 +39,13 @@ Browser ──JWT──▶ backend-v3:4000/v3/agent/* ──service-token──�
 | 9 | `file_read` | Read a document from the GDA Command file store | None (local) |
 | 10 | `pwin_score` | Get probability-of-win score for an opportunity (F-302 model) | LLM call |
 | 11 | `govwin_search` | Search GovWin IQ for government contract intelligence | GovWin API credit |
+| 12 | `govtribe_search` | Search GovTribe for opportunities, awards, and forecasts | GovTribe API credit (3–4/call) |
 
 ### Credit-burn annotations
 
 - **Free/Local**: `sam_search`, `usaspending_search`, `federal_register_search`, `db_query`, `rag_search`, `decision_memory_lookup`, `file_read` — zero external cost.
 - **LLM**: `doctrine_check`, `pwin_score` — consume LLM tokens (OpenAI/Anthropic). Cost tracked via `AGENT_HOURLY_COST_LIMIT_USD` (default $5/hr).
-- **API credits**: `web_search` (Perplexity/Tavily per-query), `govwin_search` (GovWin IQ API).
+- **API credits**: `web_search` (Perplexity/Tavily per-query), `govwin_search` (GovWin IQ API), `govtribe_search` (GovTribe API — 3 credits/opp search, 4/award search, 3/forecast search; 150/cycle cap, 1200/month cap).
 
 ## Tool Schemas
 
@@ -126,6 +127,17 @@ Output: { result: { score(0-100), feature_weights, model_version, confidence, so
 Input:  { query, agency? }
 Output: { results: [{ title, agency, status, source_url }], warning? }
 ```
+
+### govtribe_search
+
+```
+Input:  { query, category?(opportunities|awards|forecasts), naics_filter?, max_results(1-50) }
+Output: { results: [{ govtribe_id, title, agency, naics_code?, set_aside?, posted_date?, response_deadline?, description?, source_url }], credits_used, throttled, warning? }
+```
+
+Routed through backend `/v3/govtribe/search` — agent never hits GovTribe API directly.
+Credit-budget enforced via `govtribe_credit_ledger` with `caller=agent-v3`.
+Respects cycle cap (150/cycle) and monthly cap (1200/month). Returns throttled response if cap hit.
 
 ## Configuration (Environment Variables)
 

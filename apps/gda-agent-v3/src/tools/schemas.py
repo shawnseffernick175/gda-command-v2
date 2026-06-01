@@ -228,3 +228,35 @@ class GovwinResult(BaseModel):
 class GovwinSearchOutput(BaseModel):
     results: list[GovwinResult]
     warning: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# govtribe_search
+# ---------------------------------------------------------------------------
+class GovtribeSearchInput(BaseModel):
+    query: str
+    category: str = Field(
+        default="opportunities",
+        description="Search category: opportunities, awards, or forecasts",
+    )
+    naics_filter: str | None = None
+    max_results: int = Field(default=10, ge=1, le=50)
+
+
+class GovtribeHit(BaseModel):
+    govtribe_id: str
+    title: str
+    agency: str
+    naics_code: str | None = None
+    set_aside: str | None = None
+    posted_date: str | None = None
+    response_deadline: str | None = None
+    description: str | None = None
+    source_url: str
+
+
+class GovtribeSearchOutput(BaseModel):
+    results: list[GovtribeHit]
+    credits_used: int = 0
+    throttled: bool = False
+    warning: str | None = None
