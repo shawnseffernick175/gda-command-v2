@@ -178,17 +178,19 @@ jobs:
       - name: Env-name parity — code env reads vs compose passthroughs
         run: |
           FAIL=0
+          ENV_PATTERN='(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)'
 
-          # Extract env var names read by backend-v3 connector code (GOVTRIBE_* / GOVWIN_*)
-          CODE_ENVS_BACKEND=$(grep -rEoh "process\.env\[?['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?\]?" \
+          # Extract env var names read by backend-v3 connector code
+          # Matches both bracket notation process.env['VAR'] and dot notation process.env.VAR
+          CODE_ENVS_BACKEND=$(grep -rEoh "process\.env\[?['\"]?${ENV_PATTERN}['\"]?\]?|process\.env\.${ENV_PATTERN}" \
             apps/backend-v3/src/ 2>/dev/null \
-            | grep -oE '(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)' \
+            | grep -oE "${ENV_PATTERN}" \
             | sort -u)
 
-          # Extract env var names read by gda-agent-v3 connector code
-          CODE_ENVS_AGENT=$(grep -rEoh "process\.env\[?['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?\]?|os\.environ\[?['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?\]?|os\.environ\.get\(['\"]?(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)['\"]?" \
+          # Extract env var names read by gda-agent-v3 connector code (TS + Python)
+          CODE_ENVS_AGENT=$(grep -rEoh "process\.env\[?['\"]?${ENV_PATTERN}['\"]?\]?|process\.env\.${ENV_PATTERN}|os\.environ\[?['\"]?${ENV_PATTERN}['\"]?\]?|os\.environ\.get\(['\"]?${ENV_PATTERN}['\"]?" \
             apps/gda-agent-v3/src/ 2>/dev/null \
-            | grep -oE '(GOVTRIBE_[A-Z0-9_]+|GOVWIN_[A-Z0-9_]+|ENABLE_GOVTRIBE_[A-Z0-9_]+)' \
+            | grep -oE "${ENV_PATTERN}" \
             | sort -u)
 
           # Combine unique env names from both services
@@ -203,14 +205,18 @@ jobs:
           echo "$ALL_CODE_ENVS"
           echo ""
 
+          # Extract per-service environment blocks from compose
+          BACKEND_ENV=$(sed -n '/^  backend-v3:/,/^  [a-z]/p' docker-compose.prod.yml)
+          AGENT_ENV=$(sed -n '/^  gda-agent-v3:/,/^  [a-z]/p' docker-compose.prod.yml)
+
           # Check backend-v3 compose environment block
           echo "=== Checking backend-v3 compose block ==="
           for var in $ALL_CODE_ENVS; do
-            if ! grep -qE "^\s+${var}:" docker-compose.prod.yml; then
-              echo "::error::backend-v3 missing compose passthrough for ${var} (read in code but not in docker-compose.prod.yml)"
+            if ! echo "$BACKEND_ENV" | grep -qE "^\s+${var}:"; then
+              echo "::error::backend-v3 missing compose passthrough for ${var} (read in code but not in backend-v3 environment block)"
               FAIL=1
             else
-              echo "OK: ${var} present in compose"
+              echo "OK: ${var} present in backend-v3"
             fi
           done
 
@@ -218,11 +224,11 @@ jobs:
           echo ""
           echo "=== Checking gda-agent-v3 compose block ==="
           for var in $ALL_CODE_ENVS; do
-            if ! grep -qE "^\s+${var}:" docker-compose.prod.yml; then
-              echo "::error::gda-agent-v3 missing compose passthrough for ${var} (read in code but not in docker-compose.prod.yml)"
+            if ! echo "$AGENT_ENV" | grep -qE "^\s+${var}:"; then
+              echo "::error::gda-agent-v3 missing compose passthrough for ${var} (read in code but not in gda-agent-v3 environment block)"
               FAIL=1
             else
-              echo "OK: ${var} present in compose"
+              echo "OK: ${var} present in gda-agent-v3"
             fi
           done
 
