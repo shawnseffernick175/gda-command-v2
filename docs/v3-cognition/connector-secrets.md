@@ -59,6 +59,7 @@ failure.
 | `GOVTRIBE_CYCLE_CREDIT_CAP` | `150` | `apps/backend-v3/src/ingest/govtribe/client.ts` |
 | `GOVTRIBE_MONTHLY_CREDIT_CAP` | `1200` | `apps/backend-v3/src/ingest/govtribe/client.ts` |
 | `ENABLE_GOVTRIBE_INGEST` | enabled unless `'false'` | `apps/backend-v3/src/cron/index.ts` |
+| `GOVTRIBE_MCP_URL` | `https://govtribe.com/mcp` | `apps/backend-v3/src/ingest/govtribe/mcp_client.ts` (F-323) |
 
 ### GovWin IQ — CAS Auth (PR #561)
 
