@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { toolRegistry } from './tools/index.js';
 import { requireBearerJwt } from './middleware/auth.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,7 +35,33 @@ function createMcpServer(): Server {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: [] };
+    return {
+      tools: toolRegistry.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+      })),
+    };
+  });
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    const tool = toolRegistry.find((t) => t.name === name);
+    if (!tool) {
+      return {
+        isError: true,
+        content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+      };
+    }
+    try {
+      return await tool.handler((args as Record<string, unknown>) ?? {});
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        isError: true,
+        content: [{ type: 'text' as const, text: message }],
+      };
+    }
   });
 
   return server;
