@@ -57,8 +57,9 @@
 - **Stack:** Docker Compose (`docker-compose.prod.yml`)
 - **Services deployed:** `backend-v3` (port 4000), `frontend-v3` (port 80 via Traefik)
 - **Services NOT redeployed:** `postgres`, `postgres-staging`, `gda-agent-v3` (left running)
+- **Separately deployed:** `gda-mcp-server` (port 4100, own workflow `.github/workflows/deploy-mcp-server.yml`)
 - **Reverse proxy:** Traefik (external `n8n_default` network), TLS via Let's Encrypt
-- **Domains:** `gda-v3.csr-llc.tech` (backend API), `gda.csr-llc.tech` / `app.csr-llc.tech` (frontend)
+- **Domains:** `gda-v3.csr-llc.tech` (backend API), `gda.csr-llc.tech` / `app.csr-llc.tech` (frontend), `gda-mcp.csr-llc.tech` (MCP server)
 
 ---
 
