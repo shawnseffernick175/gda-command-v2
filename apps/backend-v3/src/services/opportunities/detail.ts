@@ -217,6 +217,8 @@ export interface UnifiedListItem {
   pwin: number | null;
   doctrine_status: string | null;
   updated_at: string;
+  /** R1: clickable provenance links back to the primary-source record. */
+  sources: SourceRef[];
 }
 
 export interface UnifiedListFilters {
@@ -323,7 +325,40 @@ export async function listUnifiedOpportunities(
     pwin: r.pwin != null ? Number(r.pwin) : null,
     doctrine_status: (r.doctrine_status as string) ?? null,
     updated_at: r.updated_at as string,
+    sources: [] as SourceRef[],
   }));
+
+  // R1: attach clickable provenance links. Batch-fetch the primary-source
+  // link row for every item in one query (avoids N+1), then build the
+  // SourceRef for each item from its own primary_source + matching link.
+  if (items.length > 0) {
+    const ids = items.map((it) => it.internal_id);
+    const linkRes = await pool.query(
+      `SELECT internal_id, source, source_native_id
+         FROM unified_opportunity_links
+        WHERE internal_id = ANY($1::text[])`,
+      [ids],
+    );
+    const linksByInternalId = new Map<
+      string,
+      Array<{ source: string; source_native_id: string }>
+    >();
+    for (const lr of linkRes.rows as Array<Record<string, unknown>>) {
+      const key = lr.internal_id as string;
+      const arr = linksByInternalId.get(key) ?? [];
+      arr.push({
+        source: lr.source as string,
+        source_native_id: lr.source_native_id as string,
+      });
+      linksByInternalId.set(key, arr);
+    }
+    for (const it of items) {
+      it.sources = buildFieldSourceRefs(
+        it.primary_source,
+        linksByInternalId.get(it.internal_id) ?? [],
+      );
+    }
+  }
 
   let nextCursor: string | null = null;
   if (hasMore && items.length > 0) {

@@ -5,6 +5,7 @@ import { EmptyState } from '../../components/EmptyState/EmptyState';
 import { ErrorState } from '../../components/ErrorState/ErrorState';
 import { Tabs } from '../../components/Tabs/Tabs';
 import { StageChip } from './components/StageChip';
+import { SourceLink } from '../opportunities/components/SourceLink';
 import { useUnifiedList, UNIFIED_TABS } from './hooks/useUnifiedList';
 import { formatDate, formatValueCents, dueCountdownLabel } from './format';
 import type { TableColumn } from '../../types';
@@ -41,16 +42,24 @@ const columns: TableColumn<UnifiedListItem>[] = [
     key: 'title',
     header: 'Title',
     render: (row) => (
-      <span className="text-ink-primary" data-testid={`row-title-${row.internal_id}`}>
-        {row.title ?? '—'}
-      </span>
+      <SourceLink
+        value={row.title ?? '—'}
+        sources={row.sources}
+        data-testid={`row-title-${row.internal_id}`}
+      />
     ),
   },
   {
     key: 'agency',
     header: 'Agency',
     width: 160,
-    render: (row) => <span className="text-ink-muted">{row.agency ?? '—'}</span>,
+    render: (row) => (
+      <SourceLink
+        value={<span className="text-ink-muted">{row.agency ?? '—'}</span>}
+        sources={row.sources}
+        data-testid={`row-agency-${row.internal_id}`}
+      />
+    ),
   },
   {
     key: 'estimated_value_cents',
@@ -58,7 +67,11 @@ const columns: TableColumn<UnifiedListItem>[] = [
     width: 110,
     align: 'right',
     render: (row) => (
-      <span data-numeric>{formatValueCents(row.estimated_value_cents)}</span>
+      <SourceLink
+        value={<span data-numeric>{formatValueCents(row.estimated_value_cents)}</span>}
+        sources={row.sources}
+        data-testid={`row-value-${row.internal_id}`}
+      />
     ),
   },
   {
@@ -72,7 +85,11 @@ const columns: TableColumn<UnifiedListItem>[] = [
           : null;
       return (
         <div className="flex flex-col">
-          <span className="text-ink-primary">{formatDate(row.response_due_at)}</span>
+          <SourceLink
+            value={formatDate(row.response_due_at)}
+            sources={row.sources}
+            data-testid={`row-due-${row.internal_id}`}
+          />
           {countdown && (
             <span className="text-xs text-critical font-medium" data-testid={`due-countdown-${row.internal_id}`}>
               {countdown}
@@ -89,6 +106,7 @@ export function UnifiedList() {
   const {
     tab,
     isListTab,
+    filters,
     items,
     pagination,
     isLoading,
@@ -176,7 +194,7 @@ export function UnifiedList() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  disabled={!pagination.cursor}
+                  disabled={!filters.cursor}
                   onClick={() => goToCursor(null)}
                 >
                   First

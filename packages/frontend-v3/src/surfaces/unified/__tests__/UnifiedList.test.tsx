@@ -10,7 +10,7 @@ function makeItem(overrides: Partial<UnifiedListItem> = {}): UnifiedListItem {
   return {
     internal_id: overrides.internal_id ?? 'uo-1',
     lifecycle_stage: overrides.lifecycle_stage ?? 'solicitation',
-    primary_source: overrides.primary_source ?? 'sam_gov',
+    primary_source: overrides.primary_source ?? 'sam',
     title: overrides.title ?? 'Cyber Range Support Services',
     agency: overrides.agency ?? 'DISA',
     naics: overrides.naics ?? '541512',
@@ -21,6 +21,15 @@ function makeItem(overrides: Partial<UnifiedListItem> = {}): UnifiedListItem {
     pwin: overrides.pwin ?? 62,
     doctrine_status: overrides.doctrine_status ?? 'qualified',
     updated_at: overrides.updated_at ?? '2026-05-30T00:00:00Z',
+    sources:
+      overrides.sources ?? [
+        {
+          kind: 'sam_gov',
+          title: 'SAM.gov',
+          url: 'https://sam.gov/opp/uo-1-native/view',
+          retrieved_at: '2026-05-30T00:00:00Z',
+        },
+      ],
   };
 }
 
@@ -104,9 +113,51 @@ describe('UnifiedList (F-421 tab structure)', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(envelope(MOCK_ITEMS)));
     const user = userEvent.setup();
     renderList();
-    const row = await screen.findByTestId('row-title-uo-1');
-    await user.click(row);
+    // Click the stage chip cell (not the source-link anchor, which opens a new
+    // tab) so the row-level navigation handler fires.
+    await screen.findByTestId('row-title-uo-1');
+    const chip = screen.getAllByTestId('stage-chip')[0]!;
+    await user.click(chip);
     await waitFor(() => expect(screen.getByText('Detail Page')).toBeInTheDocument());
+  });
+
+  it('R1: renders each row value as a clickable link back to its source', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(envelope(MOCK_ITEMS)));
+    renderList();
+    const titleLink = await screen.findByTestId('row-title-uo-1');
+    // The value is wrapped in an anchor pointing at the primary-source record.
+    expect(titleLink).toHaveAttribute('href', 'https://sam.gov/opp/uo-1-native/view');
+    expect(titleLink.tagName).toBe('A');
+    // Agency, value, and due date are likewise source-linked.
+    expect(screen.getByTestId('row-agency-uo-1')).toHaveAttribute('href');
+    expect(screen.getByTestId('row-value-uo-1')).toHaveAttribute('href');
+    expect(screen.getByTestId('row-due-uo-1')).toHaveAttribute('href');
+  });
+
+  it('R1: falls back to plain text when a row has no addressable source', async () => {
+    const noSource = [makeItem({ internal_id: 'uo-9', title: 'Fast Track Signal', sources: [] })];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(envelope(noSource)));
+    renderList();
+    const titleEl = await screen.findByTestId('row-title-uo-9');
+    expect(titleEl.tagName).toBe('SPAN');
+    expect(titleEl).toHaveTextContent('Fast Track Signal');
+  });
+
+  it('disables the First pager button on page one and enables it after paging', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(envelope(MOCK_ITEMS, true)));
+    // initialEntry without a cursor → page one → First is disabled.
+    renderList('/unified');
+    await screen.findByTestId('row-title-uo-1');
+    expect(screen.getByRole('button', { name: 'First' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  });
+
+  it('enables the First pager button when a cursor is present in the URL', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(envelope(MOCK_ITEMS, true)));
+    // A cursor in the URL means we are past page one → First is enabled.
+    renderList('/unified?cursor=abc123');
+    await screen.findByTestId('row-title-uo-1');
+    expect(screen.getByRole('button', { name: 'First' })).toBeEnabled();
   });
 
   it('requests the active stage group when the Active tab is selected', async () => {

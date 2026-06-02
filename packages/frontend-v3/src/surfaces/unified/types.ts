@@ -77,6 +77,11 @@ export interface UnifiedListItem {
   pwin: number | null;
   doctrine_status: string | null;
   updated_at: string;
+  /**
+   * R1: clickable provenance links back to the primary-source record.
+   * Empty when the source has no externally addressable page (e.g. Fast Track).
+   */
+  sources: SourceRef[];
 }
 
 export interface UnifiedListResult {
