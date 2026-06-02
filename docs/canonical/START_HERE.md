@@ -51,7 +51,7 @@ GDA Command = Shawn's operating system for emerging defense / DoD business devel
 
 - **Phase 1 (Unified Opportunity Foundation): DONE.** Schema, SourceAdapter, Matcher v1, backfill, field merge — all complete.
 - **MCP server: LIVE and verified.** `https://gda-mcp.csr-llc.tech`, container `gda-mcp-server`, port 4100, healthy. `/health` returns `{"status":"ok","service":"gda-mcp","version":"0.1.0"}`.
-  - **11 tools live:** gda_search_opportunities, gda_get_opportunity, gda_score_doctrine, gda_get_pwin, gda_query_rag, gda_list_action_items, gda_get_pipeline, gda_run_color_team, gda_get_launchpad_summary, gda_recall_decisions, gda_search_bills (LegiScan).
+  - **13 tools live:** gda_search_opportunities, gda_get_opportunity, gda_score_doctrine, gda_get_pwin, gda_query_rag, gda_list_action_items, gda_get_pipeline, gda_run_color_team, gda_get_launchpad_summary, gda_recall_decisions, gda_search_bills (LegiScan), gda_company_financials (SEC EDGAR), gda_company_awards (USAspending.gov).
   - `gda_query_rag` fix VERIFIED: `@gda/backend-v3` loads with 17 exports.
   - Auth: `/mcp` needs `Authorization: Bearer <JWT>` (HS256 via `JWT_SECRET`). Raw curl gives "Server not initialized" because MCP needs an initialize handshake first — real clients (Claude Desktop/Cursor) do this automatically, so that is NOT a failure.
   - Mint a test JWT in-container:

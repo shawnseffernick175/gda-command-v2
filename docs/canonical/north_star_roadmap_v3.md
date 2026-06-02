@@ -15,9 +15,11 @@
 ✅ F-404 Backfill legacy opportunities
 ✅ F-405 Field merge service
 ✅ F-320 agent-v3 govtribe_search tool
-✅ F-500 MCP Server Epic — all 11 tools live at https://gda-mcp.csr-llc.tech
+✅ F-500 MCP Server Epic — all 13 tools live at https://gda-mcp.csr-llc.tech
 &nbsp;&nbsp;&nbsp;&nbsp;✅ F-501 Scaffold · ✅ F-502 First 5 tools · ✅ F-503 Next 5 tools · ✅ F-504 Deploy + DNS · ✅ F-505 Client configs · ✅ F-506 LegiScan gda_search_bills (11th tool)
 ✅ F-507 gda_query_rag runtime fix — @gda/backend-v3 dep bundled (PR #627), RAG module loads OK in prod, verified live
+✅ F-509 gda_company_financials (SEC EDGAR) — 12th tool, PR #628 merged, live (verified: Lockheed Martin 10-K filings)
+✅ F-508 gda_company_awards (USAspending.gov DoD contract awards) — 13th tool, PR #629 merged, live (verified: Anduril DoD awards). Replaced dropped Crunchbase intel tool.
 ⏳ F-410–F-413 Unified API endpoints (Phase 2)
 ⏳ F-420–F-423 Unified UI (Phase 3)
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
@@ -145,7 +147,7 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 - ✅ F-505 Client configs (Claude Desktop, Cursor, Devin, frontend) — PR #625
 - ✅ F-506 LegiScan gda_search_bills — 11th tool
 - ✅ F-507 gda_query_rag runtime fix — added @gda/backend-v3 as a real dep so the RAG module loads in the isolated prod image (PR #627). Verified live: RAG module loads OK in-container; LegiScan + Voyage keys present in .env.production; container healthy on port 4100.
-- **Live:** https://gda-mcp.csr-llc.tech — 11 tools, server healthy.
+- **Live:** https://gda-mcp.csr-llc.tech — 13 tools, server healthy.
 - **Definition of done:** ✅ all 11 gda_* tools registered and callable; gda_query_rag loads @gda/backend-v3 at runtime without error.
 
 ### Phase 2 — Unified API
@@ -214,7 +216,7 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 4. ✅ CI gates: dep audit, integration tests, compose drift, env parity all green
 5. ✅ Credit ledger enforcing budget caps
 6. ✅ Phase 1 unified opportunity foundation complete (all 5 tickets done)
-6b. ✅ Phase 1.5 external MCP surface complete (11 tools live; gda_query_rag verified)
+6b. ✅ Phase 1.5 external MCP surface complete (13 tools live; gda_query_rag verified)
 7. ⏳ Phase 2 unified API complete
 8. ⏳ Phase 3 unified UI complete
 9. ⏳ At least 3 Fast Track adapters live (Phase 4)
@@ -233,7 +235,7 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 - F-405 field merge fires after F-404 lands
 
 ### Shawn's personal must-do
-- Nothing right now. MCP server is fully live (11 tools). Test it in Claude Desktop/Cursor when convenient — paste the config from docs/mcp/claude-desktop.md. Build remains on autopilot under the clean-CI auto-merge rule.
+- Nothing right now. MCP server is fully live (13 tools). Test it in Claude Desktop/Cursor when convenient — paste the config from docs/mcp/claude-desktop.md. Build remains on autopilot under the clean-CI auto-merge rule.
 
 ### This week's targets
 - Phase 1 complete (F-404 + F-405 land)
