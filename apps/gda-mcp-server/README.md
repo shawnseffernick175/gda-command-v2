@@ -86,3 +86,58 @@ docker logs gda-mcp-server --tail 50
 # Health endpoint
 curl https://gda-mcp.csr-llc.tech/health
 ```
+
+## Generating a test JWT
+
+The MCP server shares `JWT_SECRET` with backend-v3. Both verify tokens using **HS256**.
+
+### Quick one-liner (Node.js)
+
+```bash
+node -e "console.log(require('jsonwebtoken').sign({ sub: 'test-user', role: 'admin' }, process.env.JWT_SECRET || 'YOUR_JWT_SECRET', { algorithm: 'HS256', expiresIn: '1h' }))"
+```
+
+> Replace `YOUR_JWT_SECRET` with the actual `JWT_SECRET` from `.env.prod` — or ensure the `JWT_SECRET` environment variable is set in your shell.
+
+### Programmatic (TypeScript)
+
+```typescript
+import jwt from 'jsonwebtoken';
+
+const token = jwt.sign(
+  { sub: 'test-user', role: 'admin' },
+  process.env.JWT_SECRET!,
+  { algorithm: 'HS256', expiresIn: '1h' }
+);
+```
+
+### JWT claims
+
+| Claim   | Required | Description                        |
+| ------- | -------- | ---------------------------------- |
+| `sub`   | Yes      | User or service identifier         |
+| `role`  | No       | `admin`, `analyst`, `service`      |
+| `email` | No       | User email for audit logging       |
+| `exp`   | Auto     | Set via `expiresIn`                |
+
+### Verify the token works
+
+```bash
+curl -s -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer YOUR_JWT_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+  https://gda-mcp.csr-llc.tech/mcp
+```
+
+- `200` — token is valid, tools/list returned successfully
+- `401` — token is invalid, expired, or missing
+
+## Client configuration
+
+See [docs/mcp/](../../docs/mcp/README.md) for copy-paste config snippets for:
+
+- [Claude Desktop](../../docs/mcp/claude-desktop.md)
+- [Cursor](../../docs/mcp/cursor.md)
+- [Devin](../../docs/mcp/devin.md)
+- [Frontend / Agent (internal)](../../docs/mcp/frontend.md)
