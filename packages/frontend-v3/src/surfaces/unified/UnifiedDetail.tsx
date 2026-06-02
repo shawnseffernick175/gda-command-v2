@@ -4,6 +4,7 @@ import { Button } from '../../components/Button/Button';
 import { ErrorState } from '../../components/ErrorState/ErrorState';
 import { Card } from '../../components/Card/Card';
 import { Chip } from '../../components/Chip/Chip';
+import { SourceLink } from '../opportunities/components/SourceLink';
 import { useUnifiedDetail } from './hooks/useUnifiedDetail';
 import type {
   UnifiedOpportunityDetail,
@@ -153,6 +154,8 @@ function MergedFieldRow({
 }) {
   const value = field?.value ?? null;
   const source = field?.source ?? null;
+  const sources = field?.sources ?? [];
+  const formatted = formatFieldValue(fieldKey, value);
   return (
     <div className="flex flex-col gap-1 py-2 border-b border-border last:border-b-0">
       <div className="flex items-center gap-2">
@@ -164,7 +167,15 @@ function MergedFieldRow({
         )}
       </div>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-ink-primary">{formatFieldValue(fieldKey, value)}</span>
+        <span className="text-sm text-ink-primary">
+          {/* R1 (F-420a): value links out to the source's public page when one
+              exists; SourceLink falls back to a plain span otherwise. */}
+          <SourceLink
+            value={formatted}
+            sources={sources}
+            data-testid={`field-value-${fieldKey}`}
+          />
+        </span>
         {source && (
           <span className="text-xs text-ink-dim shrink-0" data-testid="field-source">
             via {source}

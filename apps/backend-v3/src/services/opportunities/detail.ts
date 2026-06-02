@@ -27,6 +27,8 @@ import {
   type MergedOpportunity,
 } from './merge.js';
 import type { OpportunityLink } from '../../db/types/opportunity.js';
+import { buildFieldSourceRefs } from '../../lib/source-urls.js';
+import type { SourceRef } from '../../lib/sources.js';
 
 // ─── Exported types ──────────────────────────────────────────────────────────
 
@@ -34,6 +36,8 @@ import type { OpportunityLink } from '../../db/types/opportunity.js';
 export interface MergedField {
   value: unknown;
   source: string | null;
+  /** R1 (F-420a): clickable provenance links for the winning source. */
+  sources: SourceRef[];
 }
 
 /** A field where two or more sources disagree on a non-null value. */
@@ -124,9 +128,11 @@ function buildMergedFields(merged: MergedOpportunity): Record<string, MergedFiel
   const out: Record<string, MergedField> = {};
   const m = merged as unknown as Record<string, unknown>;
   for (const field of MERGED_FIELD_NAMES) {
+    const source = merged.field_sources[field] ?? null;
     out[field] = {
       value: m[field] ?? null,
-      source: merged.field_sources[field] ?? null,
+      source,
+      sources: buildFieldSourceRefs(source, merged.links),
     };
   }
   return out;
@@ -330,3 +336,52 @@ export async function listUnifiedOpportunities(
   return { items, pagination: { limit, cursor: nextCursor, hasMore } };
 }
 
+
+// ─── F-420a (R2): resolve the underlying opportunities.id for analysis ───────
+
+/**
+ * Map a unified opportunity to the opportunities.id row that the analysis
+ * pipeline operates on, via the primary-source link (or the first
+ * addressable link). Returns null when no analyzable source row exists.
+ *
+ * Native-id -> opportunities lookup mirrors merge.fetchSourceRecords:
+ *   sam      -> opportunities.sam_notice_id = native_id (data_source sam_gov)
+ *   govwin   -> opportunities.sam_notice_id = govwin- || native_id
+ *   govtribe -> opportunities.govtribe_id   = native_id
+ * fast_track has no analyzable opportunities row and is skipped.
+ */
+export async function resolvePrimaryOpportunityId(
+  pool: pg.Pool,
+  detail: UnifiedOpportunityDetail,
+): Promise<string | null> {
+  const order = (detail.primary_source ? [detail.primary_source] : []).concat(
+    detail.lineage.map((l) => l.source),
+  );
+  const seen = new Set<string>();
+  for (const source of order) {
+    if (seen.has(source)) continue;
+    seen.add(source);
+    const link = detail.lineage.find((l) => l.source === source);
+    if (!link) continue;
+
+    let sql: string | null = null;
+    let param: string | null = null;
+    if (source === 'sam') {
+      sql =
+        "SELECT id FROM opportunities WHERE sam_notice_id = $1 AND data_source = 'sam_gov' AND deleted_at IS NULL LIMIT 1";
+      param = link.source_native_id;
+    } else if (source === 'govwin') {
+      sql = 'SELECT id FROM opportunities WHERE sam_notice_id = $1 AND deleted_at IS NULL LIMIT 1';
+      param = `govwin-${link.source_native_id}`;
+    } else if (source === 'govtribe') {
+      sql = 'SELECT id FROM opportunities WHERE govtribe_id = $1 AND deleted_at IS NULL LIMIT 1';
+      param = link.source_native_id;
+    } else {
+      continue; // fast_track / unknown — not analyzable
+    }
+
+    const res = await pool.query<{ id: string }>(sql, [param]);
+    if (res.rows[0]?.id) return res.rows[0].id;
+  }
+  return null;
+}
