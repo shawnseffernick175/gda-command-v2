@@ -24,7 +24,8 @@
 🔄 F-420–F-423 Unified UI (Phase 3) — IN PROGRESS
    ✅ F-420 unified detail page — route /unified/:internal_id, PR #637 merged, live at gda.csr-llc.tech (source badges, lifecycle/lineage trail, conflict drawer, merged fields + provenance, source lineage table)
    ✅ F-420a connect-the-data — per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis (R1/R2 compliance), PR #639 merged, live at gda.csr-llc.tech
-   ⏭ F-421 tab structure (say-something surfaces) — NEXT
+   ✅ F-421 tab structure (say-something surfaces) — tabbed unified list (All/Active/Pipeline/Fast Track/Awarded/Review Matches) on /unified, stage-group filters, R1 source links on every value, PR #641 merged, live at gda.csr-llc.tech
+   ⏭ F-422 suggestion review UI sidebar — NEXT
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
 ⏳ F-440–F-443 Hardening + analytics (Phase 5)
 
