@@ -98,10 +98,11 @@ const EXPECTED_TOOL_NAMES = [
   'gda_get_launchpad_summary',
   'gda_recall_decisions',
   'gda_search_bills',
+  'gda_company_financials',
 ];
 
 describe('MCP tools/list', () => {
-  it('returns exactly 11 tools with correct names via MCP client', async () => {
+  it('returns exactly 12 tools with correct names via MCP client', async () => {
     const token = makeToken();
     const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
       requestInit: {
@@ -112,7 +113,7 @@ describe('MCP tools/list', () => {
     const client = new Client({ name: 'test-client', version: '1.0.0' });
     await client.connect(transport);
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(11);
+    expect(tools).toHaveLength(12);
     const names = tools.map((t) => t.name);
     expect(names).toEqual(EXPECTED_TOOL_NAMES);
     for (const tool of tools) {

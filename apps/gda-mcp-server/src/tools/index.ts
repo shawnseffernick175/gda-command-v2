@@ -18,6 +18,7 @@ import { gdaRunColorTeam } from './color-teams.js';
 import { gdaGetLaunchpadSummary } from './launchpad.js';
 import { gdaRecallDecisions } from './memory.js';
 import { gdaSearchBills } from './legislation.js';
+import { gdaCompanyFinancials } from './financials.js';
 
 export const toolRegistry: ToolRegistryEntry[] = [
   // F-502 tools
@@ -34,4 +35,6 @@ export const toolRegistry: ToolRegistryEntry[] = [
   gdaRecallDecisions,
   // F-506 tools
   gdaSearchBills,
+  // F-509 tools
+  gdaCompanyFinancials,
 ];
