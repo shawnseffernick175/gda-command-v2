@@ -20,8 +20,8 @@
 ✅ F-507 gda_query_rag runtime fix — @gda/backend-v3 dep bundled (PR #627), RAG module loads OK in prod, verified live
 ✅ F-509 gda_company_financials (SEC EDGAR) — 12th tool, PR #628 merged, live (verified: Lockheed Martin 10-K filings)
 ✅ F-508 gda_company_awards (USAspending.gov DoD contract awards) — 13th tool, PR #629 merged, live (verified: Anduril DoD awards). Replaced dropped Crunchbase intel tool.
-🔄 Phase 2 Unified API endpoints — ✅ F-410 unified detail endpoint live · ⏳ F-411–F-413
-⏳ F-420–F-423 Unified UI (Phase 3)
+✅ Phase 2 Unified API endpoints COMPLETE — F-410 detail · F-411 stage filter · F-412 suggestion queue · F-413 field override+audit — all live on backend-v3
+🔄 F-420–F-423 Unified UI (Phase 3) — NEXT, starting F-420 detail page
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
 ⏳ F-440–F-443 Hardening + analytics (Phase 5)
 
@@ -152,9 +152,11 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 
 ### Phase 2 — Unified API
 - ✅ F-410 unified detail endpoint `GET /v3/opportunities/unified/:internal_id` — merged_fields{} (provenance), sources[], conflicts[], lineage[]. PR #631 merged, live on backend-v3.
-- F-411 stage filter on list endpoint
-- F-412 suggestion queue for MEDIUM/LOW review
-- F-413 field override endpoint with audit trail
+- ✅ F-411 stage filter on list endpoint `GET /v3/opportunities/unified?stage=active|pipeline|fast_track|awarded` (STAGE_GROUPS). PR #633 merged, live.
+- ✅ F-412 suggestion queue for MEDIUM/LOW review `GET/POST /v3/match-suggestions` (confirm/reject, merge-cache invalidation). PR #634 merged, live.
+- ✅ F-413 field override endpoint with audit trail `PUT /v3/opportunities/:internal_id/field-override` + `GET .../field-override/audit` (migration v3_028, transactional audit). PR #635 merged, live.
+
+**✅ Phase 2 COMPLETE — full Unified API live on backend-v3.**
 - **Definition of done:** frontend can ask for any opportunity by internal_id and get a fully merged response
 
 ### Phase 3 — Unified UI
@@ -217,7 +219,7 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 5. ✅ Credit ledger enforcing budget caps
 6. ✅ Phase 1 unified opportunity foundation complete (all 5 tickets done)
 6b. ✅ Phase 1.5 external MCP surface complete (13 tools live; gda_query_rag verified)
-7. ⏳ Phase 2 unified API complete
+7. ✅ Phase 2 unified API complete (F-410–F-413 live)
 8. ⏳ Phase 3 unified UI complete
 9. ⏳ At least 3 Fast Track adapters live (Phase 4)
 10. ⏳ Conversion funnel report available (Phase 5)
