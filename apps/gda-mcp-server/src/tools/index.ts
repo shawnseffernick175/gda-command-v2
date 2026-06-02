@@ -19,6 +19,7 @@ import { gdaGetLaunchpadSummary } from './launchpad.js';
 import { gdaRecallDecisions } from './memory.js';
 import { gdaSearchBills } from './legislation.js';
 import { gdaCompanyFinancials } from './financials.js';
+import { gdaCompanyAwards } from './awards.js';
 
 export const toolRegistry: ToolRegistryEntry[] = [
   // F-502 tools
@@ -37,4 +38,6 @@ export const toolRegistry: ToolRegistryEntry[] = [
   gdaSearchBills,
   // F-509 tools
   gdaCompanyFinancials,
+  // F-508 tools
+  gdaCompanyAwards,
 ];

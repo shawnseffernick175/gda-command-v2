@@ -114,10 +114,10 @@ afterAll(async () => {
 // ─── tools/list ─────────────────────────────────────────────────────────────
 
 describe('tools/list', () => {
-  it('returns exactly 12 gda_ tools with descriptions and inputSchemas', async () => {
+  it('returns exactly 13 gda_ tools with descriptions and inputSchemas', async () => {
     const client = await createMcpClient();
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(12);
+    expect(tools).toHaveLength(13);
 
     const expected = [
       'gda_search_opportunities',
@@ -132,6 +132,7 @@ describe('tools/list', () => {
       'gda_recall_decisions',
       'gda_search_bills',
       'gda_company_financials',
+      'gda_company_awards',
     ];
     expect(tools.map((t) => t.name)).toEqual(expected);
     for (const tool of tools) {
