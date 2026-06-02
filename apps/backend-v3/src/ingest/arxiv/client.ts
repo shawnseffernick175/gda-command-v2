@@ -16,8 +16,12 @@ const PAGE_LIMIT = 100;
 const MAX_RECORDS = 200;
 const REQUEST_TIMEOUT_MS = 60_000;
 const REQUEST_DELAY_MS = 3_000;
-const MAX_RETRIES = 3;
-const INITIAL_BACKOFF_MS = 2_000;
+// arXiv enforces a strict per-IP rate limit and can 429 for an extended
+// cooldown window. Allow more attempts with a longer exponential backoff
+// (5s, 10s, 20s, 40s, 80s, 160s) so transient throttling is ridden out
+// rather than failing the whole ingest run.
+const MAX_RETRIES = 6;
+const INITIAL_BACKOFF_MS = 5_000;
 
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
