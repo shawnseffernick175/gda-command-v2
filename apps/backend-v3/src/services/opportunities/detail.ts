@@ -165,8 +165,14 @@ interface DoctrineEnrichment {
 
 /**
  * Resolve the underlying `opportunities.id` for the primary-source link,
- * then pull doctrine alignment score, matched principles, teammates, and
- * competitors from existing tables. Never throws — returns safe defaults.
+ * then pull doctrine alignment score, teammates, and competitors from
+ * existing tables. Wrapped in try/catch so enrichment failures never
+ * break the opportunity detail endpoint — returns safe defaults on error.
+ *
+ * Note: doctrine_evaluations.entity_id is uuid while opportunities.id is
+ * bigint, so we cannot join them. matchedPrincipleIds stays empty; the
+ * badge still derives label/score from doctrine_alignment_score in pwin
+ * features per spec.
  */
 async function resolveDoctrineEnrichment(
   pool: pg.Pool,
@@ -178,66 +184,55 @@ async function resolveDoctrineEnrichment(
     competitors: [],
   };
 
-  // Resolve the underlying opportunities.id via the link table (same logic
-  // as resolvePrimaryOpportunityId but avoids a circular dependency).
-  const oppIdRes = await pool.query<{ id: string }>(
-    `SELECT o.id FROM opportunities o
-     JOIN unified_opportunity_links l ON (
-       (l.source = 'sam'      AND o.sam_notice_id = l.source_native_id AND o.data_source = 'sam_gov')
-       OR (l.source = 'govwin'   AND o.sam_notice_id = 'govwin-' || l.source_native_id)
-       OR (l.source = 'govtribe' AND o.govtribe_id  = l.source_native_id)
-     )
-     WHERE l.internal_id = $1 AND o.deleted_at IS NULL
-     LIMIT 1`,
-    [merged.internal_id],
-  );
-  const oppId = oppIdRes.rows[0]?.id;
-  if (!oppId) return none;
+  try {
+    const oppIdRes = await pool.query<{ id: string }>(
+      `SELECT o.id FROM opportunities o
+       JOIN unified_opportunity_links l ON (
+         (l.source = 'sam'      AND o.sam_notice_id = l.source_native_id AND o.data_source = 'sam_gov')
+         OR (l.source = 'govwin'   AND o.sam_notice_id = 'govwin-' || l.source_native_id)
+         OR (l.source = 'govtribe' AND o.govtribe_id  = l.source_native_id)
+       )
+       WHERE l.internal_id = $1 AND o.deleted_at IS NULL
+       LIMIT 1`,
+      [merged.internal_id],
+    );
+    const oppId = oppIdRes.rows[0]?.id;
+    if (!oppId) return none;
 
-  // Parallel: pwin features, latest doctrine evaluation, analysis competitors
-  const [featRes, evalRes, analysisRes] = await Promise.all([
-    pool.query<{ features: Record<string, unknown> }>(
-      `SELECT features FROM pwin_features
-       WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
-      [oppId],
-    ),
-    pool.query<{ principle_scores: Record<string, unknown> }>(
-      `SELECT principle_scores FROM doctrine_evaluations
-       WHERE entity_kind = 'opportunity' AND entity_id = $1
-       ORDER BY evaluated_at DESC LIMIT 1`,
-      [oppId],
-    ),
-    pool.query<{ analysis: Record<string, unknown> | null }>(
-      `SELECT analysis FROM opportunities
-       WHERE id = $1 AND deleted_at IS NULL`,
-      [oppId],
-    ),
-  ]);
+    const [featRes, analysisRes] = await Promise.all([
+      pool.query<{ features: Record<string, unknown> }>(
+        `SELECT features FROM pwin_features
+         WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
+        [oppId],
+      ),
+      pool.query<{ analysis: Record<string, unknown> | null }>(
+        `SELECT analysis FROM opportunities
+         WHERE id = $1 AND deleted_at IS NULL`,
+        [oppId],
+      ),
+    ]);
 
-  const features = featRes.rows[0]?.features;
-  const doctrineAlignmentScore =
-    (features?.doctrine_alignment_score as number | undefined) ?? null;
-  const candidatePartners =
-    (features?.candidate_partners as string[] | undefined) ?? [];
+    const features = featRes.rows[0]?.features;
+    const doctrineAlignmentScore =
+      (features?.doctrine_alignment_score as number | undefined) ?? null;
+    const candidatePartners =
+      (features?.candidate_partners as string[] | undefined) ?? [];
 
-  const principleScores = evalRes.rows[0]?.principle_scores;
-  const matchedPrincipleIds = principleScores ? Object.keys(principleScores) : [];
+    const analysis = analysisRes.rows[0]?.analysis;
+    const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
+    const competitors: Competitor[] = rawCompetitors
+      .filter((c) => typeof c.name === 'string')
+      .map((c) => ({
+        name: c.name as string,
+        threat_level: (c.threat_level as Competitor['threat_level']) ?? 'medium',
+      }));
 
-  const analysis = analysisRes.rows[0]?.analysis;
-  const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
-  const competitors: Competitor[] = rawCompetitors
-    .filter((c) => typeof c.name === 'string')
-    .map((c) => ({
-      name: c.name as string,
-      threat_level: (c.threat_level as Competitor['threat_level']) ?? 'medium',
-    }));
+    const badge = computeDoctrineBadge({ doctrineAlignmentScore });
 
-  const badge = computeDoctrineBadge({
-    doctrineAlignmentScore,
-    matchedPrincipleIds,
-  });
-
-  return { badge, candidatePartners: candidatePartners, competitors };
+    return { badge, candidatePartners, competitors };
+  } catch {
+    return none;
+  }
 }
 
 /**
