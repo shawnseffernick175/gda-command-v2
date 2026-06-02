@@ -1,158 +1,109 @@
 /**
- * SBIR.gov public API client — fetches DoD SBIR/STTR awards and
- * open solicitation topics. JSON via undici, paginated, rate-limit-aware.
+ * DSIP (DoD SBIR/STTR Innovation Portal) API client — fetches open +
+ * pre-release topics from dodsbirsttr.mil, enriches each with detail
+ * data. Resilient: per-request timeout, retry with exponential backoff
+ * on 429/5xx/timeout.
  *
- * Rate-limit handling:
- *  - On 429, read Retry-After header (seconds); else exponential backoff from 30s.
- *  - Max 5 retries per request. After exhaustion, return what we have (degraded).
- *  - Minimum 1-second pacing between consecutive requests.
+ * The DSIP search endpoint accepts a JSON-encoded `searchParam` query
+ * parameter with `solicitationCycleNames: ["openTopics"]` and
+ * `topicReleaseStatus: [591, 592]` to filter to open + pre-release
+ * topics. Pagination uses `size` (page size) and `page` (0-based).
  */
 
 import { request } from 'undici';
 import { logger } from '../../lib/logger.js';
+import type {
+  DSIPTopicListItem,
+  DSIPTopicDetail,
+  DSIPSearchResponse,
+  DSIPEnrichedTopic,
+} from './types.js';
 
-const BASE_URL = 'https://api.www.sbir.gov/public/api';
-const PAGE_SIZE = 100;
-const REQUEST_TIMEOUT_MS = 60_000;
-const MAX_RETRIES = 5;
-const INITIAL_BACKOFF_MS = 30_000;
-const MIN_PACING_MS = parseInt(process.env.SBIR_INGEST_MIN_PACING_MS ?? '1000', 10);
+const DEFAULT_BASE_URL = 'https://www.dodsbirsttr.mil/topics/api/public';
+
+const BASE_URL = process.env.SBIR_DSIP_BASE_URL ?? DEFAULT_BASE_URL;
+const REQUEST_TIMEOUT_MS = parseInt(process.env.SBIR_REQUEST_TIMEOUT_MS ?? '60000', 10);
+const MAX_RETRIES = parseInt(process.env.SBIR_MAX_RETRIES ?? '3', 10);
+const INITIAL_BACKOFF_MS = 2_000;
+const PAGE_SIZE = 50;
+const DETAIL_DELAY_MS = 300;
+const MAX_TOPICS = 500;
 
 const HEADERS = {
-  'User-Agent': 'GDA-Ingest/1.0 (+contact: shawn.seffernick175@gmail.com)',
+  'User-Agent': 'Mozilla/5.0 (compatible; GDA-Ingest/1.0)',
   'Accept': 'application/json',
 };
 
-export interface SBIRAwardRaw {
-  award_number?: string;
-  agency?: string;
-  branch?: string;
-  program?: string;
-  phase?: string;
-  award_year?: number;
-  firm?: string;
-  duns?: string;
-  uei?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  pi?: string;
-  ri?: string;
-  award_title?: string;
-  award_abstract?: string;
-  award_amount?: number;
-  contract?: string;
-  proposal_number?: string;
-  topic_code?: string;
-  solicitation_number?: string;
-  award_start_date?: string;
-  award_end_date?: string;
-  sbir_url?: string;
-  [key: string]: unknown;
+/** Defense/R&D-relevant keyword set for tagging matched topics. */
+export const SBIR_KEYWORDS: readonly string[] = [
+  'artificial intelligence',
+  'machine learning',
+  'autonomy',
+  'cybersecurity',
+  'hypersonics',
+  'quantum',
+  'directed energy',
+  'microelectronics',
+] as const;
+
+/**
+ * Build the searchParam JSON for the DSIP search endpoint.
+ * Filters to open + pre-release topics only.
+ */
+function buildSearchParam(): string {
+  return JSON.stringify({
+    searchText: null,
+    components: null,
+    programYear: null,
+    solicitationCycleNames: ['openTopics'],
+    releaseNumbers: [],
+    topicReleaseStatus: [591, 592],
+    modernizationPriorities: null,
+    sortBy: 'finalTopicCode,asc',
+  });
 }
 
-export interface SBIRTopicRaw {
-  topic_number?: string;
-  solicitation_number?: string;
-  agency?: string;
-  branch?: string;
-  program?: string;
-  phase?: string;
-  topic_title?: string;
-  description?: string;
-  technology_areas?: string[];
-  open_date?: string;
-  close_date?: string;
-  pre_release_date?: string;
-  url?: string;
-  status?: string;
-  [key: string]: unknown;
-}
-
-interface FetchState {
-  degraded: boolean;
-  degradedReason?: string;
-}
-
-let lastRequestTime = 0;
-
-async function paceRequest(): Promise<void> {
-  const elapsed = Date.now() - lastRequestTime;
-  if (elapsed < MIN_PACING_MS) {
-    await new Promise((r) => setTimeout(r, MIN_PACING_MS - elapsed));
-  }
-  lastRequestTime = Date.now();
-}
-
-async function fetchWithRetry(
-  url: string,
-  state: FetchState,
-): Promise<unknown | null> {
+async function fetchWithRetry<T>(url: string, label: string): Promise<T> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       const delay = INITIAL_BACKOFF_MS * Math.pow(2, attempt - 1);
       logger.warn(
-        { attempt, delay, source: 'sbir', url },
+        { attempt, delay, source: 'sbir', label },
         'sbir_retry',
       );
       await new Promise((r) => setTimeout(r, delay));
     }
 
-    await paceRequest();
-
     try {
-      const { statusCode, headers, body: respBody } = await request(url, {
+      const { statusCode, body: respBody } = await request(url, {
         method: 'GET',
         headers: HEADERS,
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
-      if (statusCode === 429) {
-        const retryAfterRaw = headers['retry-after'];
-        const retryAfterStr = Array.isArray(retryAfterRaw) ? retryAfterRaw[0] : retryAfterRaw;
-        if (retryAfterStr) {
-          const secs = parseInt(retryAfterStr, 10);
-          if (!isNaN(secs) && secs > 0) {
-            logger.warn(
-              { retryAfterSecs: secs, source: 'sbir' },
-              'sbir_429_retry_after',
-            );
-            await new Promise((r) => setTimeout(r, secs * 1000));
-          }
-        }
-        await respBody.text().catch(() => '');
-        lastError = new Error(`SBIR.gov API 429: rate limited`);
-        continue;
-      }
-
-      if (statusCode >= 500) {
+      if (statusCode === 429 || statusCode >= 500) {
         const text = await respBody.text().catch(() => '');
-        lastError = new Error(`SBIR.gov API ${statusCode}: ${text.slice(0, 300)}`);
+        lastError = new Error(
+          `DSIP API ${statusCode}: ${text.slice(0, 300)}`,
+        );
         continue;
       }
 
       if (statusCode !== 200) {
         const text = await respBody.text().catch(() => '');
-        throw new Error(`SBIR.gov API ${statusCode}: ${text.slice(0, 300)}`);
+        throw new Error(
+          `DSIP API ${statusCode}: ${text.slice(0, 300)}`,
+        );
       }
 
-      const rawText = await respBody.text();
-      try {
-        return JSON.parse(rawText);
-      } catch (parseErr) {
-        logger.error(
-          { source: 'sbir', url, error: parseErr instanceof Error ? parseErr.message : String(parseErr) },
-          'sbir_json_parse_error',
-        );
-        return null;
-      }
+      return (await respBody.json()) as T;
     } catch (err) {
       if (
         err instanceof Error &&
-        err.message.startsWith('SBIR.gov API 4') &&
-        !err.message.includes('429')
+        err.message.startsWith('DSIP API 4') &&
+        !err.message.includes('DSIP API 429')
       ) {
         throw err;
       }
@@ -160,82 +111,91 @@ async function fetchWithRetry(
     }
   }
 
-  state.degraded = true;
-  state.degradedReason = lastError?.message ?? 'Max retries exhausted';
-  logger.error(
-    { source: 'sbir', url, error: state.degradedReason },
-    'sbir_fetch_exhausted',
+  throw lastError ?? new Error('DSIP API: max retries exhausted');
+}
+
+/**
+ * Fetch all open + pre-release DSIP topics with pagination.
+ */
+export async function fetchDSIPTopics(
+  limit?: number,
+): Promise<DSIPTopicListItem[]> {
+  const cap = limit ?? MAX_TOPICS;
+  const searchParam = encodeURIComponent(buildSearchParam());
+  const allTopics: DSIPTopicListItem[] = [];
+  let page = 0;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const url = `${BASE_URL}/topics/search?searchParam=${searchParam}&size=${PAGE_SIZE}&page=${page}`;
+
+    logger.info(
+      { source: 'sbir', page, size: PAGE_SIZE },
+      'sbir_dsip_fetch_page',
+    );
+
+    const resp = await fetchWithRetry<DSIPSearchResponse>(url, 'search');
+    const topics = resp.data ?? [];
+
+    allTopics.push(...topics);
+
+    logger.info(
+      { source: 'sbir', page, fetched: topics.length, total: allTopics.length, apiTotal: resp.total },
+      'sbir_dsip_page_result',
+    );
+
+    if (topics.length < PAGE_SIZE || allTopics.length >= cap) break;
+
+    page++;
+    await new Promise((r) => setTimeout(r, DETAIL_DELAY_MS));
+  }
+
+  return allTopics.slice(0, cap);
+}
+
+/**
+ * Fetch detail for a single topic. Returns null on error (non-fatal).
+ */
+export async function fetchDSIPTopicDetail(
+  topicId: string,
+): Promise<DSIPTopicDetail | null> {
+  const url = `${BASE_URL}/topics/${encodeURIComponent(topicId)}/details`;
+
+  try {
+    return await fetchWithRetry<DSIPTopicDetail>(url, `detail:${topicId}`);
+  } catch (err) {
+    logger.warn(
+      {
+        source: 'sbir',
+        topicId,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      'sbir_dsip_detail_error',
+    );
+    return null;
+  }
+}
+
+/**
+ * Fetch open + pre-release topics and enrich each with detail data.
+ */
+export async function fetchEnrichedTopics(
+  limit?: number,
+): Promise<DSIPEnrichedTopic[]> {
+  const topics = await fetchDSIPTopics(limit);
+
+  logger.info(
+    { source: 'sbir', topicCount: topics.length },
+    'sbir_dsip_enriching_details',
   );
-  return null;
-}
 
-/**
- * Fetch DoD SBIR/STTR awards for a specific year.
- * Paginated via `start` offset.
- */
-export async function fetchSBIRAwards(
-  year: number,
-  state: FetchState,
-): Promise<SBIRAwardRaw[]> {
-  const allResults: SBIRAwardRaw[] = [];
-  let start = 0;
+  const enriched: DSIPEnrichedTopic[] = [];
 
-  logger.info({ source: 'sbir', year }, 'sbir_awards_fetch_start');
-
-  while (!state.degraded) {
-    const url = `${BASE_URL}/awards?agency=DOD&year=${year}&start=${start}&rows=${PAGE_SIZE}`;
-    const data = await fetchWithRetry(url, state);
-    if (data === null) break;
-
-    const records = Array.isArray(data) ? data as SBIRAwardRaw[] : [];
-    if (records.length === 0) break;
-
-    allResults.push(...records);
-    logger.info(
-      { source: 'sbir', year, start, fetched: records.length, total: allResults.length },
-      'sbir_awards_page',
-    );
-
-    if (records.length < PAGE_SIZE) break;
-    start += PAGE_SIZE;
+  for (const topic of topics) {
+    const detail = await fetchDSIPTopicDetail(topic.topicId);
+    enriched.push({ list: topic, detail });
+    await new Promise((r) => setTimeout(r, DETAIL_DELAY_MS));
   }
 
-  return allResults;
-}
-
-/**
- * Fetch currently open/pre-release DoD SBIR/STTR solicitation topics.
- * Paginated via `start` offset.
- */
-export async function fetchSBIRTopics(
-  state: FetchState,
-): Promise<SBIRTopicRaw[]> {
-  const allResults: SBIRTopicRaw[] = [];
-  let start = 0;
-
-  logger.info({ source: 'sbir' }, 'sbir_topics_fetch_start');
-
-  while (!state.degraded) {
-    const url = `${BASE_URL}/solicitations?agency=DOD&open=Y&start=${start}&rows=${PAGE_SIZE}`;
-    const data = await fetchWithRetry(url, state);
-    if (data === null) break;
-
-    const records = Array.isArray(data) ? data as SBIRTopicRaw[] : [];
-    if (records.length === 0) break;
-
-    allResults.push(...records);
-    logger.info(
-      { source: 'sbir', start, fetched: records.length, total: allResults.length },
-      'sbir_topics_page',
-    );
-
-    if (records.length < PAGE_SIZE) break;
-    start += PAGE_SIZE;
-  }
-
-  return allResults;
-}
-
-export function createFetchState(): FetchState {
-  return { degraded: false };
+  return enriched;
 }

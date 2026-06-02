@@ -9,8 +9,8 @@
  * alternative infra is in place. See GitHub issue #513.
  *
  * SBIR cron is gated behind ENABLE_SBIR_INGEST (default OFF).
- * api.www.sbir.gov returns HTTP 429 for all requests from VPS egress IP.
- * See GitHub issue #527.
+ * Source: DoD DSIP API (dodsbirsttr.mil). Orchestrator flips flag after
+ * deploy verification.
  */
 
 import cron, { type ScheduledTask } from 'node-cron';
@@ -53,7 +53,7 @@ const JOBS: CronJob[] = [
     : []),
   { sourceKey: 'federalregister.gov', schedule: '15 */6 * * *', label: 'Federal Register ingest (every 6 hours)' },
   ...(sbirEnabled
-    ? [{ sourceKey: 'sbir.gov', schedule: '45 */12 * * *', label: 'SBIR/STTR awards + open topics (twice daily)' }]
+    ? [{ sourceKey: 'sbir', schedule: '0 9 * * *', label: 'DoD SBIR/STTR open topics via DSIP (daily 05:00 ET)' }]
     : []),
   { sourceKey: 'nsf', schedule: '0 8 * * *', label: 'NSF research awards ingest (daily 04:00 ET)' },
   ...(govtribeEnabled
@@ -91,7 +91,7 @@ export function startCronScheduler(): void {
   logger.info({ sources: registeredSources, adapters: registeredAdapters }, '[ingest] framework ready');
 
   if (!sbirEnabled) {
-    logger.info({ flag: 'ENABLE_SBIR_INGEST' }, '[cron] sbir.12h skipped — gated behind env flag (default off due to api.www.sbir.gov 429 block on VPS egress)');
+    logger.info({ flag: 'ENABLE_SBIR_INGEST' }, '[cron] sbir.daily skipped — gated behind env flag (default off)');
   }
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
@@ -140,7 +140,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'dibbs' ? 'dibbs.6h'
       : job.sourceKey === 'neco' ? 'neco.6h'
       : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
-      : job.sourceKey === 'sbir.gov' ? 'sbir.12h'
+      : job.sourceKey === 'sbir' ? 'sbir.daily'
       : job.sourceKey === 'govtribe' ? 'govtribe.opps.mon_thu'
       : job.sourceKey === 'govtribe.contacts' ? 'govtribe.contacts.weekly'
       : job.sourceKey === 'govtribe.vehicles' ? 'govtribe.vehicles.monthly'
