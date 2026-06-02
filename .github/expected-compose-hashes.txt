@@ -1,1 +1,1 @@
-docker-compose.prod.yml 85324b11dee19e0d080f31ba1df73e133b3cffc2937a4f80dd2316281718c237
+docker-compose.prod.yml e6ff24d8730a4d29b45b8efce71af9e4dffcc20c2fae8ee5f234ab43aa329069

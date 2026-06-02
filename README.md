@@ -151,6 +151,7 @@ The production stack runs:
 - **postgres** — PostgreSQL 16 with health checks
 - **backend** — Node.js API server (port 3001, internal only)
 - **frontend** — Nginx serving React SPA + reverse proxy to backend (port 80)
+- **gda-mcp-server** — MCP tool server (port 4100) at `https://gda-mcp.csr-llc.tech`
 
 Auto-migration runs on container startup. Set `AUTO_MIGRATE=false` to disable.
 

@@ -1,0 +1,109 @@
+name: Deploy MCP Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/gda-mcp-server/**"
+      - "docker-compose.prod.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-mcp-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy gda-mcp-server to prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.PROD_SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy gda-mcp-server
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" bash -s <<'EOF'
+          set -euo pipefail
+          DEPLOY_DIR="/root/gda-command-v2"
+          COMPOSE_FILE="docker-compose.prod.yml"
+          SERVICE="gda-mcp-server"
+          CONTAINER="gda-mcp-server"
+
+          cd "$DEPLOY_DIR"
+          echo "=== deploy-mcp-server ==="
+          echo "prev_sha=$(git rev-parse --short HEAD)"
+
+          git fetch origin
+          git reset --hard origin/main
+          DEPLOY_SHA=$(git rev-parse --short HEAD)
+          echo "deploy_sha=${DEPLOY_SHA}"
+
+          echo "--- docker compose build ${SERVICE} ---"
+          DEPLOY_COMMIT_SHA=$(git rev-parse HEAD) \
+            docker compose -f "$COMPOSE_FILE" build "$SERVICE"
+
+          echo "--- docker compose up -d ${SERVICE} ---"
+          docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps "$SERVICE"
+
+          echo "--- waiting for ${CONTAINER} health ---"
+          for i in $(seq 1 20); do
+            status=$(docker inspect "$CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+            if [ "$status" = "healthy" ]; then
+              echo "${CONTAINER} healthy (attempt ${i})"
+              break
+            fi
+            if [ "$i" -eq 20 ]; then
+              echo "DEPLOY_FAILED ${CONTAINER} not healthy after 60s (status: ${status})"
+              docker logs "$CONTAINER" --tail 30 2>&1 || true
+              exit 1
+            fi
+            sleep 3
+          done
+
+          echo "--- verifying /health endpoint ---"
+          BODY=$(docker exec "$CONTAINER" wget -qO- "http://127.0.0.1:4100/health" 2>/dev/null || echo '{"status":"error"}')
+          echo "health: ${BODY}"
+
+          docker image prune -f
+          echo "DEPLOY_OK ${DEPLOY_SHA}"
+          EOF
+
+      - name: Set commit status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.sha;
+            const success = '${{ job.status }}' === 'success';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha,
+              state: success ? 'success' : 'failure',
+              context: 'deploy/mcp-server',
+              description: success
+                ? `MCP server deployed ${sha.substring(0, 7)} at ${new Date().toISOString()}`
+                : `MCP server deploy failed — see logs`,
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
