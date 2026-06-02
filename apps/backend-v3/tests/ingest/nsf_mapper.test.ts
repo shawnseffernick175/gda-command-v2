@@ -34,13 +34,14 @@ describe('mapNSFAward', () => {
     expect(opportunity.agency).toBe('National Science Foundation');
     expect(opportunity.sub_agency).toBe('Secure & Trustworthy Cyberspace');
     expect(opportunity.department).toBe('National Science Foundation');
-    expect(opportunity.status).toBe('signal');
+    expect(opportunity.status).toBe('discovery');
     expect(opportunity.data_source).toBe('nsf');
     expect(opportunity.posted_at).toBe('2026-05-15');
     expect(opportunity.value_min).toBe(750000);
     expect(opportunity.value_max).toBe(750000);
     expect(opportunity.place_of_performance).toBe('MA');
     expect(opportunity.tags).toContain('fast_track');
+    expect(opportunity.tags).toContain('signal');
     expect(opportunity.tags).toContain('nsf');
     expect(opportunity.tags).toContain('research');
     expect(opportunity.opportunity_type).toBe('research_award');

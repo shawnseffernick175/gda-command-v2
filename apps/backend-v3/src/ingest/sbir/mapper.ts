@@ -4,7 +4,7 @@
  * source citations. Follows R1: every data point has a searchable source.
  *
  * data_source = 'sbir' (canonical PrimarySource enum value).
- * lifecycle_stage = 'signal' (Fast Track signal source).
+ * status = 'discovery' (DB CHECK constraint); 'signal' preserved in tags.
  */
 
 import type { DSIPEnrichedTopic } from './types.js';
@@ -79,7 +79,7 @@ function normalizeComponent(raw: string | null | undefined): string | null {
 function buildTags(
   topic: DSIPEnrichedTopic,
 ): string[] {
-  const tags: string[] = ['fast_track', 'sbir', 'dod'];
+  const tags: string[] = ['fast_track', 'signal', 'sbir', 'dod'];
 
   const { list, detail } = topic;
 
@@ -149,7 +149,7 @@ export function mapDSIPTopic(
     sub_agency: comp,
     department: 'Department of Defense',
     solicitation_number: trimOrNull(list.solicitationNumber),
-    status: 'signal',
+    status: 'discovery',
     value_min: null,
     value_max: null,
     naics: null,

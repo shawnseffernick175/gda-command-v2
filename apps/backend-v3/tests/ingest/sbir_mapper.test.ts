@@ -65,7 +65,7 @@ describe('mapDSIPTopic', () => {
     expect(opportunity.sub_agency).toBe('Army');
     expect(opportunity.department).toBe('Department of Defense');
     expect(opportunity.data_source).toBe('sbir');
-    expect(opportunity.status).toBe('signal');
+    expect(opportunity.status).toBe('discovery');
     expect(opportunity.opportunity_type).toBe('sbir_topic');
     expect(opportunity.solicitation_number).toBe('26.BX');
     expect(opportunity.part_number).toBe('ARM26BX01-NV001');
@@ -153,10 +153,11 @@ describe('mapDSIPTopic', () => {
     expect(mapDSIPTopic(topic)).toBeNull();
   });
 
-  it('includes fast_track, sbir, dod tags', () => {
+  it('includes fast_track, signal, sbir, dod tags', () => {
     const result = mapDSIPTopic(makeEnriched());
     const tags = result!.opportunity.tags;
     expect(tags).toContain('fast_track');
+    expect(tags).toContain('signal');
     expect(tags).toContain('sbir');
     expect(tags).toContain('dod');
   });
