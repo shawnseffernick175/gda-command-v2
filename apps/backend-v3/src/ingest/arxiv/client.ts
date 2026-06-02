@@ -126,13 +126,19 @@ function parseEntries($: cheerio.CheerioAPI): ArxivEntryRaw[] {
     });
 
     if (!absUrl && idText.startsWith('http')) {
-      absUrl = idText.replace('/abs/', '/abs/');
+      absUrl = idText;
     }
 
-    let primaryCategory: string | null = null;
-    const primaryCatEl = $entry.find('category').first();
-    if (primaryCatEl.length) {
-      primaryCategory = primaryCatEl.attr('term') ?? null;
+    // arXiv marks the true primary category with <arxiv:primary_category>.
+    // cheerio (xmlMode) preserves the namespaced tag; escape the colon in the
+    // selector. Fall back to the first <category> if the primary tag is absent.
+    let primaryCategory: string | null =
+      $entry.find('arxiv\\:primary_category').first().attr('term') ?? null;
+    if (!primaryCategory) {
+      const firstCat = $entry.find('category').first();
+      if (firstCat.length) {
+        primaryCategory = firstCat.attr('term') ?? null;
+      }
     }
 
     const categories: string[] = [];
