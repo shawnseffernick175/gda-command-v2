@@ -24,6 +24,7 @@
 
 import type pg from 'pg';
 import { invalidateMergeCache } from './merge.js';
+import { recordAuditLog } from '../audit/audit-log.js';
 
 // ─── Allow-list ───────────────────────────────────────────────────────────────
 
@@ -60,6 +61,10 @@ export interface FieldOverrideInput {
   field_value: unknown;
   set_by: string;
   reason?: string | null;
+  request_id?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  user_id?: number | null;
 }
 
 export interface FieldOverrideResult {
@@ -183,6 +188,23 @@ export async function setFieldOverrideWithAudit(
         input.reason ?? null,
       ],
     );
+
+    // Mirror into the unified audit_log (F-442) — additive, keeps the domain
+    // audit row above untouched.
+    const auditAction: string = isClear ? 'field_override_clear' : 'field_override_set';
+    await recordAuditLog(client, {
+      action: auditAction,
+      table_name: 'unified_opportunity_field_overrides',
+      record_id: null,
+      record_ref: input.internal_id,
+      old_values: oldValue != null ? { [input.field_name]: oldValue } : null,
+      new_values: !isClear ? { [input.field_name]: input.field_value } : null,
+      actor: input.set_by,
+      user_id: input.user_id ?? null,
+      ip_address: input.ip_address ?? null,
+      user_agent: input.user_agent ?? null,
+      request_id: input.request_id ?? null,
+    });
 
     await client.query('COMMIT');
 

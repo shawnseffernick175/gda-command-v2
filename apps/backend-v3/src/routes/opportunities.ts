@@ -144,6 +144,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       field_value: body.field_value,
       set_by: setBy,
       reason,
+      request_id: req.requestId ?? null,
+      ip_address: req.ip ?? null,
+      user_agent: (req.headers['user-agent'] as string) ?? null,
+      user_id: null,
     });
 
     if (!result) {
@@ -243,6 +247,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       link_id: linkId,
       action: body.action as 'confirm' | 'reject',
       decided_by: decidedBy,
+      request_id: req.requestId ?? null,
+      ip_address: req.ip ?? null,
+      user_agent: (req.headers['user-agent'] as string) ?? null,
+      user_id: null,
     });
 
     if (!result) {
