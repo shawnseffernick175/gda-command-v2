@@ -45,6 +45,45 @@ export interface LineageEntry {
   confirmed_at: string | null;
 }
 
+/**
+ * F-421: tab identifiers for the unified opportunities list. Each maps to a
+ * stage-group filter on GET /v3/opportunities/unified (except `review`, which
+ * routes to the F-422 suggestion queue).
+ */
+export type UnifiedTabId =
+  | 'all'
+  | 'active'
+  | 'pipeline'
+  | 'fast_track'
+  | 'awarded'
+  | 'review';
+
+/**
+ * One row in the unified opportunities list. Mirrors the F-411 backend
+ * contract `UnifiedListItem` returned by GET /v3/opportunities/unified
+ * (apps/backend-v3/src/services/opportunities/detail.ts).
+ */
+export interface UnifiedListItem {
+  internal_id: string;
+  lifecycle_stage: string;
+  primary_source: string | null;
+  title: string | null;
+  agency: string | null;
+  naics: string | null;
+  set_aside: string | null;
+  estimated_value_cents: number | null;
+  response_due_at: string | null;
+  posted_at: string | null;
+  pwin: number | null;
+  doctrine_status: string | null;
+  updated_at: string;
+}
+
+export interface UnifiedListResult {
+  items: UnifiedListItem[];
+  pagination: { limit: number; cursor: string | null; hasMore: boolean };
+}
+
 export interface UnifiedOpportunityDetail {
   internal_id: string;
   lifecycle_stage: string;
