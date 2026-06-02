@@ -173,6 +173,8 @@ services:
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://${STAGING_POSTGRES_USER:-gda_staging}:${STAGING_POSTGRES_PASSWORD}@postgres-staging:5432/${STAGING_POSTGRES_DB:-gda_staging}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      # --- LegiScan legislation search (F-506) ---
+      LEGISCAN_API_KEY: ${LEGISCAN_API_KEY:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4100/health || exit 1"]
       interval: 30s

@@ -1,5 +1,5 @@
 /**
- * F-502 + F-503 integration tests — validates that all 10 MCP tools:
+ * F-502 + F-503 + F-506 integration tests — validates that all 11 MCP tools:
  * 1. Appear in tools/list with correct names, descriptions, inputSchemas
  * 2. Return valid MCP responses (not transport crashes) when called
  * 3. Surface service/validation errors as MCP error responses (isError: true)
@@ -114,10 +114,10 @@ afterAll(async () => {
 // ─── tools/list ─────────────────────────────────────────────────────────────
 
 describe('tools/list', () => {
-  it('returns exactly 10 gda_ tools with descriptions and inputSchemas', async () => {
+  it('returns exactly 11 gda_ tools with descriptions and inputSchemas', async () => {
     const client = await createMcpClient();
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(10);
+    expect(tools).toHaveLength(11);
 
     const expected = [
       'gda_search_opportunities',
@@ -130,6 +130,7 @@ describe('tools/list', () => {
       'gda_run_color_team',
       'gda_get_launchpad_summary',
       'gda_recall_decisions',
+      'gda_search_bills',
     ];
     expect(tools.map((t) => t.name)).toEqual(expected);
     for (const tool of tools) {

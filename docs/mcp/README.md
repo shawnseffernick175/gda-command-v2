@@ -14,7 +14,7 @@
 | Devin | Session prompt | [devin.md](./devin.md) |
 | Frontend / Agent (internal) | TypeScript / Docker | [frontend.md](./frontend.md) |
 
-## Tool catalog (10 tools)
+## Tool catalog (11 tools)
 
 All tools are prefixed `gda_` and registered in [`apps/gda-mcp-server/src/tools/index.ts`](../../apps/gda-mcp-server/src/tools/index.ts).
 
@@ -30,6 +30,7 @@ All tools are prefixed `gda_` and registered in [`apps/gda-mcp-server/src/tools/
 | 8 | `gda_run_color_team` | F-503 | Run a color-team review (Pink/Red/Gold) |
 | 9 | `gda_get_launchpad_summary` | F-503 | Launchpad summary dashboard data |
 | 10 | `gda_recall_decisions` | F-503 | Recall past capture decisions from memory |
+| 11 | `gda_search_bills` | F-506 | Search federal + state legislation via LegiScan |
 
 ## Generating a JWT
 
@@ -40,6 +41,6 @@ See the [Getting a JWT](./claude-desktop.md#getting-a-jwt) section or the [MCP s
 After configuring any client with a valid JWT:
 
 1. The client connects to `https://gda-mcp.csr-llc.tech/mcp` via Streamable HTTP.
-2. Running `tools/list` returns exactly **10 tools** starting with `gda_`.
+2. Running `tools/list` returns exactly **11 tools** starting with `gda_`.
 3. Each tool can be invoked via `tools/call` with the appropriate arguments.
 4. Invalid or expired tokens return HTTP 401.
