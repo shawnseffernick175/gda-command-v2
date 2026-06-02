@@ -1,5 +1,5 @@
 /**
- * USAspending ingest job — pulls the last 48 hours of DoD contract award
+ * USAspending ingest job — pulls the last 7 days of DoD contract award
  * modifications, maps to award rows, and upserts with per-field source
  * citations (R1 compliant).
  *
@@ -15,7 +15,7 @@ import { mapUSASpendingAward } from './mapper.js';
 import type { AwardRow, AwardSourceCitation } from './mapper.js';
 import type { IngestResult } from '../framework/registry.js';
 
-const LOOKBACK_HOURS = 48;
+const LOOKBACK_HOURS = 168; // 7 days — USAspending last_modified_date window
 
 const FIELD_TO_TABLE: Record<string, string> = {
   awardee: 'award_awardee_sources',

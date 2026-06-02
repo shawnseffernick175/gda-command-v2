@@ -81,7 +81,6 @@ interface SpendingByAwardResponse {
   page_metadata: {
     page: number;
     hasNext: boolean;
-    total: number;
     limit: number;
   };
 }
@@ -166,7 +165,7 @@ export async function fetchGroup(
     const body = {
       filters: {
         award_type_codes: typeCodes,
-        time_period: [{ start_date: startDate, end_date: endDate }],
+        time_period: [{ start_date: startDate, end_date: endDate, date_type: 'last_modified_date' }],
         agencies: DOD_AGENCY_FILTER,
       },
       fields: REQUESTED_FIELDS,
@@ -185,7 +184,7 @@ export async function fetchGroup(
     results.push(...resp.results);
 
     logger.info(
-      { source: 'usaspending', group: groupLabel, page, count: resp.results.length, total: resp.page_metadata.total },
+      { source: 'usaspending', group: groupLabel, page, count: resp.results.length },
       'usaspending_ingest_page',
     );
 
