@@ -101,6 +101,29 @@ describe('isOverridableField', () => {
     expect(isOverridableField(undefined)).toBe(false);
     expect(isOverridableField(42)).toBe(false);
   });
+
+  it('mirrors EXACTLY the merge service override-honoring fields (Devin finding)', () => {
+    // These are the field names merge.ts resolves through overrideMap:
+    // mergeField('title'|'agency'|'office'|'naics'|'psc'|'set_aside'|'award_at')
+    // plus the 3 custom-precedence fields. Drift here = silently-ignored
+    // overrides. `office` is correct (NOT `sub_agency`).
+    const mergeHonoredFields = [
+      'title',
+      'agency',
+      'office',
+      'naics',
+      'psc',
+      'set_aside',
+      'award_at',
+      'estimated_value_cents',
+      'response_due_at',
+      'posted_at',
+    ].sort();
+    expect([...OVERRIDABLE_FIELDS].sort()).toEqual(mergeHonoredFields);
+    // Regression guards for the specific drift Devin caught:
+    expect(isOverridableField('office')).toBe(true);
+    expect(isOverridableField('sub_agency')).toBe(false);
+  });
 });
 
 // ─── setFieldOverrideWithAudit: SET ───────────────────────────────────────────

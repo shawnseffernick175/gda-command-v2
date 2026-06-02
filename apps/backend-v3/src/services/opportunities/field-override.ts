@@ -28,25 +28,27 @@ import { invalidateMergeCache } from './merge.js';
 // ─── Allow-list ───────────────────────────────────────────────────────────────
 
 /**
- * Fields an operator is permitted to override. Mirrors the fields the merge
- * service (F-405) actually honors from the override map. Anything outside this
- * set is rejected with 400 so we don't silently store overrides that the merge
- * layer will never apply.
+ * Fields an operator is permitted to override. This list MUST mirror exactly
+ * the field names the merge service (F-405, merge.ts) resolves through the
+ * override map — i.e. the `mergeField('<name>')` calls plus the three
+ * custom-precedence fields. Anything outside this set is rejected with 400 so
+ * we don't silently store overrides the merge layer will never apply.
+ *
+ * Verified against merge.ts §5 ("Merge fields"): the only override-honoring
+ * field names are these. Note it is `office` (not `sub_agency`) — the merged
+ * model exposes `office`, and `overrideMap.has('office')` is what merge checks.
  */
 export const OVERRIDABLE_FIELDS = new Set<string>([
   'title',
   'agency',
-  'sub_agency',
+  'office',
   'naics',
   'psc',
-  'description',
-  'solicitation_number',
+  'set_aside',
+  'award_at',
   'estimated_value_cents',
   'response_due_at',
   'posted_at',
-  'lifecycle_stage',
-  'place_of_performance',
-  'set_aside',
 ]);
 
 export type OverrideAction = 'set' | 'clear';
