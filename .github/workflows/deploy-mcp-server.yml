@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/gda-mcp-server/**"
+      - "apps/backend-v3/**"
       - "docker-compose.prod.yml"
   workflow_dispatch:
 
