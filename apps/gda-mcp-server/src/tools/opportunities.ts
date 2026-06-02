@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { pool } from '../lib/pool.js';
-import { getMergedOpportunity } from '../lib/services.js';
+import { getMergedOpportunity, computeDoctrineBadge } from '../lib/services.js';
+import type { Competitor } from '../lib/service-types.js';
 import type { ToolRegistryEntry } from './index.js';
 
 // ─── gda_search_opportunities ───────────────────────────────────────────────
@@ -90,6 +91,62 @@ const GetInputSchema = z.object({
   internal_id: z.string(),
 });
 
+/**
+ * Resolve doctrine badge, candidate_partners, and competitors from existing
+ * tables for a merged opportunity (F-437). Never throws.
+ */
+async function enrichWithDoctrineBadge(internalId: string) {
+  const noneBadge = await computeDoctrineBadge({});
+  const defaults = { doctrine_badge: noneBadge, candidate_partners: [] as string[], competitors: [] as Competitor[] };
+
+  const oppIdRes = await pool.query<{ id: string }>(
+    `SELECT o.id FROM opportunities o
+     JOIN unified_opportunity_links l ON (
+       (l.source = 'sam'      AND o.sam_notice_id = l.source_native_id AND o.data_source = 'sam_gov')
+       OR (l.source = 'govwin'   AND o.sam_notice_id = 'govwin-' || l.source_native_id)
+       OR (l.source = 'govtribe' AND o.govtribe_id  = l.source_native_id)
+     )
+     WHERE l.internal_id = $1 AND o.deleted_at IS NULL
+     LIMIT 1`,
+    [internalId],
+  );
+  const oppId = oppIdRes.rows[0]?.id;
+  if (!oppId) return defaults;
+
+  const [featRes, evalRes, analysisRes] = await Promise.all([
+    pool.query<{ features: Record<string, unknown> }>(
+      `SELECT features FROM pwin_features WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
+      [oppId],
+    ),
+    pool.query<{ principle_scores: Record<string, unknown> }>(
+      `SELECT principle_scores FROM doctrine_evaluations
+       WHERE entity_kind = 'opportunity' AND entity_id = $1
+       ORDER BY evaluated_at DESC LIMIT 1`,
+      [oppId],
+    ),
+    pool.query<{ analysis: Record<string, unknown> | null }>(
+      `SELECT analysis FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
+      [oppId],
+    ),
+  ]);
+
+  const features = featRes.rows[0]?.features;
+  const doctrineAlignmentScore = (features?.doctrine_alignment_score as number | undefined) ?? null;
+  const candidatePartners = (features?.candidate_partners as string[] | undefined) ?? [];
+
+  const principleScores = evalRes.rows[0]?.principle_scores;
+  const matchedPrincipleIds = principleScores ? Object.keys(principleScores) : [];
+
+  const analysis = analysisRes.rows[0]?.analysis;
+  const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
+  const competitors: Competitor[] = rawCompetitors
+    .filter((c) => typeof c.name === 'string')
+    .map((c) => ({ name: c.name as string, threat_level: (c.threat_level as string) ?? 'medium' }));
+
+  const badge = await computeDoctrineBadge({ doctrineAlignmentScore, matchedPrincipleIds });
+  return { doctrine_badge: badge, candidate_partners: candidatePartners, competitors };
+}
+
 export const gdaGetOpportunity: ToolRegistryEntry = {
   name: 'gda_get_opportunity',
   description:
@@ -110,8 +167,10 @@ export const gdaGetOpportunity: ToolRegistryEntry = {
         content: [{ type: 'text' as const, text: `Opportunity ${internal_id} not found` }],
       };
     }
+    const enrichment = await enrichWithDoctrineBadge(internal_id);
+    const payload = { ...merged, ...enrichment };
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify(merged, null, 2) }],
+      content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
     };
   },
 };

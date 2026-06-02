@@ -29,6 +29,8 @@ import {
 import type { OpportunityLink } from '../../db/types/opportunity.js';
 import { buildFieldSourceRefs } from '../../lib/source-urls.js';
 import type { SourceRef } from '../../lib/sources.js';
+import { computeDoctrineBadge, type DoctrineBadge } from '../doctrine/badge.js';
+import type { Competitor } from './types.js';
 
 // ─── Exported types ──────────────────────────────────────────────────────────
 
@@ -65,6 +67,9 @@ export interface UnifiedOpportunityDetail {
   primary_source: string | null;
   pwin: number | null;
   doctrine_status: string | null;
+  doctrine_badge: DoctrineBadge;
+  candidate_partners: string[];
+  competitors: Competitor[];
   created_at: string;
   updated_at: string;
   merged_fields: Record<string, MergedField>;
@@ -150,6 +155,91 @@ function toLineage(links: OpportunityLink[]): LineageEntry[] {
   }));
 }
 
+// ─── F-437: resolve doctrine badge + teammates/competitors from analysis ────
+
+interface DoctrineEnrichment {
+  badge: DoctrineBadge;
+  candidatePartners: string[];
+  competitors: Competitor[];
+}
+
+/**
+ * Resolve the underlying `opportunities.id` for the primary-source link,
+ * then pull doctrine alignment score, matched principles, teammates, and
+ * competitors from existing tables. Never throws — returns safe defaults.
+ */
+async function resolveDoctrineEnrichment(
+  pool: pg.Pool,
+  merged: MergedOpportunity,
+): Promise<DoctrineEnrichment> {
+  const none: DoctrineEnrichment = {
+    badge: computeDoctrineBadge({}),
+    candidatePartners: [],
+    competitors: [],
+  };
+
+  // Resolve the underlying opportunities.id via the link table (same logic
+  // as resolvePrimaryOpportunityId but avoids a circular dependency).
+  const oppIdRes = await pool.query<{ id: string }>(
+    `SELECT o.id FROM opportunities o
+     JOIN unified_opportunity_links l ON (
+       (l.source = 'sam'      AND o.sam_notice_id = l.source_native_id AND o.data_source = 'sam_gov')
+       OR (l.source = 'govwin'   AND o.sam_notice_id = 'govwin-' || l.source_native_id)
+       OR (l.source = 'govtribe' AND o.govtribe_id  = l.source_native_id)
+     )
+     WHERE l.internal_id = $1 AND o.deleted_at IS NULL
+     LIMIT 1`,
+    [merged.internal_id],
+  );
+  const oppId = oppIdRes.rows[0]?.id;
+  if (!oppId) return none;
+
+  // Parallel: pwin features, latest doctrine evaluation, analysis competitors
+  const [featRes, evalRes, analysisRes] = await Promise.all([
+    pool.query<{ features: Record<string, unknown> }>(
+      `SELECT features FROM pwin_features
+       WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
+      [oppId],
+    ),
+    pool.query<{ principle_scores: Record<string, unknown> }>(
+      `SELECT principle_scores FROM doctrine_evaluations
+       WHERE entity_kind = 'opportunity' AND entity_id = $1
+       ORDER BY evaluated_at DESC LIMIT 1`,
+      [oppId],
+    ),
+    pool.query<{ analysis: Record<string, unknown> | null }>(
+      `SELECT analysis FROM opportunities
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [oppId],
+    ),
+  ]);
+
+  const features = featRes.rows[0]?.features;
+  const doctrineAlignmentScore =
+    (features?.doctrine_alignment_score as number | undefined) ?? null;
+  const candidatePartners =
+    (features?.candidate_partners as string[] | undefined) ?? [];
+
+  const principleScores = evalRes.rows[0]?.principle_scores;
+  const matchedPrincipleIds = principleScores ? Object.keys(principleScores) : [];
+
+  const analysis = analysisRes.rows[0]?.analysis;
+  const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
+  const competitors: Competitor[] = rawCompetitors
+    .filter((c) => typeof c.name === 'string')
+    .map((c) => ({
+      name: c.name as string,
+      threat_level: (c.threat_level as Competitor['threat_level']) ?? 'medium',
+    }));
+
+  const badge = computeDoctrineBadge({
+    doctrineAlignmentScore,
+    matchedPrincipleIds,
+  });
+
+  return { badge, candidatePartners: candidatePartners, competitors };
+}
+
 /**
  * Build the full unified detail payload for an internal_id.
  * Returns null when no unified_opportunities row exists.
@@ -162,7 +252,10 @@ export async function getUnifiedOpportunityDetail(
   if (!merged) return null;
 
   // Raw per-source records (REJECTED links already filtered inside).
-  const sources = await fetchSourceRecords(pool, merged.links);
+  const [sources, enrichment] = await Promise.all([
+    fetchSourceRecords(pool, merged.links),
+    resolveDoctrineEnrichment(pool, merged),
+  ]);
 
   return {
     internal_id: merged.internal_id,
@@ -170,6 +263,9 @@ export async function getUnifiedOpportunityDetail(
     primary_source: merged.primary_source,
     pwin: merged.pwin,
     doctrine_status: merged.doctrine_status,
+    doctrine_badge: enrichment.badge,
+    candidate_partners: enrichment.candidatePartners,
+    competitors: enrichment.competitors,
     created_at: merged.created_at,
     updated_at: merged.updated_at,
     merged_fields: buildMergedFields(merged),

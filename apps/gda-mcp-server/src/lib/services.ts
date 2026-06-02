@@ -20,6 +20,8 @@ import type {
   AgentDecisionRow,
   LaunchpadSummary,
   DraftRow,
+  DoctrineBadge,
+  ComputeDoctrineBadgeInput,
 } from './service-types.js';
 
 /**
@@ -43,6 +45,7 @@ const PIPELINE_MODULE = '@gda/backend-v3/dist/services/pipeline/index.js';
 const COLOR_TEAMS_MODULE = '@gda/backend-v3/dist/services/color-teams/index.js';
 const LAUNCHPAD_MODULE = '@gda/backend-v3/dist/services/launchpad/summary.js';
 const MEMORY_MODULE = '@gda/backend-v3/dist/services/memory/index.js';
+const BADGE_MODULE = '@gda/backend-v3/dist/services/doctrine/badge.js';
 
 // ─── Merge service (F-405) ──────────────────────────────────────────────────
 
@@ -163,4 +166,13 @@ export async function getRecentDecisionsSummary(
 ): Promise<AgentDecisionRow[]> {
   const mod = await load(MEMORY_MODULE);
   return mod.getRecentDecisionsSummary(days, limit) as Promise<AgentDecisionRow[]>;
+}
+
+// ─── Doctrine badge (F-437) ─────────────────────────────────────────────────
+
+export async function computeDoctrineBadge(
+  input: ComputeDoctrineBadgeInput,
+): Promise<DoctrineBadge> {
+  const mod = await load(BADGE_MODULE);
+  return mod.computeDoctrineBadge(input) as DoctrineBadge;
 }
