@@ -24,6 +24,7 @@ import { registerUSASpendingSource } from '../ingest/usaspending/index.js';
 import { registerFederalRegisterSource } from '../ingest/federal_register/index.js';
 import { registerSBIRSource } from '../ingest/sbir/index.js';
 import { registerNSFSource } from '../ingest/nsf/index.js';
+import { registerDoDRSSSource } from '../ingest/dod_rss/index.js';
 import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
@@ -56,6 +57,7 @@ const JOBS: CronJob[] = [
     ? [{ sourceKey: 'sbir', schedule: '0 9 * * *', label: 'DoD SBIR/STTR open topics via DSIP (daily 05:00 ET)' }]
     : []),
   { sourceKey: 'nsf', schedule: '0 8 * * *', label: 'NSF research awards ingest (daily 04:00 ET)' },
+  { sourceKey: 'dod_rss', schedule: '30 22 * * *', label: 'DoD contract announcements RSS ingest (daily 18:30 ET, after 5pm ET feed publish)' },
   ...(govtribeEnabled
     ? [
         { sourceKey: 'govtribe', schedule: '0 10 * * 1,4', label: 'GovTribe opps poll (Mon+Thu 6am ET / 10:00 UTC)' },
@@ -81,6 +83,7 @@ export function startCronScheduler(): void {
   registerFederalRegisterSource();
   registerSBIRSource();
   registerNSFSource();
+  registerDoDRSSSource();
   registerGovTribeSource();
   if (govwinEnabled) {
     registerGovWinSource();
@@ -146,6 +149,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'govtribe.vehicles' ? 'govtribe.vehicles.monthly'
       : job.sourceKey === 'govtribe.budget' ? 'govtribe.budget.nightly'
       : job.sourceKey === 'govwin' ? 'govwin.6h'
+      : job.sourceKey === 'dod_rss' ? 'dod_rss.daily'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
