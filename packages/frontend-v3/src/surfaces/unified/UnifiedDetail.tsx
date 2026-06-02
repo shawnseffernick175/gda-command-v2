@@ -326,7 +326,7 @@ export function UnifiedDetail() {
                 onClick={() => setConflictsOpen((o) => !o)}
                 data-testid="conflict-count-toggle"
               >
-                {conflictCount} {conflictCount === 1 ? 'field conflicts' : 'fields conflict'} across
+                {conflictCount} {conflictCount === 1 ? 'field conflict' : 'field conflicts'} across
                 sources {conflictsOpen ? '▲' : '▼'}
               </button>
             ) : (

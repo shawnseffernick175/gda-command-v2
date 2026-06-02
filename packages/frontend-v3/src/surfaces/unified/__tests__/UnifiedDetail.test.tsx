@@ -138,7 +138,7 @@ describe('UnifiedDetail', () => {
     render(<UnifiedDetail />, { wrapper });
 
     const toggle = await screen.findByTestId('conflict-count-toggle');
-    expect(toggle).toHaveTextContent('1 field conflicts across');
+    expect(toggle).toHaveTextContent('1 field conflict across');
 
     // drawer hidden initially
     expect(screen.queryByTestId('conflict-drawer')).not.toBeInTheDocument();
