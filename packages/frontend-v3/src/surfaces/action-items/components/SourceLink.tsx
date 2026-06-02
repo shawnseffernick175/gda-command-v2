@@ -7,7 +7,7 @@ interface SourceLinkProps {
 function buildSourceUrl(type: string | null, id: string | null): string | null {
   if (!type || !id) return null;
   switch (type) {
-    case 'opportunity': return `/opp/${id}`;
+    case 'opportunity': return `/unified`;
     case 'capture': return `/capture/${id}`;
     case 'pipeline': return `/pipeline?id=${id}`;
     default: return null;

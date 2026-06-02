@@ -98,7 +98,7 @@ export function PipelineDetailDrawer({
                 Linked Opportunity
               </h4>
               <a
-                href={`/opp/${row.linked_opportunity_id}`}
+                href={`/unified`}
                 className="text-sm text-accent hover:underline"
               >
                 View Opportunity

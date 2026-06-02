@@ -45,7 +45,7 @@ export function App() {
                   <Route path="/fast-track" element={<FastTrack />} />
                   <Route path="/opportunities" element={<OpportunitiesList />} />
                   <Route path="/awards" element={<AwardsSurface />} />
-                  <Route path="/opp/:notice_id" element={<OpportunitiesList />} />
+
                   <Route path="/capture" element={<CaptureList />} />
                   <Route path="/capture/:opp_id" element={<CaptureDetail />} />
                   <Route path="/unified" element={<UnifiedList />} />

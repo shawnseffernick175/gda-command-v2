@@ -109,7 +109,7 @@ describe('ActionItemDetail', () => {
     expect(anchorLink).toBeDefined();
     const anchor = anchorLink!.closest('a');
     expect(anchor).not.toBeNull();
-    expect(anchor!.getAttribute('href')).toBe('/opp/opp-456');
-    expect(anchor!.getAttribute('data-source-url')).toBe('/opp/opp-456');
+    expect(anchor!.getAttribute('href')).toBe('/unified');
+    expect(anchor!.getAttribute('data-source-url')).toBe('/unified');
   });
 });
