@@ -32,7 +32,11 @@ import {
   type OpportunityUpdateInput,
   type ListFilters,
 } from '../services/opportunities/index.js';
-import { getUnifiedOpportunityDetail } from '../services/opportunities/detail.js';
+import {
+  getUnifiedOpportunityDetail,
+  listUnifiedOpportunities,
+  resolveStages,
+} from '../services/opportunities/detail.js';
 
 function isCacheFresh(row: OpportunityRow): boolean {
   if (!row.analysis || !row.analysis_version || !row.ai_analyzed_at) return false;
@@ -80,6 +84,45 @@ function enqueueAnalysis(id: string, trigger: AnalysisJobData['trigger']): void 
 }
 
 export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
+  // GET /v3/opportunities/unified — unified list with lifecycle_stage filter (F-411)
+  // Query params:
+  //   stage  — single lifecycle_stage (signal|forecast|pre_sol|solicitation|
+  //            awarded|post_award|closed) OR a group (active|pipeline|
+  //            fast_track|awarded)
+  //   agency — ILIKE substring match
+  //   naics  — ILIKE substring match
+  //   limit  — 1..200 (default 50)
+  //   cursor — opaque keyset cursor
+  app.get('/v3/opportunities/unified', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+
+    // Validate stage token (single value or known group) up front.
+    if (query.stage) {
+      const resolved = resolveStages(query.stage);
+      if (resolved !== null && resolved.length === 0) {
+        return reply
+          .status(400)
+          .send(
+            errorEnvelope(
+              'VALIDATION_ERROR',
+              `Unknown stage '${query.stage}'. Use a lifecycle_stage value or a group (active, pipeline, fast_track, awarded).`,
+              req.requestId,
+            ),
+          );
+      }
+    }
+
+    const result = await listUnifiedOpportunities(pool, {
+      stage: query.stage,
+      agency: query.agency,
+      naics: query.naics,
+      limit: query.limit ? Number(query.limit) : undefined,
+      cursor: query.cursor,
+    });
+
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
   // GET /v3/opportunities/unified/:internal_id — unified merged view (F-410)
   // Returns the canonical merged opportunity assembled across all linked
   // sources: merged_fields{} (value + provenance), sources[] (raw per-source

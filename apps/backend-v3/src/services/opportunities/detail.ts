@@ -172,3 +172,156 @@ export async function getUnifiedOpportunityDetail(
     lineage: toLineage(merged.links),
   };
 }
+
+// ─── F-411: unified list with lifecycle_stage filtering ─────────────────────
+
+/**
+ * Named stage groups that map directly to the planned UI tabs
+ * (architecture doc §"Tabs"). A request may pass either a single
+ * lifecycle_stage value OR one of these group names.
+ */
+export const STAGE_GROUPS: Record<string, readonly string[]> = {
+  active: ['solicitation'],
+  pipeline: ['forecast', 'pre_sol'],
+  fast_track: ['signal'],
+  awarded: ['awarded', 'post_award'],
+};
+
+const VALID_STAGES = new Set([
+  'signal',
+  'forecast',
+  'pre_sol',
+  'solicitation',
+  'awarded',
+  'post_award',
+  'closed',
+]);
+
+export interface UnifiedListItem {
+  internal_id: string;
+  lifecycle_stage: string;
+  primary_source: string | null;
+  title: string | null;
+  agency: string | null;
+  naics: string | null;
+  set_aside: string | null;
+  estimated_value_cents: number | null;
+  response_due_at: string | null;
+  posted_at: string | null;
+  pwin: number | null;
+  doctrine_status: string | null;
+  updated_at: string;
+}
+
+export interface UnifiedListFilters {
+  /** Single lifecycle_stage value OR a STAGE_GROUPS key (active/pipeline/fast_track/awarded). */
+  stage?: string;
+  agency?: string;
+  naics?: string;
+  limit?: number;
+  /** Opaque base64 cursor: { updated_at, internal_id }. */
+  cursor?: string;
+}
+
+export interface UnifiedListResult {
+  items: UnifiedListItem[];
+  pagination: { limit: number; cursor: string | null; hasMore: boolean };
+}
+
+/** Resolve a stage filter to a concrete list of lifecycle_stage values. */
+export function resolveStages(stage: string | undefined): string[] | null {
+  if (!stage) return null;
+  if (stage in STAGE_GROUPS) return [...STAGE_GROUPS[stage]];
+  if (VALID_STAGES.has(stage)) return [stage];
+  // Unknown stage token — caller should 400.
+  return [];
+}
+
+/**
+ * List unified opportunities with optional lifecycle_stage (or stage-group)
+ * filtering. Orders by (updated_at DESC, internal_id DESC) for stable
+ * keyset pagination. Uses the idx_unified_opps_stage_due index when stage
+ * is supplied.
+ */
+export async function listUnifiedOpportunities(
+  pool: pg.Pool,
+  filters: UnifiedListFilters,
+): Promise<UnifiedListResult> {
+  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  let i = 1;
+
+  const stages = resolveStages(filters.stage);
+  if (stages) {
+    conditions.push(`lifecycle_stage = ANY($${i++}::opportunity_lifecycle_stage[])`);
+    params.push(stages);
+  }
+  if (filters.agency) {
+    conditions.push(`agency ILIKE $${i++}`);
+    params.push(`%${filters.agency}%`);
+  }
+  if (filters.naics) {
+    conditions.push(`naics ILIKE $${i++}`);
+    params.push(`%${filters.naics}%`);
+  }
+
+  if (filters.cursor) {
+    try {
+      const decoded = JSON.parse(
+        Buffer.from(filters.cursor, 'base64').toString('utf-8'),
+      ) as { updated_at: string; internal_id: string };
+      conditions.push(
+        `(updated_at, internal_id) < ($${i++}, $${i++})`,
+      );
+      params.push(decoded.updated_at, decoded.internal_id);
+    } catch {
+      // invalid cursor — ignore
+    }
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sql = `
+    SELECT internal_id, lifecycle_stage, primary_source, title, agency, naics,
+           set_aside, estimated_value_cents, response_due_at::text,
+           posted_at::text, pwin, doctrine_status, updated_at::text
+    FROM unified_opportunities
+    ${where}
+    ORDER BY updated_at DESC, internal_id DESC
+    LIMIT $${i}`;
+  params.push(limit + 1);
+
+  const res = await pool.query(sql, params);
+  const rows = res.rows as Array<Record<string, unknown>>;
+
+  const hasMore = rows.length > limit;
+  const slice = hasMore ? rows.slice(0, limit) : rows;
+
+  const items: UnifiedListItem[] = slice.map((r) => ({
+    internal_id: r.internal_id as string,
+    lifecycle_stage: r.lifecycle_stage as string,
+    primary_source: (r.primary_source as string) ?? null,
+    title: (r.title as string) ?? null,
+    agency: (r.agency as string) ?? null,
+    naics: (r.naics as string) ?? null,
+    set_aside: (r.set_aside as string) ?? null,
+    estimated_value_cents:
+      r.estimated_value_cents != null ? Number(r.estimated_value_cents) : null,
+    response_due_at: (r.response_due_at as string) ?? null,
+    posted_at: (r.posted_at as string) ?? null,
+    pwin: r.pwin != null ? Number(r.pwin) : null,
+    doctrine_status: (r.doctrine_status as string) ?? null,
+    updated_at: r.updated_at as string,
+  }));
+
+  let nextCursor: string | null = null;
+  if (hasMore && items.length > 0) {
+    const last = items[items.length - 1]!;
+    nextCursor = Buffer.from(
+      JSON.stringify({ updated_at: last.updated_at, internal_id: last.internal_id }),
+    ).toString('base64');
+  }
+
+  return { items, pagination: { limit, cursor: nextCursor, hasMore } };
+}
+
