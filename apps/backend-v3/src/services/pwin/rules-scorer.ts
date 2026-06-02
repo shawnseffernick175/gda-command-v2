@@ -3,6 +3,7 @@
  */
 
 import type { PwinFeatures, RuleContribution, PwinScoreResult } from './types.js';
+import { resolveSizeStatus } from './naics-size-standards.js';
 
 function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
@@ -91,10 +92,35 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     }
   }
 
+  // NAICS size-status contribution
+  const sizeStatus = resolveSizeStatus(features.naics);
+  let naicsSizeContribution = 0;
+  if (sizeStatus.status === 'small') {
+    naicsSizeContribution = 20;
+    contributions.push({
+      name: 'naics_size',
+      value: 20,
+      description: `+20 small-business eligible (${features.naics}: ${sizeStatus.rationale})`,
+    });
+  } else if (sizeStatus.status === 'large') {
+    naicsSizeContribution = -15;
+    contributions.push({
+      name: 'naics_size',
+      value: -15,
+      description: `-15 large-business only (${features.naics}: ${sizeStatus.rationale})`,
+    });
+  } else {
+    contributions.push({
+      name: 'naics_size',
+      value: 0,
+      description: '0 NAICS size status unknown',
+    });
+  }
+
   const rawScore = features.exclusion_triggered
     ? 0
     : base + incumbencyBonus + capabilityMatch + vehicleAccess + clearanceFit
-      + doctrineBonus + marginPenalty + teamingBonus;
+      + doctrineBonus + marginPenalty + teamingBonus + naicsSizeContribution;
 
   const score = clamp(Math.round(rawScore), 0, 100);
 
@@ -110,5 +136,7 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     feature_weights: contributions,
     top_drivers: topDrivers,
     confidence: null,
+    candidate_partners: features.candidate_partners ?? [],
+    named_competitors_count: features.named_competitors_count ?? 0,
   };
 }

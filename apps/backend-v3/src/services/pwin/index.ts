@@ -15,6 +15,9 @@ import type {
 } from './types.js';
 
 export { scoreV1Rules } from './rules-scorer.js';
+export { resolveSizeStatus, NAICS_SIZE_STANDARDS, ENVISION_EMPLOYEE_COUNT, ENVISION_AVG_ANNUAL_RECEIPTS_M } from './naics-size-standards.js';
+export type { SbaStandardType, NaicsSizeStandard, SizeStatusResult } from './naics-size-standards.js';
+export { FORECAST_PROMOTION_THRESHOLD, recommendStatus } from './promotion.js';
 export type {
   PwinFeatures,
   PwinFeatureRow,

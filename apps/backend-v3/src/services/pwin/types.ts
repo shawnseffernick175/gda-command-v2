@@ -77,6 +77,8 @@ export interface PwinScoreResult {
   feature_weights: RuleContribution[];
   top_drivers: string[];
   confidence: number | null;
+  candidate_partners?: string[];
+  named_competitors_count?: number;
 }
 
 export interface PwinModelInfo {
