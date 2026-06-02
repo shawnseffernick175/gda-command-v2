@@ -161,4 +161,45 @@ describe('mapSAMOpportunity', () => {
     }));
     expect(opportunity.set_aside).toBe('8(a) Set-Aside');
   });
+
+  it('classifies Sources Sought into opportunity_type and tags', () => {
+    const { opportunity } = mapSAMOpportunity(makeSAMRecord({
+      type: 'Sources Sought',
+      baseType: 'Sources Sought',
+    }));
+    expect(opportunity.opportunity_type).toBe('sources_sought');
+    expect(opportunity.tags).toContain('sources_sought');
+    expect(opportunity.status).toBe('discovery');
+  });
+
+  it('classifies Combined Synopsis/Solicitation as solicitation without sources_sought tag', () => {
+    const { opportunity } = mapSAMOpportunity(makeSAMRecord({
+      type: 'Combined Synopsis/Solicitation',
+      baseType: 'Combined Synopsis/Solicitation',
+    }));
+    expect(opportunity.opportunity_type).toBe('solicitation');
+    expect(opportunity.tags).not.toContain('sources_sought');
+  });
+
+  it('classifies Presolicitation into opportunity_type', () => {
+    const { opportunity } = mapSAMOpportunity(makeSAMRecord({
+      type: 'Presolicitation',
+      baseType: 'Presolicitation',
+    }));
+    expect(opportunity.opportunity_type).toBe('presolicitation');
+  });
+
+  it('returns null opportunity_type for unknown/empty type', () => {
+    const unknown = mapSAMOpportunity(makeSAMRecord({
+      type: 'SomethingNew' as string,
+      baseType: 'SomethingNew' as string,
+    }));
+    expect(unknown.opportunity.opportunity_type).toBeNull();
+
+    const empty = mapSAMOpportunity(makeSAMRecord({
+      type: undefined,
+      baseType: undefined,
+    }));
+    expect(empty.opportunity.opportunity_type).toBeNull();
+  });
 });

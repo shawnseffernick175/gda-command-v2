@@ -20,6 +20,22 @@ function buildSAMUrl(noticeId: string): string {
   return `https://sam.gov/opp/${noticeId}/view`;
 }
 
+const SAM_NOTICE_TYPE_MAP: Record<string, string> = {
+  'sources sought': 'sources_sought',
+  'presolicitation': 'presolicitation',
+  'combined synopsis/solicitation': 'solicitation',
+  'solicitation': 'solicitation',
+  'award notice': 'award_notice',
+  'special notice': 'special_notice',
+  'justification': 'justification',
+};
+
+export function classifySAMNoticeType(raw: SAMOpportunityRaw): string | null {
+  const value = (raw.type ?? raw.baseType)?.trim().toLowerCase();
+  if (!value) return null;
+  return SAM_NOTICE_TYPE_MAP[value] ?? null;
+}
+
 export function mapSAMOpportunity(raw: SAMOpportunityRaw): MappedOpportunity {
   const orgParts = raw.fullParentPathName?.split('.') ?? [];
   const agency = orgParts[0]?.trim() || null;
@@ -40,6 +56,10 @@ export function mapSAMOpportunity(raw: SAMOpportunityRaw): MappedOpportunity {
   const awardAmount = raw.award?.amount ? parseFloat(raw.award.amount) : null;
   const sourceUrl = raw.uiLink ?? buildSAMUrl(raw.noticeId);
 
+  const opportunity_type = classifySAMNoticeType(raw);
+  const tags: string[] = [];
+  if (opportunity_type === 'sources_sought') tags.push('sources_sought');
+
   const opportunity: OpportunityRow = {
     sam_notice_id: raw.noticeId,
     title: raw.title ?? 'Untitled',
@@ -58,7 +78,8 @@ export function mapSAMOpportunity(raw: SAMOpportunityRaw): MappedOpportunity {
     posted_at: tsOrNull(raw.postedDate),
     description: raw.description ?? null,
     data_source: 'sam.gov',
-    tags: [],
+    opportunity_type,
+    tags,
   };
 
   const citations: SourceCitation[] = [];
