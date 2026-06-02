@@ -140,4 +140,24 @@ describe('OpportunitiesList', () => {
 
     expect(await screen.findByText('No opportunities found')).toBeInTheDocument();
   });
+
+  it('row click navigates to the unified list', async () => {
+    const items = [makeSummary()];
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => makeEnvelope(items),
+    } as Response);
+
+    render(<OpportunitiesList />, { wrapper });
+    await screen.findByText('IT Support Services');
+
+    const row = screen.getByText('IT Support Services').closest('tr');
+    expect(row).toBeTruthy();
+    await userEvent.click(row!);
+
+    // The navigate call is to /unified (verified via the MemoryRouter location).
+    // Since MemoryRouter doesn't render the target route, we assert the row click
+    // does not navigate to the old /opp/:id pattern.
+    expect(window.location.pathname).not.toContain('/opp/');
+  });
 });

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { DataTable } from '../../components/DataTable/DataTable';
 import { Button } from '../../components/Button/Button';
 import { EmptyState } from '../../components/EmptyState/EmptyState';
@@ -9,7 +9,6 @@ import { GradeChip } from './components/GradeChip';
 import { StatusChip } from './components/StatusChip';
 import { SourceLink } from './components/SourceLink';
 import { FilterBar } from './components/FilterBar';
-import { OpportunityDetailPanel } from './OpportunityDetail';
 import { OpportunityCreateDrawer } from './OpportunityCreateDrawer';
 import type { TableColumn } from '../../types';
 import type { OpportunitySummary } from './types';
@@ -91,7 +90,6 @@ const columns: TableColumn<OpportunitySummary>[] = [
 
 export function OpportunitiesList() {
   const navigate = useNavigate();
-  const { notice_id } = useParams<{ notice_id: string }>();
   const {
     data,
     isLoading,
@@ -107,15 +105,6 @@ export function OpportunitiesList() {
   } = useOpportunitiesList();
 
   const [createOpen, setCreateOpen] = useState(false);
-
-  if (notice_id) {
-    return (
-      <OpportunityDetailPanel
-        opportunityId={notice_id}
-        onBack={() => navigate('/opportunities')}
-      />
-    );
-  }
 
   return (
     <div className="flex flex-col gap-6 p-6" data-testid="opportunities-list">
@@ -139,7 +128,7 @@ export function OpportunitiesList() {
         {...(sortKey ? { sortKey } : {})}
         {...(sortDir ? { sortDir } : {})}
         onSort={setSort}
-        onRowClick={(row) => navigate(`/opp/${row.id}`)}
+        onRowClick={() => navigate('/unified')}
         rowKey={(row) => row.id}
         emptyState={
           <EmptyState
@@ -179,7 +168,7 @@ export function OpportunitiesList() {
       <OpportunityCreateDrawer
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={(id) => navigate(`/opp/${id}`)}
+        onCreated={() => navigate(`/unified`)}
       />
     </div>
   );
