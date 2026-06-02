@@ -70,18 +70,17 @@ export async function listDupCandidates(
   const byId = new Map<number, DupOpportunity>();
   for (const opp of opps) byId.set(opp.id, opp);
 
-  let candidates = findDupCandidates(opps);
+  const allCandidates = findDupCandidates(opps);
 
-  // Optional tier filter.
-  if (tierFilter) {
-    candidates = candidates.filter((c) => c.tier === tierFilter);
-  }
+  // Total counts before any filtering (always show the full picture).
+  const strong = allCandidates.filter((c) => c.tier === 'STRONG').length;
+  const weak = allCandidates.filter((c) => c.tier === 'WEAK').length;
 
-  const strong = candidates.filter((c) => c.tier === 'STRONG').length;
-  const weak = candidates.filter((c) => c.tier === 'WEAK').length;
-
-  // Apply limit.
-  const sliced = candidates.slice(0, limit);
+  // Optional tier filter, then limit.
+  const filtered = tierFilter
+    ? allCandidates.filter((c) => c.tier === tierFilter)
+    : allCandidates;
+  const sliced = filtered.slice(0, limit);
 
   const items = sliced.map((c) => {
     const left = byId.get(c.left_id)!;
