@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@gda/backend-v3": "*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",

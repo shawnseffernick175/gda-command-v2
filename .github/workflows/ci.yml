@@ -228,6 +228,22 @@ jobs:
           fi
           echo "All connector env vars have compose passthroughs — no drift"
 
+  mcp-server-resolve:
+    name: MCP Server — backend-v3 resolve check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build backend-v3 (required by MCP server at runtime)
+        run: npm run build --workspace=@gda/backend-v3
+      - name: Verify @gda/backend-v3 modules resolve
+        working-directory: apps/gda-mcp-server
+        run: npx vitest run tests/backend-v3-resolve.test.ts
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
