@@ -31,6 +31,11 @@ const NAV_ITEMS: NavEntry[] = [
     icon: <svg {...svgProps}><rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 7V5a4 4 0 0 0-8 0v2" /></svg>,
   },
   {
+    label: 'Unified',
+    href: '/unified',
+    icon: <svg {...svgProps}><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M20 4 9 15" /><path d="M9 9V4h5" /><path d="M6 9v6" /></svg>,
+  },
+  {
     label: 'Awards',
     href: '/awards',
     icon: <svg {...svgProps}><path d="M12 15l-3 5 1-6-5-1 5-3-1-6 3 5 3-5-1 6 5 3-5 1 1 6z" /></svg>,

@@ -16,9 +16,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 let lastSql = '';
 let lastParams: unknown[] = [];
 let nextRows: Record<string, unknown>[] = [];
+// Link rows returned for the R1 provenance join. Keyed nowhere special — the
+// service maps them by internal_id, so include that column.
+let nextLinkRows: Record<string, unknown>[] = [];
 
 const mockPool = {
   query: vi.fn(async (sql: string, params?: unknown[]) => {
+    // The R1 provenance batch-fetch hits unified_opportunity_links; return the
+    // link fixtures for that query so we don't clobber lastSql/lastParams,
+    // which the list-query assertions inspect.
+    if (sql.includes('unified_opportunity_links')) {
+      return { rows: nextLinkRows, rowCount: nextLinkRows.length };
+    }
     lastSql = sql;
     lastParams = params ?? [];
     return { rows: nextRows, rowCount: nextRows.length };
@@ -55,6 +64,7 @@ beforeEach(() => {
   lastSql = '';
   lastParams = [];
   nextRows = [];
+  nextLinkRows = [];
   mockPool.query.mockClear();
 });
 
@@ -85,6 +95,32 @@ describe('listUnifiedOpportunities (F-411)', () => {
     expect(typeof result.items[0].estimated_value_cents).toBe('number');
     expect(result.items[0].pwin).toBe(70);
     expect(result.items[0].internal_id).toBe('iid-1');
+  });
+
+  it('R1: attaches a clickable SourceRef from the primary-source link', async () => {
+    nextRows = [row({ internal_id: 'iid-1', primary_source: 'sam' })];
+    nextLinkRows = [
+      { internal_id: 'iid-1', source: 'sam', source_native_id: 'NTV-123' },
+    ];
+    const result = await listUnifiedOpportunities(mockPool as unknown as pg.Pool, {});
+    expect(result.items[0].sources).toHaveLength(1);
+    expect(result.items[0].sources[0].url).toContain('NTV-123');
+  });
+
+  it('R1: returns an empty sources array when the row has no addressable link', async () => {
+    nextRows = [row({ internal_id: 'iid-2', primary_source: 'fast_track' })];
+    nextLinkRows = []; // no link → no URL
+    const result = await listUnifiedOpportunities(mockPool as unknown as pg.Pool, {});
+    expect(result.items[0].sources).toEqual([]);
+  });
+
+  it('R1: skips the provenance query entirely when no rows are returned', async () => {
+    nextRows = [];
+    await listUnifiedOpportunities(mockPool as unknown as pg.Pool, {});
+    const hitLinks = mockPool.query.mock.calls.some(([sql]) =>
+      String(sql).includes('unified_opportunity_links'),
+    );
+    expect(hitLinks).toBe(false);
   });
 
   it('passes the expanded stage group array to the query', async () => {

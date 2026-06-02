@@ -24,10 +24,10 @@ function authAndRender(route = '/launchpad') {
   );
 }
 
-const NAV_LABELS = ['Launchpad', 'Fast Track', 'Opportunities', 'Awards', 'Capture', 'Pipeline', 'Action Items', 'Regulatory', 'Settings'];
+const NAV_LABELS = ['Launchpad', 'Fast Track', 'Opportunities', 'Unified', 'Awards', 'Capture', 'Pipeline', 'Action Items', 'Regulatory', 'Settings'];
 
 describe('Left Rail navigation', () => {
-  it('renders all 9 nav items as links', () => {
+  it('renders all 10 nav items as links', () => {
     authAndRender();
     for (const label of NAV_LABELS) {
       expect(screen.getByRole('link', { name: new RegExp(label, 'i') })).toBeInTheDocument();
