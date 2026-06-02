@@ -43,6 +43,12 @@ import {
   isValidAction,
   PENDING_CONFIDENCES,
 } from '../services/opportunities/match-suggestions.js';
+import {
+  setFieldOverrideWithAudit,
+  getFieldOverrideAudit,
+  isOverridableField,
+  OVERRIDABLE_FIELDS,
+} from '../services/opportunities/field-override.js';
 
 function isCacheFresh(row: OpportunityRow): boolean {
   if (!row.analysis || !row.analysis_version || !row.ai_analyzed_at) return false;
@@ -90,6 +96,75 @@ function enqueueAnalysis(id: string, trigger: AnalysisJobData['trigger']): void 
 }
 
 export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
+  // ── F-413: field override with audit trail ─────────────────────────────
+  // PUT /v3/opportunities/:internal_id/field-override
+  //   body: { field_name, field_value, set_by?, reason? }
+  //   field_value === null clears the override; any other value sets it.
+  app.put('/v3/opportunities/:internal_id/field-override', async (req, reply) => {
+    const { internal_id } = req.params as { internal_id: string };
+    const body = req.body as Record<string, unknown> | undefined;
+
+    if (!isOverridableField(body?.field_name)) {
+      return reply
+        .status(400)
+        .send(
+          errorEnvelope(
+            'VALIDATION_ERROR',
+            `field_name must be one of: ${[...OVERRIDABLE_FIELDS].sort().join(', ')}`,
+            req.requestId,
+          ),
+        );
+    }
+
+    // field_value is required in the body (use null to clear). Distinguish a
+    // missing key from an explicit null.
+    if (body === undefined || !('field_value' in body)) {
+      return reply
+        .status(400)
+        .send(
+          errorEnvelope(
+            'VALIDATION_ERROR',
+            'field_value is required (use null to clear the override)',
+            req.requestId,
+          ),
+        );
+    }
+
+    const user = (req as typeof req & { user?: { sub: string } }).user;
+    const setBy = (body.set_by as string) ?? user?.sub ?? 'system';
+    const reason = (body.reason as string | undefined) ?? null;
+
+    const result = await setFieldOverrideWithAudit(pool, {
+      internal_id,
+      field_name: body.field_name as string,
+      field_value: body.field_value,
+      set_by: setBy,
+      reason,
+    });
+
+    if (!result) {
+      return reply
+        .status(404)
+        .send(
+          errorEnvelope('NOT_FOUND', `Opportunity ${internal_id} not found`, req.requestId),
+        );
+    }
+
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  // GET /v3/opportunities/:internal_id/field-override/audit?field_name=
+  //   Returns the override audit trail (newest first).
+  app.get('/v3/opportunities/:internal_id/field-override/audit', async (req, reply) => {
+    const { internal_id } = req.params as { internal_id: string };
+    const { field_name } = req.query as { field_name?: string };
+
+    const entries = await getFieldOverrideAudit(pool, internal_id, field_name);
+    return reply
+      .status(200)
+      .send(successEnvelope({ internal_id, entries }, req.requestId));
+  });
+
   // ── F-412: match suggestions review queue ──────────────────────────────
   // GET /v3/match-suggestions — list pending (MEDIUM/LOW) cross-source link
   // suggestions awaiting a human decision. Query params:
