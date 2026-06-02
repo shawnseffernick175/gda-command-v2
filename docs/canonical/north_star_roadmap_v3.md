@@ -25,7 +25,8 @@
    ✅ F-420 unified detail page — route /unified/:internal_id, PR #637 merged, live at gda.csr-llc.tech (source badges, lifecycle/lineage trail, conflict drawer, merged fields + provenance, source lineage table)
    ✅ F-420a connect-the-data — per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis (R1/R2 compliance), PR #639 merged, live at gda.csr-llc.tech
    ✅ F-421 tab structure (say-something surfaces) — tabbed unified list (All/Active/Pipeline/Fast Track/Awarded/Review Matches) on /unified, stage-group filters, R1 source links on every value, PR #641 merged, live at gda.csr-llc.tech
-   ⏭ F-422 suggestion review UI sidebar — NEXT
+   ✅ F-422 suggestion review UI (Review Matches tab) — human-in-the-loop queue to confirm/reject MEDIUM/LOW cross-source match suggestions, per-card decisions, R1 source links on every field, PR #643 merged, live at gda.csr-llc.tech
+   ⏭ F-423 decommission old per-source detail routes — NEXT
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
 ⏳ F-440–F-443 Hardening + analytics (Phase 5)
 
@@ -167,7 +168,7 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 - ✅ F-420 unified detail page (route `/unified/:internal_id`) — PR #637, live. Renders F-410 merged detail: source badge strip, lifecycle stage + lineage trail, conflict count/drawer, merged fields with provenance, source lineage table.
 - ✅ F-420a — extended F-410 with per-field source URLs + unified analyze endpoint, wired clickable SourceLinks + auto-analysis on open (full R1/R2 compliance) — PR #639, live
 - F-421 tab structure with say-something surfaces
-- F-422 suggestion review UI sidebar
+- ✅ F-422 suggestion review UI (Review Matches tab) — PR #643, live. Human-in-the-loop queue confirming/rejecting MEDIUM/LOW cross-source match suggestions (GET/POST /v3/match-suggestions), tier filters, per-card confirm/reject, R1 source links.
 - F-423 decommission old per-source detail routes
 - **Definition of done:** old per-source detail pages gone, one canonical opportunity view across the app
 
