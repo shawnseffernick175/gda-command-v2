@@ -11,6 +11,7 @@ import { PipelineSurface } from "./surfaces/pipeline/PipelineSurface";
 import { OpportunitiesList } from "./surfaces/opportunities/OpportunitiesList";
 import { CaptureList } from "./surfaces/capture/CaptureList";
 import { CaptureDetail } from "./surfaces/capture/CaptureDetail";
+import { UnifiedDetail } from "./surfaces/unified/UnifiedDetail";
 import { AwardsSurface } from "./surfaces/awards/AwardsSurface";
 import { useUiStore } from "./stores/ui-store";
 import { RequireAuth } from "./components/RequireAuth";
@@ -46,6 +47,7 @@ export function App() {
                   <Route path="/opp/:notice_id" element={<OpportunitiesList />} />
                   <Route path="/capture" element={<CaptureList />} />
                   <Route path="/capture/:opp_id" element={<CaptureDetail />} />
+                  <Route path="/unified/:internal_id" element={<UnifiedDetail />} />
                   <Route path="/pipeline" element={<PipelineSurface />} />
                   <Route path="/action-items" element={<ActionItemsList />} />
                   <Route path="/regulatory" element={<RegulatorySurface />} />
