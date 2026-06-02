@@ -6,6 +6,7 @@ import { ErrorState } from '../../components/ErrorState/ErrorState';
 import { Tabs } from '../../components/Tabs/Tabs';
 import { StageChip } from './components/StageChip';
 import { SourceLink } from '../opportunities/components/SourceLink';
+import { ReviewMatches } from './ReviewMatches';
 import { useUnifiedList, UNIFIED_TABS } from './hooks/useUnifiedList';
 import { formatDate, formatValueCents, dueCountdownLabel } from './format';
 import type { TableColumn } from '../../types';
@@ -117,12 +118,9 @@ export function UnifiedList() {
     goToCursor,
   } = useUnifiedList();
 
-  const tabItems = UNIFIED_TABS.map((t) => ({
-    id: t.id,
-    label: t.label,
-    // Review Matches has no list endpoint until F-422; show it disabled.
-    ...(t.isList ? {} : { disabled: true }),
-  }));
+  // F-422: the Review Matches tab now opens the suggestion queue, so every tab
+  // is selectable (no disabled tabs).
+  const tabItems = UNIFIED_TABS.map((t) => ({ id: t.id, label: t.label }));
 
   const subtitle = SUBTITLES[tab] ?? '';
 
@@ -148,12 +146,8 @@ export function UnifiedList() {
         )}
       </div>
 
-      {!isListTab && (
-        <EmptyState
-          title="Review Matches is coming next"
-          description="The match-suggestion review queue ships in F-422. For now, browse opportunities in the other tabs."
-        />
-      )}
+      {/* F-422: Review Matches opens the human-in-the-loop suggestion queue. */}
+      {!isListTab && <ReviewMatches active={tab === 'review'} />}
 
       {isListTab && (
         <>

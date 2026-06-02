@@ -187,20 +187,41 @@ describe('UnifiedList (F-421 tab structure)', () => {
     expect(firstUrl).not.toContain('stage=');
   });
 
-  it('shows the Review Matches placeholder without fetching a list', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(envelope(MOCK_ITEMS));
+  it('opens the F-422 review queue when the Review Matches tab is selected', async () => {
+    // The list endpoint answers the All slice; the suggestions endpoint answers
+    // once the Review tab is open. Route by URL so either call resolves.
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('/v3/match-suggestions')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: { items: [], pagination: { limit: 50, cursor: null, hasMore: false } },
+            }),
+        });
+      }
+      return Promise.resolve(envelope(MOCK_ITEMS));
+    });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     renderList();
     await screen.findByTestId('row-title-uo-1');
-    const callsBefore = fetchMock.mock.calls.length;
 
-    // Review Matches tab is disabled (F-422 not shipped) — clicking it is a
-    // no-op, so the All slice stays rendered and no new fetch fires.
+    // Review Matches is now enabled and opens the suggestion queue.
     const reviewTab = screen.getByRole('tab', { name: 'Review Matches' });
-    expect(reviewTab).toBeDisabled();
-    await user.click(reviewTab).catch(() => undefined);
-    expect(fetchMock.mock.calls.length).toBe(callsBefore);
+    expect(reviewTab).not.toBeDisabled();
+    await user.click(reviewTab);
+
+    // The review surface renders and hits the suggestions endpoint.
+    await screen.findByTestId('review-matches');
+    await waitFor(() => {
+      const calledSuggestions = fetchMock.mock.calls.some(([u]) =>
+        String(u).includes('/v3/match-suggestions'),
+      );
+      expect(calledSuggestions).toBe(true);
+    });
   });
 
   it('shows an empty state when the slice has no rows', async () => {
