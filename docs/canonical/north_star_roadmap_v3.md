@@ -26,7 +26,7 @@
    ✅ F-420a connect-the-data — per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis (R1/R2 compliance), PR #639 merged, live at gda.csr-llc.tech
    ✅ F-421 tab structure (say-something surfaces) — tabbed unified list (All/Active/Pipeline/Fast Track/Awarded/Review Matches) on /unified, stage-group filters, R1 source links on every value, PR #641 merged, live at gda.csr-llc.tech
    ✅ F-422 suggestion review UI (Review Matches tab) — human-in-the-loop queue to confirm/reject MEDIUM/LOW cross-source match suggestions, per-card decisions, R1 source links on every field, PR #643 merged, live at gda.csr-llc.tech
-   ⏭ F-423 decommission old per-source detail routes — NEXT
+   🔄 F-423 decommission old per-source detail routes — IN PROGRESS (Devin, orchestrated)
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
 ⏳ F-440–F-443 Hardening + analytics (Phase 5)
 
@@ -169,7 +169,8 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 - ✅ F-420a — extended F-410 with per-field source URLs + unified analyze endpoint, wired clickable SourceLinks + auto-analysis on open (full R1/R2 compliance) — PR #639, live
 - F-421 tab structure with say-something surfaces
 - ✅ F-422 suggestion review UI (Review Matches tab) — PR #643, live. Human-in-the-loop queue confirming/rejecting MEDIUM/LOW cross-source match suggestions (GET/POST /v3/match-suggestions), tier filters, per-card confirm/reject, R1 source links.
-- F-423 decommission old per-source detail routes
+- 🔄 F-423 decommission old per-source detail routes — IN PROGRESS (Devin session, orchestrated build)
+- ✅ F-314 V1/V2 teardown — COMPLETE. V1/V2 already removed from git; only stale VPS build artifacts remained (deleted). CI guard no-phantom-backend.yml enforces. Decision record: docs/canonical/specs/F-314-spec.md
 - **Definition of done:** old per-source detail pages gone, one canonical opportunity view across the app
 
 ### Phase 4 — Fast Track adapters
