@@ -43,20 +43,33 @@ export function ReviewMatches({ active }: { active: boolean }) {
 
   // link_id -> the action it was decided as (for the resolved-state flash).
   const [decided, setDecided] = useState<Record<number, SuggestionAction>>({});
-  // link_id currently in flight.
-  const [pendingId, setPendingId] = useState<number | null>(null);
+  // Set of link_ids with a decision in flight. Tracking each card
+  // independently (rather than a single id) prevents a second card's
+  // resolution from prematurely re-enabling a first card whose request has
+  // not yet returned, which could otherwise allow a duplicate submission.
+  const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
+
+  function clearPending(linkId: number) {
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(linkId);
+      return next;
+    });
+  }
 
   function handleDecide(linkId: number, action: SuggestionAction) {
-    setPendingId(linkId);
+    // Ignore re-clicks on a card whose decision is already in flight.
+    if (pendingIds.has(linkId)) return;
+    setPendingIds((prev) => new Set(prev).add(linkId));
     decide.mutate(
       { link_id: linkId, action },
       {
         onSuccess: () => {
           setDecided((prev) => ({ ...prev, [linkId]: action }));
-          setPendingId(null);
+          clearPending(linkId);
         },
         onError: () => {
-          setPendingId(null);
+          clearPending(linkId);
         },
       },
     );
@@ -123,7 +136,7 @@ export function ReviewMatches({ active }: { active: boolean }) {
               key={s.link_id}
               suggestion={s}
               onDecide={handleDecide}
-              isDeciding={pendingId === s.link_id}
+              isDeciding={pendingIds.has(s.link_id)}
               {...(decided[s.link_id] ? { decidedAs: decided[s.link_id] } : {})}
             />
           ))}

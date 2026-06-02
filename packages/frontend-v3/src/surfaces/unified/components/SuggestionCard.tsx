@@ -93,17 +93,33 @@ export function SuggestionCard({
         </div>
         <div className="flex flex-col">
           <span className="text-xs text-ink-dim">Agency</span>
-          <span className="text-ink-muted">{opp.agency ?? '—'}</span>
+          <SourceLink
+            value={<span className="text-ink-muted">{opp.agency ?? '—'}</span>}
+            sources={refs}
+            data-testid={`suggestion-agency-${suggestion.link_id}`}
+          />
         </div>
         <div className="flex flex-col">
           <span className="text-xs text-ink-dim">Est. value</span>
-          <span className="text-ink-primary" data-numeric>
-            {formatValueCents(opp.estimated_value_cents)}
-          </span>
+          <SourceLink
+            value={
+              <span className="text-ink-primary" data-numeric>
+                {formatValueCents(opp.estimated_value_cents)}
+              </span>
+            }
+            sources={refs}
+            data-testid={`suggestion-value-${suggestion.link_id}`}
+          />
         </div>
         <div className="flex flex-col">
           <span className="text-xs text-ink-dim">Response due</span>
-          <span className="text-ink-primary">{formatDate(opp.response_due_at)}</span>
+          <SourceLink
+            value={
+              <span className="text-ink-primary">{formatDate(opp.response_due_at)}</span>
+            }
+            sources={refs}
+            data-testid={`suggestion-due-${suggestion.link_id}`}
+          />
         </div>
       </div>
 

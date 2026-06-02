@@ -195,6 +195,59 @@ describe('ReviewMatches (F-422 suggestion queue)', () => {
     );
   });
 
+  // Regression (Devin finding #3): R1 requires every user-facing value to
+  // carry a clickable SourceRef. The opportunity context fields (agency,
+  // est. value, response due) must be wrapped in SourceLink, linking back to
+  // the suggested source record — not rendered as bare text.
+  it('R1: agency, value, and due fields link back to the source record', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(listEnvelope([makeSuggestion()])));
+    renderReview();
+    await screen.findByTestId('suggestion-101');
+    for (const id of ['suggestion-agency-101', 'suggestion-value-101', 'suggestion-due-101']) {
+      const el = screen.getByTestId(id);
+      // govtribe + GT-555 resolves to a clickable URL, so each is an anchor.
+      expect(el.tagName).toBe('A');
+      expect(el).toHaveAttribute('href', expect.stringContaining('GT-555'));
+    }
+  });
+
+  // Regression (Devin finding #2): deciding card A then card B before A
+  // resolves must NOT re-enable card A's buttons. Each card tracks its own
+  // in-flight state, so a never-resolving A stays disabled while B is clicked.
+  it('keeps a card disabled while its decision is in flight, independent of other cards', async () => {
+    let resolveA: ((v: unknown) => void) | undefined;
+    const pendingA = new Promise((res) => {
+      resolveA = res;
+    });
+    const fetchMock = vi.fn((url: string, init?: { method?: string }) => {
+      if (String(url).includes('/v3/match-suggestions') && init?.method === 'POST') {
+        // First (card A) POST never resolves during the test.
+        return pendingA as unknown as Promise<Response>;
+      }
+      return Promise.resolve(
+        listEnvelope([makeSuggestion(), makeSuggestion({ link_id: 102 })]) as unknown as Response,
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderReview();
+
+    await screen.findByTestId('suggestion-101');
+    const confirmA = within(screen.getByTestId('confirm-101')).getByRole('button');
+    await user.click(confirmA);
+
+    // Card A's buttons are disabled while its request is in flight.
+    await waitFor(() => expect(confirmA).toBeDisabled());
+
+    // Card B's buttons remain independently enabled (not affected by A).
+    const confirmB = within(screen.getByTestId('confirm-102')).getByRole('button');
+    expect(confirmB).not.toBeDisabled();
+
+    // Card A stays disabled — B's state never clears A's pending flag.
+    expect(confirmA).toBeDisabled();
+    resolveA?.(decisionEnvelope(101, 'confirm'));
+  });
+
   it('does not fetch when inactive', async () => {
     const fetchMock = vi.fn().mockResolvedValue(listEnvelope([makeSuggestion()]));
     vi.stubGlobal('fetch', fetchMock);

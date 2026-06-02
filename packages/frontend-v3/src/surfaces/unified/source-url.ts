@@ -41,6 +41,27 @@ export function sourceLabel(source: string): string {
 }
 
 /**
+ * Map an internal merge-layer source name to a canonical SourceKind, mirroring
+ * the backend's `apps/backend-v3/src/lib/source-urls.ts:sourceKindOf`. The R1
+ * SourceRef contract uses canonical kinds (`sam_gov`, `govwin`, `govtribe`,
+ * `internal`) — never the raw internal short names — so every SourceRef in the
+ * UI stays consistent (see product_rules.md acceptable source kinds).
+ */
+export function sourceKindOf(source: string): string {
+  switch (source) {
+    case 'sam':
+      return 'sam_gov';
+    case 'govwin':
+      return 'govwin';
+    case 'govtribe':
+      return 'govtribe';
+    default:
+      // fast_track and any unknown source map to the internal kind.
+      return 'internal';
+  }
+}
+
+/**
  * Build the R1 SourceRef array for a suggestion's source record. Returns an
  * empty array when the source has no addressable URL, which SourceLink renders
  * as plain text.
@@ -54,7 +75,7 @@ export function suggestionSourceRefs(
   if (!url) return [];
   return [
     {
-      kind: source,
+      kind: sourceKindOf(source),
       title: sourceLabel(source),
       url,
       retrieved_at: retrievedAt ?? new Date().toISOString(),
