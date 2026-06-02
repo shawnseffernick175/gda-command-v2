@@ -14,7 +14,8 @@ import { upsertExternalOpportunity } from '../framework/source_writer.js';
 import type { IngestResult } from '../framework/registry.js';
 
 export async function runNIHIngest(): Promise<IngestResult> {
-  const currentFY = new Date().getFullYear();
+  const now = new Date();
+  const currentFY = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
   const fiscalYears = [currentFY, currentFY - 1];
 
   logger.info(
