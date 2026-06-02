@@ -22,6 +22,7 @@
 
 import type pg from 'pg';
 import { invalidateMergeCache } from './merge.js';
+import { recordAuditLog } from '../audit/audit-log.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,10 @@ export interface DecisionInput {
   link_id: number;
   action: SuggestionAction;
   decided_by: string;
+  request_id?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  user_id?: number | null;
 }
 
 export interface DecisionResult {
@@ -241,34 +246,82 @@ export async function decideMatchSuggestion(
   input: DecisionInput,
 ): Promise<DecisionResult | null> {
   const newConfidence = input.action === 'confirm' ? 'CONFIRMED' : 'REJECTED';
+  const auditAction = input.action === 'confirm'
+    ? 'match_suggestion_confirm'
+    : 'match_suggestion_reject';
 
-  const sql = `
-    UPDATE unified_opportunity_links
-       SET confidence   = $1::opportunity_link_confidence,
-           confirmed_by = $2,
-           confirmed_at = NOW()
-     WHERE id = $3
-       AND confidence IN ('MEDIUM', 'LOW')
-    RETURNING id AS link_id, internal_id, source, source_native_id,
-              confidence::text AS confidence,
-              confirmed_by, confirmed_at::text AS confirmed_at`;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  const res = await pool.query(sql, [newConfidence, input.decided_by, input.link_id]);
-  const row = res.rows[0] as Record<string, unknown> | undefined;
-  if (!row) return null;
+    // Capture the prior confidence tier before mutating so the audit row
+    // records the transition (e.g. MEDIUM → CONFIRMED).
+    const prior = await client.query(
+      `SELECT confidence::text AS confidence FROM unified_opportunity_links
+        WHERE id = $1 AND confidence IN ('MEDIUM', 'LOW')`,
+      [input.link_id],
+    );
+    const priorRow = prior.rows[0] as { confidence: string } | undefined;
+    if (!priorRow) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    const oldConfidence = priorRow.confidence;
 
-  const internalId = row.internal_id as string;
-  // The merged view depends on which links are CONFIRMED/REJECTED, so the
-  // 60s merge cache for this opportunity is now stale.
-  invalidateMergeCache(internalId);
+    const sql = `
+      UPDATE unified_opportunity_links
+         SET confidence   = $1::opportunity_link_confidence,
+             confirmed_by = $2,
+             confirmed_at = NOW()
+       WHERE id = $3
+         AND confidence IN ('MEDIUM', 'LOW')
+      RETURNING id AS link_id, internal_id, source, source_native_id,
+                confidence::text AS confidence,
+                confirmed_by, confirmed_at::text AS confirmed_at`;
 
-  return {
-    link_id: Number(row.link_id),
-    internal_id: internalId,
-    source: row.source as string,
-    source_native_id: row.source_native_id as string,
-    confidence: row.confidence as string,
-    confirmed_by: row.confirmed_by as string,
-    confirmed_at: row.confirmed_at as string,
-  };
+    const res = await client.query(sql, [newConfidence, input.decided_by, input.link_id]);
+    const row = res.rows[0] as Record<string, unknown> | undefined;
+    if (!row) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const internalId = row.internal_id as string;
+    const linkId = Number(row.link_id);
+
+    await recordAuditLog(client, {
+      action: auditAction,
+      table_name: 'unified_opportunity_links',
+      record_id: linkId,
+      record_ref: internalId,
+      old_values: { confidence: oldConfidence },
+      new_values: { confidence: newConfidence },
+      actor: input.decided_by,
+      user_id: input.user_id ?? null,
+      ip_address: input.ip_address ?? null,
+      user_agent: input.user_agent ?? null,
+      request_id: input.request_id ?? null,
+    });
+
+    await client.query('COMMIT');
+
+    // The merged view depends on which links are CONFIRMED/REJECTED, so the
+    // 60s merge cache for this opportunity is now stale.
+    invalidateMergeCache(internalId);
+
+    return {
+      link_id: linkId,
+      internal_id: internalId,
+      source: row.source as string,
+      source_native_id: row.source_native_id as string,
+      confidence: row.confidence as string,
+      confirmed_by: row.confirmed_by as string,
+      confirmed_at: row.confirmed_at as string,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }

@@ -16,6 +16,11 @@ vi.mock('../../../src/services/opportunities/merge.js', () => ({
   invalidateMergeCache: (id: string) => invalidateSpy(id),
 }));
 
+const recordAuditSpy = vi.fn(async () => 1);
+vi.mock('../../../src/services/audit/audit-log.js', () => ({
+  recordAuditLog: (...args: unknown[]) => recordAuditSpy(...args),
+}));
+
 import {
   setFieldOverrideWithAudit,
   getFieldOverrideAudit,
@@ -83,6 +88,7 @@ beforeEach(() => {
   mockPool.connect.mockClear();
   mockPool.query.mockClear();
   invalidateSpy.mockClear();
+  recordAuditSpy.mockClear();
 });
 
 // ─── isOverridableField ───────────────────────────────────────────────────────

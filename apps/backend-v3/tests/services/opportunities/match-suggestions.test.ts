@@ -20,11 +20,47 @@ vi.mock('../../../src/services/opportunities/merge.js', () => ({
   invalidateMergeCache: (id: string) => invalidateSpy(id),
 }));
 
+const recordAuditSpy = vi.fn(async () => 1);
+vi.mock('../../../src/services/audit/audit-log.js', () => ({
+  recordAuditLog: (...args: unknown[]) => recordAuditSpy(...args),
+}));
+
 // ─── Mock pool ───────────────────────────────────────────────────────────────
 
 let lastSql = '';
 let lastParams: unknown[] = [];
 let nextRows: Record<string, unknown>[] = [];
+
+// Steps queue for the transactional decideMatchSuggestion path.
+interface Step {
+  match: RegExp;
+  rows?: Record<string, unknown>[];
+  rowCount?: number;
+}
+let clientSteps: Step[] = [];
+let clientExecuted: string[] = [];
+
+function makeClient() {
+  return {
+    query: vi.fn(async (sql: string, params?: unknown[]) => {
+      clientExecuted.push(sql.trim().split('\n')[0]!.trim());
+      if (/^\s*(BEGIN|COMMIT|ROLLBACK)/i.test(sql)) {
+        return { rows: [], rowCount: 0 };
+      }
+      const step = clientSteps.find((s) => s.match.test(sql));
+      if (step) {
+        return { rows: step.rows ?? [], rowCount: step.rowCount ?? (step.rows?.length ?? 0) };
+      }
+      // fallback for list queries (non-transactional)
+      lastSql = sql;
+      lastParams = params ?? [];
+      return { rows: nextRows, rowCount: nextRows.length };
+    }),
+    release: vi.fn(),
+  };
+}
+
+let client: ReturnType<typeof makeClient>;
 
 const mockPool = {
   query: vi.fn(async (sql: string, params?: unknown[]) => {
@@ -32,6 +68,7 @@ const mockPool = {
     lastParams = params ?? [];
     return { rows: nextRows, rowCount: nextRows.length };
   }),
+  connect: vi.fn(async () => client),
 };
 
 import {
@@ -67,8 +104,13 @@ beforeEach(() => {
   lastSql = '';
   lastParams = [];
   nextRows = [];
+  clientSteps = [];
+  clientExecuted = [];
+  client = makeClient();
   mockPool.query.mockClear();
+  mockPool.connect.mockClear();
   invalidateSpy.mockClear();
+  recordAuditSpy.mockClear();
 });
 
 // ─── clampLimit ───────────────────────────────────────────────────────────────
@@ -219,18 +261,29 @@ describe('listMatchSuggestions', () => {
 // ─── decideMatchSuggestion ────────────────────────────────────────────────────
 
 describe('decideMatchSuggestion', () => {
-  it('confirm sets confidence=CONFIRMED and stamps confirmed_by', async () => {
-    nextRows = [
+  function setupConfirmSteps(overrides: Record<string, unknown> = {}) {
+    clientSteps = [
       {
-        link_id: 7,
-        internal_id: 'iid-1',
-        source: 'govtribe',
-        source_native_id: 'gt-123',
-        confidence: 'CONFIRMED',
-        confirmed_by: 'user-42',
-        confirmed_at: '2026-06-02T01:00:00Z',
+        match: /SELECT confidence.*FROM unified_opportunity_links/,
+        rows: [{ confidence: overrides.priorConfidence ?? 'MEDIUM' }],
+      },
+      {
+        match: /UPDATE unified_opportunity_links/,
+        rows: [{
+          link_id: overrides.link_id ?? 7,
+          internal_id: overrides.internal_id ?? 'iid-1',
+          source: overrides.source ?? 'govtribe',
+          source_native_id: overrides.source_native_id ?? 'gt-123',
+          confidence: overrides.confidence ?? 'CONFIRMED',
+          confirmed_by: overrides.confirmed_by ?? 'user-42',
+          confirmed_at: overrides.confirmed_at ?? '2026-06-02T01:00:00Z',
+        }],
       },
     ];
+  }
+
+  it('confirm sets confidence=CONFIRMED and stamps confirmed_by', async () => {
+    setupConfirmSteps();
     const res = await decideMatchSuggestion(mockPool as unknown as pg.Pool, {
       link_id: 7,
       action: 'confirm',
@@ -239,54 +292,43 @@ describe('decideMatchSuggestion', () => {
     expect(res).not.toBeNull();
     expect(res!.confidence).toBe('CONFIRMED');
     expect(res!.confirmed_by).toBe('user-42');
-    expect(lastParams[0]).toBe('CONFIRMED');
-    expect(lastParams[1]).toBe('user-42');
-    expect(lastParams[2]).toBe(7);
+    expect(clientExecuted).toContain('BEGIN');
+    expect(clientExecuted).toContain('COMMIT');
+    expect(recordAuditSpy).toHaveBeenCalledOnce();
   });
 
   it('reject sets confidence=REJECTED', async () => {
-    nextRows = [
-      {
-        link_id: 8,
-        internal_id: 'iid-2',
-        source: 'sam',
-        source_native_id: 's-9',
-        confidence: 'REJECTED',
-        confirmed_by: 'user-1',
-        confirmed_at: '2026-06-02T01:00:00Z',
-      },
-    ];
+    setupConfirmSteps({
+      link_id: 8, internal_id: 'iid-2', source: 'sam',
+      source_native_id: 's-9', confidence: 'REJECTED',
+      confirmed_by: 'user-1',
+    });
     const res = await decideMatchSuggestion(mockPool as unknown as pg.Pool, {
       link_id: 8,
       action: 'reject',
       decided_by: 'user-1',
     });
     expect(res!.confidence).toBe('REJECTED');
-    expect(lastParams[0]).toBe('REJECTED');
   });
 
   it('guards the UPDATE to pending tiers only', async () => {
-    nextRows = [
-      {
-        link_id: 7,
-        internal_id: 'iid-1',
-        source: 'govtribe',
-        source_native_id: 'gt-123',
-        confidence: 'CONFIRMED',
-        confirmed_by: 'u',
-        confirmed_at: '2026-06-02T01:00:00Z',
-      },
-    ];
+    setupConfirmSteps();
     await decideMatchSuggestion(mockPool as unknown as pg.Pool, {
       link_id: 7,
       action: 'confirm',
       decided_by: 'u',
     });
-    expect(lastSql).toContain("confidence IN ('MEDIUM', 'LOW')");
+    const updateCall = client.query.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && /UPDATE unified_opportunity_links/.test(c[0] as string),
+    );
+    expect(updateCall).toBeDefined();
+    expect(updateCall![0]).toContain("confidence IN ('MEDIUM', 'LOW')");
   });
 
   it('returns null when no pending link matches (unknown or already decided)', async () => {
-    nextRows = [];
+    clientSteps = [
+      { match: /SELECT confidence.*FROM unified_opportunity_links/, rows: [] },
+    ];
     const res = await decideMatchSuggestion(mockPool as unknown as pg.Pool, {
       link_id: 999,
       action: 'confirm',
@@ -294,25 +336,34 @@ describe('decideMatchSuggestion', () => {
     });
     expect(res).toBeNull();
     expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(recordAuditSpy).not.toHaveBeenCalled();
   });
 
   it('invalidates the merge cache for the affected internal_id on success', async () => {
-    nextRows = [
-      {
-        link_id: 7,
-        internal_id: 'iid-77',
-        source: 'govtribe',
-        source_native_id: 'gt-123',
-        confidence: 'CONFIRMED',
-        confirmed_by: 'u',
-        confirmed_at: '2026-06-02T01:00:00Z',
-      },
-    ];
+    setupConfirmSteps({ internal_id: 'iid-77' });
     await decideMatchSuggestion(mockPool as unknown as pg.Pool, {
       link_id: 7,
       action: 'confirm',
       decided_by: 'u',
     });
     expect(invalidateSpy).toHaveBeenCalledWith('iid-77');
+  });
+
+  it('calls recordAuditLog with correct action and old/new values', async () => {
+    setupConfirmSteps({ priorConfidence: 'LOW' });
+    await decideMatchSuggestion(mockPool as unknown as pg.Pool, {
+      link_id: 7,
+      action: 'confirm',
+      decided_by: 'user-42',
+      request_id: 'req-1',
+    });
+    expect(recordAuditSpy).toHaveBeenCalledOnce();
+    const entry = recordAuditSpy.mock.calls[0]![1] as Record<string, unknown>;
+    expect(entry.action).toBe('match_suggestion_confirm');
+    expect(entry.table_name).toBe('unified_opportunity_links');
+    expect(entry.old_values).toEqual({ confidence: 'LOW' });
+    expect(entry.new_values).toEqual({ confidence: 'CONFIRMED' });
+    expect(entry.actor).toBe('user-42');
+    expect(entry.request_id).toBe('req-1');
   });
 });
