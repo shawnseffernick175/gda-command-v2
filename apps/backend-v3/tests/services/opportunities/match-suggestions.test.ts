@@ -185,6 +185,35 @@ describe('listMatchSuggestions', () => {
     expect(res.pagination.hasMore).toBe(false);
     expect(res.pagination.cursor).toBeNull();
   });
+
+  it('emits a cursor encoding a NULL matched_at when the last row has none', async () => {
+    // Regression (Devin finding): rows whose matched_at is NULL must still
+    // produce a usable cursor; the encoded value is null and the SQL must
+    // COALESCE both sides so the next page does not silently return zero rows.
+    nextRows = [
+      suggestionRow({ link_id: 3, matched_at: null }),
+      suggestionRow({ link_id: 2, matched_at: null }),
+    ];
+    const res = await listMatchSuggestions(mockPool as unknown as pg.Pool, { limit: 1 });
+    expect(res.pagination.hasMore).toBe(true);
+    const decoded = JSON.parse(
+      Buffer.from(res.pagination.cursor as string, 'base64').toString('utf-8'),
+    );
+    expect(decoded.matched_at).toBeNull();
+    expect(decoded.link_id).toBe(3);
+  });
+
+  it('COALESCEs both sides of the cursor comparison for NULL safety', async () => {
+    nextRows = [];
+    const cursor = Buffer.from(
+      JSON.stringify({ matched_at: null, link_id: 5 }),
+    ).toString('base64');
+    await listMatchSuggestions(mockPool as unknown as pg.Pool, { cursor });
+    // Both column and parameter sides must be wrapped in COALESCE(...'-infinity').
+    const coalesceCount = (lastSql.match(/COALESCE\(/g) ?? []).length;
+    expect(coalesceCount).toBeGreaterThanOrEqual(3); // ORDER BY + both cursor sides
+    expect(lastSql).toContain("COALESCE($");
+  });
 });
 
 // ─── decideMatchSuggestion ────────────────────────────────────────────────────

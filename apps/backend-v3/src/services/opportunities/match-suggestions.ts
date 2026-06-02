@@ -148,9 +148,12 @@ export async function listMatchSuggestions(
       const decoded = JSON.parse(
         Buffer.from(filters.cursor, 'base64').toString('utf-8'),
       ) as { matched_at: string | null; link_id: number };
-      // matched_at may be NULL; order NULLs last and tiebreak on id.
+      // matched_at may be NULL; order NULLs last and tiebreak on id. COALESCE
+      // BOTH sides to '-infinity' so a NULL cursor value compares identically
+      // to the column — otherwise tuple comparison with a NULL element yields
+      // NULL (not TRUE) and the next page would silently return zero rows.
       conditions.push(
-        `(COALESCE(l.matched_at, '-infinity'::timestamptz), l.id) < ($${i++}::timestamptz, $${i++})`,
+        `(COALESCE(l.matched_at, '-infinity'::timestamptz), l.id) < (COALESCE($${i++}::timestamptz, '-infinity'::timestamptz), $${i++})`,
       );
       params.push(decoded.matched_at, decoded.link_id);
     } catch {
