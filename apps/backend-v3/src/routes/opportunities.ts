@@ -38,6 +38,7 @@ import {
   resolveStages,
   resolvePrimaryOpportunityId,
 } from '../services/opportunities/detail.js';
+import { invalidateMergeCache } from '../services/opportunities/merge.js';
 import {
   listMatchSuggestions,
   decideMatchSuggestion,
@@ -366,6 +367,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
       analysisCacheHits.inc();
       // Re-read the unified detail so pwin/doctrine reflect the fresh analysis.
+      // The first getUnifiedOpportunityDetail above populated the merge cache
+      // (60s TTL), so we must invalidate it before re-reading or we'd return
+      // the stale pre-analysis payload (Devin #639/0001).
+      invalidateMergeCache(internal_id);
       const refreshed = (await getUnifiedOpportunityDetail(pool, internal_id)) ?? detail;
       return reply.status(200).send(successEnvelope(refreshed, req.requestId));
     },
