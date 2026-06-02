@@ -68,7 +68,7 @@ export interface MergedOpportunity {
 
 // ─── Source-row shape (subset of legacy opportunities table) ─────────────────
 
-interface SourceRecord {
+export interface SourceRecord {
   source: string;
   title: string | null;
   agency: string | null;
@@ -157,7 +157,7 @@ export function clearMergeCache(): void {
  * - GovTribe → opportunities.govtribe_id = source_native_id
  * - Fast Track → fast_track_assessments.input_hash = source_native_id
  */
-async function fetchSourceRecords(
+export async function fetchSourceRecords(
   pool: pg.Pool,
   links: OpportunityLink[],
 ): Promise<SourceRecord[]> {
