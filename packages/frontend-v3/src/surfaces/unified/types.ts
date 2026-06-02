@@ -89,6 +89,52 @@ export interface UnifiedListResult {
   pagination: { limit: number; cursor: string | null; hasMore: boolean };
 }
 
+/**
+ * F-422: a pending cross-source match suggestion (a MEDIUM/LOW-confidence
+ * link awaiting a human decision). Mirrors the F-412 backend contract
+ * `MatchSuggestion` from GET /v3/match-suggestions
+ * (apps/backend-v3/src/services/opportunities/match-suggestions.ts).
+ */
+export interface MatchSuggestion {
+  link_id: number;
+  internal_id: string;
+  source: string;
+  source_native_id: string;
+  confidence: string | null;
+  match_method: string | null;
+  matched_at: string | null;
+  opportunity: {
+    lifecycle_stage: string;
+    primary_source: string | null;
+    title: string | null;
+    agency: string | null;
+    naics: string | null;
+    estimated_value_cents: number | null;
+    response_due_at: string | null;
+  };
+}
+
+export interface MatchSuggestionsResult {
+  items: MatchSuggestion[];
+  pagination: { limit: number; cursor: string | null; hasMore: boolean };
+}
+
+/** Confidence tiers that represent an unresolved suggestion. */
+export type PendingConfidence = 'MEDIUM' | 'LOW';
+
+export type SuggestionAction = 'confirm' | 'reject';
+
+/** Result of POST /v3/match-suggestions (a confirm/reject decision). */
+export interface SuggestionDecisionResult {
+  link_id: number;
+  internal_id: string;
+  source: string;
+  source_native_id: string;
+  confidence: string;
+  confirmed_by: string;
+  confirmed_at: string;
+}
+
 export interface UnifiedOpportunityDetail {
   internal_id: string;
   lifecycle_stage: string;
