@@ -23,6 +23,7 @@ import { registerNECOSource } from '../ingest/neco/index.js';
 import { registerUSASpendingSource } from '../ingest/usaspending/index.js';
 import { registerFederalRegisterSource } from '../ingest/federal_register/index.js';
 import { registerSBIRSource } from '../ingest/sbir/index.js';
+import { registerNSFSource } from '../ingest/nsf/index.js';
 import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
@@ -54,6 +55,7 @@ const JOBS: CronJob[] = [
   ...(sbirEnabled
     ? [{ sourceKey: 'sbir.gov', schedule: '45 */12 * * *', label: 'SBIR/STTR awards + open topics (twice daily)' }]
     : []),
+  { sourceKey: 'nsf', schedule: '0 8 * * *', label: 'NSF research awards ingest (daily 04:00 ET)' },
   ...(govtribeEnabled
     ? [
         { sourceKey: 'govtribe', schedule: '0 10 * * 1,4', label: 'GovTribe opps poll (Mon+Thu 6am ET / 10:00 UTC)' },
@@ -78,6 +80,7 @@ export function startCronScheduler(): void {
   registerNECOSource();
   registerFederalRegisterSource();
   registerSBIRSource();
+  registerNSFSource();
   registerGovTribeSource();
   if (govwinEnabled) {
     registerGovWinSource();
