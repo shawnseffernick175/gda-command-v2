@@ -32,6 +32,7 @@ import {
   type OpportunityUpdateInput,
   type ListFilters,
 } from '../services/opportunities/index.js';
+import { getUnifiedOpportunityDetail } from '../services/opportunities/detail.js';
 
 function isCacheFresh(row: OpportunityRow): boolean {
   if (!row.analysis || !row.analysis_version || !row.ai_analyzed_at) return false;
@@ -79,6 +80,26 @@ function enqueueAnalysis(id: string, trigger: AnalysisJobData['trigger']): void 
 }
 
 export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
+  // GET /v3/opportunities/unified/:internal_id — unified merged view (F-410)
+  // Returns the canonical merged opportunity assembled across all linked
+  // sources: merged_fields{} (value + provenance), sources[] (raw per-source
+  // records), conflicts[] (fields where sources disagree), lineage[] (links).
+  app.get<{ Params: { internal_id: string } }>(
+    '/v3/opportunities/unified/:internal_id',
+    async (req, reply) => {
+      const { internal_id } = req.params;
+
+      const detail = await getUnifiedOpportunityDetail(pool, internal_id);
+      if (!detail) {
+        return reply
+          .status(404)
+          .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+      }
+
+      return reply.status(200).send(successEnvelope(detail, req.requestId));
+    },
+  );
+
   // GET /v3/opportunities — list with filters + cursor pagination
   app.get('/v3/opportunities', async (req, reply) => {
     const query = req.query as Record<string, string | undefined>;
