@@ -45,6 +45,8 @@ import {
   isValidAction,
   PENDING_CONFIDENCES,
 } from '../services/opportunities/match-suggestions.js';
+import { listDupCandidates } from '../services/opportunities/dup-candidates.js';
+import type { DupTier } from '../matching/dup-candidates.js';
 import {
   setFieldOverrideWithAudit,
   getFieldOverrideAudit,
@@ -255,6 +257,41 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
           ),
         );
     }
+
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  // ── F-440: near-duplicate opportunity candidates (read-only) ───────────
+  // GET /v3/opportunities/dup-candidates — list LOW-confidence near-dup
+  // candidate pairs for human review.
+  //   limit — 1..200 (default 50)
+  //   tier  — STRONG | WEAK (optional filter; 400 on other values)
+  const VALID_DUP_TIERS = new Set<DupTier>(['STRONG', 'WEAK']);
+
+  app.get('/v3/opportunities/dup-candidates', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+
+    let tier: DupTier | undefined;
+    if (query.tier) {
+      const upper = query.tier.toUpperCase() as DupTier;
+      if (!VALID_DUP_TIERS.has(upper)) {
+        return reply
+          .status(400)
+          .send(
+            errorEnvelope(
+              'VALIDATION_ERROR',
+              `Invalid tier '${query.tier}'. Must be STRONG or WEAK.`,
+              req.requestId,
+            ),
+          );
+      }
+      tier = upper;
+    }
+
+    const result = await listDupCandidates(pool, {
+      limit: query.limit ? Number(query.limit) : undefined,
+      tier,
+    });
 
     return reply.status(200).send(successEnvelope(result, req.requestId));
   });
