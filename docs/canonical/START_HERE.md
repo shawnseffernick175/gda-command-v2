@@ -80,11 +80,77 @@ DNS for new subdomains. `gda-mcp.csr-llc.tech` is already done. If a new subdoma
 ## 6. Credentials available to the assistant
 
 Custom credentials (use `api_credentials=["custom-cred:<host>"]`):
-- Devin API — `api.devin.ai` (bearer). NOTE: Devin can't reach the VPS; don't route VPS work through it.
+- Devin API — `api.devin.ai` (bearer). Drives the orchestrator workflow (see Section 8). NOTE: Devin's own VM can't reach the VPS, so don't ask Devin to SSH/deploy to the VPS — the assistant does VPS/deploy steps; Devin does code+PR.
 - Voyage embeddings — `api.voyageai.com`
 - LegiScan — `api.legiscan.com`
 
 Connected services: GitHub, Google Calendar, Google Drive, Finance.
+
+---
+
+## 8. Working with Devin (the orchestrator workflow)
+
+The standing workflow (Shawn's preference, 2026-06-02): **the assistant is the
+ORCHESTRATOR and does NOT write feature code itself. Devin writes the code.**
+The assistant plans, gathers context, writes the Devin spec, monitors, QAs, and
+merges. Devin handles code changes, PRs, and tests.
+
+Exception: while Devin is busy on another task, the assistant may make small,
+fast code changes directly rather than queueing behind Devin.
+
+### How to talk to Devin (REST API, confirmed working)
+
+Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call
+(bearer key injected automatically). Base: `https://api.devin.ai/v1`.
+
+- **Create a session** (hand off a ticket):
+  ```
+  curl -s -X POST https://api.devin.ai/v1/sessions \
+    -H "Content-Type: application/json" \
+    --data @payload.json
+  ```
+  `payload.json` = `{"prompt":"<full spec>","idempotent":true,"tags":["fNNN"],"title":"..."}`.
+  Returns `{session_id, url, is_new_session}`.
+- **Check status / result:** `curl -s https://api.devin.ai/v1/session/<session_id>`
+  → read `status_enum` (`working` | `blocked` | `finished`), `pull_request.url`,
+  `structured_output`.
+- **Send a follow-up:** `POST https://api.devin.ai/v1/session/<session_id>/message`
+  with `{"message":"..."}` — use to unblock or correct, not to bounce work back
+  unresolved.
+- **List sessions:** `curl -s "https://api.devin.ai/v1/sessions?limit=N"`.
+
+The MCP endpoint (`https://mcp.devin.ai/mcp`, methods `devin_session_create`,
+`devin_session_interact`, `devin_session_gather`) exposes the same capability;
+the REST API above is the confirmed-working path.
+
+### What every Devin spec MUST include
+
+1. **Repo + base branch** — `shawnseffernick175/gda-command-v2`, `main` (+ current HEAD).
+2. **Exact files/routes to touch** (saves Devin exploration time) and explicit
+   **OUT OF SCOPE** list.
+3. **Definition of done** — the exact check commands that must pass, run from
+   `packages/frontend-v3` using the DIRECT binaries (NOT npx):
+   `node ../../node_modules/typescript/bin/tsc --noEmit`,
+   `node ../../node_modules/eslint/bin/eslint.js . --max-warnings 0`,
+   `node ../../node_modules/vitest/vitest.mjs run` (+ `--config vitest.contract.config.ts`),
+   `npm run build`, and all GitHub CI checks green.
+4. **Constraints (house rules):** R1 (every user-facing value carries a clickable
+   SourceRef/SourceLink); R2 forbidden-token scan (no `running`/`pending`/
+   `not_yet_analyzed`/`analysis_status`/`"stale":bool`/`analysis:null`); color lock
+   (6 tokens only, NO gold, no raw hex/box-shadow/gradients/emoji/JetBrains Mono);
+   no nested-heredoc file edits; clean PR off `main`, stage only changed paths.
+5. **A report-back request:** branch, PR number, key decisions made, files
+   deleted, green CI status.
+
+### Orchestrator loop
+
+spec → `create session` → poll `status_enum` → (if `blocked`, fix the blocker via
+a follow-up message) → when a PR appears, the assistant QAs the diff against the
+DoD, runs/inspects CI, and on green + scope-correct merges with `gh pr merge
+--squash --admin` → deploy if needed (assistant does VPS deploy) → verify live
+→ update roadmap. Devin's PR-open Review still runs as a second set of eyes; the
+assistant surfaces findings, fixes legit ones (or has Devin fix), and merges per
+the approved pattern (CI green + findings resolved).
 
 ---
 
@@ -98,4 +164,4 @@ Connected services: GitHub, Google Calendar, Google Drive, Finance.
 
 ---
 
-**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket (Phase 2 is COMPLETE — next is **Phase 3 Unified UI — F-420 detail page + F-420a connect-the-data + F-421 tab structure DONE+live; F-422 suggestion review UI DONE+live; next is F-423 decommission old per-source detail routes**), do the work, open a clean PR, wait for Devin Review to post, fix any legit findings, merge when Devin is resolved and CI is green. End with a recommendation. Don't make Shawn do anything but approve.
+**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket (Phase 2 is COMPLETE — next is **Phase 3 Unified UI — F-420 detail page + F-420a connect-the-data + F-421 tab structure DONE+live; F-422 suggestion review UI DONE+live; next is F-423 decommission the legacy V3 single-source detail page (running via Devin). V1/V2 teardown (F-314) is COMPLETE — V1/V2 was already removed from git; stale VPS artifacts cleaned 2026-06-02; the no-phantom-backend CI guard enforces it**), then ORCHESTRATE: write a Devin spec (Section 8), hand it to Devin via the REST API, monitor, QA the PR against the DoD, merge when CI is green and findings are resolved, and deploy. (Assistant does VPS/deploy steps; Devin writes the code. Small quick fixes the assistant may do directly while Devin is busy.) End with a recommendation. Don't make Shawn do anything but approve.
