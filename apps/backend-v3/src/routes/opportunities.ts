@@ -37,6 +37,12 @@ import {
   listUnifiedOpportunities,
   resolveStages,
 } from '../services/opportunities/detail.js';
+import {
+  listMatchSuggestions,
+  decideMatchSuggestion,
+  isValidAction,
+  PENDING_CONFIDENCES,
+} from '../services/opportunities/match-suggestions.js';
 
 function isCacheFresh(row: OpportunityRow): boolean {
   if (!row.analysis || !row.analysis_version || !row.ai_analyzed_at) return false;
@@ -84,6 +90,98 @@ function enqueueAnalysis(id: string, trigger: AnalysisJobData['trigger']): void 
 }
 
 export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
+  // ── F-412: match suggestions review queue ──────────────────────────────
+  // GET /v3/match-suggestions — list pending (MEDIUM/LOW) cross-source link
+  // suggestions awaiting a human decision. Query params:
+  //   confidence  — narrow to a single pending tier (MEDIUM|LOW)
+  //   internal_id — only suggestions for one unified opportunity
+  //   limit       — 1..200 (default 50)
+  //   cursor      — opaque keyset cursor
+  app.get('/v3/match-suggestions', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+
+    if (query.confidence) {
+      const tier = query.confidence.toUpperCase();
+      if (!PENDING_CONFIDENCES.includes(tier as (typeof PENDING_CONFIDENCES)[number])) {
+        return reply
+          .status(400)
+          .send(
+            errorEnvelope(
+              'VALIDATION_ERROR',
+              `Invalid confidence '${query.confidence}'. Pending tiers are MEDIUM or LOW.`,
+              req.requestId,
+            ),
+          );
+      }
+    }
+
+    const result = await listMatchSuggestions(pool, {
+      confidence: query.confidence,
+      internal_id: query.internal_id,
+      limit: query.limit ? Number(query.limit) : undefined,
+      cursor: query.cursor,
+    });
+
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  // POST /v3/match-suggestions — confirm or reject a pending suggestion.
+  // Body: { link_id: number, action: 'confirm' | 'reject', decided_by?: string }
+  app.post('/v3/match-suggestions', async (req, reply) => {
+    const body = req.body as Record<string, unknown> | undefined;
+
+    const rawLinkId = body?.link_id;
+    const linkId =
+      typeof rawLinkId === 'number'
+        ? rawLinkId
+        : typeof rawLinkId === 'string'
+          ? Number(rawLinkId)
+          : NaN;
+    if (!Number.isInteger(linkId) || linkId <= 0) {
+      return reply
+        .status(400)
+        .send(
+          errorEnvelope('VALIDATION_ERROR', 'link_id (positive integer) is required', req.requestId),
+        );
+    }
+
+    if (!isValidAction(body?.action)) {
+      return reply
+        .status(400)
+        .send(
+          errorEnvelope(
+            'VALIDATION_ERROR',
+            "action must be 'confirm' or 'reject'",
+            req.requestId,
+          ),
+        );
+    }
+
+    const user = (req as typeof req & { user?: { sub: string } }).user;
+    const decidedBy = (body?.decided_by as string) ?? user?.sub ?? 'system';
+
+    const result = await decideMatchSuggestion(pool, {
+      link_id: linkId,
+      action: body.action as 'confirm' | 'reject',
+      decided_by: decidedBy,
+    });
+
+    if (!result) {
+      // No pending link with this id — either unknown or already decided.
+      return reply
+        .status(404)
+        .send(
+          errorEnvelope(
+            'NOT_FOUND',
+            'No pending match suggestion found for that link_id (it may not exist or was already decided)',
+            req.requestId,
+          ),
+        );
+    }
+
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
   // GET /v3/opportunities/unified — unified list with lifecycle_stage filter (F-411)
   // Query params:
   //   stage  — single lifecycle_stage (signal|forecast|pre_sol|solicitation|
