@@ -118,6 +118,7 @@ export async function upsertOpportunityWithSources(
          posted_at            = EXCLUDED.posted_at,
          description          = EXCLUDED.description,
          data_source          = EXCLUDED.data_source,
+         tags                 = EXCLUDED.tags,
          source_id            = EXCLUDED.source_id,
          opportunity_type     = EXCLUDED.opportunity_type,
          updated_at           = NOW()
@@ -226,6 +227,7 @@ export async function upsertExternalOpportunity(
          response_due_at      = EXCLUDED.response_due_at,
          posted_at            = EXCLUDED.posted_at,
          description          = EXCLUDED.description,
+         tags                 = EXCLUDED.tags,
          source_id            = EXCLUDED.source_id,
          agency_subtype       = EXCLUDED.agency_subtype,
          opportunity_type     = EXCLUDED.opportunity_type,
