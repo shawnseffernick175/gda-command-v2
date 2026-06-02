@@ -23,7 +23,7 @@
 ✅ Phase 2 Unified API endpoints COMPLETE — F-410 detail · F-411 stage filter · F-412 suggestion queue · F-413 field override+audit — all live on backend-v3
 🔄 F-420–F-423 Unified UI (Phase 3) — IN PROGRESS
    ✅ F-420 unified detail page — route /unified/:internal_id, PR #637 merged, live at gda.csr-llc.tech (source badges, lifecycle/lineage trail, conflict drawer, merged fields + provenance, source lineage table)
-   ⏳ F-420a connect-the-data fast-follow — add per-field source URLs to F-410 + unified analyze endpoint, then wire clickable SourceLinks + auto-analysis (R1/R2 compliance)
+   ✅ F-420a connect-the-data — per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis (R1/R2 compliance), PR #639 merged, live at gda.csr-llc.tech
    ⏭ F-421 tab structure (say-something surfaces) — NEXT
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
 ⏳ F-440–F-443 Hardening + analytics (Phase 5)
@@ -164,7 +164,7 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 
 ### Phase 3 — Unified UI
 - ✅ F-420 unified detail page (route `/unified/:internal_id`) — PR #637, live. Renders F-410 merged detail: source badge strip, lifecycle stage + lineage trail, conflict count/drawer, merged fields with provenance, source lineage table.
-- ⏳ F-420a (fast-follow) — extend F-410 with per-field source URLs + add unified analyze endpoint, then wire clickable SourceLinks + auto-analysis on open (full R1/R2 compliance)
+- ✅ F-420a — extended F-410 with per-field source URLs + unified analyze endpoint, wired clickable SourceLinks + auto-analysis on open (full R1/R2 compliance) — PR #639, live
 - F-421 tab structure with say-something surfaces
 - F-422 suggestion review UI sidebar
 - F-423 decommission old per-source detail routes

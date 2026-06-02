@@ -63,7 +63,7 @@ GDA Command = Shawn's operating system for emerging defense / DoD business devel
 ## 4. What's NEXT (the build order)
 
 - **Phase 2 — Unified API (✅ COMPLETE):** ✅ F-410 unified detail (`GET /v3/opportunities/unified/:internal_id`) · ✅ F-411 stage filter (`GET /v3/opportunities/unified?stage=`) · ✅ F-412 suggestion queue (`GET/POST /v3/match-suggestions`) · ✅ F-413 field override + audit (`PUT /v3/opportunities/:internal_id/field-override`). All live on backend-v3.
-- **Phase 3 — Unified UI (IN PROGRESS):** ✅ F-420 unified detail page (route `/unified/:internal_id`, PR #637, live) → ⏳ F-420a connect-the-data fast-follow (per-field source URLs in F-410 + unified analyze endpoint, then clickable SourceLinks + auto-analysis for R1/R2) → **F-421 tab structure (say-something surfaces) = NEXT** → F-422 review sidebar → F-423 decommission old per-source pages.
+- **Phase 3 — Unified UI (IN PROGRESS):** ✅ F-420 unified detail page (route `/unified/:internal_id`, PR #637, live) → ✅ F-420a connect-the-data (per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis for R1/R2, PR #639, live) → **F-421 tab structure (say-something surfaces) = NEXT** → F-422 review sidebar → F-423 decommission old per-source pages.
 - **Phase 4 — Fast Track adapters:** F-430 NSF, F-431 SBIR, F-432 SAM Sources Sought/Pre-Sol, F-433 DoD RSS, F-434 NIH RePORTER, F-435 arXiv+USAspending, F-436 signal scoring, F-437 doctrine badge.
 - **Phase 5 — Hardening + analytics:** F-440 LOW-confidence matcher, F-441 conversion funnel, F-442 audit log, F-443 bulk review.
 
@@ -98,4 +98,4 @@ Connected services: GitHub, Google Calendar, Google Drive, Finance.
 
 ---
 
-**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket (Phase 2 is COMPLETE — next is **Phase 3 Unified UI — F-420 detail page DONE+live; next is F-421 tab structure (F-420a connect-the-data is a queued fast-follow)**), do the work, open a clean PR, wait for Devin Review to post, fix any legit findings, merge when Devin is resolved and CI is green. End with a recommendation. Don't make Shawn do anything but approve.
+**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket (Phase 2 is COMPLETE — next is **Phase 3 Unified UI — F-420 detail page + F-420a connect-the-data DONE+live; next is F-421 tab structure**), do the work, open a clean PR, wait for Devin Review to post, fix any legit findings, merge when Devin is resolved and CI is green. End with a recommendation. Don't make Shawn do anything but approve.
