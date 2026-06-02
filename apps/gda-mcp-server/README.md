@@ -28,6 +28,7 @@ npm run start --workspace=@gda/mcp-server
 | `JWT_SECRET`   | Yes      | `dev-jwt-secret-change-in-production`      | Shared secret for HS256 JWT verification   |
 | `MCP_PORT`     | No       | `4100`                                     | Port the MCP server listens on             |
 | `DATABASE_URL` | No       | —                                          | PostgreSQL connection string (future use)  |
+| `LEGISCAN_API_KEY` | No  | —                                          | LegiScan API key for `gda_search_bills` (F-506) |
 
 ## Production Deploy
 
@@ -44,6 +45,7 @@ npm run start --workspace=@gda/mcp-server
 | `STAGING_POSTGRES_USER` | Defaults to `gda_staging` |
 | `STAGING_POSTGRES_PASSWORD` | Required |
 | `STAGING_POSTGRES_DB` | Defaults to `gda_staging` |
+| `LEGISCAN_API_KEY` | LegiScan API key (F-506) |
 
 ### Deploy
 
