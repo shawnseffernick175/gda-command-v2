@@ -1,9 +1,27 @@
 # GDA Command North Star Roadmap — V3 Edition
 
-**Date:** June 1, 2026
+**Date:** June 1, 2026 (updated June 1, 2026 — MCP epic complete + gda_query_rag verified live)
 **Owner:** Shawn Seffernick
 **Replaces:** `gda-north-star-roadmap.md` (April 27, 2026)
 **Project Space:** GDA Rebuild
+
+---
+
+## Master task list (glance view)
+
+✅ F-401 Unified opportunities schema
+✅ F-402 SourceAdapter refactor (SAM/GovWin/GovTribe)
+✅ F-403 Matcher v1 (HIGH + MEDIUM)
+✅ F-404 Backfill legacy opportunities
+✅ F-405 Field merge service
+✅ F-320 agent-v3 govtribe_search tool
+✅ F-500 MCP Server Epic — all 11 tools live at https://gda-mcp.csr-llc.tech
+&nbsp;&nbsp;&nbsp;&nbsp;✅ F-501 Scaffold · ✅ F-502 First 5 tools · ✅ F-503 Next 5 tools · ✅ F-504 Deploy + DNS · ✅ F-505 Client configs · ✅ F-506 LegiScan gda_search_bills (11th tool)
+✅ F-507 gda_query_rag runtime fix — @gda/backend-v3 dep bundled (PR #627), RAG module loads OK in prod, verified live
+⏳ F-410–F-413 Unified API endpoints (Phase 2)
+⏳ F-420–F-423 Unified UI (Phase 3)
+⏳ F-430–F-437 Fast Track adapters (Phase 4)
+⏳ F-440–F-443 Hardening + analytics (Phase 5)
 
 ---
 
@@ -110,13 +128,25 @@ Precedence stack: human override > GovWin > SAM > GovTribe > Fast Track. Cached 
 - SAM + GovWin ingest baseline operational
 - Cognition stack online
 
-### Phase 1 — Unified opportunity foundation (IN PROGRESS — ~60% done)
+### Phase 1 — Unified opportunity foundation (✅ COMPLETE)
 - ✅ F-401 schema
 - ✅ F-402 SourceAdapter
 - ✅ F-403 Matcher v1
-- ⚙️ F-404 backfill (in flight)
-- ⏳ F-405 field merge (queued)
+- ✅ F-404 backfill
+- ✅ F-405 field merge
 - **Definition of done:** every opportunity in the system, regardless of source, lives in unified `opportunities` with at least one `opportunity_links` row, and the merge view returns a coherent record
+
+### Phase 1.5 — External MCP surface (✅ COMPLETE — June 1, 2026)
+The GDA MCP server exposes the platform's intelligence to external AI clients (Claude Desktop, Cursor, Devin, frontend) over Streamable HTTP with Bearer JWT auth.
+- ✅ F-501 Scaffold (server, transport, /health, JWT auth) — PR #620
+- ✅ F-502 First 5 tools: search_opportunities, get_opportunity, score_doctrine, get_pwin, query_rag — PR #621
+- ✅ F-503 Next 5 tools: list_action_items, get_pipeline, run_color_team, get_launchpad_summary, recall_decisions — PR #622
+- ✅ F-504 Deploy + DNS (docker-compose.prod, Traefik, gda-mcp.csr-llc.tech)
+- ✅ F-505 Client configs (Claude Desktop, Cursor, Devin, frontend) — PR #625
+- ✅ F-506 LegiScan gda_search_bills — 11th tool
+- ✅ F-507 gda_query_rag runtime fix — added @gda/backend-v3 as a real dep so the RAG module loads in the isolated prod image (PR #627). Verified live: RAG module loads OK in-container; LegiScan + Voyage keys present in .env.production; container healthy on port 4100.
+- **Live:** https://gda-mcp.csr-llc.tech — 11 tools, server healthy.
+- **Definition of done:** ✅ all 11 gda_* tools registered and callable; gda_query_rag loads @gda/backend-v3 at runtime without error.
 
 ### Phase 2 — Unified API
 - F-410 unified detail endpoint `/api/opportunities/:internal_id`
@@ -183,7 +213,8 @@ Precedence stack: human override > GovWin > SAM > GovTribe > Fast Track. Cached 
 3. ✅ Repo and VPS infra aligned (no drift)
 4. ✅ CI gates: dep audit, integration tests, compose drift, env parity all green
 5. ✅ Credit ledger enforcing budget caps
-6. ⏳ Phase 1 unified opportunity foundation complete (3 of 5 tickets done; F-404 + F-405 in flight)
+6. ✅ Phase 1 unified opportunity foundation complete (all 5 tickets done)
+6b. ✅ Phase 1.5 external MCP surface complete (11 tools live; gda_query_rag verified)
 7. ⏳ Phase 2 unified API complete
 8. ⏳ Phase 3 unified UI complete
 9. ⏳ At least 3 Fast Track adapters live (Phase 4)
@@ -202,7 +233,7 @@ Precedence stack: human override > GovWin > SAM > GovTribe > Fast Track. Cached 
 - F-405 field merge fires after F-404 lands
 
 ### Shawn's personal must-do
-- Nothing right now. SAM registration is already active. The build is on autopilot under the new merge rule.
+- Nothing right now. MCP server is fully live (11 tools). Test it in Claude Desktop/Cursor when convenient — paste the config from docs/mcp/claude-desktop.md. Build remains on autopilot under the clean-CI auto-merge rule.
 
 ### This week's targets
 - Phase 1 complete (F-404 + F-405 land)
