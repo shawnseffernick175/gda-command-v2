@@ -20,7 +20,7 @@
 ✅ F-507 gda_query_rag runtime fix — @gda/backend-v3 dep bundled (PR #627), RAG module loads OK in prod, verified live
 ✅ F-509 gda_company_financials (SEC EDGAR) — 12th tool, PR #628 merged, live (verified: Lockheed Martin 10-K filings)
 ✅ F-508 gda_company_awards (USAspending.gov DoD contract awards) — 13th tool, PR #629 merged, live (verified: Anduril DoD awards). Replaced dropped Crunchbase intel tool.
-⏳ F-410–F-413 Unified API endpoints (Phase 2)
+🔄 Phase 2 Unified API endpoints — ✅ F-410 unified detail endpoint live · ⏳ F-411–F-413
 ⏳ F-420–F-423 Unified UI (Phase 3)
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
 ⏳ F-440–F-443 Hardening + analytics (Phase 5)
@@ -151,7 +151,7 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 - **Definition of done:** ✅ all 11 gda_* tools registered and callable; gda_query_rag loads @gda/backend-v3 at runtime without error.
 
 ### Phase 2 — Unified API
-- F-410 unified detail endpoint `/api/opportunities/:internal_id`
+- ✅ F-410 unified detail endpoint `GET /v3/opportunities/unified/:internal_id` — merged_fields{} (provenance), sources[], conflicts[], lineage[]. PR #631 merged, live on backend-v3.
 - F-411 stage filter on list endpoint
 - F-412 suggestion queue for MEDIUM/LOW review
 - F-413 field override endpoint with audit trail
