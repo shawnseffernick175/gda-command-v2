@@ -92,17 +92,35 @@ const GetInputSchema = z.object({
 });
 
 /**
- * Resolve doctrine badge, candidate_partners, and competitors from existing
- * tables for a merged opportunity (F-437). Wrapped in try/catch so
- * enrichment failures never crash the MCP tool handler.
+ * Pull doctrine badge, candidate_partners, and competitors for a unified
+ * opportunity (F-437). Each data path independently guarded so a failure
+ * in one does not suppress the other.
  *
- * doctrine_evaluations.entity_id is uuid while opportunities.id is bigint,
- * so that query is omitted; matchedPrincipleIds stays empty.
+ * Key id types:
+ *  - pwin_features.opportunity_id = uuid (keyed on internal_id)
+ *  - opportunities.id = bigint (only needed for analysis.competitors)
  */
 async function enrichWithDoctrineBadge(internalId: string) {
   const noneBadge = await computeDoctrineBadge({});
   const defaults = { doctrine_badge: noneBadge, candidate_partners: [] as string[], competitors: [] as Competitor[] };
 
+  // Badge + partners: pwin_features keyed on uuid internal_id.
+  let doctrineAlignmentScore: number | null = null;
+  let candidatePartners: string[] = [];
+  try {
+    const featRes = await pool.query<{ features: Record<string, unknown> }>(
+      `SELECT features FROM pwin_features WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
+      [internalId],
+    );
+    const features = featRes.rows[0]?.features;
+    doctrineAlignmentScore = (features?.doctrine_alignment_score as number | undefined) ?? null;
+    candidatePartners = (features?.candidate_partners as string[] | undefined) ?? [];
+  } catch {
+    // pwin_features lookup failed — badge defaults to none, partners empty.
+  }
+
+  // Competitors: lives in bigint opportunities.analysis — resolve via link table.
+  let competitors: Competitor[] = [];
   try {
     const oppIdRes = await pool.query<{ id: string }>(
       `SELECT o.id FROM opportunities o
@@ -116,34 +134,23 @@ async function enrichWithDoctrineBadge(internalId: string) {
       [internalId],
     );
     const oppId = oppIdRes.rows[0]?.id;
-    if (!oppId) return defaults;
-
-    const [featRes, analysisRes] = await Promise.all([
-      pool.query<{ features: Record<string, unknown> }>(
-        `SELECT features FROM pwin_features WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
-        [oppId],
-      ),
-      pool.query<{ analysis: Record<string, unknown> | null }>(
+    if (oppId) {
+      const analysisRes = await pool.query<{ analysis: Record<string, unknown> | null }>(
         `SELECT analysis FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
         [oppId],
-      ),
-    ]);
-
-    const features = featRes.rows[0]?.features;
-    const doctrineAlignmentScore = (features?.doctrine_alignment_score as number | undefined) ?? null;
-    const candidatePartners = (features?.candidate_partners as string[] | undefined) ?? [];
-
-    const analysis = analysisRes.rows[0]?.analysis;
-    const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
-    const competitors: Competitor[] = rawCompetitors
-      .filter((c) => typeof c.name === 'string')
-      .map((c) => ({ name: c.name as string, threat_level: (c.threat_level as string) ?? 'medium' }));
-
-    const badge = await computeDoctrineBadge({ doctrineAlignmentScore });
-    return { doctrine_badge: badge, candidate_partners: candidatePartners, competitors };
+      );
+      const analysis = analysisRes.rows[0]?.analysis;
+      const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
+      competitors = rawCompetitors
+        .filter((c) => typeof c.name === 'string')
+        .map((c) => ({ name: c.name as string, threat_level: (c.threat_level as string) ?? 'medium' }));
+    }
   } catch {
-    return defaults;
+    // competitors lookup failed — empty array.
   }
+
+  const badge = await computeDoctrineBadge({ doctrineAlignmentScore });
+  return { doctrine_badge: badge, candidate_partners: candidatePartners, competitors };
 }
 
 export const gdaGetOpportunity: ToolRegistryEntry = {

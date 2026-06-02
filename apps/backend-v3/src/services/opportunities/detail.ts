@@ -164,15 +164,15 @@ interface DoctrineEnrichment {
 }
 
 /**
- * Resolve the underlying `opportunities.id` for the primary-source link,
- * then pull doctrine alignment score, teammates, and competitors from
- * existing tables. Wrapped in try/catch so enrichment failures never
- * break the opportunity detail endpoint — returns safe defaults on error.
+ * Pull doctrine badge, teammates, and competitors for a unified opportunity.
+ * Wrapped in try/catch so enrichment failures never break the detail endpoint.
  *
- * Note: doctrine_evaluations.entity_id is uuid while opportunities.id is
- * bigint, so we cannot join them. matchedPrincipleIds stays empty; the
- * badge still derives label/score from doctrine_alignment_score in pwin
- * features per spec.
+ * Key id types:
+ *  - pwin_features.opportunity_id = uuid (keyed on unified_opportunities.internal_id)
+ *  - opportunities.id = bigint (only needed for analysis.competitors)
+ *
+ * Badge + candidate_partners come from pwin_features (uuid path).
+ * Competitors come from opportunities.analysis (bigint path, independently guarded).
  */
 async function resolveDoctrineEnrichment(
   pool: pg.Pool,
@@ -184,6 +184,26 @@ async function resolveDoctrineEnrichment(
     competitors: [],
   };
 
+  // Badge + partners: pwin_features keyed on uuid internal_id.
+  let doctrineAlignmentScore: number | null = null;
+  let candidatePartners: string[] = [];
+  try {
+    const featRes = await pool.query<{ features: Record<string, unknown> }>(
+      `SELECT features FROM pwin_features
+       WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
+      [merged.internal_id],
+    );
+    const features = featRes.rows[0]?.features;
+    doctrineAlignmentScore =
+      (features?.doctrine_alignment_score as number | undefined) ?? null;
+    candidatePartners =
+      (features?.candidate_partners as string[] | undefined) ?? [];
+  } catch {
+    // pwin_features lookup failed — badge defaults to none, partners empty.
+  }
+
+  // Competitors: lives in bigint opportunities.analysis — resolve via link table.
+  let competitors: Competitor[] = [];
   try {
     const oppIdRes = await pool.query<{ id: string }>(
       `SELECT o.id FROM opportunities o
@@ -197,42 +217,26 @@ async function resolveDoctrineEnrichment(
       [merged.internal_id],
     );
     const oppId = oppIdRes.rows[0]?.id;
-    if (!oppId) return none;
-
-    const [featRes, analysisRes] = await Promise.all([
-      pool.query<{ features: Record<string, unknown> }>(
-        `SELECT features FROM pwin_features
-         WHERE opportunity_id = $1 ORDER BY computed_at DESC LIMIT 1`,
+    if (oppId) {
+      const analysisRes = await pool.query<{ analysis: Record<string, unknown> | null }>(
+        `SELECT analysis FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
         [oppId],
-      ),
-      pool.query<{ analysis: Record<string, unknown> | null }>(
-        `SELECT analysis FROM opportunities
-         WHERE id = $1 AND deleted_at IS NULL`,
-        [oppId],
-      ),
-    ]);
-
-    const features = featRes.rows[0]?.features;
-    const doctrineAlignmentScore =
-      (features?.doctrine_alignment_score as number | undefined) ?? null;
-    const candidatePartners =
-      (features?.candidate_partners as string[] | undefined) ?? [];
-
-    const analysis = analysisRes.rows[0]?.analysis;
-    const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
-    const competitors: Competitor[] = rawCompetitors
-      .filter((c) => typeof c.name === 'string')
-      .map((c) => ({
-        name: c.name as string,
-        threat_level: (c.threat_level as Competitor['threat_level']) ?? 'medium',
-      }));
-
-    const badge = computeDoctrineBadge({ doctrineAlignmentScore });
-
-    return { badge, candidatePartners, competitors };
+      );
+      const analysis = analysisRes.rows[0]?.analysis;
+      const rawCompetitors = (analysis?.competitors ?? []) as Array<Record<string, unknown>>;
+      competitors = rawCompetitors
+        .filter((c) => typeof c.name === 'string')
+        .map((c) => ({
+          name: c.name as string,
+          threat_level: (c.threat_level as Competitor['threat_level']) ?? 'medium',
+        }));
+    }
   } catch {
-    return none;
+    // competitors lookup failed — empty array.
   }
+
+  const badge = computeDoctrineBadge({ doctrineAlignmentScore });
+  return { badge, candidatePartners, competitors };
 }
 
 /**
