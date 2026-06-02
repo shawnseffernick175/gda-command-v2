@@ -40,7 +40,10 @@ const mockPool = {
 
 // ─── Import under test ──────────────────────────────────────────────────────
 
-import { getUnifiedOpportunityDetail } from '../../../src/services/opportunities/detail.js';
+import {
+  getUnifiedOpportunityDetail,
+  resolvePrimaryOpportunityId,
+} from '../../../src/services/opportunities/detail.js';
 import { clearMergeCache } from '../../../src/services/opportunities/merge.js';
 import type pg from 'pg';
 
@@ -238,5 +241,127 @@ describe('getUnifiedOpportunityDetail (F-410)', () => {
     expect(result!.doctrine_status).toBe('excluded');
     expect(result!.lifecycle_stage).toBe('solicitation');
     expect(result!.primary_source).toBe('sam');
+  });
+});
+
+// ─── F-420a (R1): per-field source provenance links ─────────────────────────
+
+describe('merged_fields source provenance (F-420a R1)', () => {
+  it('attaches a clickable SAM SourceRef to fields sourced from sam', async () => {
+    onQuery('FROM unified_opportunities WHERE internal_id', [unifiedRow()]);
+    onQuery('FROM unified_opportunity_links WHERE internal_id', [link('sam', 'N-1')]);
+    onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
+    onQuery("data_source = 'sam_gov'", [samSrc()]);
+
+    const result = await getUnifiedOpportunityDetail(
+      mockPool as unknown as pg.Pool,
+      'uuid-410',
+    );
+
+    const titleSources = result!.merged_fields.title.sources;
+    expect(titleSources).toHaveLength(1);
+    expect(titleSources[0].kind).toBe('sam_gov');
+    expect(titleSources[0].title).toBe('SAM.gov');
+    expect(titleSources[0].url).toBe('https://sam.gov/opp/N-1/view');
+    expect(typeof titleSources[0].retrieved_at).toBe('string');
+  });
+
+  it('builds a GovTribe URL for govtribe-sourced fields', async () => {
+    onQuery('FROM unified_opportunities WHERE internal_id', [
+      unifiedRow({ primary_source: 'govtribe' }),
+    ]);
+    onQuery('FROM unified_opportunity_links WHERE internal_id', [link('govtribe', 'GT-9')]);
+    onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
+    onQuery('WHERE govtribe_id = $1', [
+      samSrc({ title: 'GovTribe Title' }),
+    ]);
+
+    const result = await getUnifiedOpportunityDetail(
+      mockPool as unknown as pg.Pool,
+      'uuid-410',
+    );
+
+    const s = result!.merged_fields.title.sources;
+    expect(s[0].kind).toBe('govtribe');
+    expect(s[0].url).toBe(
+      'https://govtribe.com/opportunity/federal-contract-opportunity/GT-9',
+    );
+  });
+
+  it('returns no SourceRef for fast_track (no addressable URL)', async () => {
+    onQuery('FROM unified_opportunities WHERE internal_id', [
+      unifiedRow({ primary_source: 'fast_track' }),
+    ]);
+    onQuery('FROM unified_opportunity_links WHERE internal_id', [
+      link('fast_track', 'FT-1'),
+    ]);
+    onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
+    onQuery('FROM fast_track_assessments', [
+      { title: 'FT Title', agency: null, office: null, naics: '541512', psc: null,
+        set_aside: null, estimated_value_cents: null, posted_at: null,
+        response_due_at: null, award_at: null },
+    ]);
+
+    const result = await getUnifiedOpportunityDetail(
+      mockPool as unknown as pg.Pool,
+      'uuid-410',
+    );
+
+    expect(result!.merged_fields.title.sources).toEqual([]);
+  });
+});
+
+// ─── F-420a (R2): resolve underlying opportunities.id for analysis ──────────
+
+describe('resolvePrimaryOpportunityId (F-420a R2)', () => {
+  it('resolves the sam opportunities.id via primary-source link', async () => {
+    onQuery('FROM unified_opportunities WHERE internal_id', [unifiedRow()]);
+    onQuery('FROM unified_opportunity_links WHERE internal_id', [link('sam', 'N-1')]);
+    onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
+    onQuery("data_source = 'sam_gov'", [samSrc()]);
+
+    const detail = await getUnifiedOpportunityDetail(
+      mockPool as unknown as pg.Pool,
+      'uuid-410',
+    );
+
+    // Reset registrations so the resolver's id-lookup fragment is matched
+    // first (the mock returns the first registered fragment that matches).
+    resetMock();
+    onQuery("SELECT id FROM opportunities WHERE sam_notice_id = $1 AND data_source = 'sam_gov'", [
+      { id: 'opp-uuid-1' },
+    ]);
+
+    const oppId = await resolvePrimaryOpportunityId(
+      mockPool as unknown as pg.Pool,
+      detail!,
+    );
+    expect(oppId).toBe('opp-uuid-1');
+  });
+
+  it('returns null when the only source is fast_track (not analyzable)', async () => {
+    onQuery('FROM unified_opportunities WHERE internal_id', [
+      unifiedRow({ primary_source: 'fast_track' }),
+    ]);
+    onQuery('FROM unified_opportunity_links WHERE internal_id', [
+      link('fast_track', 'FT-1'),
+    ]);
+    onQuery('FROM unified_opportunity_field_overrides WHERE internal_id', []);
+    onQuery('FROM fast_track_assessments', [
+      { title: 'FT Title', agency: null, office: null, naics: '541512', psc: null,
+        set_aside: null, estimated_value_cents: null, posted_at: null,
+        response_due_at: null, award_at: null },
+    ]);
+
+    const detail = await getUnifiedOpportunityDetail(
+      mockPool as unknown as pg.Pool,
+      'uuid-410',
+    );
+
+    const oppId = await resolvePrimaryOpportunityId(
+      mockPool as unknown as pg.Pool,
+      detail!,
+    );
+    expect(oppId).toBeNull();
   });
 });

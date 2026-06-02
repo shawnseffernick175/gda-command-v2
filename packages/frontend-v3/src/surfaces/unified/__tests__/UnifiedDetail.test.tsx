@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -13,16 +13,49 @@ const mockDetail = {
   created_at: '2026-05-01T12:00:00Z',
   updated_at: '2026-05-30T12:00:00Z',
   merged_fields: {
-    title: { value: 'Army RS3 Sustainment', source: 'sam_gov' },
-    agency: { value: 'US Army', source: 'sam_gov' },
-    office: { value: 'CECOM', source: 'govtribe' },
-    naics: { value: '541512', source: 'sam_gov' },
-    psc: { value: 'D307', source: 'sam_gov' },
-    set_aside: { value: 'SDVOSB', source: 'sam_gov' },
-    estimated_value_cents: { value: 25000000000, source: 'govwin' },
-    posted_at: { value: '2026-05-01T00:00:00Z', source: 'sam_gov' },
-    response_due_at: { value: '2026-06-15T00:00:00Z', source: 'govtribe' },
-    award_at: { value: null, source: null },
+    title: {
+      value: 'Army RS3 Sustainment',
+      source: 'sam_gov',
+      sources: [
+        {
+          kind: 'sam_gov',
+          title: 'SAM.gov',
+          url: 'https://sam.gov/opp/sam-abc/view',
+          retrieved_at: '2026-05-02T12:00:00Z',
+        },
+      ],
+    },
+    agency: {
+      value: 'US Army',
+      source: 'sam_gov',
+      sources: [
+        {
+          kind: 'sam_gov',
+          title: 'SAM.gov',
+          url: 'https://sam.gov/opp/sam-abc/view',
+          retrieved_at: '2026-05-02T12:00:00Z',
+        },
+      ],
+    },
+    office: {
+      value: 'CECOM',
+      source: 'govtribe',
+      sources: [
+        {
+          kind: 'govtribe',
+          title: 'GovTribe',
+          url: 'https://govtribe.com/opportunity/federal-contract-opportunity/gt-xyz',
+          retrieved_at: '2026-05-04T12:00:00Z',
+        },
+      ],
+    },
+    naics: { value: '541512', source: 'sam_gov', sources: [] },
+    psc: { value: 'D307', source: 'sam_gov', sources: [] },
+    set_aside: { value: 'SDVOSB', source: 'sam_gov', sources: [] },
+    estimated_value_cents: { value: 25000000000, source: 'govwin', sources: [] },
+    posted_at: { value: '2026-05-01T00:00:00Z', source: 'sam_gov', sources: [] },
+    response_due_at: { value: '2026-06-15T00:00:00Z', source: 'govtribe', sources: [] },
+    award_at: { value: null, source: null, sources: [] },
   },
   sources: [
     { source: 'sam_gov', response_due_at: '2026-06-15T00:00:00Z' },
@@ -76,25 +109,36 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
+function envelope(data: unknown) {
+  return {
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        success: true,
+        data,
+        meta: { generatedAt: '2026-05-30T12:00:00Z', source: 'v3', requestId: 'r1' },
+      }),
+  } as Response;
+}
+
 function mockOk() {
-  vi.mocked(globalThis.fetch).mockImplementation((url: string | URL | Request) => {
-    const urlStr = typeof url === 'string' ? url : url.toString();
-    if (urlStr.includes('/opportunities/unified/uo-123')) {
+  vi.mocked(globalThis.fetch).mockImplementation(
+    (url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      // R2: the analyze endpoint returns the refreshed unified detail.
+      if (urlStr.includes('/opportunities/unified/uo-123/analyze')) {
+        expect(init?.method).toBe('POST');
+        return Promise.resolve(envelope(mockDetail));
+      }
+      if (urlStr.includes('/opportunities/unified/uo-123')) {
+        return Promise.resolve(envelope(mockDetail));
+      }
       return Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            success: true,
-            data: mockDetail,
-            meta: { generatedAt: '2026-05-30T12:00:00Z', source: 'v3', requestId: 'r1' },
-          }),
+        ok: false,
+        json: () => Promise.resolve({ success: false, error: 'not found' }),
       } as Response);
-    }
-    return Promise.resolve({
-      ok: false,
-      json: () => Promise.resolve({ success: false, error: 'not found' }),
-    } as Response);
-  });
+    },
+  );
 }
 
 describe('UnifiedDetail', () => {
@@ -195,15 +239,7 @@ describe('UnifiedDetail', () => {
     vi.mocked(globalThis.fetch).mockImplementation((url: string | URL | Request) => {
       const urlStr = typeof url === 'string' ? url : url.toString();
       if (urlStr.includes('/opportunities/unified/uo-123')) {
-        return Promise.resolve({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              success: true,
-              data: { ...mockDetail, conflicts: [] },
-              meta: { generatedAt: '2026-05-30T12:00:00Z', source: 'v3', requestId: 'r1' },
-            }),
-        } as Response);
+        return Promise.resolve(envelope({ ...mockDetail, conflicts: [] }));
       }
       return Promise.resolve({
         ok: false,
@@ -215,5 +251,57 @@ describe('UnifiedDetail', () => {
 
     expect(await screen.findByText('No field conflicts')).toBeInTheDocument();
     expect(screen.queryByTestId('conflict-count-toggle')).not.toBeInTheDocument();
+  });
+
+  // ─── F-420a (R1): clickable source links ──────────────────────────────────
+
+  it('renders fields with a clickable source URL as an external link (R1)', async () => {
+    mockOk();
+    render(<UnifiedDetail />, { wrapper });
+
+    // The title field is sam_gov-sourced and carries a SAM.gov URL.
+    const titleLink = await screen.findByTestId('field-value-title');
+    expect(titleLink.tagName).toBe('A');
+    expect(titleLink).toHaveAttribute('href', 'https://sam.gov/opp/sam-abc/view');
+    expect(titleLink).toHaveAttribute('target', '_blank');
+    expect(titleLink).toHaveAttribute('rel', 'noopener noreferrer');
+
+    // The office field is govtribe-sourced and links to GovTribe.
+    const officeLink = screen.getByTestId('field-value-office');
+    expect(officeLink.tagName).toBe('A');
+    expect(officeLink).toHaveAttribute(
+      'href',
+      'https://govtribe.com/opportunity/federal-contract-opportunity/gt-xyz',
+    );
+  });
+
+  it('renders fields without a source URL as plain text, not a link (R1)', async () => {
+    mockOk();
+    render(<UnifiedDetail />, { wrapper });
+
+    // naics has source sam_gov but an empty sources[] -> no addressable URL.
+    const naicsValue = await screen.findByTestId('field-value-naics');
+    expect(naicsValue.tagName).toBe('SPAN');
+    expect(naicsValue).not.toHaveAttribute('href');
+  });
+
+  // ─── F-420a (R2): auto-analysis on mount ──────────────────────────────────
+
+  it('auto-triggers the analyze endpoint via POST on mount (R2)', async () => {
+    mockOk();
+    render(<UnifiedDetail />, { wrapper });
+
+    // Wait for the page to settle (detail loaded).
+    await screen.findAllByText('Army RS3 Sustainment');
+
+    await waitFor(() => {
+      const calls = vi.mocked(globalThis.fetch).mock.calls;
+      const analyzeCall = calls.find(([url]) => {
+        const u = typeof url === 'string' ? url : (url as URL | Request).toString();
+        return u.includes('/opportunities/unified/uo-123/analyze');
+      });
+      expect(analyzeCall).toBeDefined();
+      expect((analyzeCall?.[1] as RequestInit | undefined)?.method).toBe('POST');
+    });
   });
 });

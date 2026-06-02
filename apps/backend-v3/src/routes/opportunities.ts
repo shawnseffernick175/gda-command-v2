@@ -36,7 +36,9 @@ import {
   getUnifiedOpportunityDetail,
   listUnifiedOpportunities,
   resolveStages,
+  resolvePrimaryOpportunityId,
 } from '../services/opportunities/detail.js';
+import { invalidateMergeCache } from '../services/opportunities/merge.js';
 import {
   listMatchSuggestions,
   decideMatchSuggestion,
@@ -313,6 +315,64 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return reply.status(200).send(successEnvelope(detail, req.requestId));
+    },
+  );
+
+  // POST /v3/opportunities/unified/:internal_id/analyze — trigger analysis
+  // for a unified opportunity (F-420a / R2). Resolves the underlying
+  // opportunities.id via the primary-source link, enqueues a high-priority
+  // analysis job, blocks up to the configured analysis timeout, then returns
+  // the refreshed unified detail (so the caller gets pwin + provenance in one
+  // round-trip). Mirrors the GET /v3/opportunities/:id analyze-on-read path.
+  app.post<{ Params: { internal_id: string } }>(
+    '/v3/opportunities/unified/:internal_id/analyze',
+    async (req, reply) => {
+      const { internal_id } = req.params;
+
+      const detail = await getUnifiedOpportunityDetail(pool, internal_id);
+      if (!detail) {
+        return reply
+          .status(404)
+          .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+      }
+
+      const opportunityId = await resolvePrimaryOpportunityId(pool, detail);
+      if (!opportunityId) {
+        // No analyzable source row (e.g. fast_track-only). Return the current
+        // unified detail unchanged rather than 5xx — nothing to analyze.
+        return reply.status(200).send(successEnvelope(detail, req.requestId));
+      }
+
+      enqueueAnalysis(opportunityId, 'detail-endpoint');
+
+      const fresh = await waitForAnalysis(
+        opportunityId,
+        config.analysisTimeoutMs,
+        config.analysisPollIntervalMs,
+      );
+
+      if (!fresh) {
+        analysisTimeoutCount.inc();
+        return reply
+          .status(503)
+          .send(
+            errorEnvelope(
+              'ANALYSIS_TIMEOUT',
+              'Analysis not ready, retry in a few seconds',
+              req.requestId,
+              'estimated_seconds=8',
+            ),
+          );
+      }
+
+      analysisCacheHits.inc();
+      // Re-read the unified detail so pwin/doctrine reflect the fresh analysis.
+      // The first getUnifiedOpportunityDetail above populated the merge cache
+      // (60s TTL), so we must invalidate it before re-reading or we'd return
+      // the stale pre-analysis payload (Devin #639/0001).
+      invalidateMergeCache(internal_id);
+      const refreshed = (await getUnifiedOpportunityDetail(pool, internal_id)) ?? detail;
+      return reply.status(200).send(successEnvelope(refreshed, req.requestId));
     },
   );
 

@@ -5,10 +5,19 @@
  * (apps/backend-v3/src/services/opportunities/detail.ts).
  */
 
-/** Per-field merged value plus the source that supplied it. */
+import type { SourceRef } from '../opportunities/types';
+
+export type { SourceRef };
+
+/** Per-field merged value plus the source(s) that supplied it. */
 export interface MergedField {
   value: unknown;
   source: string | null;
+  /**
+   * R1 (F-420a): clickable provenance links for the winning source.
+   * Empty when the source has no externally addressable page (e.g. Fast Track).
+   */
+  sources: SourceRef[];
 }
 
 /** A field where two or more sources disagree on a non-null value. */
