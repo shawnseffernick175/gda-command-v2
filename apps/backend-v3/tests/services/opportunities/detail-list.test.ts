@@ -126,6 +126,14 @@ describe('listUnifiedOpportunities (F-411)', () => {
     expect(result.pagination.cursor).toBeNull();
   });
 
+  it('falls back to default 50 when limit is non-numeric (NaN guard)', async () => {
+    nextRows = [];
+    // Simulates route passing Number('abc') === NaN through to the service.
+    await listUnifiedOpportunities(mockPool as unknown as pg.Pool, { limit: NaN });
+    // last param is limit+1; NaN must NOT propagate — defaults to 50 → 51.
+    expect(lastParams[lastParams.length - 1]).toBe(51);
+  });
+
   it('clamps limit to the 1..200 range', async () => {
     nextRows = [];
     await listUnifiedOpportunities(mockPool as unknown as pg.Pool, { limit: 9999 });

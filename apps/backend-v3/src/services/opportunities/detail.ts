@@ -247,7 +247,12 @@ export async function listUnifiedOpportunities(
   pool: pg.Pool,
   filters: UnifiedListFilters,
 ): Promise<UnifiedListResult> {
-  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
+  // Guard against NaN/Infinity from a non-numeric query param (e.g. ?limit=abc):
+  // NaN is not nullish so ?? would not catch it, and NaN would propagate to the
+  // SQL LIMIT clause. Fall back to the default 50 for any non-finite value.
+  const rawLimit = filters.limit;
+  const safeLimit = typeof rawLimit === "number" && Number.isFinite(rawLimit) ? rawLimit : 50;
+  const limit = Math.min(Math.max(safeLimit, 1), 200);
   const conditions: string[] = [];
   const params: unknown[] = [];
   let i = 1;
