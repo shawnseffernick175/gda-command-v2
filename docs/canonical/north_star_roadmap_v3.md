@@ -21,7 +21,10 @@
 ✅ F-509 gda_company_financials (SEC EDGAR) — 12th tool, PR #628 merged, live (verified: Lockheed Martin 10-K filings)
 ✅ F-508 gda_company_awards (USAspending.gov DoD contract awards) — 13th tool, PR #629 merged, live (verified: Anduril DoD awards). Replaced dropped Crunchbase intel tool.
 ✅ Phase 2 Unified API endpoints COMPLETE — F-410 detail · F-411 stage filter · F-412 suggestion queue · F-413 field override+audit — all live on backend-v3
-🔄 F-420–F-423 Unified UI (Phase 3) — NEXT, starting F-420 detail page
+🔄 F-420–F-423 Unified UI (Phase 3) — IN PROGRESS
+   ✅ F-420 unified detail page — route /unified/:internal_id, PR #637 merged, live at gda.csr-llc.tech (source badges, lifecycle/lineage trail, conflict drawer, merged fields + provenance, source lineage table)
+   ⏳ F-420a connect-the-data fast-follow — add per-field source URLs to F-410 + unified analyze endpoint, then wire clickable SourceLinks + auto-analysis (R1/R2 compliance)
+   ⏭ F-421 tab structure (say-something surfaces) — NEXT
 ⏳ F-430–F-437 Fast Track adapters (Phase 4)
 ⏳ F-440–F-443 Hardening + analytics (Phase 5)
 
@@ -160,7 +163,8 @@ The GDA MCP server exposes the platform's intelligence to external AI clients (C
 - **Definition of done:** frontend can ask for any opportunity by internal_id and get a fully merged response
 
 ### Phase 3 — Unified UI
-- F-420 new `/opportunities/:internal_id` detail page
+- ✅ F-420 unified detail page (route `/unified/:internal_id`) — PR #637, live. Renders F-410 merged detail: source badge strip, lifecycle stage + lineage trail, conflict count/drawer, merged fields with provenance, source lineage table.
+- ⏳ F-420a (fast-follow) — extend F-410 with per-field source URLs + add unified analyze endpoint, then wire clickable SourceLinks + auto-analysis on open (full R1/R2 compliance)
 - F-421 tab structure with say-something surfaces
 - F-422 suggestion review UI sidebar
 - F-423 decommission old per-source detail routes
