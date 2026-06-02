@@ -202,6 +202,29 @@ export interface LaunchpadSummary {
   action_items_overdue_sources: object[];
 }
 
+// ─── doctrine/badge.ts (F-437) ──────────────────────────────────────────────
+
+export type DoctrineFitLabel = 'strong' | 'moderate' | 'weak' | 'none';
+
+export interface DoctrineBadge {
+  label: DoctrineFitLabel;
+  score: number;
+  matchedPrinciples: string[];
+  primaryPrinciple: string | null;
+  rationale: string;
+}
+
+export interface ComputeDoctrineBadgeInput {
+  doctrineAlignmentScore?: number | null;
+  matchedPrincipleIds?: string[];
+  naicsSizeStatus?: 'small' | 'large' | 'unknown';
+}
+
+export interface Competitor {
+  name: string;
+  threat_level: string;
+}
+
 // ─── memory/types.ts ────────────────────────────────────────────────────────
 
 export interface AgentDecisionRow {

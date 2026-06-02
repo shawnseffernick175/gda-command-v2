@@ -13,3 +13,9 @@ export {
   type ExclusionResult,
   type MarginCheck,
 } from './evaluate.js';
+export {
+  computeDoctrineBadge,
+  type DoctrineBadge,
+  type DoctrineFitLabel,
+  type ComputeDoctrineBadgeInput,
+} from './badge.js';
