@@ -92,18 +92,6 @@ function skippedSteps(): Step[] {
   ];
 }
 
-/** Steps that cause decideMatchSuggestion to throw (simulate DB error). */
-function errorSteps(): Step[] {
-  return [
-    {
-      match: /SELECT confidence.*FROM unified_opportunity_links/,
-      rows: [{ confidence: 'MEDIUM' }],
-    },
-    // Missing UPDATE step → the UPDATE returns empty → null. But we want a throw.
-    // Instead, use a special approach: make the SELECT throw by using a non-step path.
-  ];
-}
-
 beforeEach(() => {
   clientConfigs = [];
   invalidateSpy.mockClear();
