@@ -56,15 +56,19 @@ export function deriveSignals(input: EnrichmentInput): DerivedSignals {
 
   let scopeScore: number;
   if (matchCount === 0) scopeScore = 0;
-  else if (matchCount === 1) scopeScore = 25;
-  else if (matchCount === 2) scopeScore = 45;
-  else if (matchCount === 3) scopeScore = 60;
-  else if (matchCount === 4) scopeScore = 75;
-  else scopeScore = 90;
+  else if (matchCount === 1) scopeScore = 35;
+  else if (matchCount === 2) scopeScore = 55;
+  else if (matchCount === 3) scopeScore = 70;
+  else if (matchCount === 4) scopeScore = 82;
+  else scopeScore = 92;
 
-  // NAICS lane bonus
+  // NAICS lane bonus (+10, cap 100); baseline 20 for lane-aligned with no keyword hits
   if (input.naics && ENVISION_NAICS_LANES.includes(input.naics.trim())) {
-    scopeScore = Math.min(100, scopeScore + 10);
+    if (matchCount === 0) {
+      scopeScore = 20;
+    } else {
+      scopeScore = Math.min(100, scopeScore + 10);
+    }
   }
 
   // ── has_vehicle_access / vehicle ───────────────────────────────────────
