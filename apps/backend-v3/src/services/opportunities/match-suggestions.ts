@@ -90,6 +90,40 @@ export interface DecisionResult {
   confirmed_at: string;
 }
 
+// ─── Bulk decision types ─────────────────────────────────────────────────────
+
+export interface BulkDecisionItem {
+  link_id: number;
+  action: 'confirm' | 'reject';
+}
+
+export interface BulkDecisionInput {
+  items: BulkDecisionItem[];
+  decided_by: string;
+  request_id?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  user_id?: number | null;
+}
+
+export interface BulkDecisionOutcome {
+  link_id: number;
+  action: 'confirm' | 'reject';
+  outcome: 'decided' | 'skipped' | 'error';
+  result?: DecisionResult;
+  error?: string;
+}
+
+export interface BulkDecisionResult {
+  total: number;
+  decided: number;
+  skipped: number;
+  errored: number;
+  items: BulkDecisionOutcome[];
+}
+
+export const BULK_DECISION_MAX_ITEMS = 200;
+
 // ─── Validation helpers ───────────────────────────────────────────────────────
 
 /** Returns true when `action` is an accepted decision verb. */
@@ -324,4 +358,66 @@ export async function decideMatchSuggestion(
   } finally {
     client.release();
   }
+}
+
+// ─── Bulk decide ─────────────────────────────────────────────────────────────
+
+/**
+ * Apply confirm/reject decisions to many pending suggestions in one call.
+ * Each item is processed sequentially via `decideMatchSuggestion` (which opens
+ * its own transaction) so every decision is individually audited and atomic.
+ * A single item failure does not abort the batch.
+ */
+export async function bulkDecideMatchSuggestions(
+  pool: pg.Pool,
+  input: BulkDecisionInput,
+): Promise<BulkDecisionResult> {
+  // De-duplicate by link_id, keeping first occurrence.
+  const seen = new Set<number>();
+  const unique: BulkDecisionItem[] = [];
+  for (const item of input.items) {
+    if (!seen.has(item.link_id)) {
+      seen.add(item.link_id);
+      unique.push(item);
+    }
+  }
+
+  const outcomes: BulkDecisionOutcome[] = [];
+  let decided = 0;
+  let skippedCount = 0;
+  let errored = 0;
+
+  for (const item of unique) {
+    try {
+      const result = await decideMatchSuggestion(pool, {
+        link_id: item.link_id,
+        action: item.action,
+        decided_by: input.decided_by,
+        request_id: input.request_id ?? null,
+        ip_address: input.ip_address ?? null,
+        user_agent: input.user_agent ?? null,
+        user_id: input.user_id ?? null,
+      });
+
+      if (result) {
+        decided++;
+        outcomes.push({ link_id: item.link_id, action: item.action, outcome: 'decided', result });
+      } else {
+        skippedCount++;
+        outcomes.push({ link_id: item.link_id, action: item.action, outcome: 'skipped' });
+      }
+    } catch (err: unknown) {
+      errored++;
+      const message = err instanceof Error ? err.message : String(err);
+      outcomes.push({ link_id: item.link_id, action: item.action, outcome: 'error', error: message });
+    }
+  }
+
+  return {
+    total: unique.length,
+    decided,
+    skipped: skippedCount,
+    errored,
+    items: outcomes,
+  };
 }

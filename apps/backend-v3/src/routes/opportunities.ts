@@ -42,8 +42,10 @@ import { invalidateMergeCache } from '../services/opportunities/merge.js';
 import {
   listMatchSuggestions,
   decideMatchSuggestion,
+  bulkDecideMatchSuggestions,
   isValidAction,
   PENDING_CONFIDENCES,
+  BULK_DECISION_MAX_ITEMS,
 } from '../services/opportunities/match-suggestions.js';
 import { listDupCandidates } from '../services/opportunities/dup-candidates.js';
 import type { DupTier } from '../matching/dup-candidates.js';
@@ -265,6 +267,88 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
           ),
         );
     }
+
+    return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  // POST /v3/match-suggestions/bulk — bulk confirm/reject pending suggestions.
+  // Body: { items: [{ link_id, action }], decided_by }
+  app.post('/v3/match-suggestions/bulk', async (req, reply) => {
+    const body = req.body as Record<string, unknown> | undefined;
+
+    const items = body?.items;
+    if (!Array.isArray(items) || items.length === 0) {
+      return reply
+        .status(400)
+        .send(errorEnvelope('VALIDATION_ERROR', 'items must be a non-empty array', req.requestId));
+    }
+    if (items.length > BULK_DECISION_MAX_ITEMS) {
+      return reply
+        .status(400)
+        .send(
+          errorEnvelope(
+            'VALIDATION_ERROR',
+            `items exceeds maximum of ${BULK_DECISION_MAX_ITEMS}`,
+            req.requestId,
+          ),
+        );
+    }
+
+    // Validate each item.
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx] as Record<string, unknown> | undefined;
+      const rawId = item?.link_id;
+      const id =
+        typeof rawId === 'number'
+          ? rawId
+          : typeof rawId === 'string'
+            ? Number(rawId)
+            : NaN;
+      if (!Number.isInteger(id) || id <= 0) {
+        return reply
+          .status(400)
+          .send(
+            errorEnvelope(
+              'VALIDATION_ERROR',
+              `items[${idx}].link_id must be a positive integer`,
+              req.requestId,
+            ),
+          );
+      }
+      if (!isValidAction(item?.action)) {
+        return reply
+          .status(400)
+          .send(
+            errorEnvelope(
+              'VALIDATION_ERROR',
+              `items[${idx}].action must be 'confirm' or 'reject'`,
+              req.requestId,
+            ),
+          );
+      }
+    }
+
+    const decidedBy = body?.decided_by;
+    if (typeof decidedBy !== 'string' || decidedBy.trim() === '') {
+      return reply
+        .status(400)
+        .send(errorEnvelope('VALIDATION_ERROR', 'decided_by is required', req.requestId));
+    }
+
+    // Coerce link_ids to numbers (bigint strings from pg).
+    const coercedItems = items.map((item: Record<string, unknown>) => ({
+      link_id: Number(item.link_id),
+      action: item.action as 'confirm' | 'reject',
+    }));
+
+    const result = await bulkDecideMatchSuggestions(pool, {
+      items: coercedItems,
+      decided_by: decidedBy,
+      request_id: req.requestId ?? null,
+      ip_address: req.ip ?? null,
+      user_agent: (req.headers['user-agent'] as string) ?? null,
+      user_id: null,
+    });
 
     return reply.status(200).send(successEnvelope(result, req.requestId));
   });
