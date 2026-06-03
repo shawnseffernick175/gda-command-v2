@@ -1,9 +1,9 @@
 /**
  * GovWin adapters — GovWinForecastAdapter and GovWinSolicitationAdapter.
  *
+ * F-332: Now uses the OAuth2 Web Services API client instead of scraping.
  * GovWin opportunities may be forecasts (pre-RFP intel) or active
- * solicitations depending on their status field. Both adapters share
- * the same fetch/parse path via the GovWin web scraper client.
+ * solicitations depending on their status field.
  */
 
 import type {
@@ -14,13 +14,12 @@ import type {
   NormalizedOpportunity,
 } from '../adapter/types.js';
 import {
-  discoverRecentOpportunityIds,
-  fetchOpportunityBatch,
-  type GovWinOpportunity,
-} from '../../services/govwin/client.js';
+  discoverRecentOpportunitiesApi,
+  type GovWinApiOpportunity,
+} from '../../services/govwin/api_client.js';
 
 function toNormalized(
-  opp: GovWinOpportunity,
+  opp: GovWinApiOpportunity,
   stage: 'forecast' | 'solicitation',
 ): NormalizedOpportunity {
   const valueCents = opp.valueMin !== null
@@ -46,9 +45,7 @@ function toNormalized(
 }
 
 async function fetchGovWinRecords(_opts: FetchOpts): Promise<RawRecord[]> {
-  const ids = await discoverRecentOpportunityIds();
-  if (ids.length === 0) return [];
-  const opps = await fetchOpportunityBatch(ids);
+  const opps = await discoverRecentOpportunitiesApi();
   return opps as unknown as RawRecord[];
 }
 
@@ -63,7 +60,7 @@ export class GovWinForecastAdapter implements ForecastAdapter {
   }
 
   normalize(raw: RawRecord): NormalizedOpportunity | null {
-    const opp = raw as unknown as GovWinOpportunity;
+    const opp = raw as unknown as GovWinApiOpportunity;
     if (!opp.govwinId) return null;
 
     const status = (opp.status ?? '').toLowerCase();
@@ -82,7 +79,7 @@ export class GovWinSolicitationAdapter implements SolicitationAdapter {
   }
 
   normalize(raw: RawRecord): NormalizedOpportunity | null {
-    const opp = raw as unknown as GovWinOpportunity;
+    const opp = raw as unknown as GovWinApiOpportunity;
     if (!opp.govwinId) return null;
 
     const status = (opp.status ?? '').toLowerCase();
