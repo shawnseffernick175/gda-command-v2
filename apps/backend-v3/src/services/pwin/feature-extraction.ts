@@ -107,7 +107,7 @@ export function extractFeaturesFromOpportunity(
     sub_agency: '',
     ceiling_value_m: ceilingValueM,
     is_incumbent: signals.is_incumbent,
-    incumbent_competitor: '',
+    incumbent_competitor: signals.incumbent_competitor,
     is_recompete: signals.is_recompete,
     scope_match_score: signals.scope_match_score,
     days_to_proposal_due: daysToProposalDue,
