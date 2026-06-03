@@ -6,7 +6,7 @@ process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:543
 process.env['NODE_ENV'] = 'test';
 process.env['ANALYSIS_VERSION'] ??= 'v0.0.1-test';
 
-const { computePwin, buildFullAnalysis } = await import('../src/workers/analysis.js');
+const { buildFullAnalysis } = await import('../src/workers/analysis.js');
 const { evaluateTeamingFlags, ANALYSIS_AFFECTING_FIELDS } = await import(
   '../src/services/opportunities/index.js'
 );
@@ -15,122 +15,27 @@ const { SOURCE_KINDS } = await import('../src/lib/sources.js');
 // Indirection avoids forbidden-token scanner on test fixture defaults
 const NO_VALUE = null;
 
-describe('Pwin model determinism', () => {
-  it('returns same value for same inputs', () => {
-    const features = {
-      set_aside: 'SDB',
+describe('Pwin via buildFullAnalysis (F-450: now uses real scoreV1Rules)', () => {
+  it('returns deterministic structured pwin object', () => {
+    const row: Record<string, unknown> = {
+      id: '1',
       agency: 'Department of the Army',
       naics: '541330',
+      set_aside: null,
       value_min: 5000000,
       value_max: 15000000,
-      response_due_at: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      response_due_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      posted_at: new Date().toISOString(),
       incumbent: null,
-      grade: 'A',
+      solicitation_number: 'W52P1J-26-R-0047',
+      sam_notice_id: null,
     };
-
-    const result1 = computePwin(features);
-    const result2 = computePwin(features);
-    const result3 = computePwin(features);
-
-    expect(result1).toBe(result2);
-    expect(result2).toBe(result3);
-  });
-
-  it('returns value between 0.05 and 0.95', () => {
-    const features = {
-      set_aside: null,
-      agency: null,
-      naics: null,
-      value_min: null,
-      value_max: null,
-      response_due_at: null,
-      incumbent: null,
-      grade: null,
-    };
-    const result = computePwin(features);
-    expect(result).toBeGreaterThanOrEqual(0.05);
-    expect(result).toBeLessThanOrEqual(0.95);
-  });
-
-  it('Envision set-aside increases pwin', () => {
-    const base = {
-      set_aside: null,
-      agency: null,
-      naics: null,
-      value_min: null,
-      value_max: null,
-      response_due_at: null,
-      incumbent: null,
-      grade: null,
-    };
-    const withSetAside = { ...base, set_aside: 'SDB' };
-
-    expect(computePwin(withSetAside)).toBeGreaterThan(computePwin(base));
-  });
-
-  it('Envision agency increases pwin', () => {
-    const base = {
-      set_aside: null,
-      agency: null,
-      naics: null,
-      value_min: null,
-      value_max: null,
-      response_due_at: null,
-      incumbent: null,
-      grade: null,
-    };
-    const withAgency = { ...base, agency: 'Department of the Army' };
-
-    expect(computePwin(withAgency)).toBeGreaterThan(computePwin(base));
-  });
-
-  it('NAICS match increases pwin', () => {
-    const base = {
-      set_aside: null,
-      agency: null,
-      naics: null,
-      value_min: null,
-      value_max: null,
-      response_due_at: null,
-      incumbent: null,
-      grade: null,
-    };
-    const withNaics = { ...base, naics: '541330' };
-
-    expect(computePwin(withNaics)).toBeGreaterThan(computePwin(base));
-  });
-
-  it('Grade A gives higher pwin than Grade B', () => {
-    const base = {
-      set_aside: null,
-      agency: null,
-      naics: null,
-      value_min: null,
-      value_max: null,
-      response_due_at: null,
-      incumbent: null,
-      grade: null,
-    };
-    const gradeA = { ...base, grade: 'A' };
-    const gradeB = { ...base, grade: 'B' };
-
-    expect(computePwin(gradeA)).toBeGreaterThan(computePwin(gradeB));
-  });
-
-  it('known incumbent decreases pwin', () => {
-    const base = {
-      set_aside: null,
-      agency: null,
-      naics: null,
-      value_min: null,
-      value_max: null,
-      response_due_at: null,
-      incumbent: null,
-      grade: null,
-    };
-    const withIncumbent = { ...base, incumbent: 'CACI International' };
-
-    expect(computePwin(withIncumbent)).toBeLessThan(computePwin(base));
+    const a1 = buildFullAnalysis(row);
+    const a2 = buildFullAnalysis(row);
+    const pwin1 = a1.pwin as { score: number; band: string };
+    const pwin2 = a2.pwin as { score: number; band: string };
+    expect(pwin1.score).toBe(pwin2.score);
+    expect(pwin1.band).toBe(pwin2.band);
   });
 });
 
@@ -155,7 +60,9 @@ describe('buildFullAnalysis', () => {
     const analysis = buildFullAnalysis(row);
 
     expect(analysis.pwin).toBeDefined();
-    expect(typeof analysis.pwin).toBe('number');
+    // F-450: pwin is now a structured object
+    expect(typeof analysis.pwin).toBe('object');
+    expect((analysis.pwin as { model_version: string }).model_version).toBe('v1-rules');
     expect(analysis.pwin_sources).toBeDefined();
     expect(Array.isArray(analysis.pwin_sources)).toBe(true);
 

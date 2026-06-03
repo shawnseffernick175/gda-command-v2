@@ -83,7 +83,9 @@ function parseAnalysis(row: OpportunityRow): AnalysisBlock | null {
   return {
     version: (a.version as string) ?? row.analysis_version ?? '',
     generated_at: (a.generated_at as string) ?? row.ai_analyzed_at ?? '',
-    pwin: (a.pwin as number) ?? 0,
+    pwin: typeof a.pwin === 'object' && a.pwin !== null
+      ? ((a.pwin as { score?: number | null }).score ?? 0)
+      : ((a.pwin as number) ?? 0),
     pwin_sources: (a.pwin_sources as SourceRef[]) ?? [],
     incumbent: (a.incumbent as string) ?? null,
     incumbent_sources: (a.incumbent_sources as SourceRef[]) ?? [],

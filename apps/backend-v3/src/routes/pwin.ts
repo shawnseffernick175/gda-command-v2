@@ -7,6 +7,7 @@
  *   GET    /v3/pwin/model        — active model info
  *   POST   /v3/pwin/retrain      — trigger retraining (admin)
  *   GET    /v3/pwin/models       — list all model versions
+ *   POST   /v3/pwin/batch-score  — F-450 on-demand batch scoring (admin)
  */
 
 import type { FastifyInstance } from 'fastify';
@@ -19,6 +20,7 @@ import {
   listModelVersions,
 } from '../services/pwin/index.js';
 import type { PwinFeatures } from '../services/pwin/types.js';
+import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
 
 export async function pwinRoutes(app: FastifyInstance): Promise<void> {
   // POST /v3/pwin/features — compute + save feature snapshot
@@ -91,5 +93,35 @@ export async function pwinRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/pwin/models', async (req, reply) => {
     const versions = await listModelVersions();
     return reply.status(200).send(successEnvelope(versions, req.requestId));
+  });
+
+  // POST /v3/pwin/batch-score — F-450 on-demand batch scoring
+  app.post('/v3/pwin/batch-score', async (req, reply) => {
+    const body = req.body as { ids?: unknown; limit?: unknown } | undefined;
+
+    // Validate ids (optional array of numbers)
+    let ids: number[] | undefined;
+    if (body?.ids !== undefined) {
+      if (!Array.isArray(body.ids) || !body.ids.every((v) => typeof v === 'number')) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', 'ids must be an array of numbers', req.requestId),
+        );
+      }
+      ids = body.ids as number[];
+    }
+
+    // Validate limit (optional positive integer)
+    let limit: number | undefined;
+    if (body?.limit !== undefined) {
+      if (typeof body.limit !== 'number' || !Number.isInteger(body.limit) || body.limit < 1) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', 'limit must be a positive integer', req.requestId),
+        );
+      }
+      limit = body.limit;
+    }
+
+    const result = await batchScoreOpportunities({ ids, limit });
+    return reply.status(200).send(successEnvelope(result, req.requestId));
   });
 }
