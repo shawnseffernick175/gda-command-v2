@@ -86,16 +86,24 @@ describe('v1 rules scorer', () => {
     expect(withIncumbent.score - noIncumbent.score).toBe(30);
   });
 
-  it('adds +10 for vehicle access, -15 without', () => {
+  it('adds +10 for vehicle access, 0 when unknown', () => {
     const withAccess = scoreV1Rules(makeFeatures({ has_vehicle_access: true }), 'v1-rules');
     const noAccess = scoreV1Rules(makeFeatures({ has_vehicle_access: false }), 'v1-rules');
-    expect(withAccess.score - noAccess.score).toBe(25);
+    expect(withAccess.score - noAccess.score).toBe(10);
+
+    const noAccessContrib = noAccess.feature_weights.find((w) => w.name === 'vehicle_access');
+    expect(noAccessContrib?.value).toBe(0);
+    expect(noAccessContrib?.description).toBe('0 vehicle access not indicated');
   });
 
-  it('adds +5 for clearance fit, -10 without', () => {
+  it('adds +5 for clearance fit, 0 when unknown', () => {
     const fit = scoreV1Rules(makeFeatures({ clearance_fit: true }), 'v1-rules');
     const noFit = scoreV1Rules(makeFeatures({ clearance_fit: false }), 'v1-rules');
-    expect(fit.score - noFit.score).toBe(15);
+    expect(fit.score - noFit.score).toBe(5);
+
+    const noFitContrib = noFit.feature_weights.find((w) => w.name === 'clearance_fit');
+    expect(noFitContrib?.value).toBe(0);
+    expect(noFitContrib?.description).toBe('0 clearance not indicated');
   });
 
   it('clamps to 0 when exclusion is triggered', () => {
@@ -154,5 +162,23 @@ describe('v1 rules scorer', () => {
     const low = scoreV1Rules(makeFeatures({ scope_match_score: 0 }), 'v1-rules');
     const high = scoreV1Rules(makeFeatures({ scope_match_score: 100 }), 'v1-rules');
     expect(high.score - low.score).toBe(30);
+  });
+
+  it('large-business-only NAICS still receives -15 naics_size', () => {
+    const result = scoreV1Rules(
+      makeFeatures({ naics: '541990' }),
+      'v1-rules',
+    );
+    const naicsContrib = result.feature_weights.find((w) => w.name === 'naics_size');
+    expect(naicsContrib?.value).toBe(-15);
+  });
+
+  it('neutral vehicle/clearance signals are excluded from top_drivers', () => {
+    const result = scoreV1Rules(
+      makeFeatures({ has_vehicle_access: false, clearance_fit: false }),
+      'v1-rules',
+    );
+    expect(result.top_drivers.every((d) => !d.includes('vehicle'))).toBe(true);
+    expect(result.top_drivers.every((d) => !d.includes('clearance'))).toBe(true);
   });
 });

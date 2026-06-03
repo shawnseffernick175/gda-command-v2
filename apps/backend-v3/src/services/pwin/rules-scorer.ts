@@ -29,22 +29,22 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     });
   }
 
-  const vehicleAccess = features.has_vehicle_access ? 10 : -15;
+  const vehicleAccess = features.has_vehicle_access ? 10 : 0;
   contributions.push({
     name: 'vehicle_access',
     value: vehicleAccess,
     description: features.has_vehicle_access
       ? '+10 vehicle access'
-      : '-15 no vehicle access',
+      : '0 vehicle access not indicated',
   });
 
-  const clearanceFit = features.clearance_fit ? 5 : -10;
+  const clearanceFit = features.clearance_fit ? 5 : 0;
   contributions.push({
     name: 'clearance_fit',
     value: clearanceFit,
     description: features.clearance_fit
       ? '+5 clearance fit'
-      : '-10 clearance gap',
+      : '0 clearance not indicated',
   });
 
   const doctrineBonus = Math.round((features.doctrine_alignment_score / 40) * 10 * 100) / 100;
