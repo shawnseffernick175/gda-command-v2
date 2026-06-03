@@ -27,7 +27,7 @@ export const ENVISION_KNOWN_CUSTOMERS = [
   'usn',
   'navy',
   'fema',
-  'va',
+  'veterans affairs',
   'dhs',
   'coast guard',
 ];

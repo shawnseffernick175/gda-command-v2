@@ -154,8 +154,18 @@ describe('deriveSignals — existing customer', () => {
     expect(s.is_existing_customer).toBe(true);
   });
 
+  it('detects Veterans Affairs as existing customer', () => {
+    const s = deriveSignals(makeInput({ agency: 'Department of Veterans Affairs' }));
+    expect(s.is_existing_customer).toBe(true);
+  });
+
   it('returns false for unknown agency', () => {
     const s = deriveSignals(makeInput({ agency: 'Department of Education' }));
+    expect(s.is_existing_customer).toBe(false);
+  });
+
+  it('does not false-positive on agencies containing "va" substring', () => {
+    const s = deriveSignals(makeInput({ agency: 'Defense Advanced Research Projects Agency' }));
     expect(s.is_existing_customer).toBe(false);
   });
 
