@@ -65,6 +65,12 @@ services:
       GOVWIN_USERNAME: ${GOVWIN_USERNAME:-}
       GOVWIN_PASSWORD: ${GOVWIN_PASSWORD:-}
       GOVWIN_CONNECTOR_V1: ${GOVWIN_CONNECTOR_V1:-}
+      # --- GovWin OAuth2 Web Services API (F-332) ---
+      GOVWIN_CLIENT_ID: ${GOVWIN_CLIENT_ID:-}
+      GOVWIN_CLIENT_SECRET: ${GOVWIN_CLIENT_SECRET:-}
+      GOVWIN_API_BASE: ${GOVWIN_API_BASE:-}
+      GOVWIN_DAILY_LIMIT: ${GOVWIN_DAILY_LIMIT:-200}
+      GOVWIN_ALLOW_SCRAPE: ${GOVWIN_ALLOW_SCRAPE:-false}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gda-v3.rule=Host(`gda-v3.csr-llc.tech`)"
@@ -113,6 +119,12 @@ services:
       GOVWIN_USERNAME: ${GOVWIN_USERNAME:-}
       GOVWIN_PASSWORD: ${GOVWIN_PASSWORD:-}
       GOVWIN_CONNECTOR_V1: ${GOVWIN_CONNECTOR_V1:-}
+      # --- GovWin OAuth2 Web Services API (F-332) ---
+      GOVWIN_CLIENT_ID: ${GOVWIN_CLIENT_ID:-}
+      GOVWIN_CLIENT_SECRET: ${GOVWIN_CLIENT_SECRET:-}
+      GOVWIN_API_BASE: ${GOVWIN_API_BASE:-}
+      GOVWIN_DAILY_LIMIT: ${GOVWIN_DAILY_LIMIT:-200}
+      GOVWIN_ALLOW_SCRAPE: ${GOVWIN_ALLOW_SCRAPE:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/healthz"]
       interval: 15s
