@@ -94,7 +94,9 @@ describe('Analysis worker', () => {
       expect(analyzedAt).not.toBeNull();
 
       const parsed = typeof analysis === 'string' ? JSON.parse(analysis) : analysis;
-      expect(typeof parsed.pwin).toBe('number');
+      // F-450: pwin is now a structured object with score, band, model_version
+      expect(typeof parsed.pwin).toBe('object');
+      expect(parsed.pwin.model_version).toBe('v1-rules');
       expect(parsed.version).toBe('v0.0.1-test');
     } finally {
       await workerBoss.stop({ graceful: true, timeout: 5_000 });
