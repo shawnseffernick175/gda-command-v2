@@ -45,7 +45,7 @@ describe('MCP Tool Wrappers', () => {
       expect.objectContaining({
         query: 'SETA',
         per_page: 50,
-        naics_category_codes: ['541511'],
+        naics_category_ids: ['541511'],
       }),
       'test-opps',
     );

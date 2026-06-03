@@ -24,12 +24,14 @@ import {
   searchContacts,
   searchVehicles,
   fetchOpportunityDetailBatch,
+  fetchAwardDetailBatch,
+  fetchForecastDetailBatch,
 } from './mcp_tools.js';
-import { mapGovTribeDetail } from './mapper.js';
+import { mapGovTribeDetail, mapGovTribeAward, mapGovTribeForecast } from './mapper.js';
 import { upsertExternalOpportunity } from '../framework/source_writer.js';
-import { ingestGovTribeDetailToRag } from './rag_sink.js';
+import { ingestGovTribeDetailToRag, ingestGovTribeAwardToRag, ingestGovTribeForecastToRag } from './rag_sink.js';
 import type { IngestResult } from '../framework/registry.js';
-import type { GovTribeIdStub, GovTribeDetailRecord } from './types.js';
+import type { GovTribeIdStub, GovTribeDetailRecord, GovTribeAwardDetail, GovTribeForecastDetail } from './types.js';
 import { GOVTRIBE_SAVED_SEARCHES } from './saved_searches.js';
 
 /** Max IDs per detail-fetch batch (avoids oversized MCP requests). */
@@ -107,44 +109,65 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
       'govtribe_opps_search_ids',
     );
 
-    // Phase 2: detail-fetch in batches — only for opportunity searches
-    if (search.category === 'opportunities') {
-      const details = await fetchDetailBatches(ids, search.id);
-      totalFetched += details.length;
-
-      for (const detail of details) {
-        try {
-          const mapped = mapGovTribeDetail(detail);
-          if (!mapped) {
+    // Phase 2: detail-fetch in batches for ALL categories
+    switch (search.category) {
+      case 'opportunities': {
+        const details = await fetchOppDetailBatches(ids, search.id);
+        totalFetched += details.length;
+        for (const detail of details) {
+          try {
+            const mapped = mapGovTribeDetail(detail);
+            if (!mapped) { skipped++; continue; }
+            const outcome = await upsertGovTribeOpp(mapped);
+            if (outcome === 'inserted') inserted++;
+            else if (outcome === 'updated') updated++;
+            else skipped++;
+            await ingestGovTribeDetailToRag(detail, search.name).catch((err) => {
+              logger.error({ source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) }, 'govtribe_rag_sink_error');
+            });
+          } catch (err) {
             skipped++;
-            continue;
+            logger.error({ source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) }, 'govtribe_opp_row_error');
           }
-
-          const outcome = await upsertGovTribeOpp(mapped);
-          if (outcome === 'inserted') inserted++;
-          else if (outcome === 'updated') updated++;
-          else skipped++;
-
-          await ingestGovTribeDetailToRag(detail, search.name).catch((err) => {
-            logger.error(
-              { source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) },
-              'govtribe_rag_sink_error',
-            );
-          });
-        } catch (err) {
-          skipped++;
-          logger.error(
-            {
-              source: 'govtribe',
-              govtribeId: detail.govtribe_id,
-              error: err instanceof Error ? err.message : String(err),
-            },
-            'govtribe_opp_row_error',
-          );
         }
+        break;
       }
-    } else {
-      totalFetched += ids.length;
+      case 'awards': {
+        const details = await fetchAwardDetailBatches(ids, search.id);
+        totalFetched += details.length;
+        for (const detail of details) {
+          try {
+            const mapped = mapGovTribeAward(detail);
+            if (!mapped) { skipped++; continue; }
+            inserted++;
+            await ingestGovTribeAwardToRag(detail, mapped, search.name).catch((err) => {
+              logger.error({ source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) }, 'govtribe_award_rag_error');
+            });
+          } catch (err) {
+            skipped++;
+            logger.error({ source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) }, 'govtribe_award_row_error');
+          }
+        }
+        break;
+      }
+      case 'forecasts': {
+        const details = await fetchForecastDetailBatches(ids, search.id);
+        totalFetched += details.length;
+        for (const detail of details) {
+          try {
+            const mapped = mapGovTribeForecast(detail);
+            if (!mapped) { skipped++; continue; }
+            inserted++;
+            await ingestGovTribeForecastToRag(detail, mapped, search.name).catch((err) => {
+              logger.error({ source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) }, 'govtribe_forecast_rag_error');
+            });
+          } catch (err) {
+            skipped++;
+            logger.error({ source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) }, 'govtribe_forecast_row_error');
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -184,41 +207,66 @@ function extractIdsFromSearchResponse(data: unknown): string[] {
   return [];
 }
 
-/**
- * Fetch full detail for a list of IDs in batches of DETAIL_BATCH_SIZE.
- */
-async function fetchDetailBatches(
-  ids: string[],
-  searchId: string,
-): Promise<GovTribeDetailRecord[]> {
+async function fetchOppDetailBatches(ids: string[], searchId: string): Promise<GovTribeDetailRecord[]> {
   const details: GovTribeDetailRecord[] = [];
-
   for (let i = 0; i < ids.length; i += DETAIL_BATCH_SIZE) {
     if (isCycleCapExceeded()) {
-      logger.warn(
-        { source: 'govtribe', remaining: ids.length - i },
-        'govtribe_detail_batch_cycle_cap',
-      );
+      logger.warn({ source: 'govtribe', remaining: ids.length - i }, 'govtribe_detail_batch_cycle_cap');
       break;
     }
-
     const batch = ids.slice(i, i + DETAIL_BATCH_SIZE);
     const cacheId = `detail_${searchId}_batch_${Math.floor(i / DETAIL_BATCH_SIZE)}`;
-
     try {
       const result = await fetchOpportunityDetailBatch(batch, cacheId);
-
       if (result.data?.results && Array.isArray(result.data.results)) {
         details.push(...result.data.results);
       }
     } catch (err) {
-      logger.error(
-        { source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) },
-        'govtribe_detail_batch_error',
-      );
+      logger.error({ source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) }, 'govtribe_detail_batch_error');
     }
   }
+  return details;
+}
 
+async function fetchAwardDetailBatches(ids: string[], searchId: string): Promise<GovTribeAwardDetail[]> {
+  const details: GovTribeAwardDetail[] = [];
+  for (let i = 0; i < ids.length; i += DETAIL_BATCH_SIZE) {
+    if (isCycleCapExceeded()) {
+      logger.warn({ source: 'govtribe', remaining: ids.length - i }, 'govtribe_award_detail_cycle_cap');
+      break;
+    }
+    const batch = ids.slice(i, i + DETAIL_BATCH_SIZE);
+    const cacheId = `award_detail_${searchId}_batch_${Math.floor(i / DETAIL_BATCH_SIZE)}`;
+    try {
+      const result = await fetchAwardDetailBatch(batch, cacheId);
+      if (result.data?.results && Array.isArray(result.data.results)) {
+        details.push(...result.data.results);
+      }
+    } catch (err) {
+      logger.error({ source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) }, 'govtribe_award_detail_batch_error');
+    }
+  }
+  return details;
+}
+
+async function fetchForecastDetailBatches(ids: string[], searchId: string): Promise<GovTribeForecastDetail[]> {
+  const details: GovTribeForecastDetail[] = [];
+  for (let i = 0; i < ids.length; i += DETAIL_BATCH_SIZE) {
+    if (isCycleCapExceeded()) {
+      logger.warn({ source: 'govtribe', remaining: ids.length - i }, 'govtribe_forecast_detail_cycle_cap');
+      break;
+    }
+    const batch = ids.slice(i, i + DETAIL_BATCH_SIZE);
+    const cacheId = `forecast_detail_${searchId}_batch_${Math.floor(i / DETAIL_BATCH_SIZE)}`;
+    try {
+      const result = await fetchForecastDetailBatch(batch, cacheId);
+      if (result.data?.results && Array.isArray(result.data.results)) {
+        details.push(...result.data.results);
+      }
+    } catch (err) {
+      logger.error({ source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) }, 'govtribe_forecast_detail_batch_error');
+    }
+  }
   return details;
 }
 
