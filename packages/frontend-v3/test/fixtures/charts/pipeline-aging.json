@@ -1,7 +1,0 @@
-{
-  "items": [
-    { "id": "1", "title": "DOD Cloud Migration", "stage": 2, "daysInStage": 45, "threshold": 30, "value": 2500000 },
-    { "id": "2", "title": "VA Health IT", "stage": 3, "daysInStage": 12, "threshold": 21, "value": 4800000 }
-  ],
-  "sourceRefs": [{ "url": "https://sam.gov/opp/pipeline", "kind": "sam_gov" }]
-}
