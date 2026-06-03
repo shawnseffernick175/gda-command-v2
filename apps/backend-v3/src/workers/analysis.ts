@@ -436,7 +436,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
           config.analysisVersion,
           now,
           typeof analysis.pwin === 'object' && analysis.pwin !== null
-            ? (analysis.pwin as { score?: number | null }).score ?? null
+            ? ((analysis.pwin as { score?: number | null }).score ?? 0) / 100
             : analysis.pwin,
           analysis.incumbent,
           JSON.stringify(analysis.competitors),
