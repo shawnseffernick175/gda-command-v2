@@ -39,6 +39,8 @@ import type { ActionItemRow } from '../services/action-items/index.js';
 import { computeCaptureAnalysis } from './capture-analysis.js';
 import type { ComplianceItem } from '../services/captures/compliance.js';
 import type { ColorReviewStage } from '../services/captures/color-review.js';
+import { scoreSingleOpportunityPwin } from '../services/pwin/batch-score.js';
+import type { OpportunityRow as PwinOpportunityRow } from '../services/pwin/feature-extraction.js';
 
 const { Pool } = pg;
 
@@ -53,89 +55,7 @@ let workerBossRef: PgBoss | null = null;
 // Pwin deterministic model
 // ────────────────────────────────────────────────────────────────────────────
 
-interface OppFeatures {
-  set_aside: string | null;
-  agency: string | null;
-  naics: string | null;
-  value_min: number | null;
-  value_max: number | null;
-  response_due_at: string | null;
-  incumbent: string | null;
-  grade: string | null;
-}
-
 const ENVISION_SET_ASIDES = new Set(['SDB', 'Small Business', 'SB', 'Minority-Owned', '8(a)']);
-const ENVISION_AGENCIES = new Set([
-  'department of the army',
-  'department of defense',
-  'u.s. army',
-  'army',
-  'united states coast guard',
-  'uscg',
-  'department of homeland security',
-  'department of the navy',
-  'fema',
-  'department of veterans affairs',
-]);
-const ENVISION_NAICS = new Set([
-  '541330', '541611', '541512', '541519', '561210',
-  '541614', '541990', '561110',
-]);
-
-function computePwin(features: OppFeatures): number {
-  let score = 0.35; // baseline
-
-  // Set-aside fit
-  if (features.set_aside) {
-    if (ENVISION_SET_ASIDES.has(features.set_aside)) {
-      score += 0.12;
-    } else if (features.set_aside.toLowerCase().includes('small')) {
-      score += 0.06;
-    }
-  } else {
-    score += 0.03; // unrestricted — neutral
-  }
-
-  // Agency history
-  if (features.agency && ENVISION_AGENCIES.has(features.agency.toLowerCase())) {
-    score += 0.10;
-  }
-
-  // NAICS match
-  if (features.naics && ENVISION_NAICS.has(features.naics)) {
-    score += 0.08;
-  }
-
-  // Value band
-  const avgVal = ((features.value_min ?? 0) + (features.value_max ?? 0)) / 2;
-  if (avgVal > 0 && avgVal <= 25_000_000) {
-    score += 0.07;
-  } else if (avgVal > 25_000_000 && avgVal <= 100_000_000) {
-    score += 0.04;
-  }
-
-  // Time-to-due
-  if (features.response_due_at) {
-    const daysUntilDue =
-      (new Date(features.response_due_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-    if (daysUntilDue > 30) {
-      score += 0.05;
-    } else if (daysUntilDue > 14) {
-      score += 0.02;
-    }
-  }
-
-  // Grade bonus
-  if (features.grade === 'A') score += 0.08;
-  else if (features.grade === 'B') score += 0.04;
-
-  // Incumbent penalty
-  if (features.incumbent && features.incumbent.toLowerCase() !== 'unknown') {
-    score -= 0.05;
-  }
-
-  return Math.min(Math.max(Math.round(score * 100) / 100, 0.05), 0.95);
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Incumbent extraction
@@ -425,32 +345,35 @@ function extractTimeline(row: Record<string, unknown>): {
 // ────────────────────────────────────────────────────────────────────────────
 
 function buildFullAnalysis(row: Record<string, unknown>): Record<string, unknown> {
-  const features: OppFeatures = {
-    set_aside: row.set_aside as string | null,
-    agency: row.agency as string | null,
+  // F-450: real scoring via the shared helper
+  const pwinRow: PwinOpportunityRow = {
     naics: row.naics as string | null,
-    value_min: row.value_min !== null && row.value_min !== undefined ? Number(row.value_min) : null,
-    value_max: row.value_max !== null && row.value_max !== undefined ? Number(row.value_max) : null,
+    agency: row.agency as string | null,
+    set_aside: row.set_aside as string | null,
+    value_min: row.value_min != null ? Number(row.value_min) : null,
+    value_max: row.value_max != null ? Number(row.value_max) : null,
     response_due_at: row.response_due_at as string | null,
+    posted_at: row.posted_at as string | null,
     incumbent: row.incumbent as string | null,
-    grade: row.grade as string | null,
+    solicitation_number: row.solicitation_number as string | null,
   };
-
-  const pwin = computePwin(features);
+  const pwinObj = scoreSingleOpportunityPwin(pwinRow);
+  // Numeric 0–1 for wargame strategy (scorer returns 0–100)
+  const pwinNumeric = (pwinObj.score ?? 0) / 100;
   const { incumbent, sources: incumbentSources } = extractIncumbent(row);
   const { competitors, sources: competitorsSources } = extractCompetitors(row);
   const { blackhat, sources: blackhatSources } = assessBlackhat(row, competitors);
-  const { wargame, sources: wargameSources } = buildWargame(row, pwin);
+  const { wargame, sources: wargameSources } = buildWargame(row, pwinNumeric);
   const { timeline, sources: timelineSources } = extractTimeline(row);
 
   const now = new Date().toISOString();
 
   return {
-    pwin,
+    pwin: pwinObj,
     pwin_sources: [
       {
         kind: 'internal',
-        title: `Deterministic Pwin model ${config.analysisVersion}`,
+        title: `Deterministic Pwin model v1-rules (F-450)`,
         url: '/audit/analysis/pwin',
         retrieved_at: now,
       },
@@ -512,7 +435,9 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
           entityId,
           config.analysisVersion,
           now,
-          analysis.pwin,
+          typeof analysis.pwin === 'object' && analysis.pwin !== null
+            ? ((analysis.pwin as { score?: number | null }).score ?? 0) / 100
+            : analysis.pwin,
           analysis.incumbent,
           JSON.stringify(analysis.competitors),
           JSON.stringify(analysis.blackhat),
@@ -611,7 +536,11 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
       );
       const opp = oppRes.rows[0];
       if (opp?.analysis) {
-        oppAnalysis = { pwin: typeof opp.analysis.pwin === 'number' ? opp.analysis.pwin : 0.5 };
+        const rawPwin = opp.analysis.pwin;
+        const numPwin = typeof rawPwin === 'object' && rawPwin !== null
+          ? ((rawPwin as { score?: number | null }).score ?? 0) / 100
+          : (typeof rawPwin === 'number' ? rawPwin : 0.5);
+        oppAnalysis = { pwin: numPwin };
       }
     }
 
@@ -805,7 +734,7 @@ export async function startWorker(): Promise<PgBoss> {
 }
 
 // Export for testing
-export { computePwin, buildFullAnalysis };
+export { buildFullAnalysis };
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
   startWorker().catch((err) => {
