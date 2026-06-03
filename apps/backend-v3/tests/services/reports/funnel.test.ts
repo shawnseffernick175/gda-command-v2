@@ -204,10 +204,10 @@ describe('signal_funnel', () => {
         return {
           rows: [
             { score_text: '30' },   // discovery (<45)
-            { score_text: '50' },   // signal (45-69)
-            { score_text: '80' },   // forecast (>=70)
+            { score_text: '50' },   // signal (45-66)
+            { score_text: '80' },   // forecast (>=67)
             { score_text: '45' },   // signal (boundary)
-            { score_text: '70' },   // forecast (boundary)
+            { score_text: '67' },   // forecast (boundary)
             { score_text: null },   // skipped
             { score_text: 'bad' },  // skipped (non-numeric)
           ],
