@@ -7,6 +7,29 @@
 
 import { mcpCallTool } from './mcp_client.js';
 import type { McpToolCallResult } from './mcp_client.js';
+import type { GovTribeDetailRecord, GovTribeAwardDetail, GovTribeForecastDetail } from './types.js';
+
+/** All fields we request when fetching opportunity detail by ID. */
+const DETAIL_FIELDS: string[] = [
+  'govtribe_id',
+  'govtribe_url',
+  'source_url',
+  'solicitation_number',
+  'name',
+  'opportunity_type',
+  'opportunity_state',
+  'set_aside_type',
+  'posted_date',
+  'due_date',
+  'award_date',
+  'descriptions',
+  'federal_agency',
+  'naics_category',
+  'psc_category',
+  'place_of_performance',
+  'points_of_contact',
+  'govtribe_ai_summary',
+];
 
 /* ── Opportunities search ──────────────────────────────────────────── */
 
@@ -28,7 +51,7 @@ export async function searchOpportunities(
     page: args.page ?? 1,
   };
   if (args.naicsCodes?.length) {
-    mcpArgs['naics_category_codes'] = args.naicsCodes;
+    mcpArgs['naics_category_ids'] = args.naicsCodes;
   }
   if (args.setAsideCodes?.length) {
     mcpArgs['set_aside_codes'] = args.setAsideCodes;
@@ -60,7 +83,7 @@ export async function searchAwards(
     page: args.page ?? 1,
   };
   if (args.naicsCodes?.length) {
-    mcpArgs['naics_category_codes'] = args.naicsCodes;
+    mcpArgs['naics_category_ids'] = args.naicsCodes;
   }
 
   return mcpCallTool(
@@ -89,7 +112,7 @@ export async function searchForecasts(
     page: args.page ?? 1,
   };
   if (args.naicsCodes?.length) {
-    mcpArgs['naics_category_codes'] = args.naicsCodes;
+    mcpArgs['naics_category_ids'] = args.naicsCodes;
   }
 
   return mcpCallTool(
@@ -188,6 +211,112 @@ export async function searchVendors(
       page: args.page ?? 1,
     },
     cacheId,
+  );
+}
+
+/* ── Opportunity detail fetch by IDs ────────────────────────────────── */
+
+/**
+ * Fetch full detail for a batch of opportunity IDs via the same
+ * Search_Federal_Contract_Opportunities tool with federal_contract_opportunity_ids
+ * filter + fields_to_return. Marks calls as `critical` so they proceed
+ * even at >80% budget (these are detail fills for IDs we already paid to discover).
+ */
+export async function fetchOpportunityDetailBatch(
+  govtribeIds: string[],
+  cacheId: string,
+): Promise<McpToolCallResult<{ results?: GovTribeDetailRecord[] }>> {
+  return mcpCallTool<{ results?: GovTribeDetailRecord[] }>(
+    'Search_Federal_Contract_Opportunities',
+    {
+      federal_contract_opportunity_ids: govtribeIds,
+      fields_to_return: DETAIL_FIELDS,
+      per_page: govtribeIds.length,
+      page: 1,
+    },
+    cacheId,
+    true, // critical — detail fill for already-discovered IDs
+  );
+}
+
+/* ── Award detail fetch by IDs ──────────────────────────────────────── */
+
+const AWARD_DETAIL_FIELDS: string[] = [
+  'govtribe_id',
+  'govtribe_url',
+  'name',
+  'contract_number',
+  'award_date',
+  'completion_date',
+  'ultimate_completion_date',
+  'ceiling_value',
+  'dollars_obligated',
+  'contract_type',
+  'set_aside_type',
+  'extent_competed',
+  'descriptions',
+  'awardee',
+  'parent_of_awardee',
+  'contracting_federal_agency',
+  'funding_federal_agency',
+  'naics_category',
+  'psc_category',
+  'place_of_performance',
+  'originating_federal_contract_opportunity',
+  'federal_contract_vehicle',
+  'govtribe_ai_summary',
+];
+
+export async function fetchAwardDetailBatch(
+  govtribeIds: string[],
+  cacheId: string,
+): Promise<McpToolCallResult<{ results?: GovTribeAwardDetail[] }>> {
+  return mcpCallTool<{ results?: GovTribeAwardDetail[] }>(
+    'Search_Federal_Contract_Awards',
+    {
+      federal_contract_award_ids: govtribeIds,
+      fields_to_return: AWARD_DETAIL_FIELDS,
+      per_page: govtribeIds.length,
+      page: 1,
+    },
+    cacheId,
+    true,
+  );
+}
+
+/* ── Forecast detail fetch by IDs ───────────────────────────────────── */
+
+const FORECAST_DETAIL_FIELDS: string[] = [
+  'govtribe_id',
+  'govtribe_url',
+  'source_url',
+  'name',
+  'forecast_type',
+  'set_aside',
+  'estimated_solicitation_release_date',
+  'estimated_award_start_date',
+  'estimated_award_value',
+  'descriptions',
+  'federal_agency',
+  'place_of_performance',
+  'points_of_contact',
+  'govtribe_ai_summary',
+];
+
+export async function fetchForecastDetailBatch(
+  govtribeIds: string[],
+  cacheId: string,
+): Promise<McpToolCallResult<{ results?: GovTribeForecastDetail[] }>> {
+  return mcpCallTool<{ results?: GovTribeForecastDetail[] }>(
+    'Search_Federal_Forecasts',
+    {
+      federal_forecast_ids: govtribeIds,
+      fields_to_return: FORECAST_DETAIL_FIELDS,
+      per_page: govtribeIds.length,
+      page: 1,
+    },
+    cacheId,
+    true,
   );
 }
 

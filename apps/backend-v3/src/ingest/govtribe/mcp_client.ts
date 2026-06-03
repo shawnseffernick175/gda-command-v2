@@ -29,24 +29,25 @@ const CYCLE_CREDIT_CAP = parseInt(process.env['GOVTRIBE_CYCLE_CREDIT_CAP'] ?? '1
 const MONTHLY_CREDIT_BUDGET = parseInt(process.env['GOVTRIBE_MONTHLY_CREDIT_CAP'] ?? '1200', 10);
 
 /**
- * Default per-tool credit cost. The MCP tools/list response does not
- * reliably expose a cost field, so we keep a conservative static map
- * derived from the GovTribe MCP pricing docs. Any tool not listed
- * defaults to 1 credit.
+ * Per-10-results credit rate from docs/canonical/govtribe_credit_table_v1.md.
+ * GovTribe bills per 10 results returned, NOT per call.
+ * Actual cost = ceil(resultCount / 10) × rate. Any tool not listed defaults to 1.
  */
-const TOOL_CREDITS: Record<string, number> = {
+const TOOL_CREDIT_PER_10: Record<string, number> = {
   'Search_Federal_Contract_Opportunities': 3,
   'Search_Federal_Contract_Awards': 4,
   'Search_Federal_Forecasts': 3,
   'Search_Federal_Contract_IDVs': 3,
-  'Search_Federal_Contract_Vehicles': 2,
-  'Search_Contacts': 2,
+  'Search_Federal_Contract_Vehicles': 3,
+  'Search_Federal_Contract_Vehicle_Opportunities': 3,
+  'Search_FCV_Subcategories': 3,
+  'Search_Contacts': 4,
   'Search_Federal_Agencies': 1,
-  'Search_Vendors': 2,
-  'Search_GovTribe': 1,
+  'Search_Vendors': 4,
+  'Search_GovTribe': 4,
   'Search_Pipelines': 1,
   'Search_Pursuits': 1,
-  'Search_Saved_Searches': 1,
+  'Search_Saved_Searches': 2,
   'Documentation': 0,
 };
 
@@ -262,8 +263,30 @@ export async function listTools(): Promise<McpToolInfo[]> {
 
 /* ── Tool invocation with credit budget ────────────────────────────── */
 
-function getToolCreditCost(toolName: string): number {
-  return TOOL_CREDITS[toolName] ?? 1;
+/**
+ * Compute actual credit cost based on returned result count.
+ * GovTribe charges per 10 results: ceil(resultCount / 10) × per-10 rate.
+ * Minimum 1 credit for any successful call (except Documentation = 0).
+ */
+export function getToolCreditCost(toolName: string, resultCount = 10): number {
+  const per10Rate = TOOL_CREDIT_PER_10[toolName] ?? 1;
+  if (per10Rate === 0) return 0;
+  const pages = Math.ceil(Math.max(resultCount, 1) / 10);
+  return pages * per10Rate;
+}
+
+/**
+ * Count result rows in an MCP response for accurate credit accounting.
+ * Handles { results: [...] }, { data: [...] }, { rows: [...] }, or bare arrays.
+ */
+function countResultRows(data: unknown): number {
+  if (!data) return 0;
+  if (Array.isArray(data)) return data.length;
+  const obj = data as Record<string, unknown>;
+  for (const key of ['results', 'data', 'rows']) {
+    if (Array.isArray(obj[key])) return (obj[key] as unknown[]).length;
+  }
+  return 1;
 }
 
 /**
@@ -281,7 +304,10 @@ export async function mcpCallTool<T = unknown>(
   critical = false,
 ): Promise<McpToolCallResult<T>> {
   const budgetStatus = await getCreditBudgetStatus();
-  const costCredits = getToolCreditCost(toolName);
+  // Pre-estimate cost using per_page arg (or 10 default) for budget checks;
+  // actual cost is recalculated after response using real row count.
+  const estimatedRows = (args['per_page'] as number | undefined) ?? 10;
+  const estimatedCost = getToolCreditCost(toolName, estimatedRows);
 
   // Cycle cap check
   if (isCycleCapExceeded() && !critical) {
@@ -289,7 +315,7 @@ export async function mcpCallTool<T = unknown>(
       { source: 'govtribe', cycleUsed: cycleCreditsUsed, cycleCap: CYCLE_CREDIT_CAP },
       'govtribe_mcp_cycle_cap_exceeded',
     );
-    await logCreditUsage(toolName, costCredits, 'skipped_cycle_cap');
+    await logCreditUsage(toolName, estimatedCost, 'skipped_cycle_cap');
     const cached = await getCachedResponse(toolName, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -301,7 +327,7 @@ export async function mcpCallTool<T = unknown>(
   }
 
   if (budgetStatus.pct >= 95 && !critical) {
-    await logCreditUsage(toolName, costCredits, 'skipped_halted');
+    await logCreditUsage(toolName, estimatedCost, 'skipped_halted');
     const cached = await getCachedResponse(toolName, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -313,7 +339,7 @@ export async function mcpCallTool<T = unknown>(
   }
 
   if (budgetStatus.pct >= 80 && !critical) {
-    await logCreditUsage(toolName, costCredits, 'skipped_low_budget');
+    await logCreditUsage(toolName, estimatedCost, 'skipped_low_budget');
     const cached = await getCachedResponse(toolName, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -374,16 +400,20 @@ export async function mcpCallTool<T = unknown>(
         }
       }
 
-      await logCreditUsage(toolName, costCredits, 'called', 200);
+      // Calculate actual credit cost from real result count
+      const actualRows = countResultRows(data);
+      const actualCost = getToolCreditCost(toolName, actualRows);
+
+      await logCreditUsage(toolName, actualCost, 'called', 200);
       await setCachedResponse(toolName, cacheId, data);
-      cycleCreditsUsed += costCredits;
+      cycleCreditsUsed += actualCost;
 
       const updatedBudget = await getCreditBudgetStatus();
       return {
         data: data as T,
         decision: 'called',
         from_cache: false,
-        credits_used: costCredits,
+        credits_used: actualCost,
         budget_status: updatedBudget,
       };
     } catch (err) {

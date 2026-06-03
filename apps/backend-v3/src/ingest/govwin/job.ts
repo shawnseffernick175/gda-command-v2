@@ -1,8 +1,11 @@
 /**
  * GovWin IQ ingest job — discovers recently-modified opportunities
- * via the GovWin web UI, scrapes detail pages, and upserts into the
+ * via the GovWin Web Services API (OAuth2), upserts into the
  * opportunities table with kind='govwin'. Caches raw payloads to
  * govwin_cache for debugging/reprocessing.
+ *
+ * F-332: Now uses the official OAuth2 JSON API instead of CAS+scraping.
+ * The old scraper path is hard-disabled (F-333).
  *
  * Deduplication: matches existing SAM rows by solicitation_number
  * first, then (agency, title, due_date). GovWin rows supplement
@@ -13,15 +16,17 @@ import { pool } from '../../lib/db.js';
 import type { PoolClient } from 'pg';
 import { logger } from '../../lib/logger.js';
 import {
-  discoverRecentOpportunityIds,
-  fetchOpportunityBatch,
-  type GovWinOpportunity,
-} from '../../services/govwin/client.js';
+  discoverRecentOpportunitiesApi,
+  logQuotaStatus,
+  getDailyCallCount,
+  getDailyLimit,
+  type GovWinApiOpportunity,
+} from '../../services/govwin/api_client.js';
 import type { IngestResult } from '../framework/registry.js';
 
 const CACHE_RETENTION_DAYS = 30;
 
-async function upsertGovWinCache(opp: GovWinOpportunity): Promise<void> {
+async function upsertGovWinCache(opp: GovWinApiOpportunity): Promise<void> {
   const payload = {
     title: opp.title,
     agency: opp.agency,
@@ -48,7 +53,7 @@ async function upsertGovWinCache(opp: GovWinOpportunity): Promise<void> {
   );
 }
 
-async function findExistingSAMOpp(db: PoolClient, opp: GovWinOpportunity): Promise<string | null> {
+async function findExistingSAMOpp(db: PoolClient, opp: GovWinApiOpportunity): Promise<string | null> {
   if (opp.solicitationNumber) {
     const { rows } = await db.query(
       `SELECT id FROM opportunities
@@ -76,7 +81,7 @@ async function findExistingSAMOpp(db: PoolClient, opp: GovWinOpportunity): Promi
 }
 
 async function upsertOpportunity(
-  opp: GovWinOpportunity,
+  opp: GovWinApiOpportunity,
 ): Promise<'inserted' | 'updated' | 'skipped'> {
   const client = await pool.connect();
   try {
@@ -208,14 +213,23 @@ async function cleanOldCache(): Promise<number> {
 export async function runGovWinIngest(): Promise<IngestResult> {
   logger.info('govwin_ingest_start');
 
-  const ids = await discoverRecentOpportunityIds();
-  logger.info({ count: ids.length }, 'govwin_ingest_discovered_ids');
-
-  if (ids.length === 0) {
-    return { inserted: 0, updated: 0, skipped: 0 };
+  let opps: GovWinApiOpportunity[];
+  try {
+    opps = await discoverRecentOpportunitiesApi();
+  } catch (err) {
+    logger.error(
+      { error: err instanceof Error ? err.message : String(err) },
+      'govwin_api_discovery_failed',
+    );
+    return { inserted: 0, updated: 0, skipped: 0, degraded: true, degradedReason: 'API discovery failed' };
   }
 
-  const opps = await fetchOpportunityBatch(ids);
+  logger.info({ count: opps.length }, 'govwin_ingest_discovered');
+
+  if (opps.length === 0) {
+    logQuotaStatus();
+    return { inserted: 0, updated: 0, skipped: 0 };
+  }
 
   let inserted = 0;
   let updated = 0;
@@ -245,6 +259,10 @@ export async function runGovWinIngest(): Promise<IngestResult> {
     logger.info({ cleaned }, 'govwin_cache_cleaned');
   }
 
-  logger.info({ inserted, updated, skipped }, 'govwin_ingest_complete');
+  logQuotaStatus();
+  logger.info(
+    { inserted, updated, skipped, dailyUsed: getDailyCallCount(), dailyLimit: getDailyLimit() },
+    'govwin_ingest_complete',
+  );
   return { inserted, updated, skipped };
 }

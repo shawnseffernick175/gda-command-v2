@@ -7,7 +7,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { getAuthHealth } from '../services/govwin/auth.js';
-import { fetchOpportunityDetail } from '../services/govwin/client.js';
+import { fetchOpportunityByIdApi } from '../services/govwin/api_client.js';
 import { runIngest } from '../ingest/framework/registry.js';
 import { pool } from '../lib/db.js';
 import type { JwtPayload } from '../middleware/auth.js';
@@ -138,7 +138,12 @@ export async function govwinRoutes(app: FastifyInstance): Promise<void> {
           );
         }
 
-        const opp = await fetchOpportunityDetail(govwinId);
+        const opp = await fetchOpportunityByIdApi(govwinId);
+        if (!opp) {
+          return reply.status(404).send(
+            errorEnvelope('NOT_FOUND', `GovWin opportunity ${govwinId} not found`, req.requestId),
+          );
+        }
 
         const payload = {
           title: opp.title,
