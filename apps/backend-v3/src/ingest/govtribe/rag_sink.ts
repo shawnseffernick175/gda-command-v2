@@ -8,11 +8,95 @@
 
 import { ingestFromBuffer } from '../../services/rag/store.js';
 import { logger } from '../../lib/logger.js';
-import type { GovTribeOpportunityRaw } from './types.js';
+import type { GovTribeDetailRecord, GovTribeOpportunityRaw } from './types.js';
 
 /**
- * Ingest a GovTribe opportunity record into the RAG knowledge base.
- * Converts the raw JSON to a text buffer and uses the F-301 ingest path.
+ * Ingest a GovTribe MCP detail record into the RAG knowledge base.
+ */
+export async function ingestGovTribeDetailToRag(
+  detail: GovTribeDetailRecord,
+  searchName: string,
+): Promise<void> {
+  const id = detail.govtribe_id;
+  const title = detail.name ?? 'Untitled';
+  const sourceUrl = detail.govtribe_url
+    ?? `https://govtribe.com/opportunity/${id}`;
+
+  const textContent = buildDetailRagText(detail, searchName);
+  const buffer = Buffer.from(textContent, 'utf-8');
+
+  try {
+    await ingestFromBuffer(buffer, {
+      source_filename: `govtribe-${id}.txt`,
+      source_url: sourceUrl,
+      doc_type: 'govtribe',
+      evidence_grade: 'B',
+      title: `[GovTribe] ${title}`,
+      metadata: {
+        govtribe_id: id,
+        search_name: searchName,
+        solicitation_number: detail.solicitation_number ?? null,
+        agency: detail.federal_agency?.name ?? null,
+        naics: detail.naics_category?.code ?? null,
+        posted_date: detail.posted_date ?? null,
+        response_date: detail.due_date ?? null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('existing')) return;
+    logger.warn(
+      { source: 'govtribe', govtribeId: id, error: err instanceof Error ? err.message : String(err) },
+      'govtribe_rag_ingest_warn',
+    );
+  }
+}
+
+function buildDetailRagText(detail: GovTribeDetailRecord, searchName: string): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${detail.name ?? 'Untitled GovTribe Opportunity'}`);
+  lines.push(`Source: GovTribe Saved Search "${searchName}"`);
+  lines.push('');
+
+  if (detail.solicitation_number) lines.push(`Solicitation: ${detail.solicitation_number}`);
+  if (detail.federal_agency?.name) lines.push(`Agency: ${detail.federal_agency.name}`);
+  if (detail.federal_agency?.sub_tier) lines.push(`Sub-Agency: ${detail.federal_agency.sub_tier}`);
+  if (detail.federal_agency?.office) lines.push(`Office: ${detail.federal_agency.office}`);
+  if (detail.naics_category?.code) lines.push(`NAICS: ${detail.naics_category.code}`);
+  if (detail.psc_category?.code) lines.push(`PSC: ${detail.psc_category.code}`);
+  if (detail.set_aside_type) lines.push(`Set-Aside: ${detail.set_aside_type}`);
+
+  const pop = detail.place_of_performance;
+  if (pop) {
+    const parts = [pop.city, pop.state, pop.zip, pop.country].filter(Boolean);
+    if (parts.length > 0) lines.push(`Place of Performance: ${parts.join(', ')}`);
+  }
+
+  if (detail.opportunity_state) lines.push(`Status: ${detail.opportunity_state}`);
+  if (detail.posted_date) lines.push(`Posted: ${detail.posted_date}`);
+  if (detail.due_date) lines.push(`Response Due: ${detail.due_date}`);
+  if (detail.award_date) lines.push(`Award Date: ${detail.award_date}`);
+
+  if (detail.descriptions && detail.descriptions.length > 0) {
+    lines.push('');
+    lines.push('## Description');
+    lines.push(detail.descriptions.join('\n\n'));
+  }
+
+  if (detail.points_of_contact && detail.points_of_contact.length > 0) {
+    lines.push('');
+    lines.push('## Contacts');
+    for (const c of detail.points_of_contact) {
+      const parts = [c.name, c.title, c.email, c.phone].filter(Boolean);
+      lines.push(`- ${parts.join(' | ')}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Legacy RAG sink for GovTribeOpportunityRaw — kept for cached data reprocessing.
  */
 export async function ingestGovTribeToRag(
   raw: GovTribeOpportunityRaw,
@@ -45,7 +129,6 @@ export async function ingestGovTribeToRag(
       },
     });
   } catch (err) {
-    // Dedup (sha256 match) returns 'existing' status — not an error
     if (err instanceof Error && err.message.includes('existing')) return;
     logger.warn(
       { source: 'govtribe', govtribeId: id, error: err instanceof Error ? err.message : String(err) },

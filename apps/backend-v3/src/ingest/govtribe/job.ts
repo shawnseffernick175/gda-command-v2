@@ -17,16 +17,27 @@ import {
   getCycleCreditCap,
   purgeExpiredCache,
 } from './mcp_client.js';
-import { searchOpportunities, searchAwards, searchForecasts, searchContacts, searchVehicles } from './mcp_tools.js';
-import { mapGovTribeOpportunity } from './mapper.js';
+import {
+  searchOpportunities,
+  searchAwards,
+  searchForecasts,
+  searchContacts,
+  searchVehicles,
+  fetchOpportunityDetailBatch,
+} from './mcp_tools.js';
+import { mapGovTribeDetail } from './mapper.js';
 import { upsertExternalOpportunity } from '../framework/source_writer.js';
-import { ingestGovTribeToRag } from './rag_sink.js';
+import { ingestGovTribeDetailToRag } from './rag_sink.js';
 import type { IngestResult } from '../framework/registry.js';
-import type { GovTribeOpportunityRaw } from './types.js';
+import type { GovTribeIdStub, GovTribeDetailRecord } from './types.js';
 import { GOVTRIBE_SAVED_SEARCHES } from './saved_searches.js';
+
+/** Max IDs per detail-fetch batch (avoids oversized MCP requests). */
+const DETAIL_BATCH_SIZE = 25;
 
 /**
  * govtribe.opps.poll — Runs all 7 saved searches against GovTribe MCP.
+ * Two-phase: search returns ID stubs, then detail-fetch fills full records.
  * Cadence: Mon + Thu 6am ET (10:00 UTC). Credit cost: ~115 credits/cycle.
  */
 export async function runGovTribeOppsIngest(): Promise<IngestResult> {
@@ -54,7 +65,7 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
 
     const cacheId = `saved_search_${search.id}`;
 
-    // Use the typed MCP wrapper based on category
+    // Phase 1: search returns ID stubs
     let result;
     switch (search.category) {
       case 'opportunities':
@@ -87,44 +98,53 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
       break;
     }
 
-    // MCP returns data as parsed JSON — extract rows array
-    const responseData = result.data as Record<string, unknown> | null;
-    const opps = (responseData?.data ?? responseData?.rows ?? (Array.isArray(responseData) ? responseData : [])) as GovTribeOpportunityRaw[];
-    if (opps.length === 0) continue;
+    // Extract IDs from search response (bare stubs or wrapped results)
+    const ids = extractIdsFromSearchResponse(result.data);
+    if (ids.length === 0) continue;
 
-    totalFetched += opps.length;
+    logger.info(
+      { source: 'govtribe', search: search.name, idCount: ids.length },
+      'govtribe_opps_search_ids',
+    );
 
-    for (const raw of opps) {
-      try {
-        const mapped = mapGovTribeOpportunity(raw);
-        if (!mapped) {
+    // Phase 2: detail-fetch in batches — only for opportunity searches
+    if (search.category === 'opportunities') {
+      const details = await fetchDetailBatches(ids, search.id);
+      totalFetched += details.length;
+
+      for (const detail of details) {
+        try {
+          const mapped = mapGovTribeDetail(detail);
+          if (!mapped) {
+            skipped++;
+            continue;
+          }
+
+          const outcome = await upsertGovTribeOpp(mapped);
+          if (outcome === 'inserted') inserted++;
+          else if (outcome === 'updated') updated++;
+          else skipped++;
+
+          await ingestGovTribeDetailToRag(detail, search.name).catch((err) => {
+            logger.error(
+              { source: 'govtribe', govtribeId: detail.govtribe_id, error: err instanceof Error ? err.message : String(err) },
+              'govtribe_rag_sink_error',
+            );
+          });
+        } catch (err) {
           skipped++;
-          continue;
-        }
-
-        const outcome = await upsertGovTribeOpp(mapped);
-        if (outcome === 'inserted') inserted++;
-        else if (outcome === 'updated') updated++;
-        else skipped++;
-
-        // RAG sink: write to kb_documents with doc_kind='govtribe', evidence_grade='B'
-        await ingestGovTribeToRag(raw, search.name).catch((err) => {
           logger.error(
-            { source: 'govtribe', govtribeId: raw._id ?? raw.id, error: err instanceof Error ? err.message : String(err) },
-            'govtribe_rag_sink_error',
+            {
+              source: 'govtribe',
+              govtribeId: detail.govtribe_id,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            'govtribe_opp_row_error',
           );
-        });
-      } catch (err) {
-        skipped++;
-        logger.error(
-          {
-            source: 'govtribe',
-            govtribeId: raw._id ?? raw.id,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          'govtribe_opp_row_error',
-        );
+        }
       }
+    } else {
+      totalFetched += ids.length;
     }
   }
 
@@ -136,8 +156,74 @@ export async function runGovTribeOppsIngest(): Promise<IngestResult> {
   return { inserted, updated, skipped, degraded, degradedReason };
 }
 
+/**
+ * Extract govtribe_id values from a search response.
+ * Handles both the MCP shape { results: [{ govtribe_id }] }
+ * and fallback shapes like { data: [...] } or bare arrays.
+ */
+function extractIdsFromSearchResponse(data: unknown): string[] {
+  if (!data) return [];
+
+  const obj = data as Record<string, unknown>;
+
+  // MCP shape: { results: [{ govtribe_id: "..." }] }
+  if (Array.isArray(obj.results)) {
+    return (obj.results as GovTribeIdStub[])
+      .map((r) => r.govtribe_id)
+      .filter(Boolean);
+  }
+
+  // Fallback: { data: [...] } or { rows: [...] }
+  const arr = obj.data ?? obj.rows ?? (Array.isArray(data) ? data : []);
+  if (Array.isArray(arr)) {
+    return (arr as Array<Record<string, unknown>>)
+      .map((r) => (r.govtribe_id ?? r._id ?? r.id) as string)
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+/**
+ * Fetch full detail for a list of IDs in batches of DETAIL_BATCH_SIZE.
+ */
+async function fetchDetailBatches(
+  ids: string[],
+  searchId: string,
+): Promise<GovTribeDetailRecord[]> {
+  const details: GovTribeDetailRecord[] = [];
+
+  for (let i = 0; i < ids.length; i += DETAIL_BATCH_SIZE) {
+    if (isCycleCapExceeded()) {
+      logger.warn(
+        { source: 'govtribe', remaining: ids.length - i },
+        'govtribe_detail_batch_cycle_cap',
+      );
+      break;
+    }
+
+    const batch = ids.slice(i, i + DETAIL_BATCH_SIZE);
+    const cacheId = `detail_${searchId}_batch_${Math.floor(i / DETAIL_BATCH_SIZE)}`;
+
+    try {
+      const result = await fetchOpportunityDetailBatch(batch, cacheId);
+
+      if (result.data?.results && Array.isArray(result.data.results)) {
+        details.push(...result.data.results);
+      }
+    } catch (err) {
+      logger.error(
+        { source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) },
+        'govtribe_detail_batch_error',
+      );
+    }
+  }
+
+  return details;
+}
+
 async function upsertGovTribeOpp(
-  mapped: ReturnType<typeof mapGovTribeOpportunity> & object,
+  mapped: ReturnType<typeof mapGovTribeDetail> & object,
 ): Promise<'inserted' | 'updated' | 'skipped'> {
   const { opportunity, citations, govtribe_id, source_uri } = mapped;
 

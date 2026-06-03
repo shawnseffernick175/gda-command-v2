@@ -1,10 +1,91 @@
 /**
- * GovTribe API response types — based on GovTribe REST API (JSON:API format).
+ * GovTribe MCP response types — based on the live MCP Search tool response
+ * shape (fields_to_return enum).
+ *
+ * The MCP search returns bare ID stubs by default: { govtribe_id }.
+ * A detail call with fields_to_return populates the full shape below.
  */
+
+/* ── ID stub returned by default search ──────────────────────────── */
+
+export interface GovTribeIdStub {
+  govtribe_id: string;
+}
+
+/* ── Full detail shape from fields_to_return ─────────────────────── */
+
+export interface GovTribeDetailRecord {
+  govtribe_id: string;
+  govtribe_url?: string;
+  source_url?: string;
+  name?: string;
+  solicitation_number?: string;
+  opportunity_type?: string;
+  opportunity_state?: string;
+  set_aside_type?: string;
+  posted_date?: string;
+  due_date?: string;
+  award_date?: string;
+  descriptions?: string[];
+  federal_agency?: GovTribeFederalAgency;
+  naics_category?: GovTribeCategory;
+  psc_category?: GovTribeCategory;
+  place_of_performance?: GovTribePlaceOfPerformance;
+  points_of_contact?: GovTribeContact[];
+  federal_contract_awards?: GovTribeLinkedRecord[];
+  federal_contract_vehicle?: GovTribeLinkedRecord;
+  govtribe_ai_summary?: string;
+  updated_at?: string;
+}
+
+export interface GovTribeFederalAgency {
+  govtribe_id?: string;
+  name?: string;
+  sub_tier?: string;
+  office?: string;
+}
+
+export interface GovTribeCategory {
+  govtribe_id?: string;
+  code?: string;
+  name?: string;
+}
+
+export interface GovTribePlaceOfPerformance {
+  city?: string;
+  state?: string;
+  country?: string;
+  zip?: string;
+}
+
+export interface GovTribeContact {
+  name?: string;
+  email?: string;
+  phone?: string;
+  title?: string;
+  role?: string;
+}
+
+export interface GovTribeLinkedRecord {
+  govtribe_id?: string;
+  name?: string;
+}
+
+/* ── Search response wrapper ─────────────────────────────────────── */
+
+export interface GovTribeSearchResponse {
+  results?: GovTribeIdStub[];
+  total?: number;
+  page?: number;
+  per_page?: number;
+}
+
+/* ── Legacy REST shape (kept for backward compat, not used in live) ─ */
 
 export interface GovTribeOpportunityRaw {
   _id?: string;
   id?: string;
+  govtribe_id?: string;
   type?: string;
   attributes?: {
     title?: string;
@@ -40,14 +121,6 @@ export interface GovTribeOpportunityRaw {
   links?: {
     self?: string;
   };
-}
-
-export interface GovTribeContact {
-  name?: string;
-  email?: string;
-  phone?: string;
-  title?: string;
-  role?: string;
 }
 
 export interface GovTribeAgencyContactsRaw {
