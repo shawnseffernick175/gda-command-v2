@@ -1,11 +1,12 @@
 /**
- * F-450 — Feature-extraction layer.
+ * F-450 / F-451 — Feature-extraction layer.
  *
  * Maps an opportunity DB row → PwinFeatures for the V1 rules scorer.
  * Pure function — no DB access.
  */
 
 import type { PwinFeatures } from './types.js';
+import { deriveSignals, type EnrichmentInput } from './enrich-features.js';
 
 /** Minimal typed shape of the opportunity columns used for feature extraction. */
 export interface OpportunityRow {
@@ -17,7 +18,11 @@ export interface OpportunityRow {
   response_due_at: string | Date | null;
   posted_at: string | Date | null;
   incumbent: string | null;
+  incumbent_confidence: string | null;
   solicitation_number: string | null;
+  title: string | null;
+  description: string | null;
+  psc: string | null;
 }
 
 /**
@@ -83,32 +88,45 @@ export function extractFeaturesFromOpportunity(
 
   const needsTeaming = requiresTeaming(row.set_aside);
 
+  // F-451: derive real signals from text fields
+  const enrichInput: EnrichmentInput = {
+    title: row.title,
+    description: row.description,
+    agency: row.agency,
+    naics: row.naics,
+    psc: row.psc,
+    set_aside: row.set_aside,
+    incumbent: row.incumbent,
+    incumbent_confidence: row.incumbent_confidence,
+  };
+  const signals = deriveSignals(enrichInput);
+
   return {
     naics: row.naics ?? '',
     agency: row.agency ?? '',
     sub_agency: '',
     ceiling_value_m: ceilingValueM,
-    is_incumbent: false,
+    is_incumbent: signals.is_incumbent,
     incumbent_competitor: '',
-    is_recompete: false,
-    scope_match_score: 0,
+    is_recompete: signals.is_recompete,
+    scope_match_score: signals.scope_match_score,
     days_to_proposal_due: daysToProposalDue,
     days_to_rfp_release: 0,
     is_under_continuing_resolution: false,
-    core_offering_match: [],
-    has_vehicle_access: false,
-    vehicle: '',
+    core_offering_match: signals.core_offering_match,
+    has_vehicle_access: signals.has_vehicle_access,
+    vehicle: signals.vehicle,
     vehicle_set_aside: '',
-    clearance_required: '',
-    clearance_fit: true,
-    doctrine_alignment_score: 20,
-    exclusion_triggered: false,
-    exclusion_ids: [],
+    clearance_required: signals.clearance_required,
+    clearance_fit: signals.clearance_fit,
+    doctrine_alignment_score: signals.doctrine_alignment_score,
+    exclusion_triggered: signals.exclusion_triggered,
+    exclusion_ids: signals.exclusion_ids,
     expected_margin_pct: 0,
     below_margin_floor: false,
     needs_teaming_partner: needsTeaming,
     candidate_partners: [],
-    is_existing_customer: false,
+    is_existing_customer: signals.is_existing_customer,
     named_competitors_count: 0,
     competitor_incumbency_rate: 0,
     similar_awards_count: 0,

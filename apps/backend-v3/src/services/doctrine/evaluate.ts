@@ -366,6 +366,90 @@ function generateRecommendations(
   return recommendations;
 }
 
+// ── Pure scoring function (no DB) ─────────────────────────────────────────
+
+export interface DoctrineScoreResult {
+  alignment_total: number;
+  exclusion_triggers: ExclusionResult[];
+}
+
+/** Default principle IDs matching the scorePrinciple switch cases. */
+const DEFAULT_PRINCIPLE_IDS = [
+  'alignment',
+  'ethics_always',
+  'teamwork',
+  'data_first',
+  'relentless_execution',
+  'relationships',
+  'market_mission_brand',
+  'customer_facing',
+];
+
+/** Default exclusion IDs matching the evaluateExclusion switch cases. */
+const DEFAULT_EXCLUSION_IDS = [
+  'low_assurance_cyber',
+  'commercial_software_only',
+  'staff_aug_only',
+  'below_margin_floor',
+  'non_cleared_commercial_it',
+  'ou2_out_of_lane',
+];
+
+/**
+ * Pure doctrine scoring — no DB reads or writes.
+ * Runs the same scorePrinciple/evaluateExclusion logic as runDoctrineCheck
+ * using hardcoded principle and exclusion IDs.
+ */
+export function scoreDoctrineFromContext(context: {
+  title?: string;
+  description?: string;
+  agency?: string;
+  naics?: string;
+  set_aside?: string;
+}): DoctrineScoreResult {
+  const entityContext: EntityContext = { ...context };
+
+  // Score all principles using default IDs
+  const principleScores: Record<string, PrincipleScore> = {};
+  for (const id of DEFAULT_PRINCIPLE_IDS) {
+    const principle: DoctrinePrinciple = {
+      id,
+      name: id,
+      short_form: id,
+      long_form: id,
+      evaluation_prompt: '',
+      display_order: 0,
+    };
+    principleScores[id] = scorePrinciple(principle, entityContext);
+  }
+
+  // Calculate alignment total (sum of all principle scores, max 40)
+  const rawTotal = Object.values(principleScores).reduce((sum, s) => sum + s.score, 0);
+  const alignmentTotal = Math.min(40, rawTotal);
+
+  // Evaluate exclusions using default IDs
+  const exclusionResults: ExclusionResult[] = [];
+  for (const id of DEFAULT_EXCLUSION_IDS) {
+    const exclusion: DoctrineExclusion = {
+      id,
+      name: id,
+      description: '',
+      trigger_logic_prompt: '',
+      applies_to_ous: [],
+      is_hard_block: true,
+      override_requires: null,
+    };
+    exclusionResults.push(evaluateExclusion(exclusion, entityContext));
+  }
+
+  return {
+    alignment_total: alignmentTotal,
+    exclusion_triggers: exclusionResults,
+  };
+}
+
+// ── Persisting doctrine check (existing behavior) ─────────────────────────
+
 export async function runDoctrineCheck(
   entityKind: string,
   entityId: string,

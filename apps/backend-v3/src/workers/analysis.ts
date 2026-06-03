@@ -345,7 +345,7 @@ function extractTimeline(row: Record<string, unknown>): {
 // ────────────────────────────────────────────────────────────────────────────
 
 function buildFullAnalysis(row: Record<string, unknown>): Record<string, unknown> {
-  // F-450: real scoring via the shared helper
+  // F-450 / F-451: real scoring via the shared helper (with text fields for enrichment)
   const pwinRow: PwinOpportunityRow = {
     naics: row.naics as string | null,
     agency: row.agency as string | null,
@@ -355,7 +355,11 @@ function buildFullAnalysis(row: Record<string, unknown>): Record<string, unknown
     response_due_at: row.response_due_at as string | null,
     posted_at: row.posted_at as string | null,
     incumbent: row.incumbent as string | null,
+    incumbent_confidence: row.incumbent_confidence as string | null,
     solicitation_number: row.solicitation_number as string | null,
+    title: row.title as string | null,
+    description: row.description as string | null,
+    psc: row.psc as string | null,
   };
   const pwinObj = scoreSingleOpportunityPwin(pwinRow);
   // Numeric 0–1 for wargame strategy (scorer returns 0–100)

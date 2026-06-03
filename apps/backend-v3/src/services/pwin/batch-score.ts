@@ -14,6 +14,7 @@ import {
   extractFeaturesFromOpportunity,
   type OpportunityRow,
 } from './feature-extraction.js';
+import { scoreDoctrineFromContext } from '../doctrine/evaluate.js';
 
 // ── Structured pwin object written to analysis.pwin ─────────────────────────
 
@@ -62,6 +63,25 @@ export function scoreSingleOpportunityPwin(
 
   // Score via the real deterministic rules scorer
   const features = extractFeaturesFromOpportunity(row, now);
+
+  // F-451: Use real doctrine engine (pure, no DB) for authoritative alignment_total
+  if (row.title || row.description) {
+    const docResult = scoreDoctrineFromContext({
+      title: row.title ?? undefined,
+      description: row.description ?? undefined,
+      agency: row.agency ?? undefined,
+      naics: row.naics ?? undefined,
+      set_aside: row.set_aside ?? undefined,
+    });
+    features.doctrine_alignment_score = docResult.alignment_total;
+    // Override exclusion if doctrine engine detects a hard-block
+    const hardBlocks = docResult.exclusion_triggers.filter((e) => e.triggered);
+    if (hardBlocks.length > 0) {
+      features.exclusion_triggered = true;
+      features.exclusion_ids = hardBlocks.map((e) => e.id);
+    }
+  }
+
   const result = scoreV1Rules(features, 'v1-rules');
   const band = recommendStatus(result.score);
 
@@ -120,14 +140,16 @@ export async function batchScoreOpportunities(
 
     if (opts?.ids && opts.ids.length > 0) {
       query = `SELECT id, naics, agency, set_aside, value_min, value_max,
-                      response_due_at, posted_at, incumbent, solicitation_number
+                      response_due_at, posted_at, incumbent, incumbent_confidence,
+                      solicitation_number, title, description, psc
                FROM opportunities
                WHERE deleted_at IS NULL AND id > $1 AND id = ANY($2)
                ORDER BY id LIMIT $3`;
       params = [lastId, opts.ids, batchLimit];
     } else {
       query = `SELECT id, naics, agency, set_aside, value_min, value_max,
-                      response_due_at, posted_at, incumbent, solicitation_number
+                      response_due_at, posted_at, incumbent, incumbent_confidence,
+                      solicitation_number, title, description, psc
                FROM opportunities
                WHERE deleted_at IS NULL AND id > $1
                ORDER BY id LIMIT $2`;
@@ -143,22 +165,21 @@ export async function batchScoreOpportunities(
       await client.query('BEGIN');
 
       for (const dbRow of res.rows) {
+        const r = dbRow as Record<string, unknown>;
         const row: OpportunityRow = {
-          naics: (dbRow as Record<string, unknown>).naics as string | null,
-          agency: (dbRow as Record<string, unknown>).agency as string | null,
-          set_aside: (dbRow as Record<string, unknown>).set_aside as string | null,
-          value_min:
-            (dbRow as Record<string, unknown>).value_min != null
-              ? Number((dbRow as Record<string, unknown>).value_min)
-              : null,
-          value_max:
-            (dbRow as Record<string, unknown>).value_max != null
-              ? Number((dbRow as Record<string, unknown>).value_max)
-              : null,
-          response_due_at: (dbRow as Record<string, unknown>).response_due_at as string | null,
-          posted_at: (dbRow as Record<string, unknown>).posted_at as string | null,
-          incumbent: (dbRow as Record<string, unknown>).incumbent as string | null,
-          solicitation_number: (dbRow as Record<string, unknown>).solicitation_number as string | null,
+          naics: r.naics as string | null,
+          agency: r.agency as string | null,
+          set_aside: r.set_aside as string | null,
+          value_min: r.value_min != null ? Number(r.value_min) : null,
+          value_max: r.value_max != null ? Number(r.value_max) : null,
+          response_due_at: r.response_due_at as string | null,
+          posted_at: r.posted_at as string | null,
+          incumbent: r.incumbent as string | null,
+          incumbent_confidence: r.incumbent_confidence as string | null,
+          solicitation_number: r.solicitation_number as string | null,
+          title: r.title as string | null,
+          description: r.description as string | null,
+          psc: r.psc as string | null,
         };
 
         const pwinObj = scoreSingleOpportunityPwin(row, now);
@@ -169,7 +190,7 @@ export async function batchScoreOpportunities(
            SET analysis = COALESCE(analysis, '{}'::jsonb) || jsonb_build_object('pwin', $1::jsonb),
                updated_at = NOW()
            WHERE id = $2 AND deleted_at IS NULL`,
-          [JSON.stringify(pwinObj), (dbRow as Record<string, unknown>).id],
+          [JSON.stringify(pwinObj), r.id],
         );
 
         result.processed++;
@@ -182,7 +203,7 @@ export async function batchScoreOpportunities(
           result.byBand[band]++;
         }
 
-        lastId = Number((dbRow as Record<string, unknown>).id);
+        lastId = Number(r.id);
       }
 
       await client.query('COMMIT');
