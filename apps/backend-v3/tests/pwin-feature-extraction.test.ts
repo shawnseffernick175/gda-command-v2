@@ -20,7 +20,11 @@ function makeRow(overrides: Partial<OpportunityRow> = {}): OpportunityRow {
     response_due_at: '2026-09-01T00:00:00Z',
     posted_at: '2026-05-01T00:00:00Z',
     incumbent: null,
+    incumbent_confidence: null,
     solicitation_number: 'W52P1J-26-R-0001',
+    title: null,
+    description: null,
+    psc: null,
     ...overrides,
   };
 }
@@ -143,9 +147,10 @@ describe('extractFeaturesFromOpportunity', () => {
     expect(f.clearance_fit).toBe(true);
   });
 
-  it('defaults doctrine_alignment_score to 20 (neutral midpoint)', () => {
+  it('computes doctrine_alignment_score from enrichment signals', () => {
+    // naics 541330 in lanes (+5) + army is existing customer (+8) + clearance_fit (+4) = 17
     const f = extractFeaturesFromOpportunity(makeRow(), NOW);
-    expect(f.doctrine_alignment_score).toBe(20);
+    expect(f.doctrine_alignment_score).toBe(17);
   });
 
   it('defaults is_incumbent to false', () => {
@@ -153,8 +158,14 @@ describe('extractFeaturesFromOpportunity', () => {
     expect(f.is_incumbent).toBe(false);
   });
 
-  it('defaults scope_match_score to 0', () => {
+  it('computes scope_match_score from enrichment (NAICS lane bonus)', () => {
+    // No text but naics 541330 in lanes → scope 0 + 10 NAICS bonus = 10
     const f = extractFeaturesFromOpportunity(makeRow(), NOW);
+    expect(f.scope_match_score).toBe(10);
+  });
+
+  it('returns 0 scope_match_score when no text and no NAICS lane', () => {
+    const f = extractFeaturesFromOpportunity(makeRow({ naics: '999999' }), NOW);
     expect(f.scope_match_score).toBe(0);
   });
 

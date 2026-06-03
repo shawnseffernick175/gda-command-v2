@@ -18,7 +18,11 @@ function makeRow(overrides: Partial<OpportunityRow> = {}): OpportunityRow {
     response_due_at: '2026-09-01T00:00:00Z',
     posted_at: '2026-05-01T00:00:00Z',
     incumbent: null,
+    incumbent_confidence: null,
     solicitation_number: 'W52P1J-26-R-0001',
+    title: null,
+    description: null,
+    psc: null,
     ...overrides,
   };
 }
