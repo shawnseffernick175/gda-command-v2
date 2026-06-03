@@ -34,12 +34,43 @@ export interface DerivedSignals {
   is_existing_customer: boolean;
   is_recompete: boolean;
   is_incumbent: boolean;
+  incumbent_competitor: string;
   exclusion_triggered: boolean;
   exclusion_ids: string[];
   core_offering_match: string[];
 }
 
 const ENVISION_IDENTITY_MARKERS = ['envision', 'envision sciences'];
+
+// ── Named-incumbent primes (canonical name → lowercase match substrings) ─────
+const NAMED_PRIMES: { canonical: string; patterns: { text: string; needsBoundary: boolean }[] }[] = [
+  { canonical: 'Northrop Grumman', patterns: [{ text: 'northrop grumman', needsBoundary: false }, { text: 'ngsc', needsBoundary: true }] },
+  { canonical: 'Lockheed Martin', patterns: [{ text: 'lockheed martin', needsBoundary: false }, { text: 'lockheed', needsBoundary: false }] },
+  { canonical: 'Raytheon', patterns: [{ text: 'raytheon', needsBoundary: false }, { text: 'rtx', needsBoundary: true }] },
+  { canonical: 'Boeing', patterns: [{ text: 'boeing', needsBoundary: false }] },
+  { canonical: 'General Dynamics', patterns: [{ text: 'general dynamics', needsBoundary: false }, { text: 'gdit', needsBoundary: true }] },
+  { canonical: 'Leidos', patterns: [{ text: 'leidos', needsBoundary: false }] },
+  { canonical: 'Booz Allen Hamilton', patterns: [{ text: 'booz allen', needsBoundary: false }] },
+  { canonical: 'SAIC', patterns: [{ text: 'saic', needsBoundary: true }] },
+  { canonical: 'BAE Systems', patterns: [{ text: 'bae systems', needsBoundary: false }] },
+  { canonical: 'L3Harris', patterns: [{ text: 'l3harris', needsBoundary: false }, { text: 'l3 harris', needsBoundary: false }] },
+  { canonical: 'CACI', patterns: [{ text: 'caci', needsBoundary: true }] },
+  { canonical: 'Peraton', patterns: [{ text: 'peraton', needsBoundary: false }] },
+  { canonical: 'ManTech', patterns: [{ text: 'mantech', needsBoundary: false }] },
+];
+
+/** Word-boundary check for short tokens to avoid false positives. */
+function matchesBounded(haystack: string, token: string): boolean {
+  const re = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+  return re.test(haystack);
+}
+
+const RECOMPETE_KEYWORDS = [
+  'recompete', 're-compete', 'follow-on', 'follow on', 'bridge contract',
+  'currently performed', 'recompete of', 're-solicitation', 'resolicitation',
+  'successor contract', 'incumbent contractor', 'incumbent vendor',
+  'option to extend', 'continuation of', 'previously awarded',
+];
 
 export function deriveSignals(input: EnrichmentInput): DerivedSignals {
   const text = `${input.title ?? ''} ${input.description ?? ''}`.toLowerCase();
@@ -112,14 +143,27 @@ export function deriveSignals(input: EnrichmentInput): DerivedSignals {
     agencyLower.includes(c),
   );
 
-  // ── is_recompete / is_incumbent ────────────────────────────────────────
-  const isRecompete =
-    text.includes('recompete') ||
-    text.includes('re-compete') ||
-    text.includes('follow-on') ||
-    text.includes('follow on') ||
-    text.includes('bridge contract') ||
-    text.includes('currently performed');
+  // ── is_recompete / is_incumbent / incumbent_competitor ─────────────────
+  const keywordRecompete = RECOMPETE_KEYWORDS.some((kw) => text.includes(kw));
+
+  // ── Extract named incumbent prime (first match wins) ───────────────────
+  let incumbentCompetitor = '';
+  for (const prime of NAMED_PRIMES) {
+    let matched = false;
+    for (const p of prime.patterns) {
+      if (p.needsBoundary ? matchesBounded(text, p.text) : text.includes(p.text)) {
+        matched = true;
+        break;
+      }
+    }
+    if (matched) {
+      incumbentCompetitor = prime.canonical;
+      break;
+    }
+  }
+
+  // A name alone does NOT set is_recompete; only OR in when co-occurring with a recompete keyword
+  const isRecompete = keywordRecompete;
 
   const incumbentVal = (input.incumbent ?? '').toLowerCase().trim();
   const isIncumbent =
@@ -191,6 +235,7 @@ export function deriveSignals(input: EnrichmentInput): DerivedSignals {
     is_existing_customer: isExistingCustomer,
     is_recompete: isRecompete,
     is_incumbent: isIncumbent,
+    incumbent_competitor: incumbentCompetitor,
     exclusion_triggered: exclusionTriggered,
     exclusion_ids: exclusionIds,
     core_offering_match: coreOfferingMatch,

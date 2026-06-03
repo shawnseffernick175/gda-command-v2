@@ -34,6 +34,11 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     contributions.push({ name: 'incumbency_bonus', value: incumbencyBonus, description: '+30 incumbency' });
   }
 
+  const recompeteBonus = features.is_recompete ? 8 : 0;
+  if (recompeteBonus > 0) {
+    contributions.push({ name: 'recompete', value: 8, description: '+8 recompete (known requirement, displacement target)' });
+  }
+
   const capabilityMatch = Math.round(features.scope_match_score * 0.3 * 100) / 100;
   if (capabilityMatch !== 0) {
     contributions.push({
@@ -153,7 +158,7 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
 
   const rawScore = features.exclusion_triggered
     ? 0
-    : base + incumbencyBonus + capabilityMatch + vehicleAccess + clearanceFit
+    : base + incumbencyBonus + recompeteBonus + capabilityMatch + vehicleAccess + clearanceFit
       + doctrineBonus + marginPenalty + teamingBonus + naicsSizeContribution
       + existingCustomerContribution;
 

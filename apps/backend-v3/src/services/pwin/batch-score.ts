@@ -24,6 +24,7 @@ export interface PwinAnalysisObject {
   reason?: string;
   model_version: string;
   top_drivers?: string[];
+  incumbent_competitor?: string;
   days_to_due: number | null;
   scored_at: string;
 }
@@ -90,6 +91,7 @@ export function scoreSingleOpportunityPwin(
     band,
     model_version: 'v1-rules',
     top_drivers: result.top_drivers,
+    ...(features.incumbent_competitor ? { incumbent_competitor: features.incumbent_competitor } : {}),
     days_to_due: daysToDue,
     scored_at: scoredAt,
   };
