@@ -2,16 +2,24 @@
  * GovWin IQ HTTP client — makes authenticated requests using
  * CAS session cookies obtained via the auth service.
  *
- * GovWin IQ does not expose a REST/JSON API; the web app is
- * server-rendered Grails. We scrape structured data from the
- * opportunity detail pages using cheerio.
+ * ⚠️  F-333: scrape path is HARD-DISABLED by default.
+ *     Set GOVWIN_ALLOW_SCRAPE=true to re-enable (dev/debug only).
+ *     Production uses the OAuth2 Web Services API (F-332) instead.
  */
 
 import * as cheerio from 'cheerio';
 import { authenticate, invalidateAuth } from './auth.js';
 import { logger } from '../../lib/logger.js';
 
+const SCRAPE_ALLOWED = process.env['GOVWIN_ALLOW_SCRAPE'] === 'true';
 const IQ_BASE = 'https://iq.govwin.com';
+
+function assertScrapeAllowed(): void {
+  if (!SCRAPE_ALLOWED) {
+    logger.error('govwin_scrape_blocked: API-only — scraping disabled');
+    throw new Error('API-only — scraping disabled. Use the GovWin Web Services API (F-332) instead.');
+  }
+}
 
 export interface GovWinOpportunity {
   govwinId: string;
@@ -40,6 +48,7 @@ function buildCookieHeader(cookies: string[]): string {
 }
 
 async function fetchWithAuth(path: string): Promise<string> {
+  assertScrapeAllowed();
   const cookies = await authenticate();
   const url = `${IQ_BASE}${path}`;
   const res = await fetch(url, {
@@ -165,6 +174,7 @@ export async function fetchOpportunityDetail(govwinId: string): Promise<GovWinOp
 export async function discoverRecentOpportunityIds(
   maxPages: number = 5,
 ): Promise<string[]> {
+  assertScrapeAllowed();
   const ids: string[] = [];
 
   try {

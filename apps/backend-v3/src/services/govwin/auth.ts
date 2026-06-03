@@ -1,6 +1,10 @@
 /**
  * GovWin IQ CAS REST authentication service.
  *
+ * ⚠️  F-333: CAS/scrape path is HARD-DISABLED by default.
+ *     Set GOVWIN_ALLOW_SCRAPE=true to re-enable (dev/debug only).
+ *     Production uses the OAuth2 Web Services API (F-332) instead.
+ *
  * GovWin uses Apereo CAS (not OAuth2 client-credentials).
  * Flow: POST /cas/v1/tickets with username+password → TGT,
  * then POST /cas/v1/tickets/{TGT} with service URL → ST,
@@ -13,6 +17,8 @@
 import { createHash } from 'node:crypto';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+
+const SCRAPE_ALLOWED = process.env['GOVWIN_ALLOW_SCRAPE'] === 'true';
 
 const CAS_BASE = 'https://iq.govwin.com/cas/v1/tickets';
 const SERVICE_URL = 'https://iq.govwin.com/neo/j_spring_cas_security_check';
@@ -104,6 +110,11 @@ async function persistAuthState(
 }
 
 export async function authenticate(): Promise<string[]> {
+  if (!SCRAPE_ALLOWED) {
+    logger.error('govwin_scrape_blocked: API-only — scraping disabled (set GOVWIN_ALLOW_SCRAPE=true to override)');
+    throw new Error('API-only — scraping disabled. Use the GovWin Web Services API (F-332) instead.');
+  }
+
   if (cached.tgt && cached.cookies.length > 0 && Date.now() < cached.expiresAt) {
     return cached.cookies;
   }
