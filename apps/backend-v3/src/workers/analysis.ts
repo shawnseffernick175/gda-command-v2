@@ -538,7 +538,7 @@ async function handleCaptureAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promi
       if (opp?.analysis) {
         const rawPwin = opp.analysis.pwin;
         const numPwin = typeof rawPwin === 'object' && rawPwin !== null
-          ? ((rawPwin as { score?: number | null }).score ?? 0)
+          ? ((rawPwin as { score?: number | null }).score ?? 0) / 100
           : (typeof rawPwin === 'number' ? rawPwin : 0.5);
         oppAnalysis = { pwin: numPwin };
       }
