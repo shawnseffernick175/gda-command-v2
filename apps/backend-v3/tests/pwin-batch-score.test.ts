@@ -106,7 +106,7 @@ describe('scoreSingleOpportunityPwin — deadline gate', () => {
 });
 
 describe('scoreSingleOpportunityPwin — band assignment', () => {
-  it('assigns forecast band for high-scoring opportunities (score >= 70)', () => {
+  it('assigns forecast band for high-scoring opportunities (score >= 67)', () => {
     // Incumbent + vehicle access + small NAICS + doctrine → should push score high
     // We can't easily control scoreV1Rules output, but a typical row with good signals
     // will have base(30) + vehicle(−15) + clearance(+5) + doctrine(20/40*10=5) + naics_size

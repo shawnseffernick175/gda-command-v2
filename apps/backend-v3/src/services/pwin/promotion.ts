@@ -3,7 +3,7 @@
  * Lifecycle promotion (discovery → signal → forecast) is wired separately.
  */
 
-export const FORECAST_PROMOTION_THRESHOLD = 70;
+export const FORECAST_PROMOTION_THRESHOLD = 67;
 
 export function recommendStatus(score: number): 'discovery' | 'signal' | 'forecast' {
   if (score >= FORECAST_PROMOTION_THRESHOLD) return 'forecast';
