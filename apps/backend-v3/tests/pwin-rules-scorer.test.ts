@@ -37,6 +37,7 @@ function makeFeatures(overrides: Partial<PwinFeatures> = {}): PwinFeatures {
     competitor_incumbency_rate: 0.5,
     similar_awards_count: 5,
     avg_similar_award_value_m: 8,
+    set_aside: null,
     ...overrides,
   };
 }
@@ -164,13 +165,76 @@ describe('v1 rules scorer', () => {
     expect(high.score - low.score).toBe(30);
   });
 
-  it('large-business-only NAICS still receives -15 naics_size', () => {
+  it('large-business NAICS receives 0 naics_size (no penalty)', () => {
     const result = scoreV1Rules(
-      makeFeatures({ naics: '541990' }),
+      makeFeatures({ naics: '541990', set_aside: null }),
       'v1-rules',
     );
     const naicsContrib = result.feature_weights.find((w) => w.name === 'naics_size');
-    expect(naicsContrib?.value).toBe(-15);
+    expect(naicsContrib?.value).toBe(0);
+  });
+
+  it('large-business core-lane fit with existing customer scores ≥70 (forecast)', () => {
+    const result = scoreV1Rules(
+      makeFeatures({
+        naics: '561210',
+        scope_match_score: 80,
+        agency: 'Department of Defense',
+        is_existing_customer: true,
+        set_aside: null,
+        has_vehicle_access: true,
+        clearance_fit: true,
+        doctrine_alignment_score: 26,
+      }),
+      'v1-rules',
+    );
+    expect(result.score).toBeGreaterThanOrEqual(70);
+    const naicsContrib = result.feature_weights.find((w) => w.name === 'naics_size');
+    expect(naicsContrib?.value).toBe(0);
+    expect(result.top_drivers.every((d) => !d.includes('-15'))).toBe(true);
+  });
+
+  it('small-eligible full-and-open research opp scores <70 (signal) with +10 driver', () => {
+    const result = scoreV1Rules(
+      makeFeatures({
+        naics: '541715',
+        scope_match_score: 20,
+        set_aside: null,
+        is_existing_customer: true,
+        has_vehicle_access: false,
+        clearance_fit: true,
+        doctrine_alignment_score: 26,
+      }),
+      'v1-rules',
+    );
+    expect(result.score).toBeLessThan(70);
+    const naicsContrib = result.feature_weights.find((w) => w.name === 'naics_size');
+    expect(naicsContrib?.value).toBe(10);
+    expect(naicsContrib?.description).toContain('+10');
+  });
+
+  it('small-eligible opp WITH a small-business set-aside shows +20 driver', () => {
+    const result = scoreV1Rules(
+      makeFeatures({
+        naics: '541715',
+        scope_match_score: 50,
+        set_aside: 'Total Small Business Set-Aside',
+      }),
+      'v1-rules',
+    );
+    const naicsContrib = result.feature_weights.find((w) => w.name === 'naics_size');
+    expect(naicsContrib?.value).toBe(20);
+    expect(naicsContrib?.description).toContain('+20 small-business set-aside advantage');
+  });
+
+  it('existing-customer true adds +5; false adds 0 (no penalty)', () => {
+    const withCustomer = scoreV1Rules(makeFeatures({ is_existing_customer: true }), 'v1-rules');
+    const noCustomer = scoreV1Rules(makeFeatures({ is_existing_customer: false }), 'v1-rules');
+    expect(withCustomer.score - noCustomer.score).toBe(5);
+    const custContrib = withCustomer.feature_weights.find((w) => w.name === 'existing_customer');
+    expect(custContrib?.value).toBe(5);
+    const noCustContrib = noCustomer.feature_weights.find((w) => w.name === 'existing_customer');
+    expect(noCustContrib).toBeUndefined();
   });
 
   it('neutral vehicle/clearance signals are excluded from top_drivers', () => {

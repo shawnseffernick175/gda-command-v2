@@ -131,5 +131,6 @@ export function extractFeaturesFromOpportunity(
     competitor_incumbency_rate: 0,
     similar_awards_count: 0,
     avg_similar_award_value_m: 0,
+    set_aside: row.set_aside ?? null,
   };
 }

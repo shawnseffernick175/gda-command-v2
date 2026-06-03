@@ -9,6 +9,20 @@ function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
 }
 
+const SET_ASIDE_PATTERNS = [
+  'small business', 'set-aside', 'set aside', 'sdvosb', 'service-disabled',
+  '8(a)', '8a', 'wosb', 'women-owned', 'hubzone', 'edwosb', 'isbee', 'buy indian',
+];
+
+const SET_ASIDE_EXCLUSIONS = ['no set aside', 'no set-aside'];
+
+function isSmallBusinessSetAside(setAside: string | null): boolean {
+  if (!setAside) return false;
+  const lower = setAside.toLowerCase();
+  if (SET_ASIDE_EXCLUSIONS.some((ex) => lower.includes(ex))) return false;
+  return SET_ASIDE_PATTERNS.some((p) => lower.includes(p));
+}
+
 export function scoreV1Rules(features: PwinFeatures, modelVersion: string): PwinScoreResult {
   const contributions: RuleContribution[] = [];
 
@@ -92,22 +106,32 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     }
   }
 
-  // NAICS size-status contribution
+  // NAICS size-status contribution (F-451.3: neutralize large penalty, gate small bonus on set-aside)
   const sizeStatus = resolveSizeStatus(features.naics);
   let naicsSizeContribution = 0;
   if (sizeStatus.status === 'small') {
-    naicsSizeContribution = 20;
-    contributions.push({
-      name: 'naics_size',
-      value: 20,
-      description: `+20 small-business eligible (${features.naics}: ${sizeStatus.rationale})`,
-    });
+    const hasSetAside = isSmallBusinessSetAside(features.set_aside);
+    if (hasSetAside) {
+      naicsSizeContribution = 20;
+      contributions.push({
+        name: 'naics_size',
+        value: 20,
+        description: `+20 small-business set-aside advantage (${features.naics}: ${sizeStatus.rationale})`,
+      });
+    } else {
+      naicsSizeContribution = 10;
+      contributions.push({
+        name: 'naics_size',
+        value: 10,
+        description: `+10 small-business eligible, full-and-open (${features.naics}: ${sizeStatus.rationale})`,
+      });
+    }
   } else if (sizeStatus.status === 'large') {
-    naicsSizeContribution = -15;
+    naicsSizeContribution = 0;
     contributions.push({
       name: 'naics_size',
-      value: -15,
-      description: `-15 large-business only (${features.naics}: ${sizeStatus.rationale})`,
+      value: 0,
+      description: `0 large-business, full-and-open (${features.naics}: ${sizeStatus.rationale})`,
     });
   } else {
     contributions.push({
@@ -117,10 +141,21 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     });
   }
 
+  // Existing-customer contribution (F-451.3)
+  const existingCustomerContribution = features.is_existing_customer ? 5 : 0;
+  if (existingCustomerContribution > 0) {
+    contributions.push({
+      name: 'existing_customer',
+      value: 5,
+      description: '+5 existing customer relationship',
+    });
+  }
+
   const rawScore = features.exclusion_triggered
     ? 0
     : base + incumbencyBonus + capabilityMatch + vehicleAccess + clearanceFit
-      + doctrineBonus + marginPenalty + teamingBonus + naicsSizeContribution;
+      + doctrineBonus + marginPenalty + teamingBonus + naicsSizeContribution
+      + existingCustomerContribution;
 
   const score = clamp(Math.round(rawScore), 0, 100);
 

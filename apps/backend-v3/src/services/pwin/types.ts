@@ -32,6 +32,7 @@ export interface PwinFeatures {
   competitor_incumbency_rate: number;
   similar_awards_count: number;
   avg_similar_award_value_m: number;
+  set_aside: string | null;
 }
 
 export interface PwinFeatureRow {
