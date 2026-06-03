@@ -3,9 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Accept API URL as build arg (baked into Vite at compile time)
+# Accept API URL as build arg — supports both legacy VITE_V3_API_URL and new NEXT_PUBLIC_API_URL
 ARG VITE_V3_API_URL=https://gda-v3.csr-llc.tech
-ENV VITE_V3_API_URL=$VITE_V3_API_URL
+ARG NEXT_PUBLIC_API_URL
+# If NEXT_PUBLIC_API_URL is not set explicitly, fall back to VITE_V3_API_URL
+ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_URL:-$VITE_V3_API_URL}
 
 # Copy workspace root files
 COPY package.json package-lock.json ./
@@ -17,14 +19,14 @@ RUN npm ci --workspace=@gda/frontend-v3 --include-workspace-root
 # Copy source
 COPY packages/frontend-v3/ packages/frontend-v3/
 
-# Build (compile tokens → tsc → vite build)
+# Build (Next.js static export → out/)
 RUN npm run build --workspace=@gda/frontend-v3
 
 # ---- Production Stage ----
 FROM nginx:1.27-alpine AS production
 
-# Copy built assets
-COPY --from=builder /app/packages/frontend-v3/dist/ /usr/share/nginx/html/
+# Copy built assets (Next.js static export outputs to out/)
+COPY --from=builder /app/packages/frontend-v3/out/ /usr/share/nginx/html/
 
 # Custom nginx config for SPA routing
 COPY packages/frontend-v3/nginx.conf /etc/nginx/conf.d/default.conf

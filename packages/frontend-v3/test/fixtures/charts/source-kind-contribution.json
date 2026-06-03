@@ -1,7 +1,0 @@
-{
-  "periods": [
-    { "label": "Jan", "sources": [{ "kind": "sam_gov", "count": 15, "qualified": 8, "value": 12000000 }] },
-    { "label": "Feb", "sources": [{ "kind": "sam_gov", "count": 22, "qualified": 11, "value": 18000000 }] }
-  ],
-  "sourceRefs": [{ "url": "https://sam.gov/opp/source-kinds", "kind": "sam_gov" }]
-}

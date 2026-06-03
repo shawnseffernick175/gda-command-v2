@@ -1,0 +1,237 @@
+"use client";
+
+import {
+  useLaunchpadSummary,
+  useLaunchpadFlags,
+} from "@/hooks/use-launchpad";
+import { useOpportunities } from "@/hooks/use-opportunities";
+import { useActionItems } from "@/hooks/use-action-items";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BandBadge } from "@/components/band-badge";
+import { ScoreDisplay } from "@/components/score-display";
+import { ErrorState } from "@/components/shared/error-state";
+import { formatMoney } from "@/lib/format-money";
+import Link from "next/link";
+
+export default function LaunchpadPage() {
+  const { data: summary, isLoading: sLoad, error: sErr, refetch: sRefetch } = useLaunchpadSummary();
+  const { data: flags } = useLaunchpadFlags();
+  const { data: topOpps } = useOpportunities({ limit: 5, status: "forecast" });
+  const { data: todayItems } = useActionItems({ due: "today" });
+
+  return (
+    <div className="space-y-6">
+      <h1 className="font-mono text-lg font-bold text-foreground">
+        Launchpad
+      </h1>
+
+      {/* Flags / Alerts */}
+      {flags?.flags && flags.flags.length > 0 && (
+        <div className="space-y-2">
+          {flags.flags.map((flag, i) => (
+            <div
+              key={i}
+              className={`rounded-md border p-3 text-sm ${
+                flag.severity === "critical"
+                  ? "border-gda-red/30 bg-gda-red/10 text-gda-red"
+                  : flag.severity === "warning"
+                    ? "border-gda-amber/30 bg-gda-amber/10 text-gda-amber"
+                    : "border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan"
+              }`}
+            >
+              {flag.message}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sErr && (
+        <ErrorState
+          message={(sErr as Error).message}
+          onRetry={() => void sRefetch()}
+        />
+      )}
+
+      {/* 3 Stat Cards */}
+      {sLoad ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 bg-gda-panel" />
+          ))}
+        </div>
+      ) : summary ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatCard
+            label="Flags"
+            value={flags?.flags?.length ?? 0}
+            color="text-gda-amber"
+          />
+          <StatCard
+            label="Action Items Due Today"
+            value={todayItems?.items?.length ?? 0}
+            color="text-gda-red"
+          />
+          <StatCard
+            label="Pipeline Value"
+            value={formatMoney(
+              (topOpps?.items ?? []).reduce((sum, o) => sum + (o.value ?? 0), 0),
+            )}
+            color="text-gda-green"
+          />
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Top 5 Programs */}
+        <Card className="border-border bg-gda-panel">
+          <CardHeader>
+            <CardTitle className="font-mono text-sm text-muted-foreground">
+              Top 5 Programs (by capture pwin)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topOpps?.items && topOpps.items.length > 0 ? (
+              <div className="space-y-2">
+                {topOpps.items.slice(0, 5).map((opp, i) => (
+                  <Link
+                    key={opp.internal_id}
+                    href={`/opportunities?id=${opp.internal_id}`}
+                    className="flex items-center gap-3 rounded p-2 text-sm hover:bg-gda-bg-base transition-colors"
+                  >
+                    <span className="font-mono text-xs text-muted-foreground w-4">
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 truncate text-foreground">
+                      {opp.title}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {opp.agency}
+                    </span>
+                    <span className="font-mono text-xs text-foreground">
+                      {formatMoney(opp.value)}
+                    </span>
+                    {opp.pwin && (
+                      <ScoreDisplay score={opp.pwin.score} className="text-sm" />
+                    )}
+                    {opp.pwin?.band && <BandBadge band={opp.pwin.band} />}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No forecast-band opportunities yet.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* What Needs Me Today */}
+        <Card className="border-border bg-gda-panel">
+          <CardHeader>
+            <CardTitle className="font-mono text-sm text-muted-foreground">
+              What Needs Me Today
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {flags?.flags && flags.flags.filter((f) => f.severity === "critical").length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-medium text-gda-red mb-1">Critical Flags</p>
+                {flags.flags
+                  .filter((f) => f.severity === "critical")
+                  .map((f, i) => (
+                    <p key={i} className="text-xs text-gda-red">{f.message}</p>
+                  ))}
+              </div>
+            )}
+            {todayItems?.items && todayItems.items.length > 0 ? (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  Overdue / Due Today
+                </p>
+                {todayItems.items.slice(0, 5).map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 text-xs"
+                  >
+                    <span
+                      className={
+                        item.status === "overdue"
+                          ? "text-gda-red"
+                          : "text-foreground"
+                      }
+                    >
+                      {item.title}
+                    </span>
+                    {item.owner && (
+                      <span className="text-muted-foreground">
+                        → {item.owner}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nothing urgent today.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Signals */}
+      <Card className="border-border bg-gda-panel">
+        <CardHeader>
+          <CardTitle className="font-mono text-sm text-muted-foreground">
+            Recent Signals
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {summary?.recent_scores && summary.recent_scores.length > 0 ? (
+            <div className="space-y-2">
+              {summary.recent_scores.slice(0, 5).map((s) => (
+                <Link
+                  key={s.internal_id}
+                  href={`/opportunities?id=${s.internal_id}`}
+                  className="flex items-center gap-3 rounded p-2 text-sm hover:bg-gda-bg-base transition-colors"
+                >
+                  <span className="flex-1 truncate text-foreground">
+                    {s.title}
+                  </span>
+                  <ScoreDisplay score={s.score} className="text-sm" />
+                  <BandBadge band={s.band} />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No recent signals.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number | string;
+  color: string;
+}) {
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardContent className="py-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`font-mono text-2xl font-bold tabular-nums ${color}`}>
+          {value}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
