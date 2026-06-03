@@ -11,7 +11,7 @@ export default function FastTrackPage() {
         Fast Track
       </h1>
       <p className="text-sm text-muted-foreground">
-        Discover innovation from academia &amp; research. Auto-suggest government
+        Discover innovation from academia and research. Auto-suggest government
         match + your angle.
       </p>
 

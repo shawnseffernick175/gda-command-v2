@@ -19,7 +19,7 @@ export default function AwardsPage() {
   return (
     <div className="space-y-6">
       <h1 className="font-mono text-lg font-bold text-foreground">
-        Awards &amp; Intel
+        Awards & Intel
       </h1>
 
       <div className="flex gap-2">

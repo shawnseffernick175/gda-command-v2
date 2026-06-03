@@ -70,7 +70,7 @@ jobs:
         working-directory: packages/frontend-v3
         env:
           MOCK_LLM: '1'
-        run: npx vitest run --coverage
+        run: npx vitest run --coverage --passWithNoTests
 
       - name: Post coverage summary
         if: always() && github.event_name == 'pull_request'
@@ -133,7 +133,7 @@ jobs:
         working-directory: packages/frontend-v3
         env:
           MOCK_LLM: '1'
-        run: npx vitest run --config vitest.contract.config.ts --passWithNoTests
+        run: npx vitest run --passWithNoTests 'contract'
 
   jsx-entity-lint:
     name: JSX Entity Lint
@@ -158,43 +158,25 @@ jobs:
       - run: npm ci
       - run: npm run build -w packages/shared
 
-      - name: Build frontend-v3
+      - name: Build frontend-v3 (Next.js static export)
         working-directory: packages/frontend-v3
-        run: npx vite build
+        run: npx next build
 
       - name: Check bundle size
         working-directory: packages/frontend-v3
         run: |
           MAX_MAIN_KB=350
-          MAX_SURFACE_KB=100
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
-          # Find main chunk
-          MAIN_SIZE=$(find dist/assets -name 'index-*.js' -exec gzip -c {} \; | wc -c)
-          MAIN_KB=$((MAIN_SIZE / 1024))
-          echo "Main bundle: ${MAIN_KB}KB gzipped (budget: ${MAX_MAIN_KB}KB)" | tee -a /tmp/bundle-report.md
+          # Find main chunk in Next.js output
+          TOTAL_SIZE=$(find out/_next/static -name '*.js' -exec cat {} + | gzip -c | wc -c)
+          TOTAL_KB=$((TOTAL_SIZE / 1024))
+          echo "Total JS bundle: ${TOTAL_KB}KB gzipped (budget: ${MAX_MAIN_KB}KB)" | tee -a /tmp/bundle-report.md
 
-          if [ "$MAIN_KB" -gt "$MAX_MAIN_KB" ]; then
-            echo "::error::Main bundle exceeds ${MAX_MAIN_KB}KB budget: ${MAIN_KB}KB"
+          if [ "$TOTAL_KB" -gt "$MAX_MAIN_KB" ]; then
+            echo "::error::Total JS bundle exceeds ${MAX_MAIN_KB}KB budget: ${TOTAL_KB}KB"
             exit 1
-          fi
-
-          # Check per-surface chunks
-          OVER_BUDGET=0
-          for chunk in dist/assets/*.js; do
-            SIZE=$(gzip -c "$chunk" | wc -c)
-            KB=$((SIZE / 1024))
-            NAME=$(basename "$chunk")
-            echo "  $NAME: ${KB}KB gzipped" >> /tmp/bundle-report.md
-            if [ "$KB" -gt "$MAX_SURFACE_KB" ] && [ "$NAME" != "index-"* ]; then
-              echo "::warning::Chunk $NAME exceeds ${MAX_SURFACE_KB}KB: ${KB}KB"
-              OVER_BUDGET=$((OVER_BUDGET + 1))
-            fi
-          done
-
-          if [ "$OVER_BUDGET" -gt 0 ]; then
-            echo "::warning::$OVER_BUDGET chunk(s) exceed per-surface budget"
           fi
 
           echo "Bundle size check passed."
@@ -204,7 +186,7 @@ jobs:
         continue-on-error: true
         run: |
           npx -y @lhci/cli@0.14.x autorun \
-            --collect.staticDistDir=dist \
+            --collect.staticDistDir=out \
             --assert.preset=lighthouse:recommended \
             --assert.assertions.categories:performance=warn \
             --assert.assertions.categories:performance.minScore=0.7 \

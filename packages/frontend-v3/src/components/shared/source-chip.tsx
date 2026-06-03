@@ -41,8 +41,8 @@ export function SourceChip({
 
   return (
     <span className={cn(base, kindStyles[kind], className)}>
-      {kind === "heuristic" && "⚠ "}
-      {kind === "pending" && "⏳ "}
+      {kind === "heuristic" && "~ "}
+      {kind === "pending" && "... "}
       {label}
     </span>
   );

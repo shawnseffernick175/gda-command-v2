@@ -59,7 +59,7 @@ export function AskAiPanel({
           onClick={() => setOpen(false)}
           className="text-xs text-muted-foreground hover:text-foreground"
         >
-          ✕
+          x
         </button>
       </div>
       <div className="flex gap-2">

@@ -41,7 +41,7 @@ function CaptureList() {
       </h1>
       <p className="text-sm text-muted-foreground">
         Pursuits in Capture (Pursue stage and beyond). pwin set here via Shipley
-        drivers — pursuit without a capture plan shows &quot;—&quot; and is
+        drivers — pursuit without a capture plan shows “—” and is
         unforecastable.
       </p>
 

@@ -73,8 +73,7 @@ jobs:
         env:
           MOCK_LLM: '1'
         run: |
-          npx vitest run --config vitest.contract.config.ts \
-            --passWithNoTests 'r2-.*\.contract\.test'
+          npx vitest run --passWithNoTests 'r2-.*\.contract\.test'
 
   forbidden-shapes:
     name: Forbidden response shapes
@@ -154,5 +153,4 @@ jobs:
       - name: Run source-kinds parity test
         working-directory: packages/frontend-v3
         run: |
-          npx vitest run --config vitest.contract.config.ts \
-            --passWithNoTests 'source-kinds.*\.contract\.test'
+          npx vitest run --passWithNoTests 'source-kinds.*\.contract\.test'

@@ -13,7 +13,7 @@ export function PendingState({
     <Card className="border-dashed border-border bg-gda-panel/30">
       <CardContent className="py-12 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-gda-bg-base">
-          <span className="text-lg text-muted-foreground">⏳</span>
+          <span className="text-lg text-muted-foreground">...</span>
         </div>
         <h3 className="font-mono text-sm font-medium text-foreground">
           {surface} — Pending
