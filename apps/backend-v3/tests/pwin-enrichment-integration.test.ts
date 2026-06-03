@@ -64,6 +64,43 @@ describe('F-451 integration: enriched features → score ≥ 70 (forecast)', () 
   });
 });
 
+describe('F-451.1 integration: defense customer + mission keywords → forecast', () => {
+  it('DoD agency with logistics/sustainment keywords and IDIQ vehicle reaches forecast (≥70)', () => {
+    const row = makeRow({
+      title: 'Logistics and Sustainment Support Services',
+      description:
+        'Provide operations and maintenance, engineering services, and IDIQ-based ' +
+        'task order support for defense installations.',
+      agency: 'Department of Defense',
+      naics: '541330',
+      set_aside: 'Total Small Business Set-Aside',
+    });
+
+    const features = extractFeaturesFromOpportunity(row, NOW);
+    const result = scoreV1Rules(features, 'v1-rules');
+
+    expect(result.score).toBeGreaterThanOrEqual(70);
+  });
+
+  it('research grant (NSF, 541715, no logistics language) stays well below forecast', () => {
+    const row = makeRow({
+      title: 'Basic Research Grant',
+      description:
+        'Fundamental research in quantum computing and photonics. ' +
+        'National Science Foundation funded academic study.',
+      agency: 'National Science Foundation',
+      naics: '541715',
+    });
+
+    const features = extractFeaturesFromOpportunity(row, NOW);
+    const result = scoreV1Rules(features, 'v1-rules');
+
+    // 541715 is in NAICS lanes (+20 baseline) and small-eligible (+20 naicsSize);
+    // still stays well below forecast (70) with no mission-keyword alignment.
+    expect(result.score).toBeLessThan(50);
+  });
+});
+
 describe('F-451 integration: weak/off-lane row yields discovery', () => {
   it('weak row (no text, unknown NAICS, unknown agency) yields < 45 (discovery)', () => {
     const row = makeRow({

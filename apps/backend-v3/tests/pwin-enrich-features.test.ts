@@ -25,42 +25,42 @@ describe('deriveSignals — scope_match_score', () => {
     expect(s.scope_match_score).toBe(0);
   });
 
-  it('returns NAICS lane bonus (+10) even with empty text', () => {
+  it('returns NAICS lane baseline (20) with empty text', () => {
     const s = deriveSignals(makeInput({ naics: '541330' }));
-    expect(s.scope_match_score).toBe(10);
+    expect(s.scope_match_score).toBe(20);
   });
 
-  it('scores 25 for 1 keyword match', () => {
-    const s = deriveSignals(makeInput({ title: 'Logistics support services' }));
-    expect(s.scope_match_score).toBe(25);
+  it('scores 35 for 1 keyword match', () => {
+    const s = deriveSignals(makeInput({ title: 'Depot level repair contract' }));
+    expect(s.scope_match_score).toBe(35);
   });
 
-  it('scores 45 for 2 keyword matches', () => {
+  it('scores 55 for 2 keyword matches', () => {
     const s = deriveSignals(makeInput({
       title: 'Logistics and sustainment',
     }));
-    expect(s.scope_match_score).toBe(45);
+    expect(s.scope_match_score).toBe(55);
   });
 
-  it('scores 60 for 3 keyword matches', () => {
+  it('scores 70 for 3 keyword matches', () => {
     const s = deriveSignals(makeInput({
       title: 'Logistics sustainment and training',
     }));
-    expect(s.scope_match_score).toBe(60);
+    expect(s.scope_match_score).toBe(70);
   });
 
-  it('scores 75 for 4 keyword matches', () => {
+  it('scores 82 for 4 keyword matches', () => {
     const s = deriveSignals(makeInput({
       title: 'Logistics sustainment training and maintenance',
     }));
-    expect(s.scope_match_score).toBe(75);
+    expect(s.scope_match_score).toBe(82);
   });
 
-  it('scores 90 for 5+ keyword matches', () => {
+  it('scores 92 for 5+ keyword matches', () => {
     const s = deriveSignals(makeInput({
       description: 'Logistics sustainment training maintenance and integration services',
     }));
-    expect(s.scope_match_score).toBe(90);
+    expect(s.scope_match_score).toBe(92);
   });
 
   it('caps at 100 with NAICS lane bonus on 5+ matches', () => {
@@ -71,12 +71,12 @@ describe('deriveSignals — scope_match_score', () => {
     expect(s.scope_match_score).toBe(100);
   });
 
-  it('adds +10 NAICS bonus to keyword score (3 matches + lane = 70)', () => {
+  it('adds +10 NAICS bonus to keyword score (3 matches + lane = 80)', () => {
     const s = deriveSignals(makeInput({
       naics: '541715',
       title: 'Logistics sustainment and training',
     }));
-    expect(s.scope_match_score).toBe(70);
+    expect(s.scope_match_score).toBe(80);
   });
 });
 
