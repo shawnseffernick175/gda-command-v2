@@ -5,27 +5,39 @@ import { apiGet, apiPut } from "@/lib/api";
 import type {
   OpportunitySummary,
   OpportunityDetail,
-  PaginatedResponse,
 } from "@/lib/types";
 
+interface OpportunitiesPaginated {
+  items: OpportunitySummary[];
+  pagination: { limit: number; cursor: string | null; hasMore: boolean };
+}
+
 interface UseOpportunitiesParams {
+  q?: string;
   limit?: number;
   cursor?: string;
   status?: string;
   agency?: string;
   naics?: string;
+  grade?: string;
+  due_before?: string;
+  due_after?: string;
 }
 
 export function useOpportunities(params: UseOpportunitiesParams = {}) {
   return useQuery({
     queryKey: ["opportunities", params],
     queryFn: () =>
-      apiGet<PaginatedResponse<OpportunitySummary>>("/v3/opportunities", {
+      apiGet<OpportunitiesPaginated>("/v3/opportunities", {
+        q: params.q,
         limit: params.limit ?? 100,
         cursor: params.cursor,
         status: params.status,
         agency: params.agency,
         naics: params.naics,
+        grade: params.grade,
+        due_before: params.due_before,
+        due_after: params.due_after,
       }),
   });
 }

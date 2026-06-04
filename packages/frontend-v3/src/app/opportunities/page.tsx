@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useOpportunities, useOpportunity } from "@/hooks/use-opportunities";
@@ -19,6 +19,7 @@ import { formatMoney } from "@/lib/format-money";
 import type {
   DoctrineFitLabel,
   LlmAnalysis,
+  OpportunitySummary,
   ShipleyDimension,
 } from "@/lib/types";
 
@@ -39,15 +40,90 @@ function OpportunitiesContent() {
 }
 
 function OpportunityList() {
-  const [search, setSearch] = useState("");
-  const { data, isLoading, error, refetch } = useOpportunities({ limit: 200 });
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [dueSoonFilter, setDueSoonFilter] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [previousItems, setPreviousItems] = useState<OpportunitySummary[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const items = (data?.items ?? []).filter(
-    (o) =>
-      !search ||
-      o.title.toLowerCase().includes(search.toLowerCase()) ||
-      o.agency?.toLowerCase().includes(search.toLowerCase()),
+  const dueBefore = useMemo(
+    () =>
+      dueSoonFilter
+        ? new Date(Date.now() + 14 * 86400 * 1000).toISOString()
+        : undefined,
+    [dueSoonFilter],
   );
+
+  const { data, isLoading, error, refetch } = useOpportunities({
+    q: debouncedQ || undefined,
+    grade: gradeFilter || undefined,
+    due_before: dueBefore,
+    limit: 100,
+    cursor,
+  });
+
+  const allItems = useMemo(() => {
+    const combined = [...previousItems, ...(data?.items ?? [])];
+    const seen = new Set<string>();
+    return combined.filter((item) => {
+      const key = item.internal_id ?? String(item.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [previousItems, data?.items]);
+
+  const hasMore = data?.pagination?.hasMore ?? false;
+
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      setQ(val);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        setCursor(undefined);
+        setPreviousItems([]);
+        setDebouncedQ(val);
+      }, 350);
+    },
+    [],
+  );
+
+  const handleGradeChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setCursor(undefined);
+      setPreviousItems([]);
+      setGradeFilter(e.target.value);
+    },
+    [],
+  );
+
+  const handleDueSoonChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setCursor(undefined);
+      setPreviousItems([]);
+      setDueSoonFilter(e.target.checked);
+    },
+    [],
+  );
+
+  const handleClearFilters = useCallback(() => {
+    setQ("");
+    setDebouncedQ("");
+    setGradeFilter("");
+    setDueSoonFilter(false);
+    setCursor(undefined);
+    setPreviousItems([]);
+  }, []);
+
+  const handleLoadMore = useCallback(() => {
+    if (data?.pagination?.cursor) {
+      setPreviousItems((prev) => [...prev, ...(data?.items ?? [])]);
+      setCursor(data.pagination.cursor);
+    }
+  }, [data]);
 
   return (
     <div className="space-y-4">
@@ -55,18 +131,49 @@ function OpportunityList() {
         <h1 className="font-mono text-lg font-bold text-foreground">
           Opportunities
         </h1>
-        <span className="text-xs text-muted-foreground">
-          {data?.total ?? items.length} total
-        </span>
       </div>
 
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Filter by title or agency..."
-        className="w-full max-w-sm rounded border border-border bg-gda-bg-base px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-gda-cyan focus:outline-none"
-      />
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <input
+          type="text"
+          placeholder="Search title or agency…"
+          value={q}
+          onChange={handleSearchChange}
+          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 w-64"
+        />
+        <select
+          value={gradeFilter}
+          onChange={handleGradeChange}
+          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+        >
+          <option value="">All Grades</option>
+          <option value="A">Grade A</option>
+          <option value="B">Grade B</option>
+          <option value="C">Grade C</option>
+          <option value="D">Grade D</option>
+        </select>
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={dueSoonFilter}
+            onChange={handleDueSoonChange}
+            className="rounded border-border"
+          />
+          Due in 14 days
+        </label>
+        {(debouncedQ || gradeFilter || dueSoonFilter) && (
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            Clear filters
+          </button>
+        )}
+        <span className="ml-auto text-[11px] text-muted-foreground">
+          {hasMore ? `${allItems.length}+ results` : `${allItems.length} results`}
+        </span>
+      </div>
 
       {error && (
         <ErrorState
@@ -75,7 +182,7 @@ function OpportunityList() {
         />
       )}
 
-      {isLoading ? (
+      {isLoading && !allItems.length ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-10 bg-gda-panel" />
@@ -96,7 +203,7 @@ function OpportunityList() {
               </tr>
             </thead>
             <tbody>
-              {items.map((opp) => (
+              {allItems.map((opp) => (
                 <tr
                   key={opp.internal_id}
                   className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9"
@@ -144,12 +251,23 @@ function OpportunityList() {
               ))}
             </tbody>
           </table>
-          {items.length === 0 && (
+          {allItems.length === 0 && !isLoading && (
             <div className="py-8 text-center text-sm text-muted-foreground">
               No opportunities match your filter.
             </div>
           )}
         </div>
+      )}
+
+      {hasMore && (
+        <button
+          type="button"
+          onClick={handleLoadMore}
+          disabled={isLoading}
+          className="w-full rounded border border-border bg-gda-panel py-2 text-xs font-mono text-muted-foreground hover:text-foreground hover:border-gda-green/30 transition-colors disabled:opacity-50"
+        >
+          {isLoading ? "Loading…" : "Load more"}
+        </button>
       )}
     </div>
   );
