@@ -96,21 +96,26 @@ Connected services: GitHub, Google Calendar, Google Drive, Finance.
 
 ## 8. Working with Devin (the orchestrator workflow)
 
-The standing workflow (Shawn's preference, 2026-06-02): **the assistant is the
-ORCHESTRATOR and does NOT write feature code itself. Devin writes the code.**
-The assistant plans, gathers context, writes the Devin spec, monitors, QAs, and
-merges. Devin handles code changes, PRs, and tests.
+**Shawn is cut out of this loop entirely.** The assistant is the ORCHESTRATOR. Devin writes the code. Shawn only gets involved for risky changes (table drops, secret rotation, infra teardown).
 
-Exception: while Devin is busy on another task, the assistant may make small,
-fast code changes directly rather than queueing behind Devin.
+### The loop
+
+1. Assistant writes spec → creates a **Session** (`POST /v1/sessions`)
+2. Devin works → assistant monitors, sends follow-up messages to unblock
+3. Devin opens a PR
+4. CI completes → assistant reviews the diff
+5. **All CI green + diff is scope-correct → assistant merges automatically.** No Shawn approval needed.
+6. Assistant deploys to VPS, verifies live, updates roadmap.
+
+**No approval step. If it's green and clean, merge it.**
 
 ### How to talk to Devin (REST API, confirmed working)
 
 Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call
 (bearer key injected automatically). Base: `https://api.devin.ai/v1`.
 
-- **IMPORTANT:** Always create a **Session** (`POST /v1/sessions`), never a Review. Sessions are the correct API path for handing off tickets.
-- **Create a session** (hand off a ticket):
+- **Always create a Session. Never use Review.**
+- **Create a session:**
   ```
   curl -s -X POST https://api.devin.ai/v1/sessions \
     -H "Content-Type: application/json" \
@@ -118,46 +123,23 @@ Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call
   ```
   `payload.json` = `{"prompt":"<full spec>","idempotent":true,"tags":["fNNN"],"title":"..."}`.
   Returns `{session_id, url, is_new_session}`.
-- **Check status / result:** `curl -s https://api.devin.ai/v1/session/<session_id>`
-  → read `status_enum` (`working` | `blocked` | `finished`), `pull_request.url`,
-  `structured_output`.
+- **Check status:** `curl -s https://api.devin.ai/v1/session/<session_id>`
+  → read `status_enum` (`working` | `blocked` | `finished`), `pull_request.url`.
 - **Send a follow-up:** `POST https://api.devin.ai/v1/session/<session_id>/message`
-  with `{"message":"..."}` — use to unblock or correct, not to bounce work back
-  unresolved.
+  with `{"message":"..."}` — use to unblock or correct.
 - **List sessions:** `curl -s "https://api.devin.ai/v1/sessions?limit=N"`.
-
-The MCP endpoint (`https://mcp.devin.ai/mcp`, methods `devin_session_create`,
-`devin_session_interact`, `devin_session_gather`) exposes the same capability;
-the REST API above is the confirmed-working path.
 
 ### What every Devin spec MUST include
 
 1. **Repo + base branch** — `shawnseffernick175/gda-command-v2`, `main` (+ current HEAD).
-2. **Exact files/routes to touch** (saves Devin exploration time) and explicit
-   **OUT OF SCOPE** list.
-3. **Definition of done** — the exact check commands that must pass, run from
-   `packages/frontend-v3` using the DIRECT binaries (NOT npx):
+2. **Exact files/routes to touch** and explicit **OUT OF SCOPE** list.
+3. **Definition of done** — exact check commands from `packages/frontend-v3` using DIRECT binaries (NOT npx):
    `node ../../node_modules/typescript/bin/tsc --noEmit`,
    `node ../../node_modules/eslint/bin/eslint.js . --max-warnings 0`,
    `node ../../node_modules/vitest/vitest.mjs run` (+ `--config vitest.contract.config.ts`),
    `npm run build`, and all GitHub CI checks green.
-4. **Constraints (house rules):** R1 (every user-facing value carries a clickable
-   SourceRef/SourceLink); R2 forbidden-token scan (no `running`/`pending`/
-   `not_yet_analyzed`/`analysis_status`/`"stale":bool`/`analysis:null`); color lock
-   (6 tokens only, NO gold, no raw hex/box-shadow/gradients/emoji/JetBrains Mono);
-   no nested-heredoc file edits; clean PR off `main`, stage only changed paths.
-5. **A report-back request:** branch, PR number, key decisions made, files
-   deleted, green CI status.
-
-### Orchestrator loop
-
-spec → `create session` → poll `status_enum` → (if `blocked`, fix the blocker via
-a follow-up message) → when a PR appears, the assistant QAs the diff against the
-DoD, runs/inspects CI, and on green + scope-correct merges with `gh pr merge
---squash --admin` → deploy if needed (assistant does VPS deploy) → verify live
-→ update roadmap. Devin's PR-open Review still runs as a second set of eyes; the
-assistant surfaces findings, fixes legit ones (or has Devin fix), and merges per
-the approved pattern (CI green + findings resolved).
+4. **Constraints (house rules):** R1 (every user-facing value carries a clickable SourceRef/SourceLink); R2 forbidden-token scan (no `running`/`pending`/`not_yet_analyzed`/`analysis_status`/`"stale":bool`/`analysis:null`); color lock (6 tokens only, NO gold, no raw hex/box-shadow/gradients/emoji/JetBrains Mono); no nested-heredoc file edits; clean PR off `main`, stage only changed paths.
+5. **A report-back request:** branch, PR number, key decisions, files deleted, CI status.
 
 ---
 
