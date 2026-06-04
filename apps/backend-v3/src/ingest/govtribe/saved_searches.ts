@@ -3,6 +3,9 @@
  * 3 Opportunities, 2 Awards, 2 Forecasts.
  *
  * Total estimated credit cost: ~115 credits/cycle (Mon + Thu).
+ *
+ * NAICS filters removed 2026-06-04 — keywords handle targeting,
+ * scoring handles ranking. Filters were blocking all results.
  */
 
 export type SearchCategory = 'opportunities' | 'awards' | 'forecasts';
@@ -13,7 +16,7 @@ export interface GovTribeSavedSearch {
   category: SearchCategory;
   mcpTool: string;
   keywords: string[];
-  naicsFilter: string[];
+  naicsFilter: string[]; // empty = no filter (keyword-only)
   expectedCreditsPerPage: number;
   maxResults: number;
 }
@@ -26,7 +29,7 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
     category: 'opportunities',
     mcpTool: 'Search_Federal_Contract_Opportunities',
     keywords: ['SETA', 'C5ISR', 'PEO IEW&S', 'CPE IEW&S', 'PEO C3N', 'CPE C3N', 'cybersecurity', 'systems engineering'],
-    naicsFilter: ['541511', '541512', '541519', '541330', '541611', '541690'],
+    naicsFilter: [],
     expectedCreditsPerPage: 15,
     maxResults: 50,
   },
@@ -36,7 +39,7 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
     category: 'opportunities',
     mcpTool: 'Search_Federal_Contract_Opportunities',
     keywords: ['CMMC', 'AI/ML', 'XR/AR', 'DEVCOM', 'synthetic training'],
-    naicsFilter: ['541511', '541512', '541715', '518210'],
+    naicsFilter: [],
     expectedCreditsPerPage: 15,
     maxResults: 50,
   },
@@ -46,7 +49,7 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
     category: 'opportunities',
     mcpTool: 'Search_Federal_Contract_Opportunities',
     keywords: ['advisory services', 'innovation', 'ISR', 'EW'],
-    naicsFilter: ['541611', '541690', '541715'],
+    naicsFilter: [],
     expectedCreditsPerPage: 15,
     maxResults: 50,
   },
@@ -58,7 +61,7 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
     category: 'awards',
     mcpTool: 'Search_Federal_Contract_Awards',
     keywords: ['SETA', 'C5ISR', 'PEO IEW&S', 'CPE IEW&S', 'cybersecurity', 'systems engineering'],
-    naicsFilter: ['541511', '541512', '541519', '541330'],
+    naicsFilter: [],
     expectedCreditsPerPage: 20,
     maxResults: 50,
   },
@@ -68,7 +71,7 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
     category: 'awards',
     mcpTool: 'Search_Federal_Contract_Awards',
     keywords: ['CMMC', 'AI/ML', 'DEVCOM'],
-    naicsFilter: ['541511', '541512', '541715'],
+    naicsFilter: [],
     expectedCreditsPerPage: 20,
     maxResults: 50,
   },
@@ -80,7 +83,7 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
     category: 'forecasts',
     mcpTool: 'Search_Federal_Forecasts',
     keywords: ['SETA', 'C5ISR', 'PEO IEW&S', 'CPE IEW&S', 'cybersecurity'],
-    naicsFilter: ['541511', '541512', '541519'],
+    naicsFilter: [],
     expectedCreditsPerPage: 15,
     maxResults: 50,
   },
@@ -90,7 +93,7 @@ export const GOVTRIBE_SAVED_SEARCHES: GovTribeSavedSearch[] = [
     category: 'forecasts',
     mcpTool: 'Search_Federal_Forecasts',
     keywords: ['AI/ML', 'CMMC', 'DEVCOM', 'innovation'],
-    naicsFilter: ['541715', '518210'],
+    naicsFilter: [],
     expectedCreditsPerPage: 15,
     maxResults: 50,
   },
