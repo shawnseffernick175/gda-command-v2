@@ -61,7 +61,7 @@ export function mapGrantsGovOpp(
     sub_agency: null,
     department: trimOrNull(raw.agencyName),
     solicitation_number: trimOrNull(raw.number),
-    status: raw.oppStatus === 'posted' ? 'solicitation' : 'forecast',
+    status: 'discovery',
     value_min: numOrNull(raw.awardFloor),
     value_max: numOrNull(raw.awardCeiling),
     naics: null,
