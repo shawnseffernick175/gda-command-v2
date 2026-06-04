@@ -7,6 +7,7 @@ import { useOpportunities, useOpportunity } from "@/hooks/use-opportunities";
 import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
+import { AskAiPanel } from "@/components/shared/ask-ai-panel";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
 import { PendingState } from "@/components/shared/pending-state";
@@ -426,6 +427,17 @@ function OpportunityDetail({ id }: { id: string }) {
           />
         </div>
       </div>
+
+      {/* Ask AI (F-480) */}
+      <AskAiPanel
+        objectType="opportunity"
+        objectId={id}
+        context={{
+          title: opp.title,
+          agency: opp.agency,
+          pwin: opp.pwin?.score,
+        }}
+      />
     </div>
   );
 }
