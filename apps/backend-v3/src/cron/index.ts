@@ -29,6 +29,7 @@ import { registerNIHSource } from '../ingest/nih/index.js';
 import { registerArxivSource } from '../ingest/arxiv/index.js';
 import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
+import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
@@ -36,6 +37,7 @@ const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
+const grantsGovEnabled = process.env.ENABLE_GRANTS_GOV_INGEST !== 'false';
 
 const tasks: ScheduledTask[] = [];
 
@@ -75,6 +77,9 @@ const JOBS: CronJob[] = [
         { sourceKey: 'govwin', schedule: '0 */6 * * *', label: 'GovWin IQ opps poll (every 6 hours)' },
       ]
     : []),
+  ...(grantsGovEnabled
+    ? [{ sourceKey: 'grants.gov', schedule: '0 11 * * *', label: 'Grants.gov open opportunities (daily 07:00 ET)' }]
+    : []),
 ];
 
 export function startCronScheduler(): void {
@@ -94,6 +99,7 @@ export function startCronScheduler(): void {
   if (govwinEnabled) {
     registerGovWinSource();
   }
+  registerGrantsGovSource();
 
   const registeredSources = getRegisteredSources();
   const registeredAdapters = listAdapters();
@@ -158,6 +164,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'dod_rss' ? 'dod_rss.daily'
       : job.sourceKey === 'nih' ? 'nih.weekly'
       : job.sourceKey === 'arxiv' ? 'arxiv.weekly'
+      : job.sourceKey === 'grants.gov' ? 'grants.daily'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
