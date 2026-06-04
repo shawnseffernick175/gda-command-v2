@@ -38,10 +38,13 @@ export async function callOpenAIEmbed(opts: {
   const openai = getClient();
 
   try {
-    const response = await openai.embeddings.create({
-      model: opts.model,
-      input: opts.text,
-    });
+    const response = await openai.embeddings.create(
+      {
+        model: opts.model,
+        input: opts.text,
+      },
+      { timeout: opts.timeout_ms },
+    );
 
     const data = response.data[0];
     if (!data) {

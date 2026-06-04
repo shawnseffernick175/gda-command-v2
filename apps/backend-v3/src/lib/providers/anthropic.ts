@@ -59,12 +59,15 @@ export async function callAnthropic(opts: {
   const userContent = JSON.stringify(opts.input);
 
   try {
-    const response = await anthropic.messages.create({
-      model: opts.model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userContent }],
-    });
+    const response = await anthropic.messages.create(
+      {
+        model: opts.model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userContent }],
+      },
+      { timeout: opts.timeout_ms },
+    );
 
     const textBlock = response.content.find((b) => b.type === 'text');
     const text = textBlock && 'text' in textBlock ? textBlock.text : '';

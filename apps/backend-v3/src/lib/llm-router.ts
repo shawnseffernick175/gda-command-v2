@@ -169,6 +169,7 @@ async function route<T extends Task>(
   let lastError: { message: string; status?: number; kind?: RouterErrorKind } | null = null;
   let primaryTokens: TokenUsage | null = null;
   let primaryModelUsed: string | null = null;
+  let fallbackAttempted = false;
 
   // Attempt primary provider with retry
   try {
@@ -255,6 +256,7 @@ async function route<T extends Task>(
       const minBudget = entry.fallback.min_remaining_budget_ms ?? 500;
 
       if (remaining >= minBudget) {
+        fallbackAttempted = true;
         try {
           const fbResult = await callProvider(
             task,
@@ -323,7 +325,7 @@ async function route<T extends Task>(
     latency_ms: latencyMs,
     tokens: primaryTokens,
     cost_estimate_usd: 0,
-    fallback_used: entry.fallback !== null,
+    fallback_used: fallbackAttempted,
     quality_flag: 'degraded',
     error_kind: finalErrorKind,
     error_message: lastError?.message ?? 'Unknown error',

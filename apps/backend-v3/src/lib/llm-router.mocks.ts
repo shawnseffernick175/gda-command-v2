@@ -21,9 +21,17 @@ import type {
   SourceResearchOutput,
 } from './llm-router.types.js';
 
-/** Deterministic hash of input for mock lookup. */
+/** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
 export function hashInput(input: unknown): string {
-  const json = JSON.stringify(input, Object.keys(input as object).sort());
+  const json = JSON.stringify(input, (_key, value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.keys(value).sort().reduce<Record<string, unknown>>((acc, k) => {
+        acc[k] = (value as Record<string, unknown>)[k];
+        return acc;
+      }, {});
+    }
+    return value;
+  });
   return createHash('sha256').update(json).digest('hex').slice(0, 16);
 }
 

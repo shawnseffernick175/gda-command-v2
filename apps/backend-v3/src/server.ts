@@ -7,12 +7,16 @@ import { startSoakDigestWorker } from './workers/soak-digest.js';
 import { subscribeFastTrack } from './workers/fast-track.js';
 import { pool } from './lib/db.js';
 import { startCronScheduler, stopCronScheduler } from './cron/index.js';
+import { initRouter, validateKeys } from './lib/llm-router.js';
 
 async function main(): Promise<void> {
   logger.info(
     { version: config.version, commit: config.gitSha, port: config.port },
     'Starting GDA Command V3 backend'
   );
+
+  validateKeys();
+  initRouter(pool);
 
   await initBoss();
 
