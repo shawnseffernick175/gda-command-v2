@@ -109,6 +109,7 @@ function OpportunityList() {
   );
 
   const handleClearFilters = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setQ("");
     setDebouncedQ("");
     setGradeFilter("");
