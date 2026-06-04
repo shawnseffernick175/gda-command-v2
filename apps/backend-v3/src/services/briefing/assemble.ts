@@ -126,7 +126,8 @@ async function fetchCapturesWithGaps(): Promise<CaptureSummary[]> {
     FROM captures c
     JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
     JOIN opportunities o ON o.id = pi.opportunity_id
-    WHERE c.color_stage IN ('pink', 'red', 'gold')
+    WHERE o.deleted_at IS NULL
+      AND c.color_stage IN ('pink', 'red', 'gold')
     ORDER BY c.updated_at DESC
     LIMIT 10
   `);
