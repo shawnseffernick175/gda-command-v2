@@ -13,7 +13,7 @@ import { getAccessToken, invalidateOAuth2Token } from './oauth2_auth.js';
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 
-const API_BASE = process.env['GOVWIN_API_BASE'] ?? 'https://api.govwin.com/v1';
+const API_BASE = process.env['GOVWIN_API_BASE'] ?? 'https://services.govwin.com/neo-ws';
 const DAILY_LIMIT = parseInt(process.env['GOVWIN_DAILY_LIMIT'] ?? '200', 10);
 const BACKOFF_429_MS = 60_000; // 1 min backoff on 429
 
