@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiGet, apiPut, apiPost } from "@/lib/api";
 
@@ -14,50 +15,47 @@ function formatLabel(key: string): string {
 type PwinWeights = Record<string, number>;
 
 export default function PwinSettingsPage() {
-  const [weights, setWeights] = useState<PwinWeights | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<PwinWeights | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const fetchWeights = useCallback(async () => {
-    try {
-      const data = await apiGet<PwinWeights>("/v3/pwin/config");
-      setWeights(data);
-    } catch {
-      setMessage("Failed to load weights");
-    }
-  }, []);
+  const { data: weights, isLoading } = useQuery({
+    queryKey: ["pwin-config"],
+    queryFn: () => apiGet<PwinWeights>("/v3/pwin/config"),
+  });
 
-  useEffect(() => {
-    void fetchWeights();
-  }, [fetchWeights]);
+  const displayed = draft ?? weights ?? null;
 
-  const handleSave = async () => {
-    if (!weights) return;
-    setSaving(true);
-    setMessage(null);
-    try {
-      await apiPut<PwinWeights>("/v3/pwin/config", weights);
+  const saveMutation = useMutation({
+    mutationFn: (body: PwinWeights) =>
+      apiPut<PwinWeights>("/v3/pwin/config", body),
+    onSuccess: () => {
       setMessage("Saved");
-    } catch {
-      setMessage("Failed to save");
-    } finally {
-      setSaving(false);
-    }
+      setDraft(null);
+      void qc.invalidateQueries({ queryKey: ["pwin-config"] });
+    },
+    onError: () => setMessage("Failed to save"),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => apiPost<PwinWeights>("/v3/pwin/config/reset"),
+    onSuccess: () => {
+      setMessage("Reset to defaults");
+      setDraft(null);
+      void qc.invalidateQueries({ queryKey: ["pwin-config"] });
+    },
+    onError: () => setMessage("Failed to reset"),
+  });
+
+  const handleSave = () => {
+    if (!displayed) return;
+    setMessage(null);
+    saveMutation.mutate(displayed);
   };
 
-  const handleReset = async () => {
-    setResetting(true);
+  const handleReset = () => {
     setMessage(null);
-    try {
-      await apiPost<PwinWeights>("/v3/pwin/config/reset");
-      await fetchWeights();
-      setMessage("Reset to defaults");
-    } catch {
-      setMessage("Failed to reset");
-    } finally {
-      setResetting(false);
-    }
+    resetMutation.mutate();
   };
 
   return (
@@ -73,7 +71,7 @@ export default function PwinSettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!weights ? (
+          {isLoading || !displayed ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div
@@ -85,7 +83,7 @@ export default function PwinSettingsPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Object.entries(weights).map(([key, value]) => (
+                {Object.entries(displayed).map(([key, value]) => (
                   <div key={key} className="flex items-center gap-2">
                     <label className="flex-1 text-xs font-mono text-muted-foreground">
                       {formatLabel(key)}
@@ -97,9 +95,10 @@ export default function PwinSettingsPage() {
                       onChange={(e) => {
                         const num = parseFloat(e.target.value);
                         if (!isNaN(num)) {
-                          setWeights((prev) =>
-                            prev ? { ...prev, [key]: num } : prev,
-                          );
+                          setDraft((prev) => ({
+                            ...(prev ?? displayed),
+                            [key]: num,
+                          }));
                         }
                       }}
                       className="w-24 rounded border border-border bg-gda-bg-base px-2 py-1 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan"
@@ -111,17 +110,17 @@ export default function PwinSettingsPage() {
               <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saveMutation.isPending}
                   className="rounded bg-gda-cyan px-4 py-1.5 text-xs font-mono font-medium text-gda-bg-base hover:bg-gda-cyan/90 disabled:opacity-50"
                 >
-                  {saving ? "Saving..." : "Save"}
+                  {saveMutation.isPending ? "Saving..." : "Save"}
                 </button>
                 <button
                   onClick={handleReset}
-                  disabled={resetting}
+                  disabled={resetMutation.isPending}
                   className="rounded border border-border px-4 py-1.5 text-xs font-mono text-muted-foreground hover:bg-gda-bg-base disabled:opacity-50"
                 >
-                  {resetting ? "Resetting..." : "Reset to Defaults"}
+                  {resetMutation.isPending ? "Resetting..." : "Reset to Defaults"}
                 </button>
                 {message && (
                   <span className="text-xs text-muted-foreground">
