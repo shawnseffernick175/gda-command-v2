@@ -1,2 +1,0 @@
-id,name,my_class,devin_class,confidence,evidence,notes
-AQOLuJyT8edVTEyP,GDA.cron.ndaa-ingest,KEEP_INDEPENDENT,REWIRE_TO_V3,High,"Node 'Store NDAA Intel' (type: n8n-nodes-base.code) has credential postgres:GDA Postgres (id HwronxMmGY5XDGEt). Workflow writes NDAA intel to V2 DB — needs repointing to V3 staging DB.","my-triage.csv says 'no DB/V2 dependency' but the postgres credential is present in the workflow JSON. has_pg column also shows N which contradicts the credential."
