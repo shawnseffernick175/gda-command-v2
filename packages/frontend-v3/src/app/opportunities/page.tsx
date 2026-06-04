@@ -102,7 +102,7 @@ function OpportunityList() {
                 >
                   <td className="px-3 py-1.5">
                     <Link
-                      href={`/opportunities?id=${opp.internal_id}`}
+                      href={`/opportunities?id=${opp.id}`}
                       className="text-foreground hover:text-gda-green truncate block max-w-xs"
                     >
                       {opp.title}
