@@ -38,11 +38,11 @@ async function persistTokenHash(accessToken: string): Promise<void> {
   try {
     const tokenHash = createHash('sha256').update(accessToken).digest('hex').slice(0, 16);
     await pool.query(
-      `INSERT INTO govwin_auth_state (id, token_hash, authenticated_at)
+      `INSERT INTO govwin_auth_state (id, tgt_hash, last_refresh_at)
        VALUES (1, $1, NOW())
        ON CONFLICT (id) DO UPDATE SET
-         token_hash = $1,
-         authenticated_at = NOW()`,
+         tgt_hash = $1,
+         last_refresh_at = NOW()`,
       [tokenHash],
     );
   } catch (err) {

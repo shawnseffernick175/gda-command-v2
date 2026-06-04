@@ -181,7 +181,7 @@ export async function discoverRecentOpportunitiesApi(
   maxResults = 50,
 ): Promise<GovWinApiOpportunity[]> {
   const data = await apiGet<GovWinSearchResult>(
-    `/opportunities?sort=updated_at&order=desc&per_page=${maxResults}`,
+    `/opportunities?sort=updatedDate&order=desc&max=${maxResults}&oppSelectionDateFrom=-30D`,
   );
 
   const rawItems = data.opportunities ?? data.results ?? data.data ?? [];
