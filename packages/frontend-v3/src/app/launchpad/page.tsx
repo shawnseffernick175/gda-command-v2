@@ -3,6 +3,7 @@
 import {
   useLaunchpadSummary,
   useLaunchpadFlags,
+  useFunnelReport,
 } from "@/hooks/use-launchpad";
 import { useOpportunities } from "@/hooks/use-opportunities";
 import { useActionItems } from "@/hooks/use-action-items";
@@ -180,6 +181,9 @@ export default function LaunchpadPage() {
         </Card>
       </div>
 
+      {/* Lifecycle Funnel */}
+      <FunnelSection />
+
       {/* Recent Signals */}
       <Card className="border-border bg-gda-panel">
         <CardHeader>
@@ -212,6 +216,53 @@ export default function LaunchpadPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function FunnelSection() {
+  const { data: funnel, isLoading } = useFunnelReport();
+
+  if (isLoading) return <Skeleton className="h-32 bg-gda-panel" />;
+  if (!funnel?.stages?.length) return null;
+
+  const maxCount = Math.max(...funnel.stages.map((s) => s.count), 1);
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader>
+        <CardTitle className="font-mono text-sm text-muted-foreground">
+          Lifecycle Funnel
+          <span className="ml-2 font-normal text-[11px]">
+            {funnel.window_days}d window
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {funnel.stages.map((s) => (
+            <div key={s.stage} className="flex items-center gap-3">
+              <span className="w-28 text-xs text-muted-foreground truncate">
+                {s.stage}
+              </span>
+              <div className="flex-1 h-5 bg-gda-bg-base rounded overflow-hidden">
+                <div
+                  className="h-full rounded bg-gda-green/40"
+                  style={{ width: `${(s.count / maxCount) * 100}%` }}
+                />
+              </div>
+              <span className="font-mono text-xs text-foreground tabular-nums w-8 text-right">
+                {s.count}
+              </span>
+              {s.conversion_rate != null && (
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums w-12 text-right">
+                  {(s.conversion_rate * 100).toFixed(0)}%
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

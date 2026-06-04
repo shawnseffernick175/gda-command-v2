@@ -33,14 +33,39 @@ export interface OpportunitySummary {
   days_in_stage?: number | null;
 }
 
+export interface AnalysisTimeline {
+  rfp_release: string | null;
+  proposals_due: string | null;
+  award_estimate: string | null;
+}
+
+export interface AnalysisBlock {
+  version: string;
+  generated_at: string;
+  pwin: number | null;
+  timeline: AnalysisTimeline | null;
+}
+
+export type DoctrineFitLabel = "strong" | "moderate" | "weak" | "none";
+
+export interface DoctrineBadge {
+  label: DoctrineFitLabel;
+  score: number;
+  matchedPrinciples: string[];
+  primaryPrinciple: string | null;
+  rationale: string;
+}
+
 export interface OpportunityDetail extends OpportunitySummary {
   description: string | null;
   place_of_performance: string | null;
   solicitation_number: string | null;
   notice_id: string | null;
   response_deadline: string | null;
+  posted_at: string | null;
   source: string | null;
-  analysis?: Record<string, unknown> | null;
+  doctrine_badge?: DoctrineBadge | null;
+  analysis?: AnalysisBlock | null;
 }
 
 export interface PaginatedResponse<T> {

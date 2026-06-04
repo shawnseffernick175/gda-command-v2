@@ -8,14 +8,14 @@ import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
-import { OodaInspector } from "@/components/shared/ooda-inspector";
-import { AskAiPanel } from "@/components/shared/ask-ai-panel";
 import { ErrorState } from "@/components/shared/error-state";
+import { PendingState } from "@/components/shared/pending-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
+import type { DoctrineFitLabel } from "@/lib/types";
 
 export default function OpportunitiesPage() {
   return (
@@ -150,6 +150,24 @@ function OpportunityList() {
   );
 }
 
+const DOCTRINE_PRINCIPLES = [
+  "Alignment",
+  "Ethics Always",
+  "Teamwork",
+  "Data First, Then Debate",
+  "Relentless Execution",
+  "Relationships, Relationships, Relationships",
+  "Market, Mission, Brand Focus",
+  "Customer Facing",
+] as const;
+
+const FIT_COLORS: Record<DoctrineFitLabel, string> = {
+  strong: "text-gda-green",
+  moderate: "text-gda-cyan",
+  weak: "text-gda-amber",
+  none: "text-muted-foreground",
+};
+
 function OpportunityDetail({ id }: { id: string }) {
   const { data: opp, isLoading, error } = useOpportunity(id);
 
@@ -167,15 +185,16 @@ function OpportunityDetail({ id }: { id: string }) {
   }
 
   if (error) {
-    return (
-      <ErrorState message={(error as Error).message} />
-    );
+    return <ErrorState message={(error as Error).message} />;
   }
 
   if (!opp) return null;
 
   const pwin = opp.pwin;
   const band = pwin?.band ?? "discovery";
+  const doctrine = opp.doctrine_badge;
+  const doctrineScore = opp.doctrine_score;
+  const timeline = opp.analysis?.timeline;
 
   return (
     <div className="space-y-6">
@@ -207,15 +226,13 @@ function OpportunityDetail({ id }: { id: string }) {
               Named prime: {pwin.incumbent_competitor}
             </Badge>
           )}
-          {opp.source && (
-            <SourceChip label={opp.source} kind="real" />
-          )}
+          {opp.source && <SourceChip label={opp.source} kind="real" />}
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Canvas (main content) */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Overview */}
           <Card className="border-border bg-gda-panel">
             <CardHeader>
               <CardTitle className="font-mono text-sm text-muted-foreground">
@@ -254,7 +271,7 @@ function OpportunityDetail({ id }: { id: string }) {
             </CardContent>
           </Card>
 
-          {/* Pwin */}
+          {/* Pwin Panel */}
           {pwin && (
             <Card className="border-border bg-gda-panel">
               <CardHeader>
@@ -270,6 +287,9 @@ function OpportunityDetail({ id }: { id: string }) {
                 <div className="text-xs text-muted-foreground">
                   Model: {pwin.model_version} · Scored:{" "}
                   {new Date(pwin.scored_at).toLocaleDateString()}
+                  {pwin.days_to_due != null && (
+                    <> · {pwin.days_to_due}d to due</>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {pwin.top_drivers.map((d, i) => (
@@ -282,26 +302,145 @@ function OpportunityDetail({ id }: { id: string }) {
             </Card>
           )}
 
-          <AskAiPanel objectType="opportunity" objectId={id} />
+          {/* Doctrine Panel */}
+          <Card className="border-border bg-gda-panel">
+            <CardHeader>
+              <CardTitle className="font-mono text-sm text-muted-foreground">
+                Doctrine Fit{" "}
+                <span className="font-normal italic text-[11px]">
+                  (keyword-based doctrine fit)
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {doctrine ? (
+                <>
+                  <div className="flex items-baseline gap-3">
+                    <span className={`font-mono text-2xl font-bold ${FIT_COLORS[doctrine.label]}`}>
+                      {Math.round((doctrine.score / 100) * 40)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">/ 40</span>
+                    <Badge
+                      variant="outline"
+                      className={`capitalize text-xs ${FIT_COLORS[doctrine.label]}`}
+                    >
+                      {doctrine.label}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {doctrine.rationale}
+                  </p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {DOCTRINE_PRINCIPLES.map((p) => {
+                      const matched = doctrine.matchedPrinciples.some(
+                        (m) => p.toLowerCase().includes(m.replace(/_/g, " ")),
+                      );
+                      return (
+                        <span
+                          key={p}
+                          className={`text-[11px] ${
+                            matched ? "text-gda-green" : "text-muted-foreground"
+                          }`}
+                        >
+                          {matched ? "●" : "○"} {p}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : doctrineScore != null ? (
+                <>
+                  <div className="flex items-baseline gap-3">
+                    <span className="font-mono text-2xl font-bold text-gda-cyan">
+                      {doctrineScore}
+                    </span>
+                    <span className="text-sm text-muted-foreground">/ 40</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {DOCTRINE_PRINCIPLES.map((p) => (
+                      <span key={p} className="text-[11px] text-muted-foreground">
+                        ○ {p}
+                      </span>
+                    ))}
+                  </div>
+                  <SourceChip label="keyword alignment" kind="heuristic" />
+                </>
+              ) : (
+                <PendingState
+                  surface="Doctrine Fit"
+                  reason="Doctrine alignment score will appear once the opportunity has been scored by the rules engine."
+                />
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Inspector (OODA) */}
+        {/* Right column: Timeline */}
         <div className="space-y-4">
           <Card className="border-border bg-gda-panel">
             <CardHeader>
               <CardTitle className="font-mono text-sm text-muted-foreground">
-                OODA Inspector
+                Timeline
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <OodaInspector
-                opportunityId={id}
-                stage={opp.stage ?? undefined}
+            <CardContent className="space-y-3">
+              <TimelineRow
+                label="RFP Release"
+                date={timeline?.rfp_release ?? opp.posted_at}
               />
+              <TimelineRow
+                label="Proposals Due"
+                date={timeline?.proposals_due ?? opp.response_deadline}
+              />
+              <TimelineRow
+                label="Award Estimate"
+                date={timeline?.award_estimate}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Capture Pwin — read-only from pipeline */}
+          {opp.capture_pwin != null && (
+            <Card className="border-border bg-gda-panel">
+              <CardHeader>
+                <CardTitle className="font-mono text-sm text-muted-foreground">
+                  Capture Pwin
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScoreDisplay score={opp.capture_pwin} className="text-2xl" />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Shipley-driven capture probability
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Honesty gate — hidden panels */}
+          <Card className="border-dashed border-border bg-gda-panel/30">
+            <CardContent className="py-6 text-center text-xs text-muted-foreground">
+              <p className="font-mono font-medium">
+                Additional panels coming soon
+              </p>
+              <p className="mt-1">
+                OODA Inspector, Ask AI, Competitor Analysis, Black Hat, and Wargame
+                panels are pending the real intelligence layer.
+              </p>
             </CardContent>
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TimelineRow({ label, date }: { label: string; date?: string | null }) {
+  return (
+    <div className="flex items-center justify-between text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono text-foreground">
+        {date ? new Date(date).toLocaleDateString() : "—"}
+      </span>
     </div>
   );
 }
