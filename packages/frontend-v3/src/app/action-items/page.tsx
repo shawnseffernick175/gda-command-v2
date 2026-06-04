@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useActionItems, useUpdateActionItem } from "@/hooks/use-action-items";
+import {
+  useActionItems,
+  useUpdateActionItem,
+  useCreateDraft,
+} from "@/hooks/use-action-items";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +13,7 @@ import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { cn } from "@/lib/utils";
+import type { ActionItem, ActionItemDraft } from "@/lib/types";
 
 const STATUS_FILTERS = [
   { label: "All", value: undefined },
@@ -18,19 +23,23 @@ const STATUS_FILTERS = [
   { label: "Done", value: "done" },
 ] as const;
 
+const DRAFT_KINDS = ["reply", "research", "milestone"] as const;
+
 export default function ActionItemsPage() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+
   const { data, isLoading, error, refetch } = useActionItems({
     status: statusFilter,
   });
+
+  const items = data?.items ?? [];
+
   const updateItem = useUpdateActionItem();
 
-  const overdue = (data?.items ?? []).filter((i) => i.status === "overdue");
-  const open = (data?.items ?? []).filter((i) => i.status === "open");
-  const inProgress = (data?.items ?? []).filter(
-    (i) => i.status === "in_progress",
-  );
-  const done = (data?.items ?? []).filter((i) => i.status === "done");
+  const overdue = items.filter((i) => i.status === "overdue");
+  const open = items.filter((i) => i.status === "open");
+  const inProgress = items.filter((i) => i.status === "in_progress");
+  const done = items.filter((i) => i.status === "done");
 
   return (
     <div className="space-y-4">
@@ -69,7 +78,7 @@ export default function ActionItemsPage() {
             <Skeleton key={i} className="h-10 bg-gda-panel" />
           ))}
         </div>
-      ) : (data?.items ?? []).length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState
           title="No action items"
           description="Action items are created from pursuits, captures, and reviews."
@@ -142,77 +151,173 @@ function ActionItemGroup({
   items,
   onToggle,
 }: {
-  items: Array<{
-    id: number;
-    title: string;
-    due_date: string | null;
-    owner: string | null;
-    status: string;
-  }>;
+  items: ActionItem[];
   onToggle: (id: number, status: string) => void;
 }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
   return (
     <div className="space-y-1">
       {items.map((item) => (
-        <div
-          key={item.id}
-          className="flex items-center gap-3 rounded px-2 py-1.5 text-sm hover:bg-gda-bg-base transition-colors"
-        >
-          <button
-            type="button"
-            onClick={() =>
-              onToggle(
-                item.id,
-                item.status === "done" ? "open" : "done",
-              )
-            }
-            className={cn(
-              "h-4 w-4 rounded border transition-colors",
-              item.status === "done"
-                ? "bg-gda-green border-gda-green"
-                : "border-border hover:border-gda-green",
-            )}
-          />
-          <span
-            className={cn(
-              "flex-1 text-foreground",
-              item.status === "done" && "line-through text-muted-foreground",
-            )}
-          >
-            {item.title}
-          </span>
-          {item.owner && (
-            <span className="text-xs text-muted-foreground">
-              {item.owner}
-            </span>
-          )}
-          {item.due_date && (
-            <span
+        <div key={item.id}>
+          <div className="flex items-center gap-3 rounded px-2 py-1.5 text-sm hover:bg-gda-bg-base transition-colors">
+            <button
+              type="button"
+              onClick={() =>
+                onToggle(
+                  item.id,
+                  item.status === "done" ? "open" : "done",
+                )
+              }
               className={cn(
-                "font-mono text-[11px]",
-                item.status === "overdue"
-                  ? "text-gda-red"
-                  : "text-muted-foreground",
+                "h-4 w-4 rounded border transition-colors shrink-0",
+                item.status === "done"
+                  ? "bg-gda-green border-gda-green"
+                  : "border-border hover:border-gda-green",
+              )}
+            />
+            <button
+              type="button"
+              onClick={() =>
+                setExpandedId(expandedId === item.id ? null : item.id)
+              }
+              className={cn(
+                "flex-1 text-left text-foreground hover:text-gda-green transition-colors",
+                item.status === "done" && "line-through text-muted-foreground",
               )}
             >
-              {new Date(item.due_date).toLocaleDateString()}
-            </span>
-          )}
-          <Badge
-            variant="outline"
-            className={cn(
-              "text-[11px]",
-              item.status === "overdue"
-                ? "border-gda-red/30 text-gda-red"
-                : item.status === "done"
-                  ? "border-gda-green/30 text-gda-green"
-                  : "border-border text-muted-foreground",
+              {item.title}
+            </button>
+            {item.owner && (
+              <span className="text-xs text-muted-foreground">
+                {item.owner}
+              </span>
             )}
-          >
-            {item.status}
-          </Badge>
+            {item.due_date && (
+              <span
+                className={cn(
+                  "font-mono text-[11px]",
+                  item.status === "overdue"
+                    ? "text-gda-red"
+                    : "text-muted-foreground",
+                )}
+              >
+                {new Date(item.due_date).toLocaleDateString()}
+              </span>
+            )}
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[11px]",
+                item.status === "overdue"
+                  ? "border-gda-red/30 text-gda-red"
+                  : item.status === "done"
+                    ? "border-gda-green/30 text-gda-green"
+                    : "border-border text-muted-foreground",
+              )}
+            >
+              {item.status}
+            </Badge>
+          </div>
+
+          {expandedId === item.id && (
+            <DraftPanel itemId={item.id} drafts={item.drafts ?? []} />
+          )}
         </div>
       ))}
     </div>
   );
+}
+
+/* ── Draft panel (shown when an item row is expanded) ────────── */
+
+function DraftPanel({
+  itemId,
+  drafts,
+}: {
+  itemId: number;
+  drafts: ActionItemDraft[];
+}) {
+  const createDraft = useCreateDraft();
+
+  return (
+    <div className="ml-9 mr-2 mb-2 rounded bg-gda-bg-base p-2 space-y-2">
+      <div className="flex gap-1.5">
+        {DRAFT_KINDS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            disabled={createDraft.isPending}
+            onClick={() => createDraft.mutate({ id: itemId, kind })}
+            className="text-xs font-mono px-2 py-0.5 rounded border border-border hover:border-gda-green transition-colors disabled:opacity-50"
+          >
+            {kind === "reply"
+              ? "Reply Draft"
+              : kind === "research"
+                ? "Research"
+                : "Milestone"}
+          </button>
+        ))}
+      </div>
+
+      {drafts.length > 0 && (
+        <div className="space-y-1">
+          {drafts.map((draft) => (
+            <DraftRow key={draft.id} draft={draft} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Single draft row (expandable) ───────────────────────────── */
+
+function DraftRow({ draft }: { draft: ActionItemDraft }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="rounded border border-border/50 px-2 py-1">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 w-full text-left"
+      >
+        <Badge variant="outline" className="text-[10px] shrink-0">
+          {draft.kind}
+        </Badge>
+        <DraftStatusChip status={draft.status} />
+        <span className="text-xs text-muted-foreground line-clamp-2 flex-1">
+          {draft.status === "generating"
+            ? "Generating…"
+            : draft.content.slice(0, 120)}
+        </span>
+      </button>
+
+      {open && draft.status === "done" && (
+        <pre className="text-xs whitespace-pre-wrap bg-gda-bg-base rounded p-2 mt-1">
+          {draft.content}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function DraftStatusChip({
+  status,
+}: {
+  status: ActionItemDraft["status"];
+}) {
+  if (status === "generating") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-amber-400">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+        generating
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return <span className="text-[10px] text-gda-red">failed</span>;
+  }
+  return <span className="text-[10px] text-gda-green">done</span>;
 }
