@@ -152,6 +152,7 @@ export interface OpportunityUpdateInput {
 }
 
 export interface ListFilters {
+  q?: string;
   status?: string;
   agency?: string;
   naics?: string;

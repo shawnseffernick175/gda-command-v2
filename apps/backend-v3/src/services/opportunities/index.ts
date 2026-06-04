@@ -209,6 +209,11 @@ export async function listOpportunities(
   const params: unknown[] = [];
   let paramIdx = 1;
 
+  if (filters.q) {
+    conditions.push(`(title ILIKE $${paramIdx} OR agency ILIKE $${paramIdx})`);
+    params.push(`%${filters.q}%`);
+    paramIdx++;
+  }
   if (filters.status) {
     conditions.push(`status = $${paramIdx++}`);
     params.push(filters.status);

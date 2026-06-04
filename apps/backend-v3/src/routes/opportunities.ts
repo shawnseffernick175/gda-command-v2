@@ -509,6 +509,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/opportunities', async (req, reply) => {
     const query = req.query as Record<string, string | undefined>;
     const filters: ListFilters = {
+      q: query.q,
       status: query.status,
       agency: query.agency,
       naics: query.naics,
