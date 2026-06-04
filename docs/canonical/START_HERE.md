@@ -2,7 +2,7 @@
 
 **If you are an AI assistant in a new chat: read this whole file first. It loads you with everything you need. Do NOT re-ask the user for any of this.**
 
-Last verified: June 1, 2026. Owner: Shawn Seffernick, CTO, Envision-IS (emerging defense / DoD contracting), Alexandria VA.
+Last verified: June 3, 2026. Owner: Shawn Seffernick, CTO, Envision-IS (emerging defense / DoD contracting), Alexandria VA.
 
 ---
 
@@ -57,13 +57,19 @@ GDA Command = Shawn's operating system for emerging defense / DoD business devel
   - Mint a test JWT in-container:
     `docker exec gda-mcp-server node -e "console.log(require('jsonwebtoken').sign({sub:'verify',role:'admin'}, process.env.JWT_SECRET, {algorithm:'HS256', expiresIn:'10m'}))"`
 - **`.env.production` keys confirmed present:** LEGISCAN_API_KEY, VOYAGE_API_KEY, JWT_SECRET, STAGING_POSTGRES_PASSWORD. (ANTHROPIC_API_KEY not needed.)
+- **GovTribe ingest: FIXED ✅ (June 3, 2026).** PR #678 fixed 0-rows bug — `fetchOppDetailBatches` only handled `{ results: [] }` shape; GovTribe MCP returns `{ data: [] }`, `{ rows: [] }`, and bare arrays too. Added `extractResultsArray<T>()` helper in `apps/backend-v3/src/ingest/govtribe/job.ts`. Verified: run_id=57 → 349 rows inserted.
+- **GovWin ingest: FIXED ✅ (June 3, 2026).** GovWin uses OAuth2 **password grant** (NOT client_credentials). Working token endpoint: `https://services.govwin.com/neo-ws/oauth/token`. Three bugs fixed across PRs #679 and #680:
+  1. `oauth2_auth.ts` — switched to `grant_type=password` + username + password + `scope=read`; fixed column names `tgt_hash`/`last_refresh_at` (not `token_hash`/`authenticated_at`).
+  2. `api_client.ts` — sort param `updatedDate` (not `updated_at`), pagination `max` (not `per_page`), added `oppSelectionDateFrom=-30D`.
+  - Credentials: `sseffernick@pd-sys.net` / `AUR_nka3arb_vbn0pzv`, client_id `DJTCSO5JOVG94UIQIV9KQ9NMLELV01HIAEBIHB83E0VQ4`, secret in `.env`. Verified: run_id=61 → 50 rows inserted.
+- **Devin API: currently returning 403** on all keys (June 3, 2026). Cannot receive sessions until resolved externally.
 
 ---
 
 ## 4. What's NEXT (the build order)
 
 - **Phase 2 — Unified API (✅ COMPLETE):** ✅ F-410 unified detail (`GET /v3/opportunities/unified/:internal_id`) · ✅ F-411 stage filter (`GET /v3/opportunities/unified?stage=`) · ✅ F-412 suggestion queue (`GET/POST /v3/match-suggestions`) · ✅ F-413 field override + audit (`PUT /v3/opportunities/:internal_id/field-override`). All live on backend-v3.
-- **Phase 3 — Unified UI (IN PROGRESS):** ✅ F-420 unified detail page (route `/unified/:internal_id`, PR #637, live) → ✅ F-420a connect-the-data (per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis for R1/R2, PR #639, live) → ✅ F-421 tab structure (say-something surfaces) — tabbed unified list at `/unified`, stage-group filters, R1 source links on every value, PR #641, live → ✅ F-422 suggestion review UI (Review Matches tab, human-in-the-loop confirm/reject queue, PR #643, live) → **F-423 decommission old per-source detail routes = NEXT**.
+- **Phase 3 — Unified UI (IN PROGRESS):** ✅ F-420 unified detail page (route `/unified/:internal_id`, PR #637, live) → ✅ F-420a connect-the-data (per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis for R1/R2, PR #639, live) → ✅ F-421 tab structure (say-something surfaces) — tabbed unified list at `/unified`, stage-group filters, R1 source links on every value, PR #641, live → ✅ F-422 suggestion review UI (Review Matches tab, human-in-the-loop confirm/reject queue, PR #643, live) → **F-423 decommission old per-source detail routes = NEXT** (Devin blocked at 403 — queue this when Devin comes back online).
 - **Phase 4 — Fast Track adapters:** F-430 NSF, F-431 SBIR, F-432 SAM Sources Sought/Pre-Sol, F-433 DoD RSS, F-434 NIH RePORTER, F-435 arXiv+USAspending, F-436 signal scoring, F-437 doctrine badge.
 - **Phase 5 — Hardening + analytics:** F-440 LOW-confidence matcher, F-441 conversion funnel, F-442 audit log, F-443 bulk review.
 
@@ -103,6 +109,7 @@ fast code changes directly rather than queueing behind Devin.
 Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call
 (bearer key injected automatically). Base: `https://api.devin.ai/v1`.
 
+- **IMPORTANT:** Always create a **Session** (`POST /v1/sessions`), never a Review. Sessions are the correct API path for handing off tickets.
 - **Create a session** (hand off a ticket):
   ```
   curl -s -X POST https://api.devin.ai/v1/sessions \
@@ -164,4 +171,4 @@ the approved pattern (CI green + findings resolved).
 
 ---
 
-**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket (Phase 2 is COMPLETE — next is **Phase 3 Unified UI — F-420 detail page + F-420a connect-the-data + F-421 tab structure DONE+live; F-422 suggestion review UI DONE+live; next is F-423 decommission the legacy V3 single-source detail page (running via Devin). V1/V2 teardown (F-314) is COMPLETE — V1/V2 was already removed from git; stale VPS artifacts cleaned 2026-06-02; the no-phantom-backend CI guard enforces it**), then ORCHESTRATE: write a Devin spec (Section 8), hand it to Devin via the REST API, monitor, QA the PR against the DoD, merge when CI is green and findings are resolved, and deploy. (Assistant does VPS/deploy steps; Devin writes the code. Small quick fixes the assistant may do directly while Devin is busy.) End with a recommendation. Don't make Shawn do anything but approve.
+**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket. Current state as of June 3, 2026: Phase 2 COMPLETE. Phase 3 Unified UI — F-420/F-420a/F-421/F-422 DONE+live. **Next ticket: F-423** (decommission legacy per-source detail routes). GovTribe ingest ✅ (349 rows, run_id=57). GovWin ingest ✅ (50 rows, run_id=61, OAuth2 password grant). V1/V2 teardown F-314 COMPLETE. **Devin API currently 403** — if it's still down, hold F-423 and check Devin status first. When Devin is back: write spec (Section 8), hand off via `POST /v1/sessions` (Session, not Review), monitor, QA, merge when CI green. Assistant does VPS/deploy. Devin writes code. Small quick fixes the assistant may do directly while Devin is busy. End with a recommendation. Don't make Shawn do anything but approve.

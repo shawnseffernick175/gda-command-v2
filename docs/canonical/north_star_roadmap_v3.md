@@ -58,7 +58,7 @@ The end state is **one detail page per opportunity, regardless of source, with d
 ### Layer 1: Source ingestion
 - **SAM.gov** — Get Opportunities Public API + Entity Management API (read-only key in Devin store, active SAM entity registration)
 - **GovTribe** — MCP over Streamable HTTP (Bearer JWT), 64 tools discovered, $0.039–$0.09/credit pricing, self-imposed cap 1200/mo + 150/cycle, real-spend confirmed today at 3 credits per opportunity search
-- **GovWin** — CAS portal auth (username+password), Iron portal login, no Deltek OAuth tier
+- **GovWin** — OAuth2 **password grant** (`grant_type=password`, `scope=read`), token endpoint `https://services.govwin.com/neo-ws/oauth/token`, API base `https://services.govwin.com/neo-ws`. Sort: `updatedDate`. Pagination: `max` (max 100). Fixed June 3, 2026 via PRs #679/#680. Verified run_id=61 → 50 rows.
 - **Fast Track sources** (Phase 4) — SBIR, SAM Sources Sought + Pre-Sol, NIH RePORTER, NSF Awards, USAspending, DARPA/ONR BAA, DoD RSS, arXiv
 
 ### Layer 2: Unified opportunity model
