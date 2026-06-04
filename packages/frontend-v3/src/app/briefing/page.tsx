@@ -72,7 +72,7 @@ export default function BriefingPage() {
         <Card className="border-border bg-gda-panel">
           <CardContent className="py-8 text-center">
             <p className="text-sm text-muted-foreground">
-              No briefing generated yet — click Regenerate to generate today&apos;s
+              No briefing generated yet — click Regenerate to generate today{"'"}s
               brief.
             </p>
             <Button
