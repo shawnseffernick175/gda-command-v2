@@ -2,7 +2,7 @@
 
 **If you are an AI assistant in a new chat: read this whole file first. It loads you with everything you need. Do NOT re-ask the user for any of this.**
 
-Last verified: June 3, 2026. Owner: Shawn Seffernick, CTO, Envision-IS (emerging defense / DoD contracting), Alexandria VA.
+Last verified: June 4, 2026. Owner: Shawn Seffernick, CTO, Envision-IS (emerging defense / DoD contracting), Alexandria VA.
 
 ---
 
@@ -62,7 +62,9 @@ GDA Command = Shawn's operating system for emerging defense / DoD business devel
   1. `oauth2_auth.ts` — switched to `grant_type=password` + username + password + `scope=read`; fixed column names `tgt_hash`/`last_refresh_at` (not `token_hash`/`authenticated_at`).
   2. `api_client.ts` — sort param `updatedDate` (not `updated_at`), pagination `max` (not `per_page`), added `oppSelectionDateFrom=-30D`.
   - Credentials: `sseffernick@pd-sys.net` / `AUR_nka3arb_vbn0pzv`, client_id `DJTCSO5JOVG94UIQIV9KQ9NMLELV01HIAEBIHB83E0VQ4`, secret in `.env`. Verified: run_id=61 → 50 rows inserted.
-- **Devin API: currently returning 403** on all keys (June 3, 2026). Cannot receive sessions until resolved externally.
+- **F-460 Frontend Rewire: DONE ✅ (June 4, 2026).** PR #681 merged (squash, commit `add6dcc`). Frontend rebuilt and redeployed to VPS. All routes 200. Pipeline → `/v3/opportunities` (band filter, score sort, top_drivers chips). OpportunityDetail → REAL tier only (Doctrine panel 0–40, Timeline, Capture Pwin). Approvals → `/v3/match-suggestions`. Launchpad → lifecycle funnel from `/v3/reports/funnel`. Honesty gate enforced — heuristic panels hidden with "coming soon".
+- **nginx SPA routing fix: DONE ✅ (June 4, 2026).** Commit `06d28ea` — added `try_files $uri $uri.html` so Next.js static export `/page.html` paths route correctly without 403.
+- **Devin API: FIXED ✅ (June 3, 2026).** New API key saved to vault (`api.devin.ai`, bearer). Duplicate entries cleaned.
 
 ---
 
@@ -153,4 +155,4 @@ Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call
 
 ---
 
-**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket. Current state as of June 3, 2026: Phase 2 COMPLETE. Phase 3 Unified UI — F-420/F-420a/F-421/F-422 DONE+live. **Next ticket: F-423** (decommission legacy per-source detail routes). GovTribe ingest ✅ (349 rows, run_id=57). GovWin ingest ✅ (50 rows, run_id=61, OAuth2 password grant). V1/V2 teardown F-314 COMPLETE. **Devin API currently 403** — if it's still down, hold F-423 and check Devin status first. When Devin is back: write spec (Section 8), hand off via `POST /v1/sessions` (Session, not Review), monitor, QA, merge when CI green. Assistant does VPS/deploy. Devin writes code. Small quick fixes the assistant may do directly while Devin is busy. End with a recommendation. Don't make Shawn do anything but approve.
+**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket. Current state as of June 4, 2026: **All 5 phases COMPLETE.** F-460 Frontend Rewire live at `https://gda.csr-llc.tech` — Pipeline, OpportunityDetail, Approvals, Launchpad all hitting real backend-v3 v3 endpoints. Honesty gate enforced. GovTribe ✅ (349 rows). GovWin ✅ (50 rows, OAuth2 password grant). Devin API ✅ (new key in vault). **Next: F-215 D4** (real LLM router — Anthropic + OpenAI keys already in n8n env on VPS, un-hides AI panels). After that: **F-453** (tunable Pwin weights UI, has a DB migration, fold in after F-215 D4 live). When sending to Devin: write spec (Section 8), hand off via `POST /v1/sessions` (Session, not Review), monitor, QA, merge when CI green. Assistant does VPS/deploy. Devin writes code. End with a recommendation. Don't make Shawn do anything.

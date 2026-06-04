@@ -1,6 +1,6 @@
 # GDA Command North Star Roadmap — V3 Edition
 
-**Date:** June 3, 2026 (updated — Phases 1–5 ALL COMPLETE; F-450 → F-452 Pwin scoring chain shipped; GovTribe + GovWin ingest fixed; main HEAD 6747741. NEXT: Phase 6 frontend rewire F-460 — live UI is frozen May 9 on the OLD n8n schema and must be repointed at backend-v3)
+**Date:** June 4, 2026 (updated — F-460 frontend rewire COMPLETE; live at gda.csr-llc.tech; PR #681 merged add6dcc + nginx SPA fix 06d28ea. NEXT: F-215 D4 real LLM router, then F-453 tunable Pwin weights)
 **Owner:** Shawn Seffernick
 **Replaces:** north_star_roadmap_v3.md (June 1, 2026)
 **Project Space:** GDA Rebuild
@@ -92,20 +92,26 @@ The unified opportunity foundation (Phase 1) and the external MCP epic (F-500) a
 
 ---
 
-## What's next — Phase 6
+## What's next — Phase 7
 
-### F-460 — GDA Command frontend rewire (NEXT MAJOR SPRINT)
+### ✅ F-460 — GDA Command frontend rewire (COMPLETE — June 4, 2026)
 
-**The problem:** the backend is solid, calibrated, deployed. But the **live frontend at `gda.csr-llc.tech` is frozen May 9, 2026** — it predates every recent backend change. It serves a React/Vite app backed by its OWN in-repo Node BFF (`src/api/routes/*`) that reads the **OLD n8n Postgres DB** (`gda_opportunity_tracker`, `pwin`/`score` as flat columns). It does NOT call backend-v3, has zero `/v3/` references, and cannot display any of the new scoring/bands/top_drivers/reports/review work.
+**Shipped:** PR #681 merged (squash, commit `add6dcc`). nginx SPA routing fixed (commit `06d28ea`). Frontend rebuilt + redeployed. All routes 200.
 
-**The fix:**
-- **Rip out the in-repo BFF entirely** (`src/api/routes/*` + the n8n `pg.Pool`). That layer IS the v1/v2 contamination — deleted, not reused.
-- **Point all React pages at backend-v3's `/v3/` endpoints** (JWT-protected, schema-validated).
-- **Surface the new structured `analysis.pwin`** — score, band (forecast/signal/discovery/pass), top_drivers, days_to_due, model_version, incumbent_competitor — on Pipeline + OpportunityDetail.
-- **Map each existing page to a v3 endpoint first** to find gaps; gaps become new backend-v3 endpoints.
-- Deploy: build → static `dist` served from Hostinger; all data via `gda-v3.csr-llc.tech`.
+- Pipeline → `/v3/opportunities` (band filter, score sort, top_drivers chips, days_to_due, incumbent tag)
+- OpportunityDetail → REAL tier only (Doctrine panel 0–40, Timeline panel, Capture Pwin). Heuristic panels hidden with "coming soon" (honesty gate enforced)
+- Approvals → `/v3/match-suggestions` + bulk confirm/reject, added to nav
+- Launchpad → lifecycle funnel chart from `/v3/reports/funnel`
+- BFF (`src/api/routes/*`) was already cleaned in prior work
+- Doctrine score: backend `doctrine_badge.score` is 0–100 (backend normalizes native 0–40 → 0–100); frontend converts back to 0–40 via `Math.round((score/100)*40)` for display. Round-trip math correct.
 
-**F-453 — Tunable Pwin weights + reset-to-defaults** — fold into F-460 (it is a frontend feature). New `pwin_scoring_config` table; scorer reads weights from config; GET/PUT `/v3/pwin/config` + POST `/v3/pwin/config/reset`; settings panel in UI with reset button.
+### F-215 D4 — Real LLM Router (NEXT)
+
+Anthropic + OpenAI keys already in n8n env on VPS. Un-hides AI panels (OODA Inspector, Ask AI, Competitive Intel). Send to Devin via `POST /v1/sessions`.
+
+### F-453 — Tunable Pwin weights + reset-to-defaults
+
+Separate ticket (has a DB migration). New `pwin_scoring_config` table; scorer reads weights from config; GET/PUT `/v3/pwin/config` + POST `/v3/pwin/config/reset`; settings panel in UI with reset button. **Fold in after F-215 D4 is live.**
 
 ### Known follow-ups / candidates (not yet ticketed)
 - **Grants.gov adapter** — confirmed live during SBIR diagnosis; strong civilian SBIR/STTR + grants signal source.
@@ -163,7 +169,7 @@ Precedence: human override > GovWin > SAM > GovTribe > Fast Track. Cached 60s pe
 
 ### Layer 6: UI
 - frontend-v3 React (`packages/frontend-v3`) at `gda.csr-llc.tech`
-- **WARNING: frontend FROZEN May 9 — still backed by old in-repo BFF on n8n DB.** F-460 rewires it to backend-v3. Until F-460 is done, the live UI does NOT show scoring/bands/fast-track data.
+- **Frontend: LIVE at gda.csr-llc.tech** — F-460 complete. All pages hit backend-v3 `/v3/` endpoints. Pwin bands, top_drivers, doctrine fit, timeline, approvals queue, lifecycle funnel all real. Heuristic panels (OODA, Ask AI, Competitive Intel) hidden pending F-215 D4.
 - 6-color palette only: Pink, Red, Black, Blue, White, Green. **No gold.**
 
 ### Layer 7: Infrastructure
@@ -188,10 +194,10 @@ Precedence: human override > GovWin > SAM > GovTribe > Fast Track. Cached 60s pe
 9. ✅ Phase 3 unified UI complete
 10. ✅ Phase 4 Fast Track adapters complete (7 sources + F-436 scoring + F-437 doctrine badge)
 11. ✅ Phase 5 hardening + analytics complete (F-440–F-443 + F-450–F-452 Pwin chain)
-12. ⏳ Phase 6 frontend rewire (F-460) — live UI reconnected to backend-v3
+12. ✅ Phase 6 frontend rewire (F-460) — live UI reconnected to backend-v3 (DONE June 4, 2026)
 
 **Items 1–11 all met. Single remaining bar: Phase 6.**
 
 ---
 
-*Canonical roadmap for GDA Command V3 as of June 3, 2026. Phases 1–5 COMPLETE. Backend scoring engine done (F-452). GovTribe + GovWin ingest fixed. Devin API 403 (hold new sessions). NEXT = Phase 6 frontend rewire F-460: delete in-repo BFF, point React at /v3/ endpoints, surface new Pwin bands. Reload before any planning session.*
+*Canonical roadmap for GDA Command V3 as of June 4, 2026. Phases 1–6 COMPLETE. F-460 frontend rewire LIVE at gda.csr-llc.tech. Devin API fixed (new key in vault). NEXT = F-215 D4 real LLM router (un-hides AI panels), then F-453 tunable Pwin weights (has DB migration). Reload before any planning session.*
