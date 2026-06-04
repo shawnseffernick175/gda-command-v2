@@ -33,7 +33,7 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     task: 'daily_briefing',
     provider: 'anthropic',
     model: 'claude-sonnet-4-5',
-    timeout_ms: 30_000,
+    timeout_ms: 90_000,
     fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
   },
   {
