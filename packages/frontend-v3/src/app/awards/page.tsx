@@ -58,10 +58,15 @@ export default function AwardsPage() {
   const { data, isLoading, error, refetch } = useAwards(params);
   const { data: countData } = useAwardsCount();
 
-  const allItems = useMemo(
-    () => [...previousItems, ...(data?.items ?? [])],
-    [previousItems, data?.items],
-  );
+  const allItems = useMemo(() => {
+    const combined = [...previousItems, ...(data?.items ?? [])];
+    const seen = new Set<string>();
+    return combined.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [previousItems, data?.items]);
 
   const resetFilters = useCallback(() => {
     setCursor(undefined);
@@ -224,23 +229,43 @@ function AwardCard({ award }: { award: Award }) {
               {award.contract_type}
             </Badge>
           )}
-          <SourceChip label="USAspending" kind="real" />
+          <SourceChip
+            label="USAspending"
+            url={award.fpds_url}
+            kind="real"
+          />
           <span className="ml-auto text-[11px] text-muted-foreground font-mono">
             {formattedDate}
           </span>
+          {award.awarded_at_sources?.map((s, i) => (
+            <SourceChip key={`date-${i}`} label={s.title} url={s.url} kind="real" />
+          ))}
         </div>
-        <p className="text-sm text-foreground">
-          <span className="text-muted-foreground text-[11px]">Recipient:</span>{" "}
-          {award.recipient_name ?? "—"}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          <span className="text-muted-foreground">Agency:</span>{" "}
-          {award.agency ?? "—"}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm text-foreground">
+            <span className="text-muted-foreground text-[11px]">Recipient:</span>{" "}
+            {award.recipient_name ?? "—"}
+          </p>
+          {award.recipient_name_sources?.map((s, i) => (
+            <SourceChip key={`rcpt-${i}`} label={s.title} url={s.url} kind="real" />
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground">Agency:</span>{" "}
+            {award.agency ?? "—"}
+          </p>
+          {award.agency_sources?.map((s, i) => (
+            <SourceChip key={`agcy-${i}`} label={s.title} url={s.url} kind="real" />
+          ))}
+        </div>
         <div className="flex items-center gap-3">
           <span className="font-mono text-sm text-foreground tabular-nums">
             {formatMoney(award.awarded_amount)}
           </span>
+          {award.awarded_amount_sources?.map((s, i) => (
+            <SourceChip key={`amt-${i}`} label={s.title} url={s.url} kind="real" />
+          ))}
           {award.fpds_url && (
             <a
               href={award.fpds_url}
