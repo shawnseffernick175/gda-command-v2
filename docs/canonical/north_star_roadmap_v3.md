@@ -127,6 +127,17 @@ The unified opportunity foundation (Phase 1) and the external MCP epic (F-500) a
 - Settings page at `/settings/pwin` — tune weights, save, reset to defaults. Added to sidebar nav.
 - Scorer (`rules-scorer.ts`) accepts optional `PwinWeights` param; falls back to hardcoded defaults when not provided.
 
+### ✅ F-460b — Daily Commander Briefing (COMPLETE — June 4, 2026)
+
+**Shipped:** PR #684 merged (squash, commit `dd78719`). Migration `v3_036_daily_briefing_cache.sql` applied. Backend + frontend rebuilt. Timeout fix + system prompt fix pushed (commits `03eae7d`, `0607b16`).
+
+- `daily_briefing_cache` table: one row per day, `UNIQUE(briefing_date)`, upsert on conflict.
+- Assembler (`services/briefing/assemble.ts`): pulls open opps (grade A/B or forecast/signal pwin), captures with pink/red/gold color stages, action items due within 7 days, pipeline at risk within 14 days. Calls `llmRouter.route({ task: 'daily_briefing' })`. LLM task: claude-sonnet-4-5, **90s timeout**, explicit JSON schema in system prompt.
+- Cron: `DAILY_BRIEFING` queue, `0 10 * * *` UTC = 06:00 ET, retryLimit 1.
+- Routes: `GET /v3/briefing/today` (returns cached row or 404) + `POST /v3/briefing/generate` (on-demand upsert).
+- Frontend: `/briefing` page — headline card, priority actions (urgency chips: immediate/today/this_week), risk flags card (red border), market intel, cert expiration warnings (amber border), Regenerate button. Added to sidebar nav (Newspaper icon, 2nd item after Launchpad).
+- First briefing generated June 4 — 200 OK, real Claude output with live pipeline data.
+
 ### Known follow-ups / candidates (not yet ticketed)
 - **Grants.gov adapter** — confirmed live during SBIR diagnosis; strong civilian SBIR/STTR + grants signal source.
 - **Backfill notice-type classification** — ~2,398 older SAM rows still `opportunity_type=null`; will reclassify naturally through daily cron, or a one-time backfill.
@@ -214,4 +225,4 @@ Precedence: human override > GovWin > SAM > GovTribe > Fast Track. Cached 60s pe
 
 ---
 
-*Canonical roadmap for GDA Command V3 as of June 4, 2026. Phases 1–6 COMPLETE. F-460 frontend rewire LIVE at gda.csr-llc.tech. Devin API fixed (new key in vault). NEXT = F-215 D4 real LLM router (un-hides AI panels), then F-453 tunable Pwin weights (has DB migration). Reload before any planning session.*
+*Canonical roadmap for GDA Command V3 as of June 4, 2026. Phases 1–6 COMPLETE. F-460b Daily Commander Briefing LIVE at gda.csr-llc.tech/briefing — 06:00 ET cron, claude-sonnet-4-5, first briefing generated and verified. LLM router (F-215 D4) wired and real. AI Analysis + Pwin config (F-453) live. GovTribe ✅ GovWin ✅. Reload before any planning session.*
