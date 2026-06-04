@@ -68,9 +68,10 @@ export function validateKeys(): void {
 
 /**
  * Check if mock mode is active (env or request-level).
+ * Supports MOCK_LLM=1 (D4 spec) and LLM_ROUTER_MODE=mock (legacy integration tests).
  */
 function isMockMode(opts?: { mock?: boolean }): boolean {
-  return opts?.mock === true || process.env['MOCK_LLM'] === '1';
+  return opts?.mock === true || process.env['MOCK_LLM'] === '1' || process.env['LLM_ROUTER_MODE'] === 'mock';
 }
 
 /**
