@@ -62,9 +62,12 @@ export async function getAccessToken(): Promise<string> {
   const { clientId, clientSecret } = getClientCredentials();
 
   const body = new URLSearchParams({
-    grant_type: 'client_credentials',
+    grant_type: 'password',
     client_id: clientId,
     client_secret: clientSecret,
+    username: process.env['GOVWIN_USERNAME'] ?? '',
+    password: process.env['GOVWIN_PASSWORD'] ?? '',
+    scope: 'read',
   });
 
   const res = await fetch(TOKEN_URL, {
