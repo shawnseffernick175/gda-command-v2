@@ -15,7 +15,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
-import type { DoctrineFitLabel } from "@/lib/types";
+import type {
+  DoctrineFitLabel,
+  LlmAnalysis,
+  ShipleyDimension,
+} from "@/lib/types";
 
 export default function OpportunitiesPage() {
   return (
@@ -415,21 +419,187 @@ function OpportunityDetail({ id }: { id: string }) {
             </Card>
           )}
 
-          {/* Honesty gate — hidden panels */}
-          <Card className="border-dashed border-border bg-gda-panel/30">
-            <CardContent className="py-6 text-center text-xs text-muted-foreground">
-              <p className="font-mono font-medium">
-                Additional panels coming soon
-              </p>
-              <p className="mt-1">
-                OODA Inspector, Ask AI, Competitor Analysis, Black Hat, and Wargame
-                panels are pending the real intelligence layer.
-              </p>
-            </CardContent>
-          </Card>
+          {/* AI Analysis (F-453) */}
+          <AiAnalysisCard
+            llmAnalysis={opp.llm_analysis as LlmAnalysis | null | undefined}
+            qualityFlag={opp.llm_quality_flag}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── AI Analysis Card (F-453) ────────────────────────────────────────────
+
+const SHIPLEY_DIMENSIONS: Array<{
+  key: keyof import("@/lib/types").ShipleyBidNoBid;
+  label: string;
+}> = [
+  { key: "customer_knowledge", label: "Customer Knowledge" },
+  { key: "solution_match", label: "Solution Match" },
+  { key: "competitive_position", label: "Competitive Position" },
+  { key: "past_performance", label: "Past Performance" },
+];
+
+const BID_COLORS: Record<string, string> = {
+  Bid: "text-gda-green border-gda-green/30",
+  "No Bid": "text-gda-red border-gda-red/30",
+  Conditional: "text-gda-amber border-gda-amber/30",
+};
+
+function AiAnalysisCard({
+  llmAnalysis,
+  qualityFlag,
+}: {
+  llmAnalysis?: LlmAnalysis | null;
+  qualityFlag?: string | null;
+}) {
+  if (llmAnalysis === undefined) {
+    return (
+      <Card className="border-dashed border-border bg-gda-panel/30">
+        <CardContent className="py-6 text-center text-xs text-muted-foreground">
+          <p className="font-mono">AI analysis running...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!llmAnalysis) {
+    return (
+      <Card className="border-dashed border-border bg-gda-panel/30">
+        <CardContent className="py-6 text-center text-xs text-muted-foreground">
+          <p className="font-mono">AI analysis running...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const bidColor =
+    BID_COLORS[llmAnalysis.shipley_bid_no_bid.overall] ?? "text-muted-foreground";
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader>
+        <CardTitle className="font-mono text-sm text-muted-foreground">
+          AI Analysis
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Win Probability */}
+        <div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-bold text-gda-green">
+              {llmAnalysis.win_probability}%
+            </span>
+            <span className="text-xs text-muted-foreground">Win Probability</span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {llmAnalysis.win_probability_reasoning}
+          </p>
+          {qualityFlag === "degraded" && (
+            <Badge
+              variant="outline"
+              className="mt-1 border-gda-amber/30 text-[11px] text-gda-amber"
+            >
+              Degraded (fallback model used)
+            </Badge>
+          )}
+        </div>
+
+        <Separator className="bg-border" />
+
+        {/* Shipley Bid/No-Bid */}
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              Shipley Bid/No-Bid:
+            </span>
+            <Badge variant="outline" className={`text-xs ${bidColor}`}>
+              {llmAnalysis.shipley_bid_no_bid.overall}
+            </Badge>
+          </div>
+          <div className="mt-2 rounded border border-border overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border bg-gda-bg-base text-muted-foreground">
+                  <th className="px-2 py-1 text-left font-medium">Dimension</th>
+                  <th className="px-2 py-1 text-center font-medium">Score</th>
+                  <th className="px-2 py-1 text-left font-medium">Reasoning</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SHIPLEY_DIMENSIONS.map((dim) => {
+                  const d = llmAnalysis.shipley_bid_no_bid[
+                    dim.key
+                  ] as ShipleyDimension | undefined;
+                  if (!d) return null;
+                  return (
+                    <tr key={dim.key} className="border-b border-border">
+                      <td className="px-2 py-1 text-muted-foreground">
+                        {dim.label}
+                      </td>
+                      <td className="px-2 py-1 text-center font-mono text-foreground">
+                        {d.score}/10
+                      </td>
+                      <td className="px-2 py-1 text-muted-foreground truncate max-w-[200px]">
+                        {d.reasoning}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Competitor Landscape */}
+        {llmAnalysis.competitive_landscape.length > 0 && (
+          <>
+            <Separator className="bg-border" />
+            <div>
+              <span className="text-xs font-medium text-muted-foreground">
+                Competitor Landscape
+              </span>
+              <div className="mt-1 space-y-1">
+                {llmAnalysis.competitive_landscape.slice(0, 3).map((c, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs"
+                  >
+                    <span className="font-mono text-foreground whitespace-nowrap">
+                      {c.name}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {c.our_differentiator}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Source Chips */}
+        {llmAnalysis.source_chips.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {llmAnalysis.source_chips.map((chip, i) => (
+              <SourceChip
+                key={i}
+                label={chip.label}
+                url={chip.url}
+                kind="real"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Model footer */}
+        <p className="text-[11px] font-mono text-muted-foreground">
+          Model: {llmAnalysis.model_used}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

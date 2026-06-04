@@ -115,6 +115,8 @@ export interface OpportunityDetail extends OpportunitySummary {
   qualified_by: string | null;
   grade_evidence: string | null;
   analysis: AnalysisBlock;
+  llm_analysis?: unknown;
+  llm_quality_flag?: string | null;
 }
 
 export interface OpportunityCreateInput {

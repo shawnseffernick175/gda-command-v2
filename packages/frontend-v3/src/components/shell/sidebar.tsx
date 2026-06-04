@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, SETTINGS_ITEM } from "./nav-items";
+import { NAV_ITEMS, SETTINGS_ITEM, PWIN_SETTINGS_ITEM } from "./nav-items";
 import { useSentinel } from "@/hooks/use-sentinel";
 
 export function Sidebar() {
@@ -65,6 +65,19 @@ export function Sidebar() {
         >
           <SETTINGS_ITEM.icon size={15} />
           <span>{SETTINGS_ITEM.label}</span>
+        </Link>
+
+        <Link
+          href={PWIN_SETTINGS_ITEM.href}
+          className={cn(
+            "flex items-center gap-2.5 rounded px-3 py-1.5 text-[11px] transition-colors",
+            pathname === PWIN_SETTINGS_ITEM.href
+              ? "text-gda-green"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <PWIN_SETTINGS_ITEM.icon size={13} />
+          <span>{PWIN_SETTINGS_ITEM.label}</span>
         </Link>
 
         <Link

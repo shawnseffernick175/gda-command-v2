@@ -29,6 +29,7 @@ import { colorTeamRoutes } from './routes/color-teams.js';
 import { doctrineRoutes } from './routes/doctrine.js';
 import { memoryRoutes } from './routes/memory.js';
 import { pwinRoutes } from './routes/pwin.js';
+import { pwinConfigRoutes } from './routes/pwin-config.js';
 import { awardRoutes } from './routes/awards.js';
 import { agentRoutes } from './routes/agent.js';
 import { auditRoutes } from './routes/audit.js';
@@ -139,6 +140,7 @@ export async function buildApp() {
   await app.register(sentinelRoutes);
   await app.register(memoryRoutes);
   await app.register(pwinRoutes);
+  await app.register(pwinConfigRoutes);
   await app.register(awardRoutes);
   await app.register(agentRoutes);
   await app.register(auditRoutes);

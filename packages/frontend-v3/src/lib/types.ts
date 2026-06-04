@@ -66,6 +66,8 @@ export interface OpportunityDetail extends OpportunitySummary {
   source: string | null;
   doctrine_badge?: DoctrineBadge | null;
   analysis?: AnalysisBlock | null;
+  llm_analysis?: LlmAnalysis | null;
+  llm_quality_flag?: string | null;
 }
 
 export interface PaginatedResponse<T> {
@@ -301,4 +303,33 @@ export interface LlmResponse {
   latency_ms: number;
   trace_id: string;
   error_message?: string | null;
+}
+
+/* ── LLM Analysis (F-453) ────────────────────────────────────── */
+
+export interface ShipleyDimension {
+  score: number;
+  reasoning: string;
+}
+
+export interface ShipleyBidNoBid {
+  overall: "Bid" | "No Bid" | "Conditional";
+  customer_knowledge: ShipleyDimension;
+  solution_match: ShipleyDimension;
+  competitive_position: ShipleyDimension;
+  past_performance: ShipleyDimension;
+}
+
+export interface CompetitorEntry {
+  name: string;
+  our_differentiator: string;
+}
+
+export interface LlmAnalysis {
+  win_probability: number;
+  win_probability_reasoning: string;
+  shipley_bid_no_bid: ShipleyBidNoBid;
+  competitive_landscape: CompetitorEntry[];
+  source_chips: Array<{ label: string; url: string; kind: string }>;
+  model_used: string;
 }

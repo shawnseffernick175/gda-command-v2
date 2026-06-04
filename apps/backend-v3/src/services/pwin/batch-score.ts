@@ -10,6 +10,7 @@ import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { scoreV1Rules } from './rules-scorer.js';
 import { recommendStatus } from './promotion.js';
+import type { PwinWeights } from './pwin-weights.js';
 import {
   extractFeaturesFromOpportunity,
   type OpportunityRow,
@@ -38,6 +39,7 @@ export interface PwinAnalysisObject {
 export function scoreSingleOpportunityPwin(
   row: OpportunityRow,
   now: Date = new Date(),
+  weights?: PwinWeights,
 ): PwinAnalysisObject {
   const scoredAt = now.toISOString();
 
@@ -83,7 +85,7 @@ export function scoreSingleOpportunityPwin(
     }
   }
 
-  const result = scoreV1Rules(features, 'v1-rules');
+  const result = scoreV1Rules(features, 'v1-rules', weights);
   const band = recommendStatus(result.score);
 
   return {
@@ -114,7 +116,7 @@ const BATCH_SIZE = 250;
  * analysis.pwin via a jsonb merge that preserves other analysis keys.
  */
 export async function batchScoreOpportunities(
-  opts?: { ids?: number[]; limit?: number },
+  opts?: { ids?: number[]; limit?: number; weights?: PwinWeights },
 ): Promise<BatchScoreResult> {
   const start = Date.now();
   const result: BatchScoreResult = {
@@ -184,7 +186,7 @@ export async function batchScoreOpportunities(
           psc: r.psc as string | null,
         };
 
-        const pwinObj = scoreSingleOpportunityPwin(row, now);
+        const pwinObj = scoreSingleOpportunityPwin(row, now, opts?.weights);
 
         // Persist — jsonb merge replacing only the pwin key
         await client.query(

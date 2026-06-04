@@ -180,6 +180,11 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
     }
   }
 
+  // Extract llm_analysis from the raw analysis JSONB (F-453)
+  const rawAnalysis = row.analysis as unknown as Record<string, unknown> | null;
+  const llmAnalysis = rawAnalysis?.llm_analysis ?? null;
+  const llmQualityFlag = (rawAnalysis?.llm_quality_flag as string | null) ?? null;
+
   return {
     ...summary,
     sam_notice_id: row.sam_notice_id,
@@ -191,6 +196,8 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
     qualified_by: row.qualified_by,
     grade_evidence: row.grade_evidence,
     analysis: enrichedAnalysis!,
+    llm_analysis: llmAnalysis,
+    llm_quality_flag: llmQualityFlag,
   };
 }
 

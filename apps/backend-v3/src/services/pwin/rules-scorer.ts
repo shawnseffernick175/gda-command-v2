@@ -4,6 +4,7 @@
 
 import type { PwinFeatures, RuleContribution, PwinScoreResult } from './types.js';
 import { resolveSizeStatus } from './naics-size-standards.js';
+import type { PwinWeights } from './pwin-weights.js';
 
 function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
@@ -23,23 +24,30 @@ function isSmallBusinessSetAside(setAside: string | null): boolean {
   return SET_ASIDE_PATTERNS.some((p) => lower.includes(p));
 }
 
-export function scoreV1Rules(features: PwinFeatures, modelVersion: string): PwinScoreResult {
+export function scoreV1Rules(
+  features: PwinFeatures,
+  modelVersion: string,
+  weights?: PwinWeights,
+): PwinScoreResult {
   const contributions: RuleContribution[] = [];
+  const w = weights ?? {};
 
-  const base = 30;
+  const base = w.base ?? 30;
   contributions.push({ name: 'base', value: base, description: 'Base score' });
 
-  const incumbencyBonus = features.is_incumbent ? 30 : 0;
+  const incumbencyBonus = features.is_incumbent ? (w.incumbency_bonus ?? 30) : 0;
   if (incumbencyBonus > 0) {
-    contributions.push({ name: 'incumbency_bonus', value: incumbencyBonus, description: '+30 incumbency' });
+    contributions.push({ name: 'incumbency_bonus', value: incumbencyBonus, description: `+${incumbencyBonus} incumbency` });
   }
 
-  const recompeteBonus = features.is_recompete ? 8 : 0;
+  const recompeteBonusVal = w.recompete_bonus ?? 8;
+  const recompeteBonus = features.is_recompete ? recompeteBonusVal : 0;
   if (recompeteBonus > 0) {
-    contributions.push({ name: 'recompete', value: 8, description: '+8 recompete (known requirement, displacement target)' });
+    contributions.push({ name: 'recompete', value: recompeteBonusVal, description: `+${recompeteBonusVal} recompete (known requirement, displacement target)` });
   }
 
-  const capabilityMatch = Math.round(features.scope_match_score * 0.3 * 100) / 100;
+  const capMultiplier = w.capability_match_multiplier ?? 0.3;
+  const capabilityMatch = Math.round(features.scope_match_score * capMultiplier * 100) / 100;
   if (capabilityMatch !== 0) {
     contributions.push({
       name: 'capability_match',
@@ -48,37 +56,41 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     });
   }
 
-  const vehicleAccess = features.has_vehicle_access ? 10 : 0;
+  const vehicleAccessVal = w.vehicle_access ?? 10;
+  const vehicleAccess = features.has_vehicle_access ? vehicleAccessVal : 0;
   contributions.push({
     name: 'vehicle_access',
     value: vehicleAccess,
     description: features.has_vehicle_access
-      ? '+10 vehicle access'
+      ? `+${vehicleAccessVal} vehicle access`
       : '0 vehicle access not indicated',
   });
 
-  const clearanceFit = features.clearance_fit ? 5 : 0;
+  const clearanceFitVal = w.clearance_fit ?? 5;
+  const clearanceFit = features.clearance_fit ? clearanceFitVal : 0;
   contributions.push({
     name: 'clearance_fit',
     value: clearanceFit,
     description: features.clearance_fit
-      ? '+5 clearance fit'
+      ? `+${clearanceFitVal} clearance fit`
       : '0 clearance not indicated',
   });
 
-  const doctrineBonus = Math.round((features.doctrine_alignment_score / 40) * 10 * 100) / 100;
+  const doctrineBonusMax = w.doctrine_bonus_max ?? 10;
+  const doctrineBonus = Math.round((features.doctrine_alignment_score / 40) * doctrineBonusMax * 100) / 100;
   contributions.push({
     name: 'doctrine_bonus',
     value: doctrineBonus,
     description: `+${doctrineBonus.toFixed(1)} doctrine alignment (${features.doctrine_alignment_score}/40)`,
   });
 
-  const marginPenalty = features.below_margin_floor ? -20 : 0;
+  const marginPenaltyVal = w.margin_penalty ?? -20;
+  const marginPenalty = features.below_margin_floor ? marginPenaltyVal : 0;
   if (marginPenalty !== 0) {
     contributions.push({
       name: 'margin_penalty',
-      value: marginPenalty,
-      description: '-20 below margin floor',
+      value: marginPenaltyVal,
+      description: `${marginPenaltyVal} below margin floor`,
     });
   }
 
@@ -92,43 +104,47 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
     });
   }
 
+  const teamingBonusVal = w.teaming_bonus ?? 5;
+  const teamingPenaltyVal = w.teaming_penalty ?? -10;
   let teamingBonus = 0;
   if (features.needs_teaming_partner) {
     if (features.candidate_partners.length >= 1) {
-      teamingBonus = 5;
+      teamingBonus = teamingBonusVal;
       contributions.push({
         name: 'teaming_bonus',
-        value: 5,
-        description: `+5 teaming partner identified (${features.candidate_partners.length} candidate(s))`,
+        value: teamingBonusVal,
+        description: `+${teamingBonusVal} teaming partner identified (${features.candidate_partners.length} candidate(s))`,
       });
     } else {
-      teamingBonus = -10;
+      teamingBonus = teamingPenaltyVal;
       contributions.push({
         name: 'teaming_penalty',
-        value: -10,
-        description: '-10 needs teaming partner, none identified',
+        value: teamingPenaltyVal,
+        description: `${teamingPenaltyVal} needs teaming partner, none identified`,
       });
     }
   }
 
   // NAICS size-status contribution (F-451.3: neutralize large penalty, gate small bonus on set-aside)
   const sizeStatus = resolveSizeStatus(features.naics);
+  const naicsSmallSetasideVal = w.naics_small_setaside ?? 20;
+  const naicsSmallFullopenVal = w.naics_small_fullopen ?? 10;
   let naicsSizeContribution = 0;
   if (sizeStatus.status === 'small') {
     const hasSetAside = isSmallBusinessSetAside(features.set_aside);
     if (hasSetAside) {
-      naicsSizeContribution = 20;
+      naicsSizeContribution = naicsSmallSetasideVal;
       contributions.push({
         name: 'naics_size',
-        value: 20,
-        description: `+20 small-business set-aside advantage (${features.naics}: ${sizeStatus.rationale})`,
+        value: naicsSmallSetasideVal,
+        description: `+${naicsSmallSetasideVal} small-business set-aside advantage (${features.naics}: ${sizeStatus.rationale})`,
       });
     } else {
-      naicsSizeContribution = 10;
+      naicsSizeContribution = naicsSmallFullopenVal;
       contributions.push({
         name: 'naics_size',
-        value: 10,
-        description: `+10 small-business eligible, full-and-open (${features.naics}: ${sizeStatus.rationale})`,
+        value: naicsSmallFullopenVal,
+        description: `+${naicsSmallFullopenVal} small-business eligible, full-and-open (${features.naics}: ${sizeStatus.rationale})`,
       });
     }
   } else if (sizeStatus.status === 'large') {
@@ -147,7 +163,8 @@ export function scoreV1Rules(features: PwinFeatures, modelVersion: string): Pwin
   }
 
   // Existing-customer contribution (F-451.3)
-  const existingCustomerContribution = features.is_existing_customer ? 5 : 0;
+  const existingCustomerVal = w.existing_customer ?? 5;
+  const existingCustomerContribution = features.is_existing_customer ? existingCustomerVal : 0;
   if (existingCustomerContribution > 0) {
     contributions.push({
       name: 'existing_customer',
