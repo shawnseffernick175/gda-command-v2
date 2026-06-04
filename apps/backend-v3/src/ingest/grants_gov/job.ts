@@ -40,7 +40,7 @@ export async function runGrantsGovIngest(): Promise<IngestResult> {
         continue;
       }
 
-      const outcome = await upsertExternalOpportunity(mapped.opportunity, mapped.citations, 'grants.gov');
+      const outcome = await upsertExternalOpportunity(mapped.opportunity, mapped.citations, 'grants_gov');
 
       if (outcome === 'inserted') inserted++;
       else if (outcome === 'updated') updated++;

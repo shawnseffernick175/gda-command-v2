@@ -71,7 +71,7 @@ export function mapGrantsGovOpp(
     response_due_at: parseDateMMDDYYYY(raw.closeDate),
     posted_at: parseDateToISO(raw.openDate),
     description: trimOrNull(raw.description),
-    data_source: 'grants.gov',
+    data_source: 'grants_gov',
     tags: ['fast_track', 'signal', 'grants', 'grants.gov'],
     agency_subtype: null,
     opportunity_type: 'grant',
