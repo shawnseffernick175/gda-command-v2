@@ -138,8 +138,18 @@ The unified opportunity foundation (Phase 1) and the external MCP epic (F-500) a
 - Frontend: `/briefing` page — headline card, priority actions (urgency chips: immediate/today/this_week), risk flags card (red border), market intel, cert expiration warnings (amber border), Regenerate button. Added to sidebar nav (Newspaper icon, 2nd item after Launchpad).
 - First briefing generated June 4 — 200 OK, real Claude output with live pipeline data.
 
+### ✅ F-470 — Grants.gov ingest adapter (COMPLETE — June 4, 2026)
+
+**Shipped:** PR #685 merged (squash, commit `608832d`). Post-merge fixes: API field names, dropped broken date filter, `grants_gov` kind value, `discovery` status. Migration `v3_037_sources_kind_grants_gov.sql` applied. Backend rebuilt.
+
+- `apps/backend-v3/src/ingest/grants_gov/` — 5 files (types, client, mapper, job, index)
+- Public endpoint `https://apply07.grants.gov/grantsws/rest/opportunities/search` POST, no auth
+- 500-record cap per run, paginated 100/page, 500ms inter-page delay, 3-retry backoff
+- `data_source: 'grants_gov'`, `opportunity_type: 'grant'`, `status: 'discovery'`, CFDA number in `part_number`
+- Cron: `0 11 * * *` UTC = 07:00 ET daily, gated by `ENABLE_GRANTS_GOV_INGEST !== 'false'`
+- First run: **500 rows inserted** ✅
+
 ### Known follow-ups / candidates (not yet ticketed)
-- **Grants.gov adapter** — confirmed live during SBIR diagnosis; strong civilian SBIR/STTR + grants signal source.
 - **Backfill notice-type classification** — ~2,398 older SAM rows still `opportunity_type=null`; will reclassify naturally through daily cron, or a one-time backfill.
 
 ---
@@ -225,4 +235,4 @@ Precedence: human override > GovWin > SAM > GovTribe > Fast Track. Cached 60s pe
 
 ---
 
-*Canonical roadmap for GDA Command V3 as of June 4, 2026. Phases 1–6 COMPLETE. F-460b Daily Commander Briefing LIVE at gda.csr-llc.tech/briefing — 06:00 ET cron, claude-sonnet-4-5, first briefing generated and verified. LLM router (F-215 D4) wired and real. AI Analysis + Pwin config (F-453) live. GovTribe ✅ GovWin ✅. Reload before any planning session.*
+*Canonical roadmap for GDA Command V3 as of June 4, 2026. Phases 1–6 COMPLETE. F-470 Grants.gov adapter LIVE — 500 rows inserted, daily 07:00 ET cron. F-460b Daily Commander Briefing LIVE at gda.csr-llc.tech/briefing. LLM router (F-215 D4) real. AI Analysis + Pwin config (F-453) live. GovTribe ✅ GovWin ✅ Grants.gov ✅. 16 ingest sources total. Reload before any planning session.*
