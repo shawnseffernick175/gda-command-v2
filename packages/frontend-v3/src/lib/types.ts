@@ -218,6 +218,16 @@ export interface Award {
 
 /* ── Action Items ─────────────────────────────────────────────── */
 
+export interface ActionItemDraft {
+  id: number;
+  action_item_id: number;
+  kind: "reply" | "research" | "milestone";
+  content: string;
+  model_used: string | null;
+  status: "generating" | "done" | "failed";
+  created_at: string;
+}
+
 export interface ActionItem {
   id: number;
   title: string;
@@ -227,6 +237,7 @@ export interface ActionItem {
   linked_object_type?: string | null;
   status: "open" | "in_progress" | "done" | "overdue";
   created_at: string;
+  drafts?: ActionItemDraft[];
 }
 
 /* ── KPI Header ───────────────────────────────────────────────── */
