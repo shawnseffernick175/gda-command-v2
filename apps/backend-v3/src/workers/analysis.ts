@@ -41,6 +41,8 @@ import type { ComplianceItem } from '../services/captures/compliance.js';
 import type { ColorReviewStage } from '../services/captures/color-review.js';
 import { scoreSingleOpportunityPwin } from '../services/pwin/batch-score.js';
 import type { OpportunityRow as PwinOpportunityRow } from '../services/pwin/feature-extraction.js';
+import { llmRouter } from '../lib/llm-router.js';
+import { getPwinWeights } from '../services/pwin/pwin-weights.js';
 
 const { Pool } = pg;
 
@@ -344,7 +346,7 @@ function extractTimeline(row: Record<string, unknown>): {
 // Main analysis builder
 // ────────────────────────────────────────────────────────────────────────────
 
-function buildFullAnalysis(row: Record<string, unknown>): Record<string, unknown> {
+function buildFullAnalysis(row: Record<string, unknown>, pwinWeights?: import('../services/pwin/pwin-weights.js').PwinWeights): Record<string, unknown> {
   // F-450 / F-451: real scoring via the shared helper (with text fields for enrichment)
   const pwinRow: PwinOpportunityRow = {
     naics: row.naics as string | null,
@@ -361,7 +363,7 @@ function buildFullAnalysis(row: Record<string, unknown>): Record<string, unknown
     description: row.description as string | null,
     psc: row.psc as string | null,
   };
-  const pwinObj = scoreSingleOpportunityPwin(pwinRow);
+  const pwinObj = scoreSingleOpportunityPwin(pwinRow, new Date(), pwinWeights);
   // Numeric 0–1 for wargame strategy (scorer returns 0–100)
   const pwinNumeric = (pwinObj.score ?? 0) / 100;
   const { incumbent, sources: incumbentSources } = extractIncumbent(row);
@@ -402,6 +404,7 @@ function buildFullAnalysis(row: Record<string, unknown>): Record<string, unknown
 // ────────────────────────────────────────────────────────────────────────────
 
 async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): Promise<void> {
+  const pwinWeights = await getPwinWeights();
   for (const job of jobs) {
     const { entityId } = job.data;
     logger.info({ entityId, jobId: job.id, trigger: job.data.trigger }, 'Processing opportunity analysis');
@@ -417,7 +420,39 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       return;
     }
 
-    const analysis = buildFullAnalysis(row);
+    const analysis = buildFullAnalysis(row, pwinWeights);
+
+    // LLM analysis — async, non-blocking on failure
+    try {
+      const llmResult = await llmRouter.route({
+        task: 'opportunity_analysis',
+        input: {
+          opportunity_id: String(row.id),
+          title: row.title as string,
+          description: (row.description as string) ?? '',
+          solicitation_number: (row.solicitation_number as string | null),
+          naics_codes: row.naics ? [row.naics as string] : [],
+          set_aside: (row.set_aside as string | null),
+          place_of_performance: null,
+          response_deadline: (row.response_due_at as string | null),
+          incumbent_info: (row.incumbent as string | null),
+          sources: [],
+        },
+        opts: { disable_router_retry: true, object_ref: `opp:${String(row.id)}` },
+      });
+
+      analysis.llm_analysis = llmResult.ok ? llmResult.output : null;
+      analysis.llm_model_used = llmResult.model_used ?? null;
+      analysis.llm_quality_flag = llmResult.quality_flag;
+      analysis.llm_trace_id = llmResult.trace_id;
+    } catch (err) {
+      logger.warn({ err, entityId }, 'LLM router call failed — continuing with deterministic analysis');
+      analysis.llm_analysis = null;
+      analysis.llm_model_used = null;
+      analysis.llm_quality_flag = null;
+      analysis.llm_trace_id = null;
+    }
+
     const now = analysis.generated_at as string;
 
     // Write to opportunity_analysis_cache
