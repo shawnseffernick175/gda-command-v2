@@ -11,6 +11,7 @@ import {
   Shield,
   AlertTriangle,
   Settings,
+  ClipboardCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -27,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Capture", href: "/capture", icon: Target },
   { label: "Pipeline", href: "/pipeline", icon: BarChart3 },
   { label: "Awards & Intel", href: "/awards", icon: Trophy },
+  { label: "Approvals", href: "/approvals", icon: ClipboardCheck },
   { label: "Financial Bible", href: "/financials", icon: BookOpen },
   { label: "Action Items", href: "/action-items", icon: CheckSquare },
   { label: "Contacts", href: "/contacts", icon: Users },
