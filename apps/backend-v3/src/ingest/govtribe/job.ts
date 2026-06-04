@@ -207,6 +207,21 @@ function extractIdsFromSearchResponse(data: unknown): string[] {
   return [];
 }
 
+/**
+ * Extract the results array from an MCP detail-fetch response.
+ * GovTribe may return { results: [...] }, { data: [...] }, { rows: [...] }, or a bare array.
+ * Mirrors the countResultRows logic in mcp_client.ts.
+ */
+function extractResultsArray<T>(data: unknown): T[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data as T[];
+  const obj = data as Record<string, unknown>;
+  for (const key of ['results', 'data', 'rows']) {
+    if (Array.isArray(obj[key])) return obj[key] as T[];
+  }
+  return [];
+}
+
 async function fetchOppDetailBatches(ids: string[], searchId: string): Promise<GovTribeDetailRecord[]> {
   const details: GovTribeDetailRecord[] = [];
   for (let i = 0; i < ids.length; i += DETAIL_BATCH_SIZE) {
@@ -218,8 +233,10 @@ async function fetchOppDetailBatches(ids: string[], searchId: string): Promise<G
     const cacheId = `detail_${searchId}_batch_${Math.floor(i / DETAIL_BATCH_SIZE)}`;
     try {
       const result = await fetchOpportunityDetailBatch(batch, cacheId);
-      if (result.data?.results && Array.isArray(result.data.results)) {
-        details.push(...result.data.results);
+      const rows = extractResultsArray<GovTribeDetailRecord>(result.data);
+      if (rows.length > 0) {
+        logger.debug({ source: 'govtribe', batchStart: i, rowCount: rows.length }, 'govtribe_opp_detail_batch_ok');
+        details.push(...rows);
       }
     } catch (err) {
       logger.error({ source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) }, 'govtribe_detail_batch_error');
@@ -239,8 +256,10 @@ async function fetchAwardDetailBatches(ids: string[], searchId: string): Promise
     const cacheId = `award_detail_${searchId}_batch_${Math.floor(i / DETAIL_BATCH_SIZE)}`;
     try {
       const result = await fetchAwardDetailBatch(batch, cacheId);
-      if (result.data?.results && Array.isArray(result.data.results)) {
-        details.push(...result.data.results);
+      const rows = extractResultsArray<GovTribeAwardDetail>(result.data);
+      if (rows.length > 0) {
+        logger.debug({ source: 'govtribe', batchStart: i, rowCount: rows.length }, 'govtribe_award_detail_batch_ok');
+        details.push(...rows);
       }
     } catch (err) {
       logger.error({ source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) }, 'govtribe_award_detail_batch_error');
@@ -260,8 +279,10 @@ async function fetchForecastDetailBatches(ids: string[], searchId: string): Prom
     const cacheId = `forecast_detail_${searchId}_batch_${Math.floor(i / DETAIL_BATCH_SIZE)}`;
     try {
       const result = await fetchForecastDetailBatch(batch, cacheId);
-      if (result.data?.results && Array.isArray(result.data.results)) {
-        details.push(...result.data.results);
+      const rows = extractResultsArray<GovTribeForecastDetail>(result.data);
+      if (rows.length > 0) {
+        logger.debug({ source: 'govtribe', batchStart: i, rowCount: rows.length }, 'govtribe_forecast_detail_batch_ok');
+        details.push(...rows);
       }
     } catch (err) {
       logger.error({ source: 'govtribe', batchStart: i, error: err instanceof Error ? err.message : String(err) }, 'govtribe_forecast_detail_batch_error');
