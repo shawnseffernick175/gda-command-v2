@@ -168,8 +168,8 @@ export function scoreV1Rules(
   if (existingCustomerContribution > 0) {
     contributions.push({
       name: 'existing_customer',
-      value: 5,
-      description: '+5 existing customer relationship',
+      value: existingCustomerVal,
+      description: `+${existingCustomerVal} existing customer relationship`,
     });
   }
 
