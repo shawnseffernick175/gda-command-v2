@@ -1,6 +1,6 @@
 # GDA Command North Star Roadmap — V3 Edition
 
-**Date:** June 4, 2026 (updated — F-460 frontend rewire COMPLETE; live at gda.csr-llc.tech; PR #681 merged add6dcc + nginx SPA fix 06d28ea. NEXT: F-215 D4 real LLM router, then F-453 tunable Pwin weights)
+**Date:** June 4, 2026 AM (updated — F-215 D4 LLM router COMPLETE; PR #682 merged 9814e6c. Real Anthropic + OpenAI providers live. llm_calls table created. NEXT: F-453 tunable Pwin weights + wire AI panels)
 **Owner:** Shawn Seffernick
 **Replaces:** north_star_roadmap_v3.md (June 1, 2026)
 **Project Space:** GDA Rebuild
@@ -105,13 +105,25 @@ The unified opportunity foundation (Phase 1) and the external MCP epic (F-500) a
 - BFF (`src/api/routes/*`) was already cleaned in prior work
 - Doctrine score: backend `doctrine_badge.score` is 0–100 (backend normalizes native 0–40 → 0–100); frontend converts back to 0–40 via `Math.round((score/100)*40)` for display. Round-trip math correct.
 
-### F-215 D4 — Real LLM Router (NEXT)
+### ✅ F-215 D4 — Real LLM Router (COMPLETE — June 4, 2026)
 
-Anthropic + OpenAI keys already in n8n env on VPS. Un-hides AI panels (OODA Inspector, Ask AI, Competitive Intel). Send to Devin via `POST /v1/sessions`.
+**Shipped:** PR #682 merged (squash, commit `9814e6c`). Backend rebuilt and healthy.
 
-### F-453 — Tunable Pwin weights + reset-to-defaults
+- Router module: `llm-router.ts` (real entry point), `llm-router.table.ts` (routing table, 8 tasks, CI-enforced 1-entry-per-task), `llm-router.retry.ts` (retry/backoff/wall-clock), `llm-router.logger.ts`, `llm-router.mocks.ts`
+- Providers: `providers/anthropic.ts` (Claude), `providers/openai.ts` (embeddings), `providers/perplexity.ts` (source_research, raw fetch, PERPLEXITY_API_KEY optional at startup)
+- `llm_calls` table: migration `v3_033_llm_calls.sql` applied. `GET /v3/llm-cost-rollup?window=1d|7d|30d` live.
+- SDK drift detector CI check: no direct openai/@anthropic-ai/sdk imports outside `providers/`
+- MOCK_LLM=1 mode for CI (zero real API calls)
+- R2 enforced: opportunity_analysis 10s wall-clock ceiling
+- ANTHROPIC_API_KEY + OPENAI_API_KEY validated at startup; PERPLEXITY_API_KEY optional
 
-Separate ticket (has a DB migration). New `pwin_scoring_config` table; scorer reads weights from config; GET/PUT `/v3/pwin/config` + POST `/v3/pwin/config/reset`; settings panel in UI with reset button. **Fold in after F-215 D4 is live.**
+### F-453 — Tunable Pwin weights + wire AI panels (NEXT)
+
+Two parts:
+1. **Pwin config UI**: New `pwin_scoring_config` table (DB migration required). Scorer reads weights from config. GET/PUT `/v3/pwin/config` + POST `/v3/pwin/config/reset`. Settings panel in UI with reset button.
+2. **Wire AI panels**: Frontend currently hides OODA Inspector, Ask AI, Competitive Intel with "coming soon". Now that LLM router is live, wire these panels to call `/v3/opportunities/:id` (which triggers `opportunity_analysis` + `doctrine_score`). Un-hides the AI content.
+
+Send both as one Devin session.
 
 ### Known follow-ups / candidates (not yet ticketed)
 - **Grants.gov adapter** — confirmed live during SBIR diagnosis; strong civilian SBIR/STTR + grants signal source.
