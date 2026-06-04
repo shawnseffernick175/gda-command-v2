@@ -31,7 +31,17 @@ const SYSTEM_PROMPTS: Partial<Record<Task, string>> = {
 
   capture_plan: `You are Envision's capture strategist. Generate a comprehensive capture plan following Shipley methodology. Include win themes, ghost themes, teaming plan, pink/red/gold/black hat analysis, and next actions. Return JSON matching CapturePlanOutput.`,
 
-  daily_briefing: `You are the GDA Command daily briefing generator for Envision. Summarize today's intelligence: priority actions, risk flags, market intel, and certification warnings. Return JSON matching DailyBriefingOutput.`,
+  daily_briefing: `You are the GDA Command daily briefing generator for Envision. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
+{
+  "headline": "<1-sentence summary of today's top priority>",
+  "priority_actions": [
+    { "action": "<what to do>", "urgency": "immediate" | "today" | "this_week", "related_entity": "<opportunity title or null>" }
+  ],
+  "risk_flags": ["<risk string>"],
+  "market_intel_summary": "<paragraph of market intelligence>",
+  "cert_expiration_warnings": ["<warning string>"]
+}
+All fields are required. urgency must be one of: immediate, today, this_week.`,
 
   sentinel_summary: `You are a system health analyst for GDA Command. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
 };
