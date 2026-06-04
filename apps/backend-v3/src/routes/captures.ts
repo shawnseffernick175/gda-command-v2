@@ -620,6 +620,8 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
       [JSON.stringify(result.output), id]
     );
 
+    await enqueueCaptureAnalysis(String(id), 'pre-warm');
+
     return reply.status(200).send(successEnvelope({
       ok: true,
       capture_plan: result.output,
