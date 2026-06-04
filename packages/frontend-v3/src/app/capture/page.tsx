@@ -3,8 +3,10 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCapture } from "@/hooks/use-captures";
 import { usePipeline } from "@/hooks/use-pipeline";
+import { apiPost } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -112,6 +114,11 @@ function CaptureList() {
 
 function CaptureDetail({ oppId }: { oppId: string }) {
   const { data: capture, isLoading, error } = useCapture(oppId);
+  const qc = useQueryClient();
+  const generatePlan = useMutation({
+    mutationFn: () => apiPost(`/v3/captures/${oppId}/generate-plan`, {}),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['capture', oppId] }); },
+  });
 
   if (isLoading) {
     return (
@@ -207,6 +214,17 @@ function CaptureDetail({ oppId }: { oppId: string }) {
                 No win strategy documented yet.
               </p>
             )}
+            {capture.capture_plan && Object.keys(capture.capture_plan).length > 0 && (
+              <div className="mt-3 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Generated Plan</p>
+                {(capture.capture_plan as Record<string, string>).customer_profile && (
+                  <p className="text-xs text-foreground">{(capture.capture_plan as Record<string, string>).customer_profile}</p>
+                )}
+                {(capture.capture_plan as Record<string, string>).solution_strategy && (
+                  <p className="text-xs text-muted-foreground">{(capture.capture_plan as Record<string, string>).solution_strategy}</p>
+                )}
+              </div>
+            )}
             {capture.discriminators && capture.discriminators.length > 0 && (
               <div className="mt-3">
                 <p className="text-xs text-muted-foreground mb-1">Discriminators:</p>
@@ -219,6 +237,19 @@ function CaptureDetail({ oppId }: { oppId: string }) {
                 </div>
               </div>
             )}
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => generatePlan.mutate()}
+                disabled={generatePlan.isPending}
+                className="rounded bg-gda-green/10 border border-gda-green/30 px-3 py-1 text-xs text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+              >
+                {generatePlan.isPending ? 'Generating...' : 'Generate Plan'}
+              </button>
+              {generatePlan.isError && (
+                <span className="text-xs text-gda-red">{(generatePlan.error as Error).message}</span>
+              )}
+            </div>
           </CardContent>
         </Card>
 

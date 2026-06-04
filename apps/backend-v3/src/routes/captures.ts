@@ -551,4 +551,81 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
       successEnvelope(responseData, req.requestId)
     );
   });
+
+  // POST /v3/captures/:id/generate-plan — trigger capture_plan LLM task
+  app.post<{ Params: { id: string } }>('/v3/captures/:id/generate-plan', async (req, reply) => {
+    const { id } = req.params;
+
+    // Load capture + linked opportunity
+    const captureRes = await pool.query<CaptureRow & { opportunity_id: string }>(
+      `SELECT c.*, pi.opportunity_id
+       FROM captures c
+       JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
+       WHERE c.id = $1`,
+      [id]
+    );
+    const capture = captureRes.rows[0];
+    if (!capture) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Capture not found', req.requestId));
+    }
+
+    const oppRes = await pool.query<{ title: string; description: string | null; solicitation_number: string | null; naics_codes: string[] | null; set_aside: string | null; place_of_performance: string | null; incumbent_competitor: string | null }>(
+      `SELECT title, description, solicitation_number, naics_codes, set_aside, place_of_performance, incumbent_competitor FROM opportunities WHERE id = $1`,
+      [capture.opportunity_id]
+    );
+    const opp = oppRes.rows[0];
+    if (!opp) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Opportunity not found', req.requestId));
+    }
+
+    // Check analysis cache for existing LLM analysis
+    const cacheRes = await pool.query<{ pwin: number | null; version: string; generated_at: string }>(
+      `SELECT pwin, version, generated_at FROM capture_analysis_cache WHERE capture_id = $1 ORDER BY generated_at DESC LIMIT 1`,
+      [id]
+    );
+    const cached = cacheRes.rows[0];
+    const analysisSummary = cached?.pwin != null
+      ? `Capture pwin estimate: ${cached.pwin}%`
+      : 'No prior capture analysis available';
+
+    const { llmRouter } = await import('../lib/llm-router.js');
+    const result = await llmRouter.route({
+      task: 'capture_plan',
+      input: {
+        opportunity_id: String(capture.opportunity_id),
+        title: opp.title,
+        description: opp.description ?? '',
+        solicitation_number: opp.solicitation_number,
+        analysis_summary: analysisSummary,
+        incumbent_info: opp.incumbent_competitor,
+        competitor_landscape: null,
+        envision_capabilities: [
+          'DoD program support', 'systems engineering', 'logistics', 'technical services'
+        ],
+        teaming_partners: (capture.capture_plan?.teaming_partners as string[] | undefined) ?? [],
+        sources: [],
+      },
+      opts: { disable_router_retry: true },
+    });
+
+    if (!result.ok) {
+      return reply.status(502).send(
+        errorEnvelope('INTERNAL_ERROR', result.error_message ?? 'LLM router failed', req.requestId)
+      );
+    }
+
+    // Persist the generated plan into capture_plan JSONB
+    await pool.query(
+      `UPDATE captures SET capture_plan = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(result.output), id]
+    );
+
+    return reply.status(200).send(successEnvelope({
+      ok: true,
+      capture_plan: result.output,
+      model_used: result.model_used,
+      latency_ms: result.latency_ms,
+      trace_id: result.trace_id,
+    }, req.requestId));
+  });
 }

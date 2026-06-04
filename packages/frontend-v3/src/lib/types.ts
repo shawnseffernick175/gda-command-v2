@@ -200,6 +200,7 @@ export interface CaptureDetail {
   color_review_status?: string | null;
   compliance_pct?: number | null;
   next_milestone?: string | null;
+  capture_plan?: Record<string, unknown> | null;
 }
 
 /* ── Awards ───────────────────────────────────────────────────── */
