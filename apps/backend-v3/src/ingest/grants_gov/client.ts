@@ -29,6 +29,7 @@ interface GrantsGovRawHit {
   opportunityTitle?: string;
   agencyCode?: string;
   agencyName?: string;
+  agency?: string;                // actual field name returned by API
   openDate?: string;
   closeDate?: string;
   awardCeiling?: number;
@@ -36,17 +37,10 @@ interface GrantsGovRawHit {
   description?: string;
   synopsis?: string;
   oppStatus?: string;
-  cfdaList?: string;
+  cfdaList?: string | string[];   // API returns array
   cfda?: string;
   opportunityCategory?: string;
   category?: string;
-}
-
-function formatYYYYMMDD(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
 }
 
 function normalizeHit(hit: GrantsGovRawHit): GrantsGovRaw {
@@ -55,14 +49,14 @@ function normalizeHit(hit: GrantsGovRawHit): GrantsGovRaw {
     number: hit.number ?? hit.opportunityNumber ?? '',
     title: hit.title ?? hit.opportunityTitle ?? '',
     agencyCode: hit.agencyCode ?? '',
-    agencyName: hit.agencyName ?? '',
+    agencyName: hit.agencyName ?? hit.agency ?? '',
     openDate: hit.openDate ?? '',
     closeDate: hit.closeDate ?? null,
     awardCeiling: hit.awardCeiling ?? null,
     awardFloor: hit.awardFloor ?? null,
     description: hit.description ?? hit.synopsis ?? null,
     oppStatus: hit.oppStatus ?? '',
-    cfda: hit.cfdaList ?? hit.cfda ?? null,
+    cfda: (Array.isArray(hit.cfdaList) ? hit.cfdaList[0] ?? null : hit.cfdaList ?? null) ?? hit.cfda ?? null,
     category: hit.opportunityCategory ?? hit.category ?? null,
   };
 }
@@ -113,17 +107,12 @@ async function fetchWithRetry(payload: Record<string, unknown>): Promise<GrantsG
 }
 
 export interface GrantsGovFetchOptions {
-  since: Date;
-  until: Date;
   limit?: number;
 }
 
 export async function fetchGrantsGovOpportunities(opts: GrantsGovFetchOptions): Promise<GrantsGovRaw[]> {
-  const { since, until, limit } = opts;
+  const { limit } = opts;
   const cap = limit ?? MAX_RECORDS;
-
-  const startDate = formatYYYYMMDD(since);
-  const endDate = formatYYYYMMDD(until);
 
   const allResults: GrantsGovRaw[] = [];
   let startRecordNum = 0;
@@ -133,16 +122,13 @@ export async function fetchGrantsGovOpportunities(opts: GrantsGovFetchOptions): 
     const payload = {
       keyword: '',
       oppStatuses: 'forecasted|posted',
-      dateRange: 'custom',
-      startDate,
-      endDate,
       rows: ROWS_PER_PAGE,
       startRecordNum,
       sortBy: 'openDate|desc',
     };
 
     logger.info(
-      { source: 'grants.gov', startRecordNum, startDate, endDate },
+      { source: 'grants.gov', startRecordNum },
       'grants_gov_ingest_fetch',
     );
 

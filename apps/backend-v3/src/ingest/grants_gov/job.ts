@@ -13,18 +13,13 @@ import { mapGrantsGovOpp } from './mapper.js';
 import { upsertExternalOpportunity } from '../framework/source_writer.js';
 import type { IngestResult } from '../framework/registry.js';
 
-const LOOKBACK_DAYS = 30;
-
 export async function runGrantsGovIngest(): Promise<IngestResult> {
-  const toDate = new Date();
-  const fromDate = new Date(toDate.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
-
   logger.info(
-    { source: 'grants.gov', fromDate: fromDate.toISOString(), toDate: toDate.toISOString() },
+    { source: 'grants.gov' },
     'grants_gov_ingest_job_start',
   );
 
-  const rawOpps = await fetchGrantsGovOpportunities({ since: fromDate, until: toDate });
+  const rawOpps = await fetchGrantsGovOpportunities({});
 
   logger.info({ source: 'grants.gov', totalFetched: rawOpps.length }, 'grants_gov_ingest_fetched');
 
