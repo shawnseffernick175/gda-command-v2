@@ -35,6 +35,7 @@ import { agentRoutes } from './routes/agent.js';
 import { auditRoutes } from './routes/audit.js';
 import { reportRoutes } from './routes/reports.js';
 import { llmCostRollupRoutes } from './routes/llm-cost-rollup.js';
+import { briefingRoutes } from './routes/briefing.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -146,6 +147,7 @@ export async function buildApp() {
   await app.register(auditRoutes);
   await app.register(reportRoutes);
   await app.register(llmCostRollupRoutes);
+  await app.register(briefingRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

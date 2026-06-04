@@ -43,6 +43,7 @@ import { scoreSingleOpportunityPwin } from '../services/pwin/batch-score.js';
 import type { OpportunityRow as PwinOpportunityRow } from '../services/pwin/feature-extraction.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { getPwinWeights } from '../services/pwin/pwin-weights.js';
+import { assembleDailyBriefing } from '../services/briefing/assemble.js';
 
 const { Pool } = pg;
 
@@ -719,6 +720,50 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Daily briefing cron (F-460b) — 10:00 UTC = 6:00 AM ET
+// ────────────────────────────────────────────────────────────────────────────
+
+async function scheduleDailyBriefingCron(boss: PgBoss): Promise<void> {
+  await boss.schedule(QUEUE_NAMES.DAILY_BRIEFING, '0 10 * * *', {}, {
+    retryLimit: 1,
+  });
+  await boss.work<Record<string, unknown>>(QUEUE_NAMES.DAILY_BRIEFING, { batchSize: 1 }, async () => {
+    const todayET = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    logger.info({ date: todayET }, 'Running daily briefing generation');
+    const { output, model_used, quality_flag, trace_id } = await assembleDailyBriefing(todayET);
+    await pool.query(
+      `INSERT INTO daily_briefing_cache
+         (briefing_date, headline, priority_actions, risk_flags,
+          market_intel_summary, cert_expiration_warnings,
+          model_used, quality_flag, trace_id, generated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+       ON CONFLICT (briefing_date) DO UPDATE SET
+         headline = EXCLUDED.headline,
+         priority_actions = EXCLUDED.priority_actions,
+         risk_flags = EXCLUDED.risk_flags,
+         market_intel_summary = EXCLUDED.market_intel_summary,
+         cert_expiration_warnings = EXCLUDED.cert_expiration_warnings,
+         model_used = EXCLUDED.model_used,
+         quality_flag = EXCLUDED.quality_flag,
+         trace_id = EXCLUDED.trace_id,
+         generated_at = NOW()`,
+      [
+        todayET,
+        output.headline,
+        JSON.stringify(output.priority_actions),
+        JSON.stringify(output.risk_flags),
+        output.market_intel_summary,
+        JSON.stringify(output.cert_expiration_warnings),
+        model_used,
+        quality_flag,
+        trace_id,
+      ],
+    );
+    logger.info({ date: todayET, headline: output.headline }, 'Daily briefing generated');
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Worker start
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -768,6 +813,7 @@ export async function startWorker(): Promise<PgBoss> {
   // Schedule cron jobs for pre-warm sweeps
   await scheduleModelVersionBumpCron(boss);
   await schedulePeriodicRefreshCron(boss);
+  await scheduleDailyBriefingCron(boss);
 
   return boss;
 }

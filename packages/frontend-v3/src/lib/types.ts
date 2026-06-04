@@ -333,3 +333,23 @@ export interface LlmAnalysis {
   source_chips: Array<{ label: string; url: string; kind: string }>;
   model_used: string;
 }
+
+/* ── Daily Briefing (F-460b) ──────────────────────────────────── */
+
+export interface BriefingAction {
+  action: string;
+  urgency: "immediate" | "today" | "this_week";
+  related_entity: string | null;
+}
+
+export interface DailyBriefing {
+  headline: string;
+  priority_actions: BriefingAction[];
+  risk_flags: string[];
+  market_intel_summary: string;
+  cert_expiration_warnings: string[];
+  model_used: string | null;
+  quality_flag: string | null;
+  generated_at: string;
+  briefing_date: string;
+}
