@@ -283,7 +283,7 @@ function DraftRow({ draft }: { draft: ActionItemDraft }) {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 w-full text-left"
       >
-        <Badge variant="outline" className="text-[10px] shrink-0">
+        <Badge variant="outline" className="text-[11px] shrink-0">
           {draft.kind}
         </Badge>
         <DraftStatusChip status={draft.status} />
@@ -310,14 +310,14 @@ function DraftStatusChip({
 }) {
   if (status === "generating") {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] text-amber-400">
+      <span className="inline-flex items-center gap-1 text-[11px] text-amber-400">
         <span className="h-3 w-3 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
         generating
       </span>
     );
   }
   if (status === "failed") {
-    return <span className="text-[10px] text-gda-red">failed</span>;
+    return <span className="text-[11px] text-gda-red">failed</span>;
   }
-  return <span className="text-[10px] text-gda-green">done</span>;
+  return <span className="text-[11px] text-gda-green">done</span>;
 }
