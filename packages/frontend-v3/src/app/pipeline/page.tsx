@@ -109,11 +109,11 @@ export default function PipelinePage() {
               <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                 <th className="px-3 py-2 text-left font-medium">Title</th>
                 <th className="px-3 py-2 text-left font-medium">Agency</th>
-                <th className="px-3 py-2 text-right font-medium">Value</th>
-                <th className="px-3 py-2 text-center font-medium">Score</th>
-                <th className="px-3 py-2 text-center font-medium">Band</th>
+                <th className="px-3 py-2 text-left font-medium">Value</th>
+                <th className="px-3 py-2 text-left font-medium">Score</th>
+                <th className="px-3 py-2 text-left font-medium">Band</th>
                 <th className="px-3 py-2 text-left font-medium">Drivers</th>
-                <th className="px-3 py-2 text-right font-medium">Days to Due</th>
+                <th className="px-3 py-2 text-left font-medium">Days to Due</th>
               </tr>
             </thead>
             <tbody>
@@ -160,17 +160,17 @@ function PipelineRow({ opp }: { opp: OpportunitySummary }) {
       <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[120px]">
         {opp.agency ?? "—"}
       </td>
-      <td className="px-3 py-1.5 text-right font-mono text-xs text-foreground tabular-nums">
+      <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
         {formatMoney(opp.value)}
       </td>
-      <td className="px-3 py-1.5 text-center">
+      <td className="px-3 py-1.5 text-left">
         {pwin ? (
           <ScoreDisplay score={pwin.score} className="text-xs" />
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
         )}
       </td>
-      <td className="px-3 py-1.5 text-center">
+      <td className="px-3 py-1.5 text-left">
         {pwin?.band ? <BandBadge band={pwin.band} /> : <span className="text-xs text-muted-foreground">—</span>}
       </td>
       <td className="px-3 py-1.5">
@@ -182,7 +182,7 @@ function PipelineRow({ opp }: { opp: OpportunitySummary }) {
           ))}
         </div>
       </td>
-      <td className="px-3 py-1.5 text-right font-mono text-xs text-muted-foreground tabular-nums">
+      <td className="px-3 py-1.5 text-left font-mono text-xs text-muted-foreground tabular-nums">
         {pwin?.days_to_due != null ? `${pwin.days_to_due}d` : "—"}
       </td>
     </tr>

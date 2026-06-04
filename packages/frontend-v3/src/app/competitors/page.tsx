@@ -33,9 +33,9 @@ export default function CompetitorsPage() {
               <thead>
                 <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                   <th className="px-3 py-2 text-left font-medium">Name</th>
-                  <th className="px-3 py-2 text-center font-medium">Size</th>
-                  <th className="px-3 py-2 text-center font-medium">Overlap</th>
-                  <th className="px-3 py-2 text-center font-medium">FPDS Wins</th>
+                  <th className="px-3 py-2 text-left font-medium">Size</th>
+                  <th className="px-3 py-2 text-left font-medium">Overlap</th>
+                  <th className="px-3 py-2 text-left font-medium">FPDS Wins</th>
                   <th className="px-3 py-2 text-left font-medium">Threat</th>
                   <th className="px-3 py-2 text-left font-medium">Research</th>
                 </tr>

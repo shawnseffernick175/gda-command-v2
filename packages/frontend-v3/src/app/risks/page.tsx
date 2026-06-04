@@ -35,9 +35,9 @@ export default function RisksPage() {
                 <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                   <th className="px-3 py-2 text-left font-medium">Description</th>
                   <th className="px-3 py-2 text-left font-medium">Category</th>
-                  <th className="px-3 py-2 text-center font-medium">L</th>
-                  <th className="px-3 py-2 text-center font-medium">I</th>
-                  <th className="px-3 py-2 text-center font-medium">Score</th>
+                  <th className="px-3 py-2 text-left font-medium">L</th>
+                  <th className="px-3 py-2 text-left font-medium">I</th>
+                  <th className="px-3 py-2 text-left font-medium">Score</th>
                   <th className="px-3 py-2 text-left font-medium">Status</th>
                   <th className="px-3 py-2 text-left font-medium">Owner</th>
                 </tr>

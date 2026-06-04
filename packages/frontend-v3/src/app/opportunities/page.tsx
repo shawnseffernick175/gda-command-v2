@@ -88,8 +88,8 @@ function OpportunityList() {
               <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                 <th className="px-3 py-2 text-left font-medium">Title</th>
                 <th className="px-3 py-2 text-left font-medium">Agency</th>
-                <th className="px-3 py-2 text-right font-medium">Value</th>
-                <th className="px-3 py-2 text-center font-medium">Grade/Band</th>
+                <th className="px-3 py-2 text-left font-medium">Value</th>
+                <th className="px-3 py-2 text-left font-medium">Grade/Band</th>
                 <th className="px-3 py-2 text-left font-medium">Due</th>
                 <th className="px-3 py-2 text-left font-medium">Source</th>
                 <th className="px-3 py-2 text-left font-medium">Stage</th>
@@ -112,12 +112,12 @@ function OpportunityList() {
                   <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[120px]">
                     {opp.agency ?? "—"}
                   </td>
-                  <td className="px-3 py-1.5 text-right font-mono text-xs text-foreground tabular-nums">
+                  <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
                     {formatMoney(opp.value)}
                   </td>
-                  <td className="px-3 py-1.5 text-center">
+                  <td className="px-3 py-1.5 text-left">
                     {opp.pwin ? (
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center gap-1">
                         <ScoreDisplay score={opp.pwin.score} className="text-xs" />
                         <BandBadge band={opp.pwin.band} />
                       </div>
@@ -536,7 +536,7 @@ function AiAnalysisCard({
               <thead>
                 <tr className="border-b border-border bg-gda-bg-base text-muted-foreground">
                   <th className="px-2 py-1 text-left font-medium">Dimension</th>
-                  <th className="px-2 py-1 text-center font-medium">Score</th>
+                  <th className="px-2 py-1 text-left font-medium">Score</th>
                   <th className="px-2 py-1 text-left font-medium">Reasoning</th>
                 </tr>
               </thead>
@@ -551,7 +551,7 @@ function AiAnalysisCard({
                       <td className="px-2 py-1 text-muted-foreground">
                         {dim.label}
                       </td>
-                      <td className="px-2 py-1 text-center font-mono text-foreground">
+                      <td className="px-2 py-1 text-left font-mono text-foreground">
                         {d.score}/10
                       </td>
                       <td className="px-2 py-1 text-muted-foreground truncate max-w-[200px]">

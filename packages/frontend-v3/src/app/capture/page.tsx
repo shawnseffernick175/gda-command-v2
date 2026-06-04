@@ -60,8 +60,8 @@ function CaptureList() {
               <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                 <th className="px-3 py-2 text-left font-medium">Program</th>
                 <th className="px-3 py-2 text-left font-medium">Stage</th>
-                <th className="px-3 py-2 text-right font-medium">Value</th>
-                <th className="px-3 py-2 text-center font-medium">pwin</th>
+                <th className="px-3 py-2 text-left font-medium">Value</th>
+                <th className="px-3 py-2 text-left font-medium">pwin</th>
                 <th className="px-3 py-2 text-left font-medium">Next Milestone</th>
               </tr>
             </thead>
@@ -82,10 +82,10 @@ function CaptureList() {
                   <td className="px-3 py-2">
                     <StageDropdown value={item.stage} />
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-xs tabular-nums">
+                  <td className="px-3 py-2 text-left font-mono text-xs tabular-nums">
                     {formatMoney(item.value)}
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-2 text-left">
                     {item.pwin != null ? (
                       <ScoreDisplay score={item.pwin} className="text-sm" />
                     ) : (
