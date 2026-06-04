@@ -2,7 +2,7 @@
 
 **If you are an AI assistant in a new chat: read this whole file first. It loads you with everything you need. Do NOT re-ask the user for any of this.**
 
-Last verified: June 4, 2026 (AM). Owner: Shawn Seffernick, CTO, Envision-IS (emerging defense / DoD contracting), Alexandria VA.
+Last verified: June 4, 2026. Owner: Shawn Seffernick, CTO, Envision-IS (emerging defense / DoD contracting), Alexandria VA.
 
 ---
 
@@ -156,4 +156,4 @@ Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call
 
 ---
 
-**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket. Current state as of June 4, 2026 AM: **All 5 phases COMPLETE. F-460 frontend live. F-215 D4 LLM router live.** Frontend at `https://gda.csr-llc.tech` — all pages hit backend-v3 v3 endpoints. Honesty gate enforced (AI panels say "coming soon" until frontend wires them up). GovTribe ✅ (349 rows). GovWin ✅ (50 rows). Devin API ✅. `llm_calls` table exists. Real Claude calls working. **Next: F-453** (tunable Pwin weights UI + wire AI panels to real LLM router — has a DB migration for `pwin_scoring_config`). When sending to Devin: write spec (Section 8), hand off via `POST /v1/sessions` (Session, not Review), monitor, QA, merge when CI green. Assistant does VPS/deploy. Devin writes code. End with a recommendation. Don't make Shawn do anything.
+**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket. Current state as of June 4, 2026: **F-453 COMPLETE.** AI Analysis card live on OpportunityDetail (Shipley win probability, competitor landscape, source chips). Pwin weights tunable at `/settings/pwin`. LLM router wired into analysis worker — every opportunity detail load triggers real Claude `opportunity_analysis`. `pwin_scoring_config` table seeded with defaults. GovTribe ✅. GovWin ✅. Devin API ✅. When sending to Devin: write spec (Section 8), hand off via `POST /v1/sessions` (Session, not Review), monitor, QA, merge when CI green. Assistant does VPS/deploy. Devin writes code. End with a recommendation. Don't make Shawn do anything.

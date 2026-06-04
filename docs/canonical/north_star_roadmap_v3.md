@@ -1,6 +1,6 @@
 # GDA Command North Star Roadmap — V3 Edition
 
-**Date:** June 4, 2026 AM (updated — F-215 D4 LLM router COMPLETE; PR #682 merged 9814e6c. Real Anthropic + OpenAI providers live. llm_calls table created. NEXT: F-453 tunable Pwin weights + wire AI panels)
+**Date:** June 4, 2026 (updated — F-453 COMPLETE; PR #683 merged 6deb807. AI Analysis card live. Pwin weights tunable. LLM router wired into analysis worker. NEXT: candidates below)
 **Owner:** Shawn Seffernick
 **Replaces:** north_star_roadmap_v3.md (June 1, 2026)
 **Project Space:** GDA Rebuild
@@ -117,13 +117,15 @@ The unified opportunity foundation (Phase 1) and the external MCP epic (F-500) a
 - R2 enforced: opportunity_analysis 10s wall-clock ceiling
 - ANTHROPIC_API_KEY + OPENAI_API_KEY validated at startup; PERPLEXITY_API_KEY optional
 
-### F-453 — Tunable Pwin weights + wire AI panels (NEXT)
+### ✅ F-453 — Tunable Pwin weights + wire AI panels (COMPLETE — June 4, 2026)
 
-Two parts:
-1. **Pwin config UI**: New `pwin_scoring_config` table (DB migration required). Scorer reads weights from config. GET/PUT `/v3/pwin/config` + POST `/v3/pwin/config/reset`. Settings panel in UI with reset button.
-2. **Wire AI panels**: Frontend currently hides OODA Inspector, Ask AI, Competitive Intel with "coming soon". Now that LLM router is live, wire these panels to call `/v3/opportunities/:id` (which triggers `opportunity_analysis` + `doctrine_score`). Un-hides the AI content.
+**Shipped:** PR #683 merged (squash, commit `6deb807`). Migrations `v3_034` (LLM analysis index) + `v3_035` (pwin_scoring_config) applied. Backend + frontend rebuilt.
 
-Send both as one Devin session.
+- Analysis worker (`workers/analysis.ts`) calls `llmRouter.route({ task: 'opportunity_analysis', ... })` on every job. Stores `llm_analysis`, `llm_model_used`, `llm_quality_flag`, `llm_trace_id` in the analysis JSONB. Fails gracefully (logs warn, continues with deterministic output).
+- OpportunityDetail AI Analysis card: shows win probability %, Shipley Bid/No-Bid (color-coded), 4 Shipley dimensions, up to 3 competitors + differentiators, source chips. Degrades to "AI analysis running..." when null.
+- `pwin_scoring_config` table seeded with all 13 default weights. `GET/PUT /v3/pwin/config` + `POST /v3/pwin/config/reset` live.
+- Settings page at `/settings/pwin` — tune weights, save, reset to defaults. Added to sidebar nav.
+- Scorer (`rules-scorer.ts`) accepts optional `PwinWeights` param; falls back to hardcoded defaults when not provided.
 
 ### Known follow-ups / candidates (not yet ticketed)
 - **Grants.gov adapter** — confirmed live during SBIR diagnosis; strong civilian SBIR/STTR + grants signal source.
