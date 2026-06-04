@@ -244,6 +244,27 @@ jobs:
         working-directory: apps/gda-mcp-server
         run: npx vitest run tests/backend-v3-resolve.test.ts
 
+  llm-router-gates:
+    name: LLM Router Gates (F-215 D4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: SDK drift — no direct imports outside providers/
+        run: ./scripts/ci/llm-sdk-drift.sh
+      - name: Routing table completeness
+        working-directory: apps/backend-v3
+        env:
+          MOCK_LLM: '1'
+          ANTHROPIC_API_KEY: ci-fake
+          OPENAI_API_KEY: ci-fake
+          NODE_ENV: test
+        run: npx vitest run tests/llm-router.test.ts --reporter=verbose
+
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
