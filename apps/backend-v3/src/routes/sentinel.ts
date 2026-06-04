@@ -7,7 +7,7 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope } from '../lib/envelope.js';
-import { getRegisteredSources } from '../ingest/framework/registry.js';
+import { getRegisteredSourcesWithLabels } from '../ingest/framework/registry.js';
 import { getIngestStatus } from '../ingest/framework/run_logger.js';
 import { getCreditBudgetStatus } from '../ingest/govtribe/mcp_client.js';
 
@@ -63,7 +63,7 @@ function deriveSeverity(pct: number): 'ok' | 'warning' | 'critical' {
 
 export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/sentinel/sources', async (req, reply) => {
-    const registered = getRegisteredSources();
+    const registered = getRegisteredSourcesWithLabels();
     const ingestStatus = await getIngestStatus();
 
     const ingestMap = new Map(ingestStatus.map((s) => [s.source_key, s]));
@@ -84,7 +84,7 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
     );
     const recentErrors = new Map(lastErrorRows.map((r) => [r.source_key, r.error_text]));
 
-    const entries: SentinelSourceEntry[] = registered.map((sourceKey) => {
+    const entries: (SentinelSourceEntry & { label: string })[] = registered.map(({ key: sourceKey, label }) => {
       const ingest = ingestMap.get(sourceKey);
       const lagSeconds = ingest?.lag_seconds ?? null;
       const recentError = recentErrors.get(sourceKey);
@@ -105,8 +105,9 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
           ? `Error: ${recentError.slice(0, 100)}`
           : deriveSentinelMessage(sourceKey, 0, lagSeconds);
 
-      const entry: SentinelSourceEntry = {
+      const entry: SentinelSourceEntry & { label: string } = {
         source_key: sourceKey,
+        label,
         status,
         last_success_at: ingest?.last_success_at ?? null,
         lag_seconds: lagSeconds,
@@ -128,9 +129,15 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
     const govtribeEntry = entries.find((e) => e.source_key === 'govtribe');
     const severity = govtribeEntry ? deriveSeverity(govtribeBudget.pct) : 'ok';
 
+    // Derive overall health
+    const hasError = entries.some((e) => e.status === 'error');
+    const hasStale = entries.some((e) => e.status === 'stale');
+    const overall = hasError ? 'down' : hasStale ? 'degraded' : 'healthy';
+
     return reply.send(
       successEnvelope(
         {
+          overall,
           sources: entries,
           govtribe_severity: severity,
           govtribe_credits: govtribeBudget,

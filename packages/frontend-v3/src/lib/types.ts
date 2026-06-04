@@ -288,10 +288,26 @@ export interface Risk {
 export interface SentinelStatus {
   overall: "healthy" | "degraded" | "down";
   sources: Array<{
-    name: string;
-    status: "healthy" | "stale" | "error";
-    last_run: string | null;
+    source_key: string;
+    label: string;
+    status: "healthy" | "stale" | "error" | "unknown";
+    last_success_at: string | null;
+    lag_seconds: number | null;
+    message?: string;
+    credits?: {
+      used: number;
+      budget: number;
+      pct: number;
+      last_call_at: string | null;
+    };
   }>;
+  govtribe_severity: "ok" | "warning" | "critical";
+  govtribe_credits: {
+    credits_used: number;
+    credits_budget: number;
+    pct: number;
+    last_call_at: string | null;
+  };
 }
 
 /* ── LLM Router ───────────────────────────────────────────────── */

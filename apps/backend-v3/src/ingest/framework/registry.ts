@@ -33,6 +33,10 @@ export function getRegisteredSources(): string[] {
   return Array.from(sources.keys());
 }
 
+export function getRegisteredSourcesWithLabels(): Array<{ key: string; label: string }> {
+  return Array.from(sources.values()).map(({ key, label }) => ({ key, label }));
+}
+
 export async function runIngest(sourceKey: string): Promise<{
   runId: bigint;
   result: IngestResult;

@@ -55,28 +55,31 @@ export default function SettingsPage() {
               </div>
               {sentinel.sources.map((source) => (
                 <div
-                  key={source.name}
+                  key={source.source_key}
                   className="flex items-center gap-3 rounded border border-border bg-gda-bg-base px-3 py-2"
+                  title={source.message}
                 >
                   <span
                     className={cn(
-                      "h-2 w-2 rounded-full",
+                      "h-2 w-2 rounded-full flex-shrink-0",
                       source.status === "healthy"
                         ? "bg-gda-green"
                         : source.status === "stale"
                           ? "bg-gda-amber"
-                          : "bg-gda-red",
+                          : source.status === "unknown"
+                            ? "bg-muted-foreground"
+                            : "bg-gda-red",
                     )}
                   />
                   <span className="flex-1 text-sm text-foreground">
-                    {source.name}
+                    {source.label}
                   </span>
                   <Badge variant="outline" className="text-[11px]">
                     {source.status}
                   </Badge>
                   <span className="text-[11px] text-muted-foreground">
-                    {source.last_run
-                      ? new Date(source.last_run).toLocaleString()
+                    {source.last_success_at
+                      ? new Date(source.last_success_at).toLocaleString()
                       : "Never"}
                   </span>
                 </div>
