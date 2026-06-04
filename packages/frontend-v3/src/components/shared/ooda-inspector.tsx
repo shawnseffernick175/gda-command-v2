@@ -1,7 +1,6 @@
 "use client";
 
 import { useOodaAnalysis } from "@/hooks/use-llm";
-import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const OODA_PHASES = ["Observe", "Orient", "Decide", "Act"] as const;
@@ -17,14 +16,25 @@ export function OodaInspector({
 }) {
   const ooda = useOodaAnalysis();
 
-  useEffect(() => {
-    if (opportunityId) {
-      ooda.mutate({ opportunity_id: opportunityId, stage, context });
-    }
-    // R2: auto-analysis on open — no "Run Analysis" button
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opportunityId, stage]);
+  /* Idle state — user has not triggered analysis yet */
+  if (!ooda.data && !ooda.isPending && !ooda.error) {
+    return (
+      <div className="rounded border border-border bg-gda-bg-base p-4 text-center">
+        <p className="text-xs text-muted-foreground mb-3">
+          OODA loop analysis maps this opportunity across Observe → Orient → Decide → Act
+        </p>
+        <button
+          type="button"
+          onClick={() => ooda.mutate({ opportunity_id: opportunityId, stage, context })}
+          className="rounded border border-gda-cyan/30 px-3 py-1.5 text-xs font-mono text-gda-cyan hover:bg-gda-cyan/10 transition-colors"
+        >
+          Run OODA Analysis
+        </button>
+      </div>
+    );
+  }
 
+  /* Loading skeletons */
   if (ooda.isPending) {
     return (
       <div className="space-y-3">
@@ -40,10 +50,11 @@ export function OodaInspector({
     );
   }
 
+  /* Error state */
   if (ooda.error) {
     return (
       <div className="rounded border border-gda-amber/30 bg-gda-amber/10 p-3 text-xs text-gda-amber italic">
-        OODA analysis pending — activates with the intelligence layer (F-217)
+        OODA analysis failed — try again later.
       </div>
     );
   }
@@ -53,14 +64,23 @@ export function OodaInspector({
   if (!ooda.data?.ok || !output) {
     return (
       <div className="rounded border border-border bg-gda-bg-base p-3 text-xs text-muted-foreground italic">
-        OODA analysis pending — activates with the intelligence layer (F-217).
-        Real analysis will appear here once the LLM router is fully integrated.
+        OODA analysis returned no data. Try re-running.
       </div>
     );
   }
 
+  /* Result state — show 4-phase output with re-run button */
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => ooda.mutate({ opportunity_id: opportunityId, stage, context })}
+          className="rounded border border-gda-cyan/30 px-2 py-1 text-[11px] font-mono text-gda-cyan hover:bg-gda-cyan/10 transition-colors"
+        >
+          Re-run
+        </button>
+      </div>
       {OODA_PHASES.map((phase) => {
         const phaseKey = phase.toLowerCase();
         const content = output[phaseKey];

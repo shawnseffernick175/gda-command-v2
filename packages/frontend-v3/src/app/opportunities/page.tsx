@@ -8,6 +8,8 @@ import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
 import { AskAiPanel } from "@/components/shared/ask-ai-panel";
+import { CollapseSection } from "@/components/shared/collapse-section";
+import { OodaInspector } from "@/components/shared/ooda-inspector";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
 import { PendingState } from "@/components/shared/pending-state";
@@ -438,6 +440,23 @@ function OpportunityDetail({ id }: { id: string }) {
           pwin: opp.pwin?.score,
         }}
       />
+
+      {/* OODA Inspector (F-492) */}
+      <CollapseSection
+        id={`ooda-${id}`}
+        title="OODA Loop Analysis"
+        defaultOpen={false}
+      >
+        <OodaInspector
+          opportunityId={String(id)}
+          stage={opp.stage ?? undefined}
+          context={{
+            title: opp.title,
+            agency: opp.agency,
+            pwin: opp.pwin?.score,
+          }}
+        />
+      </CollapseSection>
     </div>
   );
 }
