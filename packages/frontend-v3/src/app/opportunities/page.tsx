@@ -44,17 +44,10 @@ function OpportunityList() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [dueSoonFilter, setDueSoonFilter] = useState(false);
+  const [dueBefore, setDueBefore] = useState<string | undefined>(undefined);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [previousItems, setPreviousItems] = useState<OpportunitySummary[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const dueBefore = useMemo(
-    () =>
-      dueSoonFilter
-        ? new Date(Date.now() + 14 * 86400 * 1000).toISOString()
-        : undefined,
-    [dueSoonFilter],
-  );
 
   const { data, isLoading, error, refetch } = useOpportunities({
     q: debouncedQ || undefined,
@@ -102,9 +95,15 @@ function OpportunityList() {
 
   const handleDueSoonChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = e.target.checked;
       setCursor(undefined);
       setPreviousItems([]);
-      setDueSoonFilter(e.target.checked);
+      setDueSoonFilter(checked);
+      setDueBefore(
+        checked
+          ? new Date(Date.now() + 14 * 86400 * 1000).toISOString()
+          : undefined,
+      );
     },
     [],
   );
@@ -114,6 +113,7 @@ function OpportunityList() {
     setDebouncedQ("");
     setGradeFilter("");
     setDueSoonFilter(false);
+    setDueBefore(undefined);
     setCursor(undefined);
     setPreviousItems([]);
   }, []);
