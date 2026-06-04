@@ -150,16 +150,16 @@ function OpportunityList() {
   );
 }
 
-const DOCTRINE_PRINCIPLES = [
-  "Alignment",
-  "Ethics Always",
-  "Teamwork",
-  "Data First, Then Debate",
-  "Relentless Execution",
-  "Relationships, Relationships, Relationships",
-  "Market, Mission, Brand Focus",
-  "Customer Facing",
-] as const;
+const DOCTRINE_PRINCIPLES: Array<{ id: string; label: string }> = [
+  { id: "alignment", label: "Alignment" },
+  { id: "ethics_always", label: "Ethics Always" },
+  { id: "teamwork", label: "Teamwork" },
+  { id: "data_first", label: "Data First, Then Debate" },
+  { id: "relentless_execution", label: "Relentless Execution" },
+  { id: "relationships", label: "Relationships, Relationships, Relationships" },
+  { id: "market_mission_brand", label: "Market, Mission, Brand Focus" },
+  { id: "customer_facing", label: "Customer Facing" },
+];
 
 const FIT_COLORS: Record<DoctrineFitLabel, string> = {
   strong: "text-gda-green",
@@ -332,21 +332,20 @@ function OpportunityDetail({ id }: { id: string }) {
                   </p>
                   <div className="grid grid-cols-2 gap-1">
                     {DOCTRINE_PRINCIPLES.map((p) => {
-                      const matched = doctrine.matchedPrinciples.some(
-                        (m) => p.toLowerCase().includes(m.replace(/_/g, " ")),
-                      );
+                      const matched = doctrine.matchedPrinciples.includes(p.id);
                       return (
                         <span
-                          key={p}
+                          key={p.id}
                           className={`text-[11px] ${
                             matched ? "text-gda-green" : "text-muted-foreground"
                           }`}
                         >
-                          {matched ? "●" : "○"} {p}
+                          {matched ? "●" : "○"} {p.label}
                         </span>
                       );
                     })}
                   </div>
+                  <SourceChip label="doctrine alignment" kind="heuristic" />
                 </>
               ) : doctrineScore != null ? (
                 <>
@@ -358,8 +357,8 @@ function OpportunityDetail({ id }: { id: string }) {
                   </div>
                   <div className="grid grid-cols-2 gap-1">
                     {DOCTRINE_PRINCIPLES.map((p) => (
-                      <span key={p} className="text-[11px] text-muted-foreground">
-                        ○ {p}
+                      <span key={p.id} className="text-[11px] text-muted-foreground">
+                        ○ {p.label}
                       </span>
                     ))}
                   </div>
