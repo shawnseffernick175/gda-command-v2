@@ -282,6 +282,21 @@ export interface Contact {
   notes?: string | null;
 }
 
+/* ── GovTribe Contacts (F-494) ────────────────────────────────── */
+
+export interface GovTriContact {
+  id: number;
+  govtribe_id: string;
+  name: string | null;
+  title: string | null;
+  agency: string | null;
+  email: string | null;
+  phone: string | null;
+  contact_type: string | null;
+  source_url: string | null;
+  last_seen_at: string;
+}
+
 /* ── Competitors (pending backend) ────────────────────────────── */
 
 export interface Competitor {

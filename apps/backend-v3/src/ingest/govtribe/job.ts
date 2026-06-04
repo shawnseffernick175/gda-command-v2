@@ -344,7 +344,42 @@ export async function runGovTribeContactsIngest(): Promise<IngestResult> {
     }
 
     if (result.data) {
-      inserted++;
+      const responseData = result.data as Record<string, unknown> | null;
+      const contacts = (responseData?.data ?? (Array.isArray(responseData) ? responseData : [])) as Array<{
+        _id?: string;
+        name?: string;
+        title?: string;
+        officeAgency?: { name?: string };
+        emails?: string[];
+        phones?: string[];
+        type?: string;
+        permalink?: string;
+      }>;
+
+      for (const c of contacts) {
+        if (!c._id) continue;
+        await pool.query(
+          `INSERT INTO govtribe_contacts
+             (govtribe_id, name, title, agency, email, phone, contact_type, source_url, raw_json, last_seen_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+           ON CONFLICT (govtribe_id) DO UPDATE SET
+             name=EXCLUDED.name, title=EXCLUDED.title, agency=EXCLUDED.agency,
+             email=EXCLUDED.email, phone=EXCLUDED.phone, contact_type=EXCLUDED.contact_type,
+             source_url=EXCLUDED.source_url, raw_json=EXCLUDED.raw_json, last_seen_at=NOW()`,
+          [
+            c._id,
+            c.name ?? null,
+            c.title ?? null,
+            c.officeAgency?.name ?? agencyName,
+            c.emails?.[0] ?? null,
+            c.phones?.[0] ?? null,
+            c.type ?? null,
+            c.permalink ?? null,
+            JSON.stringify(c),
+          ],
+        );
+        inserted++;
+      }
     } else {
       skipped++;
     }
