@@ -205,15 +205,32 @@ export interface CaptureDetail {
 
 /* ── Awards ───────────────────────────────────────────────────── */
 
-export interface Award {
-  id: number;
+export interface AwardSourceRef {
+  kind: string;
   title: string;
+  url: string;
+  retrieved_at?: string;
+}
+
+export interface Award {
+  id: string;
+  recipient_name: string | null;
+  recipient_name_sources: AwardSourceRef[];
   agency: string | null;
-  value: number | null;
-  outcome: "won" | "lost";
-  date: string;
-  loss_reason?: string | null;
-  source?: string | null;
+  agency_sources: AwardSourceRef[];
+  contract_type: string | null;
+  contract_type_sources: AwardSourceRef[];
+  awarded_amount: number | null;
+  awarded_amount_sources: AwardSourceRef[];
+  awarded_at: string | null;
+  awarded_at_sources: AwardSourceRef[];
+  fpds_url: string | null;
+  data_source: string;
+}
+
+export interface AwardsPaginatedResponse {
+  items: Award[];
+  pagination: { limit: number; cursor: string | null; hasMore: boolean };
 }
 
 /* ── Action Items ─────────────────────────────────────────────── */
