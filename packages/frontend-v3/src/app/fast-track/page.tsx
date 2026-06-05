@@ -784,7 +784,7 @@ export default function FastTrackPage() {
       >
         <div className="mb-3">
           <p className="text-[11px] text-muted-foreground">
-            Paste any opportunity text for an instant AI go/no-go grade against Envision&apos;s doctrine and NAICS profile.
+            Paste any opportunity text for an instant AI go/no-go grade against Envision{"'"}s doctrine and NAICS profile.
           </p>
         </div>
         <form onSubmit={handleTriage} className="space-y-3">
