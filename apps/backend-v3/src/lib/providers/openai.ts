@@ -67,6 +67,58 @@ export async function callOpenAIEmbed(opts: {
   }
 }
 
+export interface OpenAIChatResult {
+  text: string;
+  model: string;
+  tokens_input: number;
+  tokens_output: number;
+}
+
+/**
+ * Chat completion via OpenAI (gpt-4o-mini).
+ * Returns parsed text content from the first choice.
+ */
+export async function callOpenAIChat(opts: {
+  model: string;
+  messages: Array<{ role: 'user' | 'system' | 'assistant'; content: string }>;
+  response_format?: { type: string };
+  temperature?: number;
+  timeout_ms?: number;
+}): Promise<OpenAIChatResult> {
+  const openai = getClient();
+
+  try {
+    const response = await openai.chat.completions.create(
+      {
+        model: opts.model,
+        messages: opts.messages,
+        response_format: opts.response_format as { type: 'json_object' } | undefined,
+        temperature: opts.temperature ?? 0.3,
+      },
+      opts.timeout_ms ? { timeout: opts.timeout_ms } : undefined,
+    );
+
+    const choice = response.choices[0];
+    if (!choice?.message?.content) {
+      throw new Error('No content returned from OpenAI chat');
+    }
+
+    return {
+      text: choice.message.content,
+      model: response.model,
+      tokens_input: response.usage?.prompt_tokens ?? 0,
+      tokens_output: response.usage?.completion_tokens ?? 0,
+    };
+  } catch (err: unknown) {
+    const e = err as { status?: number; message?: string };
+    const status = e.status ?? 500;
+    throw Object.assign(new Error(e.message ?? 'OpenAI Chat API error'), {
+      status,
+      code: status >= 500 ? 'PROVIDER_5XX' : undefined,
+    });
+  }
+}
+
 /** Reset client (for testing). */
 export function resetOpenAIClient(): void {
   client = null;
