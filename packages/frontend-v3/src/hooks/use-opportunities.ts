@@ -12,6 +12,13 @@ interface OpportunitiesPaginated {
   pagination: { limit: number; cursor: string | null; hasMore: boolean };
 }
 
+interface OpportunitiesPagedResponse {
+  items: OpportunitySummary[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 interface UseOpportunitiesParams {
   q?: string;
   limit?: number;
@@ -32,6 +39,36 @@ export function useOpportunities(params: UseOpportunitiesParams = {}) {
         q: params.q,
         limit: params.limit ?? 100,
         cursor: params.cursor,
+        status: params.status,
+        agency: params.agency,
+        naics: params.naics,
+        grade: params.grade,
+        due_before: params.due_before,
+        due_after: params.due_after,
+      }),
+  });
+}
+
+interface UseOpportunitiesPagedParams {
+  q?: string;
+  limit?: number;
+  page?: number;
+  status?: string;
+  agency?: string;
+  naics?: string;
+  grade?: string;
+  due_before?: string;
+  due_after?: string;
+}
+
+export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) {
+  return useQuery({
+    queryKey: ["opportunities-paged", params],
+    queryFn: () =>
+      apiGet<OpportunitiesPagedResponse>("/v3/opportunities", {
+        q: params.q,
+        limit: params.limit ?? 100,
+        page: params.page ?? 1,
         status: params.status,
         agency: params.agency,
         naics: params.naics,
@@ -70,6 +107,7 @@ export function useFieldOverride() {
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["opportunities"] });
+      void qc.invalidateQueries({ queryKey: ["opportunities-paged"] });
       void qc.invalidateQueries({ queryKey: ["opportunity"] });
     },
   });

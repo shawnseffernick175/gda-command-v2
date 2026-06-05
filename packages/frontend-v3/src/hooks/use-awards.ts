@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
-import type { AwardsPaginatedResponse } from "@/lib/types";
+import type { Award, AwardsPaginatedResponse } from "@/lib/types";
 
 export interface UseAwardsParams {
   agency?: string;
@@ -22,6 +22,35 @@ export function useAwards(params: UseAwardsParams = {}) {
         contract_type: params.contract_type || undefined,
         awarded_after: params.awarded_after || undefined,
         cursor: params.cursor || undefined,
+      }),
+  });
+}
+
+interface AwardsPagedResponse {
+  items: Award[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+interface UseAwardsPagedParams {
+  agency?: string;
+  contract_type?: string;
+  awarded_after?: string;
+  limit?: number;
+  page?: number;
+}
+
+export function useAwardsPaged(params: UseAwardsPagedParams = {}) {
+  return useQuery({
+    queryKey: ["awards-paged", params],
+    queryFn: () =>
+      apiGet<AwardsPagedResponse>("/v3/awards", {
+        limit: params.limit ?? 100,
+        page: params.page ?? 1,
+        agency: params.agency || undefined,
+        contract_type: params.contract_type || undefined,
+        awarded_after: params.awarded_after || undefined,
       }),
   });
 }

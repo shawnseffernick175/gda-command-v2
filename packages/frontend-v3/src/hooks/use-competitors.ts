@@ -21,6 +21,33 @@ export function useCompetitors(params: UseCompetitorsParams = {}) {
   });
 }
 
+interface CompetitorsPagedResponse {
+  items: Competitor[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+interface UseCompetitorsPagedParams {
+  q?: string;
+  naics?: string;
+  limit?: number;
+  page?: number;
+}
+
+export function useCompetitorsPaged(params: UseCompetitorsPagedParams = {}) {
+  return useQuery({
+    queryKey: ["competitors-paged", params],
+    queryFn: () =>
+      apiGet<CompetitorsPagedResponse>("/v3/competitors", {
+        q: params.q,
+        naics: params.naics,
+        limit: params.limit ?? 100,
+        page: params.page ?? 1,
+      }),
+  });
+}
+
 export function useCompetitorsCount() {
   return useQuery({
     queryKey: ["competitors-count"],

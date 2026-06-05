@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
-import { useAwards, useAwardsCount } from "@/hooks/use-awards";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useAwardsPaged, useAwardsCount } from "@/hooks/use-awards";
+import { Pagination } from "@/components/shared/Pagination";
 import { useTodayBriefing, useGenerateBriefing } from "@/hooks/use-briefing";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,88 +38,80 @@ function getAwardedAfter(days: number | null): string | undefined {
 }
 
 export default function AwardsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const currentPage = Number(searchParams.get("page") ?? "1") || 1;
+
   const [agencyInput, setAgencyInput] = useState("");
   const [agencyFilter, setAgencyFilter] = useState("");
   const [contractType, setContractType] = useState<string>("All Types");
   const [dateRange, setDateRange] = useState<number | null>(null);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [previousItems, setPreviousItems] = useState<Award[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const awardedAfter = useMemo(() => getAwardedAfter(dateRange), [dateRange]);
 
-  const params = useMemo(
-    () => ({
-      agency: agencyFilter || undefined,
-      contract_type: contractType === "All Types" ? undefined : contractType,
-      awarded_after: awardedAfter,
-      cursor,
-    }),
-    [agencyFilter, contractType, awardedAfter, cursor],
-  );
-
-  const { data, isLoading, error, refetch } = useAwards(params);
+  const { data, isLoading, error, refetch } = useAwardsPaged({
+    agency: agencyFilter || undefined,
+    contract_type: contractType === "All Types" ? undefined : contractType,
+    awarded_after: awardedAfter,
+    limit: 100,
+    page: currentPage,
+  });
   const { data: countData } = useAwardsCount();
   const { data: briefingData, isLoading: briefingLoading } = useTodayBriefing();
   const generateBriefing = useGenerateBriefing();
 
-  const allItems = useMemo(() => {
-    const combined = [...previousItems, ...(data?.items ?? [])];
-    const seen = new Set<string>();
-    return combined.filter((item) => {
-      if (seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    });
-  }, [previousItems, data?.items]);
+  const items = data?.items ?? [];
+  const totalPages = data?.totalPages ?? 1;
 
-  const resetFilters = useCallback(() => {
-    setCursor(undefined);
-    setPreviousItems([]);
-  }, []);
+  const setPage = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (page <= 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(page));
+      }
+      router.push(`${pathname}?${params.toString()}`);
+      listRef.current?.scrollIntoView({ behavior: "smooth" });
+    },
+    [searchParams, router, pathname],
+  );
 
-  // Debounced agency filter
   const handleAgencyChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setAgencyInput(val);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        setCursor(undefined);
-        setPreviousItems([]);
         setAgencyFilter(val);
+        setPage(1);
       }, 300);
     },
-    [],
+    [setPage],
   );
 
   const handleContractTypeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      resetFilters();
       setContractType(e.target.value);
+      setPage(1);
     },
-    [resetFilters],
+    [setPage],
   );
 
   const handleDateRangeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      resetFilters();
       setDateRange(e.target.value === "all" ? null : Number(e.target.value));
+      setPage(1);
     },
-    [resetFilters],
+    [setPage],
   );
 
-  const handleLoadMore = useCallback(() => {
-    if (data?.pagination?.cursor) {
-      setPreviousItems((prev) => [...prev, ...(data?.items ?? [])]);
-      setCursor(data.pagination.cursor);
-    }
-  }, [data]);
-
-  const hasMore = data?.pagination?.hasMore ?? false;
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={listRef}>
       <div className="flex items-center gap-3">
         <h1 className="font-mono text-lg font-bold text-foreground">
           Competitive Intel — Awards
@@ -169,27 +163,17 @@ export default function AwardsPage() {
         />
       )}
 
-      {isLoading && !allItems.length ? (
+      {isLoading && !items.length ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-20 bg-gda-panel" />
           ))}
         </div>
-      ) : allItems.length > 0 ? (
+      ) : items.length > 0 ? (
         <div className="space-y-2">
-          {allItems.map((award) => (
+          {items.map((award) => (
             <AwardCard key={award.id} award={award} />
           ))}
-          {hasMore && (
-            <button
-              type="button"
-              onClick={handleLoadMore}
-              disabled={isLoading}
-              className="w-full rounded border border-border bg-gda-panel py-2 text-xs font-mono text-muted-foreground hover:text-foreground hover:border-gda-cyan/30 transition-colors disabled:opacity-50"
-            >
-              {isLoading ? "Loading…" : "Load more"}
-            </button>
-          )}
         </div>
       ) : (
         !isLoading && (
@@ -198,6 +182,14 @@ export default function AwardsPage() {
             reason="No award data matches the current filters."
           />
         )
+      )}
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       )}
 
       {/* News Digest — wired to daily briefing market_intel_summary */}

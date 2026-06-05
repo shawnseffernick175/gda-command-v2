@@ -1,29 +1,56 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useCompetitors, useCompetitorsCount, useBlackHatAnalysis } from "@/hooks/use-competitors";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useCompetitorsPaged, useCompetitorsCount, useBlackHatAnalysis } from "@/hooks/use-competitors";
+import { Pagination } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
 
 export default function CompetitorsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const currentPage = Number(searchParams.get("page") ?? "1") || 1;
+
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const setPage = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (page <= 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(page));
+      }
+      router.push(`${pathname}?${params.toString()}`);
+      listRef.current?.scrollIntoView({ behavior: "smooth" });
+    },
+    [searchParams, router, pathname],
+  );
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setDebouncedQ(q), 350);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedQ(q);
+      setPage(1);
+    }, 350);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [q]);
+  }, [q, setPage]);
 
-  const { data, isLoading } = useCompetitors({ q: debouncedQ || undefined, limit: 100 });
+  const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, limit: 100, page: currentPage });
   const { data: countData } = useCompetitorsCount();
 
   const items = data?.items ?? [];
+  const totalPages = data?.totalPages ?? 1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={listRef}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-mono text-lg font-bold text-foreground">
@@ -147,6 +174,14 @@ export default function CompetitorsPage() {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      )}
 
       <CollapseSection
         id="comp-black-hat"

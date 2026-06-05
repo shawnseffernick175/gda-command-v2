@@ -14,6 +14,7 @@ import {
   type OpportunityUpdateInput,
   type ListFilters,
   type PaginatedResult,
+  type PagedResult,
   type AnalysisBlock,
   type TeamingFlag,
 } from './types.js';
@@ -28,6 +29,7 @@ export type {
   OpportunityUpdateInput,
   ListFilters,
   PaginatedResult,
+  PagedResult,
   AnalysisBlock,
   TeamingFlag,
 } from './types.js';
@@ -293,6 +295,78 @@ export async function listOpportunities(
       hasMore,
     },
   };
+}
+
+export async function listOpportunitiesPaged(
+  filters: ListFilters,
+): Promise<PagedResult<OpportunitySummary>> {
+  const limit = Math.min(Math.max(filters.limit ?? 100, 1), 200);
+  const page = Math.max(filters.page ?? 1, 1);
+  const offset = (page - 1) * limit;
+
+  const conditions: string[] = ['deleted_at IS NULL'];
+  const params: unknown[] = [];
+  let paramIdx = 1;
+
+  if (filters.q) {
+    conditions.push(`(title ILIKE $${paramIdx} OR agency ILIKE $${paramIdx})`);
+    params.push(`%${filters.q}%`);
+    paramIdx++;
+  }
+  if (filters.status) {
+    conditions.push(`status = $${paramIdx++}`);
+    params.push(filters.status);
+  }
+  if (filters.agency) {
+    conditions.push(`agency ILIKE $${paramIdx++}`);
+    params.push(`%${filters.agency}%`);
+  }
+  if (filters.naics) {
+    conditions.push(`naics ILIKE $${paramIdx++}`);
+    params.push(`%${filters.naics}%`);
+  }
+  if (filters.grade) {
+    conditions.push(`grade = $${paramIdx++}`);
+    params.push(filters.grade);
+  }
+  if (filters.set_aside) {
+    conditions.push(`set_aside ILIKE $${paramIdx++}`);
+    params.push(`%${filters.set_aside}%`);
+  }
+  if (filters.due_before) {
+    conditions.push(`response_due_at <= $${paramIdx++}`);
+    params.push(filters.due_before);
+  }
+  if (filters.due_after) {
+    conditions.push(`response_due_at >= $${paramIdx++}`);
+    params.push(filters.due_after);
+  }
+  if (filters.min_value !== undefined) {
+    conditions.push(`value_max >= $${paramIdx++}`);
+    params.push(filters.min_value);
+  }
+  if (filters.max_value !== undefined) {
+    conditions.push(`value_min <= $${paramIdx++}`);
+    params.push(filters.max_value);
+  }
+  if (filters.hot === '1') {
+    conditions.push(`(grade = 'A')`);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const countSql = `SELECT COUNT(*)::int AS total FROM opportunities ${where}`;
+  const countRes = await pool.query<{ total: number }>(countSql, params);
+  const total = countRes.rows[0]?.total ?? 0;
+  const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+  const dataSql = `SELECT * FROM opportunities ${where} ORDER BY id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+  const dataParams = [...params, limit, offset];
+  const res = await pool.query<OpportunityRow>(dataSql, dataParams);
+
+  const summaries = await Promise.all(res.rows.map(rowToSummary));
+
+  return { items: summaries, total, page, totalPages };
 }
 
 export async function getOpportunityById(id: string): Promise<OpportunityRow | null> {
