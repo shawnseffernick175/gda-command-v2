@@ -164,12 +164,22 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
 
     const output = result.output as RiskGenerationOutput;
 
-    for (const risk of output.risks) {
-      await pool.query(
-        `INSERT INTO risks (title, description, category, likelihood, impact, mitigation, source, opportunity_id)
-         VALUES ($1, $2, $3, $4, $5, $6, 'ai_generated', $7)`,
-        [risk.title, risk.description, risk.category, risk.likelihood, risk.impact, risk.mitigation, opp.id],
-      );
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const risk of output.risks) {
+        await client.query(
+          `INSERT INTO risks (title, description, category, likelihood, impact, mitigation, source, opportunity_id)
+           VALUES ($1, $2, $3, $4, $5, $6, 'ai_generated', $7)`,
+          [risk.title, risk.description, risk.category, risk.likelihood, risk.impact, risk.mitigation, opp.id],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
     }
 
     return reply.send(successEnvelope({

@@ -443,7 +443,7 @@ export interface SourceResearchOutput {
 export interface GeneratedRisk {
   title: string;
   description: string;
-  category: 'technical' | 'schedule' | 'cost' | 'programmatic' | 'operational' | 'competitive';
+  category: 'technical' | 'schedule' | 'financial' | 'compliance' | 'operational' | 'competitive';
   likelihood: number;
   impact: number;
   mitigation: string;

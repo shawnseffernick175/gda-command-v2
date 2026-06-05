@@ -65,7 +65,7 @@ Deadline: ${input.response_deadline ?? 'Unknown'}
 
 Existing risks to avoid duplicating: ${existing}
 
-Generate 4-6 distinct risks covering technical, schedule, cost, competitive, and programmatic dimensions.
+Generate 4-6 distinct risks covering technical, schedule, financial, competitive, and compliance dimensions.
 
 Respond ONLY with valid JSON:
 {
@@ -73,7 +73,7 @@ Respond ONLY with valid JSON:
     {
       "title": "<concise risk title>",
       "description": "<1-2 sentence description>",
-      "category": "<technical|schedule|cost|programmatic|operational|competitive>",
+      "category": "<technical|schedule|financial|compliance|operational|competitive>",
       "likelihood": <1-5>,
       "impact": <1-5>,
       "mitigation": "<1-2 sentence mitigation approach>",
