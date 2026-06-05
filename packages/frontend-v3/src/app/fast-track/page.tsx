@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFastTrackList, useRunFastTrack } from "@/hooks/use-fast-track";
-import { useFTSignals, useFTMatches } from "@/hooks/use-fast-track-signals";
-import type { FTSignal, FTMatch } from "@/hooks/use-fast-track-signals";
+import {
+  useFTSignals,
+  useFTMatches,
+  useFTMatchAnalysis,
+  useRunFTMatchAnalysis,
+} from "@/hooks/use-fast-track-signals";
+import type { FTSignal, FTMatch, FTMatchAnalysis } from "@/hooks/use-fast-track-signals";
 import { Badge } from "@/components/ui/badge";
 import { SourceChip } from "@/components/shared/source-chip";
 import { CollapseSection } from "@/components/shared/collapse-section";
@@ -66,6 +71,50 @@ function UrgencyBadge({ urgency }: { urgency: string | null }) {
 }
 
 // ────────────────────────────────────────────────────────────
+// Priority/severity badge
+// ────────────────────────────────────────────────────────────
+const PRIORITY_STYLES: Record<string, string> = {
+  high:   "bg-red-500/15 border-red-500/40 text-red-400",
+  medium: "bg-amber-400/15 border-amber-400/40 text-amber-400",
+  low:    "bg-muted/30 border-border text-muted-foreground",
+};
+
+function PriorityBadge({ value }: { value: string }) {
+  return (
+    <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase", PRIORITY_STYLES[value] ?? PRIORITY_STYLES.low)}>
+      {value}
+    </span>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Institution type badge
+// ────────────────────────────────────────────────────────────
+const INSTITUTION_STYLES: Record<string, string> = {
+  academia:            "bg-gda-cyan/15 border-gda-cyan/40 text-gda-cyan",
+  ffrdc:               "bg-amber-400/15 border-amber-400/40 text-amber-400",
+  innovation_factory:  "bg-gda-green/15 border-gda-green/40 text-gda-green",
+  startup:             "bg-purple-400/15 border-purple-400/40 text-purple-400",
+  npo:                 "bg-muted/30 border-border text-muted-foreground",
+};
+
+const INSTITUTION_LABELS: Record<string, string> = {
+  academia:            "Academia",
+  ffrdc:               "FFRDC",
+  innovation_factory:  "Innovation Factory",
+  startup:             "Startup",
+  npo:                 "NPO",
+};
+
+function InstitutionBadge({ type }: { type: string }) {
+  return (
+    <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase", INSTITUTION_STYLES[type] ?? INSTITUTION_STYLES.npo)}>
+      {INSTITUTION_LABELS[type] ?? type}
+    </span>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
 // Tag pill
 // ────────────────────────────────────────────────────────────
 function Tag({ label }: { label: string }) {
@@ -79,8 +128,23 @@ function Tag({ label }: { label: string }) {
 // ────────────────────────────────────────────────────────────
 // Signal card row (shared for both pipelines)
 // ────────────────────────────────────────────────────────────
-function SignalRow({ s }: { s: FTSignal }) {
+function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+
+  const titleEl = s.source_url ? (
+    <a
+      href={s.doi ? `https://doi.org/${s.doi}` : s.source_url}
+      target="_blank"
+      rel="noreferrer"
+      className="text-xs text-gda-cyan hover:underline leading-snug line-clamp-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {s.title}
+    </a>
+  ) : (
+    <p className="text-xs text-foreground leading-snug line-clamp-2">{s.title}</p>
+  );
+
   return (
     <>
       <tr
@@ -93,13 +157,24 @@ function SignalRow({ s }: { s: FTSignal }) {
         </td>
         {/* Title */}
         <td className="px-3 py-2 text-left align-top max-w-[260px]">
-          <p className="text-xs text-foreground leading-snug line-clamp-2">{s.title}</p>
+          {titleEl}
           {s.mission_tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {s.mission_tags.map((t) => <Tag key={t} label={t} />)}
             </div>
           )}
         </td>
+        {/* Institution (industry only) */}
+        {showInstitution && (
+          <td className="px-3 py-2 text-left align-top">
+            <div className="flex flex-col gap-1">
+              {s.institution_name && (
+                <span className="text-[11px] text-foreground">{s.institution_name}</span>
+              )}
+              {s.institution_type && <InstitutionBadge type={s.institution_type} />}
+            </div>
+          </td>
+        )}
         {/* Horizon */}
         <td className="px-3 py-2 text-left align-top whitespace-nowrap">
           <span className="text-xs text-foreground font-mono">{s.horizon}</span>
@@ -121,7 +196,7 @@ function SignalRow({ s }: { s: FTSignal }) {
       </tr>
       {expanded && (
         <tr className="border-b border-border bg-gda-bg-base/50">
-          <td colSpan={6} className="px-3 py-3">
+          <td colSpan={showInstitution ? 7 : 6} className="px-3 py-3">
             <div className="space-y-2">
               {s.summary && (
                 <p className="text-xs text-foreground leading-relaxed">{s.summary}</p>
@@ -171,7 +246,7 @@ function SignalRow({ s }: { s: FTSignal }) {
 // ────────────────────────────────────────────────────────────
 // Signal table wrapper
 // ────────────────────────────────────────────────────────────
-function SignalTable({ signals, loading }: { signals: FTSignal[]; loading: boolean }) {
+function SignalTable({ signals, loading, showInstitution }: { signals: FTSignal[]; loading: boolean; showInstitution?: boolean }) {
   if (loading) {
     return (
       <div className="space-y-2">
@@ -195,6 +270,9 @@ function SignalTable({ signals, loading }: { signals: FTSignal[]; loading: boole
           <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
             <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Source</th>
             <th className="px-3 py-2 text-left font-medium">Title / Mission Tags</th>
+            {showInstitution && (
+              <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Institution</th>
+            )}
             <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Horizon</th>
             <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Strength</th>
             <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Urgency</th>
@@ -202,7 +280,9 @@ function SignalTable({ signals, loading }: { signals: FTSignal[]; loading: boole
           </tr>
         </thead>
         <tbody>
-          {signals.map((s) => <SignalRow key={s.id} s={s} />)}
+          {signals.map((s) => (
+            <SignalRow key={s.id} s={s} showInstitution={showInstitution} />
+          ))}
         </tbody>
       </table>
     </div>
@@ -234,79 +314,323 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 }
 
 // ────────────────────────────────────────────────────────────
+// Match drill-in panel
+// ────────────────────────────────────────────────────────────
+function MatchDrillIn({ m }: { m: FTMatch }) {
+  const { data: analysis, isLoading: analysisLoading } = useFTMatchAnalysis(m.id);
+  const runAnalysis = useRunFTMatchAnalysis();
+  const [localAnalysis, setLocalAnalysis] = useState<FTMatchAnalysis | null>(null);
+
+  const displayAnalysis = localAnalysis ?? analysis;
+  const missionFit  = parseFloat(m.mission_fit_score);
+  const techFit     = parseFloat(m.technical_fit_score);
+  const timing      = parseFloat(m.timing_score);
+  const overallPct  = Math.round(((missionFit + techFit + timing) / 3) * 100);
+
+  const handleRunAnalysis = useCallback(async () => {
+    try {
+      const result = await runAnalysis.mutateAsync(m.id);
+      setLocalAnalysis(result);
+    } catch {
+      // error is surfaced via runAnalysis.isError
+    }
+  }, [m.id, runAnalysis]);
+
+  // Auto-run analysis on first open if no cached analysis exists
+  const shouldAutoRun = !analysisLoading && !displayAnalysis && !runAnalysis.isPending;
+  useEffect(() => {
+    if (shouldAutoRun) {
+      runAnalysis.mutateAsync(m.id).then(setLocalAnalysis).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldAutoRun]);
+
+  return (
+    <div className="rounded border border-border bg-gda-panel p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-2 text-xs text-foreground font-semibold">
+        <span>{m.tech_title}</span>
+        <span className="text-muted-foreground">×</span>
+        <span>{m.req_title}</span>
+        <span className="ml-auto">
+          <span className={cn(
+            "rounded-full border px-2 py-0.5 font-mono text-[11px]",
+            overallPct >= 80 ? "border-gda-green text-gda-green" : overallPct >= 60 ? "border-gda-cyan text-gda-cyan" : "border-amber-400 text-amber-400"
+          )}>
+            {overallPct}% match
+          </span>
+        </span>
+      </div>
+
+      {(analysisLoading || runAnalysis.isPending) && !displayAnalysis && (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-6 animate-pulse rounded bg-gda-bg-base" />
+          ))}
+          <p className="text-[11px] text-muted-foreground animate-pulse">Running Envision broker analysis…</p>
+        </div>
+      )}
+
+      {displayAnalysis && (
+        <>
+          {/* Broker Role */}
+          {displayAnalysis.broker_role && (
+            <div>
+              <p className="text-[11px] font-mono uppercase text-gda-cyan tracking-wide mb-1">Broker Role</p>
+              <p className="text-xs text-foreground">{displayAnalysis.broker_role}</p>
+            </div>
+          )}
+
+          {/* Gap Analysis */}
+          {displayAnalysis.gap_analysis && (
+            <div>
+              <p className="text-[11px] font-mono uppercase text-muted-foreground tracking-wide mb-1">Gap Analysis</p>
+              <p className="text-xs text-foreground">{displayAnalysis.gap_analysis}</p>
+            </div>
+          )}
+
+          {/* Envision Fit */}
+          {displayAnalysis.envision_fit && (
+            <div>
+              <p className="text-[11px] font-mono uppercase text-gda-green tracking-wide mb-1">Envision Fit</p>
+              <p className="text-xs text-foreground">{displayAnalysis.envision_fit}</p>
+            </div>
+          )}
+
+          {/* Recommended Actions */}
+          {displayAnalysis.recommended_actions && displayAnalysis.recommended_actions.length > 0 && (
+            <div>
+              <p className="text-[11px] font-mono uppercase text-muted-foreground tracking-wide mb-2">Recommended Actions</p>
+              <div className="rounded border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+                      <th className="px-3 py-1.5 text-left font-medium">Action</th>
+                      <th className="px-3 py-1.5 text-left font-medium">Priority</th>
+                      <th className="px-3 py-1.5 text-left font-medium">Vehicle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayAnalysis.recommended_actions.map((a, i) => (
+                      <tr key={i} className="border-b border-border last:border-0">
+                        <td className="px-3 py-1.5 text-xs text-foreground">{a.action}</td>
+                        <td className="px-3 py-1.5"><PriorityBadge value={a.priority} /></td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground">{a.vehicle}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Risk Flags */}
+          {displayAnalysis.risk_flags && displayAnalysis.risk_flags.length > 0 && (
+            <div>
+              <p className="text-[11px] font-mono uppercase text-muted-foreground tracking-wide mb-2">Risk Flags</p>
+              <div className="space-y-1">
+                {displayAnalysis.risk_flags.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <PriorityBadge value={r.severity} />
+                    <span className="text-xs text-foreground">{r.risk}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* AI Narrative */}
+          {displayAnalysis.ai_narrative && (
+            <div className="border-t border-border pt-3">
+              <p className="text-[11px] font-mono uppercase text-muted-foreground tracking-wide mb-1">Executive Brief</p>
+              <p className="text-xs text-foreground leading-relaxed">{displayAnalysis.ai_narrative}</p>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground border-t border-border pt-2">
+            <div className="flex items-center gap-2">
+              {displayAnalysis.model_used && <span className="font-mono">{displayAnalysis.model_used}</span>}
+              {displayAnalysis.generated_at && (
+                <span>· {new Date(displayAnalysis.generated_at).toLocaleDateString()}</span>
+              )}
+            </div>
+            <SourceChip label="AI Analysis" kind="heuristic" />
+          </div>
+        </>
+      )}
+
+      {!displayAnalysis && !analysisLoading && !runAnalysis.isPending && (
+        <div className="text-center py-4">
+          <p className="text-xs text-muted-foreground mb-2">No analysis available yet</p>
+          <button
+            onClick={handleRunAnalysis}
+            disabled={runAnalysis.isPending}
+            className="rounded border border-gda-cyan bg-gda-cyan/10 px-4 py-1.5 text-xs font-mono font-medium text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors"
+          >
+            Run Analysis
+          </button>
+        </div>
+      )}
+
+      {runAnalysis.isError && (
+        <div className="rounded border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          Analysis failed — try again
+        </div>
+      )}
+
+      {/* Re-run button */}
+      {displayAnalysis && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleRunAnalysis}
+            disabled={runAnalysis.isPending}
+            className="rounded border border-border bg-gda-bg-base px-3 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel disabled:opacity-50 transition-colors"
+          >
+            {runAnalysis.isPending ? "Analyzing…" : "Re-run Analysis"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
 // Match card
 // ────────────────────────────────────────────────────────────
 function MatchCard({ m }: { m: FTMatch }) {
+  const [drillInOpen, setDrillInOpen] = useState(false);
   const missionFit  = parseFloat(m.mission_fit_score);
   const techFit     = parseFloat(m.technical_fit_score);
   const timing      = parseFloat(m.timing_score);
   const overallPct  = Math.round(((missionFit + techFit + timing) / 3) * 100);
 
   return (
-    <div className="rounded border border-border bg-gda-panel p-4 space-y-3">
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Technology Signal</p>
-          <p className="text-xs font-semibold text-foreground leading-snug">{m.tech_title}</p>
-          <p className="text-[11px] text-gda-cyan mt-0.5">{m.tech_source}</p>
+    <div className="space-y-0">
+      <div className="rounded border border-border bg-gda-panel p-4 space-y-3">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Technology Signal</p>
+            {m.tech_source_url ? (
+              <a href={m.tech_source_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-gda-cyan hover:underline leading-snug">{m.tech_title}</a>
+            ) : (
+              <p className="text-xs font-semibold text-foreground leading-snug">{m.tech_title}</p>
+            )}
+            <p className="text-[11px] text-gda-cyan mt-0.5">{m.tech_source}</p>
+          </div>
+          <div className="flex flex-col items-center px-3 shrink-0">
+            <span className={cn(
+              "text-lg font-mono font-bold rounded-full border w-10 h-10 flex items-center justify-center",
+              overallPct >= 80 ? "border-gda-green text-gda-green bg-gda-green/10"
+              : overallPct >= 60 ? "border-gda-cyan text-gda-cyan bg-gda-cyan/10"
+              : "border-amber-400 text-amber-400 bg-amber-400/10"
+            )}>
+              {overallPct}
+            </span>
+            <span className="text-[11px] text-muted-foreground mt-0.5">match</span>
+          </div>
+          <div className="flex-1 min-w-0 text-right">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Requirement Signal</p>
+            {m.req_source_url ? (
+              <a href={m.req_source_url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-gda-cyan hover:underline leading-snug">{m.req_title}</a>
+            ) : (
+              <p className="text-xs font-semibold text-foreground leading-snug">{m.req_title}</p>
+            )}
+            <p className="text-[11px] text-gda-cyan mt-0.5">{m.req_source}</p>
+          </div>
         </div>
-        <div className="flex flex-col items-center px-3 shrink-0">
-          <span className={cn(
-            "text-lg font-mono font-bold rounded-full border w-10 h-10 flex items-center justify-center",
-            overallPct >= 80 ? "border-gda-green text-gda-green bg-gda-green/10"
-            : overallPct >= 60 ? "border-gda-cyan text-gda-cyan bg-gda-cyan/10"
-            : "border-amber-400 text-amber-400 bg-amber-400/10"
-          )}>
-            {overallPct}
-          </span>
-          <span className="text-[11px] text-muted-foreground mt-0.5">match</span>
+
+        {/* Scores */}
+        <div className="space-y-1.5">
+          <ScoreBar label="Mission Fit"   value={missionFit} />
+          <ScoreBar label="Technical Fit" value={techFit} />
+          <ScoreBar label="Timing"        value={timing} />
         </div>
-        <div className="flex-1 min-w-0 text-right">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Requirement Signal</p>
-          <p className="text-xs font-semibold text-foreground leading-snug">{m.req_title}</p>
-          <p className="text-[11px] text-gda-cyan mt-0.5">{m.req_source}</p>
+
+        {/* Vehicle + path */}
+        {(m.recommended_vehicle || m.adoption_path) && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1">
+            {m.recommended_vehicle && (
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Recommended Vehicle</p>
+                <p className="text-xs text-gda-green font-medium">{m.recommended_vehicle}</p>
+              </div>
+            )}
+            {m.adoption_path && (
+              <div>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Adoption Path</p>
+                <p className="text-xs text-foreground">{m.adoption_path}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Rationale */}
+        {m.match_rationale && (
+          <p className="text-[11px] text-muted-foreground leading-relaxed border-t border-border pt-2 mt-1">
+            {m.match_rationale}
+          </p>
+        )}
+
+        {/* Shared mission tags */}
+        {m.tech_mission_tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {m.tech_mission_tags.map((t) => <Tag key={t} label={t} />)}
+          </div>
+        )}
+
+        {/* View Full Analysis button */}
+        <div className="flex justify-end pt-1">
+          <button
+            onClick={() => setDrillInOpen((v) => !v)}
+            className="rounded border border-gda-cyan bg-gda-cyan/10 px-3 py-1 text-[11px] font-mono font-medium text-gda-cyan hover:bg-gda-cyan/20 transition-colors"
+          >
+            {drillInOpen ? "Hide Analysis" : "View Full Analysis"}
+          </button>
         </div>
       </div>
 
-      {/* Scores */}
-      <div className="space-y-1.5">
-        <ScoreBar label="Mission Fit"   value={missionFit} />
-        <ScoreBar label="Technical Fit" value={techFit} />
-        <ScoreBar label="Timing"        value={timing} />
-      </div>
-
-      {/* Vehicle + path */}
-      {(m.recommended_vehicle || m.adoption_path) && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1">
-          {m.recommended_vehicle && (
-            <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Recommended Vehicle</p>
-              <p className="text-xs text-gda-green font-medium">{m.recommended_vehicle}</p>
-            </div>
-          )}
-          {m.adoption_path && (
-            <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Adoption Path</p>
-              <p className="text-xs text-foreground">{m.adoption_path}</p>
-            </div>
-          )}
+      {/* Drill-in panel */}
+      {drillInOpen && (
+        <div className="mt-2">
+          <MatchDrillIn m={m} />
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Rationale */}
-      {m.match_rationale && (
-        <p className="text-[11px] text-muted-foreground leading-relaxed border-t border-border pt-2 mt-1">
-          {m.match_rationale}
-        </p>
-      )}
+// ────────────────────────────────────────────────────────────
+// Pipeline side tab switcher
+// ────────────────────────────────────────────────────────────
+type PipelineSide = "government" | "industry";
 
-      {/* Shared mission tags */}
-      {m.tech_mission_tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 pt-1">
-          {m.tech_mission_tags.map((t) => <Tag key={t} label={t} />)}
-        </div>
-      )}
+function SideTabSwitcher({ activeSide, onChange }: { activeSide: PipelineSide; onChange: (s: PipelineSide) => void }) {
+  return (
+    <div className="flex gap-1 mb-3">
+      <button
+        onClick={() => onChange("government")}
+        className={cn(
+          "rounded px-3 py-1 text-xs font-mono font-medium transition-colors border",
+          activeSide === "government"
+            ? "bg-gda-green/15 border-gda-green/40 text-gda-green"
+            : "bg-gda-bg-base border-border text-muted-foreground hover:text-foreground"
+        )}
+      >
+        Government
+      </button>
+      <button
+        onClick={() => onChange("industry")}
+        className={cn(
+          "rounded px-3 py-1 text-xs font-mono font-medium transition-colors border",
+          activeSide === "industry"
+            ? "bg-gda-cyan/15 border-gda-cyan/40 text-gda-cyan"
+            : "bg-gda-bg-base border-border text-muted-foreground hover:text-foreground"
+        )}
+      >
+        Industry
+      </button>
     </div>
   );
 }
@@ -330,8 +654,9 @@ type TriageResult = FastTrackAssessment & {
 // Page
 // ────────────────────────────────────────────────────────────
 export default function FastTrackPage() {
+  const [activeSide, setActiveSide] = useState<PipelineSide>("government");
   const { data: listData,    isLoading: listLoading    } = useFastTrackList();
-  const { data: signalsData, isLoading: signalsLoading } = useFTSignals();
+  const { data: signalsData, isLoading: signalsLoading } = useFTSignals(activeSide);
   const { data: matchesData, isLoading: matchesLoading } = useFTMatches();
   const runTriage = useRunFastTrack();
 
@@ -344,6 +669,7 @@ export default function FastTrackPage() {
   const techSignals = signalsData?.tech ?? [];
   const reqSignals  = signalsData?.requirement ?? [];
   const matches     = matchesData?.matches ?? [];
+  const isIndustry  = activeSide === "industry";
 
   async function handleTriage(e: React.FormEvent) {
     e.preventDefault();
@@ -387,6 +713,9 @@ export default function FastTrackPage() {
         </p>
       </div>
 
+      {/* ── Pipeline Side Tabs ────────────────────────────────── */}
+      <SideTabSwitcher activeSide={activeSide} onChange={setActiveSide} />
+
       {/* ── NEED SENSING: Technology Pipeline ────────────────── */}
       <CollapseSection
         id="ft-tech-pipeline"
@@ -395,10 +724,12 @@ export default function FastTrackPage() {
       >
         <div className="mb-2">
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Watches DARPA, DIU, AFWERX, NavalX Tech Bridges, Army Applications Lab, NSIN, SBIR/STTR, startups and niche commercial firms for maturing dual-use capabilities that align with Envision’s mission areas.
+            {isIndustry
+              ? "Academic papers, FFRDC research outputs, innovation factory results, and startup dual-use capabilities that align with Envision's mission areas."
+              : "Watches DARPA, DIU, AFWERX, NavalX Tech Bridges, Army Applications Lab, NSIN, SBIR/STTR, startups and niche commercial firms for maturing dual-use capabilities that align with Envision's mission areas."}
           </p>
         </div>
-        <SignalTable signals={techSignals} loading={signalsLoading} />
+        <SignalTable signals={techSignals} loading={signalsLoading} showInstitution={isIndustry} />
       </CollapseSection>
 
       {/* ── NEED SENSING: Requirements Pipeline ──────────────── */}
@@ -409,10 +740,12 @@ export default function FastTrackPage() {
       >
         <div className="mb-2">
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Tracks procurement forecasts, sources sought, RFIs, industry days, draft RFPs, CSOs, and post-RFI formal opportunities to surface demand signals before they become competed awards.
+            {isIndustry
+              ? "FFRDC reports, university research outputs, and innovation factory assessments that surface emerging requirement patterns before formal procurements."
+              : "Tracks procurement forecasts, sources sought, RFIs, industry days, draft RFPs, CSOs, and post-RFI formal opportunities to surface demand signals before they become competed awards."}
           </p>
         </div>
-        <SignalTable signals={reqSignals} loading={signalsLoading} />
+        <SignalTable signals={reqSignals} loading={signalsLoading} showInstitution={isIndustry} />
       </CollapseSection>
 
       {/* ── NEED SENSING: Matched Pairs ───────────────────────── */}
@@ -451,7 +784,7 @@ export default function FastTrackPage() {
       >
         <div className="mb-3">
           <p className="text-[11px] text-muted-foreground">
-            Paste any opportunity text for an instant AI go/no-go grade against Envision’s doctrine and NAICS profile.
+            Paste any opportunity text for an instant AI go/no-go grade against Envision&apos;s doctrine and NAICS profile.
           </p>
         </div>
         <form onSubmit={handleTriage} className="space-y-3">

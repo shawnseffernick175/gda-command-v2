@@ -32,7 +32,8 @@ export type Task =
   | 'risk_generation'
   | 'award_analysis'
   | 'competitor_analysis'
-  | 'contact_enrich';
+  | 'contact_enrich'
+  | 'match_analysis';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -268,6 +269,40 @@ export interface ContactEnrichOutput {
   model_used: string;
 }
 
+export interface MatchAnalysisInput {
+  match_id: number;
+  tech_title: string;
+  tech_source: string;
+  req_title: string;
+  req_source: string;
+  mission_fit: number;
+  technical_fit: number;
+  timing: number;
+  recommended_vehicle: string | null;
+}
+
+export interface MatchAnalysisRecommendedAction {
+  action: string;
+  priority: 'high' | 'medium' | 'low';
+  vehicle: string;
+}
+
+export interface MatchAnalysisRiskFlag {
+  risk: string;
+  severity: 'high' | 'medium' | 'low';
+}
+
+export interface MatchAnalysisOutput {
+  broker_role: string;
+  gap_analysis: string;
+  recommended_actions: MatchAnalysisRecommendedAction[];
+  risk_flags: MatchAnalysisRiskFlag[];
+  envision_fit: string;
+  ai_narrative: string;
+  model_used: string;
+}
+
+>>>>>>> d4fbaf1 (feat(fast-track): F-613 industry pipeline + match card drill-in + Envision broker analysis)
 export interface RiskGenerationInput {
   opportunity_id: string;
   opportunity_title: string;
@@ -560,6 +595,7 @@ export interface TaskInputMap {
   award_analysis: AwardAnalysisInput;
   competitor_analysis: CompetitorAnalysisInput;
   contact_enrich: ContactEnrichInput;
+  match_analysis: MatchAnalysisInput;
 }
 
 export interface TaskOutputMap {
@@ -576,6 +612,7 @@ export interface TaskOutputMap {
   award_analysis: AwardAnalysisOutput;
   competitor_analysis: CompetitorAnalysisOutput;
   contact_enrich: ContactEnrichOutput;
+  match_analysis: MatchAnalysisOutput;
 }
 
 // ---------------------------------------------------------------------------
