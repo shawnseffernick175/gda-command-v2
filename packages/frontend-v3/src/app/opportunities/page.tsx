@@ -3,6 +3,7 @@
 import { Suspense, useState, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOpportunities, useOpportunity } from "@/hooks/use-opportunities";
 import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
@@ -12,12 +13,12 @@ import { CollapseSection } from "@/components/shared/collapse-section";
 import { OodaInspector } from "@/components/shared/ooda-inspector";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
-import { PendingState } from "@/components/shared/pending-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
+import { apiPost } from "@/lib/api";
 import type {
   DoctrineFitLabel,
   LlmAnalysis,
@@ -200,6 +201,7 @@ function OpportunityList() {
                 <th className="px-3 py-2 text-left font-medium">Agency</th>
                 <th className="px-3 py-2 text-left font-medium">Value</th>
                 <th className="px-3 py-2 text-left font-medium">Grade/Band</th>
+                <th className="px-3 py-2 text-left text-[11px] font-medium">Doctrine</th>
                 <th className="px-3 py-2 text-left font-medium">Due</th>
                 <th className="px-3 py-2 text-left font-medium">Source</th>
                 <th className="px-3 py-2 text-left font-medium">Stage</th>
@@ -233,6 +235,19 @@ function OpportunityList() {
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 text-left">
+                    {opp.doctrine_badge ? (
+                      <span className={`text-[11px] font-mono capitalize ${FIT_COLORS[opp.doctrine_badge.label]}`}>
+                        {opp.doctrine_badge.label}
+                      </span>
+                    ) : opp.doctrine_score != null ? (
+                      <span className="text-[11px] font-mono text-gda-cyan">
+                        {opp.doctrine_score}pt
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-3 py-1.5 text-xs text-muted-foreground">
@@ -296,6 +311,11 @@ const FIT_COLORS: Record<DoctrineFitLabel, string> = {
 
 function OpportunityDetail({ id }: { id: string }) {
   const { data: opp, isLoading, error } = useOpportunity(id);
+  const queryClient = useQueryClient();
+  const runDoctrine = useMutation({
+    mutationFn: () => apiPost<unknown>("/v3/doctrine/check", { entity_kind: "opportunity", entity_id: id }),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["opportunity", id] }); },
+  });
 
   if (isLoading) {
     return (
@@ -472,6 +492,14 @@ function OpportunityDetail({ id }: { id: string }) {
                     })}
                   </div>
                   <SourceChip label="doctrine alignment" kind="heuristic" />
+                  <button
+                    type="button"
+                    onClick={() => runDoctrine.mutate()}
+                    disabled={runDoctrine.isPending}
+                    className="mt-2 text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors disabled:opacity-50"
+                  >
+                    {runDoctrine.isPending ? "Scoring..." : "Re-score"}
+                  </button>
                 </>
               ) : doctrineScore != null ? (
                 <>
@@ -489,12 +517,35 @@ function OpportunityDetail({ id }: { id: string }) {
                     ))}
                   </div>
                   <SourceChip label="keyword alignment" kind="heuristic" />
+                  <button
+                    type="button"
+                    onClick={() => runDoctrine.mutate()}
+                    disabled={runDoctrine.isPending}
+                    className="mt-2 rounded border border-gda-green/40 px-2 py-1 text-[11px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors disabled:opacity-50"
+                  >
+                    {runDoctrine.isPending ? "Scoring..." : "Run Full Doctrine Check"}
+                  </button>
+                  {runDoctrine.isError && (
+                    <p className="mt-1 text-[11px] text-gda-red">Doctrine check failed</p>
+                  )}
                 </>
               ) : (
-                <PendingState
-                  surface="Doctrine Fit"
-                  reason="Doctrine alignment score will appear once the opportunity has been scored by the rules engine."
-                />
+                <div className="space-y-2">
+                  <p className="text-[11px] font-mono text-muted-foreground">
+                    Doctrine alignment not yet scored.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => runDoctrine.mutate()}
+                    disabled={runDoctrine.isPending}
+                    className="rounded border border-gda-green/40 px-2 py-1 text-[11px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors disabled:opacity-50"
+                  >
+                    {runDoctrine.isPending ? "Scoring..." : "Score This Opportunity"}
+                  </button>
+                  {runDoctrine.isError && (
+                    <p className="mt-1 text-[11px] text-gda-red">Doctrine check failed</p>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -28,6 +28,7 @@ export interface OpportunitySummary {
   updated_at: string;
   pwin?: PwinScore | null;
   doctrine_score?: number | null;
+  doctrine_badge?: DoctrineBadge | null;
   capture_pwin?: number | null;
   source?: string | null;
   days_in_stage?: number | null;
