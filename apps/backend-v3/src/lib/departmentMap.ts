@@ -91,9 +91,15 @@ const DEPARTMENT_RULES: DepartmentRule[] = [
   },
 ];
 
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Map an agency string to its parent cabinet department.
- * Tries exact match first (case-insensitive), then substring match.
+ * Tries exact match first (case-insensitive), then word-boundary
+ * substring match (prevents false positives from short abbreviations
+ * like VA/ED/NIST appearing inside longer words).
  * Returns 'Independent Agency' if no rule matches.
  */
 export function mapAgencyToDepartment(agency: string | null | undefined): string {
@@ -110,10 +116,11 @@ export function mapAgencyToDepartment(agency: string | null | undefined): string
     }
   }
 
-  // Substring match pass
+  // Word-boundary substring match pass
   for (const rule of DEPARTMENT_RULES) {
     for (const pattern of rule.patterns) {
-      if (lower.includes(pattern.toLowerCase())) {
+      const re = new RegExp('\\b' + escapeRegex(pattern) + '\\b', 'i');
+      if (re.test(agency)) {
         return rule.department;
       }
     }

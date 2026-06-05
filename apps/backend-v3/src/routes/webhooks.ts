@@ -50,7 +50,8 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
         const samNoticeId = body.sam_notice_id as string | undefined;
         let oppId: string;
 
-        const department = mapAgencyToDepartment(body.agency as string | null | undefined);
+        const agencyStr = (body.agency as string | null | undefined) ?? null;
+        const department = agencyStr ? mapAgencyToDepartment(agencyStr) : null;
 
         if (samNoticeId) {
           const upsertRes = await pool.query<{ id: string }>(
@@ -74,7 +75,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
               value_min = COALESCE(EXCLUDED.value_min, opportunities.value_min),
               value_max = COALESCE(EXCLUDED.value_max, opportunities.value_max),
               source_id = EXCLUDED.source_id,
-              department = EXCLUDED.department,
+              department = COALESCE(EXCLUDED.department, opportunities.department),
               updated_at = NOW()
             RETURNING id`,
             [
