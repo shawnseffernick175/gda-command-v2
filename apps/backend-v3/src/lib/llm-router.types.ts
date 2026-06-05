@@ -33,7 +33,8 @@ export type Task =
   | 'award_analysis'
   | 'competitor_analysis'
   | 'contact_enrich'
-  | 'match_analysis';
+  | 'match_analysis'
+  | 'vault_document_parse';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -299,6 +300,20 @@ export interface MatchAnalysisOutput {
   risk_flags: MatchAnalysisRiskFlag[];
   envision_fit: string;
   ai_narrative: string;
+  model_used: string;
+}
+
+export interface VaultDocumentParseInput {
+  doc_type: string;
+  filename: string;
+  extracted_text: string;
+}
+
+export interface VaultDocumentParseOutput {
+  summary: string;
+  tags: string[];
+  entities: { name: string; type: string; value: string }[];
+  doc_type_confirmed: string;
   model_used: string;
 }
 
@@ -595,6 +610,7 @@ export interface TaskInputMap {
   competitor_analysis: CompetitorAnalysisInput;
   contact_enrich: ContactEnrichInput;
   match_analysis: MatchAnalysisInput;
+  vault_document_parse: VaultDocumentParseInput;
 }
 
 export interface TaskOutputMap {
@@ -612,6 +628,7 @@ export interface TaskOutputMap {
   competitor_analysis: CompetitorAnalysisOutput;
   contact_enrich: ContactEnrichOutput;
   match_analysis: MatchAnalysisOutput;
+  vault_document_parse: VaultDocumentParseOutput;
 }
 
 // ---------------------------------------------------------------------------

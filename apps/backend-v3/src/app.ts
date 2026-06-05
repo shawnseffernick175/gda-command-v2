@@ -42,6 +42,7 @@ import { adminUsersRoutes } from './routes/admin-users.js';
 import { risksRoutes } from './routes/risks.js';
 import { financialsRoutes } from './routes/financials.js';
 import { captureWorkflowRoutes } from './routes/capture-workflow.js';
+import { vaultRoutes } from './routes/vault.js';
 import { fastTrackSignalRoutes } from './routes/fast-track-signals.js';
 import { promptLibraryRoutes } from './routes/prompt-library.js';
 import { errorEnvelope } from './lib/envelope.js';
@@ -162,6 +163,7 @@ export async function buildApp() {
   await app.register(risksRoutes);
   await app.register(financialsRoutes);
   await app.register(captureWorkflowRoutes);
+  await app.register(vaultRoutes);
   await app.register(adminUsersRoutes);
   await app.register(promptLibraryRoutes);
   await app.register(async (instance) => {
