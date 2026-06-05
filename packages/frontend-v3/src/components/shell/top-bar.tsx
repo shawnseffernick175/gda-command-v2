@@ -14,9 +14,14 @@ export function TopBar() {
     <>
       <div className="flex h-10 items-center justify-between border-b border-border bg-gda-bg-base px-4">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-xs font-bold text-gda-green">
+          <a
+            href="https://csr-llc.tech"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-xs font-bold text-gda-green hover:opacity-80 transition-opacity"
+          >
             Envision
-          </span>
+          </a>
           <span className="text-[11px] text-muted-foreground">OU</span>
         </div>
 
