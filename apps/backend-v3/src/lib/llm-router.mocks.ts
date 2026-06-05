@@ -21,6 +21,7 @@ import type {
   SourceResearchOutput,
   BlackHatAnalysisOutput,
   RiskGenerationOutput,
+  AwardAnalysisOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -172,6 +173,15 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       generation_summary: 'Generated 1 mock risk.',
       generated_at: new Date().toISOString(),
     } satisfies RiskGenerationOutput,
+
+    award_analysis: {
+      win_rationale: 'Incumbent advantage with strong past performance in this NAICS code.',
+      agency_signal: 'Agency continues to invest in IT modernization services.',
+      recompete_assessment: 'Contract expires within 18 months — viable re-compete target for Envision.',
+      winner_classification: 'THREAT',
+      recommended_action: 'Pursue Re-Compete',
+      so_what: 'This award signals continued DoD investment in IT services under NAICS 541512. The incumbent holds a strong position, but the upcoming re-compete window creates an opening. Envision should begin positioning now.',
+    } satisfies AwardAnalysisOutput,
   };
 
   return {

@@ -29,7 +29,8 @@ export type Task =
   | 'semantic_embed'
   | 'source_research'
   | 'black_hat_analysis'
-  | 'risk_generation';
+  | 'risk_generation'
+  | 'award_analysis';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -192,6 +193,27 @@ export interface BlackHatAnalysisOutput {
   counter_strategy: string;
   intel_summary: string;
   generated_at: string;
+}
+
+export interface AwardAnalysisInput {
+  award_id: string;
+  recipient_name: string | null;
+  agency_name: string | null;
+  naics: string | null;
+  set_aside: string | null;
+  contract_type: string | null;
+  value_obligated: number | null;
+  award_date: string | null;
+  period_of_performance_end: string | null;
+}
+
+export interface AwardAnalysisOutput {
+  win_rationale: string;
+  agency_signal: string;
+  recompete_assessment: string;
+  winner_classification: 'THREAT' | 'PARTNER' | 'IRRELEVANT';
+  recommended_action: 'Pursue Re-Compete' | 'Monitor' | 'Pass' | 'Partner with Winner';
+  so_what: string;
 }
 
 export interface RiskGenerationInput {
@@ -483,6 +505,7 @@ export interface TaskInputMap {
   source_research: SourceResearchInput;
   black_hat_analysis: BlackHatAnalysisInput;
   risk_generation: RiskGenerationInput;
+  award_analysis: AwardAnalysisInput;
 }
 
 export interface TaskOutputMap {
@@ -496,6 +519,7 @@ export interface TaskOutputMap {
   source_research: SourceResearchOutput;
   black_hat_analysis: BlackHatAnalysisOutput;
   risk_generation: RiskGenerationOutput;
+  award_analysis: AwardAnalysisOutput;
 }
 
 // ---------------------------------------------------------------------------

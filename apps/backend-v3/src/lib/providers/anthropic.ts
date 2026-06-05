@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput } from '../llm-router.types.js';
 
 let client: Anthropic | null = null;
 
@@ -57,6 +57,12 @@ All fields are required. urgency must be one of: immediate, today, this_week.`,
   black_hat_analysis: `You are a competitive intelligence analyst specializing in federal government contracting. Perform Black Hat analysis viewing competition from the competitor's perspective.`,
 
   risk_generation: `You are a risk analyst specializing in federal government contracting proposals. Generate a comprehensive set of bid/performance risks for the given opportunity. Include both negative risks (threats) and positive risks (opportunities to exploit). Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly. Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
+
+  award_analysis: `You are a sharp defense contracting analyst briefing an executive at Envision (federal IT/consulting, NAICS 541511/541512/541519/541690, based in Alexandria VA). Analyze this USAspending award and return a structured assessment.
+
+Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+
+Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
 };
 
 function buildRiskGenerationPrompt(input: RiskGenerationInput): string {
@@ -133,6 +139,8 @@ export async function callAnthropic(opts: {
     ? buildBlackHatUserPrompt(opts.input as BlackHatAnalysisInput)
     : opts.task === 'risk_generation'
     ? buildRiskGenerationPrompt(opts.input as RiskGenerationInput)
+    : opts.task === 'award_analysis'
+    ? buildAwardAnalysisPrompt(opts.input as AwardAnalysisInput)
     : JSON.stringify(opts.input);
 
   try {
@@ -186,6 +194,34 @@ Respond ONLY with valid JSON:
   "counter_strategy": "<2-3 sentences how Envision counters>",
   "intel_summary": "<1-2 sentence summary>",
   "generated_at": "<ISO 8601>"
+}`;
+}
+
+function buildAwardAnalysisPrompt(input: AwardAnalysisInput): string {
+  const value = input.value_obligated !== null
+    ? `$${(input.value_obligated / 1_000_000).toFixed(2)}M`
+    : 'Unknown';
+  return `Analyze this federal contract award:
+
+Recipient: ${input.recipient_name ?? 'Unknown'}
+Agency: ${input.agency_name ?? 'Unknown'}
+NAICS: ${input.naics ?? 'Unknown'}
+Set-aside: ${input.set_aside ?? 'None'}
+Contract type: ${input.contract_type ?? 'Unknown'}
+Award value: ${value}
+Award date: ${input.award_date ?? 'Unknown'}
+Period of performance end: ${input.period_of_performance_end ?? 'Unknown'}
+
+Envision's NAICS codes: 541511, 541512, 541519, 541690
+
+Respond ONLY with valid JSON:
+{
+  "win_rationale": "<one to two sentence explanation of why this recipient likely won>",
+  "agency_signal": "<one sentence on what this award reveals about the agency's priorities>",
+  "recompete_assessment": "<one sentence — is this a re-compete opportunity for Envision, and when does it expire?>",
+  "winner_classification": "THREAT | PARTNER | IRRELEVANT",
+  "recommended_action": "Pursue Re-Compete | Monitor | Pass | Partner with Winner",
+  "so_what": "<two to three sentence analyst summary paragraph>"
 }`;
 }
 
