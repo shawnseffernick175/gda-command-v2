@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api";
-import type { Competitor } from "@/lib/types";
+import type { Competitor, CompetitorAnalysis } from "@/lib/types";
 
 interface UseCompetitorsParams {
   q?: string;
@@ -72,6 +72,17 @@ export function useBlackHatAnalysis(competitorName: string | null) {
       if (!competitorName) throw new Error("No competitor selected");
       return apiPost<BlackHatAnalysisOutput>(
         `/v3/competitors/${encodeURIComponent(competitorName)}/black-hat`,
+      );
+    },
+  });
+}
+
+export function useCompetitorAnalysis(competitorName: string | null) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!competitorName) throw new Error("No competitor selected");
+      return apiPost<CompetitorAnalysis>(
+        `/v3/competitors/${encodeURIComponent(competitorName)}/analyze`,
       );
     },
   });

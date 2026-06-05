@@ -22,6 +22,7 @@ import type {
   BlackHatAnalysisOutput,
   RiskGenerationOutput,
   AwardAnalysisOutput,
+  CompetitorAnalysisOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -182,6 +183,16 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       recommended_action: 'Pursue Re-Compete',
       so_what: 'This award signals continued DoD investment in IT services under NAICS 541512. The incumbent holds a strong position, but the upcoming re-compete window creates an opening. Envision should begin positioning now.',
     } satisfies AwardAnalysisOutput,
+
+    competitor_analysis: {
+      size_classification: 'Large Business',
+      classification: 'THREAT',
+      classification_rationale: 'Direct competitor in same NAICS codes with larger contract base.',
+      so_what: 'This firm holds multiple active contracts in Envision\'s target agencies and NAICS codes. Their incumbency in DoD IT modernization creates significant barriers to displacement, but their size may exclude them from small business set-asides where Envision competes.',
+      recompete_contracts: [],
+      recommended_action: 'Compete',
+      trend: 'Flat',
+    } satisfies CompetitorAnalysisOutput,
   };
 
   return {

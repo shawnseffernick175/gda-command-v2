@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput } from '../llm-router.types.js';
 
 let client: Anthropic | null = null;
 
@@ -63,6 +63,12 @@ All fields are required. urgency must be one of: immediate, today, this_week.`,
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
+
+  competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+
+Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.
+
+You are analyzing a competitor in the federal IT/consulting market relative to Envision (NAICS 541511/541512/541519/541690, 8(a) eligible small business specializing in digital transformation and data analytics for DoD/federal agencies). Classify this competitor and provide actionable intelligence.`,
 };
 
 function buildRiskGenerationPrompt(input: RiskGenerationInput): string {
@@ -141,6 +147,8 @@ export async function callAnthropic(opts: {
     ? buildRiskGenerationPrompt(opts.input as RiskGenerationInput)
     : opts.task === 'award_analysis'
     ? buildAwardAnalysisPrompt(opts.input as AwardAnalysisInput)
+    : opts.task === 'competitor_analysis'
+    ? buildCompetitorAnalysisPrompt(opts.input as CompetitorAnalysisInput)
     : JSON.stringify(opts.input);
 
   try {
@@ -222,6 +230,40 @@ Respond ONLY with valid JSON:
   "winner_classification": "THREAT | PARTNER | IRRELEVANT",
   "recommended_action": "Pursue Re-Compete | Monitor | Pass | Partner with Winner",
   "so_what": "<two to three sentence analyst summary paragraph>"
+}`;
+}
+
+function buildCompetitorAnalysisPrompt(input: CompetitorAnalysisInput): string {
+  const recompetes = input.recompete_contracts.length > 0
+    ? input.recompete_contracts.map((r) => `  - ${r.title} (${r.agency}, $${(r.value / 1_000_000).toFixed(2)}M, expires ${r.expiration_date})`).join('\n')
+    : '  None identified';
+  return `Analyze this competitor:
+
+Company: ${input.competitor_name}
+UEI: ${input.awardee_uei ?? 'Unknown'}
+Win count: ${input.win_count}
+Total obligated: $${(input.total_obligated / 1_000_000).toFixed(2)}M
+Agencies: ${input.agencies.join(', ') || 'Unknown'}
+NAICS codes: ${input.naics_codes.join(', ') || 'Unknown'}
+Set-aside types: ${input.set_asides.join(', ') || 'None'}
+Contract types: ${input.contract_types.join(', ') || 'Unknown'}
+
+Re-compete contracts (expiring within 18 months):
+${recompetes}
+
+Our context: ${input.envision_context}
+
+Derive size_classification from NAICS codes, set-aside types, and contract volume. If data is insufficient, set to "Unknown".
+
+Respond ONLY with valid JSON:
+{
+  "size_classification": "Large Business | Small Business | SDVOSB | 8(a) | HUBZone | WOSB | Unknown",
+  "classification": "THREAT | PARTNER | MONITOR",
+  "classification_rationale": "<one sentence>",
+  "so_what": "<two to three sentence analyst paragraph>",
+  "recompete_contracts": [],
+  "recommended_action": "Compete | Partner | Monitor | Ignore",
+  "trend": "Up | Down | Flat"
 }`;
 }
 

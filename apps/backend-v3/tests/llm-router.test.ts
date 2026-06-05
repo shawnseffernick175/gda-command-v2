@@ -27,6 +27,7 @@ const ALL_TASKS: readonly Task[] = [
   'black_hat_analysis',
   'risk_generation',
   'award_analysis',
+  'competitor_analysis',
 ] as const;
 
 describe('Routing Table', () => {
@@ -36,7 +37,7 @@ describe('Routing Table', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('has exactly 10 entries (one per task)', () => {
+  it('has exactly 12 entries (one per task)', () => {
     expect(ROUTING_TABLE.length).toBe(ALL_TASKS.length);
   });
 

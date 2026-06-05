@@ -331,6 +331,25 @@ export interface GovTriContact {
 
 /* ── Competitors (pending backend) ────────────────────────────── */
 
+export interface CompetitorRecompeteContract {
+  contract_id: string;
+  title: string;
+  value: number;
+  expiration_date: string;
+  agency: string;
+}
+
+export interface CompetitorAnalysis {
+  size_classification: string;
+  classification: 'THREAT' | 'PARTNER' | 'MONITOR';
+  classification_rationale: string;
+  so_what: string;
+  recompete_contracts: CompetitorRecompeteContract[];
+  recommended_action: 'Compete' | 'Partner' | 'Monitor' | 'Ignore';
+  trend: 'Up' | 'Down' | 'Flat';
+  from_cache?: boolean;
+}
+
 export interface Competitor {
   name: string;
   awardee_uei: string | null;
@@ -342,6 +361,7 @@ export interface Competitor {
   naics_codes: string[];
   set_asides: string[];
   contract_types: string[];
+  competitor_analysis: CompetitorAnalysis | null;
 }
 
 /* ── Risks (pending backend) ──────────────────────────────────── */
