@@ -1,19 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   useActionItems,
   useUpdateActionItem,
   useCreateDraft,
+  useUsers,
 } from "@/hooks/use-action-items";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
-import { CollapseSection } from "@/components/shared/collapse-section";
 import { cn } from "@/lib/utils";
-import type { ActionItem, ActionItemDraft } from "@/lib/types";
+import type { ActionItem, ActionItemDraft, ActionItemPriority } from "@/lib/types";
+import Link from "next/link";
 
 const STATUS_FILTERS = [
   { label: "All", value: undefined },
@@ -25,21 +27,52 @@ const STATUS_FILTERS = [
 
 const DRAFT_KINDS = ["reply", "research", "milestone"] as const;
 
+const PRIORITY_COLORS: Record<ActionItemPriority, string> = {
+  CRITICAL: "bg-red-500/20 text-red-400 border-red-500/30",
+  HIGH: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  MEDIUM: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  LOW: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  opportunity: "Opportunity",
+  risk: "Risk",
+  award: "Award",
+  capture: "Capture",
+};
+
+const SOURCE_ROUTES: Record<string, string> = {
+  opportunity: "/opportunities",
+  risk: "/risks",
+  award: "/awards",
+  capture: "/capture",
+};
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
+function isOverdue(item: ActionItem): boolean {
+  if (!item.due_date || item.status === "done") return false;
+  return new Date(item.due_date) < new Date();
+}
+
 export default function ActionItemsPage() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const { data, isLoading, error, refetch } = useActionItems({
     status: statusFilter,
   });
 
   const items = data?.items ?? [];
-
   const updateItem = useUpdateActionItem();
-
-  const overdue = items.filter((i) => i.status === "overdue");
-  const open = items.filter((i) => i.status === "open");
-  const inProgress = items.filter((i) => i.status === "in_progress");
-  const done = items.filter((i) => i.status === "done");
 
   return (
     <div className="space-y-4">
@@ -86,60 +119,21 @@ export default function ActionItemsPage() {
       ) : (
         <Card className="border-border bg-gda-panel overflow-hidden">
           <CardContent className="p-0">
-            {overdue.length > 0 && (
-              <CollapseSection
-                id="ai-overdue"
-                title="Overdue"
-                count={overdue.length}
-                defaultOpen={true}
-              >
-                <ActionItemGroup
-                  items={overdue}
+            <div className="divide-y divide-border">
+              {items.map((item) => (
+                <ActionItemRow
+                  key={item.id}
+                  item={item}
+                  highlighted={String(item.id) === highlightId}
                   onToggle={(id, status) =>
                     updateItem.mutate({ id, status })
                   }
+                  onAssign={(id, assignee_id) =>
+                    updateItem.mutate({ id, assignee_id })
+                  }
                 />
-              </CollapseSection>
-            )}
-            <CollapseSection
-              id="ai-open"
-              title="Open"
-              count={open.length}
-              defaultOpen={false}
-            >
-              <ActionItemGroup
-                items={open}
-                onToggle={(id, status) =>
-                  updateItem.mutate({ id, status })
-                }
-              />
-            </CollapseSection>
-            <CollapseSection
-              id="ai-progress"
-              title="In Progress"
-              count={inProgress.length}
-              defaultOpen={false}
-            >
-              <ActionItemGroup
-                items={inProgress}
-                onToggle={(id, status) =>
-                  updateItem.mutate({ id, status })
-                }
-              />
-            </CollapseSection>
-            <CollapseSection
-              id="ai-done"
-              title="Done"
-              count={done.length}
-              defaultOpen={false}
-            >
-              <ActionItemGroup
-                items={done}
-                onToggle={(id, status) =>
-                  updateItem.mutate({ id, status })
-                }
-              />
-            </CollapseSection>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -147,84 +141,183 @@ export default function ActionItemsPage() {
   );
 }
 
-function ActionItemGroup({
-  items,
+/* ── Single action item row ──────────────────────────────────── */
+
+function ActionItemRow({
+  item,
+  highlighted,
   onToggle,
+  onAssign,
 }: {
-  items: ActionItem[];
+  item: ActionItem;
+  highlighted: boolean;
   onToggle: (id: number, status: string) => void;
+  onAssign: (id: number, assignee_id: number | null) => void;
 }) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlighted && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlighted]);
+
+  const overdue = isOverdue(item);
+  const priority = item.priority ?? "MEDIUM";
+  const sourceType = item.linked_record_type ?? item.source_type;
+  const sourceId = item.linked_record_id;
 
   return (
-    <div className="space-y-1">
-      {items.map((item) => (
-        <div key={item.id}>
-          <div className="flex items-center gap-3 rounded px-2 py-1.5 text-sm hover:bg-gda-bg-base transition-colors">
-            <button
-              type="button"
-              onClick={() =>
-                onToggle(
-                  item.id,
-                  item.status === "done" ? "open" : "done",
-                )
-              }
-              className={cn(
-                "h-4 w-4 rounded border transition-colors shrink-0",
-                item.status === "done"
-                  ? "bg-gda-green border-gda-green"
-                  : "border-border hover:border-gda-green",
-              )}
-            />
-            <button
-              type="button"
-              onClick={() =>
-                setExpandedId(expandedId === item.id ? null : item.id)
-              }
-              className={cn(
-                "flex-1 text-left text-foreground hover:text-gda-green transition-colors",
-                item.status === "done" && "line-through text-muted-foreground",
-              )}
-            >
-              {item.title}
-            </button>
-            {item.owner && (
-              <span className="text-xs text-muted-foreground">
-                {item.owner}
-              </span>
-            )}
-            {item.due_date && (
-              <span
-                className={cn(
-                  "font-mono text-[11px]",
-                  item.status === "overdue"
-                    ? "text-gda-red"
-                    : "text-muted-foreground",
-                )}
-              >
-                {new Date(item.due_date).toLocaleDateString()}
-              </span>
-            )}
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-[11px]",
-                item.status === "overdue"
-                  ? "border-gda-red/30 text-gda-red"
-                  : item.status === "done"
-                    ? "border-gda-green/30 text-gda-green"
-                    : "border-border text-muted-foreground",
-              )}
-            >
-              {item.status}
-            </Badge>
-          </div>
-
-          {expandedId === item.id && (
-            <DraftPanel itemId={item.id} drafts={item.drafts ?? []} />
+    <div
+      ref={rowRef}
+      className={cn(
+        "transition-colors",
+        highlighted && "bg-gda-green/5 ring-1 ring-gda-green/30",
+      )}
+    >
+      <div className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-gda-bg-base transition-colors">
+        {/* Checkbox */}
+        <button
+          type="button"
+          onClick={() =>
+            onToggle(item.id, item.status === "done" ? "open" : "done")
+          }
+          className={cn(
+            "h-4 w-4 rounded border transition-colors shrink-0",
+            item.status === "done"
+              ? "bg-gda-green border-gda-green"
+              : "border-border hover:border-gda-green",
           )}
+        />
+
+        {/* Priority badge */}
+        <Badge
+          variant="outline"
+          className={cn("text-[10px] font-mono shrink-0", PRIORITY_COLORS[priority])}
+        >
+          {priority}
+        </Badge>
+
+        {/* Title */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className={cn(
+            "flex-1 text-left text-foreground hover:text-gda-green transition-colors truncate",
+            item.status === "done" && "line-through text-muted-foreground",
+          )}
+        >
+          {item.title}
+        </button>
+
+        {/* Due date */}
+        {item.due_date && (
+          <span
+            className={cn(
+              "font-mono text-[11px] shrink-0",
+              overdue ? "text-red-400" : "text-muted-foreground",
+            )}
+          >
+            {formatDate(item.due_date)}
+          </span>
+        )}
+
+        {/* Source link chip */}
+        {sourceType && sourceId && (
+          <Link
+            href={`${SOURCE_ROUTES[sourceType] ?? "/"}?id=${sourceId}`}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-mono bg-gda-cyan/10 text-gda-cyan border border-gda-cyan/20 hover:bg-gda-cyan/20 transition-colors"
+          >
+            {SOURCE_LABELS[sourceType] ?? sourceType} &rarr;
+          </Link>
+        )}
+
+        {/* Assignee */}
+        <AssigneePicker
+          currentAssigneeId={item.assignee_id}
+          currentAssigneeName={item.assignee?.name ?? null}
+          onAssign={(assigneeId) => onAssign(item.id, assigneeId)}
+        />
+
+        {/* Status badge */}
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-[11px] shrink-0",
+            overdue
+              ? "border-gda-red/30 text-gda-red"
+              : item.status === "done"
+                ? "border-gda-green/30 text-gda-green"
+                : "border-border text-muted-foreground",
+          )}
+        >
+          {overdue ? "overdue" : item.status}
+        </Badge>
+      </div>
+
+      {expanded && (
+        <DraftPanel itemId={item.id} drafts={item.drafts ?? []} />
+      )}
+    </div>
+  );
+}
+
+/* ── Assignee picker ─────────────────────────────────────────── */
+
+function AssigneePicker({
+  currentAssigneeId,
+  currentAssigneeName,
+  onAssign,
+}: {
+  currentAssigneeId: number | null;
+  currentAssigneeName: string | null;
+  onAssign: (id: number | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const { data: users } = useUsers();
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors max-w-[100px] truncate"
+      >
+        {currentAssigneeName ?? "Unassigned"}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-border bg-gda-panel shadow-lg py-1">
+          <button
+            type="button"
+            onClick={() => {
+              onAssign(null);
+              setOpen(false);
+            }}
+            className="w-full text-left px-3 py-1.5 text-xs hover:bg-gda-bg-base transition-colors text-muted-foreground"
+          >
+            Unassigned
+          </button>
+          {(users ?? []).map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => {
+                onAssign(u.id);
+                setOpen(false);
+              }}
+              className={cn(
+                "w-full text-left px-3 py-1.5 text-xs hover:bg-gda-bg-base transition-colors",
+                u.id === currentAssigneeId
+                  ? "text-gda-green"
+                  : "text-foreground",
+              )}
+            >
+              {u.display_name}
+            </button>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

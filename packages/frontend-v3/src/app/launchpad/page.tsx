@@ -6,14 +6,24 @@ import {
   useFunnelReport,
 } from "@/hooks/use-launchpad";
 import { useOpportunities } from "@/hooks/use-opportunities";
-import { useActionItems } from "@/hooks/use-action-items";
+import { useActionItems, useTopActionItems } from "@/hooks/use-action-items";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { ErrorState } from "@/components/shared/error-state";
 import { formatMoney } from "@/lib/format-money";
+import { cn } from "@/lib/utils";
+import type { ActionItemPriority } from "@/lib/types";
 import Link from "next/link";
+
+const PRIORITY_COLORS: Record<ActionItemPriority, string> = {
+  CRITICAL: "bg-red-500/20 text-red-400 border-red-500/30",
+  HIGH: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  MEDIUM: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  LOW: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+};
 
 export default function LaunchpadPage() {
   const { data: summary, isLoading: sLoad, error: sErr, refetch: sRefetch } = useLaunchpadSummary();
@@ -128,57 +138,7 @@ export default function LaunchpadPage() {
         </Card>
 
         {/* What Needs Me Today */}
-        <Card className="border-border bg-gda-panel">
-          <CardHeader>
-            <CardTitle className="font-mono text-sm text-muted-foreground">
-              What Needs Me Today
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {flags?.flags && flags.flags.filter((f) => f.severity === "critical").length > 0 && (
-              <div className="mb-3">
-                <p className="text-xs font-medium text-gda-red mb-1">Critical Flags</p>
-                {flags.flags
-                  .filter((f) => f.severity === "critical")
-                  .map((f, i) => (
-                    <p key={i} className="text-xs text-gda-red">{f.message}</p>
-                  ))}
-              </div>
-            )}
-            {todayItems?.items && todayItems.items.length > 0 ? (
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  Overdue / Due Today
-                </p>
-                {todayItems.items.slice(0, 5).map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-2 text-xs"
-                  >
-                    <span
-                      className={
-                        item.status === "overdue"
-                          ? "text-gda-red"
-                          : "text-foreground"
-                      }
-                    >
-                      {item.title}
-                    </span>
-                    {item.owner && (
-                      <span className="text-muted-foreground">
-                        → {item.owner}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nothing urgent today.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <WhatNeedsMeTodayWidget />
       </div>
 
       {/* Lifecycle Funnel */}
@@ -261,6 +221,68 @@ function FunnelSection() {
             </div>
           ))}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WhatNeedsMeTodayWidget() {
+  const { data: items, isLoading } = useTopActionItems(5);
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader>
+        <CardTitle className="font-mono text-sm text-muted-foreground">
+          What Needs Me Today
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 bg-gda-bg-base" />
+            ))}
+          </div>
+        ) : items && items.length > 0 ? (
+          <div className="space-y-1">
+            {items.map((item) => {
+              const priority = (item.priority ?? "MEDIUM") as ActionItemPriority;
+              return (
+                <Link
+                  key={item.id}
+                  href={`/action-items?highlight=${item.id}`}
+                  className="flex items-center gap-2 rounded p-1.5 text-xs hover:bg-gda-bg-base transition-colors"
+                >
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[9px] font-mono shrink-0",
+                      PRIORITY_COLORS[priority],
+                    )}
+                  >
+                    {priority}
+                  </Badge>
+                  <span className="flex-1 truncate text-foreground">
+                    {item.title}
+                  </span>
+                  {item.due_date && (
+                    <span className="font-mono text-[11px] text-muted-foreground shrink-0">
+                      {new Date(item.due_date).toLocaleDateString("en-US", {
+                        month: "2-digit",
+                        day: "2-digit",
+                        year: "numeric",
+                      })}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            All clear — no actions required today.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

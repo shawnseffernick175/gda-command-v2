@@ -4,15 +4,21 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type ActionItemStatus = 'open' | 'in_progress' | 'done';
 
+export type ActionItemPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
 export interface ActionItemRow {
   id: string;
   title: string;
   detail: string | null;
   owner: string;
   status: ActionItemStatus;
+  priority: ActionItemPriority;
   due_date: string | null;
   source: string;
   source_id: string | null;
+  source_type: string | null;
+  is_auto: boolean;
+  assignee_id: number | null;
   linked_record_type: string | null;
   linked_record_id: string | null;
   completed_at: string | null;
@@ -24,8 +30,12 @@ export interface ActionItemCreateInput {
   title: string;
   detail?: string;
   owner: string;
+  priority?: ActionItemPriority;
   source?: string;
   source_id?: string;
+  source_type?: string;
+  is_auto?: boolean;
+  assignee_id?: number;
   due_date?: string;
   linked_record_type?: string;
   linked_record_id?: string;
@@ -34,6 +44,7 @@ export interface ActionItemCreateInput {
 export interface ActionItemUpdateInput {
   status?: ActionItemStatus;
   owner?: string;
+  assignee_id?: number | null;
   due_date?: string | null;
   linked_record_type?: string | null;
   linked_record_id?: string | null;
@@ -48,6 +59,19 @@ export interface ActionItemListFilters {
   limit: number;
   cursor?: string;
 }
+
+interface AssigneeInfo {
+  id: number;
+  name: string;
+  email: string;
+}
+
+const PRIORITY_ORDER: Record<string, number> = {
+  CRITICAL: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3,
+};
 
 export interface AuditEntry {
   id: string;
@@ -76,8 +100,11 @@ function buildSourceRef(label: string, itemId: string): object {
   };
 }
 
-export function toApiShape(row: ActionItemRow, drafts: object[] = []): object {
-  const sourceRef = buildSourceRef(row.source === 'email' ? 'Email ingest' : 'Manual entry', row.id);
+export function toApiShape(row: ActionItemRow, drafts: object[] = [], assignee?: AssigneeInfo | null): object {
+  const sourceRef = buildSourceRef(
+    row.is_auto ? 'Auto-generated' : row.source === 'email' ? 'Email ingest' : 'Manual entry',
+    row.id,
+  );
   return {
     id: row.id,
     title: row.title,
@@ -87,11 +114,16 @@ export function toApiShape(row: ActionItemRow, drafts: object[] = []): object {
     owner: row.owner,
     owner_sources: [sourceRef],
     status: row.status,
+    priority: row.priority ?? 'MEDIUM',
     due_date: row.due_date,
     due_date_sources: row.due_date ? [sourceRef] : [],
     source: row.source,
-    linked_record_type: row.linked_record_type,
-    linked_record_id: row.linked_record_id,
+    source_type: row.source_type,
+    is_auto: row.is_auto ?? false,
+    assignee_id: row.assignee_id,
+    assignee: assignee ?? null,
+    linked_record_type: row.linked_record_type ?? row.source_type,
+    linked_record_id: row.linked_record_id ?? row.source_id,
     drafts,
     completed_at: row.completed_at,
     created_at: row.created_at,
@@ -120,17 +152,21 @@ export async function createActionItem(
   const now = new Date().toISOString();
 
   const res = await pool.query<ActionItemRow>(
-    `INSERT INTO action_items (id, title, detail, owner, status, due_date, source, source_id, linked_record_type, linked_record_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, $9, $10, $10)
+    `INSERT INTO action_items (id, title, detail, owner, status, priority, due_date, source, source_id, source_type, is_auto, assignee_id, linked_record_type, linked_record_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
      RETURNING *`,
     [
       id,
       input.title.trim(),
       input.detail?.trim() ?? null,
       input.owner.trim(),
+      input.priority ?? 'MEDIUM',
       input.due_date ?? null,
       input.source ?? 'manual',
       input.source_id ?? null,
+      input.source_type ?? null,
+      input.is_auto ?? false,
+      input.assignee_id ?? null,
       input.linked_record_type ?? null,
       input.linked_record_id ?? null,
       now,
@@ -190,6 +226,11 @@ export async function updateActionItem(
     vals.push(input.owner.trim());
     await logAudit(id, 'owner', row.owner, input.owner.trim(), actor);
   }
+  if (input.assignee_id !== undefined) {
+    sets.push(`assignee_id = $${idx++}`);
+    vals.push(input.assignee_id);
+    await logAudit(id, 'assignee_id', String(row.assignee_id), String(input.assignee_id), actor);
+  }
   if (input.due_date !== undefined) {
     sets.push(`due_date = $${idx++}`);
     vals.push(input.due_date);
@@ -228,7 +269,10 @@ export async function listActionItems(
   const vals: unknown[] = [];
   let idx = 1;
 
-  if (filters.status) {
+  if (filters.status === 'overdue') {
+    conditions.push(`status NOT IN ('done')`);
+    conditions.push(`due_date < NOW()`);
+  } else if (filters.status) {
     conditions.push(`status = $${idx++}`);
     vals.push(filters.status);
   }
@@ -254,7 +298,18 @@ export async function listActionItems(
   vals.push(limit + 1);
 
   const res = await pool.query<ActionItemRow>(
-    `SELECT * FROM action_items ${where} ORDER BY created_at DESC, id DESC LIMIT $${idx}`,
+    `SELECT * FROM action_items ${where}
+     ORDER BY
+       CASE priority
+         WHEN 'CRITICAL' THEN 0
+         WHEN 'HIGH'     THEN 1
+         WHEN 'MEDIUM'   THEN 2
+         WHEN 'LOW'      THEN 3
+         ELSE 4
+       END,
+       due_date ASC NULLS LAST,
+       created_at DESC
+     LIMIT $${idx}`,
     vals
   );
 
@@ -299,6 +354,61 @@ function validateStatusTransition(
       { statusCode: 400 }
     );
   }
+}
+
+export async function getTopActionItems(limit: number = 5): Promise<ActionItemRow[]> {
+  const res = await pool.query<ActionItemRow>(
+    `SELECT * FROM action_items
+     WHERE status NOT IN ('done')
+     ORDER BY
+       CASE priority
+         WHEN 'CRITICAL' THEN 0
+         WHEN 'HIGH'     THEN 1
+         WHEN 'MEDIUM'   THEN 2
+         WHEN 'LOW'      THEN 3
+         ELSE 4
+       END,
+       due_date ASC NULLS LAST,
+       created_at DESC
+     LIMIT $1`,
+    [Math.min(Math.max(limit, 1), 20)]
+  );
+  return res.rows;
+}
+
+export async function getAssignee(assigneeId: number | null): Promise<AssigneeInfo | null> {
+  if (!assigneeId) return null;
+  const res = await pool.query<{ id: number; display_name: string; email: string }>(
+    'SELECT id, display_name, email FROM users WHERE id = $1',
+    [assigneeId]
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return { id: row.id, name: row.display_name, email: row.email };
+}
+
+export async function getAdminUserId(): Promise<number | null> {
+  const res = await pool.query<{ id: number }>(
+    "SELECT id FROM users WHERE role = 'admin' AND is_active = TRUE ORDER BY created_at ASC LIMIT 1"
+  );
+  return res.rows[0]?.id ?? null;
+}
+
+export async function findExistingAutoItem(
+  sourceType: string,
+  sourceId: string,
+  titlePrefix: string
+): Promise<boolean> {
+  const res = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) as count FROM action_items
+     WHERE source_type = $1
+       AND source_id = $2
+       AND title LIKE $3
+       AND status NOT IN ('done')
+       AND is_auto = TRUE`,
+    [sourceType, sourceId, `${titlePrefix}%`]
+  );
+  return parseInt(res.rows[0]?.count ?? '0', 10) > 0;
 }
 
 async function logAudit(

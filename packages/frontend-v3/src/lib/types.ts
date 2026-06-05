@@ -246,13 +246,26 @@ export interface ActionItemDraft {
   created_at: string;
 }
 
+export type ActionItemPriority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+
+export interface ActionItemAssignee {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface ActionItem {
   id: number;
   title: string;
   due_date: string | null;
   owner: string | null;
-  linked_object?: string | null;
-  linked_object_type?: string | null;
+  priority: ActionItemPriority;
+  source_type: string | null;
+  is_auto: boolean;
+  assignee_id: number | null;
+  assignee: ActionItemAssignee | null;
+  linked_record_type: string | null;
+  linked_record_id: string | null;
   status: "open" | "in_progress" | "done" | "overdue";
   created_at: string;
   drafts?: ActionItemDraft[];
