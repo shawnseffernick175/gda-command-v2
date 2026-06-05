@@ -48,7 +48,7 @@ All fields are required. urgency must be one of: immediate, today, this_week.`,
 
   black_hat_analysis: `You are a competitive intelligence analyst specializing in federal government contracting. Perform Black Hat analysis viewing competition from the competitor's perspective.`,
 
-  risk_generation: `You are a risk analyst specializing in federal government contracting proposals. Generate a comprehensive set of bid/performance risks for the given opportunity.`,
+  risk_generation: `You are a risk analyst specializing in federal government contracting proposals. Generate a comprehensive set of bid/performance risks for the given opportunity. Include both negative risks (threats) and positive risks (opportunities to exploit). Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly. Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
 };
 
 function buildRiskGenerationPrompt(input: RiskGenerationInput): string {
@@ -66,6 +66,17 @@ Deadline: ${input.response_deadline ?? 'Unknown'}
 Existing risks to avoid duplicating: ${existing}
 
 Generate 4-6 distinct risks covering technical, schedule, financial, competitive, and compliance dimensions.
+Include both negative risks (threats — things that could go wrong) and positive risks (opportunities — favorable conditions to exploit).
+
+For each risk provide:
+- risk_type: "negative" for threats, "positive" for opportunities
+- if_condition: the trigger — "If this happens…"
+- then_impact: the downstream effect — "…then this occurs."
+- mitigation_plan: (negative risks only) specific actions to reduce likelihood or impact
+- exploitation_plan: (positive risks only) how to capitalize on the opportunity
+
+Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.
 
 Respond ONLY with valid JSON:
 {
@@ -77,7 +88,12 @@ Respond ONLY with valid JSON:
       "likelihood": <1-5>,
       "impact": <1-5>,
       "mitigation": "<1-2 sentence mitigation approach>",
-      "rationale": "<why this risk applies to this specific opportunity>"
+      "rationale": "<why this risk applies to this specific opportunity>",
+      "risk_type": "<negative|positive>",
+      "if_condition": "<trigger condition>",
+      "then_impact": "<downstream effect>",
+      "mitigation_plan": "<for negative risks — actions to reduce likelihood/impact>",
+      "exploitation_plan": "<for positive risks — how to capitalize>"
     }
   ],
   "generation_summary": "<1 sentence summary>",

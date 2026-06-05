@@ -448,6 +448,11 @@ export interface GeneratedRisk {
   impact: number;
   mitigation: string;
   rationale: string;
+  risk_type?: 'negative' | 'positive';
+  if_condition?: string;
+  then_impact?: string;
+  mitigation_plan?: string;
+  exploitation_plan?: string;
 }
 
 export interface RiskGenerationOutput {
