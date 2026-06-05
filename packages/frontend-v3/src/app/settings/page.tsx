@@ -441,7 +441,7 @@ export default function SettingsPage() {
       <h1 className="font-mono text-lg font-bold text-foreground">Settings</h1>
 
       {/* ── Sentinel Health ───────────────────────────────────── */}
-      <Card className="border-border bg-gda-panel">
+      <Card id="sentinel" className="border-border bg-gda-panel">
         <CardHeader>
           <CardTitle className="font-mono text-sm text-muted-foreground">
             Sentinel — Data Source Health

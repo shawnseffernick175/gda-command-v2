@@ -81,7 +81,7 @@ export function Sidebar() {
         </Link>
 
         <Link
-          href="/settings/health"
+          href="/settings#sentinel"
           className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
         >
           <span className={cn("h-2 w-2 rounded-full", sentinelColor)} />
