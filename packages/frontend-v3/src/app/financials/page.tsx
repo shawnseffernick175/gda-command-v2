@@ -1,11 +1,23 @@
 "use client";
 
 import { useKpiHeader } from "@/hooks/use-kpi";
+import { useFinancialsForecast, useFinancialsTrend } from "@/hooks/use-financials";
 import { Card, CardContent } from "@/components/ui/card";
 import { PendingState } from "@/components/shared/pending-state";
 import { SourceChip } from "@/components/shared/source-chip";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function FinancialsPage() {
   const { data, isLoading } = useKpiHeader();
@@ -71,10 +83,7 @@ export default function FinancialsPage() {
         title="Pipeline Forecast vs Plan"
         defaultOpen={false}
       >
-        <PendingState
-          surface="Pipeline Forecast Chart"
-          reason="Activates when pipeline value data + financial plan are both available. Will show bar chart: actual vs plan by quarter."
-        />
+        <ForecastChart />
       </CollapseSection>
 
       <CollapseSection
@@ -82,11 +91,89 @@ export default function FinancialsPage() {
         title="Historical Trend"
         defaultOpen={false}
       >
-        <PendingState
-          surface="Historical Trend Chart"
-          reason="Activates with historical financial data. Will show line chart: monthly trend for all 5 KPIs."
-        />
+        <TrendChart />
       </CollapseSection>
+    </div>
+  );
+}
+
+function ForecastChart() {
+  const { data, isLoading } = useFinancialsForecast();
+
+  if (isLoading) {
+    return <div className="h-64 animate-pulse rounded bg-gda-panel" />;
+  }
+
+  if (!data?.items.length) {
+    return <p className="text-xs text-muted-foreground">No forecast data yet</p>;
+  }
+
+  return (
+    <div className="w-full h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data.items}>
+          <XAxis
+            dataKey="period"
+            tick={{ fontSize: 11 }}
+            className="text-muted-foreground"
+          />
+          <YAxis
+            tickFormatter={(v: number) => formatMoney(v)}
+            tick={{ fontSize: 11 }}
+            className="text-muted-foreground"
+          />
+          <Tooltip
+            formatter={(value) => formatMoney(Number(value))}
+            contentStyle={{ backgroundColor: "#0a0f1a", border: "1px solid #1e293b" }}
+            labelStyle={{ color: "#94a3b8" }}
+            itemStyle={{ color: "#e2e8f0" }}
+          />
+          <Legend />
+          <Bar dataKey="actual_orders" name="Actual Orders" fill="#22d3ee" />
+          <Bar dataKey="plan_orders" name="Plan Orders" fill="#334155" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TrendChart() {
+  const { data, isLoading } = useFinancialsTrend();
+
+  if (isLoading) {
+    return <div className="h-64 animate-pulse rounded bg-gda-panel" />;
+  }
+
+  if (!data?.items.length) {
+    return <p className="text-xs text-muted-foreground">No trend data yet</p>;
+  }
+
+  return (
+    <div className="w-full h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data.items}>
+          <XAxis
+            dataKey="period"
+            tick={{ fontSize: 11 }}
+            className="text-muted-foreground"
+          />
+          <YAxis
+            tickFormatter={(v: number) => formatMoney(v)}
+            tick={{ fontSize: 11 }}
+            className="text-muted-foreground"
+          />
+          <Tooltip
+            formatter={(value) => formatMoney(Number(value))}
+            contentStyle={{ backgroundColor: "#0a0f1a", border: "1px solid #1e293b" }}
+            labelStyle={{ color: "#94a3b8" }}
+            itemStyle={{ color: "#e2e8f0" }}
+          />
+          <Legend />
+          <Line type="monotone" dataKey="orders" name="Orders" stroke="#22d3ee" dot={false} />
+          <Line type="monotone" dataKey="sales" name="Sales" stroke="#4ade80" dot={false} />
+          <Line type="monotone" dataKey="ebit" name="EBIT" stroke="#f59e0b" dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 }
