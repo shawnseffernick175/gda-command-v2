@@ -511,13 +511,13 @@ function OpportunityDetail({ id }: { id: string }) {
                 </span>
                 {opp.agency && (
                   <>
-                    <span className="text-muted-foreground mx-1">&gt;</span>
+                    <span className="text-muted-foreground mx-1">{">"}</span>
                     <span className="text-foreground">{opp.agency}</span>
                   </>
                 )}
                 {opp.office && (
                   <>
-                    <span className="text-muted-foreground mx-1">&gt;</span>
+                    <span className="text-muted-foreground mx-1">{">"}</span>
                     <span className="text-foreground">{opp.office}</span>
                   </>
                 )}
