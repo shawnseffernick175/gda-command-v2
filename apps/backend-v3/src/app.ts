@@ -37,6 +37,8 @@ import { reportRoutes } from './routes/reports.js';
 import { llmCostRollupRoutes } from './routes/llm-cost-rollup.js';
 import { briefingRoutes } from './routes/briefing.js';
 import { contactsRoutes } from './routes/contacts.js';
+import { competitorsRoutes } from './routes/competitors.js';
+import { risksRoutes } from './routes/risks.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -150,6 +152,8 @@ export async function buildApp() {
   await app.register(llmCostRollupRoutes);
   await app.register(briefingRoutes);
   await app.register(contactsRoutes);
+  await app.register(competitorsRoutes);
+  await app.register(risksRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

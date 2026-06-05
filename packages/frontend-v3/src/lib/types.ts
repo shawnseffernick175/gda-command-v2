@@ -300,30 +300,36 @@ export interface GovTriContact {
 /* ── Competitors (pending backend) ────────────────────────────── */
 
 export interface Competitor {
-  id: number;
   name: string;
-  size: "S" | "M" | "L";
-  overlap: number;
-  threat: string | null;
-  fpds_wins: number;
-  last_researched: string | null;
-  status: "done" | "queued" | "in_progress";
+  awardee_uei: string | null;
+  win_count: number;
+  total_obligated: number | null;
+  largest_award: number | null;
+  last_win_date: string | null;
+  agencies: string[];
+  naics_codes: string[];
+  set_asides: string[];
+  contract_types: string[];
 }
 
 /* ── Risks (pending backend) ──────────────────────────────────── */
 
 export interface Risk {
   id: number;
-  description: string;
-  category: string;
+  title: string;
+  description: string | null;
+  category: "operational" | "technical" | "financial" | "compliance" | "schedule" | "competitive" | "personnel" | string;
   likelihood: number;
   impact: number;
   score: number;
-  status: "Open" | "Mitigating" | "Closed";
-  mitigation: string | null;
-  linked_pursuit?: string | null;
+  status: "open" | "mitigated" | "accepted" | "closed";
   owner: string | null;
-  source?: string | null;
+  mitigation: string | null;
+  opportunity_id: number | null;
+  opportunity_title: string | null;
+  source: "manual" | "ai_generated";
+  created_at: string;
+  updated_at: string;
 }
 
 /* ── Sentinel ─────────────────────────────────────────────────── */
