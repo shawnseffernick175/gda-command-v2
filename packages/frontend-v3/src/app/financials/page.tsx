@@ -19,6 +19,19 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+const COLOR_CYAN = "#22d3ee"; // allowed-hex
+const COLOR_GREEN = "#4ade80"; // allowed-hex
+const COLOR_AMBER = "#f59e0b"; // allowed-hex
+const COLOR_MUTED = "#334155"; // allowed-hex
+const TOOLTIP_BG = "#0a0f1a"; // allowed-hex
+const TOOLTIP_BORDER = "#1e293b"; // allowed-hex
+const TOOLTIP_LABEL = "#94a3b8"; // allowed-hex
+const TOOLTIP_ITEM = "#e2e8f0"; // allowed-hex
+
+const tooltipContentStyle = { backgroundColor: TOOLTIP_BG, border: `1px solid ${TOOLTIP_BORDER}` };
+const tooltipLabelStyle = { color: TOOLTIP_LABEL };
+const tooltipItemStyle = { color: TOOLTIP_ITEM };
+
 export default function FinancialsPage() {
   const { data, isLoading } = useKpiHeader();
 
@@ -124,13 +137,13 @@ function ForecastChart() {
           />
           <Tooltip
             formatter={(value) => formatMoney(Number(value))}
-            contentStyle={{ backgroundColor: "#0a0f1a", border: "1px solid #1e293b" }}
-            labelStyle={{ color: "#94a3b8" }}
-            itemStyle={{ color: "#e2e8f0" }}
+            contentStyle={tooltipContentStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
           />
           <Legend />
-          <Bar dataKey="actual_orders" name="Actual Orders" fill="#22d3ee" />
-          <Bar dataKey="plan_orders" name="Plan Orders" fill="#334155" />
+          <Bar dataKey="actual_orders" name="Actual Orders" fill={COLOR_CYAN} />
+          <Bar dataKey="plan_orders" name="Plan Orders" fill={COLOR_MUTED} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -164,14 +177,14 @@ function TrendChart() {
           />
           <Tooltip
             formatter={(value) => formatMoney(Number(value))}
-            contentStyle={{ backgroundColor: "#0a0f1a", border: "1px solid #1e293b" }}
-            labelStyle={{ color: "#94a3b8" }}
-            itemStyle={{ color: "#e2e8f0" }}
+            contentStyle={tooltipContentStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
           />
           <Legend />
-          <Line type="monotone" dataKey="orders" name="Orders" stroke="#22d3ee" dot={false} />
-          <Line type="monotone" dataKey="sales" name="Sales" stroke="#4ade80" dot={false} />
-          <Line type="monotone" dataKey="ebit" name="EBIT" stroke="#f59e0b" dot={false} />
+          <Line type="monotone" dataKey="orders" name="Orders" stroke={COLOR_CYAN} dot={false} />
+          <Line type="monotone" dataKey="sales" name="Sales" stroke={COLOR_GREEN} dot={false} />
+          <Line type="monotone" dataKey="ebit" name="EBIT" stroke={COLOR_AMBER} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
