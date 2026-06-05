@@ -23,6 +23,14 @@ import Link from "next/link";
 
 const VALID_BANDS: Set<string> = new Set(["forecast", "signal", "discovery", "pass"]);
 
+const STAGE_LABELS: Record<string, string> = {
+  pre_sol: "Pre-Solicitation",
+  solicitation: "Solicitation",
+  awarded: "Awarded",
+  post_award: "Post-Award",
+  closed: "Closed",
+};
+
 const PRIORITY_COLORS: Record<ActionItemPriority, string> = {
   CRITICAL: "bg-red-500/20 text-red-400 border-red-500/30",
   HIGH: "bg-orange-500/20 text-orange-400 border-orange-500/30",
@@ -202,7 +210,7 @@ function TopProgramsTable({
                     <BandBadge band={opp.band as Band} />
                   ) : (
                     <Badge variant="outline" className="text-[11px] font-mono">
-                      {opp.band}
+                      {STAGE_LABELS[opp.band] ?? opp.band}
                     </Badge>
                   )}
                 </td>

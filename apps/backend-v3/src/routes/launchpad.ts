@@ -121,43 +121,30 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
       estimated_value_cents: string | null;
       pwin: number | null;
       lifecycle_stage: string;
-      primary_source: string | null;
+      sam_native_id: string | null;
     }>(
-      `SELECT internal_id, title, agency, estimated_value_cents::text,
-              pwin, lifecycle_stage, primary_source
-       FROM unified_opportunities
-       WHERE lifecycle_stage IN ('forecast', 'signal', 'pre_sol')
-         AND pwin IS NOT NULL
-       ORDER BY pwin DESC
+      `SELECT o.internal_id, o.title, o.agency, o.estimated_value_cents::text,
+              o.pwin, o.lifecycle_stage, l.source_native_id AS sam_native_id
+       FROM unified_opportunities o
+       LEFT JOIN unified_opportunity_links l
+         ON l.internal_id = o.internal_id AND l.source = 'sam'
+       WHERE o.lifecycle_stage IN ('forecast', 'signal', 'pre_sol')
+         AND o.pwin IS NOT NULL
+       ORDER BY o.pwin DESC
        LIMIT 5`,
     );
 
-    // Build SAM.gov source URL from linked source records
-    const items = await Promise.all(
-      res.rows.map(async (r) => {
-        let source_url: string | null = null;
-        const linkRes = await pool.query<{ source: string; source_native_id: string }>(
-          `SELECT source, source_native_id FROM unified_opportunity_links
-           WHERE internal_id = $1 AND source = 'sam'
-           LIMIT 1`,
-          [r.internal_id],
-        );
-        if (linkRes.rows.length > 0) {
-          const nativeId = linkRes.rows[0]!.source_native_id;
-          source_url = `https://sam.gov/opp/${nativeId}/view`;
-        }
-
-        return {
-          internal_id: r.internal_id,
-          title: r.title,
-          agency: r.agency,
-          value: r.estimated_value_cents != null ? Number(r.estimated_value_cents) / 100 : null,
-          pwin: r.pwin,
-          band: r.lifecycle_stage,
-          source_url,
-        };
-      }),
-    );
+    const items = res.rows.map((r) => ({
+      internal_id: r.internal_id,
+      title: r.title,
+      agency: r.agency,
+      value: r.estimated_value_cents != null ? Number(r.estimated_value_cents) / 100 : null,
+      pwin: r.pwin,
+      band: r.lifecycle_stage,
+      source_url: r.sam_native_id
+        ? `https://sam.gov/opp/${r.sam_native_id}/view`
+        : null,
+    }));
 
     return reply.status(200).send(successEnvelope({ items }, req.requestId));
   });
