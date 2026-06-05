@@ -40,6 +40,7 @@ import { contactsRoutes } from './routes/contacts.js';
 import { competitorsRoutes } from './routes/competitors.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
 import { risksRoutes } from './routes/risks.js';
+import { fastTrackSignalRoutes } from './routes/fast-track-signals.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -128,6 +129,7 @@ export async function buildApp() {
   await app.register(pipelineRoutes);
   await app.register(launchpadRoutes);
   await app.register(fastTrackRoutes);
+  await app.register(fastTrackSignalRoutes);
   await app.register(sourceRoutes);
   await app.register(partnerRoutes);
   await app.register(actionItemRoutes);
