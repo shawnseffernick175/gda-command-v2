@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useAwards, useAwardsCount } from "@/hooks/use-awards";
+import { useTodayBriefing, useGenerateBriefing } from "@/hooks/use-briefing";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,8 @@ export default function AwardsPage() {
 
   const { data, isLoading, error, refetch } = useAwards(params);
   const { data: countData } = useAwardsCount();
+  const { data: briefingData, isLoading: briefingLoading } = useTodayBriefing();
+  const generateBriefing = useGenerateBriefing();
 
   const allItems = useMemo(() => {
     const combined = [...previousItems, ...(data?.items ?? [])];
@@ -197,16 +200,46 @@ export default function AwardsPage() {
         )
       )}
 
-      {/* News Digest — pending F-217 */}
+      {/* News Digest — wired to daily briefing market_intel_summary */}
       <CollapseSection
         id="awards-news"
-        title="News Digest"
+        title="Market Intelligence Digest"
         defaultOpen={false}
       >
-        <PendingState
-          surface="News Digest"
-          reason="Activates with the intelligence layer (F-217). Will auto-summarize industry news, competitor moves, and policy changes."
-        />
+        {briefingLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-4 animate-pulse rounded bg-gda-bg-base" />
+            ))}
+          </div>
+        ) : briefingData?.market_intel_summary ? (
+          <div className="space-y-3">
+            <div className="rounded border border-border bg-gda-bg-base p-4">
+              <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
+                {briefingData.market_intel_summary}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <SourceChip label="Daily Briefing" kind="real" />
+              <span className="text-[11px] text-muted-foreground">
+                Generated {new Date(briefingData.generated_at).toLocaleDateString()} · {briefingData.model_used ?? "AI"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              No briefing generated today yet. Generate one to see market intelligence, competitor moves, and policy changes.
+            </p>
+            <button
+              onClick={() => generateBriefing.mutate()}
+              disabled={generateBriefing.isPending}
+              className="rounded border border-gda-cyan/40 bg-gda-cyan/10 px-3 py-1.5 text-xs font-mono text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50 transition-colors"
+            >
+              {generateBriefing.isPending ? "Generating…" : "Generate Today's Briefing"}
+            </button>
+          </div>
+        )}
       </CollapseSection>
     </div>
   );
