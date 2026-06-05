@@ -331,6 +331,13 @@ export interface Risk {
   source: "manual" | "ai_generated";
   created_at: string;
   updated_at: string;
+  risk_type: "negative" | "positive";
+  if_condition: string | null;
+  then_impact: string | null;
+  mitigation_plan: string | null;
+  exploitation_plan: string | null;
+  due_date: string | null;
+  next_step: string | null;
 }
 
 /* ── Sentinel ─────────────────────────────────────────────────── */

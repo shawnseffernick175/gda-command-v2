@@ -168,7 +168,7 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
     } satisfies BlackHatAnalysisOutput,
 
     risk_generation: {
-      risks: [{ title: 'Mock Technical Risk', description: 'Mock risk description', category: 'technical', likelihood: 3, impact: 4, mitigation: 'Mock mitigation', rationale: 'Mock rationale' }],
+      risks: [{ title: 'Mock Technical Risk', description: 'Mock risk description', category: 'technical', likelihood: 3, impact: 4, mitigation: 'Mock mitigation', rationale: 'Mock rationale', risk_type: 'negative', if_condition: 'If key personnel depart mid-performance', then_impact: 'Then delivery timelines slip and quality degrades', mitigation_plan: 'Maintain bench depth and cross-train team members', exploitation_plan: undefined }],
       generation_summary: 'Generated 1 mock risk.',
       generated_at: new Date().toISOString(),
     } satisfies RiskGenerationOutput,

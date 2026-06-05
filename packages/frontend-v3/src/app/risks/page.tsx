@@ -5,6 +5,7 @@ import { useRisks, useCreateRisk, useUpdateRisk, useDeleteRisk, useGenerateRisks
 import { useOpportunities } from "@/hooks/use-opportunities";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
+import { RiskDetailPanel } from "@/components/RiskDetailPanel";
 import { cn } from "@/lib/utils";
 import type { Risk } from "@/lib/types";
 
@@ -116,6 +117,7 @@ export default function RisksPage() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
 
   const { data, isLoading } = useRisks({
     status: filterStatus || undefined,
@@ -463,6 +465,7 @@ export default function RisksPage() {
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
               <th className="px-3 py-2 text-left font-medium">Risk</th>
+              <th className="px-3 py-2 text-left font-medium">Type</th>
               <th className="px-3 py-2 text-left font-medium">Category</th>
               <th className="px-3 py-2 text-left font-medium">L</th>
               <th className="px-3 py-2 text-left font-medium">I</th>
@@ -477,14 +480,14 @@ export default function RisksPage() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-border animate-pulse">
-                  <td colSpan={9} className="px-3 py-2">
+                  <td colSpan={10} className="px-3 py-2">
                     <div className="h-3 bg-gda-panel rounded w-3/4" />
                   </td>
                 </tr>
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-xs text-muted-foreground">
+                <td colSpan={10} className="px-3 py-8 text-center text-xs text-muted-foreground">
                   No risks logged yet — click {'"+"'} Add Risk to create one
                 </td>
               </tr>
@@ -492,7 +495,7 @@ export default function RisksPage() {
               items.map((r) => {
                 const score = riskScore(r.likelihood ?? 3, r.impact ?? 3);
                 return (
-                  <tr key={r.id} className="border-b border-border hover:bg-gda-panel/50">
+                  <tr key={r.id} className="border-b border-border hover:bg-gda-panel/50 cursor-pointer" onClick={() => setSelectedRisk(r)}>
                     <td className="px-3 py-2 max-w-[200px]">
                       <span className="block font-medium text-xs text-foreground truncate" title={r.title}>
                         {r.title}
@@ -502,6 +505,11 @@ export default function RisksPage() {
                           {r.mitigation}
                         </span>
                       )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge className={cn("text-[10px] font-mono font-bold uppercase tracking-wide", r.risk_type === "positive" ? "bg-gda-green/15 text-gda-green border-gda-green/30" : "bg-red-500/15 text-red-400 border-red-500/30")}>
+                        {r.risk_type === "positive" ? "OPPORTUNITY" : "THREAT"}
+                      </Badge>
                     </td>
                     <td className="px-3 py-2 text-left text-xs text-muted-foreground capitalize">
                       {r.category ?? "—"}
@@ -536,14 +544,14 @@ export default function RisksPage() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => startEdit(r)}
+                          onClick={(e) => { e.stopPropagation(); startEdit(r); }}
                           className="text-[11px] text-muted-foreground hover:text-foreground"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(r.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
                           className="text-[11px] text-red-400 hover:text-red-300"
                         >
                           Del
@@ -562,6 +570,14 @@ export default function RisksPage() {
       <CollapseSection id="risk-ai-gen" title="AI Risk Generation" defaultOpen={false}>
         <AiRiskGeneration />
       </CollapseSection>
+
+      {/* Risk Detail Panel */}
+      {selectedRisk && (
+        <RiskDetailPanel
+          risk={selectedRisk}
+          onClose={() => setSelectedRisk(null)}
+        />
+      )}
     </div>
   );
 }

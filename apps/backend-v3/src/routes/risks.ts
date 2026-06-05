@@ -76,7 +76,7 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     const body = req.body as Record<string, unknown>;
 
-    const allowed = ['title', 'description', 'category', 'likelihood', 'impact', 'status', 'owner', 'mitigation'];
+    const allowed = ['title', 'description', 'category', 'likelihood', 'impact', 'status', 'owner', 'mitigation', 'risk_type', 'if_condition', 'then_impact', 'mitigation_plan', 'exploitation_plan', 'due_date', 'next_step'];
     const sets: string[] = [];
     const params: unknown[] = [];
 
@@ -169,9 +169,17 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
       await client.query('BEGIN');
       for (const risk of output.risks) {
         await client.query(
-          `INSERT INTO risks (title, description, category, likelihood, impact, mitigation, source, opportunity_id)
-           VALUES ($1, $2, $3, $4, $5, $6, 'ai_generated', $7)`,
-          [risk.title, risk.description, risk.category, risk.likelihood, risk.impact, risk.mitigation, opp.id],
+          `INSERT INTO risks (title, description, category, likelihood, impact, mitigation, source, opportunity_id, risk_type, if_condition, then_impact, mitigation_plan, exploitation_plan)
+           VALUES ($1, $2, $3, $4, $5, $6, 'ai_generated', $7, $8, $9, $10, $11, $12)`,
+          [
+            risk.title, risk.description, risk.category, risk.likelihood, risk.impact,
+            risk.mitigation, opp.id,
+            risk.risk_type ?? 'negative',
+            risk.if_condition ?? null,
+            risk.then_impact ?? null,
+            risk.mitigation_plan ?? null,
+            risk.exploitation_plan ?? null,
+          ],
         );
       }
       await client.query('COMMIT');
