@@ -128,10 +128,10 @@ export function TrendChart() {
                   {formatMoney(item.ebit)}
                 </td>
                 <td className="px-3 py-2 text-left text-foreground font-mono">
-                  {(item.gross_margin * 100).toFixed(1)}%
+                  {item.gross_margin.toFixed(1)}%
                 </td>
                 <td className="px-3 py-2 text-left text-foreground font-mono">
-                  {(item.ros * 100).toFixed(1)}%
+                  {item.ros.toFixed(1)}%
                 </td>
               </tr>
             ))}
