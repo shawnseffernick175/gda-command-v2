@@ -5,6 +5,7 @@
 import { pool } from '../../lib/db.js';
 import { resolveFieldSources, type SourceRef } from '../../lib/sources.js';
 import { evaluateTeamingFlags } from './teaming.js';
+import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
   type OpportunityRow,
@@ -123,6 +124,7 @@ function buildSummaryFromSources(
     title_sources: sources.title_sources ?? [],
     agency: row.agency,
     agency_sources: sources.agency_sources ?? [],
+    department: row.department ?? mapAgencyToDepartment(row.agency),
     naics: row.naics,
     naics_sources: sources.naics_sources ?? [],
     set_aside: row.set_aside,
@@ -235,6 +237,10 @@ export async function listOpportunities(
     conditions.push(`agency ILIKE $${paramIdx++}`);
     params.push(`%${filters.agency}%`);
   }
+  if (filters.department) {
+    conditions.push(`department = $${paramIdx++}`);
+    params.push(filters.department);
+  }
   if (filters.naics) {
     conditions.push(`naics ILIKE $${paramIdx++}`);
     params.push(`%${filters.naics}%`);
@@ -337,6 +343,10 @@ export async function listOpportunitiesPaged(
     conditions.push(`agency ILIKE $${paramIdx++}`);
     params.push(`%${filters.agency}%`);
   }
+  if (filters.department) {
+    conditions.push(`department = $${paramIdx++}`);
+    params.push(filters.department);
+  }
   if (filters.naics) {
     conditions.push(`naics ILIKE $${paramIdx++}`);
     params.push(`%${filters.naics}%`);
@@ -406,12 +416,14 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
   );
   const sourceId = sourceRes.rows[0]!.id;
 
+  const department = mapAgencyToDepartment(input.agency);
+
   const res = await pool.query<OpportunityRow>(
     `INSERT INTO opportunities (
       title, agency, sub_agency, sam_notice_id, naics, description,
       set_aside, response_due_at, posted_at, value_min, value_max,
-      data_source, source_id, status
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery')
+      data_source, source_id, status, department
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery', $14)
     RETURNING *`,
     [
       input.title,
@@ -427,6 +439,7 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
       input.value_max ?? null,
       input.source,
       sourceId,
+      department,
     ],
   );
 
@@ -474,6 +487,7 @@ export async function updateOpportunity(
   let analysisAffected = false;
 
   const fields = Object.entries(input).filter(([, v]) => v !== undefined);
+  let agencyValue: string | undefined;
   for (const [key, value] of fields) {
     if (key === 'tags') {
       setClauses.push(`tags = $${paramIdx++}`);
@@ -482,9 +496,18 @@ export async function updateOpportunity(
       setClauses.push(`"${key}" = $${paramIdx++}`);
       params.push(value);
     }
+    if (key === 'agency') {
+      agencyValue = value as string;
+    }
     if (ANALYSIS_AFFECTING_FIELDS.has(key)) {
       analysisAffected = true;
     }
+  }
+
+  // Re-map department when agency changes
+  if (agencyValue !== undefined) {
+    setClauses.push(`department = $${paramIdx++}`);
+    params.push(mapAgencyToDepartment(agencyValue));
   }
 
   setClauses.push(`updated_at = NOW()`);

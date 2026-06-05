@@ -25,6 +25,7 @@ interface UseOpportunitiesParams {
   cursor?: string;
   status?: string;
   agency?: string;
+  department?: string;
   naics?: string;
   grade?: string;
   due_before?: string;
@@ -41,6 +42,7 @@ export function useOpportunities(params: UseOpportunitiesParams = {}) {
         cursor: params.cursor,
         status: params.status,
         agency: params.agency,
+        department: params.department,
         naics: params.naics,
         grade: params.grade,
         due_before: params.due_before,
@@ -55,6 +57,7 @@ interface UseOpportunitiesPagedParams {
   page?: number;
   status?: string;
   agency?: string;
+  department?: string;
   naics?: string;
   grade?: string;
   due_before?: string;
@@ -71,6 +74,7 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         page: params.page ?? 1,
         status: params.status,
         agency: params.agency,
+        department: params.department,
         naics: params.naics,
         grade: params.grade,
         due_before: params.due_before,
