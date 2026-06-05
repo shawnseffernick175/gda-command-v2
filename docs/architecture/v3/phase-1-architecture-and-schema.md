@@ -414,6 +414,9 @@ CREATE TABLE action_items (
   origin_ref      TEXT,                        -- reference ID from the origin system
   opportunity_id  BIGINT        REFERENCES opportunities(id),
   partner_context TEXT,                        -- e.g., "ask Angela about SHIELD task order capacity"
+  source_type     TEXT,                        -- F-611: auto-gen source type (opportunity|risk|award|capture)
+  is_auto         BOOLEAN       NOT NULL DEFAULT FALSE,  -- F-611: TRUE for system-generated items
+  assignee_id     BIGINT        REFERENCES users(id),    -- F-611: assigned user for the action item
   source_id       BIGINT        NOT NULL REFERENCES sources(id),
   created_by      BIGINT        REFERENCES users(id),
   completed_at    TIMESTAMPTZ,
@@ -437,6 +440,9 @@ CREATE INDEX idx_actions_source      ON action_items (source_id);
 | `origin_ref` | Back-reference to the originating email/alert/flag ID |
 | `opportunity_id` | Optional FK linking the action item to a specific opportunity |
 | `partner_context` | Free text for cross-OU action items (e.g., "ask Angela about SHIELD capacity") per Partner Intel spec |
+| `source_type` | F-611: auto-gen source type (`opportunity`, `risk`, `award`, `capture`) |
+| `is_auto` | F-611: `TRUE` for system-generated items, `FALSE` for manual |
+| `assignee_id` | F-611: FK to `users(id)` — assigned user for the action item |
 | `source_id` | **R1 FK** — cites the source of the action item |
 
 **Indexes:** Partial indexes on `status != 'done'` — active items are the hot set. Due date index supports launchpad "overdue items" queries.

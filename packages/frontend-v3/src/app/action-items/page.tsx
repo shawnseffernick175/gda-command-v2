@@ -194,7 +194,7 @@ function ActionItemRow({
         {/* Priority badge */}
         <Badge
           variant="outline"
-          className={cn("text-[10px] font-mono shrink-0", PRIORITY_COLORS[priority])}
+          className={cn("text-[11px] font-mono shrink-0", PRIORITY_COLORS[priority])}
         >
           {priority}
         </Badge>
@@ -227,7 +227,7 @@ function ActionItemRow({
         {sourceType && sourceId && (
           <Link
             href={`${SOURCE_ROUTES[sourceType] ?? "/"}?id=${sourceId}`}
-            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-mono bg-gda-cyan/10 text-gda-cyan border border-gda-cyan/20 hover:bg-gda-cyan/20 transition-colors"
+            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono bg-gda-cyan/10 text-gda-cyan border border-gda-cyan/20 hover:bg-gda-cyan/20 transition-colors"
           >
             {SOURCE_LABELS[sourceType] ?? sourceType} →
           </Link>

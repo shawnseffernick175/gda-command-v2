@@ -256,7 +256,7 @@ function WhatNeedsMeTodayWidget() {
                   <Badge
                     variant="outline"
                     className={cn(
-                      "text-[9px] font-mono shrink-0",
+                      "text-[11px] font-mono shrink-0",
                       PRIORITY_COLORS[priority],
                     )}
                   >
