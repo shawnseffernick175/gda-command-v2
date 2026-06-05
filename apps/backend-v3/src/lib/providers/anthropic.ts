@@ -7,6 +7,16 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput } from '../llm-router.types.js';
+import { getStoredPrompt } from '../prompt-store.js';
+
+/** Map from task to prompt_library key for read-through lookup. */
+const TASK_PROMPT_KEY: Partial<Record<Task, string>> = {
+  opportunity_analysis: 'opportunity_analysis',
+  risk_generation: 'risk_generation',
+  fast_track_triage: 'fast_track_triage',
+  black_hat_analysis: 'competitor_black_hat',
+  daily_briefing: 'daily_briefing',
+};
 
 let client: Anthropic | null = null;
 
@@ -144,7 +154,11 @@ export async function callAnthropic(opts: {
   timeout_ms: number;
 }): Promise<AnthropicCallResult> {
   const anthropic = getClient();
-  const systemPrompt = SYSTEM_PROMPTS[opts.task] ?? 'Return valid JSON matching the requested output schema.';
+
+  // Read-through: check prompt_library first, fall back to hard-coded default
+  const promptKey = TASK_PROMPT_KEY[opts.task];
+  const stored = promptKey ? await getStoredPrompt(promptKey) : null;
+  const systemPrompt = stored?.system_prompt ?? SYSTEM_PROMPTS[opts.task] ?? 'Return valid JSON matching the requested output schema.';
 
   const userContent = opts.task === 'black_hat_analysis'
     ? buildBlackHatUserPrompt(opts.input as BlackHatAnalysisInput)

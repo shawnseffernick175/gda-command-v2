@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, SETTINGS_ITEM } from "./nav-items";
+import { NAV_ITEMS, SETTINGS_ITEM, PROMPT_CREATOR_ITEM } from "./nav-items";
 import { useSentinel } from "@/hooks/use-sentinel";
 
 export function Sidebar() {
@@ -65,6 +65,19 @@ export function Sidebar() {
         >
           <SETTINGS_ITEM.icon size={15} />
           <span>{SETTINGS_ITEM.label}</span>
+        </Link>
+
+        <Link
+          href={PROMPT_CREATOR_ITEM.href}
+          className={cn(
+            "flex items-center gap-2.5 rounded px-3 py-1.5 text-[13px] transition-colors",
+            pathname.startsWith("/prompt-creator")
+              ? "border-l-2 border-gda-green bg-gda-panel text-gda-green"
+              : "text-muted-foreground hover:bg-gda-panel hover:text-foreground",
+          )}
+        >
+          <PROMPT_CREATOR_ITEM.icon size={15} />
+          <span>{PROMPT_CREATOR_ITEM.label}</span>
         </Link>
 
         <Link

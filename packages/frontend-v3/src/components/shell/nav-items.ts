@@ -13,6 +13,7 @@ import {
   Settings,
   ClipboardCheck,
   Newspaper,
+  Terminal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -44,3 +45,8 @@ export const SETTINGS_ITEM: NavItem = {
   icon: Settings,
 };
 
+export const PROMPT_CREATOR_ITEM: NavItem = {
+  label: "Prompt Creator",
+  href: "/prompt-creator",
+  icon: Terminal,
+};
