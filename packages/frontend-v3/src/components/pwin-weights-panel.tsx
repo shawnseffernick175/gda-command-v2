@@ -52,16 +52,10 @@ function computeSimPwin(
   savedWeights: PwinWeights,
   draftWeights: PwinWeights,
 ): number {
-  const savedAbs = Object.values(savedWeights).reduce(
-    (s, v) => s + Math.abs(v),
-    0,
-  );
-  const draftAbs = Object.values(draftWeights).reduce(
-    (s, v) => s + Math.abs(v),
-    0,
-  );
-  if (savedAbs === 0) return currentPwin;
-  const ratio = draftAbs / savedAbs;
+  const savedSum = Object.values(savedWeights).reduce((s, v) => s + v, 0);
+  const draftSum = Object.values(draftWeights).reduce((s, v) => s + v, 0);
+  if (savedSum === 0) return currentPwin;
+  const ratio = draftSum / savedSum;
   return Math.max(0, Math.min(100, Math.round(currentPwin * ratio)));
 }
 
@@ -198,7 +192,7 @@ export function PwinWeightsPanel() {
         <div className="flex items-center gap-2">
           <button
             onClick={handleSave}
-            disabled={saveMutation.isPending || (!sumValid && isDirty)}
+            disabled={saveMutation.isPending || !isDirty}
             className="rounded bg-gda-cyan px-4 py-1.5 text-xs font-mono font-medium text-gda-bg-base hover:bg-gda-cyan/90 disabled:opacity-50 transition-colors"
           >
             {saveMutation.isPending ? "Saving…" : "Save Weights"}
@@ -241,7 +235,7 @@ export function PwinWeightsPanel() {
                   </div>
                   <input
                     type="range"
-                    min={isNegative ? -100 : -100}
+                    min={isNegative ? -100 : 0}
                     max={100}
                     step={1}
                     value={value}
