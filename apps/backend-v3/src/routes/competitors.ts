@@ -39,25 +39,27 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
       params.push(offset);
       const dataSql = `
         SELECT
-          awardee_name                                                    AS name,
-          awardee_uei,
+          a.awardee_name                                                  AS name,
+          a.awardee_uei,
           count(*)::int                                                   AS win_count,
-          sum(value_obligated)::numeric                                   AS total_obligated,
-          max(value_obligated)::numeric                                   AS largest_award,
-          max(award_date)                                                 AS last_win_date,
-          array_agg(DISTINCT agency_name ORDER BY agency_name)
-            FILTER (WHERE agency_name IS NOT NULL AND agency_name <> '') AS agencies,
-          array_agg(DISTINCT naics ORDER BY naics)
-            FILTER (WHERE naics IS NOT NULL AND naics <> '')             AS naics_codes,
-          array_agg(DISTINCT set_aside ORDER BY set_aside)
-            FILTER (WHERE set_aside IS NOT NULL
-              AND set_aside NOT IN ('NONE', ''))                         AS set_asides,
-          array_agg(DISTINCT contract_type ORDER BY contract_type)
-            FILTER (WHERE contract_type IS NOT NULL
-              AND contract_type <> '')                                   AS contract_types
-        FROM awards
-        WHERE ${whereClause}
-        GROUP BY awardee_name, awardee_uei
+          sum(a.value_obligated)::numeric                                 AS total_obligated,
+          max(a.value_obligated)::numeric                                 AS largest_award,
+          max(a.award_date)                                               AS last_win_date,
+          array_agg(DISTINCT a.agency_name ORDER BY a.agency_name)
+            FILTER (WHERE a.agency_name IS NOT NULL AND a.agency_name <> '') AS agencies,
+          array_agg(DISTINCT a.naics ORDER BY a.naics)
+            FILTER (WHERE a.naics IS NOT NULL AND a.naics <> '')          AS naics_codes,
+          array_agg(DISTINCT a.set_aside ORDER BY a.set_aside)
+            FILTER (WHERE a.set_aside IS NOT NULL
+              AND a.set_aside NOT IN ('NONE', ''))                        AS set_asides,
+          array_agg(DISTINCT a.contract_type ORDER BY a.contract_type)
+            FILTER (WHERE a.contract_type IS NOT NULL
+              AND a.contract_type <> '')                                  AS contract_types,
+          cac.competitor_analysis
+        FROM awards a
+        LEFT JOIN competitor_analysis_cache cac ON cac.competitor_name = a.awardee_name
+        WHERE ${whereClause.replace(/awardee_name/g, 'a.awardee_name').replace(/naics ILIKE/g, 'a.naics ILIKE')}
+        GROUP BY a.awardee_name, a.awardee_uei, cac.competitor_analysis
         ORDER BY win_count DESC
         LIMIT $${params.length - 1} OFFSET $${params.length}`;
 
@@ -68,25 +70,27 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
     params.push(limit);
     const sql = `
       SELECT
-        awardee_name                                                    AS name,
-        awardee_uei,
+        a.awardee_name                                                  AS name,
+        a.awardee_uei,
         count(*)::int                                                   AS win_count,
-        sum(value_obligated)::numeric                                   AS total_obligated,
-        max(value_obligated)::numeric                                   AS largest_award,
-        max(award_date)                                                 AS last_win_date,
-        array_agg(DISTINCT agency_name ORDER BY agency_name)
-          FILTER (WHERE agency_name IS NOT NULL AND agency_name <> '') AS agencies,
-        array_agg(DISTINCT naics ORDER BY naics)
-          FILTER (WHERE naics IS NOT NULL AND naics <> '')             AS naics_codes,
-        array_agg(DISTINCT set_aside ORDER BY set_aside)
-          FILTER (WHERE set_aside IS NOT NULL
-            AND set_aside NOT IN ('NONE', ''))                         AS set_asides,
-        array_agg(DISTINCT contract_type ORDER BY contract_type)
-          FILTER (WHERE contract_type IS NOT NULL
-            AND contract_type <> '')                                   AS contract_types
-      FROM awards
-      WHERE ${whereClause}
-      GROUP BY awardee_name, awardee_uei
+        sum(a.value_obligated)::numeric                                 AS total_obligated,
+        max(a.value_obligated)::numeric                                 AS largest_award,
+        max(a.award_date)                                               AS last_win_date,
+        array_agg(DISTINCT a.agency_name ORDER BY a.agency_name)
+          FILTER (WHERE a.agency_name IS NOT NULL AND a.agency_name <> '') AS agencies,
+        array_agg(DISTINCT a.naics ORDER BY a.naics)
+          FILTER (WHERE a.naics IS NOT NULL AND a.naics <> '')          AS naics_codes,
+        array_agg(DISTINCT a.set_aside ORDER BY a.set_aside)
+          FILTER (WHERE a.set_aside IS NOT NULL
+            AND a.set_aside NOT IN ('NONE', ''))                        AS set_asides,
+        array_agg(DISTINCT a.contract_type ORDER BY a.contract_type)
+          FILTER (WHERE a.contract_type IS NOT NULL
+            AND a.contract_type <> '')                                  AS contract_types,
+        cac.competitor_analysis
+      FROM awards a
+      LEFT JOIN competitor_analysis_cache cac ON cac.competitor_name = a.awardee_name
+      WHERE ${whereClause.replace(/awardee_name/g, 'a.awardee_name').replace(/naics ILIKE/g, 'a.naics ILIKE')}
+      GROUP BY a.awardee_name, a.awardee_uei, cac.competitor_analysis
       ORDER BY win_count DESC
       LIMIT $${params.length}`;
 
@@ -100,6 +104,118 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
       `SELECT count(DISTINCT awardee_name)::int AS count FROM awards WHERE awardee_name IS NOT NULL AND awardee_name <> ''`,
     );
     return reply.send(successEnvelope({ count: rows[0].count }, req.requestId));
+  });
+
+  // POST /v3/competitors/:name/analyze — F-607 AI competitor drill-in analysis
+  app.post('/v3/competitors/:name/analyze', async (req, reply) => {
+    const competitorName = decodeURIComponent((req.params as { name: string }).name);
+
+    // Check cache (7-day TTL)
+    const cacheResult = await pool.query(
+      `SELECT competitor_analysis, competitor_analysis_run_at FROM competitor_analysis_cache
+       WHERE competitor_name = $1 AND competitor_analysis IS NOT NULL AND expires_at > NOW()`,
+      [competitorName],
+    );
+    if (cacheResult.rows.length > 0) {
+      return reply.send(
+        successEnvelope({ ...cacheResult.rows[0].competitor_analysis, from_cache: true }, req.requestId),
+      );
+    }
+
+    // Query awards for competitor stats
+    const statsResult = await pool.query(
+      `SELECT
+        count(*)::int AS win_count,
+        coalesce(sum(value_obligated), 0)::numeric AS total_obligated,
+        max(award_date) AS last_win_date,
+        min(awardee_uei) AS awardee_uei,
+        array_agg(DISTINCT agency_name ORDER BY agency_name)
+          FILTER (WHERE agency_name IS NOT NULL AND agency_name <> '') AS agencies,
+        array_agg(DISTINCT naics ORDER BY naics)
+          FILTER (WHERE naics IS NOT NULL AND naics <> '') AS naics_codes,
+        array_agg(DISTINCT set_aside ORDER BY set_aside)
+          FILTER (WHERE set_aside IS NOT NULL AND set_aside NOT IN ('NONE', '')) AS set_asides,
+        array_agg(DISTINCT contract_type ORDER BY contract_type)
+          FILTER (WHERE contract_type IS NOT NULL AND contract_type <> '') AS contract_types
+      FROM awards
+      WHERE awardee_name = $1`,
+      [competitorName],
+    );
+
+    const stats = statsResult.rows[0];
+    if (!stats || stats.win_count === 0) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', `No awards found for competitor: ${competitorName}`, req.requestId),
+      );
+    }
+
+    // Fetch re-compete contracts (period_of_performance_end within 18 months)
+    const recompeteResult = await pool.query(
+      `SELECT
+        contract_number AS contract_id,
+        description AS title,
+        coalesce(value_obligated, 0)::numeric AS value,
+        period_of_performance_end AS expiration_date,
+        agency_name AS agency
+      FROM awards
+      WHERE awardee_name = $1
+        AND period_of_performance_end IS NOT NULL
+        AND period_of_performance_end > NOW()
+        AND period_of_performance_end <= NOW() + INTERVAL '18 months'
+      ORDER BY period_of_performance_end ASC
+      LIMIT 20`,
+      [competitorName],
+    );
+
+    const recompeteContracts = recompeteResult.rows.map((r) => ({
+      contract_id: r.contract_id ?? 'N/A',
+      title: r.title ?? 'Untitled contract',
+      value: Number(r.value),
+      expiration_date: r.expiration_date ? new Date(r.expiration_date).toISOString().slice(0, 10) : 'Unknown',
+      agency: r.agency ?? 'Unknown',
+    }));
+
+    const { llmRouter } = await import('../lib/llm-router.js');
+    const result = await llmRouter.route({
+      task: 'competitor_analysis',
+      input: {
+        competitor_name: competitorName,
+        awardee_uei: stats.awardee_uei ?? null,
+        win_count: stats.win_count,
+        total_obligated: Number(stats.total_obligated),
+        agencies: stats.agencies ?? [],
+        naics_codes: stats.naics_codes ?? [],
+        set_asides: stats.set_asides ?? [],
+        contract_types: stats.contract_types ?? [],
+        recompete_contracts: recompeteContracts,
+        envision_context: 'Envision is a small business IT/consulting firm competing for federal contracts. NAICS: 541511, 541512, 541519, 541690. Certified 8(a) eligible, specializes in digital transformation and data analytics for DoD/federal agencies.',
+      },
+    });
+
+    if (!result.ok) {
+      return reply.status(502).send(
+        errorEnvelope('INTERNAL_ERROR', result.error_message ?? 'LLM router failed', req.requestId),
+      );
+    }
+
+    // Ensure recompete_contracts in output uses actual DB data (LLM may hallucinate)
+    const analysis = {
+      ...result.output,
+      recompete_contracts: recompeteContracts,
+    };
+
+    // Upsert cache (7-day TTL)
+    await pool.query(
+      `INSERT INTO competitor_analysis_cache (competitor_name, awardee_uei, competitor_analysis, competitor_analysis_run_at, expires_at)
+       VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '7 days')
+       ON CONFLICT (competitor_name)
+       DO UPDATE SET competitor_analysis = $3, awardee_uei = $2, competitor_analysis_run_at = NOW(), expires_at = NOW() + INTERVAL '7 days'`,
+      [competitorName, stats.awardee_uei ?? null, JSON.stringify(analysis)],
+    );
+
+    return reply.send(
+      successEnvelope({ ...analysis, from_cache: false }, req.requestId),
+    );
   });
 
   // POST /v3/competitors/:name/black-hat — on-demand Black Hat Analysis

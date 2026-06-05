@@ -7,6 +7,8 @@ import { Pagination } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
+import CompetitorDetailPanel, { SizeBadge } from "@/components/CompetitorDetailPanel";
+import type { Competitor } from "@/lib/types";
 
 export default function CompetitorsPage() {
   const searchParams = useSearchParams();
@@ -42,6 +44,8 @@ export default function CompetitorsPage() {
     }, 350);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [q, setPage]);
+
+  const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
 
   const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, limit: 100, page: currentPage });
   const { data: countData } = useCompetitorsCount();
@@ -127,9 +131,16 @@ export default function CompetitorsPage() {
                 const naicsMore = (c.naics_codes?.length ?? 0) - 1;
 
                 return (
-                  <tr key={c.name} className="border-b border-border hover:bg-gda-panel/50">
+                  <tr
+                    key={c.name}
+                    className="border-b border-border hover:bg-gda-panel/50 cursor-pointer"
+                    onClick={() => setSelectedCompetitor(c)}
+                  >
                     <td className="px-3 py-2 font-medium text-foreground text-xs max-w-[220px]">
-                      <span className="truncate block" title={c.name}>{c.name}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate" title={c.name}>{c.name}</span>
+                        <SizeBadge analysis={c.competitor_analysis ?? null} />
+                      </div>
                       {c.awardee_uei && (
                         <span className="text-[11px] text-muted-foreground font-mono">{c.awardee_uei}</span>
                       )}
@@ -190,6 +201,13 @@ export default function CompetitorsPage() {
       >
         <BlackHatSection competitors={items} />
       </CollapseSection>
+
+      {selectedCompetitor && (
+        <CompetitorDetailPanel
+          competitor={selectedCompetitor}
+          onClose={() => setSelectedCompetitor(null)}
+        />
+      )}
     </div>
   );
 }

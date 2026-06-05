@@ -30,7 +30,8 @@ export type Task =
   | 'source_research'
   | 'black_hat_analysis'
   | 'risk_generation'
-  | 'award_analysis';
+  | 'award_analysis'
+  | 'competitor_analysis';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -214,6 +215,37 @@ export interface AwardAnalysisOutput {
   winner_classification: 'THREAT' | 'PARTNER' | 'IRRELEVANT';
   recommended_action: 'Pursue Re-Compete' | 'Monitor' | 'Pass' | 'Partner with Winner';
   so_what: string;
+}
+
+export interface CompetitorAnalysisInput {
+  competitor_name: string;
+  awardee_uei: string | null;
+  win_count: number;
+  total_obligated: number;
+  agencies: string[];
+  naics_codes: string[];
+  set_asides: string[];
+  contract_types: string[];
+  recompete_contracts: CompetitorRecompeteContract[];
+  envision_context: string;
+}
+
+export interface CompetitorRecompeteContract {
+  contract_id: string;
+  title: string;
+  value: number;
+  expiration_date: string;
+  agency: string;
+}
+
+export interface CompetitorAnalysisOutput {
+  size_classification: string;
+  classification: 'THREAT' | 'PARTNER' | 'MONITOR';
+  classification_rationale: string;
+  so_what: string;
+  recompete_contracts: CompetitorRecompeteContract[];
+  recommended_action: 'Compete' | 'Partner' | 'Monitor' | 'Ignore';
+  trend: 'Up' | 'Down' | 'Flat';
 }
 
 export interface RiskGenerationInput {
@@ -506,6 +538,7 @@ export interface TaskInputMap {
   black_hat_analysis: BlackHatAnalysisInput;
   risk_generation: RiskGenerationInput;
   award_analysis: AwardAnalysisInput;
+  competitor_analysis: CompetitorAnalysisInput;
 }
 
 export interface TaskOutputMap {
@@ -520,6 +553,7 @@ export interface TaskOutputMap {
   black_hat_analysis: BlackHatAnalysisOutput;
   risk_generation: RiskGenerationOutput;
   award_analysis: AwardAnalysisOutput;
+  competitor_analysis: CompetitorAnalysisOutput;
 }
 
 // ---------------------------------------------------------------------------
