@@ -76,6 +76,12 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         due_before: params.due_before,
         due_after: params.due_after,
       }),
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      if (!items) return false;
+      const hasAnalyzing = items.some((i) => !i.pwin);
+      return hasAnalyzing ? 10_000 : false;
+    },
   });
 }
 

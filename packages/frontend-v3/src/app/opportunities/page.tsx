@@ -14,12 +14,14 @@ import { CollapseSection } from "@/components/shared/collapse-section";
 import { OodaInspector } from "@/components/shared/ooda-inspector";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
+import { OpportunityCard } from "@/components/OpportunityCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
 import { apiPost } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type {
   DoctrineFitLabel,
   LlmAnalysis,
@@ -42,12 +44,57 @@ function OpportunitiesContent() {
   return <OpportunityList />;
 }
 
+type ViewMode = "cards" | "table";
+
+function getInitialViewMode(): ViewMode {
+  if (typeof window === "undefined") return "cards";
+  const saved = localStorage.getItem("opp_view_mode");
+  return saved === "table" ? "table" : "cards";
+}
+
+function useViewMode(): [ViewMode, (m: ViewMode) => void] {
+  const [mode, setModeState] = useState<ViewMode>(getInitialViewMode);
+  const setMode = useCallback((m: ViewMode) => {
+    setModeState(m);
+    localStorage.setItem("opp_view_mode", m);
+  }, []);
+  return [mode, setMode];
+}
+
+function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
+  return (
+    <div className="inline-flex rounded border border-border overflow-hidden text-xs font-mono">
+      <button
+        type="button"
+        onClick={() => onChange("table")}
+        className={cn(
+          "px-2.5 py-1 transition-colors",
+          mode === "table" ? "bg-gda-green/15 text-gda-green" : "text-muted-foreground hover:bg-gda-panel"
+        )}
+      >
+        Table
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("cards")}
+        className={cn(
+          "px-2.5 py-1 transition-colors",
+          mode === "cards" ? "bg-gda-green/15 text-gda-green" : "text-muted-foreground hover:bg-gda-panel"
+        )}
+      >
+        Cards
+      </button>
+    </div>
+  );
+}
+
 function OpportunityList() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
   const currentPage = Number(searchParams.get("page") ?? "1") || 1;
+  const [viewMode, setViewMode] = useViewMode();
 
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -134,6 +181,7 @@ function OpportunityList() {
         <h1 className="font-mono text-lg font-bold text-foreground">
           Opportunities
         </h1>
+        <ViewToggle mode={viewMode} onChange={setViewMode} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -191,6 +239,19 @@ function OpportunityList() {
             <Skeleton key={i} className="h-10 bg-gda-panel" />
           ))}
         </div>
+      ) : viewMode === "cards" ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {items.map((opp) => (
+              <OpportunityCard key={opp.internal_id} opp={opp} />
+            ))}
+          </div>
+          {items.length === 0 && !isLoading && (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No opportunities match your filter.
+            </div>
+          )}
+        </>
       ) : (
         <div className="rounded border border-border overflow-hidden">
           <table className="w-full text-sm">
@@ -207,65 +268,75 @@ function OpportunityList() {
               </tr>
             </thead>
             <tbody>
-              {items.map((opp) => (
-                <tr
-                  key={opp.internal_id}
-                  className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9"
-                >
-                  <td className="px-3 py-1.5">
-                    <Link
-                      href={`/opportunities?id=${opp.id}`}
-                      className="text-foreground hover:text-gda-green truncate block max-w-xs"
-                    >
-                      {opp.title}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[120px]">
-                    {opp.agency ?? "—"}
-                  </td>
-                  <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
-                    {formatMoney(opp.value)}
-                  </td>
-                  <td className="px-3 py-1.5 text-left">
-                    {opp.pwin ? (
-                      <div className="flex items-center gap-1">
-                        <ScoreDisplay score={opp.pwin.score} className="text-xs" />
-                        <BandBadge band={opp.pwin.band} />
+              {items.map((opp) => {
+                const deadlineWarning = opp.deadline_warning === true;
+                return (
+                  <tr
+                    key={opp.internal_id}
+                    className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9"
+                  >
+                    <td className="px-3 py-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Link
+                          href={`/opportunities?id=${opp.id}`}
+                          className="text-foreground hover:text-gda-green truncate block max-w-xs"
+                        >
+                          {opp.title}
+                        </Link>
+                        {deadlineWarning && (
+                          <span className="shrink-0 rounded bg-red-500/15 border border-red-500/40 px-1 py-0.5 text-[11px] font-mono font-bold uppercase text-red-400">
+                            DEADLINE
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-1.5 text-left">
-                    {opp.doctrine_badge ? (
-                      <span className={`text-[11px] font-mono capitalize ${FIT_COLORS[opp.doctrine_badge.label]}`}>
-                        {opp.doctrine_badge.label}
-                      </span>
-                    ) : opp.doctrine_score != null ? (
-                      <span className="text-[11px] font-mono text-gda-cyan">
-                        {opp.doctrine_score}pt
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                    {opp.due_date
-                      ? new Date(opp.due_date).toLocaleDateString()
-                      : "—"}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    {opp.source ? (
-                      <SourceChip label={opp.source} kind="real" />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <StageDropdown value={opp.stage ?? "Interest"} />
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[120px]">
+                      {opp.agency ?? "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
+                      {formatMoney(opp.value)}
+                    </td>
+                    <td className="px-3 py-1.5 text-left">
+                      {opp.pwin ? (
+                        <div className="flex items-center gap-1">
+                          <ScoreDisplay score={opp.pwin.score} className="text-xs" />
+                          <BandBadge band={opp.pwin.band} />
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded border border-border bg-muted/20 px-1.5 py-0.5 text-[11px] text-muted-foreground animate-pulse">Analyzing…</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-left">
+                      {opp.doctrine_badge ? (
+                        <span className={`text-[11px] font-mono capitalize ${FIT_COLORS[opp.doctrine_badge.label]}`}>
+                          {opp.doctrine_badge.label}
+                        </span>
+                      ) : opp.doctrine_score != null ? (
+                        <span className="text-[11px] font-mono text-gda-cyan">
+                          {opp.doctrine_score}pt
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded border border-border bg-muted/20 px-1.5 py-0.5 text-[11px] text-muted-foreground animate-pulse">Analyzing…</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                      {opp.due_date
+                        ? new Date(opp.due_date).toLocaleDateString()
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      {opp.source ? (
+                        <SourceChip label={opp.source} kind="real" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <StageDropdown value={opp.stage ?? "Interest"} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {items.length === 0 && !isLoading && (

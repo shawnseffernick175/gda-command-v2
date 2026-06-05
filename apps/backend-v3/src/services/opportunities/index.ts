@@ -102,9 +102,19 @@ function parseAnalysis(row: OpportunityRow): AnalysisBlock | null {
   };
 }
 
+function computeDeadlineWarning(row: OpportunityRow, hasPipelineStage?: boolean): boolean {
+  if (hasPipelineStage) return false;
+  if (!row.response_due_at) return false;
+  const due = new Date(row.response_due_at);
+  const now = new Date();
+  const daysRemaining = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+  return daysRemaining >= 0 && daysRemaining <= 30;
+}
+
 function buildSummaryFromSources(
   row: OpportunityRow,
   sources: Record<string, SourceRef[]>,
+  hasPipelineStage?: boolean,
 ): OpportunitySummary {
   const teamingFlags = evaluateTeamingFlags(row);
   return {
@@ -129,6 +139,7 @@ function buildSummaryFromSources(
     teaming_flags: teamingFlags,
     ai_analyzed_at: row.ai_analyzed_at,
     analysis_version: row.analysis_version,
+    deadline_warning: computeDeadlineWarning(row, hasPipelineStage),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -270,16 +281,21 @@ export async function listOpportunities(
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const sql = `SELECT * FROM opportunities ${where} ORDER BY id DESC LIMIT $${paramIdx}`;
+  const sql = `SELECT *, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = opportunities.id)) AS has_pipeline_stage FROM opportunities ${where} ORDER BY id DESC LIMIT $${paramIdx}`;
   params.push(limit + 1);
 
-  const res = await pool.query<OpportunityRow>(sql, params);
+  const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean }>(sql, params);
   const rows = res.rows;
 
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
 
-  const summaries = await Promise.all(items.map(rowToSummary));
+  const summaries = await Promise.all(
+    items.map(async (row) => {
+      const sources = await resolveOpportunitySources(String(row.id));
+      return buildSummaryFromSources(row, sources, row.has_pipeline_stage);
+    }),
+  );
 
   let nextCursor: string | null = null;
   if (hasMore && items.length > 0) {
@@ -360,11 +376,16 @@ export async function listOpportunitiesPaged(
   const total = countRes.rows[0]?.total ?? 0;
   const totalPages = Math.max(Math.ceil(total / limit), 1);
 
-  const dataSql = `SELECT * FROM opportunities ${where} ORDER BY id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+  const dataSql = `SELECT *, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = opportunities.id)) AS has_pipeline_stage FROM opportunities ${where} ORDER BY id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
   const dataParams = [...params, limit, offset];
-  const res = await pool.query<OpportunityRow>(dataSql, dataParams);
+  const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean }>(dataSql, dataParams);
 
-  const summaries = await Promise.all(res.rows.map(rowToSummary));
+  const summaries = await Promise.all(
+    res.rows.map(async (row) => {
+      const sources = await resolveOpportunitySources(String(row.id));
+      return buildSummaryFromSources(row, sources, row.has_pipeline_stage);
+    }),
+  );
 
   return { items: summaries, total, page, totalPages };
 }
