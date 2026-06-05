@@ -23,6 +23,7 @@ import { logger } from '../lib/logger.js';
 import { runDoctrineCheck } from '../services/doctrine/index.js';
 import {
   listOpportunities,
+  listOpportunitiesPaged,
   getOpportunityById,
   createOpportunity,
   updateOpportunity,
@@ -530,7 +531,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       hot: query.hot,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor,
+      page: query.page ? Number(query.page) : undefined,
     };
+
+    if (filters.page) {
+      const result = await listOpportunitiesPaged(filters);
+      return reply.status(200).send(successEnvelope(result, req.requestId));
+    }
 
     const result = await listOpportunities(filters);
     return reply.status(200).send(successEnvelope(result, req.requestId));

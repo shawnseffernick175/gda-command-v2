@@ -98,6 +98,8 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
       cursor: query.cursor,
     };
 
+    const pageParam = query.page ? Number(query.page) : undefined;
+
     const conditions: string[] = ["a.data_source = 'usaspending'"];
     const params: unknown[] = [];
     let paramIdx = 1;
@@ -119,6 +121,26 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
       params.push(filters.awarded_before);
     }
 
+    const where = `WHERE ${conditions.join(' AND ')}`;
+
+    if (pageParam) {
+      const page = Math.max(pageParam, 1);
+      const offset = (page - 1) * filters.limit;
+
+      const countSql = `SELECT COUNT(*)::int AS total FROM awards a ${where}`;
+      const countRes = await pool.query<{ total: number }>(countSql, params);
+      const total = countRes.rows[0]?.total ?? 0;
+      const totalPages = Math.max(Math.ceil(total / filters.limit), 1);
+
+      const dataSql = `SELECT a.id, a.piid, a.awardee_name, a.agency_name, a.contract_type, a.value_obligated, a.award_date, a.fpds_url, a.data_source, s.kind AS source_kind, s.title AS source_title, s.url AS source_url, s.retrieved_at AS source_retrieved_at FROM awards a LEFT JOIN sources s ON s.id = a.source_id ${where} ORDER BY a.award_date DESC, a.id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+      const dataParams = [...params, filters.limit, offset];
+      const res = await pool.query<AwardRow>(dataSql, dataParams);
+
+      return reply.status(200).send(
+        successEnvelope({ items: res.rows.map(rowToItem), total, page, totalPages }, req.requestId),
+      );
+    }
+
     if (filters.cursor) {
       try {
         const decoded = JSON.parse(
@@ -134,7 +156,6 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const where = `WHERE ${conditions.join(' AND ')}`;
     const sql = `SELECT a.id, a.piid, a.awardee_name, a.agency_name, a.contract_type, a.value_obligated, a.award_date, a.fpds_url, a.data_source, s.kind AS source_kind, s.title AS source_title, s.url AS source_url, s.retrieved_at AS source_retrieved_at FROM awards a LEFT JOIN sources s ON s.id = a.source_id ${where} ORDER BY a.award_date DESC, a.id DESC LIMIT $${paramIdx}`;
     params.push(filters.limit + 1);
 

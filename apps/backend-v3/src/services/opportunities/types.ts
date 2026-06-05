@@ -165,6 +165,7 @@ export interface ListFilters {
   hot?: string;
   limit?: number;
   cursor?: string;
+  page?: number;
 }
 
 export interface PaginatedResult<T> {
@@ -174,6 +175,13 @@ export interface PaginatedResult<T> {
     cursor: string | null;
     hasMore: boolean;
   };
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 export const ANALYSIS_AFFECTING_FIELDS = new Set([

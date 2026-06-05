@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState, useRef, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState, useRef, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useOpportunities, useOpportunity } from "@/hooks/use-opportunities";
+import { useOpportunitiesPaged, useOpportunity } from "@/hooks/use-opportunities";
+import { Pagination } from "@/components/shared/Pagination";
 import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
@@ -22,7 +23,6 @@ import { apiPost } from "@/lib/api";
 import type {
   DoctrineFitLabel,
   LlmAnalysis,
-  OpportunitySummary,
   ShipleyDimension,
 } from "@/lib/types";
 
@@ -43,35 +43,45 @@ function OpportunitiesContent() {
 }
 
 function OpportunityList() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const currentPage = Number(searchParams.get("page") ?? "1") || 1;
+
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [dueSoonFilter, setDueSoonFilter] = useState(false);
   const [dueBefore, setDueBefore] = useState<string | undefined>(undefined);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [previousItems, setPreviousItems] = useState<OpportunitySummary[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, error, refetch } = useOpportunities({
+  const { data, isLoading, error, refetch } = useOpportunitiesPaged({
     q: debouncedQ || undefined,
     grade: gradeFilter || undefined,
     due_before: dueBefore,
     limit: 100,
-    cursor,
+    page: currentPage,
   });
 
-  const allItems = useMemo(() => {
-    const combined = [...previousItems, ...(data?.items ?? [])];
-    const seen = new Set<string>();
-    return combined.filter((item) => {
-      const key = item.internal_id ?? String(item.id);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [previousItems, data?.items]);
+  const items = data?.items ?? [];
+  const totalPages = data?.totalPages ?? 1;
+  const total = data?.total ?? 0;
 
-  const hasMore = data?.pagination?.hasMore ?? false;
+  const setPage = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (page <= 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(page));
+      }
+      router.push(`${pathname}?${params.toString()}`);
+      listRef.current?.scrollIntoView({ behavior: "smooth" });
+    },
+    [searchParams, router, pathname],
+  );
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,36 +89,33 @@ function OpportunityList() {
       setQ(val);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        setCursor(undefined);
-        setPreviousItems([]);
         setDebouncedQ(val);
+        setPage(1);
       }, 350);
     },
-    [],
+    [setPage],
   );
 
   const handleGradeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setCursor(undefined);
-      setPreviousItems([]);
       setGradeFilter(e.target.value);
+      setPage(1);
     },
-    [],
+    [setPage],
   );
 
   const handleDueSoonChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const checked = e.target.checked;
-      setCursor(undefined);
-      setPreviousItems([]);
       setDueSoonFilter(checked);
       setDueBefore(
         checked
           ? new Date(Date.now() + 14 * 86400 * 1000).toISOString()
           : undefined,
       );
+      setPage(1);
     },
-    [],
+    [setPage],
   );
 
   const handleClearFilters = useCallback(() => {
@@ -118,19 +125,11 @@ function OpportunityList() {
     setGradeFilter("");
     setDueSoonFilter(false);
     setDueBefore(undefined);
-    setCursor(undefined);
-    setPreviousItems([]);
-  }, []);
-
-  const handleLoadMore = useCallback(() => {
-    if (data?.pagination?.cursor) {
-      setPreviousItems((prev) => [...prev, ...(data?.items ?? [])]);
-      setCursor(data.pagination.cursor);
-    }
-  }, [data]);
+    setPage(1);
+  }, [setPage]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={listRef}>
       <div className="flex items-center justify-between">
         <h1 className="font-mono text-lg font-bold text-foreground">
           Opportunities
@@ -175,7 +174,7 @@ function OpportunityList() {
           </button>
         )}
         <span className="ml-auto text-[11px] text-muted-foreground">
-          {hasMore ? `${allItems.length}+ results` : `${allItems.length} results`}
+          {total.toLocaleString()} results
         </span>
       </div>
 
@@ -186,7 +185,7 @@ function OpportunityList() {
         />
       )}
 
-      {isLoading && !allItems.length ? (
+      {isLoading && !items.length ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-10 bg-gda-panel" />
@@ -208,7 +207,7 @@ function OpportunityList() {
               </tr>
             </thead>
             <tbody>
-              {allItems.map((opp) => (
+              {items.map((opp) => (
                 <tr
                   key={opp.internal_id}
                   className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9"
@@ -269,7 +268,7 @@ function OpportunityList() {
               ))}
             </tbody>
           </table>
-          {allItems.length === 0 && !isLoading && (
+          {items.length === 0 && !isLoading && (
             <div className="py-8 text-center text-sm text-muted-foreground">
               No opportunities match your filter.
             </div>
@@ -277,15 +276,12 @@ function OpportunityList() {
         </div>
       )}
 
-      {hasMore && (
-        <button
-          type="button"
-          onClick={handleLoadMore}
-          disabled={isLoading}
-          className="w-full rounded border border-border bg-gda-panel py-2 text-xs font-mono text-muted-foreground hover:text-foreground hover:border-gda-green/30 transition-colors disabled:opacity-50"
-        >
-          {isLoading ? "Loading…" : "Load more"}
-        </button>
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );
