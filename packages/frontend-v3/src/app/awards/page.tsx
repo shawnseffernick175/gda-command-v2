@@ -242,6 +242,7 @@ export default function AwardsPage() {
 
       {selectedAward && (
         <AwardDetailPanel
+          key={selectedAward.id}
           award={selectedAward}
           onClose={() => setSelectedAward(null)}
         />

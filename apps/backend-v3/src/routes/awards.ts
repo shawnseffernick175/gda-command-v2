@@ -177,7 +177,7 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const sql = `SELECT a.id, a.piid, a.awardee_name, a.agency_name, a.contract_type, a.value_obligated, a.award_date, a.fpds_url, a.data_source, a.is_recompete_candidate, a.period_of_performance_end, a.set_aside, a.naics, a.award_analysis, a.award_analysis_run_at, s.kind AS source_kind, s.title AS source_title, s.url AS source_url, s.retrieved_at AS source_retrieved_at FROM awards a LEFT JOIN sources s ON s.id = a.source_id ${where} ORDER BY a.is_recompete_candidate DESC, a.award_date DESC, a.id DESC LIMIT $${paramIdx}`;
+    const sql = `SELECT a.id, a.piid, a.awardee_name, a.agency_name, a.contract_type, a.value_obligated, a.award_date, a.fpds_url, a.data_source, a.is_recompete_candidate, a.period_of_performance_end, a.set_aside, a.naics, a.award_analysis, a.award_analysis_run_at, s.kind AS source_kind, s.title AS source_title, s.url AS source_url, s.retrieved_at AS source_retrieved_at FROM awards a LEFT JOIN sources s ON s.id = a.source_id ${where} ORDER BY a.award_date DESC, a.id DESC LIMIT $${paramIdx}`;
     params.push(filters.limit + 1);
 
     const res = await pool.query<AwardRow>(sql, params);
