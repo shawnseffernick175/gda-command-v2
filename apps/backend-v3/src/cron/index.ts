@@ -31,6 +31,7 @@ import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
+import { generateActionItems } from '../jobs/generateActionItems.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
@@ -111,6 +112,19 @@ export function startCronScheduler(): void {
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
   }
+
+  // Action items auto-generation — every 6 hours
+  const actionItemsGenTask = cron.schedule('30 */6 * * *', async () => {
+    try {
+      logger.info('[cron] action-items-gen starting');
+      await generateActionItems();
+      logger.info('[cron] action-items-gen completed');
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_action_items_gen_error');
+    }
+  });
+  tasks.push(actionItemsGenTask);
+  logger.info({ schedule: '30 */6 * * *' }, '[cron] registered: action-items-gen (30 */6 * * *)');
 
   // PWin nightly retrain — runs at 02:00 UTC (10 PM ET)
   const pwinRetrainTask = cron.schedule('0 2 * * *', async () => {

@@ -5,6 +5,8 @@ import {
   updateActionItem,
   listActionItems,
   getActionItem,
+  getTopActionItems,
+  getAssignee,
   toApiShape,
   type ActionItemCreateInput,
   type ActionItemUpdateInput,
@@ -47,8 +49,11 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
 
     const itemsWithDrafts = await Promise.all(
       result.items.map(async (item) => {
-        const drafts = await getDraftsByActionItem(item.id);
-        return toApiShape(item, drafts.map(toDraftApiShape));
+        const [drafts, assignee] = await Promise.all([
+          getDraftsByActionItem(item.id),
+          getAssignee(item.assignee_id),
+        ]);
+        return toApiShape(item, drafts.map(toDraftApiShape), assignee);
       })
     );
 
@@ -125,6 +130,25 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
       }
       throw err;
     }
+  });
+
+  app.get<{
+    Querystring: { limit?: string };
+  }>('/v3/action-items/top', async (req, reply) => {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 5;
+    const items = await getTopActionItems(limit);
+
+    const shaped = await Promise.all(
+      items.map(async (item) => {
+        const [drafts, assignee] = await Promise.all([
+          getDraftsByActionItem(item.id),
+          getAssignee(item.assignee_id),
+        ]);
+        return toApiShape(item, drafts.map(toDraftApiShape), assignee);
+      })
+    );
+
+    return reply.status(200).send(successEnvelope(shaped, req.requestId));
   });
 
   app.post<{

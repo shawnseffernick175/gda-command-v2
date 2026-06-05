@@ -61,9 +61,29 @@ export function useUpdateActionItem() {
       title?: string;
       due_date?: string;
       owner?: string;
+      assignee_id?: number | null;
     }) => apiPatch<ActionItem>(`/v3/action-items/${id}`, updates),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["action-items"] });
+      void qc.invalidateQueries({ queryKey: ["top-action-items"] });
     },
+  });
+}
+
+export function useTopActionItems(limit: number = 5) {
+  return useQuery({
+    queryKey: ["top-action-items", limit],
+    queryFn: () =>
+      apiGet<ActionItem[]>("/v3/action-items/top", { limit }),
+  });
+}
+
+export function useUsers() {
+  return useQuery({
+    queryKey: ["users"],
+    queryFn: () =>
+      apiGet<{ id: number; display_name: string; email: string }[]>(
+        "/v3/admin/users",
+      ),
   });
 }
