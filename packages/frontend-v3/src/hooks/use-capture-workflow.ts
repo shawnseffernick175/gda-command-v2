@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, getToken } from "@/lib/api";
 import type {
   CaptureColorStage,
   CaptureStageAnnotation,
@@ -101,9 +101,13 @@ export function useUploadRfp(captureId: string | number) {
       formData.append("rfp", file);
       const API_BASE =
         process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech";
+      const token = getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(`${API_BASE}/v3/captures/${captureId}/upload-rfp`, {
         method: "POST",
         body: formData,
+        headers,
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));

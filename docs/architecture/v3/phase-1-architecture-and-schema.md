@@ -339,6 +339,11 @@ CREATE TABLE captures (
                                   CHECK (compliance_status IN ('incomplete', 'partial', 'complete')),
   win_themes        TEXT[],                    -- key win themes for this pursuit
   ghost_team        JSONB,                     -- competitor "black hat" analysis
+  entry_point       TEXT          NOT NULL DEFAULT 'full_pipeline'
+                                  CHECK (entry_point IN ('full_pipeline', 'white_only')),
+  rfp_filename      TEXT,
+  rfp_text          TEXT,
+  rfp_uploaded_at   TIMESTAMPTZ,
   source_id         BIGINT        NOT NULL REFERENCES sources(id),
   created_by        BIGINT        REFERENCES users(id),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),

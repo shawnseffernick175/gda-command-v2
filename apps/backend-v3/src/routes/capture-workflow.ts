@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import multipart from '@fastify/multipart';
 import mammoth from 'mammoth';
-import OpenAI from 'openai';
+import { callOpenAIChat } from '../lib/providers/openai.js';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
@@ -19,12 +19,6 @@ const STAGE_LABELS: Record<WorkflowStage, string> = {
 
 function isValidWorkflowStage(s: string): s is WorkflowStage {
   return (STAGES as readonly string[]).includes(s);
-}
-
-function getOpenAIClient(): OpenAI {
-  const apiKey = process.env['OPENAI_API_KEY'];
-  if (!apiKey) throw Object.assign(new Error('OPENAI_API_KEY not configured'), { statusCode: 500 });
-  return new OpenAI({ apiKey });
 }
 
 function buildStageAnalysisPrompt(
@@ -261,14 +255,13 @@ export async function captureWorkflowRoutes(app: FastifyInstance): Promise<void>
           const capture = (await pool.query<CaptureMinimal>('SELECT id, rfp_text, entry_point, pipeline_item_id, rfp_filename, rfp_uploaded_at FROM captures WHERE id = $1', [id])).rows[0];
           const ctx = await getCaptureContext(id);
           const prompt = buildStageAnalysisPrompt(stage, capture?.rfp_text ?? null, ctx.title, ctx.agency, ctx.value);
-          const openai = getOpenAIClient();
-          const completion = await openai.chat.completions.create({
+          const chatResult = await callOpenAIChat({
             model: 'gpt-4o-mini',
             messages: [{ role: 'user', content: prompt }],
             response_format: { type: 'json_object' },
             temperature: 0.3,
           });
-          const analysisText = completion.choices[0]?.message?.content ?? '{}';
+          const analysisText = chatResult.text;
           const analysis = JSON.parse(analysisText);
 
           await pool.query(
@@ -305,15 +298,14 @@ export async function captureWorkflowRoutes(app: FastifyInstance): Promise<void>
     const ctx = await getCaptureContext(id);
     const prompt = buildStageAnalysisPrompt(stage, capture.rfp_text, ctx.title, ctx.agency, ctx.value);
 
-    const openai = getOpenAIClient();
-    const completion = await openai.chat.completions.create({
+    const chatResult = await callOpenAIChat({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0.3,
     });
 
-    const analysisText = completion.choices[0]?.message?.content ?? '{}';
+    const analysisText = chatResult.text;
     const analysis = JSON.parse(analysisText);
 
     await pool.query(

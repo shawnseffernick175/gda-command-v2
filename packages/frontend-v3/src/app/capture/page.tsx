@@ -9,7 +9,6 @@ import { usePipeline } from "@/hooks/use-pipeline";
 import {
   useCaptureStages,
   useUpdateStage,
-  useRunStageAnalysis,
   useAddAnnotation,
   useDeleteAnnotation,
   useTakeSnapshot,
@@ -101,7 +100,7 @@ function CaptureList() {
       </div>
       <p className="text-sm text-muted-foreground">
         Pursuits in Capture (Pursue stage and beyond). pwin set here via Shipley
-        drivers — pursuit without a capture plan shows &ldquo;—&rdquo; and is
+        drivers — pursuit without a capture plan shows {"\u201C"}—{"\u201D"} and is
         unforecastable.
       </p>
 
@@ -542,7 +541,7 @@ function ColorTeamWorkflow({ captureId }: { captureId: string }) {
 
         {/* Active Stage Panel */}
         {currentStageData && (
-          <StagePanel captureId={captureId} stageData={currentStageData} />
+          <StagePanel key={currentStageData.stage} captureId={captureId} stageData={currentStageData} />
         )}
       </CardContent>
     </Card>
@@ -558,7 +557,6 @@ function StagePanel({
 }) {
   const stage = stageData.stage;
   const updateStage = useUpdateStage(captureId);
-  const runAnalysis = useRunStageAnalysis(captureId);
   const addAnnotation = useAddAnnotation(captureId);
   const deleteAnnotation = useDeleteAnnotation(captureId);
   const takeSnapshot = useTakeSnapshot(captureId);
@@ -702,17 +700,7 @@ function StagePanel({
           {stageData.ai_analysis ? (
             <StageAnalysisDisplay analysis={stageData.ai_analysis} />
           ) : (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground italic">No analysis yet.</p>
-              <button
-                type="button"
-                onClick={() => runAnalysis.mutate(stage)}
-                disabled={runAnalysis.isPending}
-                className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-xs text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50"
-              >
-                {runAnalysis.isPending ? "Analyzing..." : "Run Analysis"}
-              </button>
-            </div>
+            <p className="text-xs text-muted-foreground italic">Analysis will run automatically when this stage is activated.</p>
           )}
           {stageData.ai_ran_at && (
             <p className="text-[11px] text-muted-foreground">
