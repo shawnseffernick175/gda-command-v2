@@ -19,6 +19,8 @@ import { pool } from '../lib/db.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { analysisCacheHits, analysisTimeoutCount } from '../lib/metrics.js';
+import { logger } from '../lib/logger.js';
+import { runDoctrineCheck } from '../services/doctrine/index.js';
 import {
   listOpportunities,
   getOpportunityById,
@@ -495,6 +497,12 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       }
 
       analysisCacheHits.inc();
+
+      // Fire-and-forget doctrine scoring after analysis
+      runDoctrineCheck('opportunity', String(opportunityId), {}).catch((err) => {
+        logger.warn({ err, opportunityId }, 'Background doctrine check failed (non-critical)');
+      });
+
       // Re-read the unified detail so pwin/doctrine reflect the fresh analysis.
       // The first getUnifiedOpportunityDetail above populated the merge cache
       // (60s TTL), so we must invalidate it before re-reading or we'd return
@@ -569,6 +577,12 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
     if (fresh) {
       analysisCacheHits.inc();
+
+      // Fire-and-forget doctrine scoring after analysis
+      runDoctrineCheck('opportunity', id, {}).catch((err) => {
+        logger.warn({ err, opportunityId: id }, 'Background doctrine check failed (non-critical)');
+      });
+
       const detail = await rowToDetail(fresh);
       return reply.status(200).send(successEnvelope(detail, req.requestId));
     }
