@@ -13,6 +13,7 @@ import { pool } from '../lib/db.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js';
 import { logger } from '../lib/logger.js';
 import { createActionItem, toApiShape } from '../services/action-items/index.js';
+import { mapAgencyToDepartment } from '../lib/departmentMap.js';
 
 interface EmailWebhookPayload {
   from: string;
@@ -49,13 +50,15 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
         const samNoticeId = body.sam_notice_id as string | undefined;
         let oppId: string;
 
+        const department = mapAgencyToDepartment(body.agency as string | null | undefined);
+
         if (samNoticeId) {
           const upsertRes = await pool.query<{ id: string }>(
             `INSERT INTO opportunities (
               title, agency, sub_agency, solicitation_number, sam_notice_id,
               naics, psc, set_aside, description, response_due_at, posted_at,
-              value_min, value_max, data_source, source_id, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'sam_gov', $14, 'discovery')
+              value_min, value_max, data_source, source_id, status, department
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'sam_gov', $14, 'discovery', $15)
             ON CONFLICT (sam_notice_id)
             DO UPDATE SET
               title = EXCLUDED.title,
@@ -71,6 +74,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
               value_min = COALESCE(EXCLUDED.value_min, opportunities.value_min),
               value_max = COALESCE(EXCLUDED.value_max, opportunities.value_max),
               source_id = EXCLUDED.source_id,
+              department = EXCLUDED.department,
               updated_at = NOW()
             RETURNING id`,
             [
@@ -88,6 +92,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
               body.value_min ?? null,
               body.value_max ?? null,
               sourceId,
+              department,
             ],
           );
           oppId = String(upsertRes.rows[0]!.id);
@@ -96,8 +101,8 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
             `INSERT INTO opportunities (
               title, agency, sub_agency, solicitation_number,
               naics, psc, set_aside, description, response_due_at, posted_at,
-              value_min, value_max, data_source, source_id, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'sam_gov', $13, 'discovery')
+              value_min, value_max, data_source, source_id, status, department
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'sam_gov', $13, 'discovery', $14)
             RETURNING id`,
             [
               body.title,
@@ -113,6 +118,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
               body.value_min ?? null,
               body.value_max ?? null,
               sourceId,
+              department,
             ],
           );
           oppId = String(insertRes.rows[0]!.id);

@@ -4,6 +4,7 @@ export interface OpportunityRow {
   id: string;
   title: string;
   agency: string | null;
+  department: string | null;
   sub_agency: string | null;
   solicitation_number: string | null;
   sam_notice_id: string | null;
@@ -85,6 +86,7 @@ export interface OpportunitySummary {
   title_sources: SourceRef[];
   agency: string | null;
   agency_sources: SourceRef[];
+  department: string | null;
   naics: string | null;
   naics_sources: SourceRef[];
   set_aside: string | null;
@@ -156,6 +158,7 @@ export interface ListFilters {
   q?: string;
   status?: string;
   agency?: string;
+  department?: string;
   naics?: string;
   grade?: string;
   due_before?: string;

@@ -521,6 +521,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       q: query.q,
       status: query.status,
       agency: query.agency,
+      department: query.department,
       naics: query.naics,
       grade: query.grade,
       due_before: query.due_before,

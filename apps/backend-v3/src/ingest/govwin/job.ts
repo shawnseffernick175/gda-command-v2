@@ -15,6 +15,7 @@
 import { pool } from '../../lib/db.js';
 import type { PoolClient } from 'pg';
 import { logger } from '../../lib/logger.js';
+import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import {
   discoverRecentOpportunitiesApi,
   logQuotaStatus,
@@ -131,15 +132,17 @@ async function upsertOpportunity(
 
     const samNoticeId = `govwin-${opp.govwinId}`;
 
+    const department = mapAgencyToDepartment(opp.agency);
+
     const { rows: upsertRows } = await client.query(
       `INSERT INTO opportunities (
          title, agency, sub_agency, solicitation_number,
          sam_notice_id, status, value_min, value_max, naics,
          set_aside, response_due_at, posted_at,
          description, data_source, tags, source_id,
-         incumbent, incumbent_confidence, incumbent_source
+         incumbent, incumbent_confidence, incumbent_source, department
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        ON CONFLICT (sam_notice_id) DO UPDATE SET
          title               = EXCLUDED.title,
          agency              = EXCLUDED.agency,
@@ -157,6 +160,7 @@ async function upsertOpportunity(
          incumbent           = COALESCE(EXCLUDED.incumbent, opportunities.incumbent),
          incumbent_confidence = CASE WHEN EXCLUDED.incumbent IS NOT NULL THEN 'high' ELSE opportunities.incumbent_confidence END,
          incumbent_source    = CASE WHEN EXCLUDED.incumbent IS NOT NULL THEN 'govwin' ELSE opportunities.incumbent_source END,
+         department          = EXCLUDED.department,
          updated_at          = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
@@ -179,6 +183,7 @@ async function upsertOpportunity(
         opp.incumbent,
         opp.incumbent ? 'high' : null,
         opp.incumbent ? 'govwin' : null,
+        department,
       ],
     );
 

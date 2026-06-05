@@ -17,6 +17,7 @@ export interface OpportunitySummary {
   internal_id: string;
   title: string;
   agency: string | null;
+  department: string | null;
   naics: string | null;
   status: string | null;
   stage?: string | null;
@@ -66,6 +67,7 @@ export interface OpportunityDetail extends OpportunitySummary {
   response_deadline: string | null;
   posted_at: string | null;
   source: string | null;
+  office?: string | null;
   doctrine_badge?: DoctrineBadge | null;
   analysis?: AnalysisBlock | null;
   llm_analysis?: LlmAnalysis | null;

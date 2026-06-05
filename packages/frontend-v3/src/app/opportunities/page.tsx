@@ -99,6 +99,7 @@ function OpportunityList() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const [dueSoonFilter, setDueSoonFilter] = useState(false);
   const [dueBefore, setDueBefore] = useState<string | undefined>(undefined);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,6 +108,7 @@ function OpportunityList() {
   const { data, isLoading, error, refetch } = useOpportunitiesPaged({
     q: debouncedQ || undefined,
     grade: gradeFilter || undefined,
+    department: departmentFilter || undefined,
     due_before: dueBefore,
     limit: 100,
     page: currentPage,
@@ -151,6 +153,22 @@ function OpportunityList() {
     [setPage],
   );
 
+  const handleDepartmentChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setDepartmentFilter(e.target.value);
+      setPage(1);
+    },
+    [setPage],
+  );
+
+  const handleDepartmentClick = useCallback(
+    (dept: string) => {
+      setDepartmentFilter(dept);
+      setPage(1);
+    },
+    [setPage],
+  );
+
   const handleDueSoonChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const checked = e.target.checked;
@@ -170,6 +188,7 @@ function OpportunityList() {
     setQ("");
     setDebouncedQ("");
     setGradeFilter("");
+    setDepartmentFilter("");
     setDueSoonFilter(false);
     setDueBefore(undefined);
     setPage(1);
@@ -212,7 +231,28 @@ function OpportunityList() {
           />
           Due in 14 days
         </label>
-        {(debouncedQ || gradeFilter || dueSoonFilter) && (
+        <select
+          value={departmentFilter}
+          onChange={handleDepartmentChange}
+          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+        >
+          <option value="">All Departments</option>
+          <option value="Department of Defense">Department of Defense</option>
+          <option value="Department of Homeland Security">Department of Homeland Security</option>
+          <option value="Department of Veterans Affairs">Department of Veterans Affairs</option>
+          <option value="Department of Health and Human Services">Department of Health and Human Services</option>
+          <option value="Department of Energy">Department of Energy</option>
+          <option value="Department of Justice">Department of Justice</option>
+          <option value="Department of State">Department of State</option>
+          <option value="Department of Treasury">Department of Treasury</option>
+          <option value="Department of Transportation">Department of Transportation</option>
+          <option value="Department of Commerce">Department of Commerce</option>
+          <option value="Department of Labor">Department of Labor</option>
+          <option value="Department of Education">Department of Education</option>
+          <option value="Department of Agriculture">Department of Agriculture</option>
+          <option value="Independent Agency">Independent Agency</option>
+        </select>
+        {(debouncedQ || gradeFilter || departmentFilter || dueSoonFilter) && (
           <button
             type="button"
             onClick={handleClearFilters}
@@ -258,7 +298,7 @@ function OpportunityList() {
             <thead>
               <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                 <th className="px-3 py-2 text-left font-medium">Title</th>
-                <th className="px-3 py-2 text-left font-medium">Agency</th>
+                <th className="px-3 py-2 text-left font-medium">Department</th>
                 <th className="px-3 py-2 text-left font-medium">Value</th>
                 <th className="px-3 py-2 text-left font-medium">Grade/Band</th>
                 <th className="px-3 py-2 text-left text-[11px] font-medium">Doctrine</th>
@@ -291,7 +331,17 @@ function OpportunityList() {
                       </div>
                     </td>
                     <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[120px]">
-                      {opp.agency ?? "—"}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDepartmentClick(opp.department ?? "Independent Agency");
+                        }}
+                        className="hover:text-gda-green transition-colors text-left"
+                        title={`Filter by ${opp.department ?? "Independent Agency"}`}
+                      >
+                        {opp.department ?? "Independent Agency"}
+                      </button>
                     </td>
                     <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
                       {formatMoney(opp.value)}
@@ -424,8 +474,8 @@ function OpportunityDetail({ id }: { id: string }) {
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <StageDropdown value={opp.stage ?? "Interest"} />
           <BandBadge band={band} />
-          {opp.agency && (
-            <Badge variant="outline" className="text-xs">{opp.agency}</Badge>
+          {opp.department && (
+            <Badge variant="outline" className="text-xs">{opp.department}</Badge>
           )}
           {opp.naics && (
             <Badge variant="outline" className="text-xs">NAICS {opp.naics}</Badge>
@@ -453,6 +503,25 @@ function OpportunityDetail({ id }: { id: string }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
+              {/* Department > Agency hierarchy breadcrumb */}
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="text-muted-foreground">Department:</span>{" "}
+                <span className="text-foreground font-medium">
+                  {opp.department ?? "Independent Agency"}
+                </span>
+                {opp.agency && (
+                  <>
+                    <span className="text-muted-foreground mx-1">&gt;</span>
+                    <span className="text-foreground">{opp.agency}</span>
+                  </>
+                )}
+                {opp.office && (
+                  <>
+                    <span className="text-muted-foreground mx-1">&gt;</span>
+                    <span className="text-foreground">{opp.office}</span>
+                  </>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-muted-foreground">Value:</span>{" "}
