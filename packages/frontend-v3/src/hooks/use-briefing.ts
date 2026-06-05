@@ -19,6 +19,7 @@ export function useGenerateBriefing() {
     mutationFn: () => apiPost<DailyBriefing>("/v3/briefing/generate"),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["briefing", "today"] });
+      void qc.invalidateQueries({ queryKey: ["launchpad", "signals"] });
     },
   });
 }
