@@ -60,7 +60,7 @@ export function TrendChart() {
       label: "Orders",
       values: items.map((i) => i.orders),
       max: maxOrders,
-      color: "#22d3ee",
+      color: "#22d3ee", // allowed-hex — SVG stroke, no CSS token equivalent
       textClass: "text-gda-cyan",
       format: formatMoney,
     },
@@ -68,7 +68,7 @@ export function TrendChart() {
       label: "Sales",
       values: items.map((i) => i.sales),
       max: maxSales,
-      color: "#4ade80",
+      color: "#4ade80", // allowed-hex — SVG stroke, no CSS token equivalent
       textClass: "text-gda-green",
       format: formatMoney,
     },
@@ -76,7 +76,7 @@ export function TrendChart() {
       label: "EBIT",
       values: items.map((i) => i.ebit),
       max: maxEbit,
-      color: "#f59e0b",
+      color: "#f59e0b", // allowed-hex — SVG stroke, no CSS token equivalent
       textClass: "text-amber-400",
       format: formatMoney,
     },
