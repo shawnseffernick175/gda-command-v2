@@ -44,7 +44,7 @@ const EMPTY_FORM = {
   category: "operational" as string,
   likelihood: 3,
   impact: 3,
-  status: "open" as string,
+  status: "open" as "open" | "mitigated" | "accepted" | "closed",
   owner: "",
   mitigation: "",
 };
@@ -200,7 +200,7 @@ export default function RisksPage() {
               <label className="block text-[11px] text-muted-foreground mb-1">Status</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "open" | "mitigated" | "accepted" | "closed" }))}
                 className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
               >
                 {STATUSES.map((s) => (
@@ -391,7 +391,7 @@ export default function RisksPage() {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
-              Numbers = risk count per cell. Hover for titles. Red ≥ 15 · Amber ≥ 8 · Green < 8.
+              Numbers = risk count per cell. Hover for titles. Red ≥ 15 · Amber ≥ 8 · Green {'<'} 8.
             </p>
           </div>
         </div>
@@ -425,7 +425,7 @@ export default function RisksPage() {
             ) : items.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-3 py-8 text-center text-xs text-muted-foreground">
-                  No risks logged yet — click "+ Add Risk" to create one
+                  No risks logged yet — click {'"+"'} Add Risk to create one
                 </td>
               </tr>
             ) : (
