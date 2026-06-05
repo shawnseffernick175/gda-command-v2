@@ -205,6 +205,45 @@ export interface CaptureDetail {
   compliance_pct?: number | null;
   next_milestone?: string | null;
   capture_plan?: Record<string, unknown> | null;
+  entry_point?: "full_pipeline" | "white_only";
+  rfp_filename?: string | null;
+  rfp_uploaded_at?: string | null;
+}
+
+/* ── Capture Color Team Workflow ──────────────────────────────── */
+
+export interface StageAnalysis {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  action_items: string[];
+  gate_recommendation: "go" | "no_go" | "conditional";
+  gate_rationale: string;
+  model_used: string;
+}
+
+export interface CaptureStageAnnotation {
+  id: number;
+  stage_id: number;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+export interface CaptureColorStage {
+  id: number;
+  capture_id: number;
+  stage: "blue" | "pink" | "red" | "green" | "white";
+  status: "pending" | "in_progress" | "complete" | "skipped";
+  reviewer: string | null;
+  gate_decision: "go" | "no_go" | "conditional" | null;
+  gate_note: string | null;
+  ai_analysis: StageAnalysis | null;
+  ai_ran_at: string | null;
+  version_snapshot: Record<string, unknown> | null;
+  snapshot_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /* ── Awards ───────────────────────────────────────────────────── */

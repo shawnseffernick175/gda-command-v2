@@ -1,11 +1,20 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCapture } from "@/hooks/use-captures";
 import { usePipeline } from "@/hooks/use-pipeline";
+import {
+  useCaptureStages,
+  useUpdateStage,
+  useRunStageAnalysis,
+  useAddAnnotation,
+  useDeleteAnnotation,
+  useTakeSnapshot,
+  useUploadRfp,
+} from "@/hooks/use-capture-workflow";
 import { apiPost } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +25,35 @@ import { SourceChip } from "@/components/shared/source-chip";
 import { PendingState } from "@/components/shared/pending-state";
 import { AskAiPanel } from "@/components/shared/ask-ai-panel";
 import { formatMoney } from "@/lib/format-money";
+import type {
+  CaptureColorStage,
+  CaptureStageAnnotation,
+  StageAnalysis,
+} from "@/lib/types";
+
+const WORKFLOW_STAGES = ["blue", "pink", "red", "green", "white"] as const;
+type WorkflowStage = (typeof WORKFLOW_STAGES)[number];
+
+const STAGE_LABELS: Record<WorkflowStage, string> = {
+  blue: "Blue",
+  pink: "Pink",
+  red: "Red",
+  green: "Green",
+  white: "White",
+};
+
+const STAGE_FULL_LABELS: Record<WorkflowStage, string> = {
+  blue: "Draft Strategy",
+  pink: "Initial Review",
+  red: "Mid-Term Review",
+  green: "Final Review",
+  white: "Compliance & Submit Gate",
+};
+
+function nextStage(current: WorkflowStage): WorkflowStage | null {
+  const idx = WORKFLOW_STAGES.indexOf(current);
+  return idx < WORKFLOW_STAGES.length - 1 ? WORKFLOW_STAGES[idx + 1] : null;
+}
 
 export default function CapturePage() {
   return (
@@ -35,15 +73,35 @@ function CaptureContent() {
 
 function CaptureList() {
   const { data: pipeline, isLoading } = usePipeline({ stage: "Pursue" });
+  const [showModal, setShowModal] = useState(false);
+  const [modalEntryPoint, setModalEntryPoint] = useState<"full_pipeline" | "white_only">("full_pipeline");
 
   return (
     <div className="space-y-6">
-      <h1 className="font-mono text-lg font-bold text-foreground">
-        Capture
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-mono text-lg font-bold text-foreground">
+          Capture
+        </h1>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setModalEntryPoint("full_pipeline"); setShowModal(true); }}
+            className="rounded border border-gda-green/30 bg-gda-green/10 px-3 py-1.5 text-xs font-medium text-gda-green hover:bg-gda-green/20"
+          >
+            Start Full Capture
+          </button>
+          <button
+            type="button"
+            onClick={() => { setModalEntryPoint("white_only"); setShowModal(true); }}
+            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs font-medium text-foreground hover:bg-gda-panel/80"
+          >
+            White Review Only
+          </button>
+        </div>
+      </div>
       <p className="text-sm text-muted-foreground">
         Pursuits in Capture (Pursue stage and beyond). pwin set here via Shipley
-        drivers — pursuit without a capture plan shows “—” and is
+        drivers — pursuit without a capture plan shows &ldquo;—&rdquo; and is
         unforecastable.
       </p>
 
@@ -108,6 +166,94 @@ function CaptureList() {
           reason="No pursuits are currently in capture stage. Move an opportunity to Pursue stage to begin capture."
         />
       )}
+
+      {showModal && (
+        <CreateCaptureModal
+          entryPoint={modalEntryPoint}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreateCaptureModal({
+  entryPoint,
+  onClose,
+}: {
+  entryPoint: "full_pipeline" | "white_only";
+  onClose: () => void;
+}) {
+  const { data: pipeline } = usePipeline({ stage: "Pursue" });
+  const [selectedOpp, setSelectedOpp] = useState("");
+  const qc = useQueryClient();
+
+  const create = useMutation({
+    mutationFn: (oppId: string) =>
+      apiPost<{ id: number }>(`/v3/captures/${oppId}/generate-plan`, { entry_point: entryPoint }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["pipeline"] });
+      onClose();
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-md rounded-lg border border-border bg-gda-bg-base p-6 shadow-xl">
+        <h2 className="font-mono text-sm font-bold text-foreground">
+          {entryPoint === "full_pipeline" ? "Start Full Capture" : "White Review Only"}
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {entryPoint === "full_pipeline"
+            ? "Blue → Pink → Red → Green → White pipeline"
+            : "Standalone White (compliance/submit) review"}
+        </p>
+
+        <div className="mt-4 space-y-3">
+          <label className="block text-xs text-muted-foreground">
+            Select Opportunity
+          </label>
+          <select
+            value={selectedOpp}
+            onChange={(e) => setSelectedOpp(e.target.value)}
+            className="w-full rounded border border-border bg-gda-panel px-3 py-2 text-xs text-foreground"
+          >
+            <option value="">— Select —</option>
+            {pipeline?.items?.map((item) => (
+              <option key={item.internal_id} value={item.internal_id}>
+                {item.title}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-2 pt-2">
+            <Badge variant="outline" className="text-xs">
+              {entryPoint === "full_pipeline" ? "Full Pipeline" : "White Only"}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!selectedOpp || create.isPending}
+            onClick={() => selectedOpp && create.mutate(selectedOpp)}
+            className="rounded bg-gda-green/10 border border-gda-green/30 px-3 py-1.5 text-xs text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+          >
+            {create.isPending ? "Creating..." : "Create Capture"}
+          </button>
+        </div>
+        {create.isError && (
+          <p className="mt-2 text-xs text-gda-red">{(create.error as Error).message}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -157,13 +303,15 @@ function CaptureDetail({ oppId }: { oppId: string }) {
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <StageDropdown value={capture.stage} />
-          {capture.color_review_status && (
+          {capture.entry_point && (
             <Badge variant="outline" className="text-xs">
-              {capture.color_review_status} Review
+              {capture.entry_point === "full_pipeline" ? "Full Pipeline" : "White Only"}
             </Badge>
           )}
         </div>
       </div>
+
+      <RfpUploadSection captureId={oppId} rfpFilename={capture.rfp_filename} rfpUploadedAt={capture.rfp_uploaded_at} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="border-border bg-gda-panel">
@@ -252,46 +400,422 @@ function CaptureDetail({ oppId }: { oppId: string }) {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="border-border bg-gda-panel col-span-2">
-          <CardHeader>
-            <CardTitle className="font-mono text-sm text-muted-foreground">
-              Color Reviews (Shipley)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              {["Pink", "Red", "Gold", "White"].map((color) => {
-                const active =
-                  capture.color_review_status?.toLowerCase() ===
-                  color.toLowerCase();
-                return (
-                  <div
-                    key={color}
-                    className={`flex-1 rounded border p-3 text-center text-xs ${
-                      active
-                        ? "border-gda-green bg-gda-green/10 text-gda-green"
-                        : "border-border bg-gda-bg-base text-muted-foreground"
-                    }`}
-                  >
-                    <p className="font-medium">{color}</p>
-                    <p className="mt-1">
-                      {active ? "Current" : "—"}
-                    </p>
-                    <SourceChip
-                      label={active ? "active" : "pending"}
-                      kind={active ? "real" : "pending"}
-                      className="mt-1"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
+      <ColorTeamWorkflow captureId={oppId} />
+
       <AskAiPanel objectType="capture" objectId={oppId} />
+    </div>
+  );
+}
+
+function RfpUploadSection({
+  captureId,
+  rfpFilename,
+  rfpUploadedAt,
+}: {
+  captureId: string;
+  rfpFilename?: string | null;
+  rfpUploadedAt?: string | null;
+}) {
+  const upload = useUploadRfp(captureId);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) upload.mutate(file);
+    },
+    [upload],
+  );
+
+  if (rfpFilename) {
+    return (
+      <Card className="border-border bg-gda-panel">
+        <CardContent className="flex items-center justify-between py-3">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-foreground">{rfpFilename}</span>
+            {rfpUploadedAt && (
+              <span className="text-xs text-muted-foreground">
+                uploaded {new Date(rfpUploadedAt).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="text-xs text-gda-green hover:underline"
+          >
+            Replace
+          </button>
+          <input ref={fileRef} type="file" accept=".pdf,.docx" className="hidden" onChange={handleFile} />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-border border-dashed bg-gda-bg-base">
+      <CardContent className="flex flex-col items-center justify-center py-6">
+        <p className="text-xs text-muted-foreground">Upload RFP (PDF or DOCX)</p>
+        <label className="mt-2 cursor-pointer rounded border border-gda-green/30 bg-gda-green/10 px-4 py-2 text-xs text-gda-green hover:bg-gda-green/20">
+          Choose File
+          <input type="file" accept=".pdf,.docx" className="hidden" onChange={handleFile} />
+        </label>
+        {upload.isPending && <p className="mt-2 text-xs text-muted-foreground">Uploading...</p>}
+        {upload.isError && <p className="mt-2 text-xs text-gda-red">{(upload.error as Error).message}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ColorTeamWorkflow({ captureId }: { captureId: string }) {
+  const { data, isLoading } = useCaptureStages(captureId);
+  const [activeStage, setActiveStage] = useState<WorkflowStage>("blue");
+
+  const stages = data?.stages ?? [];
+
+  // Auto-select the first in_progress stage
+  const inProgressStage = stages.find((s) => s.status === "in_progress");
+  const displayStage = inProgressStage ? (inProgressStage.stage as WorkflowStage) : activeStage;
+
+  if (isLoading) {
+    return <Skeleton className="h-48 bg-gda-panel" />;
+  }
+
+  if (stages.length === 0) {
+    return (
+      <Card className="border-border bg-gda-panel">
+        <CardContent className="py-4 text-center text-xs text-muted-foreground">
+          No workflow stages initialized yet.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const currentStageData = stages.find((s) => s.stage === (activeStage === displayStage ? activeStage : displayStage));
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-sm text-muted-foreground">
+          Color Team Workflow
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Stage Rail */}
+        <div className="flex gap-1">
+          {WORKFLOW_STAGES.map((stage) => {
+            const stageData = stages.find((s) => s.stage === stage);
+            const isActive = stage === activeStage;
+            const statusColor = stageData?.status === "complete"
+              ? "border-gda-green text-gda-green bg-gda-green/10"
+              : stageData?.status === "in_progress"
+              ? "border-gda-green text-gda-green bg-gda-green/5"
+              : stageData?.status === "skipped"
+              ? "border-border text-muted-foreground/50 bg-gda-bg-base line-through"
+              : "border-border text-muted-foreground bg-gda-bg-base";
+
+            return (
+              <button
+                key={stage}
+                type="button"
+                onClick={() => setActiveStage(stage)}
+                className={`flex-1 rounded border px-2 py-2 text-center transition-colors ${statusColor} ${
+                  isActive ? "ring-1 ring-gda-green" : ""
+                } hover:bg-gda-panel`}
+              >
+                <p className="font-mono text-xs font-medium">{STAGE_LABELS[stage]}</p>
+                <p className="mt-0.5 text-[11px]">
+                  {stageData?.status === "in_progress"
+                    ? "In Progress"
+                    : stageData?.status === "complete"
+                    ? "Complete"
+                    : stageData?.status === "skipped"
+                    ? "Skipped"
+                    : "Pending"}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active Stage Panel */}
+        {currentStageData && (
+          <StagePanel captureId={captureId} stageData={currentStageData} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StagePanel({
+  captureId,
+  stageData,
+}: {
+  captureId: string;
+  stageData: CaptureColorStage & { annotations: CaptureStageAnnotation[] };
+}) {
+  const stage = stageData.stage;
+  const updateStage = useUpdateStage(captureId);
+  const runAnalysis = useRunStageAnalysis(captureId);
+  const addAnnotation = useAddAnnotation(captureId);
+  const deleteAnnotation = useDeleteAnnotation(captureId);
+  const takeSnapshot = useTakeSnapshot(captureId);
+
+  const [reviewer, setReviewer] = useState(stageData.reviewer ?? "");
+  const [annotationText, setAnnotationText] = useState("");
+  const [gateNote, setGateNote] = useState(stageData.gate_note ?? "");
+
+  const next = nextStage(stage);
+
+  const handleAdvance = () => {
+    if (!next) return;
+    updateStage.mutate({ stage, status: "complete" });
+    updateStage.mutate({ stage: next, status: "in_progress" });
+  };
+
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {/* Left column (2/3) */}
+      <div className="md:col-span-2 space-y-4">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-muted-foreground">Stage:</span>
+          <span className="font-mono text-xs font-bold text-foreground">
+            {STAGE_FULL_LABELS[stage]}
+          </span>
+          <Badge variant="outline" className="text-[11px]">
+            {stageData.status}
+          </Badge>
+        </div>
+
+        {/* Reviewer */}
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Reviewer</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={reviewer}
+              onChange={(e) => setReviewer(e.target.value)}
+              placeholder="Name or email"
+              className="flex-1 rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground"
+            />
+            <button
+              type="button"
+              onClick={() => updateStage.mutate({ stage, reviewer })}
+              disabled={updateStage.isPending}
+              className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+
+        {/* Annotations */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Annotations</p>
+          {stageData.annotations.length > 0 ? (
+            <div className="space-y-1.5">
+              {stageData.annotations.map((ann) => (
+                <div
+                  key={ann.id}
+                  className="flex items-start justify-between rounded border border-border bg-gda-bg-base px-2 py-1.5"
+                >
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">{ann.author}</span>
+                    <p className="text-xs text-foreground whitespace-pre-wrap">{ann.body}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteAnnotation.mutate({ stage, annotationId: ann.id })}
+                    className="ml-2 text-[11px] text-gda-red hover:underline"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">No annotations yet.</p>
+          )}
+          <div className="flex gap-2">
+            <textarea
+              value={annotationText}
+              onChange={(e) => setAnnotationText(e.target.value)}
+              placeholder="Add annotation..."
+              className="flex-1 rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground resize-none"
+              rows={2}
+            />
+            <button
+              type="button"
+              disabled={!annotationText.trim() || addAnnotation.isPending}
+              onClick={() => {
+                addAnnotation.mutate({ stage, body: annotationText.trim() });
+                setAnnotationText("");
+              }}
+              className="self-end rounded border border-gda-green/30 bg-gda-green/10 px-2 py-1 text-xs text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
+        {/* Version Snapshot */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => takeSnapshot.mutate(stage)}
+            disabled={takeSnapshot.isPending}
+            className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {takeSnapshot.isPending ? "Saving..." : "Take Snapshot"}
+          </button>
+          {stageData.snapshot_at && (
+            <span className="text-[11px] text-muted-foreground">
+              Last snapshot: {new Date(stageData.snapshot_at).toLocaleString()}
+            </span>
+          )}
+        </div>
+
+        {/* Advance */}
+        {next && (
+          <button
+            type="button"
+            disabled={!stageData.gate_decision || updateStage.isPending}
+            onClick={handleAdvance}
+            className="rounded bg-gda-green/10 border border-gda-green/30 px-3 py-1.5 text-xs text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
+            title={!stageData.gate_decision ? "Set gate decision before advancing" : undefined}
+          >
+            Advance to {STAGE_LABELS[next]}
+          </button>
+        )}
+      </div>
+
+      {/* Right column (1/3) */}
+      <div className="space-y-4">
+        {/* AI Analysis */}
+        <div className="rounded border border-border bg-gda-bg-base p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs font-medium text-muted-foreground">AI Analysis</p>
+            <SourceChip label="AI Analysis" kind="heuristic" />
+          </div>
+          {stageData.ai_analysis ? (
+            <StageAnalysisDisplay analysis={stageData.ai_analysis} />
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground italic">No analysis yet.</p>
+              <button
+                type="button"
+                onClick={() => runAnalysis.mutate(stage)}
+                disabled={runAnalysis.isPending}
+                className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-2 py-1 text-xs text-gda-cyan hover:bg-gda-cyan/20 disabled:opacity-50"
+              >
+                {runAnalysis.isPending ? "Analyzing..." : "Run Analysis"}
+              </button>
+            </div>
+          )}
+          {stageData.ai_ran_at && (
+            <p className="text-[11px] text-muted-foreground">
+              Ran: {new Date(stageData.ai_ran_at).toLocaleString()}
+            </p>
+          )}
+        </div>
+
+        {/* Gate Decision */}
+        <div className="rounded border border-border bg-gda-bg-base p-3 space-y-2">
+          <p className="font-mono text-xs font-medium text-muted-foreground">Gate Decision</p>
+          <div className="flex gap-1">
+            {(["go", "no_go", "conditional"] as const).map((decision) => (
+              <button
+                key={decision}
+                type="button"
+                onClick={() => updateStage.mutate({ stage, gate_decision: decision })}
+                className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition-colors ${
+                  stageData.gate_decision === decision
+                    ? decision === "go"
+                      ? "bg-gda-green/20 text-gda-green border border-gda-green/40"
+                      : decision === "no_go"
+                      ? "bg-gda-red/20 text-gda-red border border-gda-red/40"
+                      : "bg-gda-amber/20 text-gda-amber border border-gda-amber/40"
+                    : "border border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {decision === "go" ? "Go" : decision === "no_go" ? "No-Go" : "Conditional"}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={gateNote}
+            onChange={(e) => setGateNote(e.target.value)}
+            onBlur={() => updateStage.mutate({ stage, gate_note: gateNote })}
+            placeholder="Gate note..."
+            className="w-full rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground resize-none"
+            rows={2}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StageAnalysisDisplay({ analysis }: { analysis: StageAnalysis }) {
+  return (
+    <div className="space-y-2 text-xs">
+      <p className="text-foreground">{analysis.summary}</p>
+
+      {analysis.strengths.length > 0 && (
+        <div>
+          <p className="font-medium text-gda-green">Strengths</p>
+          <ul className="mt-0.5 space-y-0.5 text-foreground">
+            {analysis.strengths.map((s, i) => (
+              <li key={i} className="pl-2 border-l border-gda-green/30">{s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {analysis.weaknesses.length > 0 && (
+        <div>
+          <p className="font-medium text-gda-red">Weaknesses</p>
+          <ul className="mt-0.5 space-y-0.5 text-foreground">
+            {analysis.weaknesses.map((w, i) => (
+              <li key={i} className="pl-2 border-l border-gda-red/30">{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {analysis.action_items.length > 0 && (
+        <div>
+          <p className="font-medium text-gda-cyan">Action Items</p>
+          <ul className="mt-0.5 space-y-0.5 text-foreground">
+            {analysis.action_items.map((a, i) => (
+              <li key={i} className="pl-2 border-l border-gda-cyan/30">{a}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1 border-t border-border">
+        <span className="text-muted-foreground">Gate:</span>
+        <Badge
+          variant="outline"
+          className={`text-[11px] ${
+            analysis.gate_recommendation === "go"
+              ? "border-gda-green/40 text-gda-green"
+              : analysis.gate_recommendation === "no_go"
+              ? "border-gda-red/40 text-gda-red"
+              : "border-gda-amber/40 text-gda-amber"
+          }`}
+        >
+          {analysis.gate_recommendation === "go"
+            ? "Go"
+            : analysis.gate_recommendation === "no_go"
+            ? "No-Go"
+            : "Conditional"}
+        </Badge>
+        <span className="text-muted-foreground">{analysis.gate_rationale}</span>
+      </div>
     </div>
   );
 }
