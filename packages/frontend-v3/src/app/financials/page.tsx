@@ -1,11 +1,12 @@
 "use client";
 
 import { useKpiHeader } from "@/hooks/use-kpi";
-import { Card, CardContent } from "@/components/ui/card";
 import { PendingState } from "@/components/shared/pending-state";
-import { SourceChip } from "@/components/shared/source-chip";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
+import { FinancialCard } from "@/components/financials/FinancialCard";
+import { ForecastChart } from "@/components/financials/ForecastChart";
+import { TrendChart } from "@/components/financials/TrendChart";
 
 export default function FinancialsPage() {
   const { data, isLoading } = useKpiHeader();
@@ -71,10 +72,7 @@ export default function FinancialsPage() {
         title="Pipeline Forecast vs Plan"
         defaultOpen={false}
       >
-        <PendingState
-          surface="Pipeline Forecast Chart"
-          reason="Activates when pipeline value data + financial plan are both available. Will show bar chart: actual vs plan by quarter."
-        />
+        <ForecastChart />
       </CollapseSection>
 
       <CollapseSection
@@ -82,49 +80,8 @@ export default function FinancialsPage() {
         title="Historical Trend"
         defaultOpen={false}
       >
-        <PendingState
-          surface="Historical Trend Chart"
-          reason="Activates with historical financial data. Will show line chart: monthly trend for all 5 KPIs."
-        />
+        <TrendChart />
       </CollapseSection>
     </div>
-  );
-}
-
-function FinancialCard({
-  label,
-  value,
-  plan,
-  delta,
-}: {
-  label: string;
-  value: string;
-  plan: string;
-  delta: number;
-}) {
-  return (
-    <Card className="border-border bg-gda-panel">
-      <CardContent className="py-4">
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className="mt-1 font-mono text-xl font-bold text-foreground tabular-nums">
-          {value}
-        </p>
-        <div className="mt-1 flex items-center gap-2 text-[11px]">
-          <span className="text-muted-foreground">Plan: {plan}</span>
-          <span
-            className={
-              delta >= 0 ? "text-gda-green-muted" : "text-gda-red"
-            }
-          >
-            {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}%
-          </span>
-        </div>
-        <SourceChip
-          label="Financial Bible"
-          kind="real"
-          className="mt-2"
-        />
-      </CardContent>
-    </Card>
   );
 }

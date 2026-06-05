@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRisks } from "@/hooks/use-risks";
+import { useRisks, useCreateRisk, useUpdateRisk, useDeleteRisk } from "@/hooks/use-risks";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { PendingState } from "@/components/shared/pending-state";
@@ -10,7 +10,6 @@ import type { Risk } from "@/lib/types";
 
 const CATEGORIES = ["operational", "technical", "financial", "schedule", "compliance", "personnel"] as const;
 const STATUSES = ["open", "mitigated", "accepted", "closed"] as const;
-const LIKELIHOODS = [1, 2, 3, 4, 5] as const;
 const IMPACTS = [1, 2, 3, 4, 5] as const;
 
 function riskScore(likelihood: number, impact: number): number {
@@ -45,7 +44,7 @@ const EMPTY_FORM = {
   category: "operational" as string,
   likelihood: 3,
   impact: 3,
-  status: "open" as string,
+  status: "open" as "open" | "mitigated" | "accepted" | "closed",
   owner: "",
   mitigation: "",
 };
@@ -58,10 +57,13 @@ export default function RisksPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const { data, isLoading, mutate } = useRisks({
+  const { data, isLoading } = useRisks({
     status: filterStatus || undefined,
     category: filterCategory || undefined,
   });
+  const createRisk = useCreateRisk();
+  const updateRisk = useUpdateRisk();
+  const deleteRisk = useDeleteRisk();
 
   const items: Risk[] = data?.items ?? [];
 
@@ -69,23 +71,19 @@ export default function RisksPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const url = editingId ? `/api/v3/risks/${editingId}` : "/api/v3/risks";
-      const method = editingId ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          likelihood: Number(form.likelihood),
-          impact: Number(form.impact),
-        }),
-      });
-      if (res.ok) {
-        setShowForm(false);
-        setEditingId(null);
-        setForm({ ...EMPTY_FORM });
-        mutate();
+      const payload = {
+        ...form,
+        likelihood: Number(form.likelihood),
+        impact: Number(form.impact),
+      };
+      if (editingId) {
+        await updateRisk.mutateAsync({ id: editingId, ...payload });
+      } else {
+        await createRisk.mutateAsync(payload);
       }
+      setShowForm(false);
+      setEditingId(null);
+      setForm({ ...EMPTY_FORM });
     } finally {
       setSaving(false);
     }
@@ -108,8 +106,7 @@ export default function RisksPage() {
 
   async function handleDelete(id: number) {
     if (!confirm("Delete this risk?")) return;
-    await fetch(`/api/v3/risks/${id}`, { method: "DELETE" });
-    mutate();
+    await deleteRisk.mutateAsync(id);
   }
 
   // Build 5x5 matrix — bucket items by (likelihood, impact)
@@ -203,7 +200,7 @@ export default function RisksPage() {
               <label className="block text-[11px] text-muted-foreground mb-1">Status</label>
               <select
                 value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as "open" | "mitigated" | "accepted" | "closed" }))}
                 className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
               >
                 {STATUSES.map((s) => (
@@ -384,7 +381,7 @@ export default function RisksPage() {
                               {cellItems.length}
                             </span>
                           ) : (
-                            <span className="text-muted-foreground/30 text-[10px]">{score}</span>
+                            <span className="text-muted-foreground/30 text-[11px]">{score}</span>
                           )}
                         </div>
                       );
@@ -394,7 +391,7 @@ export default function RisksPage() {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2">
-              Numbers = risk count per cell. Hover for titles. Red ≥ 15 · Amber ≥ 8 · Green &lt; 8.
+              Numbers = risk count per cell. Hover for titles. Red ≥ 15 · Amber ≥ 8 · Green {'<'} 8.
             </p>
           </div>
         </div>
@@ -428,7 +425,7 @@ export default function RisksPage() {
             ) : items.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-3 py-8 text-center text-xs text-muted-foreground">
-                  No risks logged yet — click &quot;+ Add Risk&quot; to create one
+                  No risks logged yet — click {'"+"'} Add Risk to create one
                 </td>
               </tr>
             ) : (

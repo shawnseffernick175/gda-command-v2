@@ -5,7 +5,6 @@ import { useCompetitors, useCompetitorsCount } from "@/hooks/use-competitors";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { PendingState } from "@/components/shared/pending-state";
-import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format-money";
 
 export default function CompetitorsPage() {
