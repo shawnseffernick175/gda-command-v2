@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput } from '../llm-router.types.js';
 
 let client: Anthropic | null = null;
 
@@ -44,6 +44,8 @@ const SYSTEM_PROMPTS: Partial<Record<Task, string>> = {
 All fields are required. urgency must be one of: immediate, today, this_week.`,
 
   sentinel_summary: `You are a system health analyst for GDA Command. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
+
+  black_hat_analysis: `You are a competitive intelligence analyst specializing in federal government contracting. Perform Black Hat analysis viewing competition from the competitor's perspective.`,
 };
 
 export interface AnthropicCallResult {
@@ -66,7 +68,9 @@ export async function callAnthropic(opts: {
   const anthropic = getClient();
   const systemPrompt = SYSTEM_PROMPTS[opts.task] ?? 'Return valid JSON matching the requested output schema.';
 
-  const userContent = JSON.stringify(opts.input);
+  const userContent = opts.task === 'black_hat_analysis'
+    ? buildBlackHatUserPrompt(opts.input as BlackHatAnalysisInput)
+    : JSON.stringify(opts.input);
 
   try {
     const response = await anthropic.messages.create(
@@ -96,6 +100,30 @@ export async function callAnthropic(opts: {
       code: status >= 500 ? 'PROVIDER_5XX' : undefined,
     });
   }
+}
+
+function buildBlackHatUserPrompt(input: BlackHatAnalysisInput): string {
+  return `Perform Black Hat Analysis for: ${input.competitor_name}
+
+USAspending.gov data:
+- Win count: ${input.competitor_wins}
+- Total obligated: $${input.competitor_total_obligated}
+- Agencies: ${input.competitor_agencies.join(', ')}
+- NAICS: ${input.competitor_naics.join(', ')}
+- Contract types: ${input.competitor_contract_types.join(', ')}
+
+Our context: ${input.envision_context}
+
+Respond ONLY with valid JSON:
+{
+  "competitor": "<name>",
+  "likely_approach": "<2-3 sentences on their positioning>",
+  "strengths": ["<3-5 specific strengths>"],
+  "weaknesses": ["<3-5 specific weaknesses>"],
+  "counter_strategy": "<2-3 sentences how Envision counters>",
+  "intel_summary": "<1-2 sentence summary>",
+  "generated_at": "<ISO 8601>"
+}`;
 }
 
 /** Reset client (for testing). */
