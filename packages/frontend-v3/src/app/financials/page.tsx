@@ -1,36 +1,12 @@
 "use client";
 
 import { useKpiHeader } from "@/hooks/use-kpi";
-import { useFinancialsForecast, useFinancialsTrend } from "@/hooks/use-financials";
-import { Card, CardContent } from "@/components/ui/card";
 import { PendingState } from "@/components/shared/pending-state";
-import { SourceChip } from "@/components/shared/source-chip";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-
-const COLOR_CYAN = "#22d3ee"; // allowed-hex
-const COLOR_GREEN = "#4ade80"; // allowed-hex
-const COLOR_AMBER = "#f59e0b"; // allowed-hex
-const COLOR_MUTED = "#334155"; // allowed-hex
-const TOOLTIP_BG = "#0a0f1a"; // allowed-hex
-const TOOLTIP_BORDER = "#1e293b"; // allowed-hex
-const TOOLTIP_LABEL = "#94a3b8"; // allowed-hex
-const TOOLTIP_ITEM = "#e2e8f0"; // allowed-hex
-
-const tooltipContentStyle = { backgroundColor: TOOLTIP_BG, border: `1px solid ${TOOLTIP_BORDER}` };
-const tooltipLabelStyle = { color: TOOLTIP_LABEL };
-const tooltipItemStyle = { color: TOOLTIP_ITEM };
+import { FinancialCard } from "@/components/financials/FinancialCard";
+import { ForecastChart } from "@/components/financials/ForecastChart";
+import { TrendChart } from "@/components/financials/TrendChart";
 
 export default function FinancialsPage() {
   const { data, isLoading } = useKpiHeader();
@@ -107,124 +83,5 @@ export default function FinancialsPage() {
         <TrendChart />
       </CollapseSection>
     </div>
-  );
-}
-
-function ForecastChart() {
-  const { data, isLoading } = useFinancialsForecast();
-
-  if (isLoading) {
-    return <div className="h-64 animate-pulse rounded bg-gda-panel" />;
-  }
-
-  if (!data?.items.length) {
-    return <p className="text-xs text-muted-foreground">No forecast data yet</p>;
-  }
-
-  return (
-    <div className="w-full h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data.items}>
-          <XAxis
-            dataKey="period"
-            tick={{ fontSize: 11 }}
-            className="text-muted-foreground"
-          />
-          <YAxis
-            tickFormatter={(v: number) => formatMoney(v)}
-            tick={{ fontSize: 11 }}
-            className="text-muted-foreground"
-          />
-          <Tooltip
-            formatter={(value) => formatMoney(Number(value))}
-            contentStyle={tooltipContentStyle}
-            labelStyle={tooltipLabelStyle}
-            itemStyle={tooltipItemStyle}
-          />
-          <Legend />
-          <Bar dataKey="actual_orders" name="Actual Orders" fill={COLOR_CYAN} />
-          <Bar dataKey="plan_orders" name="Plan Orders" fill={COLOR_MUTED} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function TrendChart() {
-  const { data, isLoading } = useFinancialsTrend();
-
-  if (isLoading) {
-    return <div className="h-64 animate-pulse rounded bg-gda-panel" />;
-  }
-
-  if (!data?.items.length) {
-    return <p className="text-xs text-muted-foreground">No trend data yet</p>;
-  }
-
-  return (
-    <div className="w-full h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data.items}>
-          <XAxis
-            dataKey="period"
-            tick={{ fontSize: 11 }}
-            className="text-muted-foreground"
-          />
-          <YAxis
-            tickFormatter={(v: number) => formatMoney(v)}
-            tick={{ fontSize: 11 }}
-            className="text-muted-foreground"
-          />
-          <Tooltip
-            formatter={(value) => formatMoney(Number(value))}
-            contentStyle={tooltipContentStyle}
-            labelStyle={tooltipLabelStyle}
-            itemStyle={tooltipItemStyle}
-          />
-          <Legend />
-          <Line type="monotone" dataKey="orders" name="Orders" stroke={COLOR_CYAN} dot={false} />
-          <Line type="monotone" dataKey="sales" name="Sales" stroke={COLOR_GREEN} dot={false} />
-          <Line type="monotone" dataKey="ebit" name="EBIT" stroke={COLOR_AMBER} dot={false} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function FinancialCard({
-  label,
-  value,
-  plan,
-  delta,
-}: {
-  label: string;
-  value: string;
-  plan: string;
-  delta: number;
-}) {
-  return (
-    <Card className="border-border bg-gda-panel">
-      <CardContent className="py-4">
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className="mt-1 font-mono text-xl font-bold text-foreground tabular-nums">
-          {value}
-        </p>
-        <div className="mt-1 flex items-center gap-2 text-[11px]">
-          <span className="text-muted-foreground">Plan: {plan}</span>
-          <span
-            className={
-              delta >= 0 ? "text-gda-green-muted" : "text-gda-red"
-            }
-          >
-            {delta >= 0 ? "▲" : "▼"}{Math.abs(delta).toFixed(1)}%
-          </span>
-        </div>
-        <SourceChip
-          label="Financial Bible"
-          kind="real"
-          className="mt-2"
-        />
-      </CardContent>
-    </Card>
   );
 }
