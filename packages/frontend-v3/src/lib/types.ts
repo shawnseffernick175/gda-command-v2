@@ -32,6 +32,7 @@ export interface OpportunitySummary {
   capture_pwin?: number | null;
   source?: string | null;
   days_in_stage?: number | null;
+  deadline_warning?: boolean;
 }
 
 export interface AnalysisTimeline {

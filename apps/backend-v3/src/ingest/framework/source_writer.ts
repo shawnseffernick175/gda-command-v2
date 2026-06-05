@@ -7,6 +7,28 @@
 
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
+import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../../lib/queue.js';
+
+function enqueueIngestAnalysis(oppId: string): void {
+  try {
+    const boss = requireBoss();
+    const jobData: AnalysisJobData = {
+      entityType: 'opportunity',
+      entityId: oppId,
+      priority: 'normal',
+      trigger: 'ingest',
+    };
+    void boss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, jobData, {
+      priority: 5,
+      retryLimit: 3,
+      retryDelay: 5,
+      retryBackoff: true,
+      singletonKey: `opp-${oppId}`,
+    });
+  } catch {
+    // pg-boss not initialized — swallow
+  }
+}
 
 export interface OpportunityRow {
   sam_notice_id: string;
@@ -164,6 +186,9 @@ export async function upsertOpportunityWithSources(
 
     await client.query('COMMIT');
 
+    // F-605: auto-enqueue analysis on ingest
+    enqueueIngestAnalysis(String(oppId));
+
     if (wasInserted) return 'inserted';
     return 'updated';
   } catch (err) {
@@ -278,6 +303,9 @@ export async function upsertExternalOpportunity(
     }
 
     await client.query('COMMIT');
+
+    // F-605: auto-enqueue analysis on ingest
+    enqueueIngestAnalysis(String(oppId));
 
     if (wasInserted) return 'inserted';
     return 'updated';
