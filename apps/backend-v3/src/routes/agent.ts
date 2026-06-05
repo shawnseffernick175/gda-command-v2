@@ -92,12 +92,17 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
 
   /**
    * Proxy POST /v3/agent/run → agent-v3 /agent/run (SSE passthrough)
+   *
+   * Includes one automatic retry (1 s delay) when the agent socket closes
+   * before response headers are sent.  Mid-stream failures end the
+   * response so the client never hangs.
    */
   app.post('/v3/agent/run', async (req, reply) => {
     const traceId = req.requestId;
     const user = (req as typeof req & { user?: { sub: string } }).user;
-    try {
-      const res = await undiciRequest(`${AGENT_BASE}/agent/run`, {
+
+    const doRequest = () =>
+      undiciRequest(`${AGENT_BASE}/agent/run`, {
         method: 'POST',
         headers: {
           ...agentHeaders(traceId),
@@ -109,22 +114,43 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         bodyTimeout: 0,
       });
 
-      void reply.raw.writeHead(res.statusCode, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'X-GDA-Trace-Id': traceId,
-      });
+    const MAX_ATTEMPTS = 2;
 
-      for await (const chunk of res.body) {
-        reply.raw.write(chunk);
-      }
-      reply.raw.end();
-    } catch (err) {
-      logger.error({ err }, 'agent-v3 /agent/run proxy failed');
-      if (!reply.raw.headersSent) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const res = await doRequest();
+
+        void reply.raw.writeHead(res.statusCode, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-GDA-Trace-Id': traceId,
+        });
+
+        for await (const chunk of res.body) {
+          reply.raw.write(chunk);
+        }
+        reply.raw.end();
+        return;
+      } catch (err) {
+        logger.error({ err, attempt }, 'agent-v3 /agent/run proxy failed');
+
+        if (reply.raw.headersSent) {
+          reply.raw.end();
+          return;
+        }
+
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 1_000));
+          continue;
+        }
+
         return reply.status(502).send(
-          errorEnvelope('INTERNAL_ERROR', 'Agent runtime unreachable', traceId),
+          errorEnvelope(
+            'AGENT_UNAVAILABLE',
+            'Analysis service temporarily unavailable. Please retry.',
+            traceId,
+          ),
         );
       }
     }

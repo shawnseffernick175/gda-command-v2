@@ -9,6 +9,7 @@ export type ErrorCode =
   | 'ANALYSIS_TIMEOUT'
   | 'DRAFT_NOT_READY'
   | 'INTERNAL_ERROR'
+  | 'AGENT_UNAVAILABLE'
   | 'WEBHOOK_AUTH_FAILED'
   | 'RATE_LIMITED';
 

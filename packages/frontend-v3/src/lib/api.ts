@@ -137,10 +137,12 @@ export async function apiGet<T>(
 export async function apiPost<T>(
   path: string,
   body?: unknown,
+  options?: { signal?: AbortSignal },
 ): Promise<T> {
   return apiFetch<T>(path, {
     method: "POST",
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: options?.signal,
   });
 }
 

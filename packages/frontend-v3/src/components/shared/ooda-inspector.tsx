@@ -50,11 +50,25 @@ export function OodaInspector({
     );
   }
 
-  /* Error state */
+  /* Error state — timeout or agent failure */
   if (ooda.error) {
+    const isTimeout = ooda.error.name === "AbortError";
     return (
-      <div className="rounded border border-gda-amber/30 bg-gda-amber/10 p-3 text-xs text-gda-amber italic">
-        OODA analysis failed — try again later.
+      <div className="rounded border border-gda-amber/30 bg-gda-amber/10 p-3 text-xs">
+        <p className="text-gda-amber italic mb-2">
+          {isTimeout
+            ? "Analysis timed out"
+            : "OODA analysis failed — try again later."}
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            ooda.mutate({ opportunity_id: opportunityId, stage, context })
+          }
+          className="rounded border border-gda-cyan/30 px-3 py-1.5 text-xs font-mono text-gda-cyan hover:bg-gda-cyan/10 transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
