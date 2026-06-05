@@ -1,21 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useKpiHeader } from "@/hooks/use-kpi";
 import { PendingState } from "@/components/shared/pending-state";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
 import { FinancialCard } from "@/components/financials/FinancialCard";
-
-const ForecastChart = dynamic(
-  () => import("@/components/financials/ForecastChart").then((m) => m.ForecastChart),
-  { loading: () => <div className="h-64 animate-pulse rounded bg-gda-panel" />, ssr: false },
-);
-
-const TrendChart = dynamic(
-  () => import("@/components/financials/TrendChart").then((m) => m.TrendChart),
-  { loading: () => <div className="h-64 animate-pulse rounded bg-gda-panel" />, ssr: false },
-);
+import { ForecastChart } from "@/components/financials/ForecastChart";
+import { TrendChart } from "@/components/financials/TrendChart";
 
 export default function FinancialsPage() {
   const { data, isLoading } = useKpiHeader();
