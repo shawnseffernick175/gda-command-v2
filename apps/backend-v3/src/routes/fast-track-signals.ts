@@ -99,10 +99,10 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
         tech,
         requirement,
         total: rows.length,
-      }));
+      }, req.requestId));
     } catch (err) {
       app.log.error(err, 'fast-track signals list failed');
-      return reply.status(500).send(errorEnvelope('Failed to fetch signals'));
+      return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to fetch signals', req.requestId));
     }
   });
 
@@ -137,10 +137,10 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
         LIMIT $1
       `, [limit]);
 
-      return reply.send(successEnvelope({ matches: rows, total: rows.length }));
+      return reply.send(successEnvelope({ matches: rows, total: rows.length }, req.requestId));
     } catch (err) {
       app.log.error(err, 'fast-track matches list failed');
-      return reply.status(500).send(errorEnvelope('Failed to fetch matches'));
+      return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to fetch matches', req.requestId));
     }
   });
 }
