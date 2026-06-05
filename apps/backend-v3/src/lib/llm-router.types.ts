@@ -302,7 +302,6 @@ export interface MatchAnalysisOutput {
   model_used: string;
 }
 
->>>>>>> d4fbaf1 (feat(fast-track): F-613 industry pipeline + match card drill-in + Envision broker analysis)
 export interface RiskGenerationInput {
   opportunity_id: string;
   opportunity_title: string;
