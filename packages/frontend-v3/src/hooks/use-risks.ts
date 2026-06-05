@@ -40,3 +40,19 @@ export function useDeleteRisk() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["risks"] }),
   });
 }
+
+export function useGenerateRisks(opportunityId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!opportunityId) throw new Error("No opportunity selected");
+      return apiPost<{ risks_created: number; generation_summary: string; generated_at: string }>(
+        `/v3/risks/generate/${opportunityId}`,
+        {},
+      );
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["risks"] });
+    },
+  });
+}

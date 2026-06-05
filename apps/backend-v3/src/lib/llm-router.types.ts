@@ -28,7 +28,8 @@ export type Task =
   | 'doctrine_score'
   | 'semantic_embed'
   | 'source_research'
-  | 'black_hat_analysis';
+  | 'black_hat_analysis'
+  | 'risk_generation';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -191,6 +192,18 @@ export interface BlackHatAnalysisOutput {
   counter_strategy: string;
   intel_summary: string;
   generated_at: string;
+}
+
+export interface RiskGenerationInput {
+  opportunity_id: string;
+  opportunity_title: string;
+  opportunity_description: string;
+  naics_codes: string[];
+  set_aside: string | null;
+  place_of_performance: string | null;
+  response_deadline: string | null;
+  agency: string | null;
+  existing_risks: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -427,6 +440,22 @@ export interface SourceResearchOutput {
   sources_consulted: number;
 }
 
+export interface GeneratedRisk {
+  title: string;
+  description: string;
+  category: 'technical' | 'schedule' | 'financial' | 'compliance' | 'operational' | 'competitive';
+  likelihood: number;
+  impact: number;
+  mitigation: string;
+  rationale: string;
+}
+
+export interface RiskGenerationOutput {
+  risks: GeneratedRisk[];
+  generation_summary: string;
+  generated_at: string;
+}
+
 export interface ResearchFinding {
   title: string;
   url: string;
@@ -448,6 +477,7 @@ export interface TaskInputMap {
   semantic_embed: SemanticEmbedInput;
   source_research: SourceResearchInput;
   black_hat_analysis: BlackHatAnalysisInput;
+  risk_generation: RiskGenerationInput;
 }
 
 export interface TaskOutputMap {
@@ -460,6 +490,7 @@ export interface TaskOutputMap {
   semantic_embed: SemanticEmbedOutput;
   source_research: SourceResearchOutput;
   black_hat_analysis: BlackHatAnalysisOutput;
+  risk_generation: RiskGenerationOutput;
 }
 
 // ---------------------------------------------------------------------------

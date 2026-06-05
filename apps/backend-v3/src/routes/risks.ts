@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
-import { successEnvelope } from '../lib/envelope.js';
+import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
+import { llmRouter } from '../lib/llm-router.js';
+import type { RiskGenerationInput, RiskGenerationOutput } from '../lib/llm-router.types.js';
 
 export async function risksRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/risks
@@ -109,5 +111,81 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     await pool.query('DELETE FROM risks WHERE id = $1', [Number(id)]);
     return reply.status(204).send();
+  });
+
+  // POST /v3/risks/generate/:opportunityId
+  app.post('/v3/risks/generate/:opportunityId', async (req, reply) => {
+    const { opportunityId } = req.params as { opportunityId: string };
+
+    const { rows: oppRows } = await pool.query(
+      `SELECT id, title, description, naics, set_aside, place_of_performance, response_deadline, agency
+       FROM opportunities WHERE id = $1`,
+      [Number(opportunityId)],
+    );
+
+    if (!oppRows.length) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Opportunity not found', req.requestId));
+    }
+
+    const opp = oppRows[0] as {
+      id: number;
+      title: string;
+      description: string | null;
+      naics: string | null;
+      set_aside: string | null;
+      place_of_performance: string | null;
+      response_deadline: string | null;
+      agency: string | null;
+    };
+
+    const { rows: existingRows } = await pool.query(
+      `SELECT title FROM risks WHERE opportunity_id = $1`,
+      [opp.id],
+    );
+    const existingRiskTitles = existingRows.map((r: { title: string }) => r.title);
+
+    const input: RiskGenerationInput = {
+      opportunity_id: String(opp.id),
+      opportunity_title: opp.title,
+      opportunity_description: opp.description ?? '',
+      naics_codes: opp.naics ? [opp.naics] : [],
+      set_aside: opp.set_aside,
+      place_of_performance: opp.place_of_performance,
+      response_deadline: opp.response_deadline,
+      agency: opp.agency,
+      existing_risks: existingRiskTitles,
+    };
+
+    const result = await llmRouter.route({ task: 'risk_generation', input });
+
+    if (!result.ok) {
+      return reply.status(502).send(errorEnvelope('INTERNAL_ERROR', result.error_message, req.requestId));
+    }
+
+    const output = result.output as RiskGenerationOutput;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const risk of output.risks) {
+        await client.query(
+          `INSERT INTO risks (title, description, category, likelihood, impact, mitigation, source, opportunity_id)
+           VALUES ($1, $2, $3, $4, $5, $6, 'ai_generated', $7)`,
+          [risk.title, risk.description, risk.category, risk.likelihood, risk.impact, risk.mitigation, opp.id],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+
+    return reply.send(successEnvelope({
+      risks_created: output.risks.length,
+      generation_summary: output.generation_summary,
+      generated_at: output.generated_at,
+    }, req.requestId));
   });
 }

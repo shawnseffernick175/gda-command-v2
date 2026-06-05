@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput } from '../llm-router.types.js';
 
 let client: Anthropic | null = null;
 
@@ -45,8 +45,45 @@ All fields are required. urgency must be one of: immediate, today, this_week.`,
 
   sentinel_summary: `You are a system health analyst for GDA Command. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
 
+
   black_hat_analysis: `You are a competitive intelligence analyst specializing in federal government contracting. Perform Black Hat analysis viewing competition from the competitor's perspective.`,
+
+  risk_generation: `You are a risk analyst specializing in federal government contracting proposals. Generate a comprehensive set of bid/performance risks for the given opportunity.`,
 };
+
+function buildRiskGenerationPrompt(input: RiskGenerationInput): string {
+  const desc = input.opportunity_description.slice(0, 800);
+  const naics = input.naics_codes.join(', ') || 'N/A';
+  const existing = input.existing_risks.length > 0 ? input.existing_risks.join('; ') : 'None';
+  return `Generate risks for this federal opportunity:
+Title: ${input.opportunity_title}
+Agency: ${input.agency ?? 'Unknown'}
+Description: ${desc}
+NAICS: ${naics}
+Set-aside: ${input.set_aside ?? 'None'}
+Deadline: ${input.response_deadline ?? 'Unknown'}
+
+Existing risks to avoid duplicating: ${existing}
+
+Generate 4-6 distinct risks covering technical, schedule, financial, competitive, and compliance dimensions.
+
+Respond ONLY with valid JSON:
+{
+  "risks": [
+    {
+      "title": "<concise risk title>",
+      "description": "<1-2 sentence description>",
+      "category": "<technical|schedule|financial|compliance|operational|competitive>",
+      "likelihood": <1-5>,
+      "impact": <1-5>,
+      "mitigation": "<1-2 sentence mitigation approach>",
+      "rationale": "<why this risk applies to this specific opportunity>"
+    }
+  ],
+  "generation_summary": "<1 sentence summary>",
+  "generated_at": "<ISO 8601>"
+}`;
+}
 
 export interface AnthropicCallResult {
   text: string;
@@ -70,6 +107,8 @@ export async function callAnthropic(opts: {
 
   const userContent = opts.task === 'black_hat_analysis'
     ? buildBlackHatUserPrompt(opts.input as BlackHatAnalysisInput)
+    : opts.task === 'risk_generation'
+    ? buildRiskGenerationPrompt(opts.input as RiskGenerationInput)
     : JSON.stringify(opts.input);
 
   try {
