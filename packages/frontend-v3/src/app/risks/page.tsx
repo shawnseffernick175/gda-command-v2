@@ -6,6 +6,7 @@ import { useOpportunities } from "@/hooks/use-opportunities";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { RiskDetailPanel } from "@/components/RiskDetailPanel";
+import { PwinWeightsPanel } from "@/components/pwin-weights-panel";
 import { cn } from "@/lib/utils";
 import type { Risk } from "@/lib/types";
 
@@ -110,7 +111,7 @@ function AiRiskGeneration() {
   );
 }
 
-export default function RisksPage() {
+function RisksRegisterContent() {
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
@@ -578,6 +579,43 @@ export default function RisksPage() {
           onClose={() => setSelectedRisk(null)}
         />
       )}
+    </div>
+  );
+}
+
+export default function RisksPage() {
+  const [activeTab, setActiveTab] = useState<"register" | "pwin">("register");
+
+  return (
+    <div className="space-y-6">
+      {/* Tab row */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab("register")}
+          className={cn(
+            "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
+            activeTab === "register"
+              ? "border-gda-green text-gda-green"
+              : "border-transparent text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Risk Register
+        </button>
+        <button
+          onClick={() => setActiveTab("pwin")}
+          className={cn(
+            "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
+            activeTab === "pwin"
+              ? "border-gda-green text-gda-green"
+              : "border-transparent text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Pwin Weights
+        </button>
+      </div>
+
+      {activeTab === "register" && <RisksRegisterContent />}
+      {activeTab === "pwin" && <PwinWeightsPanel />}
     </div>
   );
 }
