@@ -17,17 +17,23 @@ export function useLlmRoute() {
   });
 }
 
+const OODA_TIMEOUT_MS = 30_000;
+
 export function useOodaAnalysis() {
   return useMutation({
     mutationFn: (params: {
       opportunity_id: string;
       stage?: string;
       context?: Record<string, unknown>;
-    }) =>
-      apiPost<LlmResponse>("/v3/agent/run", {
-        task: "ooda_analysis",
-        input: params,
-      }),
+    }) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), OODA_TIMEOUT_MS);
+      return apiPost<LlmResponse>(
+        "/v3/agent/run",
+        { task: "ooda_analysis", input: params },
+        { signal: controller.signal },
+      ).finally(() => clearTimeout(timer));
+    },
   });
 }
 
