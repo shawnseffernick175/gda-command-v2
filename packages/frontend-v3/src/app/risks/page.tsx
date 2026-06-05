@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRisks, useCreateRisk, useUpdateRisk, useDeleteRisk } from "@/hooks/use-risks";
+import { useRisks, useCreateRisk, useUpdateRisk, useDeleteRisk, useGenerateRisks } from "@/hooks/use-risks";
+import { useOpportunities } from "@/hooks/use-opportunities";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
-import { PendingState } from "@/components/shared/pending-state";
 import { cn } from "@/lib/utils";
 import type { Risk } from "@/lib/types";
 
@@ -48,6 +48,66 @@ const EMPTY_FORM = {
   owner: "",
   mitigation: "",
 };
+
+function AiRiskGeneration() {
+  const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
+  const generateRisks = useGenerateRisks(selectedOppId);
+  const { data: oppData } = useOpportunities();
+  const opportunities = oppData?.items ?? [];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Select an active opportunity to auto-generate risks from its scope, agency, and deadline
+        context. Generated risks are added to the risk register as AI-generated entries for your
+        review.
+      </p>
+
+      <select
+        value={selectedOppId ?? ""}
+        onChange={(e) => setSelectedOppId(e.target.value || null)}
+        className="w-full rounded border border-border bg-gda-bg-base px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+      >
+        <option value="">Select opportunity</option>
+        {opportunities.map((o) => (
+          <option key={o.internal_id} value={String(o.id)}>
+            {o.title}{o.agency ? ` — ${o.agency}` : ""}
+          </option>
+        ))}
+      </select>
+
+      <button
+        type="button"
+        disabled={!selectedOppId || generateRisks.isPending}
+        onClick={() => generateRisks.mutate()}
+        className="rounded border border-gda-green bg-gda-green/10 px-4 py-1.5 text-xs font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
+      >
+        {generateRisks.isPending ? "Generating..." : "Generate Risks"}
+      </button>
+
+      {generateRisks.isError && (
+        <p className="text-xs text-red-400">
+          {generateRisks.error instanceof Error ? generateRisks.error.message : "Failed to generate risks"}
+        </p>
+      )}
+
+      {generateRisks.isSuccess && generateRisks.data && (
+        <div className="rounded border border-gda-green/30 bg-gda-green/5 p-3 space-y-1">
+          <p className="text-xs font-medium text-gda-green">
+            Generated {generateRisks.data.risks_created} risks and added to register.
+          </p>
+          <p className="text-xs text-muted-foreground">{generateRisks.data.generation_summary}</p>
+          <p className="text-[11px] text-muted-foreground">
+            Generated at {new Date(generateRisks.data.generated_at).toLocaleString()}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Review and edit generated risks in the Risk Register above.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function RisksPage() {
   const [filterStatus, setFilterStatus] = useState<string>("");
@@ -498,12 +558,9 @@ export default function RisksPage() {
         </table>
       </div>
 
-      {/* AI Risk Generation (future) */}
+      {/* AI Risk Generation */}
       <CollapseSection id="risk-ai-gen" title="AI Risk Generation" defaultOpen={false}>
-        <PendingState
-          surface="AI Risk Generation"
-          reason="Will auto-generate risks from opportunity analysis cache using the LLM router. Activates with the intelligence layer."
-        />
+        <AiRiskGeneration />
       </CollapseSection>
     </div>
   );

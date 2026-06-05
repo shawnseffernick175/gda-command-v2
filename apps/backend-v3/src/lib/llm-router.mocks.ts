@@ -20,6 +20,7 @@ import type {
   SemanticEmbedOutput,
   SourceResearchOutput,
   BlackHatAnalysisOutput,
+  RiskGenerationOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -165,6 +166,12 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       intel_summary: 'Mock competitor with moderate federal presence.',
       generated_at: new Date().toISOString(),
     } satisfies BlackHatAnalysisOutput,
+
+    risk_generation: {
+      risks: [{ title: 'Mock Technical Risk', description: 'Mock risk description', category: 'technical', likelihood: 3, impact: 4, mitigation: 'Mock mitigation', rationale: 'Mock rationale' }],
+      generation_summary: 'Generated 1 mock risk.',
+      generated_at: new Date().toISOString(),
+    } satisfies RiskGenerationOutput,
   };
 
   return {
