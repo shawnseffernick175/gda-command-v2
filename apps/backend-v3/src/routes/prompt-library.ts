@@ -153,7 +153,7 @@ export async function promptLibraryRoutes(app: FastifyInstance): Promise<void> {
     let filledUserPrompt = prompt.user_prompt_template ?? '';
     const values = body.variable_values ?? {};
     for (const [varName, varValue] of Object.entries(values)) {
-      filledUserPrompt = filledUserPrompt.replace(new RegExp(`\\{${varName}\\}`, 'g'), varValue);
+      filledUserPrompt = filledUserPrompt.replaceAll(`{${varName}}`, varValue);
     }
 
     const startMs = Date.now();
@@ -179,6 +179,12 @@ export async function promptLibraryRoutes(app: FastifyInstance): Promise<void> {
           max_tokens: 2048,
         }),
       });
+
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => '');
+        const durationMs = Date.now() - startMs;
+        return reply.status(502).send(errorEnvelope('INTERNAL_ERROR', `OpenAI API error ${response.status}: ${errBody}`, req.requestId));
+      }
 
       const data = await response.json() as {
         choices: Array<{ message: { content: string } }>;
