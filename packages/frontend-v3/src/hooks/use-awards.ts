@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api";
-import type { Award, AwardsPaginatedResponse } from "@/lib/types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiGet, apiPost } from "@/lib/api";
+import type { Award, AwardAnalysis, AwardsPaginatedResponse } from "@/lib/types";
 
 export interface UseAwardsParams {
   agency?: string;
@@ -59,5 +59,17 @@ export function useAwardsCount() {
   return useQuery({
     queryKey: ["awards", "count"],
     queryFn: () => apiGet<{ count: number }>("/v3/awards/count"),
+  });
+}
+
+export function useAwardAnalyze() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (awardId: string) =>
+      apiPost<AwardAnalysis>(`/v3/awards/${awardId}/analyze`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["awards-paged"] });
+      void queryClient.invalidateQueries({ queryKey: ["awards"] });
+    },
   });
 }

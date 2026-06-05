@@ -12,6 +12,7 @@ import { CollapseSection } from "@/components/shared/collapse-section";
 import { SourceChip } from "@/components/shared/source-chip";
 import { PendingState } from "@/components/shared/pending-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { AwardDetailPanel } from "@/components/AwardDetailPanel";
 import { formatMoney } from "@/lib/format-money";
 import type { Award } from "@/lib/types";
 
@@ -48,6 +49,7 @@ export default function AwardsPage() {
   const [agencyFilter, setAgencyFilter] = useState("");
   const [contractType, setContractType] = useState<string>("All Types");
   const [dateRange, setDateRange] = useState<number | null>(null);
+  const [selectedAward, setSelectedAward] = useState<Award | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -172,7 +174,11 @@ export default function AwardsPage() {
       ) : items.length > 0 ? (
         <div className="space-y-2">
           {items.map((award) => (
-            <AwardCard key={award.id} award={award} />
+            <AwardCard
+              key={award.id}
+              award={award}
+              onSelect={() => setSelectedAward(award)}
+            />
           ))}
         </div>
       ) : (
@@ -233,19 +239,55 @@ export default function AwardsPage() {
           </div>
         )}
       </CollapseSection>
+
+      {selectedAward && (
+        <AwardDetailPanel
+          key={selectedAward.id}
+          award={selectedAward}
+          onClose={() => setSelectedAward(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AwardCard({ award }: { award: Award }) {
+function formatExpires(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+}
+
+function AwardCard({
+  award,
+  onSelect,
+}: {
+  award: Award;
+  onSelect: () => void;
+}) {
   const formattedDate = award.awarded_at
     ? new Date(award.awarded_at).toLocaleDateString()
     : "—";
 
   return (
-    <Card className="border-border bg-gda-panel">
+    <Card
+      className="border-border bg-gda-panel cursor-pointer hover:border-gda-cyan/40 transition-colors"
+      onClick={onSelect}
+    >
       <CardContent className="space-y-1.5 py-3">
         <div className="flex items-center gap-2 flex-wrap">
+          {award.is_recompete_candidate && (
+            <Badge className="bg-red-500/20 text-red-400 border border-red-500/40 text-[11px] font-mono font-bold">
+              RE-COMPETE
+            </Badge>
+          )}
+          {award.is_recompete_candidate && award.period_of_performance_end && (
+            <span className="text-[11px] text-red-400/80 font-mono">
+              Expires {formatExpires(award.period_of_performance_end)}
+            </span>
+          )}
           {award.contract_type && (
             <Badge
               variant="outline"
@@ -297,6 +339,7 @@ function AwardCard({ award }: { award: Award }) {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-[11px] text-gda-cyan hover:underline font-mono"
+              onClick={(e) => e.stopPropagation()}
             >
               FPDS ↗
             </a>

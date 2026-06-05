@@ -42,6 +42,8 @@ export async function upsertAwardWithSources(
     );
     const sourceId = sourceRows[0].id;
 
+    const isRecompete = computeIsRecompeteCandidate(award.period_of_performance_end);
+
     const { rows: upsertRows } = await client.query(
       `INSERT INTO awards (
          piid, agency_id, agency_name, contracting_office,
@@ -51,9 +53,10 @@ export async function upsertAwardWithSources(
          place_of_performance_state, place_of_performance_country,
          award_date, last_mod_date, contract_type,
          sam_notice_id,
-         data_source, source_id, fpds_url
+         data_source, source_id, fpds_url,
+         period_of_performance_end, is_recompete_candidate
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        ON CONFLICT (piid, last_mod_date) DO NOTHING
        RETURNING id`,
       [
@@ -77,6 +80,8 @@ export async function upsertAwardWithSources(
         award.data_source,
         sourceId,
         award.fpds_url,
+        award.period_of_performance_end,
+        isRecompete,
       ],
     );
 
@@ -107,6 +112,15 @@ export async function upsertAwardWithSources(
   } finally {
     client.release();
   }
+}
+
+function computeIsRecompeteCandidate(popEnd: string | null): boolean {
+  if (!popEnd) return false;
+  const endDate = new Date(popEnd);
+  const now = new Date();
+  const eighteenMonths = new Date();
+  eighteenMonths.setMonth(eighteenMonths.getMonth() + 18);
+  return endDate >= now && endDate <= eighteenMonths;
 }
 
 export async function runUSASpendingIngest(): Promise<IngestResult> {

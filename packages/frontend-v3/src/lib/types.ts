@@ -214,6 +214,15 @@ export interface AwardSourceRef {
   retrieved_at?: string;
 }
 
+export interface AwardAnalysis {
+  win_rationale: string;
+  agency_signal: string;
+  recompete_assessment: string;
+  winner_classification: 'THREAT' | 'PARTNER' | 'IRRELEVANT';
+  recommended_action: 'Pursue Re-Compete' | 'Monitor' | 'Pass' | 'Partner with Winner';
+  so_what: string;
+}
+
 export interface Award {
   id: string;
   recipient_name: string | null;
@@ -228,6 +237,12 @@ export interface Award {
   awarded_at_sources: AwardSourceRef[];
   fpds_url: string | null;
   data_source: string;
+  is_recompete_candidate: boolean;
+  period_of_performance_end: string | null;
+  set_aside: string | null;
+  naics: string | null;
+  award_analysis: AwardAnalysis | null;
+  award_analysis_run_at: string | null;
 }
 
 export interface AwardsPaginatedResponse {

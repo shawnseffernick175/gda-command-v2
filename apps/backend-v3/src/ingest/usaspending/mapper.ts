@@ -26,6 +26,7 @@ export interface AwardRow {
   sam_notice_id: string | null;
   data_source: string;
   fpds_url: string | null;
+  period_of_performance_end: string | null;
 }
 
 export interface AwardSourceCitation {
@@ -91,6 +92,7 @@ export function mapUSASpendingAward(raw: USASpendingAwardRaw): MappedAward | nul
     sam_notice_id: null,
     data_source: 'usaspending',
     fpds_url: sourceUrl,
+    period_of_performance_end: parseDateOrNull(raw['End Date']),
   };
 
   const citations: AwardSourceCitation[] = [];
