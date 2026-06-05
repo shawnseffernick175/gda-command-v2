@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   Settings,
   ClipboardCheck,
-  SlidersHorizontal,
   Newspaper,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -45,8 +44,3 @@ export const SETTINGS_ITEM: NavItem = {
   icon: Settings,
 };
 
-export const PWIN_SETTINGS_ITEM: NavItem = {
-  label: "Pwin Weights",
-  href: "/settings/pwin",
-  icon: SlidersHorizontal,
-};
