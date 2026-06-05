@@ -10,7 +10,6 @@ import {
 } from "@/hooks/use-doctrine";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PendingState } from "@/components/shared/pending-state";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { cn } from "@/lib/utils";
 import type { DoctrineConfigRow } from "@/hooks/use-doctrine";
@@ -91,7 +90,7 @@ function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
       ) : (
         <p className="font-mono text-[11px] text-muted-foreground truncate">{displayValue}</p>
       )}
-      <p className="text-[10px] text-muted-foreground/50">
+      <p className="text-[11px] text-muted-foreground/50">
         Updated {new Date(row.updated_at).toLocaleString()}
       </p>
     </div>
@@ -166,7 +165,7 @@ function IntegrationsPanel({ sentinel }: { sentinel: SentinelData }) {
                 <Badge
                   variant="outline"
                   className={cn(
-                    'text-[10px] px-1.5 py-0',
+                    'text-[11px] px-1.5 py-0',
                     status === 'healthy' ? 'border-gda-green/30 text-gda-green' :
                     status === 'stale' ? 'border-amber-400/30 text-amber-400' :
                     status === 'error' ? 'border-red-500/30 text-red-400' :
@@ -185,7 +184,7 @@ function IntegrationsPanel({ sentinel }: { sentinel: SentinelData }) {
                 </a>
               </div>
               <p className="text-[11px] text-muted-foreground mt-0.5">{integration.description}</p>
-              <p className="text-[10px] text-muted-foreground/50 mt-0.5">Last success: {lastRun}</p>
+              <p className="text-[11px] text-muted-foreground/50 mt-0.5">Last success: {lastRun}</p>
             </div>
           </div>
         );
@@ -592,7 +591,7 @@ export default function SettingsPage() {
                         {ex.is_hard_block && (
                           <Badge
                             variant="destructive"
-                            className="text-[10px] px-1.5 py-0"
+                            className="text-[11px] px-1.5 py-0"
                           >
                             Hard Block
                           </Badge>

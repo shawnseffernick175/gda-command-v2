@@ -59,7 +59,7 @@ const URGENCY_STYLES: Record<string, string> = {
 function UrgencyBadge({ urgency }: { urgency: string | null }) {
   if (!urgency) return null;
   return (
-    <span className={cn("rounded border px-1.5 py-0.5 text-[10px] font-mono uppercase", URGENCY_STYLES[urgency] ?? URGENCY_STYLES.low)}>
+    <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase", URGENCY_STYLES[urgency] ?? URGENCY_STYLES.low)}>
       {urgency}
     </span>
   );
@@ -70,7 +70,7 @@ function UrgencyBadge({ urgency }: { urgency: string | null }) {
 // ────────────────────────────────────────────────────────────
 function Tag({ label }: { label: string }) {
   return (
-    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+    <span className="rounded border border-border bg-gda-bg-base px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground">
       {label}
     </span>
   );
@@ -216,7 +216,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(value * 100);
   return (
     <div className="space-y-0.5">
-      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span>{label}</span>
         <span className="font-mono text-foreground">{pct}%</span>
       </div>
@@ -247,7 +247,7 @@ function MatchCard({ m }: { m: FTMatch }) {
       {/* Header row */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Technology Signal</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Technology Signal</p>
           <p className="text-xs font-semibold text-foreground leading-snug">{m.tech_title}</p>
           <p className="text-[11px] text-gda-cyan mt-0.5">{m.tech_source}</p>
         </div>
@@ -260,10 +260,10 @@ function MatchCard({ m }: { m: FTMatch }) {
           )}>
             {overallPct}
           </span>
-          <span className="text-[10px] text-muted-foreground mt-0.5">match</span>
+          <span className="text-[11px] text-muted-foreground mt-0.5">match</span>
         </div>
         <div className="flex-1 min-w-0 text-right">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Requirement Signal</p>
+          <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Requirement Signal</p>
           <p className="text-xs font-semibold text-foreground leading-snug">{m.req_title}</p>
           <p className="text-[11px] text-gda-cyan mt-0.5">{m.req_source}</p>
         </div>
@@ -281,13 +281,13 @@ function MatchCard({ m }: { m: FTMatch }) {
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1">
           {m.recommended_vehicle && (
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Recommended Vehicle</p>
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Recommended Vehicle</p>
               <p className="text-xs text-gda-green font-medium">{m.recommended_vehicle}</p>
             </div>
           )}
           {m.adoption_path && (
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Adoption Path</p>
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Adoption Path</p>
               <p className="text-xs text-foreground">{m.adoption_path}</p>
             </div>
           )}
@@ -395,7 +395,7 @@ export default function FastTrackPage() {
       >
         <div className="mb-2">
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Watches DARPA, DIU, AFWERX, NavalX Tech Bridges, Army Applications Lab, NSIN, SBIR/STTR, startups and niche commercial firms for maturing dual-use capabilities that align with Envision&apos;s mission areas.
+            Watches DARPA, DIU, AFWERX, NavalX Tech Bridges, Army Applications Lab, NSIN, SBIR/STTR, startups and niche commercial firms for maturing dual-use capabilities that align with Envision’s mission areas.
           </p>
         </div>
         <SignalTable signals={techSignals} loading={signalsLoading} />
@@ -451,7 +451,7 @@ export default function FastTrackPage() {
       >
         <div className="mb-3">
           <p className="text-[11px] text-muted-foreground">
-            Paste any opportunity text for an instant AI go/no-go grade against Envision&apos;s doctrine and NAICS profile.
+            Paste any opportunity text for an instant AI go/no-go grade against Envision’s doctrine and NAICS profile.
           </p>
         </div>
         <form onSubmit={handleTriage} className="space-y-3">
