@@ -229,7 +229,7 @@ function ActionItemRow({
             href={`${SOURCE_ROUTES[sourceType] ?? "/"}?id=${sourceId}`}
             className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-mono bg-gda-cyan/10 text-gda-cyan border border-gda-cyan/20 hover:bg-gda-cyan/20 transition-colors"
           >
-            {SOURCE_LABELS[sourceType] ?? sourceType} &rarr;
+            {SOURCE_LABELS[sourceType] ?? sourceType} →
           </Link>
         )}
 
