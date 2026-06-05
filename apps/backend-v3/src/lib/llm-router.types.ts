@@ -31,7 +31,8 @@ export type Task =
   | 'black_hat_analysis'
   | 'risk_generation'
   | 'award_analysis'
-  | 'competitor_analysis';
+  | 'competitor_analysis'
+  | 'contact_enrich';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -246,6 +247,25 @@ export interface CompetitorAnalysisOutput {
   recompete_contracts: CompetitorRecompeteContract[];
   recommended_action: 'Compete' | 'Partner' | 'Monitor' | 'Ignore';
   trend: 'Up' | 'Down' | 'Flat';
+}
+
+export interface ContactEnrichInput {
+  name: string;
+  title: string | null;
+  agency_or_company: string | null;
+  category: string;
+  email: string | null;
+  linkedin: string | null;
+  notes: string | null;
+}
+
+export interface ContactEnrichOutput {
+  role_summary: string;
+  procurement_influence: 'high' | 'medium' | 'low' | 'unknown';
+  likely_decision_authority: string;
+  engagement_approach: string;
+  relevance_to_envision: string;
+  model_used: string;
 }
 
 export interface RiskGenerationInput {
@@ -539,6 +559,7 @@ export interface TaskInputMap {
   risk_generation: RiskGenerationInput;
   award_analysis: AwardAnalysisInput;
   competitor_analysis: CompetitorAnalysisInput;
+  contact_enrich: ContactEnrichInput;
 }
 
 export interface TaskOutputMap {
@@ -554,6 +575,7 @@ export interface TaskOutputMap {
   risk_generation: RiskGenerationOutput;
   award_analysis: AwardAnalysisOutput;
   competitor_analysis: CompetitorAnalysisOutput;
+  contact_enrich: ContactEnrichOutput;
 }
 
 // ---------------------------------------------------------------------------

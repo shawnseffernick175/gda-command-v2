@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput } from '../llm-router.types.js';
 
 let client: Anthropic | null = null;
 
@@ -63,6 +63,11 @@ All fields are required. urgency must be one of: immediate, today, this_week.`,
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
+
+  contact_enrich: `You are an intelligence analyst building a relationship profile for a defense contracting firm.
+
+Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
 
   competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
@@ -149,6 +154,8 @@ export async function callAnthropic(opts: {
     ? buildAwardAnalysisPrompt(opts.input as AwardAnalysisInput)
     : opts.task === 'competitor_analysis'
     ? buildCompetitorAnalysisPrompt(opts.input as CompetitorAnalysisInput)
+    : opts.task === 'contact_enrich'
+    ? buildContactEnrichPrompt(opts.input as ContactEnrichInput)
     : JSON.stringify(opts.input);
 
   try {
@@ -264,6 +271,29 @@ Respond ONLY with valid JSON:
   "recompete_contracts": [],
   "recommended_action": "Compete | Partner | Monitor | Ignore",
   "trend": "Up | Down | Flat"
+}`;
+}
+
+function buildContactEnrichPrompt(input: ContactEnrichInput): string {
+  return `Contact:
+- Name: ${input.name}
+- Title: ${input.title ?? 'Unknown'}
+- Agency/Company: ${input.agency_or_company ?? 'Unknown'}
+- Category: ${input.category}
+- Email: ${input.email ?? 'Unknown'}
+- LinkedIn: ${input.linkedin ?? 'N/A'}
+- Notes: ${input.notes ?? 'None'}
+
+Based on this contact's role and organization, provide:
+
+Respond ONLY with valid JSON:
+{
+  "role_summary": "<1 sentence on what this person does and why they matter>",
+  "procurement_influence": "high | medium | low | unknown",
+  "likely_decision_authority": "<What procurement decisions this person likely influences>",
+  "engagement_approach": "<Recommended first engagement action for Envision>",
+  "relevance_to_envision": "<Why Envision should track this contact specifically>",
+  "model_used": "<model>"
 }`;
 }
 
