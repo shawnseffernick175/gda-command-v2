@@ -98,6 +98,102 @@ function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
   );
 }
 
+/* ── Integrations Panel ───────────────────────────────────────── */
+const INTEGRATION_SOURCES: Array<{
+  key: string;
+  label: string;
+  description: string;
+  docsUrl: string;
+}> = [
+  { key: 'sam.gov', label: 'SAM.gov', description: 'Federal solicitations — free API, no credential required', docsUrl: 'https://open.sam.gov' },
+  { key: 'govtribe', label: 'GovTribe', description: 'Opportunity intelligence + contract vehicles + agency contacts', docsUrl: 'https://api.govtribe.com' },
+  { key: 'govwin', label: 'GovWin IQ', description: 'Forecast pipeline + competitive intelligence (CAS auth)', docsUrl: 'https://iq.govwin.com' },
+  { key: 'usaspending.gov', label: 'USAspending', description: 'Federal awards database — free public API', docsUrl: 'https://api.usaspending.gov' },
+  { key: 'grants.gov', label: 'Grants.gov', description: 'Federal grant opportunities — public XML feed', docsUrl: 'https://www.grants.gov/xml-extract' },
+  { key: 'federalregister.gov', label: 'Federal Register', description: 'Regulatory notices and agency rules', docsUrl: 'https://www.federalregister.gov/developers' },
+  { key: 'sbir', label: 'SBIR/STTR', description: 'DoD DSIP open topics — public API', docsUrl: 'https://www.dodsbirsttr.mil/topics-app/' },
+  { key: 'dibbs', label: 'DIBBS (DLA)', description: 'DLA small business RFQs — .mil site (egress blocked from VPS)', docsUrl: 'https://www.dibbs.bsm.dla.mil' },
+  { key: 'neco', label: 'NECO (Navy)', description: 'Navy electronic commerce — .mil site (egress blocked from VPS)', docsUrl: 'https://www.neco.navy.mil' },
+  { key: 'nih', label: 'NIH RePORTER', description: 'Research awards — weekly ingest (Mon 3am ET)', docsUrl: 'https://api.reporter.nih.gov' },
+  { key: 'arxiv', label: 'arXiv', description: 'Defense/tech research papers — weekly ingest (Mon 2am ET)', docsUrl: 'https://arxiv.org/help/api' },
+];
+
+type SentinelData = {
+  overall: string;
+  sources: Array<{
+    source_key: string;
+    label: string;
+    status: string;
+    last_success_at: string | null;
+    message?: string;
+  }>;
+} | null | undefined;
+
+function IntegrationsPanel({ sentinel }: { sentinel: SentinelData }) {
+  const sourceMap = new Map(
+    (sentinel?.sources ?? []).map((s) => [s.source_key, s])
+  );
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] text-muted-foreground mb-3">
+        Live status from Sentinel. All data source connections are managed via environment variables on the VPS.
+      </p>
+      {INTEGRATION_SOURCES.map((integration) => {
+        const live = sourceMap.get(integration.key);
+        const status = live?.status ?? 'unknown';
+        const lastRun = live?.last_success_at
+          ? new Date(live.last_success_at).toLocaleString()
+          : 'Never';
+
+        return (
+          <div
+            key={integration.key}
+            className="flex items-start gap-3 rounded border border-border bg-gda-bg-base px-3 py-2.5"
+          >
+            <span
+              className={cn(
+                'mt-0.5 h-2 w-2 rounded-full shrink-0',
+                status === 'healthy' ? 'bg-gda-green' :
+                status === 'stale' ? 'bg-amber-400' :
+                status === 'error' ? 'bg-red-500' :
+                'bg-muted-foreground'
+              )}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-foreground">{integration.label}</span>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-[10px] px-1.5 py-0',
+                    status === 'healthy' ? 'border-gda-green/30 text-gda-green' :
+                    status === 'stale' ? 'border-amber-400/30 text-amber-400' :
+                    status === 'error' ? 'border-red-500/30 text-red-400' :
+                    'border-border text-muted-foreground'
+                  )}
+                >
+                  {status}
+                </Badge>
+                <a
+                  href={integration.docsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-muted-foreground hover:text-foreground ml-auto"
+                >
+                  Docs ↗
+                </a>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{integration.description}</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-0.5">Last success: {lastRun}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── User Management Panel ─────────────────────────────────────── */
 const ROLES = ["admin", "operator", "viewer"] as const;
 const EMPTY_USER = { email: "", display_name: "", role: "operator", password: "" };
@@ -528,10 +624,7 @@ export default function SettingsPage() {
 
       {/* ── Integrations ─────────────────────────────────────── */}
       <CollapseSection id="settings-integrations" title="Integrations" defaultOpen={false}>
-        <PendingState
-          surface="Integration Settings"
-          reason="Configure GovTribe, GovWin, SAM.gov, FPDS, and other data source connections."
-        />
+        <IntegrationsPanel sentinel={sentinel} />
       </CollapseSection>
     </div>
   );
