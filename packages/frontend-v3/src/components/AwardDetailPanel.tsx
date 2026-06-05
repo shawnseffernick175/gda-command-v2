@@ -63,8 +63,9 @@ export function AwardDetailPanel({
         <button
           onClick={onClose}
           className="rounded p-1 text-muted-foreground hover:bg-muted/20 hover:text-foreground"
+          aria-label="Close"
         >
-          ✕
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="2" y1="2" x2="12" y2="12" /><line x1="12" y1="2" x2="2" y2="12" /></svg>
         </button>
       </div>
 
