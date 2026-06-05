@@ -316,9 +316,20 @@ export interface Contact {
 
 /* ── GovTribe Contacts (F-494) ────────────────────────────────── */
 
+export type ContactCategory = 'government' | 'teaming_partner' | 'competitor' | 'industry' | 'internal' | 'other';
+
+export interface ContactAiProfile {
+  role_summary: string;
+  procurement_influence: 'high' | 'medium' | 'low' | 'unknown';
+  likely_decision_authority: string;
+  engagement_approach: string;
+  relevance_to_envision: string;
+  model_used: string;
+}
+
 export interface GovTriContact {
   id: number;
-  govtribe_id: string;
+  govtribe_id: string | null;
   name: string | null;
   title: string | null;
   agency: string | null;
@@ -327,6 +338,16 @@ export interface GovTriContact {
   contact_type: string | null;
   source_url: string | null;
   last_seen_at: string;
+  contact_category: ContactCategory;
+  company: string | null;
+  linkedin_url: string | null;
+  notes: string | null;
+  relationship_score: number | null;
+  ai_profile: ContactAiProfile | null;
+  ai_ran_at: string | null;
+  is_manual: boolean;
+  added_by: string;
+  source_label: string | null;
 }
 
 /* ── Competitors (pending backend) ────────────────────────────── */

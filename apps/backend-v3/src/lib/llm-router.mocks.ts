@@ -23,6 +23,7 @@ import type {
   RiskGenerationOutput,
   AwardAnalysisOutput,
   CompetitorAnalysisOutput,
+  ContactEnrichOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -193,6 +194,15 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       recommended_action: 'Compete',
       trend: 'Flat',
     } satisfies CompetitorAnalysisOutput,
+
+    contact_enrich: {
+      role_summary: 'Senior contracting officer managing IT modernization procurements for DoD.',
+      procurement_influence: 'high',
+      likely_decision_authority: 'Source selection authority for IT services contracts under $50M.',
+      engagement_approach: 'Schedule an introductory capability briefing through the OSDBU office.',
+      relevance_to_envision: 'Directly manages procurements in Envision\'s core NAICS codes and agencies.',
+      model_used: 'mock',
+    } satisfies ContactEnrichOutput,
   };
 
   return {
