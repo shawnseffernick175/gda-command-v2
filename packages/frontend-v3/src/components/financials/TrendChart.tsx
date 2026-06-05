@@ -1,6 +1,7 @@
 "use client";
 
-import ReactEChartsCore from "echarts-for-react";
+import ReactEChartsCore from "echarts-for-react/lib/core";
+import { echarts } from "@/lib/echarts-setup";
 import { useFinancialsTrend } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import {
@@ -80,7 +81,11 @@ export function TrendChart() {
 
   return (
     <div className="w-full h-64">
-      <ReactEChartsCore option={option} style={{ height: "100%", width: "100%" }} />
+      <ReactEChartsCore
+        echarts={echarts}
+        option={option}
+        style={{ height: "100%", width: "100%" }}
+      />
     </div>
   );
 }
