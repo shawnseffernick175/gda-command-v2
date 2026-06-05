@@ -19,6 +19,7 @@ import type {
   DoctrineScoreOutput,
   SemanticEmbedOutput,
   SourceResearchOutput,
+  BlackHatAnalysisOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -154,6 +155,16 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       summary: 'Mock research summary',
       sources_consulted: 0,
     } satisfies SourceResearchOutput,
+
+    black_hat_analysis: {
+      competitor: 'Mock Corp',
+      likely_approach: 'Mock approach targeting small business set-asides.',
+      strengths: ['Incumbent presence', 'Agency relationships'],
+      weaknesses: ['Limited NAICS coverage', 'No 8(a) certification'],
+      counter_strategy: 'Leverage our 8(a) status and past performance.',
+      intel_summary: 'Mock competitor with moderate federal presence.',
+      generated_at: new Date().toISOString(),
+    } satisfies BlackHatAnalysisOutput,
   };
 
   return {

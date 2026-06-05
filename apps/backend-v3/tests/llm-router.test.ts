@@ -24,6 +24,7 @@ const ALL_TASKS: readonly Task[] = [
   'doctrine_score',
   'semantic_embed',
   'source_research',
+  'black_hat_analysis',
 ] as const;
 
 describe('Routing Table', () => {
@@ -33,7 +34,7 @@ describe('Routing Table', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('has exactly 8 entries (one per task)', () => {
+  it('has exactly 9 entries (one per task)', () => {
     expect(ROUTING_TABLE.length).toBe(ALL_TASKS.length);
   });
 

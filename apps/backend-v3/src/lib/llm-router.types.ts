@@ -27,7 +27,8 @@ export type Task =
   | 'sentinel_summary'
   | 'doctrine_score'
   | 'semantic_embed'
-  | 'source_research';
+  | 'source_research'
+  | 'black_hat_analysis';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -170,6 +171,26 @@ export interface SourceResearchInput {
   query: string;
   context: string | null;
   max_sources: number;
+}
+
+export interface BlackHatAnalysisInput {
+  competitor_name: string;
+  competitor_wins: number;
+  competitor_total_obligated: number;
+  competitor_agencies: string[];
+  competitor_naics: string[];
+  competitor_contract_types: string[];
+  envision_context: string;
+}
+
+export interface BlackHatAnalysisOutput {
+  competitor: string;
+  likely_approach: string;
+  strengths: string[];
+  weaknesses: string[];
+  counter_strategy: string;
+  intel_summary: string;
+  generated_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -426,6 +447,7 @@ export interface TaskInputMap {
   doctrine_score: DoctrineScoreInput;
   semantic_embed: SemanticEmbedInput;
   source_research: SourceResearchInput;
+  black_hat_analysis: BlackHatAnalysisInput;
 }
 
 export interface TaskOutputMap {
@@ -437,6 +459,7 @@ export interface TaskOutputMap {
   doctrine_score: DoctrineScoreOutput;
   semantic_embed: SemanticEmbedOutput;
   source_research: SourceResearchOutput;
+  black_hat_analysis: BlackHatAnalysisOutput;
 }
 
 // ---------------------------------------------------------------------------

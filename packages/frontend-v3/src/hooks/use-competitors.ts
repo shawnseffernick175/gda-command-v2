@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { apiGet } from "@/lib/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiGet, apiPost } from "@/lib/api";
 import type { Competitor } from "@/lib/types";
 
 interface UseCompetitorsParams {
@@ -25,5 +25,27 @@ export function useCompetitorsCount() {
   return useQuery({
     queryKey: ["competitors-count"],
     queryFn: () => apiGet<{ count: number }>("/v3/competitors/count"),
+  });
+}
+
+interface BlackHatAnalysisOutput {
+  competitor: string;
+  likely_approach: string;
+  strengths: string[];
+  weaknesses: string[];
+  counter_strategy: string;
+  intel_summary: string;
+  generated_at: string;
+  from_cache: boolean;
+}
+
+export function useBlackHatAnalysis(competitorName: string | null) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!competitorName) throw new Error("No competitor selected");
+      return apiPost<BlackHatAnalysisOutput>(
+        `/v3/competitors/${encodeURIComponent(competitorName)}/black-hat`,
+      );
+    },
   });
 }
