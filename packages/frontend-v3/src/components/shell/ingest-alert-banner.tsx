@@ -39,7 +39,7 @@ export function IngestAlertBanner() {
 
   return (
     <div className="bg-gda-amber/10 border-b border-gda-amber/30 text-gda-amber text-xs font-mono px-4 py-1.5 flex items-center gap-3">
-      <span>{"\u26A0"} {message} &mdash; check Settings for details.</span>
+      <span>{"\u26A0"} {message} {"\u2014"} check Settings for details.</span>
       <Link
         href="/settings"
         className="underline hover:text-gda-amber/80 ml-auto"

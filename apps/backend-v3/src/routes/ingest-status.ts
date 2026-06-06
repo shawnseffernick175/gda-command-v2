@@ -93,7 +93,12 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
          AND started_at > NOW() - INTERVAL '24 hours'
        ORDER BY started_at DESC`,
     );
-    const recentErrors = new Map(errorRows.map((r) => [r.source_key, r.error_text]));
+    const recentErrors = new Map<string, string>();
+    for (const r of errorRows) {
+      if (!recentErrors.has(r.source_key)) {
+        recentErrors.set(r.source_key, r.error_text);
+      }
+    }
 
     // GovTribe credits
     let govtribeCredits = { credits_used: 0, credits_budget: 1200, pct: 0, last_call_at: null as string | null };

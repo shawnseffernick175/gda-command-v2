@@ -46,14 +46,9 @@ export function useIngestStatus() {
 export function useIngestHealth() {
   return useQuery({
     queryKey: ["ingest-health"],
-    queryFn: async () => {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech"}/v3/ingest/health`,
-      );
-      if (!res.ok) throw new Error("Failed to fetch ingest health");
-      return res.json() as Promise<IngestHealth>;
-    },
+    queryFn: () => apiGet<IngestHealth>("/v3/ingest/health"),
     refetchInterval: 5 * 60_000,
+    retry: false,
   });
 }
 
