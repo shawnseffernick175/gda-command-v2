@@ -450,7 +450,7 @@ function DoctrineEditorPanel() {
       <div>
         <h2 className="font-mono text-base font-bold text-foreground">Doctrine Principles</h2>
         <p className="text-xs text-muted-foreground mt-1">
-          These evaluation prompts drive the AI&apos;s bid/no-bid scoring. Each principle is scored 0–10 on every opportunity.
+          These evaluation prompts drive the AI's bid/no-bid scoring. Each principle is scored 0–10 on every opportunity.
         </p>
       </div>
 
@@ -471,7 +471,7 @@ function ColorTeamsPanel() {
       <div>
         <h2 className="font-mono text-base font-bold text-foreground">Color Team Review Configs</h2>
         <p className="text-xs text-muted-foreground mt-1">
-          Reference view of each color team&apos;s role, tool access, and output schema.
+          Reference view of each color team's role, tool access, and output schema.
         </p>
       </div>
 
@@ -668,7 +668,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
                 onClick={() => removePoint(i)}
                 className="text-muted-foreground/40 hover:text-gda-red text-xs px-1 transition-colors"
               >
-                ✕
+                x
               </button>
             )}
           </div>
