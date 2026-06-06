@@ -22,7 +22,9 @@ import { ScoreDisplay } from "@/components/score-display";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { SourceChip } from "@/components/shared/source-chip";
 import { PendingState } from "@/components/shared/pending-state";
+import { CollapseSection } from "@/components/shared/collapse-section";
 import { AskAiPanel } from "@/components/shared/ask-ai-panel";
+import { useVaultDocuments } from "@/hooks/use-vault";
 import { formatMoney } from "@/lib/format-money";
 import type {
   CaptureColorStage,
@@ -404,6 +406,9 @@ function CaptureDetail({ oppId }: { oppId: string }) {
       <ColorTeamWorkflow captureId={oppId} />
 
       <AskAiPanel objectType="capture" objectId={oppId} />
+
+      {/* Vault Documents (F-614) */}
+      <CaptureVaultDocs captureId={Number(oppId)} />
     </div>
   );
 }
@@ -805,5 +810,43 @@ function StageAnalysisDisplay({ analysis }: { analysis: StageAnalysis }) {
         <span className="text-muted-foreground">{analysis.gate_rationale}</span>
       </div>
     </div>
+  );
+}
+
+function CaptureVaultDocs({ captureId }: { captureId: number }) {
+  const { data } = useVaultDocuments({ limit: 100 });
+  const linkedDocs = (data?.items ?? []).filter(
+    (d) => d.linked_capture_id === captureId,
+  );
+
+  if (linkedDocs.length === 0) return null;
+
+  return (
+    <CollapseSection
+      id={`vault-cap-${captureId}`}
+      title="Vault Documents"
+      count={linkedDocs.length}
+      defaultOpen={false}
+    >
+      <div className="space-y-1">
+        {linkedDocs.map((doc) => (
+          <Link
+            key={doc.id}
+            href={`/vault?doc=${doc.id}`}
+            className="flex items-center gap-3 rounded border border-border bg-gda-panel/50 px-3 py-2 text-xs hover:border-gda-cyan/40 transition-colors"
+          >
+            <span className="font-mono text-foreground">{doc.filename}</span>
+            <span className="text-muted-foreground">
+              {doc.doc_type}
+            </span>
+            {doc.ai_summary && (
+              <span className="text-muted-foreground truncate max-w-[300px]">
+                {doc.ai_summary}
+              </span>
+            )}
+          </Link>
+        ))}
+      </div>
+    </CollapseSection>
   );
 }

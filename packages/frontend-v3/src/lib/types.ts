@@ -519,6 +519,53 @@ export interface LlmAnalysis {
   model_used: string;
 }
 
+/* ── Vault (F-614) ────────────────────────────────────────────── */
+
+export interface VaultEntity {
+  name: string;
+  type: string;
+  value: string;
+}
+
+export interface VaultAuditEntry {
+  id: number;
+  document_id: number;
+  action: string;
+  actor: string;
+  detail: string | null;
+  created_at: string;
+}
+
+export interface VaultDocument {
+  id: number;
+  filename: string;
+  doc_type: string;
+  file_size_bytes: number | null;
+  file_path: string | null;
+  extracted_text: string | null;
+  ai_summary: string | null;
+  ai_tags: string[] | null;
+  ai_entities: VaultEntity[] | null;
+  linked_opportunity_id: number | null;
+  linked_capture_id: number | null;
+  linked_award_id: number | null;
+  uploaded_by: string;
+  uploaded_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  opp_title?: string | null;
+  capture_title?: string | null;
+  award_title?: string | null;
+  audit_trail?: VaultAuditEntry[];
+}
+
+export interface VaultPaginatedResponse {
+  items: VaultDocument[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 /* ── Daily Briefing (F-460b) ──────────────────────────────────── */
 
 export interface BriefingAction {

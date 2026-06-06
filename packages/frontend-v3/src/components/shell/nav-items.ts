@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   Newspaper,
   Terminal,
+  Archive,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -34,6 +35,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Approvals", href: "/approvals", icon: ClipboardCheck },
   { label: "Financial Bible", href: "/financials", icon: BookOpen },
   { label: "Action Items", href: "/action-items", icon: CheckSquare },
+  { label: "Vault", href: "/vault", icon: Archive },
   { label: "Contacts", href: "/contacts", icon: Users },
   { label: "Competitors", href: "/competitors", icon: Shield },
   { label: "Risks", href: "/risks", icon: AlertTriangle },

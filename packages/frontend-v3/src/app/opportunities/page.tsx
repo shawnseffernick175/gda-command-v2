@@ -15,6 +15,7 @@ import { OodaInspector } from "@/components/shared/ooda-inspector";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
 import { OpportunityCard } from "@/components/OpportunityCard";
+import { useVaultDocuments } from "@/hooks/use-vault";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -763,7 +764,48 @@ function OpportunityDetail({ id }: { id: string }) {
           }}
         />
       </CollapseSection>
+
+      {/* Vault Documents (F-614) */}
+      <VaultDocumentsSection opportunityId={Number(id)} />
     </div>
+  );
+}
+
+function VaultDocumentsSection({ opportunityId }: { opportunityId: number }) {
+  const { data } = useVaultDocuments({ limit: 100 });
+  const linkedDocs = (data?.items ?? []).filter(
+    (d) => d.linked_opportunity_id === opportunityId,
+  );
+
+  if (linkedDocs.length === 0) return null;
+
+  return (
+    <CollapseSection
+      id={`vault-opp-${opportunityId}`}
+      title="Vault Documents"
+      count={linkedDocs.length}
+      defaultOpen={false}
+    >
+      <div className="space-y-1">
+        {linkedDocs.map((doc) => (
+          <Link
+            key={doc.id}
+            href={`/vault?doc=${doc.id}`}
+            className="flex items-center gap-3 rounded border border-border bg-gda-panel/50 px-3 py-2 text-xs hover:border-gda-cyan/40 transition-colors"
+          >
+            <span className="font-mono text-foreground">{doc.filename}</span>
+            <span className="text-muted-foreground">
+              {doc.doc_type}
+            </span>
+            {doc.ai_summary && (
+              <span className="text-muted-foreground truncate max-w-[300px]">
+                {doc.ai_summary}
+              </span>
+            )}
+          </Link>
+        ))}
+      </div>
+    </CollapseSection>
   );
 }
 

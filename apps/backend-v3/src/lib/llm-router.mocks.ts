@@ -25,6 +25,7 @@ import type {
   CompetitorAnalysisOutput,
   ContactEnrichOutput,
   MatchAnalysisOutput,
+  VaultDocumentParseOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -219,6 +220,14 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       ai_narrative: 'This match pairs emerging autonomous capabilities with an active DoD requirement. Envision can serve as the systems integrator bridging commercial innovation to military application. The OT pathway is open and the timing aligns with Envision\'s Q3 capture calendar.',
       model_used: 'mock-model',
     } satisfies MatchAnalysisOutput,
+
+    vault_document_parse: {
+      summary: 'Mock document analysis — contract for IT modernization services.',
+      tags: ['IT modernization', 'DoD', 'NAICS 541512'],
+      entities: [{ name: 'Department of Defense', type: 'party', value: 'Contracting Agency' }],
+      doc_type_confirmed: 'contract',
+      model_used: 'mock-model',
+    } satisfies VaultDocumentParseOutput,
   };
 
   return {

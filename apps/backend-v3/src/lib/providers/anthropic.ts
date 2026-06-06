@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 
 /** Map from task to prompt_library key for read-through lookup. */
@@ -79,6 +79,11 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
 
+  vault_document_parse: `You are a document analyst at a defense contracting firm.
+
+Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
+
   competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.
@@ -141,6 +146,25 @@ Respond ONLY with valid JSON:
 }`;
 }
 
+function buildVaultDocumentParsePrompt(input: VaultDocumentParseInput): string {
+  const text = input.extracted_text.slice(0, 6000);
+  return `Document type: ${input.doc_type}
+Filename: ${input.filename}
+Extracted text (first 6000 chars):
+${text}
+
+Extract and return JSON:
+{
+  "summary": "2–3 sentence executive summary of this document",
+  "tags": ["key_term_1", "key_term_2", ...],
+  "entities": [
+    {"name": "...", "type": "party|dollar_amount|date|contract_number|naics|vehicle", "value": "..."}
+  ],
+  "doc_type_confirmed": "contract|proposal|invoice|certificate|teaming_agreement|rfp|other",
+  "model_used": "{model}"
+}`;
+}
+
 export interface AnthropicCallResult {
   text: string;
   tokens_input: number;
@@ -177,6 +201,8 @@ export async function callAnthropic(opts: {
     ? buildContactEnrichPrompt(opts.input as ContactEnrichInput)
     : opts.task === 'match_analysis'
     ? buildMatchAnalysisPrompt(opts.input as MatchAnalysisInput)
+    : opts.task === 'vault_document_parse'
+    ? buildVaultDocumentParsePrompt(opts.input as VaultDocumentParseInput)
     : JSON.stringify(opts.input);
 
   try {
