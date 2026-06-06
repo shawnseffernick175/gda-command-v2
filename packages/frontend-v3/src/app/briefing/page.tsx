@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useTodayBriefing, useGenerateBriefing } from "@/hooks/use-briefing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Download } from "lucide-react";
+import { getToken } from "@/lib/api";
 import type { BriefingAction } from "@/lib/types";
 
 function urgencyColor(u: BriefingAction["urgency"]) {
@@ -29,9 +31,44 @@ function urgencyLabel(u: BriefingAction["urgency"]) {
   }
 }
 
+function ActionRow({ item }: { item: BriefingAction }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={() => setExpanded(!expanded)}
+      className="w-full text-left flex flex-col gap-1 rounded p-2 hover:bg-gda-bg-base transition-colors cursor-pointer"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={`mt-0.5 inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium ${urgencyColor(item.urgency)}`}
+        >
+          {urgencyLabel(item.urgency)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-foreground">{item.action}</p>
+          {item.related_entity && !expanded && (
+            <p className="text-xs text-muted-foreground">
+              {item.related_entity}
+            </p>
+          )}
+        </div>
+      </div>
+      {expanded && (
+        <div className="ml-16 mt-1 text-xs text-muted-foreground space-y-1">
+          {item.related_entity && <p>Related: {item.related_entity}</p>}
+          <p className="text-foreground">{item.action}</p>
+        </div>
+      )}
+    </button>
+  );
+}
+
 export default function BriefingPage() {
   const { data: briefing, isLoading, error } = useTodayBriefing();
   const generate = useGenerateBriefing();
+  const [exporting, setExporting] = useState(false);
 
   const todayStr = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -43,6 +80,32 @@ export default function BriefingPage() {
 
   const handleRegenerate = () => {
     generate.mutate();
+  };
+
+  const handleExportPdf = async () => {
+    setExporting(true);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech";
+      const token = getToken();
+      const res = await fetch(`${apiBase}/v3/briefing/export`, {
+        method: "GET",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `daily-briefing-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail - endpoint may not exist yet
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (isLoading) {
@@ -97,10 +160,24 @@ export default function BriefingPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-mono text-lg font-bold text-foreground">
-        Daily Brief
-      </h1>
-      <p className="text-sm text-muted-foreground">{todayStr}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-mono text-lg font-bold text-foreground">
+            Daily Brief
+          </h1>
+          <p className="text-sm text-muted-foreground">{todayStr}</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportPdf}
+          disabled={exporting}
+          className="gap-1.5"
+        >
+          <Download className="h-3 w-3" />
+          {exporting ? "Exporting…" : "Export PDF"}
+        </Button>
+      </div>
 
       {/* Headline */}
       <Card className="border-border bg-gda-panel">
@@ -126,23 +203,9 @@ export default function BriefingPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-1">
               {briefing.priority_actions.map((item, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span
-                    className={`mt-0.5 inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium ${urgencyColor(item.urgency)}`}
-                  >
-                    {urgencyLabel(item.urgency)}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm text-foreground">{item.action}</p>
-                    {item.related_entity && (
-                      <p className="text-xs text-muted-foreground">
-                        {item.related_entity}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                <ActionRow key={i} item={item} />
               ))}
             </div>
           </CardContent>

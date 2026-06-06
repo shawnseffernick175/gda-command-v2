@@ -18,7 +18,7 @@ export function TopBar() {
             href="https://csr-llc.tech"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono text-xs font-bold text-gda-green hover:opacity-80 transition-opacity"
+            className="font-mono text-xs font-bold text-gda-green hover:text-gda-green transition-colors"
           >
             Envision
           </a>

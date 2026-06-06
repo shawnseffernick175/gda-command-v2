@@ -428,11 +428,14 @@ function WhatNeedsMeTodayWidget() {
           <div className="space-y-1">
             {items.map((item) => {
               const priority = (item.priority ?? "MEDIUM") as ActionItemPriority;
+              const href = item.linked_record_type === "opportunity" && item.linked_record_id
+                ? `/opportunities?id=${item.linked_record_id}`
+                : `/action-items?highlight=${item.id}`;
               return (
                 <Link
                   key={item.id}
-                  href={`/action-items?highlight=${item.id}`}
-                  className="flex items-center gap-2 rounded p-1.5 text-xs hover:bg-gda-bg-base transition-colors"
+                  href={href}
+                  className="flex items-center gap-2 rounded p-1.5 text-xs hover:bg-gda-bg-base transition-colors cursor-pointer"
                 >
                   <Badge
                     variant="outline"
