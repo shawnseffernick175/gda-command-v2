@@ -24,6 +24,7 @@ import type {
   AwardAnalysisOutput,
   CompetitorAnalysisOutput,
   ContactEnrichOutput,
+  MatchAnalysisOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -203,6 +204,21 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       relevance_to_envision: 'Directly manages procurements in Envision\'s core NAICS codes and agencies.',
       model_used: 'mock',
     } satisfies ContactEnrichOutput,
+
+    match_analysis: {
+      broker_role: 'Envision bridges this technology to the requirement through its data analytics pipeline and DoD integration expertise.',
+      gap_analysis: 'Technology maturity needs to advance from prototype to pilot stage; ATO requirements may introduce schedule risk.',
+      recommended_actions: [
+        { action: 'Schedule teaming discussion with technology provider', priority: 'high', vehicle: 'OT Agreement' },
+        { action: 'Prepare capability statement highlighting Envision analytics stack', priority: 'medium', vehicle: 'Direct contract' },
+      ],
+      risk_flags: [
+        { risk: 'Technology readiness level below threshold for direct procurement', severity: 'medium' },
+      ],
+      envision_fit: 'Envision\'s digital transformation practice and active DoD program access make it a natural integrator for this capability.',
+      ai_narrative: 'This match pairs emerging autonomous capabilities with an active DoD requirement. Envision can serve as the systems integrator bridging commercial innovation to military application. The OT pathway is open and the timing aligns with Envision\'s Q3 capture calendar.',
+      model_used: 'mock-model',
+    } satisfies MatchAnalysisOutput,
   };
 
   return {

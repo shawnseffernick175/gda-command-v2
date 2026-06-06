@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 
 /** Map from task to prompt_library key for read-through lookup. */
@@ -84,6 +84,11 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.
 
 You are analyzing a competitor in the federal IT/consulting market relative to Envision (NAICS 541511/541512/541519/541690, 8(a) eligible small business specializing in digital transformation and data analytics for DoD/federal agencies). Classify this competitor and provide actionable intelligence.`,
+
+  match_analysis: `You are a senior capture strategist at Envision, a defense IT and systems integration firm (NAICS: 541511, 541512, 541519, 541690).
+
+Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
 };
 
 function buildRiskGenerationPrompt(input: RiskGenerationInput): string {
@@ -170,6 +175,8 @@ export async function callAnthropic(opts: {
     ? buildCompetitorAnalysisPrompt(opts.input as CompetitorAnalysisInput)
     : opts.task === 'contact_enrich'
     ? buildContactEnrichPrompt(opts.input as ContactEnrichInput)
+    : opts.task === 'match_analysis'
+    ? buildMatchAnalysisPrompt(opts.input as MatchAnalysisInput)
     : JSON.stringify(opts.input);
 
   try {
@@ -308,6 +315,29 @@ Respond ONLY with valid JSON:
   "engagement_approach": "<Recommended first engagement action for Envision>",
   "relevance_to_envision": "<Why Envision should track this contact specifically>",
   "model_used": "<model>"
+}`;
+}
+
+function buildMatchAnalysisPrompt(input: MatchAnalysisInput): string {
+  return `Technology signal: ${input.tech_title} (source: ${input.tech_source})
+Requirement signal: ${input.req_title} (source: ${input.req_source})
+Match scores: Mission Fit ${Math.round(input.mission_fit * 100)}%, Technical Fit ${Math.round(input.technical_fit * 100)}%, Timing ${Math.round(input.timing * 100)}%
+Recommended vehicle: ${input.recommended_vehicle ?? 'Not yet determined'}
+
+Analyze Envision's broker role — how can Envision bridge this technology to this requirement?
+Return ONLY valid JSON:
+{
+  "broker_role": "1-2 sentences on Envision's exact bridging role",
+  "gap_analysis": "What technical or programmatic gaps remain between the tech and the requirement",
+  "recommended_actions": [
+    {"action": "...", "priority": "high|medium|low", "vehicle": "..."}
+  ],
+  "risk_flags": [
+    {"risk": "...", "severity": "high|medium|low"}
+  ],
+  "envision_fit": "Why Envision specifically — not a generic contractor",
+  "ai_narrative": "3-4 sentence executive brief on this match and Envision's play",
+  "model_used": "${input.tech_source}"
 }`;
 }
 
