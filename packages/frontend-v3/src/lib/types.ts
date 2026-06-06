@@ -1,4 +1,4 @@
-/* ── Shared types for GDA Command frontend ────────────────────── */
+/* ── Shared types for frontend ────────────────────────────────── */
 
 export type Band = "forecast" | "signal" | "discovery" | "pass";
 

@@ -1,5 +1,5 @@
 /**
- * Typed wrapper functions for the GovTribe MCP tools used by GDA Command.
+ * Typed wrapper functions for the GovTribe MCP tools.
  *
  * Each wrapper maps a GDA-specific query shape to the discovered MCP tool
  * name and parameter schema (from tools.generated.json).

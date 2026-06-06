@@ -49,7 +49,7 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 
   capture_plan: `You are Envision's capture strategist. Generate a comprehensive capture plan following Shipley methodology. Include win themes, ghost themes, teaming plan, pink/red/gold/black hat analysis, and next actions. Return JSON matching CapturePlanOutput.`,
 
-  daily_briefing: `You are the GDA Command daily briefing generator for Envision. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
+  daily_briefing: `You are Envision's daily briefing analyst. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
 {
   "headline": "<1-sentence summary of today's top priority>",
   "priority_actions": [
@@ -61,7 +61,7 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 }
 All fields are required. urgency must be one of: immediate, today, this_week.`,
 
-  sentinel_summary: `You are a system health analyst for GDA Command. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
+  sentinel_summary: `You are a system health analyst for Envision. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
 
 
   black_hat_analysis: `You are a competitive intelligence analyst specializing in federal government contracting. Perform Black Hat analysis viewing competition from the competitor's perspective.`,

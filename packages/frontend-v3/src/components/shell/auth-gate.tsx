@@ -11,7 +11,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex h-screen items-center justify-center bg-gda-bg-deep">
         <div className="animate-pulse font-mono text-gda-green">
-          Initializing GDA Command Center…
+          Initializing Command Center…
         </div>
       </div>
     );

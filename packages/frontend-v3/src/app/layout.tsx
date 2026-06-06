@@ -26,7 +26,7 @@ const plexSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "GDA Command Center",
+  title: "Command Center",
   description: "Federal contract intelligence platform",
 };
 
