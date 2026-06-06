@@ -27,6 +27,7 @@ import type {
   MatchAnalysisOutput,
   VaultDocumentParseOutput,
   VaultSmartRouteOutput,
+  DigestLeadOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -242,6 +243,13 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       routing_rationale: 'Document classified as work product contract based on content analysis.',
       confidence: 'high',
     } satisfies VaultSmartRouteOutput,
+    digest_lead: {
+      headline: 'No significant developments in the last 24 hours',
+      body: 'No new federal register notices, solicitations, or regulatory changes affecting Envision\u2019s NAICS space were published in the last 24 hours.',
+      source_label: '',
+      source_url: null,
+      related_opportunity_ids: [],
+    } satisfies DigestLeadOutput,
   };
 
   return {

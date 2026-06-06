@@ -32,6 +32,7 @@ import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
+import { runDigestRefresh } from './digest-refresh.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
@@ -125,6 +126,13 @@ export function startCronScheduler(): void {
   });
   tasks.push(actionItemsGenTask);
   logger.info({ schedule: '30 */6 * * *' }, '[cron] registered: action-items-gen (30 */6 * * *)');
+
+  // Digest lead story refresh — daily at 11:00 UTC (6:00 AM ET)
+  const digestRefreshTask = cron.schedule('0 11 * * *', async () => {
+    await runDigestRefresh();
+  });
+  tasks.push(digestRefreshTask);
+  logger.info({ schedule: '0 11 * * *' }, '[cron] registered: digest.refresh (0 11 * * *)');
 
   // PWin nightly retrain — runs at 02:00 UTC (10 PM ET)
   const pwinRetrainTask = cron.schedule('0 2 * * *', async () => {

@@ -120,6 +120,13 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     timeout_ms: 15_000,
     fallback: null,
   },
+  {
+    task: 'digest_lead',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    timeout_ms: 30_000,
+    fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
+  },
 ] as const;
 
 /** Lookup helper — O(1) via pre-built map. */
