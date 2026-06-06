@@ -3,16 +3,15 @@
 import { useCallback, useState } from "react";
 
 /**
- * Collapse memory — sessionStorage-backed.
- * Collapsed on first visit; open-state remembered while session lasts;
- * resets to collapsed on browser close (sessionStorage, NOT localStorage).
+ * Collapse memory — localStorage-backed.
+ * Persists open/closed state across browser sessions.
  */
 export function useCollapseMemory(key: string, defaultOpen = false) {
-  const storageKey = `gda-collapse:${key}`;
+  const storageKey = `settings_collapsed_${key}`;
 
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window === "undefined") return defaultOpen;
-    const stored = sessionStorage.getItem(storageKey);
+    const stored = localStorage.getItem(storageKey);
     if (stored !== null) return stored === "1";
     return defaultOpen;
   });
@@ -20,7 +19,7 @@ export function useCollapseMemory(key: string, defaultOpen = false) {
   const toggle = useCallback(() => {
     setIsOpen((prev) => {
       const next = !prev;
-      sessionStorage.setItem(storageKey, next ? "1" : "0");
+      localStorage.setItem(storageKey, next ? "1" : "0");
       return next;
     });
   }, [storageKey]);
@@ -28,7 +27,7 @@ export function useCollapseMemory(key: string, defaultOpen = false) {
   const setOpen = useCallback(
     (open: boolean) => {
       setIsOpen(open);
-      sessionStorage.setItem(storageKey, open ? "1" : "0");
+      localStorage.setItem(storageKey, open ? "1" : "0");
     },
     [storageKey],
   );

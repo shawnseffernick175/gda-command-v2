@@ -228,11 +228,11 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
                 <a
                   href={s.source_url}
                   target="_blank"
-                  rel="noreferrer"
-                  className="text-[11px] text-gda-cyan hover:underline"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-gda-cyan hover:underline font-mono"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {s.source_url}
+                  View Source ↗
                 </a>
               )}
             </div>

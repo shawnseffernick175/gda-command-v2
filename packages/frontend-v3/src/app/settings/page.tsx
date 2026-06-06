@@ -4,11 +4,9 @@ import { useState } from "react";
 import { useSentinel } from "@/hooks/use-sentinel";
 import {
   useDoctrinePrinciples,
-  useDoctrineExclusions,
   useDoctrineConfig,
   useUpdateDoctrineConfig,
 } from "@/hooks/use-doctrine";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { cn } from "@/lib/utils";
@@ -97,95 +95,160 @@ function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
   );
 }
 
-/* ── Integrations Panel ───────────────────────────────────────── */
+/* ── System Health Section ─────────────────────────────────────── */
+const SYSTEM_SERVICES = [
+  { key: "backend_api", label: "Backend API", detail: "v3.0 · gda-v3.csr-llc.tech" },
+  { key: "database", label: "Database", detail: "gda_command_staging" },
+  { key: "agent_service", label: "Agent Service", detail: "port 8001" },
+  { key: "mcp_server", label: "MCP Server", detail: "gda-mcp.csr-llc.tech" },
+  { key: "sentinel_monitor", label: "Sentinel Monitor", detail: "Background health checks" },
+];
+
+function SystemHealthSection({ sentinel }: { sentinel: ReturnType<typeof useSentinel>["data"] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const overallHealthy = sentinel?.overall === "healthy";
+  const sentinelStatus = sentinel?.overall ?? "unknown";
+
+  return (
+    <div className="space-y-2">
+      {SYSTEM_SERVICES.map((svc) => {
+        const isExpanded = expanded === svc.key;
+        const isSentinelRow = svc.key === "sentinel_monitor";
+        const status = isSentinelRow
+          ? (sentinelStatus === "healthy" ? "Active" : sentinelStatus === "degraded" ? "Degraded" : sentinelStatus === "down" ? "Down" : "Unknown")
+          : (overallHealthy ? "Healthy" : sentinelStatus === "down" ? "Down" : "Degraded");
+        const dotColor = status === "Healthy" || status === "Active"
+          ? "bg-gda-green"
+          : status === "Degraded"
+            ? "bg-gda-amber"
+            : status === "Down"
+              ? "bg-gda-red"
+              : "bg-muted-foreground";
+
+        return (
+          <div key={svc.key}>
+            <button
+              type="button"
+              onClick={() => setExpanded(isExpanded ? null : svc.key)}
+              className="flex w-full items-center gap-3 rounded border border-border bg-gda-bg-base px-4 py-2.5 text-left hover:bg-gda-panel/50 transition-colors cursor-pointer"
+            >
+              <span className={cn("h-2 w-2 rounded-full shrink-0", dotColor)} />
+              <span className="text-sm font-medium text-foreground flex-1">{svc.label}</span>
+              <span className="text-xs text-muted-foreground font-mono">{status}</span>
+              <span className="text-xs text-muted-foreground font-mono">{svc.detail}</span>
+              <span className={cn("text-xs text-muted-foreground transition-transform", isExpanded && "rotate-90")}>▸</span>
+            </button>
+            {isExpanded && (
+              <div className="ml-5 mt-1 rounded border border-border bg-gda-panel px-4 py-2 text-xs text-muted-foreground space-y-1">
+                {isSentinelRow && sentinel ? (
+                  <>
+                    <p>Overall: <span className="text-foreground font-mono">{sentinel.overall}</span></p>
+                    <p>Sources monitored: <span className="text-foreground font-mono">{sentinel.sources.length}</span></p>
+                    <p>GovTribe credits: <span className="text-foreground font-mono">{sentinel.govtribe_credits.credits_used}/{sentinel.govtribe_credits.credits_budget}</span></p>
+                  </>
+                ) : status === "Healthy" ? (
+                  <p>Service responding normally. No recent errors.</p>
+                ) : (
+                  <p>Status inferred from Sentinel overall health: <span className="text-foreground font-mono">{status}</span></p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── Integrations Section ──────────────────────────────────────── */
 const INTEGRATION_SOURCES: Array<{
   key: string;
   label: string;
   description: string;
   docsUrl: string;
 }> = [
-  { key: 'sam.gov', label: 'SAM.gov', description: 'Federal solicitations — free API, no credential required', docsUrl: 'https://open.sam.gov' },
-  { key: 'govtribe', label: 'GovTribe', description: 'Opportunity intelligence + contract vehicles + agency contacts', docsUrl: 'https://api.govtribe.com' },
-  { key: 'govwin', label: 'GovWin IQ', description: 'Forecast pipeline + competitive intelligence (CAS auth)', docsUrl: 'https://iq.govwin.com' },
-  { key: 'usaspending.gov', label: 'USAspending', description: 'Federal awards database — free public API', docsUrl: 'https://api.usaspending.gov' },
-  { key: 'grants.gov', label: 'Grants.gov', description: 'Federal grant opportunities — public XML feed', docsUrl: 'https://www.grants.gov/xml-extract' },
+  { key: 'sam.gov', label: 'SAM.gov', description: 'Federal solicitations — free API', docsUrl: 'https://open.sam.gov' },
+  { key: 'govtribe', label: 'GovTribe', description: 'Opportunity intelligence + contract vehicles', docsUrl: 'https://api.govtribe.com' },
+  { key: 'govwin', label: 'GovWin IQ', description: 'Forecast pipeline + competitive intelligence', docsUrl: 'https://iq.govwin.com' },
+  { key: 'usaspending.gov', label: 'USAspending', description: 'Federal awards database — free API', docsUrl: 'https://api.usaspending.gov' },
   { key: 'federalregister.gov', label: 'Federal Register', description: 'Regulatory notices and agency rules', docsUrl: 'https://www.federalregister.gov/developers' },
-  { key: 'sbir', label: 'SBIR/STTR', description: 'DoD DSIP open topics — public API', docsUrl: 'https://www.dodsbirsttr.mil/topics-app/' },
-  { key: 'dibbs', label: 'DIBBS (DLA)', description: 'DLA small business RFQs — .mil site (egress blocked from VPS)', docsUrl: 'https://www.dibbs.bsm.dla.mil' },
-  { key: 'neco', label: 'NECO (Navy)', description: 'Navy electronic commerce — .mil site (egress blocked from VPS)', docsUrl: 'https://www.neco.navy.mil' },
-  { key: 'nih', label: 'NIH RePORTER', description: 'Research awards — weekly ingest (Mon 3am ET)', docsUrl: 'https://api.reporter.nih.gov' },
-  { key: 'arxiv', label: 'arXiv', description: 'Defense/tech research papers — weekly ingest (Mon 2am ET)', docsUrl: 'https://arxiv.org/help/api' },
 ];
 
-type SentinelData = {
-  overall: string;
-  sources: Array<{
-    source_key: string;
-    label: string;
-    status: string;
-    last_success_at: string | null;
-    message?: string;
-  }>;
-} | null | undefined;
-
-function IntegrationsPanel({ sentinel }: { sentinel: SentinelData }) {
+function IntegrationsSection({ sentinel }: { sentinel: ReturnType<typeof useSentinel>["data"] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
   const sourceMap = new Map(
     (sentinel?.sources ?? []).map((s) => [s.source_key, s])
   );
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground mb-3">
-        Live status from Sentinel. All data source connections are managed via environment variables on the VPS.
-      </p>
       {INTEGRATION_SOURCES.map((integration) => {
         const live = sourceMap.get(integration.key);
-        const status = live?.status ?? 'unknown';
+        const status = live?.status ?? "unknown";
         const lastRun = live?.last_success_at
-          ? new Date(live.last_success_at).toLocaleString()
-          : 'Never';
+          ? timeAgo(new Date(live.last_success_at))
+          : "Never";
+        const isExpanded = expanded === integration.key;
+        const isGovTribe = integration.key === "govtribe";
+        const credits = isGovTribe ? sentinel?.govtribe_credits : undefined;
+
+        const statusLabel = status === "healthy" ? "Connected"
+          : status === "stale" ? "Stale"
+            : status === "error" ? "Error"
+              : "Unknown";
+
+        const dotColor = status === "healthy" ? "bg-gda-green"
+          : status === "stale" ? "bg-gda-amber"
+            : status === "error" ? "bg-gda-red"
+              : "bg-muted-foreground";
 
         return (
-          <div
-            key={integration.key}
-            className="flex items-start gap-3 rounded border border-border bg-gda-bg-base px-3 py-2.5"
-          >
-            <span
-              className={cn(
-                'mt-0.5 h-2 w-2 rounded-full shrink-0',
-                status === 'healthy' ? 'bg-gda-green' :
-                status === 'stale' ? 'bg-amber-400' :
-                status === 'error' ? 'bg-red-500' :
-                'bg-muted-foreground'
+          <div key={integration.key}>
+            <button
+              type="button"
+              onClick={() => setExpanded(isExpanded ? null : integration.key)}
+              className="flex w-full items-center gap-3 rounded border border-border bg-gda-bg-base px-4 py-2.5 text-left hover:bg-gda-panel/50 transition-colors cursor-pointer"
+            >
+              <span className={cn("h-2 w-2 rounded-full shrink-0", dotColor)} />
+              <span className="text-sm font-medium text-foreground flex-1">{integration.label}</span>
+              <span className="text-xs text-muted-foreground font-mono">{statusLabel}</span>
+              {isGovTribe && credits ? (
+                <span className="text-xs text-muted-foreground font-mono">
+                  Credits: {credits.credits_used}/{credits.credits_budget}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground font-mono">Last sync: {lastRun}</span>
               )}
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold text-foreground">{integration.label}</span>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-[11px] px-1.5 py-0',
-                    status === 'healthy' ? 'border-gda-green/30 text-gda-green' :
-                    status === 'stale' ? 'border-amber-400/30 text-amber-400' :
-                    status === 'error' ? 'border-red-500/30 text-red-400' :
-                    'border-border text-muted-foreground'
-                  )}
-                >
-                  {status}
-                </Badge>
+              <span className={cn("text-xs text-muted-foreground transition-transform", isExpanded && "rotate-90")}>▸</span>
+            </button>
+            {isExpanded && (
+              <div className="ml-5 mt-1 rounded border border-border bg-gda-panel px-4 py-2 text-xs text-muted-foreground space-y-1">
+                <p>{integration.description}</p>
+                <p>Status: <span className="text-foreground font-mono">{status}</span></p>
+                <p>Last success: <span className="text-foreground font-mono">{live?.last_success_at ? new Date(live.last_success_at).toLocaleString() : "Never"}</span></p>
+                {live?.message && <p>Message: <span className="text-foreground">{live.message}</span></p>}
+                {isGovTribe && credits && (
+                  <div className="space-y-1">
+                    <p>Credits used: <span className="text-foreground font-mono">{credits.credits_used} / {credits.credits_budget}</span></p>
+                    <div className="h-1.5 w-full rounded-full bg-gda-bg-base overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full", credits.pct > 80 ? "bg-gda-red" : credits.pct > 60 ? "bg-gda-amber" : "bg-gda-green")}
+                        style={{ width: `${Math.min(credits.pct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <a
                   href={integration.docsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-muted-foreground hover:text-foreground ml-auto"
+                  className="inline-block text-gda-cyan hover:underline mt-1"
                 >
                   Docs ↗
                 </a>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{integration.description}</p>
-              <p className="text-[11px] text-muted-foreground/50 mt-0.5">Last success: {lastRun}</p>
-            </div>
+            )}
           </div>
         );
       })}
@@ -429,89 +492,61 @@ function UserManagementPanel() {
   );
 }
 
+/* ── Time ago helper ───────────────────────────────────────────── */
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 /* ── Main Settings Page ─────────────────────────────────────────── */
 export default function SettingsPage() {
   const { data: sentinel, isLoading: sentinelLoading } = useSentinel();
   const { data: principles, isLoading: principlesLoading } = useDoctrinePrinciples();
-  const { data: exclusions, isLoading: exclusionsLoading } = useDoctrineExclusions();
   const { data: configRows, isLoading: configLoading } = useDoctrineConfig();
 
   return (
     <div className="space-y-6">
-      <h1 className="font-mono text-lg font-bold text-foreground">Settings</h1>
+      <div>
+        <h1 className="font-mono text-lg font-bold text-foreground">SETTINGS</h1>
+        <p className="text-sm text-muted-foreground">System configuration and integrations</p>
+      </div>
 
-      {/* ── Sentinel Health ───────────────────────────────────── */}
-      <Card id="sentinel" className="border-border bg-gda-panel">
-        <CardHeader>
-          <CardTitle className="font-mono text-sm text-muted-foreground">
-            Sentinel — Data Source Health
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {sentinelLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-8 animate-pulse rounded bg-gda-bg-base" />
-              ))}
-            </div>
-          ) : sentinel?.sources ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs text-muted-foreground">Overall:</span>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-xs",
-                    sentinel.overall === "healthy"
-                      ? "border-gda-green/30 text-gda-green"
-                      : sentinel.overall === "degraded"
-                      ? "border-gda-amber/30 text-gda-amber"
-                      : "border-gda-red/30 text-gda-red",
-                  )}
-                >
-                  {sentinel.overall}
-                </Badge>
-              </div>
-              {sentinel.sources.map((source) => (
-                <div
-                  key={source.source_key}
-                  className="flex items-center gap-3 rounded border border-border bg-gda-bg-base px-3 py-2"
-                  title={source.message}
-                >
-                  <span
-                    className={cn(
-                      "h-2 w-2 rounded-full flex-shrink-0",
-                      source.status === "healthy"
-                        ? "bg-gda-green"
-                        : source.status === "stale"
-                        ? "bg-gda-amber"
-                        : source.status === "unknown"
-                        ? "bg-muted-foreground"
-                        : "bg-gda-red",
-                    )}
-                  />
-                  <span className="flex-1 text-sm text-foreground">{source.label}</span>
-                  <Badge variant="outline" className="text-[11px]">
-                    {source.status}
-                  </Badge>
-                  <span className="text-[11px] text-muted-foreground">
-                    {source.last_success_at
-                      ? new Date(source.last_success_at).toLocaleString()
-                      : "Never"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Unable to fetch sentinel data.</p>
-          )}
-        </CardContent>
-      </Card>
+      {/* ── System Health ──────────────────────────────────────── */}
+      <div id="sentinel" />
+      <CollapseSection id="settings-system-health" title="SYSTEM HEALTH" defaultOpen={true}>
+        {sentinelLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-gda-bg-base" />
+            ))}
+          </div>
+        ) : (
+          <SystemHealthSection sentinel={sentinel} />
+        )}
+      </CollapseSection>
 
-      {/* ── Doctrine Configuration ────────────────────────────── */}
-      <CollapseSection id="settings-doctrine" title="Doctrine Configuration" defaultOpen={false}>
+      {/* ── Integrations ──────────────────────────────────────── */}
+      <CollapseSection id="settings-integrations" title="INTEGRATIONS" defaultOpen={true}>
+        {sentinelLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-gda-bg-base" />
+            ))}
+          </div>
+        ) : (
+          <IntegrationsSection sentinel={sentinel} />
+        )}
+      </CollapseSection>
+
+      {/* ── Doctrine Configuration ─────────────────────────────── */}
+      <CollapseSection id="settings-doctrine" title="DOCTRINE CONFIGURATION" defaultOpen={false}>
         <div className="space-y-5">
-
           {/* Config Keys */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
@@ -566,64 +601,12 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">No principles loaded.</p>
             )}
           </div>
-
-          {/* Exclusions */}
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-              Strategic Exclusions
-            </p>
-            {exclusionsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-10 animate-pulse rounded bg-gda-bg-base" />
-                ))}
-              </div>
-            ) : exclusions && exclusions.length > 0 ? (
-              <div className="space-y-1.5">
-                {exclusions.map((ex) => (
-                  <div
-                    key={ex.id}
-                    className="flex items-start gap-3 rounded border border-border bg-gda-bg-base px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-xs font-semibold text-foreground">{ex.name}</p>
-                        {ex.is_hard_block && (
-                          <Badge
-                            variant="destructive"
-                            className="text-[11px] px-1.5 py-0"
-                          >
-                            Hard Block
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
-                        {ex.description}
-                      </p>
-                      {ex.override_requires && (
-                        <p className="text-[11px] text-amber-400 mt-0.5">
-                          Override requires: {ex.override_requires}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">No exclusions loaded.</p>
-            )}
-          </div>
         </div>
       </CollapseSection>
 
-      {/* ── Users & Auth ─────────────────────────────────────── */}
-      <CollapseSection id="settings-users" title="Users & Authentication" defaultOpen={false}>
+      {/* ── User Management ────────────────────────────────────── */}
+      <CollapseSection id="settings-users" title="USER MANAGEMENT" defaultOpen={false}>
         <UserManagementPanel />
-      </CollapseSection>
-
-      {/* ── Integrations ─────────────────────────────────────── */}
-      <CollapseSection id="settings-integrations" title="Integrations" defaultOpen={false}>
-        <IntegrationsPanel sentinel={sentinel} />
       </CollapseSection>
     </div>
   );
