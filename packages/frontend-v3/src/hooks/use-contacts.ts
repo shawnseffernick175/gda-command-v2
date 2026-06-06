@@ -2,12 +2,20 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
-import type { GovTriContact, ContactCategory } from "@/lib/types";
+import type {
+  GovTriContact,
+  ContactCategory,
+  ContactsMeta,
+  RelationshipTemp,
+} from "@/lib/types";
 
 export interface UseContactsParams {
   q?: string;
   agency?: string;
   category?: ContactCategory | "all";
+  temperature?: RelationshipTemp | "all";
+  linked?: "yes" | "no";
+  source?: string;
   limit?: number;
   cursor?: number;
 }
@@ -15,6 +23,7 @@ export interface UseContactsParams {
 interface ContactsResponse {
   items: GovTriContact[];
   pagination: { hasMore: boolean; cursor: number | null };
+  meta: ContactsMeta;
 }
 
 export function useContacts(params: UseContactsParams = {}) {
@@ -25,6 +34,9 @@ export function useContacts(params: UseContactsParams = {}) {
         q: params.q || undefined,
         agency: params.agency || undefined,
         category: params.category || undefined,
+        temperature: params.temperature || undefined,
+        linked: params.linked || undefined,
+        source: params.source || undefined,
         limit: params.limit ?? 100,
         cursor: params.cursor || undefined,
       }),
@@ -81,6 +93,43 @@ export function useEnrichContact() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["contacts"] });
     },
+  });
+}
+
+export function useLogContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiPost<GovTriContact>(`/v3/contacts/${id}/log-contact`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["contacts"] });
+    },
+  });
+}
+
+export function useLinkContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { id: number; opportunity_id?: number; capture_id?: number }) =>
+      apiPost<GovTriContact>(`/v3/contacts/${body.id}/link`, {
+        opportunity_id: body.opportunity_id,
+        capture_id: body.capture_id,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["contacts"] });
+    },
+  });
+}
+
+export function useSearchLinkable(q: string) {
+  return useQuery({
+    queryKey: ["contacts", "search-linkable", q],
+    queryFn: () =>
+      apiGet<{
+        opportunities: Array<{ id: number; title: string; stage: string | null; value: number | null }>;
+        captures: Array<{ id: number; title: string; stage: string | null }>;
+      }>("/v3/contacts/search-linkable", { q }),
+    enabled: q.length > 0,
   });
 }
 
