@@ -151,6 +151,7 @@ CREATE TABLE users (
   locked_until       TIMESTAMPTZ,
   password_set_at    TIMESTAMPTZ,
   last_login_at      TIMESTAMPTZ,
+  settings           JSONB         NOT NULL DEFAULT '{}',
   created_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
@@ -168,6 +169,7 @@ CREATE TABLE users (
 | `locked_until` | Account lockout expiry (5 failures → 15 min lock) |
 | `password_set_at` | Timestamp when password was last set/changed |
 | `last_login_at` | Session tracking for security audit |
+| `settings` | Per-user JSONB preferences (e.g. `briefing_auto_delivery`, `briefing_delivery_email`) |
 
 **No indexes beyond PK + unique on email** — small table, full scans are negligible.
 
