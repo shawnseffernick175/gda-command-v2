@@ -33,6 +33,7 @@ import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
 import { runDigestRefresh } from './digest-refresh.js';
+import { runDailyBriefingCron } from './daily-briefing.js';
 
 const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
 const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
@@ -113,6 +114,19 @@ export function startCronScheduler(): void {
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
   }
+
+  // Daily briefing auto-delivery — 6:00 AM ET (11:00 UTC) on weekdays
+  const briefingDeliveryTask = cron.schedule('0 11 * * 1-5', async () => {
+    try {
+      logger.info('[cron] briefing.delivery starting');
+      await runDailyBriefingCron();
+      logger.info('[cron] briefing.delivery completed');
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_briefing_delivery_error');
+    }
+  });
+  tasks.push(briefingDeliveryTask);
+  logger.info({ schedule: '0 11 * * 1-5' }, '[cron] registered: briefing.delivery (0 11 * * 1-5)');
 
   // Action items auto-generation — every 6 hours
   const actionItemsGenTask = cron.schedule('30 */6 * * *', async () => {

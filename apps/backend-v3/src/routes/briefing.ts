@@ -5,12 +5,14 @@
  * POST /v3/briefing/generate — on-demand generation + upsert
  */
 
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import pg from 'pg';
+import PDFDocument from 'pdfkit';
 import { config } from '../config/index.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { assembleDailyBriefing } from '../services/briefing/assemble.js';
 import { logger } from '../lib/logger.js';
+import type { JwtPayload } from '../middleware/auth.js';
 
 const { Pool } = pg;
 
@@ -115,5 +117,147 @@ export async function briefingRoutes(app: FastifyInstance): Promise<void> {
     };
 
     return reply.status(200).send(successEnvelope(result, req.requestId));
+  });
+
+  /* ── PDF export ────────────────────────────────────────────── */
+  app.get('/v3/briefing/export', async (req, reply) => {
+    const todayET = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const { rows } = await pool.query<BriefingRow>(
+      `SELECT briefing_date, headline, priority_actions, risk_flags,
+              market_intel_summary, cert_expiration_warnings,
+              model_used, quality_flag, trace_id, generated_at
+       FROM daily_briefing_cache
+       WHERE briefing_date = $1`,
+      [todayET],
+    );
+
+    if (rows.length === 0) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'No briefing generated for today', req.requestId),
+      );
+    }
+
+    const briefing = rows[0]!;
+    const dateLabel = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      timeZone: 'America/New_York',
+    });
+
+    const doc = new PDFDocument({ margin: 50 });
+    reply.raw.setHeader('Content-Type', 'application/pdf');
+    reply.raw.setHeader(
+      'Content-Disposition',
+      `attachment; filename="daily-brief-${todayET}.pdf"`,
+    );
+    doc.pipe(reply.raw);
+
+    // Header
+    doc.fontSize(18).font('Helvetica-Bold').text('DAILY INTELLIGENCE BRIEF', { align: 'center' });
+    doc.fontSize(10).font('Helvetica').text(dateLabel, { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(14).font('Helvetica-Bold').text(briefing.headline, { align: 'center' });
+    doc.moveDown(1.5);
+
+    // Priority Actions
+    const actions = Array.isArray(briefing.priority_actions) ? briefing.priority_actions as Array<{ action: string; urgency: string; related_entity?: string }> : [];
+    if (actions.length > 0) {
+      doc.fontSize(12).font('Helvetica-Bold').text('PRIORITY ACTIONS');
+      doc.moveDown(0.5);
+      actions.forEach((item, i) => {
+        const label = item.urgency === 'immediate' ? '[IMMEDIATE]'
+          : item.urgency === 'today' ? '[TODAY]' : '[THIS WEEK]';
+        doc.fontSize(10).font('Helvetica').text(`${i + 1}. ${label} ${item.action}`);
+        if (item.related_entity) {
+          doc.fontSize(9).fillColor('#666666').text(`   ${item.related_entity}`);
+          doc.fillColor('#000000');
+        }
+        doc.moveDown(0.3);
+      });
+      doc.moveDown();
+    }
+
+    // Risk Flags
+    const risks = Array.isArray(briefing.risk_flags) ? briefing.risk_flags as string[] : [];
+    if (risks.length > 0) {
+      doc.fontSize(12).font('Helvetica-Bold').text('RISK FLAGS');
+      doc.moveDown(0.5);
+      risks.forEach((risk) => {
+        doc.fontSize(10).font('Helvetica').text(`\u2022 ${risk}`);
+        doc.moveDown(0.3);
+      });
+      doc.moveDown();
+    }
+
+    // Market Intel
+    if (briefing.market_intel_summary) {
+      doc.fontSize(12).font('Helvetica-Bold').text('MARKET INTELLIGENCE');
+      doc.moveDown(0.5);
+      doc.fontSize(10).font('Helvetica').text(briefing.market_intel_summary, { lineGap: 4 });
+      doc.moveDown();
+    }
+
+    // Cert Warnings
+    const certs = Array.isArray(briefing.cert_expiration_warnings) ? briefing.cert_expiration_warnings as string[] : [];
+    if (certs.length > 0) {
+      doc.fontSize(12).font('Helvetica-Bold').text('CERTIFICATION WARNINGS');
+      doc.moveDown(0.5);
+      certs.forEach((warn) => {
+        doc.fontSize(10).font('Helvetica').text(`\u2022 ${warn}`);
+        doc.moveDown(0.3);
+      });
+      doc.moveDown();
+    }
+
+    // Footer
+    doc.moveDown(2);
+    doc.fontSize(8).font('Helvetica').fillColor('#999999')
+      .text(`Generated ${new Date(briefing.generated_at).toLocaleString('en-US', { timeZone: 'America/New_York' })} ET`, { align: 'center' });
+
+    doc.end();
+    return reply;
+  });
+
+  /* ── User settings ──────────────────────────────────────────── */
+  app.get('/v3/users/me/settings', async (req, reply) => {
+    const userPayload = (req as FastifyRequest & { user: JwtPayload }).user;
+    if (!userPayload) {
+      return reply.status(401).send(
+        errorEnvelope('UNAUTHORIZED', 'Missing or invalid authorization', req.requestId),
+      );
+    }
+
+    const { rows } = await pool.query(
+      'SELECT settings FROM users WHERE id = $1',
+      [userPayload.sub],
+    );
+    const settings = rows[0]?.settings ?? {};
+    return reply.status(200).send(successEnvelope(settings, req.requestId));
+  });
+
+  app.patch('/v3/users/me/settings', async (req, reply) => {
+    const userPayload = (req as FastifyRequest & { user: JwtPayload }).user;
+    if (!userPayload) {
+      return reply.status(401).send(
+        errorEnvelope('UNAUTHORIZED', 'Missing or invalid authorization', req.requestId),
+      );
+    }
+
+    const body = req.body as Record<string, unknown> | null;
+    if (!body || typeof body !== 'object') {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'Request body must be a JSON object', req.requestId),
+      );
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING settings`,
+      [JSON.stringify(body), userPayload.sub],
+    );
+
+    return reply.status(200).send(successEnvelope(rows[0]?.settings ?? {}, req.requestId));
   });
 }
