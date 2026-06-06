@@ -966,7 +966,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
       <div className="relative w-full max-w-md bg-gda-bg-base border border-border rounded-lg p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-mono text-sm font-bold text-foreground">
-            Upload &amp; Route
+            Upload {"&"} Route
           </h2>
           <button
             onClick={onClose}
