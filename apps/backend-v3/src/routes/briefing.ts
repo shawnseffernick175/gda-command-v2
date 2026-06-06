@@ -144,6 +144,7 @@ export async function briefingRoutes(app: FastifyInstance): Promise<void> {
     });
 
     const doc = new PDFDocument({ margin: 50 });
+    reply.hijack();
     reply.raw.setHeader('Content-Type', 'application/pdf');
     reply.raw.setHeader(
       'Content-Disposition',
@@ -214,7 +215,6 @@ export async function briefingRoutes(app: FastifyInstance): Promise<void> {
       .text(`Generated ${new Date(briefing.generated_at).toLocaleString('en-US', { timeZone: 'America/New_York' })} ET`, { align: 'center' });
 
     doc.end();
-    return reply;
   });
 
   /* ── User settings ──────────────────────────────────────────── */
@@ -243,9 +243,20 @@ export async function briefingRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const body = req.body as Record<string, unknown> | null;
-    if (!body || typeof body !== 'object') {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
       return reply.status(400).send(
         errorEnvelope('VALIDATION_ERROR', 'Request body must be a JSON object', req.requestId),
+      );
+    }
+
+    const ALLOWED_KEYS = new Set(['briefing_auto_delivery', 'briefing_delivery_email']);
+    const filtered: Record<string, unknown> = {};
+    for (const key of Object.keys(body)) {
+      if (ALLOWED_KEYS.has(key)) filtered[key] = body[key];
+    }
+    if (Object.keys(filtered).length === 0) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'No valid settings keys provided', req.requestId),
       );
     }
 
@@ -255,7 +266,7 @@ export async function briefingRoutes(app: FastifyInstance): Promise<void> {
            updated_at = NOW()
        WHERE id = $2
        RETURNING settings`,
-      [JSON.stringify(body), userPayload.sub],
+      [JSON.stringify(filtered), userPayload.sub],
     );
 
     return reply.status(200).send(successEnvelope(rows[0]?.settings ?? {}, req.requestId));

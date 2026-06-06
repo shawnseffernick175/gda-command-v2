@@ -12,6 +12,15 @@ const smtpUser = process.env.SMTP_USER ?? '';
 const smtpPass = process.env.SMTP_PASS ?? '';
 const smtpFrom = process.env.SMTP_FROM ?? 'briefing@gda-command.local';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 interface BriefingEmailData {
   headline: string;
   priority_actions: Array<{ action: string; urgency: string; related_entity?: string }>;
@@ -28,8 +37,8 @@ function buildHtml(data: BriefingEmailData, dateLabel: string): string {
          ${data.priority_actions.map((a) => {
            const tag = a.urgency === 'immediate' ? '<b>[IMMEDIATE]</b>'
              : a.urgency === 'today' ? '[TODAY]' : '[THIS WEEK]';
-           const entity = a.related_entity ? `<br/><span style="color:#888;font-size:12px">${a.related_entity}</span>` : '';
-           return `<li>${tag} ${a.action}${entity}</li>`;
+           const entity = a.related_entity ? `<br/><span style="color:#888;font-size:12px">${escapeHtml(a.related_entity)}</span>` : '';
+           return `<li>${tag} ${escapeHtml(a.action)}${entity}</li>`;
          }).join('')}
        </ul>`
     : '';
@@ -37,19 +46,19 @@ function buildHtml(data: BriefingEmailData, dateLabel: string): string {
   const risksHtml = data.risk_flags.length > 0
     ? `<h2 style="margin-top:24px;font-size:14px;font-weight:bold;color:#c53030">RISK FLAGS</h2>
        <ul style="padding-left:20px;font-size:13px">
-         ${data.risk_flags.map((r) => `<li>${r}</li>`).join('')}
+         ${data.risk_flags.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}
        </ul>`
     : '';
 
   const intelHtml = data.market_intel_summary
     ? `<h2 style="margin-top:24px;font-size:14px;font-weight:bold">MARKET INTELLIGENCE</h2>
-       <p style="font-size:13px;white-space:pre-wrap">${data.market_intel_summary}</p>`
+       <p style="font-size:13px;white-space:pre-wrap">${escapeHtml(data.market_intel_summary)}</p>`
     : '';
 
   const certsHtml = data.cert_expiration_warnings.length > 0
     ? `<h2 style="margin-top:24px;font-size:14px;font-weight:bold;color:#d69e2e">CERTIFICATION WARNINGS</h2>
        <ul style="padding-left:20px;font-size:13px">
-         ${data.cert_expiration_warnings.map((c) => `<li>${c}</li>`).join('')}
+         ${data.cert_expiration_warnings.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}
        </ul>`
     : '';
 
@@ -57,7 +66,7 @@ function buildHtml(data: BriefingEmailData, dateLabel: string): string {
     <div style="max-width:640px;margin:0 auto;font-family:Helvetica,Arial,sans-serif;color:#1a1a1a">
       <h1 style="text-align:center;font-size:18px;margin-bottom:4px">DAILY INTELLIGENCE BRIEF</h1>
       <p style="text-align:center;font-size:12px;color:#888">${dateLabel}</p>
-      <p style="text-align:center;font-size:16px;font-weight:bold;margin-top:8px">${data.headline}</p>
+      <p style="text-align:center;font-size:16px;font-weight:bold;margin-top:8px">${escapeHtml(data.headline)}</p>
       ${actionsHtml}
       ${risksHtml}
       ${intelHtml}
