@@ -111,7 +111,7 @@ export async function computeFlags(): Promise<LaunchpadFlagsResult> {
 
   const now = new Date().toISOString();
   const internalSrc = (filterUrl: string, label: string): SourceCitation[] => [
-    { kind: 'internal', title: `GDA Command V3 — ${label}`, url: filterUrl, retrieved_at: now },
+    { kind: 'internal', title: `Envision Intelligence — ${label}`, url: filterUrl, retrieved_at: now },
   ];
 
   return {

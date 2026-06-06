@@ -18,6 +18,7 @@ import {
   getExclusions,
   getConfig,
   updateConfig,
+  updatePrincipleEvaluationPrompt,
   runDoctrineCheck,
   getEvaluationHistory,
 } from '../services/doctrine/index.js';
@@ -65,6 +66,27 @@ export async function doctrineRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/doctrine/principles', async (req, reply) => {
     const principles = await getPrinciples();
     return reply.send(successEnvelope(principles, req.requestId));
+  });
+
+  // PATCH /v3/doctrine/principles/:id — update evaluation_prompt
+  app.patch('/v3/doctrine/principles/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as { evaluation_prompt?: string } | undefined;
+
+    if (typeof body?.evaluation_prompt !== 'string') {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'evaluation_prompt string is required in body', req.requestId)
+      );
+    }
+
+    const updated = await updatePrincipleEvaluationPrompt(id, body.evaluation_prompt);
+    if (!updated) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', `Principle "${id}" not found`, req.requestId)
+      );
+    }
+
+    return reply.send(successEnvelope(updated, req.requestId));
   });
 
   // GET /v3/doctrine/exclusions — list all 6 strategic exclusions

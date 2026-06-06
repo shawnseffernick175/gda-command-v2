@@ -59,6 +59,18 @@ export async function getConfigValue(key: string): Promise<unknown | null> {
   return res.rows[0]?.value ?? null;
 }
 
+export async function updatePrincipleEvaluationPrompt(
+  id: string,
+  evaluation_prompt: string,
+): Promise<DoctrinePrinciple | null> {
+  const res = await pool.query<DoctrinePrinciple>(
+    `UPDATE doctrine_principles SET evaluation_prompt = $2 WHERE id = $1
+     RETURNING id, name, short_form, long_form, evaluation_prompt, display_order`,
+    [id, evaluation_prompt]
+  );
+  return res.rows[0] ?? null;
+}
+
 export async function updateConfig(key: string, value: unknown): Promise<DoctrineConfigRow | null> {
   const res = await pool.query<DoctrineConfigRow>(
     `UPDATE doctrine_rules_config SET value = $2::jsonb, updated_at = now() WHERE key = $1
