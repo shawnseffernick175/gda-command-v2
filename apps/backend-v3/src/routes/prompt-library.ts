@@ -225,19 +225,18 @@ export async function promptLibraryRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const builderSystemPrompt =
-      `You are a prompt engineer building precise LLM instructions for a defense contracting intelligence tool called GDA Command.\n` +
-      `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.\n` +
-      `Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.\n\n` +
-      `The user will give you a topic and a list of bullet points describing what they want the prompt to do.\n` +
-      `Build a complete, production-ready prompt from those inputs. Return JSON:\n` +
-      `{\n` +
-      `  "system_prompt": "full system prompt text",\n` +
-      `  "user_prompt_template": "user template with {VARIABLE} placeholders where appropriate",\n` +
-      `  "suggested_variables": [{"name": "VARIABLE_NAME", "description": "...", "example": "..."}],\n` +
-      `  "display_name": "short display name for the library"\n` +
-      `}`;
+      `You are a prompt engineer who specializes in writing prompts for defense contracting intelligence tasks. ` +
+      `Your job is to take a topic and a list of bullet points and turn them into a single, complete, expertly-written prompt ` +
+      `that will get dramatically better AI output than plain English. The prompt you write should: ` +
+      `(1) Open with a clear role and context sentence. ` +
+      `(2) Include the constraint: Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly. ` +
+      `(3) Include the constraint: Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup. ` +
+      `(4) Weave in the users bullet points as specific requirements or output structure. ` +
+      `(5) End with a clear, specific output format instruction. ` +
+      `Return JSON: { "prompt": "string", "display_name": "string" }`;
 
-    const userMessage = `Topic: ${body.topic.trim()}\n\nPoints:\n${body.points.map((p) => `- ${p}`).join('\n')}`;
+    const numberedPoints = body.points.map((p, i) => `${i + 1}. ${p}`).join('\n');
+    const userMessage = `Topic: ${body.topic.trim()}\n\nWhat I want:\n${numberedPoints}`;
 
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -276,10 +275,8 @@ export async function promptLibraryRoutes(app: FastifyInstance): Promise<void> {
       }
 
       return reply.send(successEnvelope({
-        system_prompt: parsed.system_prompt ?? '',
-        user_prompt_template: parsed.user_prompt_template ?? '',
-        suggested_variables: parsed.suggested_variables ?? [],
-        display_name: parsed.display_name ?? body.topic.trim(),
+        prompt: (parsed.prompt as string) ?? '',
+        display_name: (parsed.display_name as string) ?? body.topic.trim(),
         model_used: data.model ?? 'gpt-4o-mini',
       }, req.requestId));
     } catch (err) {

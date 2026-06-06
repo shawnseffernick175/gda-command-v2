@@ -533,6 +533,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
   const [result, setResult] = useState<BuildResult | null>(null);
   const [outputFlash, setOutputFlash] = useState(false);
   const [savedKey, setSavedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const pointRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -584,12 +585,21 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
         onSuccess: (data) => {
           setResult(data);
           setSavedKey(null);
+          setCopied(false);
           setOutputFlash(true);
           setTimeout(() => setOutputFlash(false), 1500);
         },
       },
     );
   }, [buildPrompt, topic, points, surface]);
+
+  const handleCopy = useCallback(() => {
+    if (!result) return;
+    void navigator.clipboard.writeText(result.prompt).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [result]);
 
   const handleSaveToLibrary = useCallback(() => {
     if (!result) return;
@@ -603,9 +613,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
         prompt_key: slug,
         display_name: result.display_name || topic.trim(),
         surface,
-        system_prompt: result.system_prompt,
-        user_prompt_template: result.user_prompt_template || undefined,
-        variables: result.suggested_variables,
+        system_prompt: result.prompt,
       },
       {
         onSuccess: (saved) => {
@@ -614,6 +622,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
           setPoints([""]);
           setResult(null);
           setSurface("opportunities");
+          setCopied(false);
         },
       },
     );
@@ -675,7 +684,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
         )}
       </div>
 
-      {/* Surface */}
+      {/* Surface (for optional Save to Library) */}
       <div className="flex items-center gap-3">
         <span className="font-mono text-[11px] text-muted-foreground">Surface</span>
         <select
@@ -716,58 +725,33 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
 
       {/* Generated Output */}
       {result && (
-        <div className="space-y-4 border-t border-border pt-4">
-          <h3 className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-            Generated Output
-          </h3>
-
-          <div className="space-y-1.5">
+        <div className="space-y-3 border-t border-border pt-4">
+          <div className="flex items-center justify-between">
             <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              System Prompt
+              Your Prompt
             </label>
-            <pre
-              className={cn(
-                "whitespace-pre-wrap font-mono text-xs rounded border p-3 text-foreground bg-gda-bg-base transition-colors duration-300",
-                outputFlash ? "border-gda-green" : "border-border",
-              )}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-xs font-mono font-medium text-gda-green hover:bg-gda-green/20 transition-colors"
             >
-              {result.system_prompt}
-            </pre>
+              {copied ? "Copied" : "Copy"}
+            </button>
           </div>
-
-          <div className="space-y-1.5">
-            <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              User Template
-            </label>
-            <pre
-              className={cn(
-                "whitespace-pre-wrap font-mono text-xs rounded border p-3 text-foreground bg-gda-bg-base transition-colors duration-300",
-                outputFlash ? "border-gda-green" : "border-border",
-              )}
-            >
-              {result.user_prompt_template}
-            </pre>
-          </div>
-
-          {result.suggested_variables.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {result.suggested_variables.map((v) => (
-                <span
-                  key={v.name}
-                  title={v.description ?? v.name}
-                  className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-cyan"
-                >
-                  {`{${v.name}}`}
-                </span>
-              ))}
-            </div>
-          )}
+          <pre
+            className={cn(
+              "whitespace-pre-wrap font-mono text-xs rounded border p-4 text-foreground bg-gda-bg-base transition-colors duration-300 max-h-[500px] overflow-y-auto",
+              outputFlash ? "border-gda-green" : "border-border",
+            )}
+          >
+            {result.prompt}
+          </pre>
 
           <button
             type="button"
             onClick={handleSaveToLibrary}
             disabled={createPrompt.isPending}
-            className="w-full rounded border border-gda-green bg-gda-green/10 px-4 py-2 text-xs font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
+            className="rounded border border-border px-3 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel disabled:opacity-50 transition-colors"
           >
             {createPrompt.isPending ? "Saving..." : "Save to Library"}
           </button>

@@ -120,9 +120,7 @@ export function useRestoreVersion() {
 }
 
 export interface BuildResult {
-  system_prompt: string;
-  user_prompt_template: string;
-  suggested_variables: PromptVariable[];
+  prompt: string;
   display_name: string;
   model_used: string;
 }
