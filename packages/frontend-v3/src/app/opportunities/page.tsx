@@ -297,29 +297,29 @@ function OpportunityList() {
       {meta && (
         <div className="flex flex-wrap gap-2">
           <IntelChip
-            icon="📋"
+            icon="#"
             label={`${meta.total_count} Active`}
             active={false}
           />
           <IntelChip
-            icon="🔴"
+            icon="!"
             label={`${meta.due_this_week} Due This Week`}
             active={dueFilter === "this_week"}
             onClick={handleDueThisWeekClick}
           />
           <IntelChip
-            icon="⚡"
+            icon="?"
             label={`${meta.unscored_count} Unscored`}
             active={gradeFilter.includes("Unscored")}
             onClick={handleUnscoredClick}
           />
           <IntelChip
-            icon="💰"
+            icon="$"
             label={`${formatMoney(meta.total_value)} Total Value`}
             active={false}
           />
           <IntelChip
-            icon="🏆"
+            icon="A"
             label={`${meta.grade_a_count} Grade A`}
             active={gradeFilter.includes("A")}
             onClick={handleGradeAClick}
