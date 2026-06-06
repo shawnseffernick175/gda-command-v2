@@ -337,7 +337,7 @@ export default function PipelinePage() {
             onClick={() => setActiveStage(null)}
             className="shrink-0 rounded border border-border bg-gda-panel px-2.5 py-1 text-xs font-mono text-foreground"
           >
-            {activeStage} ✕
+            {activeStage} x
           </button>
         )}
       </div>
