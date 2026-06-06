@@ -69,6 +69,7 @@ export default function BriefingPage() {
   const { data: briefing, isLoading, error } = useTodayBriefing();
   const generate = useGenerateBriefing();
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const todayStr = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -82,27 +83,27 @@ export default function BriefingPage() {
     generate.mutate();
   };
 
-  const handleExportPdf = async () => {
+  const handleExport = async () => {
     setExporting(true);
+    setExportError(null);
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech";
       const token = getToken();
       const res = await fetch(`${apiBase}/v3/briefing/export`, {
-        method: "GET",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error("Export failed");
+      if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `daily-briefing-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.download = `daily-brief-${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      // silently fail - endpoint may not exist yet
+      setExportError('PDF export failed');
     } finally {
       setExporting(false);
     }
@@ -170,7 +171,7 @@ export default function BriefingPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={handleExportPdf}
+          onClick={handleExport}
           disabled={exporting}
           className="gap-1.5"
         >
@@ -264,8 +265,11 @@ export default function BriefingPage() {
         </Card>
       )}
 
-      {/* Regenerate button */}
-      <div className="flex justify-end">
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-2">
+        {exportError && (
+          <span className="text-xs text-gda-red">{exportError}</span>
+        )}
         <Button
           variant="outline"
           size="sm"
