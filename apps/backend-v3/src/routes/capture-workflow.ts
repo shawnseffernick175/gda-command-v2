@@ -5,6 +5,7 @@ import { callOpenAIChat } from '../lib/providers/openai.js';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
+import { buildRegulatoryContext } from '../utils/regulatory-context.js';
 
 const STAGES = ['blue', 'pink', 'red', 'green', 'white'] as const;
 type WorkflowStage = (typeof STAGES)[number];
@@ -21,17 +22,25 @@ function isValidWorkflowStage(s: string): s is WorkflowStage {
   return (STAGES as readonly string[]).includes(s);
 }
 
-function buildStageAnalysisPrompt(
+async function buildStageAnalysisPrompt(
   stage: WorkflowStage,
   rfpText: string | null,
   title: string | null,
   agency: string | null,
   value: number | null,
-): string {
+): Promise<string> {
   const snippet = rfpText ? rfpText.slice(0, 4000) : '(No RFP text available)';
-  return `You are a Shipley-trained proposal reviewer conducting a ${STAGE_LABELS[stage]} review.
 
-Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+  // F-620: Inject regulatory context for capture color team reviews
+  const regContext = await buildRegulatoryContext({
+    keywords: ['proposal', 'color team', 'FAR Part 15', 'source selection', 'evaluation criteria'],
+    categories: ['FAR', 'DFARS'],
+    limit: 10,
+  });
+
+  return `You are a defense contracting analyst at Envision conducting a ${STAGE_LABELS[stage]} review.
+
+Never fabricate facts, names, dollar amounts, dates, regulation citations, or clause numbers. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.
 
 Proposal text:
@@ -43,6 +52,7 @@ Capture context:
 - Value: ${value != null ? `$${value.toLocaleString()}` : 'Unknown'}
 - Stage: ${STAGE_LABELS[stage]}
 
+${regContext}
 Return JSON with this exact shape:
 {
   "summary": "2–3 sentence executive summary of proposal strength at this stage",
@@ -254,7 +264,7 @@ export async function captureWorkflowRoutes(app: FastifyInstance): Promise<void>
         try {
           const capture = (await pool.query<CaptureMinimal>('SELECT id, rfp_text, entry_point, pipeline_item_id, rfp_filename, rfp_uploaded_at FROM captures WHERE id = $1', [id])).rows[0];
           const ctx = await getCaptureContext(id);
-          const prompt = buildStageAnalysisPrompt(stage, capture?.rfp_text ?? null, ctx.title, ctx.agency, ctx.value);
+          const prompt = await buildStageAnalysisPrompt(stage, capture?.rfp_text ?? null, ctx.title, ctx.agency, ctx.value);
           const chatResult = await callOpenAIChat({
             model: 'gpt-4o-mini',
             messages: [{ role: 'user', content: prompt }],
@@ -296,7 +306,7 @@ export async function captureWorkflowRoutes(app: FastifyInstance): Promise<void>
     }
 
     const ctx = await getCaptureContext(id);
-    const prompt = buildStageAnalysisPrompt(stage, capture.rfp_text, ctx.title, ctx.agency, ctx.value);
+    const prompt = await buildStageAnalysisPrompt(stage, capture.rfp_text, ctx.title, ctx.agency, ctx.value);
 
     const chatResult = await callOpenAIChat({
       model: 'gpt-4o-mini',
