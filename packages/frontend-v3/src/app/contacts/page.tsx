@@ -584,7 +584,7 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
           key={`opp-${o.id}`}
           href={`/opportunities/${o.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center rounded bg-gda-cyan/10 px-1.5 py-0.5 text-[10px] text-gda-cyan hover:bg-gda-cyan/20"
+          className="inline-flex items-center rounded bg-gda-cyan/10 px-1.5 py-0.5 text-[11px] text-gda-cyan hover:bg-gda-cyan/20"
         >
           {o.title.length > 20 ? o.title.slice(0, 20) + "\u2026" : o.title} &#8599;
         </a>
@@ -594,7 +594,7 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
           key={`cap-${c.id}`}
           href={`/captures/${c.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center rounded bg-gda-green/10 px-1.5 py-0.5 text-[10px] text-gda-green hover:bg-gda-green/20"
+          className="inline-flex items-center rounded bg-gda-green/10 px-1.5 py-0.5 text-[11px] text-gda-green hover:bg-gda-green/20"
         >
           {c.title.length > 20 ? c.title.slice(0, 20) + "\u2026" : c.title} &#8599;
         </a>
