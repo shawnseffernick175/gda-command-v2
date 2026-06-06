@@ -171,7 +171,7 @@ export default function BriefingPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={handleExportPdf}
+          onClick={handleExport}
           disabled={exporting}
           className="gap-1.5"
         >
@@ -270,19 +270,6 @@ export default function BriefingPage() {
         {exportError && (
           <span className="text-xs text-gda-red">{exportError}</span>
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          disabled={exporting}
-        >
-          {exporting ? (
-            <Download className="mr-2 h-3 w-3 animate-pulse" />
-          ) : (
-            <Download className="mr-2 h-3 w-3" />
-          )}
-          {exporting ? "Exporting…" : "Export PDF"}
-        </Button>
         <Button
           variant="outline"
           size="sm"
