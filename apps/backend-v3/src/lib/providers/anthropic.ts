@@ -8,6 +8,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
+import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
+import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
 
 /** Map from task to prompt_library key for read-through lookup. */
 const TASK_PROMPT_KEY: Partial<Record<Task, string>> = {
@@ -49,7 +51,7 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 
   capture_plan: `You are Envision's capture strategist. Generate a comprehensive capture plan following Shipley methodology. Include win themes, ghost themes, teaming plan, pink/red/gold/black hat analysis, and next actions. Return JSON matching CapturePlanOutput.`,
 
-  daily_briefing: `You are the GDA Command daily briefing generator for Envision. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
+  daily_briefing: `You are a defense contracting analyst at Envision preparing a daily intelligence brief. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
 {
   "headline": "<1-sentence summary of today's top priority>",
   "priority_actions": [
@@ -61,7 +63,7 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 }
 All fields are required. urgency must be one of: immediate, today, this_week.`,
 
-  sentinel_summary: `You are a system health analyst for GDA Command. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
+  sentinel_summary: `You are a system health analyst for Envision. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
 
 
   black_hat_analysis: `You are a competitive intelligence analyst specializing in federal government contracting. Perform Black Hat analysis viewing competition from the competitor's perspective.`,
@@ -95,6 +97,87 @@ You are analyzing a competitor in the federal IT/consulting market relative to E
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
 };
+
+/** Default regulatory context options per task. */
+function getRegulatoryOptions(task: Task, input: unknown): RegulatoryContextOptions | null {
+  switch (task) {
+    case 'opportunity_analysis': {
+      const i = input as { naics_codes?: string[]; title?: string; set_aside?: string | null };
+      return {
+        naics: i.naics_codes?.[0] ?? null,
+        keywords: [i.title, i.set_aside].filter((v): v is string => Boolean(v)),
+        categories: ['FAR', 'DFARS', 'NDAA', 'EO'],
+        limit: 10,
+      };
+    }
+    case 'risk_generation': {
+      const i = input as RiskGenerationInput;
+      return {
+        naics: i.naics_codes?.[0] ?? null,
+        keywords: ['compliance', 'cybersecurity', 'small business', i.opportunity_title].filter(Boolean) as string[],
+        categories: ['FAR', 'DFARS', 'NDAA', 'EO', 'CMMC'],
+        limit: 10,
+      };
+    }
+    case 'fast_track_triage': {
+      const i = input as { naics_codes?: string[]; set_aside?: string | null };
+      return {
+        naics: i.naics_codes?.[0] ?? null,
+        keywords: ['set-aside', 'small business', 'simplified acquisition', i.set_aside].filter((v): v is string => Boolean(v)),
+        categories: ['FAR', 'NDAA'],
+        limit: 8,
+      };
+    }
+    case 'capture_plan': {
+      return {
+        keywords: ['proposal', 'FAR Part 15', 'source selection', 'evaluation criteria'],
+        categories: ['FAR', 'DFARS'],
+        limit: 10,
+      };
+    }
+    case 'black_hat_analysis':
+    case 'competitor_analysis': {
+      const i = input as { competitor_naics?: string[]; naics_codes?: string[] };
+      return {
+        naics: i.competitor_naics?.[0] ?? i.naics_codes?.[0] ?? null,
+        keywords: ['contract award', 'competitive range', 'incumbent', 'past performance'],
+        categories: ['FAR', 'DFARS', 'GAO'],
+        limit: 8,
+      };
+    }
+    case 'daily_briefing': {
+      return {
+        categories: ['NDAA', 'EO', 'GAO'],
+        limit: 5,
+      };
+    }
+    case 'award_analysis': {
+      const i = input as AwardAnalysisInput;
+      return {
+        naics: i.naics ?? null,
+        keywords: ['award', 'IDIQ', 'task order', 'set-aside'].filter(Boolean) as string[],
+        categories: ['FAR', 'DFARS', 'NDAA'],
+        limit: 8,
+      };
+    }
+    case 'contact_enrich': {
+      return {
+        keywords: ['procurement integrity', 'organizational conflict of interest'],
+        categories: ['FAR'],
+        limit: 5,
+      };
+    }
+    case 'doctrine_score': {
+      return {
+        keywords: ['compliance', 'small business', 'cybersecurity'],
+        categories: ['FAR', 'DFARS', 'NDAA'],
+        limit: 8,
+      };
+    }
+    default:
+      return null;
+  }
+}
 
 function buildRiskGenerationPrompt(input: RiskGenerationInput): string {
   const desc = input.opportunity_description.slice(0, 800);
@@ -187,7 +270,16 @@ export async function callAnthropic(opts: {
   // Read-through: check prompt_library first, fall back to hard-coded default
   const promptKey = TASK_PROMPT_KEY[opts.task];
   const stored = promptKey ? await getStoredPrompt(promptKey) : null;
-  const systemPrompt = stored?.system_prompt ?? SYSTEM_PROMPTS[opts.task] ?? 'Return valid JSON matching the requested output schema.';
+  let systemPrompt = stored?.system_prompt ?? SYSTEM_PROMPTS[opts.task] ?? 'Return valid JSON matching the requested output schema.';
+
+  // F-620: Inject regulatory context from vault_regulatory_catalog
+  const regOpts = getRegulatoryOptions(opts.task, opts.input);
+  if (regOpts) {
+    const regContext = await buildRegulatoryContext(regOpts);
+    if (regContext) {
+      systemPrompt += regContext;
+    }
+  }
 
   const userContent = opts.task === 'black_hat_analysis'
     ? buildBlackHatUserPrompt(opts.input as BlackHatAnalysisInput)
