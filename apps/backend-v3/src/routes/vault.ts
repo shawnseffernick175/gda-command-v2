@@ -173,8 +173,10 @@ async function smartIngestRouter(
 
   try {
     const capRes = await pool.query<{ id: number; title: string }>(
-      `SELECT id, title FROM captures
-       WHERE to_tsvector('english', coalesce(title,''))
+      `SELECT c.id, o.title FROM captures c
+       JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
+       JOIN opportunities o ON o.id = pi.opportunity_id
+       WHERE to_tsvector('english', coalesce(o.title,''))
        @@ plainto_tsquery('english', $1) LIMIT 3`,
       [filename],
     );
@@ -303,7 +305,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
         d.linked_opportunity_id, d.linked_capture_id, d.linked_award_id,
         d.uploaded_by, d.uploaded_at, d.updated_at, d.deleted_at,
         o.title AS opp_title,
-        (SELECT title FROM opportunities WHERE id = d.linked_capture_id LIMIT 1) AS capture_title,
+        (SELECT o2.title FROM captures c JOIN pipeline_items pi ON pi.id = c.pipeline_item_id JOIN opportunities o2 ON o2.id = pi.opportunity_id WHERE c.id = d.linked_capture_id LIMIT 1) AS capture_title,
         a_ref.awardee_name AS award_title
       FROM vault_documents d
       LEFT JOIN opportunities o ON o.id = d.linked_opportunity_id
@@ -416,7 +418,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     const docRes = await pool.query<VaultDocumentRow>(
       `SELECT d.*,
         o.title AS opp_title,
-        (SELECT title FROM opportunities WHERE id = d.linked_capture_id LIMIT 1) AS capture_title,
+        (SELECT o2.title FROM captures c JOIN pipeline_items pi ON pi.id = c.pipeline_item_id JOIN opportunities o2 ON o2.id = pi.opportunity_id WHERE c.id = d.linked_capture_id LIMIT 1) AS capture_title,
         a_ref.awardee_name AS award_title
       FROM vault_documents d
       LEFT JOIN opportunities o ON o.id = d.linked_opportunity_id
@@ -577,7 +579,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
     const created = await pool.query<VaultDocumentRow>(
       `SELECT d.*, o.title AS opp_title,
-        (SELECT title FROM opportunities WHERE id = d.linked_capture_id LIMIT 1) AS capture_title
+        (SELECT o2.title FROM captures c JOIN pipeline_items pi ON pi.id = c.pipeline_item_id JOIN opportunities o2 ON o2.id = pi.opportunity_id WHERE c.id = d.linked_capture_id LIMIT 1) AS capture_title
        FROM vault_documents d
        LEFT JOIN opportunities o ON o.id = d.linked_opportunity_id
        WHERE d.id = $1`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -929,6 +929,9 @@ function UploadModal({ onClose }: { onClose: () => void }) {
   const upload = useUploadVaultDocument();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploadPhase, setUploadPhase] = useState<string | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -944,20 +947,27 @@ function UploadModal({ onClose }: { onClose: () => void }) {
       { file, docType: "other" },
       {
         onSuccess: (data) => {
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
           setUploadPhase(null);
           if (data.routing?.routing_rationale) {
             // show success with routing info
           }
         },
         onError: () => {
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
           setUploadPhase(null);
         },
       },
     );
     // Simulate phase transitions for UX
-    setTimeout(() => setUploadPhase("Extracting text…"), 1000);
-    setTimeout(() => setUploadPhase("AI parsing…"), 3000);
-    setTimeout(() => setUploadPhase("Auto-routing…"), 5000);
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [
+      setTimeout(() => setUploadPhase("Extracting text…"), 1000),
+      setTimeout(() => setUploadPhase("AI parsing…"), 3000),
+      setTimeout(() => setUploadPhase("Auto-routing…"), 5000),
+    ];
   }, [file, upload]);
 
   return (
