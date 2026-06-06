@@ -249,7 +249,7 @@ function LeadStoryPanel({ lead }: { lead: DigestLeadStory }) {
   return (
     <div className="rounded border border-gda-green/30 bg-gda-panel p-4 space-y-2">
       <p className="font-mono text-[11px] font-bold text-gda-green uppercase tracking-widest">
-        Today&apos;s Lead
+        Today{"'"}s Lead
       </p>
       <h3 className="font-mono text-sm font-bold text-foreground leading-tight">
         {lead.headline}
@@ -414,7 +414,7 @@ function UpcomingSolicitationsPanel({ items }: { items: UpcomingSolicitation[] }
         Upcoming Solicitations
       </h2>
       <p className="font-mono text-[11px] text-muted-foreground">
-        In Envision&apos;s NAICS space
+        In Envision{"'"}s NAICS space
       </p>
       {items.length === 0 ? (
         <p className="font-mono text-xs text-muted-foreground">
@@ -485,7 +485,7 @@ function GaoWatchlistPanel({ items }: { items: GaoDecision[] }) {
         GAO Watchlist
       </h2>
       <p className="font-mono text-[11px] text-muted-foreground">
-        Protests affecting Envision&apos;s space
+        Protests affecting Envision{"'"}s space
       </p>
       {items.length === 0 ? (
         <p className="font-mono text-xs text-muted-foreground">
