@@ -12,7 +12,7 @@ import { initRouter, validateKeys } from './lib/llm-router.js';
 async function main(): Promise<void> {
   logger.info(
     { version: config.version, commit: config.gitSha, port: config.port },
-    'Starting GDA Command V3 backend'
+    'Starting V3 backend'
   );
 
   validateKeys();

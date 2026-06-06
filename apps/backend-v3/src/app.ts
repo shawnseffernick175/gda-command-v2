@@ -60,9 +60,9 @@ export async function buildApp() {
     openapi: {
       openapi: '3.1.0',
       info: {
-        title: 'GDA Command V3 API',
+        title: 'Envision V3 API',
         version: config.version,
-        description: 'V3 API contract for GDA Command — Envision-only, single-tenant.',
+        description: 'V3 API contract for Envision — single-tenant.',
       },
     },
   });

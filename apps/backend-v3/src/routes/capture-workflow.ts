@@ -52,6 +52,7 @@ Capture context:
 - Value: ${value != null ? `$${value.toLocaleString()}` : 'Unknown'}
 - Stage: ${STAGE_LABELS[stage]}
 
+${regContext}
 Return JSON with this exact shape:
 {
   "summary": "2–3 sentence executive summary of proposal strength at this stage",
@@ -61,7 +62,7 @@ Return JSON with this exact shape:
   "gate_recommendation": "go | no_go | conditional",
   "gate_rationale": "1–2 sentences explaining why",
   "model_used": "gpt-4o-mini"
-}${regContext}`;
+}`;
 }
 
 interface StageRow {

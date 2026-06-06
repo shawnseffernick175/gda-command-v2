@@ -32,7 +32,11 @@ export interface RegulatoryContextOptions {
  */
 export async function buildRegulatoryContext(opts: RegulatoryContextOptions = {}): Promise<string> {
   try {
-    const { keywords = [], categories = [], limit = 12 } = opts;
+    const { naics, keywords = [], categories = [], limit = 12 } = opts;
+
+    // Merge naics into keywords if provided (catalog has no dedicated NAICS column)
+    const allKeywords = [...keywords];
+    if (naics) allKeywords.push(naics);
 
     let whereClause = 'WHERE is_active = true';
     const params: unknown[] = [];
@@ -44,13 +48,14 @@ export async function buildRegulatoryContext(opts: RegulatoryContextOptions = {}
       paramIdx++;
     }
 
+    // Use websearch_to_tsquery (PG 11+) — handles multi-word phrases safely
     let orderClause = 'ORDER BY ref_code';
-    if (keywords.length > 0) {
-      const kwQuery = keywords.join(' | ');
-      whereClause += ` AND (to_tsvector('english', title || ' ' || COALESCE(applicability_notes,'')) @@ to_tsquery('english', $${paramIdx}))`;
+    if (allKeywords.length > 0) {
+      const kwQuery = allKeywords.join(' OR ');
+      whereClause += ` AND (to_tsvector('english', title || ' ' || COALESCE(applicability_notes,'')) @@ websearch_to_tsquery('english', $${paramIdx}))`;
       params.push(kwQuery);
       paramIdx++;
-      orderClause = `ORDER BY ts_rank(to_tsvector('english', title || ' ' || COALESCE(applicability_notes,'')), to_tsquery('english', $${paramIdx - 1})) DESC`;
+      orderClause = `ORDER BY ts_rank(to_tsvector('english', title || ' ' || COALESCE(applicability_notes,'')), websearch_to_tsquery('english', $${paramIdx - 1})) DESC`;
     }
 
     params.push(limit);

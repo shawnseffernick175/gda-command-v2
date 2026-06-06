@@ -51,7 +51,7 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 
   capture_plan: `You are Envision's capture strategist. Generate a comprehensive capture plan following Shipley methodology. Include win themes, ghost themes, teaming plan, pink/red/gold/black hat analysis, and next actions. Return JSON matching CapturePlanOutput.`,
 
-  daily_briefing: `You are a defense contracting analyst at Envision preparing a daily intelligence brief. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
+  daily_briefing: `You are Envision's daily briefing analyst. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
 {
   "headline": "<1-sentence summary of today's top priority>",
   "priority_actions": [

@@ -76,7 +76,7 @@ Options:
 async function main(): Promise<void> {
   const options = parseArgs(process.argv);
 
-  console.log('=== GDA Command V2 → V3 Migration ===');
+  console.log('=== V2 → V3 Migration ===');
   console.log(`Mode: ${options.commit ? 'COMMIT (writes enabled)' : 'DRY-RUN (no writes)'}`);
   console.log(`Entity: ${options.entity}`);
   console.log();
