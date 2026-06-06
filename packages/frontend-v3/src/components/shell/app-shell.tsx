@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
 import { KpiHeader } from "./kpi-header";
+import { IngestAlertBanner } from "./ingest-alert-banner";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar />
+        <IngestAlertBanner />
         <KpiHeader />
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>

@@ -46,6 +46,7 @@ import { vaultRoutes } from './routes/vault.js';
 import { fastTrackSignalRoutes } from './routes/fast-track-signals.js';
 import { promptLibraryRoutes } from './routes/prompt-library.js';
 import { digestRoutes } from './routes/digest.js';
+import { ingestStatusRoutes } from './routes/ingest-status.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -150,6 +151,7 @@ export async function buildApp() {
     await app.register(govwinRoutes);
   }
   await app.register(sentinelRoutes);
+  await app.register(ingestStatusRoutes);
   await app.register(memoryRoutes);
   await app.register(pwinRoutes);
   await app.register(pwinConfigRoutes);
