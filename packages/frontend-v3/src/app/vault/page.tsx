@@ -547,7 +547,7 @@ function RegulatoryLibrary({ searchQuery }: { searchQuery: string }) {
                 </span>
                 <Badge
                   variant="outline"
-                  className="border-gda-cyan/30 text-gda-cyan font-mono text-[10px]"
+                  className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
                 >
                   {entries.length}
                 </Badge>
