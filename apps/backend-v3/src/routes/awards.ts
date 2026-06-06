@@ -60,6 +60,7 @@ interface AwardItem {
   award_analysis: AwardAnalysisOutput | null;
   award_analysis_run_at: string | null;
   incumbent_name: string | null;
+  incumbent_name_sources: SourceRef[];
   linked_opportunity_id: number | null;
 }
 
@@ -123,6 +124,7 @@ function rowToItem(row: AwardRow): AwardItem {
     award_analysis: row.award_analysis,
     award_analysis_run_at: row.award_analysis_run_at,
     incumbent_name: row.incumbent_name,
+    incumbent_name_sources: row.incumbent_name ? sources : [],
     linked_opportunity_id: row.linked_opportunity_id,
   };
 }
@@ -382,61 +384,84 @@ export async function awardRoutes(app: FastifyInstance): Promise<void> {
   // POST /v3/awards/:id/pursue — create opportunity from award, link back
   app.post('/v3/awards/:id/pursue', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const client = await pool.connect();
 
-    const { rows } = await pool.query<{
-      id: string;
-      piid: string | null;
-      awardee_name: string | null;
-      agency_name: string | null;
-      naics: string | null;
-      value_obligated: string | null;
-      set_aside: string | null;
-      linked_opportunity_id: number | null;
-    }>(
-      `SELECT id, piid, awardee_name, agency_name, naics, value_obligated, set_aside, linked_opportunity_id
-       FROM awards WHERE id = $1`,
-      [id],
-    );
+    try {
+      await client.query('BEGIN');
 
-    if (rows.length === 0) {
-      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Award not found', req.requestId));
-    }
-
-    const award = rows[0];
-
-    // Already linked — return existing opportunity
-    if (award.linked_opportunity_id) {
-      return reply.status(200).send(
-        successEnvelope({ opportunity_id: award.linked_opportunity_id, already_linked: true }, req.requestId),
+      // Lock the award row to prevent TOCTOU race
+      const { rows } = await client.query<{
+        id: string;
+        piid: string | null;
+        awardee_name: string | null;
+        agency_name: string | null;
+        naics: string | null;
+        value_obligated: string | null;
+        set_aside: string | null;
+        linked_opportunity_id: number | null;
+      }>(
+        `SELECT id, piid, awardee_name, agency_name, naics, value_obligated, set_aside, linked_opportunity_id
+         FROM awards WHERE id = $1 FOR UPDATE`,
+        [id],
       );
-    }
 
-    // Create opportunity from award
-    const title = `Re-compete: ${award.awardee_name ?? 'Unknown'} — ${award.agency_name ?? 'Unknown Agency'} (${award.piid ?? 'N/A'})`;
-    const valueNum = award.value_obligated !== null ? Number(award.value_obligated) : null;
+      if (rows.length === 0) {
+        await client.query('ROLLBACK');
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Award not found', req.requestId));
+      }
 
-    const oppResult = await pool.query<{ id: number }>(
-      `INSERT INTO opportunities (title, agency, naics, set_aside, value_min, value_max, source, data_source, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'award_pursuit', 'manual', NOW(), NOW())
-       RETURNING id`,
-      [title, award.agency_name, award.naics, award.set_aside, valueNum, valueNum, ],
-    );
+      const award = rows[0];
 
-    const oppId = oppResult.rows[0]?.id;
-    if (!oppId) {
-      return reply.status(500).send(
-        errorEnvelope('INTERNAL_ERROR', 'Failed to create opportunity', req.requestId),
+      // Already linked — return existing opportunity
+      if (award.linked_opportunity_id) {
+        await client.query('ROLLBACK');
+        return reply.status(200).send(
+          successEnvelope({ opportunity_id: award.linked_opportunity_id, already_linked: true }, req.requestId),
+        );
+      }
+
+      // Create a source row for the pursuit
+      const sourceResult = await client.query<{ id: string }>(
+        `INSERT INTO sources (kind, title, retrieved_at)
+         VALUES ('internal', 'Award pursuit', NOW()) RETURNING id`,
       );
+      const sourceId = sourceResult.rows[0]!.id;
+
+      // Create opportunity from award
+      const title = `Re-compete: ${award.awardee_name ?? 'Unknown'} — ${award.agency_name ?? 'Unknown Agency'} (${award.piid ?? 'N/A'})`;
+      const valueNum = award.value_obligated !== null ? Number(award.value_obligated) : null;
+
+      const oppResult = await client.query<{ id: number }>(
+        `INSERT INTO opportunities (title, agency, naics, set_aside, value_min, value_max, data_source, source_id, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, 'manual', $7, NOW(), NOW())
+         RETURNING id`,
+        [title, award.agency_name, award.naics, award.set_aside, valueNum, valueNum, sourceId],
+      );
+
+      const oppId = oppResult.rows[0]?.id;
+      if (!oppId) {
+        await client.query('ROLLBACK');
+        return reply.status(500).send(
+          errorEnvelope('INTERNAL_ERROR', 'Failed to create opportunity', req.requestId),
+        );
+      }
+
+      // Link award to opportunity
+      await client.query(
+        `UPDATE awards SET linked_opportunity_id = $1, recompete_flagged_at = NOW() WHERE id = $2`,
+        [oppId, id],
+      );
+
+      await client.query('COMMIT');
+
+      return reply.status(201).send(
+        successEnvelope({ opportunity_id: oppId, already_linked: false }, req.requestId),
+      );
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
-
-    // Link award to opportunity
-    await pool.query(
-      `UPDATE awards SET linked_opportunity_id = $1, recompete_flagged_at = NOW() WHERE id = $2`,
-      [oppId, id],
-    );
-
-    return reply.status(201).send(
-      successEnvelope({ opportunity_id: oppId, already_linked: false }, req.requestId),
-    );
   });
 }

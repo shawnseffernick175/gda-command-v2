@@ -426,9 +426,14 @@ function AwardRow({
           {(award.incumbent_name || award.contract_type || award.naics) && (
             <div className="flex items-center gap-2 mt-0.5">
               {award.incumbent_name && (
-                <span className="text-[11px] text-muted-foreground font-mono">
-                  Incumbent: {award.incumbent_name}
-                </span>
+                <>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    Incumbent: {award.incumbent_name}
+                  </span>
+                  {award.incumbent_name_sources?.[0]?.url && (
+                    <SourceChip label="USAspending" url={award.incumbent_name_sources[0].url} kind="real" />
+                  )}
+                </>
               )}
               {award.contract_type && (
                 <span className="text-[11px] text-muted-foreground font-mono">
@@ -568,6 +573,9 @@ function AwardInlineDetail({ award }: { award: Award }) {
           <div>
             <span className="text-muted-foreground">Awardee:</span>{" "}
             <span className="text-foreground">{award.incumbent_name ?? award.recipient_name ?? "—"}</span>
+            {award.incumbent_name_sources?.[0]?.url && (
+              <SourceChip label="USAspending" url={award.incumbent_name_sources[0].url} kind="real" />
+            )}
           </div>
           <div>
             <span className="text-muted-foreground">Award Date:</span>{" "}

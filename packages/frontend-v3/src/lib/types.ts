@@ -292,6 +292,7 @@ export interface Award {
   award_analysis: AwardAnalysis | null;
   award_analysis_run_at: string | null;
   incumbent_name: string | null;
+  incumbent_name_sources: AwardSourceRef[];
   linked_opportunity_id: number | null;
 }
 
