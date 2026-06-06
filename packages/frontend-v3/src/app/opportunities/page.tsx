@@ -694,7 +694,7 @@ function OpportunityRow({
               className="text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
               title="View detail"
             >
-              ->
+              {"->"}
             </button>
             <button
               type="button"
@@ -715,7 +715,7 @@ function OpportunityRow({
             href={`/opportunities?id=${opp.id}`}
             className="text-[11px] font-mono text-muted-foreground hover:text-gda-green"
           >
-            ->
+            {"->"}
           </Link>
         )}
       </td>
