@@ -3,15 +3,12 @@
 import { Suspense, useState, useRef, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useOpportunitiesPaged, useOpportunity } from "@/hooks/use-opportunities";
+import { useOpportunitiesPaged, useOpportunity, useAnalyzeOpportunity, useUpdateStage } from "@/hooks/use-opportunities";
+import { useAskAi } from "@/hooks/use-llm";
 import { Pagination } from "@/components/shared/Pagination";
 import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
-import { AskAiPanel } from "@/components/shared/ask-ai-panel";
-import { CollapseSection } from "@/components/shared/collapse-section";
-import { OodaInspector } from "@/components/shared/ooda-inspector";
 import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
 import { OpportunityCard } from "@/components/OpportunityCard";
@@ -21,7 +18,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
-import { apiPost } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type {
   DoctrineFitLabel,
@@ -409,17 +405,6 @@ function OpportunityList() {
   );
 }
 
-const DOCTRINE_PRINCIPLES: Array<{ id: string; label: string }> = [
-  { id: "alignment", label: "Alignment" },
-  { id: "ethics_always", label: "Ethics Always" },
-  { id: "teamwork", label: "Teamwork" },
-  { id: "data_first", label: "Data First, Then Debate" },
-  { id: "relentless_execution", label: "Relentless Execution" },
-  { id: "relationships", label: "Relationships, Relationships, Relationships" },
-  { id: "market_mission_brand", label: "Market, Mission, Brand Focus" },
-  { id: "customer_facing", label: "Customer Facing" },
-];
-
 const FIT_COLORS: Record<DoctrineFitLabel, string> = {
   strong: "text-gda-green",
   moderate: "text-gda-cyan",
@@ -427,22 +412,52 @@ const FIT_COLORS: Record<DoctrineFitLabel, string> = {
   none: "text-muted-foreground",
 };
 
+// ─── Stage constants ─────────────────────────────────────────────────────────
+const STAGES = ["Interest", "Qualified", "Capture", "Proposal", "Won"] as const;
+type Stage = (typeof STAGES)[number];
+
+const STAGE_ACTIONS: Record<string, Array<{ label: string; stage?: string }>> = {
+  Interest: [
+    { label: "Qualify", stage: "Qualified" },
+    { label: "No-Bid", stage: "No-Bid" },
+    { label: "Add to Watch List" },
+  ],
+  Qualified: [
+    { label: "Start Capture", stage: "Capture" },
+    { label: "Request More Info" },
+    { label: "No-Bid", stage: "No-Bid" },
+  ],
+  Capture: [
+    { label: "Start Proposal", stage: "Proposal" },
+    { label: "Run Color Team" },
+    { label: "No-Bid", stage: "No-Bid" },
+  ],
+  Proposal: [
+    { label: "Submit", stage: "Won" },
+    { label: "Request Extension" },
+    { label: "Withdraw", stage: "Lost" },
+  ],
+};
+
+const SUGGESTION_CHIPS = [
+  "What's Envision's win angle?",
+  "Who are the likely evaluators?",
+  "What FAR clauses apply?",
+  "Draft an executive summary",
+];
+
 function OpportunityDetail({ id }: { id: string }) {
   const { data: opp, isLoading, error } = useOpportunity(id);
-  const queryClient = useQueryClient();
-  const runDoctrine = useMutation({
-    mutationFn: () => apiPost<unknown>("/v3/doctrine/check", { entity_kind: "opportunity", entity_id: id }),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["opportunity", id] }); },
-  });
+  const analyzeOpp = useAnalyzeOpportunity();
+  const updateStage = useUpdateStage();
 
   if (isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-64 bg-gda-panel" />
-        <div className="grid gap-4 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 bg-gda-panel" />
-          ))}
+        <div className="grid gap-4 lg:grid-cols-[55%_45%]">
+          <Skeleton className="h-60 bg-gda-panel" />
+          <Skeleton className="h-60 bg-gda-panel" />
         </div>
       </div>
     );
@@ -454,14 +469,15 @@ function OpportunityDetail({ id }: { id: string }) {
 
   if (!opp) return null;
 
-  const pwin = opp.pwin;
-  const band = pwin?.band ?? "discovery";
+  const llm = opp.llm_analysis as LlmAnalysis | null | undefined;
+  const currentStage = opp.stage ?? "Interest";
+  const timeline = opp.analysis?.timeline;
   const doctrine = opp.doctrine_badge;
   const doctrineScore = opp.doctrine_score;
-  const timeline = opp.analysis?.timeline;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* ─── Header Strip ─────────────────────────────────────────────── */}
       <div>
         <Link
           href="/opportunities"
@@ -472,302 +488,522 @@ function OpportunityDetail({ id }: { id: string }) {
         <h1 className="mt-1 font-mono text-lg font-bold text-foreground">
           {opp.title}
         </h1>
+
+        {/* Stage Stepper */}
+        <div className="mt-3 flex items-center gap-1">
+          {STAGES.map((stage, idx) => {
+            const stageIdx = STAGES.indexOf(currentStage as Stage);
+            const isCurrent = stage === currentStage;
+            const isCompleted = idx < stageIdx;
+            return (
+              <div key={stage} className="flex items-center gap-1">
+                {idx > 0 && (
+                  <div className={cn("h-px w-6", isCompleted || isCurrent ? "bg-gda-green" : "bg-border")} />
+                )}
+                <button
+                  type="button"
+                  onClick={() => updateStage.mutate({ id, stage })}
+                  className={cn(
+                    "flex items-center gap-1 text-[11px] font-mono transition-colors",
+                    isCurrent && "text-gda-green font-bold",
+                    isCompleted && "text-gda-green",
+                    !isCurrent && !isCompleted && "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <span className="text-[11px]">{isCompleted || isCurrent ? "●" : "○"}</span>
+                  {stage}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Badge strip */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <StageDropdown value={opp.stage ?? "Interest"} />
-          <BandBadge band={band} />
-          {opp.department && (
-            <Badge variant="outline" className="text-xs">{opp.department}</Badge>
+          {opp.agency && (
+            <Badge variant="outline" className="text-xs">{opp.agency}</Badge>
           )}
           {opp.naics && (
-            <Badge variant="outline" className="text-xs">NAICS {opp.naics}</Badge>
+            <Badge variant="outline" className="text-xs font-mono">NAICS {opp.naics}</Badge>
           )}
-          {pwin?.incumbent_competitor && (
-            <Badge
-              variant="outline"
-              className="border-gda-amber/30 text-xs text-gda-amber"
-              title="Named prime in title — not verified incumbency"
-            >
-              Named prime: {pwin.incumbent_competitor}
-            </Badge>
+          {opp.set_aside && (
+            <Badge variant="outline" className="text-xs">{opp.set_aside}</Badge>
           )}
           {opp.source && <SourceChip label={opp.source} kind="real" />}
+          <DueCountdown dueDate={opp.response_deadline ?? opp.due_date} />
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-4">
-          {/* Overview */}
+      <Separator className="bg-border" />
+
+      {/* ─── Two-Column Layout ──────────────────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-[55%_1fr]">
+        {/* ═══ COLUMN A ═══ */}
+        <div className="space-y-4">
+          {/* Decision Brief */}
+          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending} onAnalyze={() => analyzeOpp.mutate(id)} />
+
+          {/* Competitive Intelligence */}
+          <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
+
+          {/* Risks */}
+          <RisksPanel llm={llm} />
+
+          {/* Ask AI — inline, always open */}
+          <AskAiInline id={id} title={opp.title} agency={opp.agency} pwin={opp.pwin?.score} />
+        </div>
+
+        {/* ═══ COLUMN B ═══ */}
+        <div className="space-y-4">
+          {/* Metadata Rail */}
           <Card className="border-border bg-gda-panel">
-            <CardHeader>
-              <CardTitle className="font-mono text-sm text-muted-foreground">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
                 Overview
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {/* Department > Agency hierarchy breadcrumb */}
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <span className="text-muted-foreground">Department:</span>{" "}
-                <span className="text-foreground font-medium">
-                  {opp.department ?? "Independent Agency"}
-                </span>
-                {opp.agency && (
-                  <>
-                    <span className="text-muted-foreground mx-1">{">"}</span>
-                    <span className="text-foreground">{opp.agency}</span>
-                  </>
-                )}
-                {opp.office && (
-                  <>
-                    <span className="text-muted-foreground mx-1">{">"}</span>
-                    <span className="text-foreground">{opp.office}</span>
-                  </>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Value:</span>{" "}
-                  <span className="font-mono text-foreground">{formatMoney(opp.value)}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Due:</span>{" "}
-                  <span className="text-foreground">
-                    {opp.due_date ? new Date(opp.due_date).toLocaleDateString() : "—"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Set-aside:</span>{" "}
-                  <span className="text-foreground">{opp.set_aside ?? "None"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Solicitation:</span>{" "}
-                  <span className="text-foreground">{opp.solicitation_number ?? "—"}</span>
-                </div>
-              </div>
-              {opp.description && (
-                <>
-                  <Separator className="bg-border" />
-                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                    {opp.description}
-                  </p>
-                </>
+            <CardContent className="space-y-1.5 text-xs">
+              <MetaRow label="Value" value={formatMoney(opp.value)} mono />
+              <MetaRow label="Solicitation" value={opp.solicitation_number ?? "—"} mono />
+              <MetaRow label="Posted" value={opp.posted_at ? new Date(opp.posted_at).toLocaleDateString() : "—"} />
+              <MetaRow label="Set-Aside" value={opp.set_aside ?? "None"} />
+              <MetaRow label="Place" value={opp.place_of_performance ?? "—"} />
+              <MetaRow label="NAICS" value={opp.naics ?? "—"} mono />
+              <MetaRow label="Source" value={opp.source ?? "—"} />
+              {/* Doctrine Fit — demoted to one line */}
+              {(doctrine || doctrineScore != null) && (
+                <MetaRow
+                  label="Doctrine Fit"
+                  value={doctrine ? `${doctrine.label} ${Math.round((doctrine.score / 100) * 40)}/40` : `${doctrineScore}/40`}
+                  className={doctrine ? FIT_COLORS[doctrine.label] : "text-gda-cyan"}
+                />
               )}
             </CardContent>
           </Card>
 
-          {/* Pwin Panel */}
-          {pwin && (
-            <Card className="border-border bg-gda-panel">
-              <CardHeader>
-                <CardTitle className="font-mono text-sm text-muted-foreground">
-                  Probability of Win
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-baseline gap-3">
-                  <ScoreDisplay score={pwin.score} className="text-3xl" />
-                  <span className="text-sm text-muted-foreground">/ 100</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Model: {pwin.model_version} · Scored:{" "}
-                  {new Date(pwin.scored_at).toLocaleDateString()}
-                  {pwin.days_to_due != null && (
-                    <> · {pwin.days_to_due}d to due</>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {pwin.top_drivers.map((d, i) => (
-                    <Badge key={i} variant="outline" className="border-border text-xs">
-                      {d}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Doctrine Panel */}
+          {/* Timeline */}
           <Card className="border-border bg-gda-panel">
-            <CardHeader>
-              <CardTitle className="font-mono text-sm text-muted-foreground">
-                Doctrine Fit{" "}
-                <span className="font-normal italic text-[11px]">
-                  (keyword-based doctrine fit)
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {doctrine ? (
-                <>
-                  <div className="flex items-baseline gap-3">
-                    <span className={`font-mono text-2xl font-bold ${FIT_COLORS[doctrine.label]}`}>
-                      {Math.round((doctrine.score / 100) * 40)}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/ 40</span>
-                    <Badge
-                      variant="outline"
-                      className={`capitalize text-xs ${FIT_COLORS[doctrine.label]}`}
-                    >
-                      {doctrine.label}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {doctrine.rationale}
-                  </p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {DOCTRINE_PRINCIPLES.map((p) => {
-                      const matched = doctrine.matchedPrinciples.includes(p.id);
-                      return (
-                        <span
-                          key={p.id}
-                          className={`text-[11px] ${
-                            matched ? "text-gda-green" : "text-muted-foreground"
-                          }`}
-                        >
-                          {matched ? "●" : "○"} {p.label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <SourceChip label="doctrine alignment" kind="heuristic" />
-                  <button
-                    type="button"
-                    onClick={() => runDoctrine.mutate()}
-                    disabled={runDoctrine.isPending}
-                    className="mt-2 text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors disabled:opacity-50"
-                  >
-                    {runDoctrine.isPending ? "Scoring..." : "Re-score"}
-                  </button>
-                </>
-              ) : doctrineScore != null ? (
-                <>
-                  <div className="flex items-baseline gap-3">
-                    <span className="font-mono text-2xl font-bold text-gda-cyan">
-                      {doctrineScore}
-                    </span>
-                    <span className="text-sm text-muted-foreground">/ 40</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1">
-                    {DOCTRINE_PRINCIPLES.map((p) => (
-                      <span key={p.id} className="text-[11px] text-muted-foreground">
-                        ○ {p.label}
-                      </span>
-                    ))}
-                  </div>
-                  <SourceChip label="keyword alignment" kind="heuristic" />
-                  <button
-                    type="button"
-                    onClick={() => runDoctrine.mutate()}
-                    disabled={runDoctrine.isPending}
-                    className="mt-2 rounded border border-gda-green/40 px-2 py-1 text-[11px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors disabled:opacity-50"
-                  >
-                    {runDoctrine.isPending ? "Scoring..." : "Run Full Doctrine Check"}
-                  </button>
-                  {runDoctrine.isError && (
-                    <p className="mt-1 text-[11px] text-gda-red">Doctrine check failed</p>
-                  )}
-                </>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-[11px] font-mono text-muted-foreground">
-                    Doctrine alignment not yet scored.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => runDoctrine.mutate()}
-                    disabled={runDoctrine.isPending}
-                    className="rounded border border-gda-green/40 px-2 py-1 text-[11px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors disabled:opacity-50"
-                  >
-                    {runDoctrine.isPending ? "Scoring..." : "Score This Opportunity"}
-                  </button>
-                  {runDoctrine.isError && (
-                    <p className="mt-1 text-[11px] text-gda-red">Doctrine check failed</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right column: Timeline */}
-        <div className="space-y-4">
-          <Card className="border-border bg-gda-panel">
-            <CardHeader>
-              <CardTitle className="font-mono text-sm text-muted-foreground">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
                 Timeline
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <TimelineRow
-                label="RFP Release"
-                date={timeline?.rfp_release ?? opp.posted_at}
-              />
-              <TimelineRow
+            <CardContent className="space-y-2">
+              <TimelineEntry label="Posted" date={opp.posted_at} filled />
+              <TimelineEntry label="RFP Release" date={timeline?.rfp_release ?? opp.posted_at} filled />
+              <TimelineEntry
                 label="Proposals Due"
                 date={timeline?.proposals_due ?? opp.response_deadline}
+                filled={!!(timeline?.proposals_due ?? opp.response_deadline)}
+                urgent={isUrgent(timeline?.proposals_due ?? opp.response_deadline)}
               />
-              <TimelineRow
-                label="Award Estimate"
-                date={timeline?.award_estimate}
-              />
+              <TimelineEntry label="Award Estimate" date={timeline?.award_estimate} filled={false} />
             </CardContent>
           </Card>
 
-          {/* Capture Pwin — read-only from pipeline */}
-          {opp.capture_pwin != null && (
-            <Card className="border-border bg-gda-panel">
-              <CardHeader>
-                <CardTitle className="font-mono text-sm text-muted-foreground">
-                  Capture Pwin
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScoreDisplay score={opp.capture_pwin} className="text-2xl" />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Shipley-driven capture probability
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          {/* Stage Actions */}
+          <Card className="border-border bg-gda-panel">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+                Next Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Current: <span className="text-gda-green font-mono">{currentStage}</span>
+              </p>
+              <div className="space-y-1">
+                {(STAGE_ACTIONS[currentStage] ?? []).map((action) => (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={() => action.stage && updateStage.mutate({ id, stage: action.stage })}
+                    disabled={updateStage.isPending}
+                    className="block w-full text-left rounded border border-border px-3 py-1.5 text-xs font-mono text-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors disabled:opacity-50"
+                  >
+                    → {action.label}
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* AI Analysis (F-453) */}
-          <AiAnalysisCard
-            llmAnalysis={opp.llm_analysis as LlmAnalysis | null | undefined}
-            qualityFlag={opp.llm_quality_flag}
-          />
+          {/* Vault Documents */}
+          <VaultDocumentsSection opportunityId={Number(id)} />
         </div>
       </div>
-
-      {/* Ask AI (F-480) */}
-      <AskAiPanel
-        objectType="opportunity"
-        objectId={id}
-        context={{
-          title: opp.title,
-          agency: opp.agency,
-          pwin: opp.pwin?.score,
-        }}
-      />
-
-      {/* OODA Inspector (F-492) */}
-      <CollapseSection
-        id={`ooda-${id}`}
-        title="OODA Loop Analysis"
-        defaultOpen={false}
-      >
-        <OodaInspector
-          opportunityId={String(id)}
-          stage={opp.stage ?? undefined}
-          context={{
-            title: opp.title,
-            agency: opp.agency,
-            pwin: opp.pwin?.score,
-          }}
-        />
-      </CollapseSection>
-
-      {/* Vault Documents (F-614) */}
-      <VaultDocumentsSection opportunityId={Number(id)} />
     </div>
+  );
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function DueCountdown({ dueDate }: { dueDate?: string | null }) {
+  if (!dueDate) return null;
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffMs = due.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return <span className="font-mono text-xs font-bold text-gda-red">PAST DUE</span>;
+  }
+  if (diffDays <= 7) {
+    return (
+      <span className="flex items-center gap-1 font-mono text-xs font-bold text-gda-red">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-gda-red animate-pulse" />
+        {diffDays}d remaining
+      </span>
+    );
+  }
+  if (diffDays <= 30) {
+    return <span className="font-mono text-xs text-gda-amber">{diffDays}d remaining</span>;
+  }
+  return <span className="font-mono text-xs text-muted-foreground">{due.toLocaleDateString()}</span>;
+}
+
+function isUrgent(date?: string | null): boolean {
+  if (!date) return false;
+  const diff = new Date(date).getTime() - Date.now();
+  return diff > 0 && diff <= 7 * 86400 * 1000;
+}
+
+const SHIPLEY_DIMENSIONS: Array<{
+  key: keyof import("@/lib/types").ShipleyBidNoBid;
+  label: string;
+}> = [
+  { key: "customer_knowledge", label: "Customer Knowledge" },
+  { key: "solution_match", label: "Solution Match" },
+  { key: "competitive_position", label: "Competitive Position" },
+  { key: "past_performance", label: "Past Performance" },
+];
+
+const BID_BADGE_COLORS: Record<string, string> = {
+  Bid: "bg-gda-green/20 border-gda-green text-gda-green",
+  "No Bid": "bg-gda-red/10 border-gda-red text-gda-red",
+  Conditional: "bg-gda-amber/10 border-gda-amber text-gda-amber",
+};
+
+function DecisionBriefPanel({
+  llm,
+  analyzing,
+  onAnalyze,
+}: {
+  llm?: LlmAnalysis | null;
+  oppId: string;
+  analyzing: boolean;
+  onAnalyze: () => void;
+}) {
+  if (!llm) {
+    return (
+      <Card className="border-border bg-gda-panel">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+            Decision Brief
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center py-6">
+          <p className="text-xs text-muted-foreground mb-3 font-mono">
+            {analyzing ? "Analysis running..." : "Analysis not yet available"}
+          </p>
+          {!analyzing && (
+            <button
+              type="button"
+              onClick={onAnalyze}
+              className="rounded border border-gda-green/40 px-3 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/10 transition-colors"
+            >
+              Run Analysis
+            </button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const bidRec = llm.bid_recommendation ?? llm.shipley_bid_no_bid.overall;
+  const bidColor = BID_BADGE_COLORS[bidRec] ?? "border-border text-muted-foreground";
+  const pwinScore = llm.win_probability;
+  const pwinColor = pwinScore >= 70 ? "text-gda-green" : pwinScore >= 40 ? "text-gda-amber" : "text-gda-red";
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Decision Brief
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Recommendation badge */}
+        <div>
+          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Recommendation</p>
+          <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", bidColor)}>
+            {bidRec}
+          </Badge>
+        </div>
+
+        {/* Executive summary */}
+        {llm.executive_summary && (
+          <p className="text-xs text-foreground leading-relaxed">
+            {llm.executive_summary}
+          </p>
+        )}
+
+        {/* Win Probability */}
+        <div>
+          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Win Probability</p>
+          <div className="flex items-baseline gap-2">
+            <span className={cn("font-mono text-4xl font-bold", pwinColor)}>
+              {pwinScore}%
+            </span>
+          </div>
+          {llm.win_probability_reasoning && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {llm.win_probability_reasoning}
+            </p>
+          )}
+        </div>
+
+        {/* Shipley Dimensions */}
+        <div>
+          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-2">Shipley Dimensions</p>
+          <div className="space-y-1.5">
+            {SHIPLEY_DIMENSIONS.map((dim) => {
+              const d = llm.shipley_bid_no_bid[dim.key] as ShipleyDimension | undefined;
+              if (!d) return null;
+              return (
+                <div key={dim.key} className="flex items-center gap-2 text-xs">
+                  <span className="w-40 text-muted-foreground">{dim.label}</span>
+                  <span className="font-mono text-foreground w-10">{d.score}/10</span>
+                  <div className="flex-1 h-1.5 rounded bg-gda-panel overflow-hidden border border-border">
+                    <div
+                      className="h-full rounded bg-gda-green"
+                      style={{ width: `${d.score * 10}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CompetitiveIntelPanel({
+  llm,
+  incumbent,
+}: {
+  llm?: LlmAnalysis | null;
+  incumbent?: string | null;
+}) {
+  const competitors = llm?.competitive_landscape ?? [];
+
+  if (!llm) return null;
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Competitive Intelligence
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {competitors.length > 0 ? (
+          <>
+            <div>
+              <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Likely Competitors</p>
+              <div className="space-y-1">
+                {competitors.map((c, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className="font-mono text-foreground whitespace-nowrap font-medium">
+                      {c.name}
+                    </span>
+                    {c.threat_level && (
+                      <Badge variant="outline" className={cn(
+                        "text-[11px]",
+                        c.threat_level === "high" && "text-gda-red border-gda-red/30",
+                        c.threat_level === "medium" && "text-gda-amber border-gda-amber/30",
+                        c.threat_level === "low" && "text-gda-cyan border-gda-cyan/30",
+                      )}>
+                        {c.threat_level}
+                      </Badge>
+                    )}
+                    <span className="text-muted-foreground">{c.our_differentiator}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Competitive landscape not yet analyzed
+          </p>
+        )}
+        {incumbent && (
+          <div>
+            <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Incumbent</p>
+            <span className="text-xs text-foreground font-mono">{incumbent}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const RISK_LEVEL_COLORS: Record<string, string> = {
+  HIGH: "bg-gda-red/10 text-gda-red border-gda-red/30",
+  MED: "bg-gda-amber/10 text-gda-amber border-gda-amber/30",
+  LOW: "bg-gda-cyan/10 text-gda-cyan border-gda-cyan/30",
+};
+
+function RisksPanel({ llm }: { llm?: LlmAnalysis | null }) {
+  const risks = llm?.risks ?? [];
+
+  if (!llm) return null;
+  if (risks.length === 0) {
+    return (
+      <Card className="border-border bg-gda-panel">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+            Risks
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground">No risks analyzed yet</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Risks
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {risks.map((risk, i) => (
+          <div key={i} className="text-xs space-y-0.5">
+            <div className="flex items-start gap-2">
+              <Badge className={cn("text-[11px] font-mono border shrink-0", RISK_LEVEL_COLORS[risk.level] ?? "text-muted-foreground")}>
+                {risk.level}
+              </Badge>
+              <span className="text-foreground">{risk.description}</span>
+            </div>
+            {risk.mitigation && (
+              <p className="ml-12 text-muted-foreground">Mitigation: {risk.mitigation}</p>
+            )}
+            {risk.regulatory_citation && (
+              <a
+                href={`https://www.acquisition.gov/far/${risk.regulatory_citation.replace(/\s/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-12 inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[11px] font-mono text-gda-cyan hover:border-gda-cyan/40 transition-colors"
+              >
+                {risk.regulatory_citation}
+              </a>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MetaRow({ label, value, mono, className }: { label: string; value: string; mono?: boolean; className?: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn(mono && "font-mono", className ?? "text-foreground")}>{value}</span>
+    </div>
+  );
+}
+
+function TimelineEntry({ label, date, filled, urgent }: { label: string; date?: string | null; filled?: boolean; urgent?: boolean }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className={cn("text-[11px]", filled ? "text-gda-green" : "text-muted-foreground")}>
+        {filled ? "●" : "○"}
+      </span>
+      <span className="text-muted-foreground flex-1">{label}</span>
+      <span className={cn(
+        "font-mono",
+        urgent ? "text-gda-red font-bold" : "text-foreground"
+      )}>
+        {date ? new Date(date).toLocaleDateString() : "—"}
+      </span>
+    </div>
+  );
+}
+
+function AskAiInline({ id, title, agency, pwin }: { id: string; title: string; agency: string | null; pwin?: number | null }) {
+  const [question, setQuestion] = useState("");
+  const askAi = useAskAi();
+
+  function handleAsk(q?: string) {
+    const text = (q ?? question).trim();
+    if (!text) return;
+    setQuestion(text);
+    askAi.mutate({
+      question: text,
+      object_type: "opportunity",
+      object_id: id,
+      context: { title, agency, pwin },
+    });
+  }
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Analyst Q&A
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-1">
+          {SUGGESTION_CHIPS.map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors"
+              onClick={() => { setQuestion(chip); handleAsk(chip); }}
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+            placeholder="Ask about this opportunity..."
+            className="flex-1 rounded border border-border bg-gda-bg-base px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-gda-cyan focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => handleAsk()}
+            disabled={askAi.isPending || !question.trim()}
+            className="rounded bg-gda-green/20 border border-gda-green/40 px-3 py-1 text-xs font-mono text-gda-green hover:bg-gda-green/30 transition-colors disabled:opacity-50"
+          >
+            {askAi.isPending ? "..." : "Send"}
+          </button>
+        </div>
+        {askAi.data && (
+          <div className="rounded border border-border bg-gda-bg-base p-3 text-xs text-foreground whitespace-pre-wrap">
+            {askAi.data.ok && askAi.data.output
+              ? String((askAi.data.output as Record<string, unknown>).answer ?? JSON.stringify(askAi.data.output, null, 2))
+              : <span className="text-muted-foreground italic">Processing...</span>}
+          </div>
+        )}
+        {askAi.error && (
+          <p className="text-[11px] text-gda-red">{(askAi.error as Error).message}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -780,215 +1016,27 @@ function VaultDocumentsSection({ opportunityId }: { opportunityId: number }) {
   if (linkedDocs.length === 0) return null;
 
   return (
-    <CollapseSection
-      id={`vault-opp-${opportunityId}`}
-      title="Vault Documents"
-      count={linkedDocs.length}
-      defaultOpen={false}
-    >
-      <div className="space-y-1">
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Attachments
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1">
         {linkedDocs.map((doc) => (
           <Link
             key={doc.id}
             href={`/vault?doc=${doc.id}`}
-            className="flex items-center gap-3 rounded border border-border bg-gda-panel/50 px-3 py-2 text-xs hover:border-gda-cyan/40 transition-colors"
+            className="flex items-center gap-3 rounded border border-border bg-gda-bg-base px-3 py-2 text-xs hover:border-gda-cyan/40 transition-colors"
           >
             <span className="font-mono text-foreground">{doc.filename}</span>
-            <span className="text-muted-foreground">
-              {doc.doc_type}
-            </span>
+            <span className="text-muted-foreground">{doc.doc_type}</span>
             {doc.ai_summary && (
-              <span className="text-muted-foreground truncate max-w-[300px]">
-                {doc.ai_summary}
-              </span>
+              <span className="text-muted-foreground truncate max-w-[200px]">{doc.ai_summary}</span>
             )}
           </Link>
         ))}
-      </div>
-    </CollapseSection>
-  );
-}
-
-// ─── AI Analysis Card (F-453) ────────────────────────────────────────────
-
-const SHIPLEY_DIMENSIONS: Array<{
-  key: keyof import("@/lib/types").ShipleyBidNoBid;
-  label: string;
-}> = [
-  { key: "customer_knowledge", label: "Customer Knowledge" },
-  { key: "solution_match", label: "Solution Match" },
-  { key: "competitive_position", label: "Competitive Position" },
-  { key: "past_performance", label: "Past Performance" },
-];
-
-const BID_COLORS: Record<string, string> = {
-  Bid: "text-gda-green border-gda-green/30",
-  "No Bid": "text-gda-red border-gda-red/30",
-  Conditional: "text-gda-amber border-gda-amber/30",
-};
-
-function AiAnalysisCard({
-  llmAnalysis,
-  qualityFlag,
-}: {
-  llmAnalysis?: LlmAnalysis | null;
-  qualityFlag?: string | null;
-}) {
-  if (llmAnalysis === undefined) {
-    return (
-      <Card className="border-dashed border-border bg-gda-panel/30">
-        <CardContent className="py-6 text-center text-xs text-muted-foreground">
-          <p className="font-mono">AI analysis running...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!llmAnalysis) {
-    return (
-      <Card className="border-dashed border-border bg-gda-panel/30">
-        <CardContent className="py-6 text-center text-xs text-muted-foreground">
-          <p className="font-mono">AI analysis running...</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const bidColor =
-    BID_COLORS[llmAnalysis.shipley_bid_no_bid.overall] ?? "text-muted-foreground";
-
-  return (
-    <Card className="border-border bg-gda-panel">
-      <CardHeader>
-        <CardTitle className="font-mono text-sm text-muted-foreground">
-          AI Analysis
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Win Probability */}
-        <div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold text-gda-green">
-              {llmAnalysis.win_probability}%
-            </span>
-            <span className="text-xs text-muted-foreground">Win Probability</span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {llmAnalysis.win_probability_reasoning}
-          </p>
-          {qualityFlag === "degraded" && (
-            <Badge
-              variant="outline"
-              className="mt-1 border-gda-amber/30 text-[11px] text-gda-amber"
-            >
-              Degraded (fallback model used)
-            </Badge>
-          )}
-        </div>
-
-        <Separator className="bg-border" />
-
-        {/* Shipley Bid/No-Bid */}
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              Shipley Bid/No-Bid:
-            </span>
-            <Badge variant="outline" className={`text-xs ${bidColor}`}>
-              {llmAnalysis.shipley_bid_no_bid.overall}
-            </Badge>
-          </div>
-          <div className="mt-2 rounded border border-border overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-gda-bg-base text-muted-foreground">
-                  <th className="px-2 py-1 text-left font-medium">Dimension</th>
-                  <th className="px-2 py-1 text-left font-medium">Score</th>
-                  <th className="px-2 py-1 text-left font-medium">Reasoning</th>
-                </tr>
-              </thead>
-              <tbody>
-                {SHIPLEY_DIMENSIONS.map((dim) => {
-                  const d = llmAnalysis.shipley_bid_no_bid[
-                    dim.key
-                  ] as ShipleyDimension | undefined;
-                  if (!d) return null;
-                  return (
-                    <tr key={dim.key} className="border-b border-border">
-                      <td className="px-2 py-1 text-muted-foreground">
-                        {dim.label}
-                      </td>
-                      <td className="px-2 py-1 text-left font-mono text-foreground">
-                        {d.score}/10
-                      </td>
-                      <td className="px-2 py-1 text-muted-foreground truncate max-w-[200px]">
-                        {d.reasoning}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Competitor Landscape */}
-        {llmAnalysis.competitive_landscape.length > 0 && (
-          <>
-            <Separator className="bg-border" />
-            <div>
-              <span className="text-xs font-medium text-muted-foreground">
-                Competitor Landscape
-              </span>
-              <div className="mt-1 space-y-1">
-                {llmAnalysis.competitive_landscape.slice(0, 3).map((c, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-2 rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs"
-                  >
-                    <span className="font-mono text-foreground whitespace-nowrap">
-                      {c.name}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {c.our_differentiator}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Source Chips */}
-        {llmAnalysis.source_chips.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {llmAnalysis.source_chips.map((chip, i) => (
-              <SourceChip
-                key={i}
-                label={chip.label}
-                url={chip.url}
-                kind="real"
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Model footer */}
-        <p className="text-[11px] font-mono text-muted-foreground">
-          Model: {llmAnalysis.model_used}
-        </p>
       </CardContent>
     </Card>
-  );
-}
-
-function TimelineRow({ label, date }: { label: string; date?: string | null }) {
-  return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono text-foreground">
-        {date ? new Date(date).toLocaleDateString() : "—"}
-      </span>
-    </div>
   );
 }

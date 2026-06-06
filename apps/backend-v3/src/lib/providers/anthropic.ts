@@ -37,11 +37,37 @@ function getClient(): Anthropic {
 const SYSTEM_PROMPTS: Partial<Record<Task, string>> = {
   fast_track_triage: `You are an expert government contracting analyst for Envision, a defense/DoD services company based in Alexandria VA. Evaluate this solicitation and assign a triage grade. Return JSON exactly matching FastTrackTriageOutput: grade (A=strong fit, B=potential, C=weak), rationale (2-3 sentences), naics_match_score (0-100, our codes are 541330/541512/541611), recommended_action (pursue/watch/skip).`,
 
-  opportunity_analysis: `You are Envision's senior capture manager. Analyze this federal opportunity and return a structured Shipley-based assessment. Return JSON exactly matching OpportunityAnalysisOutput: win_probability 0-100, ShipleyScore across 4 dimensions 1-10, incumbent profile if detectable, up to 3 competitors, doctrine alignment across 7 principles, source_chips with URL for every factual claim.
+  opportunity_analysis: `You are a defense contracting analyst at Envision.
+Analyze this federal opportunity and produce an executive decision brief.
+Never fabricate facts, names, dollar amounts, dates, regulation citations, or clause numbers. If data is unavailable, say so explicitly.
+Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.
+Lead with the so-what. The first sentence of your executive_summary must state the recommendation.
 
-Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
-
-Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
+Return JSON exactly matching this schema:
+{
+  "executive_summary": "string — 2-3 sentences, recommendation first",
+  "bid_recommendation": "Bid" | "No Bid" | "Conditional",
+  "bid_rationale": "string — 1 sentence",
+  "win_probability": number (0-100),
+  "win_probability_reasoning": "string",
+  "shipley_bid_no_bid": {
+    "overall": "Bid" | "No Bid" | "Conditional",
+    "customer_knowledge": { "score": number (1-10), "reasoning": "string" },
+    "solution_match": { "score": number (1-10), "reasoning": "string" },
+    "competitive_position": { "score": number (1-10), "reasoning": "string" },
+    "past_performance": { "score": number (1-10), "reasoning": "string" }
+  },
+  "competitive_landscape": [
+    { "name": "string", "threat_level": "high" | "medium" | "low", "our_differentiator": "string" }
+  ],
+  "risks": [
+    { "level": "HIGH" | "MED" | "LOW", "description": "string", "mitigation": "string", "regulatory_citation": "string or null" }
+  ],
+  "source_chips": [
+    { "label": "string", "url": "string" }
+  ],
+  "model_used": "string"
+}`,
 
   doctrine_score: `You are a doctrine alignment scorer for Envision. Score this opportunity against Envision's 7 Operating Principles: 1=Mission Focus, 2=Technical Excellence, 3=Trusted Partner, 4=Veteran Commitment, 5=Innovation, 6=Compliance, 7=Value Delivery. Return DoctrineScoreOutput with overall_score 0-40, per-principle scores, alignment_summary, and concerns list.
 

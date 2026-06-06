@@ -507,14 +507,26 @@ export interface ShipleyBidNoBid {
 
 export interface CompetitorEntry {
   name: string;
+  threat_level?: "high" | "medium" | "low";
   our_differentiator: string;
 }
 
+export interface RiskEntry {
+  level: "HIGH" | "MED" | "LOW";
+  description: string;
+  mitigation: string;
+  regulatory_citation?: string | null;
+}
+
 export interface LlmAnalysis {
+  executive_summary?: string;
+  bid_recommendation?: "Bid" | "No Bid" | "Conditional";
+  bid_rationale?: string;
   win_probability: number;
   win_probability_reasoning: string;
   shipley_bid_no_bid: ShipleyBidNoBid;
   competitive_landscape: CompetitorEntry[];
+  risks?: RiskEntry[];
   source_chips: Array<{ label: string; url: string; kind: string }>;
   model_used: string;
 }

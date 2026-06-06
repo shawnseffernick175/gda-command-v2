@@ -152,6 +152,7 @@ export interface OpportunityUpdateInput {
   psc?: string;
   incumbent?: string;
   tags?: string[];
+  stage?: string;
 }
 
 export interface ListFilters {
