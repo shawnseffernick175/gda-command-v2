@@ -291,6 +291,17 @@ export interface Award {
   naics: string | null;
   award_analysis: AwardAnalysis | null;
   award_analysis_run_at: string | null;
+  incumbent_name: string | null;
+  linked_opportunity_id: number | null;
+}
+
+export interface AwardsMeta {
+  total_count: number;
+  expiring_90d: number;
+  expiring_1yr: number;
+  total_value: number;
+  incumbents_identified: number;
+  pursuing_count: number;
 }
 
 export interface AwardsPaginatedResponse {
