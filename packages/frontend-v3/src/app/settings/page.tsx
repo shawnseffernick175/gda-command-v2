@@ -17,6 +17,7 @@ import {
   useUpdateAdminUser,
   useDeactivateAdminUser,
 } from "@/hooks/use-admin-users";
+import { IngestPipelineSection } from "@/components/settings/ingest-pipeline";
 
 /* ── Config key editor ──────────────────────────────────────────── */
 function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
@@ -607,6 +608,11 @@ export default function SettingsPage() {
       {/* ── User Management ────────────────────────────────────── */}
       <CollapseSection id="settings-users" title="USER MANAGEMENT" defaultOpen={false}>
         <UserManagementPanel />
+      </CollapseSection>
+
+      {/* ── Ingest Pipeline ───────────────────────────────────── */}
+      <CollapseSection id="settings-ingest-pipeline" title="Ingest Pipeline" defaultOpen={true}>
+        <IngestPipelineSection />
       </CollapseSection>
     </div>
   );
