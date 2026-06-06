@@ -5,9 +5,15 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 const VALID_CATEGORIES = ['government', 'teaming_partner', 'competitor', 'industry', 'internal', 'other'] as const;
 type ContactCategory = typeof VALID_CATEGORIES[number];
 
+const VALID_TEMPS = ['hot', 'warm', 'cold', 'unknown'] as const;
+
 export async function contactsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/contacts', async (req, reply) => {
-    const query = req.query as { q?: string; agency?: string; category?: string; limit?: string; cursor?: string };
+    const query = req.query as {
+      q?: string; agency?: string; category?: string;
+      temperature?: string; linked?: string; source?: string;
+      limit?: string; cursor?: string;
+    };
     const limit = Math.min(Number(query.limit ?? 100), 200);
     const cursor = query.cursor ? Number(query.cursor) : null;
 
@@ -16,7 +22,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
 
     if (query.q) {
       params.push(`%${query.q}%`);
-      conditions.push(`(c.name ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.agency ILIKE $${params.length} OR c.company ILIKE $${params.length})`);
+      conditions.push(`(c.name ILIKE $${params.length} OR c.title ILIKE $${params.length} OR c.agency ILIKE $${params.length} OR c.company ILIKE $${params.length} OR c.email ILIKE $${params.length})`);
     }
     if (query.agency) {
       params.push(`%${query.agency}%`);
@@ -26,6 +32,19 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       params.push(query.category);
       conditions.push(`c.contact_category = $${params.length}`);
     }
+    if (query.temperature && query.temperature !== 'all') {
+      params.push(query.temperature);
+      conditions.push(`c.relationship_temp = $${params.length}`);
+    }
+    if (query.linked === 'yes') {
+      conditions.push(`(array_length(c.linked_opportunity_ids, 1) > 0 OR array_length(c.linked_capture_ids, 1) > 0)`);
+    } else if (query.linked === 'no') {
+      conditions.push(`(c.linked_opportunity_ids = '{}' AND c.linked_capture_ids = '{}')`);
+    }
+    if (query.source) {
+      params.push(`%${query.source}%`);
+      conditions.push(`c.source_label ILIKE $${params.length}`);
+    }
     if (cursor) {
       params.push(cursor);
       conditions.push(`c.id < $${params.length}`);
@@ -33,10 +52,12 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
 
     params.push(limit + 1);
     const sql = `
-      SELECT id, govtribe_id, name, title, agency, email, phone, contact_type,
-             source_url, last_seen_at, contact_category, company, linkedin_url,
-             notes, relationship_score, ai_profile, ai_ran_at, is_manual,
-             added_by, source_label
+      SELECT c.id, c.govtribe_id, c.name, c.title, c.agency, c.email, c.phone, c.contact_type,
+             c.source_url, c.last_seen_at, c.contact_category, c.company, c.linkedin_url,
+             c.notes, c.relationship_score, c.ai_profile, c.ai_ran_at, c.is_manual,
+             c.added_by, c.source_label,
+             c.relationship_temp, c.last_contacted_at, c.contact_notes,
+             c.linked_opportunity_ids, c.linked_capture_ids
       FROM govtribe_contacts c
       WHERE ${conditions.join(' AND ')}
       ORDER BY c.id DESC
@@ -47,7 +68,71 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     const items = hasMore ? rows.slice(0, limit) : rows;
     const nextCursor = hasMore ? (items[items.length - 1] as { id: number }).id : null;
 
-    return reply.send(successEnvelope({ items, pagination: { hasMore, cursor: nextCursor } }, req.requestId));
+    /* ── Meta counts for intelligence bar ──────────────────────── */
+    const metaSql = `
+      SELECT
+        count(*)::int AS total_count,
+        count(*) FILTER (
+          WHERE relationship_temp = 'warm'
+            AND (last_contacted_at IS NULL OR last_contacted_at < NOW() - INTERVAL '90 days')
+        )::int AS warm_no_touch,
+        count(*) FILTER (
+          WHERE array_length(linked_opportunity_ids, 1) > 0
+            OR array_length(linked_capture_ids, 1) > 0
+        )::int AS linked_to_pursuits,
+        count(DISTINCT agency) FILTER (WHERE agency IS NOT NULL)::int AS agency_count
+      FROM govtribe_contacts`;
+    const { rows: metaRows } = await pool.query(metaSql);
+    const meta = metaRows[0] as {
+      total_count: number;
+      warm_no_touch: number;
+      linked_to_pursuits: number;
+      agency_count: number;
+    };
+
+    /* ── Resolve linked opportunity/capture titles ─────────────── */
+    const allOppIds = new Set<number>();
+    const allCapIds = new Set<number>();
+    for (const item of items as Array<{ linked_opportunity_ids: number[]; linked_capture_ids: number[] }>) {
+      for (const oid of (item.linked_opportunity_ids ?? [])) allOppIds.add(oid);
+      for (const cid of (item.linked_capture_ids ?? [])) allCapIds.add(cid);
+    }
+
+    let oppMap: Record<number, { id: number; title: string; stage: string | null }> = {};
+    if (allOppIds.size > 0) {
+      const oppIdArr = Array.from(allOppIds);
+      const { rows: oppRows } = await pool.query(
+        `SELECT id, title, stage FROM unified_opportunities WHERE id = ANY($1)`,
+        [oppIdArr],
+      );
+      for (const r of oppRows as Array<{ id: number; title: string; stage: string | null }>) {
+        oppMap[r.id] = r;
+      }
+    }
+
+    let capMap: Record<number, { id: number; title: string; color_stage: string | null }> = {};
+    if (allCapIds.size > 0) {
+      const capIdArr = Array.from(allCapIds);
+      const { rows: capRows } = await pool.query(
+        `SELECT c.id, p.title, c.color_stage FROM captures c JOIN pipeline_items p ON c.pipeline_item_id = p.id WHERE c.id = ANY($1)`,
+        [capIdArr],
+      );
+      for (const r of capRows as Array<{ id: number; title: string; color_stage: string | null }>) {
+        capMap[r.id] = r;
+      }
+    }
+
+    const enrichedItems = (items as Array<Record<string, unknown>>).map((item) => ({
+      ...item,
+      linked_opportunities: ((item.linked_opportunity_ids as number[]) ?? [])
+        .map((oid: number) => oppMap[oid])
+        .filter(Boolean),
+      linked_captures: ((item.linked_capture_ids as number[]) ?? [])
+        .map((cid: number) => capMap[cid])
+        .filter(Boolean),
+    }));
+
+    return reply.send(successEnvelope({ items: enrichedItems, pagination: { hasMore, cursor: nextCursor }, meta }, req.requestId));
   });
 
   app.get('/v3/contacts/count', async (req, reply) => {
@@ -122,6 +207,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     const allowedFields = [
       'name', 'title', 'agency', 'company', 'email', 'phone',
       'contact_category', 'linkedin_url', 'notes', 'relationship_score', 'source_label',
+      'relationship_temp', 'last_contacted_at', 'contact_notes',
     ];
 
     const setClauses: string[] = [];
@@ -149,6 +235,109 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.send(successEnvelope(rows[0], req.requestId));
+  });
+
+  // POST /v3/contacts/:id/log-contact — set last_contacted_at = NOW()
+  app.post('/v3/contacts/:id/log-contact', async (req, reply) => {
+    const { id } = req.params as { id: string };
+
+    const { rows } = await pool.query(
+      `UPDATE govtribe_contacts SET last_contacted_at = NOW() WHERE id = $1 RETURNING *`,
+      [Number(id)],
+    );
+    if (rows.length === 0) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Contact not found', req.requestId));
+    }
+    return reply.send(successEnvelope(rows[0], req.requestId));
+  });
+
+  // POST /v3/contacts/:id/link — add opportunity_id or capture_id to linked arrays
+  app.post('/v3/contacts/:id/link', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as { opportunity_id?: number; capture_id?: number };
+
+    if (!body.opportunity_id && !body.capture_id) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'opportunity_id or capture_id required', req.requestId),
+      );
+    }
+
+    let sql: string;
+    let params: unknown[];
+
+    if (body.opportunity_id) {
+      sql = `UPDATE govtribe_contacts
+             SET linked_opportunity_ids = array_append(
+               array_remove(linked_opportunity_ids, $1), $1
+             )
+             WHERE id = $2 RETURNING *`;
+      params = [body.opportunity_id, Number(id)];
+    } else {
+      sql = `UPDATE govtribe_contacts
+             SET linked_capture_ids = array_append(
+               array_remove(linked_capture_ids, $1), $1
+             )
+             WHERE id = $2 RETURNING *`;
+      params = [body.capture_id, Number(id)];
+    }
+
+    const { rows } = await pool.query(sql, params);
+    if (rows.length === 0) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Contact not found', req.requestId));
+    }
+    return reply.send(successEnvelope(rows[0], req.requestId));
+  });
+
+  // POST /v3/contacts/:id/unlink — remove opportunity_id or capture_id from linked arrays
+  app.post('/v3/contacts/:id/unlink', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as { opportunity_id?: number; capture_id?: number };
+
+    if (!body.opportunity_id && !body.capture_id) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'opportunity_id or capture_id required', req.requestId),
+      );
+    }
+
+    let sql: string;
+    let params: unknown[];
+
+    if (body.opportunity_id) {
+      sql = `UPDATE govtribe_contacts SET linked_opportunity_ids = array_remove(linked_opportunity_ids, $1) WHERE id = $2 RETURNING *`;
+      params = [body.opportunity_id, Number(id)];
+    } else {
+      sql = `UPDATE govtribe_contacts SET linked_capture_ids = array_remove(linked_capture_ids, $1) WHERE id = $2 RETURNING *`;
+      params = [body.capture_id, Number(id)];
+    }
+
+    const { rows } = await pool.query(sql, params);
+    if (rows.length === 0) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Contact not found', req.requestId));
+    }
+    return reply.send(successEnvelope(rows[0], req.requestId));
+  });
+
+  // GET /v3/contacts/search-linkable — search opportunities + captures for link modal
+  app.get('/v3/contacts/search-linkable', async (req, reply) => {
+    const query = req.query as { q?: string };
+    const q = query.q ?? '';
+    const pattern = `%${q}%`;
+
+    const [oppResult, capResult] = await Promise.all([
+      pool.query(
+        `SELECT id, title, stage, value FROM unified_opportunities WHERE title ILIKE $1 ORDER BY id DESC LIMIT 20`,
+        [pattern],
+      ),
+      pool.query(
+        `SELECT c.id, p.title, c.color_stage AS stage FROM captures c JOIN pipeline_items p ON c.pipeline_item_id = p.id WHERE p.title ILIKE $1 ORDER BY c.id DESC LIMIT 20`,
+        [pattern],
+      ),
+    ]);
+
+    return reply.send(successEnvelope({
+      opportunities: oppResult.rows,
+      captures: capResult.rows,
+    }, req.requestId));
   });
 
   // POST /v3/contacts/:id/enrich — AI enrichment

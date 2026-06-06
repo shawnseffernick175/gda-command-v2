@@ -373,6 +373,11 @@ export interface ContactAiProfile {
   model_used: string;
 }
 
+export type RelationshipTemp = 'hot' | 'warm' | 'cold' | 'unknown';
+
+export interface LinkedOpp { id: number; title: string; stage: string | null }
+export interface LinkedCapture { id: number; title: string; color_stage: string | null }
+
 export interface GovTriContact {
   id: number;
   govtribe_id: string | null;
@@ -394,6 +399,20 @@ export interface GovTriContact {
   is_manual: boolean;
   added_by: string;
   source_label: string | null;
+  relationship_temp: RelationshipTemp | null;
+  last_contacted_at: string | null;
+  contact_notes: string | null;
+  linked_opportunity_ids: number[];
+  linked_capture_ids: number[];
+  linked_opportunities: LinkedOpp[];
+  linked_captures: LinkedCapture[];
+}
+
+export interface ContactsMeta {
+  total_count: number;
+  warm_no_touch: number;
+  linked_to_pursuits: number;
+  agency_count: number;
 }
 
 /* ── Competitors (pending backend) ────────────────────────────── */
