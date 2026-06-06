@@ -219,13 +219,13 @@ export default function AwardsPage() {
           active={activeTab === "all"}
         />
         <IntelChip
-          label={meta ? `🔴 ${meta.expiring_90d} Expiring <90 Days` : "—"}
+          label={meta ? `${meta.expiring_90d} Expiring <90 Days` : "—"}
           onClick={() => handleTabChange("90d")}
           active={activeTab === "90d"}
           colorClass="text-gda-red border-gda-red/30"
         />
         <IntelChip
-          label={meta ? `⚡ ${meta.expiring_1yr} Expiring <1yr` : "—"}
+          label={meta ? `${meta.expiring_1yr} Expiring <1yr` : "—"}
           onClick={() => handleTabChange("1yr")}
           active={activeTab === "1yr"}
           colorClass="text-gda-amber border-gda-amber/30"
