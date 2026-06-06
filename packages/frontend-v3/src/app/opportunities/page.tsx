@@ -3,7 +3,6 @@
 import { Suspense, useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useOpportunitiesInfinite,
   useOpportunity,
@@ -13,10 +12,7 @@ import {
 } from "@/hooks/use-opportunities";
 import { useAskAi } from "@/hooks/use-llm";
 import { apiPost } from "@/lib/api";
-import { BandBadge } from "@/components/band-badge";
-import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
-import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
 import { useVaultDocuments } from "@/hooks/use-vault";
 import { Skeleton } from "@/components/ui/skeleton";
