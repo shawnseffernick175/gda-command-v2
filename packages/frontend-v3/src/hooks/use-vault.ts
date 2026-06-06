@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPatch, apiDelete } from "@/lib/api";
+import { apiGet, apiPatch, apiDelete, getToken } from "@/lib/api";
 import type {
   VaultDocument,
   VaultPaginatedResponse,
@@ -60,8 +60,10 @@ export function useUploadVaultDocument() {
       formData.append("file", file);
       formData.append("doc_type", docType);
 
+      const token = getToken();
       const res = await fetch(`${API_BASE}/v3/vault/upload`, {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 
