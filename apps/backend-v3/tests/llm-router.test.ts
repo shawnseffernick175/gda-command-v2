@@ -32,6 +32,7 @@ const ALL_TASKS: readonly Task[] = [
   'match_analysis',
   'vault_document_parse',
   'vault_smart_route',
+  'digest_lead',
 ] as const;
 
 describe('Routing Table', () => {
@@ -41,7 +42,7 @@ describe('Routing Table', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('has exactly 15 entries (one per task)', () => {
+  it('has exactly 17 entries (one per task)', () => {
     expect(ROUTING_TABLE.length).toBe(ALL_TASKS.length);
   });
 
