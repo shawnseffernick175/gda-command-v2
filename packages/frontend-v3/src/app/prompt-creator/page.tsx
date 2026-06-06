@@ -767,7 +767,7 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
             onClick={() => onNavigateToPrompt(savedKey)}
             className="underline hover:text-gda-green/80"
           >
-            View "{savedKey}" in All tab
+            View {'"'}{savedKey}{'"'} in All tab
           </button>
         </div>
       )}
