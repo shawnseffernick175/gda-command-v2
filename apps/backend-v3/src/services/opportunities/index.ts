@@ -443,7 +443,11 @@ function buildFilterConditions(
     conditions.push(`o.data_source = ANY($${paramIdx++})`);
     params.push(filters.sources);
   }
-  if (filters.stage) {
+  if (filters.stage === 'active') {
+    conditions.push(
+      `EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage NOT IN ('won','lost'))`,
+    );
+  } else if (filters.stage) {
     conditions.push(
       `EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = $${paramIdx++})`,
     );
@@ -461,8 +465,12 @@ export async function listOpportunitiesPaged(
   const offset = (page - 1) * limit;
 
   const { conditions, params, paramIdx } = buildFilterConditions(filters);
-
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  // Build a second WHERE without stage filter for stage tab counts
+  const filtersWithoutStage = { ...filters, stage: undefined };
+  const { conditions: baseConditions, params: baseParams } = buildFilterConditions(filtersWithoutStage);
+  const baseWhere = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
 
   const metaSql = `
     SELECT
@@ -484,14 +492,15 @@ export async function listOpportunitiesPaged(
   const total = metaRow?.total_count ?? 0;
   const totalPages = Math.max(Math.ceil(total / limit), 1);
 
+  // Stage counts use base filters (without stage) so all tab counts stay accurate
   const stageCountsSql = `
     SELECT pi.stage, COUNT(DISTINCT pi.opportunity_id)::int AS cnt
     FROM pipeline_items pi
     INNER JOIN opportunities o ON o.id = pi.opportunity_id
-    ${where}
+    ${baseWhere}
     GROUP BY pi.stage
   `;
-  const stageRes = await pool.query<{ stage: string; cnt: number }>(stageCountsSql, params);
+  const stageRes = await pool.query<{ stage: string; cnt: number }>(stageCountsSql, baseParams);
   const stageCounts: Record<string, number> = {};
   for (const row of stageRes.rows) {
     stageCounts[row.stage] = row.cnt;

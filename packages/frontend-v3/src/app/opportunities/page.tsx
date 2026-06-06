@@ -74,9 +74,18 @@ function getHeatColor(opp: OpportunitySummary): string | null {
   return null;
 }
 
+function getEffectiveDueDate(opp: OpportunitySummary): string | null {
+  return opp.response_due_at ?? opp.due_date ?? null;
+}
+
+function getEffectiveValue(opp: OpportunitySummary): number | null {
+  return opp.value_max ?? opp.value_min ?? opp.value ?? null;
+}
+
 function getDaysLeft(opp: OpportunitySummary): number | null {
-  if (!opp.due_date) return null;
-  const due = new Date(opp.due_date);
+  const dd = getEffectiveDueDate(opp);
+  if (!dd) return null;
+  const due = new Date(dd);
   const now = new Date();
   return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
@@ -87,7 +96,7 @@ function formatDaysLeft(opp: OpportunitySummary): { text: string; className: str
   if (days < 0) return { text: "PAST DUE", className: "text-gda-red font-mono font-bold italic" };
   if (days <= 7) return { text: `${days}d`, className: "text-gda-red font-mono font-bold" };
   if (days <= 30) return { text: `${days}d`, className: "text-gda-amber font-mono" };
-  const d = new Date(opp.due_date!);
+  const d = new Date(getEffectiveDueDate(opp)!);
   return {
     text: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     className: "text-muted-foreground",
@@ -179,7 +188,7 @@ function OpportunityList() {
       value_max: range?.max,
       due: dueFilter || undefined,
       sources: sourceFilter.length > 0 ? sourceFilter : undefined,
-      stage: stageTab !== "all" && stageTab !== "active" ? stageTab : undefined,
+      stage: stageTab !== "all" ? stageTab : undefined,
       limit: 50,
     };
   }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab]);
@@ -448,7 +457,7 @@ function OpportunityList() {
               <tbody>
                 {allItems.map((opp) => (
                   <OpportunityRow
-                    key={opp.internal_id}
+                    key={String(opp.internal_id ?? opp.id)}
                     opp={opp}
                     onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
                   />
@@ -874,12 +883,12 @@ function OpportunityDetail({ id }: { id: string }) {
             </CardHeader>
             <CardContent className="space-y-1.5 text-xs">
               <MetaRow label="Value" value={formatMoney(opp.value)} mono />
-              <MetaRow label="Solicitation" value={opp.solicitation_number ?? "—"} mono />
-              <MetaRow label="Posted" value={opp.posted_at ? new Date(opp.posted_at).toLocaleDateString() : "—"} />
+              <MetaRow label="Solicitation" value={opp.solicitation_number ?? "---"} mono />
+              <MetaRow label="Posted" value={opp.posted_at ? new Date(opp.posted_at).toLocaleDateString() : "---"} />
               <MetaRow label="Set-Aside" value={opp.set_aside ?? "None"} />
-              <MetaRow label="Place" value={opp.place_of_performance ?? "—"} />
-              <MetaRow label="NAICS" value={opp.naics ?? "—"} mono />
-              <MetaRow label="Source" value={opp.source ?? "—"} />
+              <MetaRow label="Place" value={opp.place_of_performance ?? "---"} />
+              <MetaRow label="NAICS" value={opp.naics ?? "---"} mono />
+              <MetaRow label="Source" value={opp.source ?? "---"} />
               {/* Doctrine Fit — demoted to one line */}
               {(doctrine || doctrineScore != null) && (
                 <MetaRow
