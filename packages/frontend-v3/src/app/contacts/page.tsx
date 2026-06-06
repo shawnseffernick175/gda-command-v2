@@ -711,7 +711,7 @@ export default function ContactsPage() {
         </Badge>
         {meta.warm_no_touch > 0 && (
           <Badge variant="outline" className="border-gda-red/30 text-gda-red font-mono text-[11px]">
-            {meta.warm_no_touch} Warm &mdash; No Recent Touch
+            {meta.warm_no_touch} Warm — No Recent Touch
           </Badge>
         )}
         <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[11px]">
@@ -837,7 +837,7 @@ export default function ContactsPage() {
         <Card className="border-border bg-gda-panel">
           <CardContent className="py-10 text-center">
             <p className="text-sm text-muted-foreground">
-              No contacts found &mdash; add one manually or wait for the next GovTribe ingest (Mon/Thu 6am ET)
+              No contacts found — add one manually or wait for the next GovTribe ingest (Mon/Thu 6am ET)
             </p>
           </CardContent>
         </Card>
