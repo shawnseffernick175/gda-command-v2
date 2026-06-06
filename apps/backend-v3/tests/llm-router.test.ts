@@ -31,6 +31,7 @@ const ALL_TASKS: readonly Task[] = [
   'contact_enrich',
   'match_analysis',
   'vault_document_parse',
+  'vault_smart_route',
 ] as const;
 
 describe('Routing Table', () => {

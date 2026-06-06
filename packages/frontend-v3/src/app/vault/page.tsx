@@ -1,22 +1,24 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   useVaultDocuments,
   useVaultCount,
   useVaultDocument,
+  useVaultDocumentText,
   useUploadVaultDocument,
   useLinkVaultDocument,
   useDeleteVaultDocument,
+  useRegulatoryCatalog,
 } from "@/hooks/use-vault";
 import { Pagination } from "@/components/shared/Pagination";
 import { PendingState } from "@/components/shared/pending-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { VaultDocument } from "@/lib/types";
+import type { VaultDocument, RegulatoryCatalogEntry } from "@/lib/types";
 
 /* ── Constants ─────────────────────────────────────────────── */
 
@@ -28,6 +30,10 @@ const DOC_TYPES = [
   "certificate",
   "teaming_agreement",
   "rfp",
+  "past_performance",
+  "color_review",
+  "bid_protest",
+  "market_research",
   "other",
 ] as const;
 
@@ -38,6 +44,36 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   certificate: "Certificate",
   teaming_agreement: "Teaming Agreement",
   rfp: "RFP",
+  past_performance: "Past Performance",
+  color_review: "Color Review",
+  bid_protest: "Bid Protest",
+  market_research: "Market Research",
+  other: "Other",
+  far: "FAR",
+  dfars: "DFARS",
+  dfars_pgi: "DFARS PGI",
+  ndaa: "NDAA",
+  executive_order: "Exec Order",
+  gao_decision: "GAO Decision",
+  dod_policy: "DoD Policy",
+  cmmc: "CMMC",
+  cui_policy: "CUI Policy",
+  itar_ear: "ITAR/EAR",
+  usd_policy: "USD Policy",
+  other_regulatory: "Other Reg",
+};
+
+const REGULATORY_CATEGORIES: Record<string, string> = {
+  far: "FAR (Federal Acquisition Regulation)",
+  dfars: "DFARS (Defense Federal Acquisition Regulation Supplement)",
+  ndaa: "NDAA (National Defense Authorization Act)",
+  executive_order: "Executive Orders",
+  gao_decision: "GAO Decisions",
+  dod_policy: "DoD Policy / USD(A&S)",
+  cmmc: "CMMC / CUI / ITAR",
+  dfars_pgi: "DFARS PGI",
+  cui_policy: "CUI Policy",
+  itar_ear: "ITAR / EAR",
   other: "Other",
 };
 
@@ -46,10 +82,15 @@ function docTypeBadgeClass(dt: string): string {
     case "contract":
     case "rfp":
       return "border-gda-cyan/30 text-gda-cyan bg-gda-cyan/10";
+    case "proposal":
+    case "past_performance":
+      return "border-gda-green/30 text-gda-green bg-gda-green/10";
     case "invoice":
+    case "bid_protest":
       return "border-gda-amber/30 text-gda-amber bg-gda-amber/10";
     case "certificate":
     case "teaming_agreement":
+    case "color_review":
       return "border-gda-green/30 text-gda-green bg-gda-green/10";
     default:
       return "border-border text-muted-foreground";
@@ -90,12 +131,14 @@ export default function VaultPage() {
 
   const currentPage = Number(searchParams.get("page") ?? "1") || 1;
 
+  const [activeTab, setActiveTab] = useState<"work_product" | "regulatory">(
+    "work_product",
+  );
   const [docTypeFilter, setDocTypeFilter] = useState("All Types");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showAuditModal, setShowAuditModal] = useState<number | null>(null);
   const [showLinkModal, setShowLinkModal] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -103,6 +146,7 @@ export default function VaultPage() {
   const { data, isLoading, error, refetch } = useVaultDocuments({
     doc_type: docTypeFilter === "All Types" ? undefined : docTypeFilter,
     q: searchQuery || undefined,
+    category: activeTab,
     limit: 50,
     page: currentPage,
   });
@@ -137,9 +181,13 @@ export default function VaultPage() {
   );
 
   const handleDelete = useCallback(
-    (id: number) => {
-      if (!confirm("Delete this document?")) return;
-      deleteDoc.mutate(id);
+    (doc: VaultDocument) => {
+      if (doc.is_system_doc) return;
+      if (
+        !confirm(`Delete ${doc.filename}? This cannot be undone.`)
+      )
+        return;
+      deleteDoc.mutate(doc.id);
     },
     [deleteDoc],
   );
@@ -159,37 +207,76 @@ export default function VaultPage() {
             </Badge>
           )}
         </div>
+        {activeTab === "work_product" && (
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
+          >
+            Upload Document
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-border">
         <button
-          onClick={() => setShowUploadModal(true)}
-          className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
+          onClick={() => {
+            setActiveTab("work_product");
+            setPage(1);
+          }}
+          className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === "work_product"
+              ? "border-gda-green text-gda-green"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
         >
-          Upload Document
+          Work Product
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("regulatory");
+            setPage(1);
+          }}
+          className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === "regulatory"
+              ? "border-gda-cyan text-gda-cyan"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Regulatory Library
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={docTypeFilter}
-          onChange={(e) => {
-            setDocTypeFilter(e.target.value);
-            setPage(1);
-          }}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
-        >
-          {DOC_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t === "All Types" ? t : DOC_TYPE_LABELS[t] ?? t}
-            </option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Search filename, summary, tags…"
-          value={searchInput}
-          onChange={handleSearchChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-64"
-        />
+      {/* Search bar */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
+            &#x1F50D;
+          </span>
+          <input
+            type="text"
+            placeholder="Search documents…"
+            value={searchInput}
+            onChange={handleSearchChange}
+            className="w-full rounded border border-border bg-gda-panel pl-8 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
+          />
+        </div>
+        {activeTab === "work_product" && (
+          <select
+            value={docTypeFilter}
+            onChange={(e) => {
+              setDocTypeFilter(e.target.value);
+              setPage(1);
+            }}
+            className="rounded border border-border bg-gda-panel px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
+          >
+            {DOC_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t === "All Types" ? t : DOC_TYPE_LABELS[t] ?? t}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Error */}
@@ -200,106 +287,20 @@ export default function VaultPage() {
         />
       )}
 
-      {/* Table */}
-      {isLoading && !items.length ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 bg-gda-panel" />
-          ))}
-        </div>
-      ) : items.length > 0 ? (
-        <div className="rounded border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium">Filename</th>
-                <th className="px-3 py-2 text-left font-medium">Type</th>
-                <th className="px-3 py-2 text-left font-medium">Size</th>
-                <th className="px-3 py-2 text-left font-medium">Linked To</th>
-                <th className="px-3 py-2 text-left font-medium">AI Tags</th>
-                <th className="px-3 py-2 text-left font-medium">Uploaded</th>
-                <th className="px-3 py-2 text-left font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((doc) => (
-                <tr
-                  key={doc.id}
-                  className="border-b border-border hover:bg-gda-panel/50 transition-colors"
-                >
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={() => setSelectedDocId(doc.id)}
-                      className="text-foreground hover:text-gda-green text-left font-mono text-xs truncate max-w-[200px] block"
-                    >
-                      {doc.filename}
-                    </button>
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={`inline-block rounded px-2 py-0.5 text-[11px] font-mono border ${docTypeBadgeClass(doc.doc_type)}`}
-                    >
-                      {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground font-mono">
-                    {formatBytes(doc.file_size_bytes)}
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    <LinkedTo doc={doc} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {(doc.ai_tags ?? []).slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded bg-gda-panel px-1.5 py-0.5 text-[11px] text-muted-foreground border border-border"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground font-mono">
-                    {formatDate(doc.uploaded_at)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShowLinkModal(doc.id)}
-                        className="text-[11px] text-gda-cyan hover:text-gda-cyan/80 font-mono"
-                      >
-                        Link
-                      </button>
-                      <button
-                        onClick={() => setShowAuditModal(doc.id)}
-                        className="text-[11px] text-muted-foreground hover:text-foreground font-mono"
-                      >
-                        Audit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(doc.id)}
-                        className="text-[11px] text-gda-red hover:text-gda-red/80 font-mono"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Content area */}
+      {activeTab === "work_product" ? (
+        <WorkProductTable
+          items={items}
+          isLoading={isLoading}
+          onSelect={setSelectedDocId}
+          onDelete={handleDelete}
+          onLink={(id) => setShowLinkModal(id)}
+        />
       ) : (
-        !isLoading && (
-          <PendingState
-            surface="Vault"
-            reason="No documents uploaded yet. Use the Upload button to add your first document."
-          />
-        )
+        <RegulatoryLibrary searchQuery={searchQuery} />
       )}
 
-      {totalPages > 1 && (
+      {activeTab === "work_product" && totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -309,12 +310,16 @@ export default function VaultPage() {
 
       {/* Detail drawer */}
       {selectedDocId !== null && (
-        <VaultDetailDrawer
+        <DocumentReaderDrawer
           docId={selectedDocId}
           onClose={() => setSelectedDocId(null)}
           onLink={(id) => {
             setSelectedDocId(null);
             setShowLinkModal(id);
+          }}
+          onDelete={(doc) => {
+            setSelectedDocId(null);
+            handleDelete(doc);
           }}
         />
       )}
@@ -324,14 +329,6 @@ export default function VaultPage() {
         <UploadModal onClose={() => setShowUploadModal(false)} />
       )}
 
-      {/* Audit modal */}
-      {showAuditModal !== null && (
-        <AuditModal
-          docId={showAuditModal}
-          onClose={() => setShowAuditModal(null)}
-        />
-      )}
-
       {/* Link modal */}
       {showLinkModal !== null && (
         <LinkModal
@@ -339,6 +336,285 @@ export default function VaultPage() {
           onClose={() => setShowLinkModal(null)}
         />
       )}
+    </div>
+  );
+}
+
+/* ── Work Product Table ────────────────────────────────────── */
+
+function WorkProductTable({
+  items,
+  isLoading,
+  onSelect,
+  onDelete,
+  onLink,
+}: {
+  items: VaultDocument[];
+  isLoading: boolean;
+  onSelect: (id: number) => void;
+  onDelete: (doc: VaultDocument) => void;
+  onLink: (id: number) => void;
+}) {
+  if (isLoading && !items.length) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 bg-gda-panel" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!items.length) {
+    return (
+      <PendingState
+        surface="Vault"
+        reason="No documents uploaded yet. Use the Upload button to add your first document."
+      />
+    );
+  }
+
+  return (
+    <div className="rounded border border-border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
+            <th className="px-3 py-2 text-left font-medium">Filename</th>
+            <th className="px-3 py-2 text-left font-medium">Type</th>
+            <th className="px-3 py-2 text-left font-medium">Linked To</th>
+            <th className="px-3 py-2 text-left font-medium">Regulatory Refs</th>
+            <th className="px-3 py-2 text-left font-medium">Uploaded</th>
+            <th className="px-3 py-2 text-left font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((doc) => (
+            <tr
+              key={doc.id}
+              className="border-b border-border hover:bg-gda-panel/50 transition-colors group"
+            >
+              <td className="px-3 py-2">
+                <button
+                  onClick={() => onSelect(doc.id)}
+                  className="text-foreground hover:text-gda-green text-left font-mono text-xs truncate max-w-[200px] block"
+                >
+                  {doc.filename}
+                </button>
+              </td>
+              <td className="px-3 py-2">
+                <span
+                  className={`inline-block rounded px-2 py-0.5 text-[11px] font-mono border ${docTypeBadgeClass(doc.doc_type)}`}
+                >
+                  {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
+                </span>
+              </td>
+              <td className="px-3 py-2 text-xs">
+                <LinkedTo doc={doc} />
+              </td>
+              <td className="px-3 py-2">
+                {doc.regulatory_citation ? (
+                  <span className="rounded px-1.5 py-0.5 text-[11px] font-mono border border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan">
+                    {doc.regulatory_citation}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground text-xs">—</span>
+                )}
+              </td>
+              <td className="px-3 py-2 text-xs text-muted-foreground font-mono">
+                {formatDate(doc.uploaded_at)}
+              </td>
+              <td className="px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onSelect(doc.id)}
+                    className="text-[11px] text-gda-cyan hover:text-gda-cyan/80 font-mono"
+                  >
+                    Read
+                  </button>
+                  <button
+                    onClick={() => onLink(doc.id)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground font-mono"
+                  >
+                    Link
+                  </button>
+                  {!doc.is_system_doc && (
+                    <button
+                      onClick={() => onDelete(doc)}
+                      className="text-[11px] text-gda-red hover:text-gda-red/80 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── Regulatory Library ────────────────────────────────────── */
+
+function RegulatoryLibrary({ searchQuery }: { searchQuery: string }) {
+  const { data: catalog, isLoading } = useRegulatoryCatalog();
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(Object.keys(REGULATORY_CATEGORIES)),
+  );
+
+  const grouped = useMemo(() => {
+    if (!catalog) return {};
+    const groups: Record<string, RegulatoryCatalogEntry[]> = {};
+    for (const entry of catalog) {
+      const cat = entry.category;
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(entry);
+    }
+    return groups;
+  }, [catalog]);
+
+  const filteredGrouped = useMemo(() => {
+    if (!searchQuery) return grouped;
+    const q = searchQuery.toLowerCase();
+    const result: Record<string, RegulatoryCatalogEntry[]> = {};
+    for (const [cat, entries] of Object.entries(grouped)) {
+      const filtered = entries.filter(
+        (e) =>
+          e.citation.toLowerCase().includes(q) ||
+          e.title.toLowerCase().includes(q) ||
+          (e.summary?.toLowerCase().includes(q) ?? false),
+      );
+      if (filtered.length > 0) result[cat] = filtered;
+    }
+    return result;
+  }, [grouped, searchQuery]);
+
+  const toggleCategory = useCallback((cat: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 bg-gda-panel" />
+        ))}
+      </div>
+    );
+  }
+
+  const categoryOrder = Object.keys(REGULATORY_CATEGORIES);
+  const sortedCategories = Object.keys(filteredGrouped).sort(
+    (a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b),
+  );
+
+  if (sortedCategories.length === 0) {
+    return (
+      <PendingState
+        surface="Regulatory Library"
+        reason={
+          searchQuery
+            ? "No regulatory entries match your search."
+            : "No regulatory catalog entries loaded."
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {sortedCategories.map((cat) => {
+        const entries = filteredGrouped[cat] ?? [];
+        const isExpanded = expandedCategories.has(cat);
+        return (
+          <div
+            key={cat}
+            className="rounded border border-border overflow-hidden"
+          >
+            <button
+              onClick={() => toggleCategory(cat)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gda-bg-base hover:bg-gda-panel/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-medium text-foreground">
+                  {REGULATORY_CATEGORIES[cat] ?? cat}
+                </span>
+                <Badge
+                  variant="outline"
+                  className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
+                >
+                  {entries.length}
+                </Badge>
+              </div>
+              <span className="text-muted-foreground text-xs">
+                {isExpanded ? "▼" : "▶"}
+              </span>
+            </button>
+            {isExpanded && (
+              <div className="border-t border-border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-gda-panel/30 text-muted-foreground">
+                      <th className="px-4 py-1.5 text-left font-medium">
+                        Citation
+                      </th>
+                      <th className="px-4 py-1.5 text-left font-medium">
+                        Title
+                      </th>
+                      <th className="px-4 py-1.5 text-left font-medium">
+                        Summary
+                      </th>
+                      <th className="px-4 py-1.5 text-left font-medium">
+                        Source
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entries.map((entry) => (
+                      <tr
+                        key={entry.id}
+                        className="border-b border-border last:border-0 hover:bg-gda-panel/30 transition-colors"
+                      >
+                        <td className="px-4 py-2">
+                          <span className="font-mono text-gda-cyan text-[11px]">
+                            {entry.citation}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-foreground max-w-[250px]">
+                          {entry.title}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground max-w-[350px] truncate">
+                          {entry.summary ?? "—"}
+                        </td>
+                        <td className="px-4 py-2">
+                          {entry.url ? (
+                            <a
+                              href={entry.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gda-cyan hover:text-gda-cyan/80 font-mono text-[11px]"
+                            >
+                              View Source ↗
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -372,49 +648,39 @@ function LinkedTo({ doc }: { doc: VaultDocument }) {
   return <span className="text-muted-foreground">—</span>;
 }
 
-/* ── Detail Drawer ─────────────────────────────────────────── */
+/* ── Document Reader Drawer ────────────────────────────────── */
 
-function VaultDetailDrawer({
+function DocumentReaderDrawer({
   docId,
   onClose,
   onLink,
+  onDelete,
 }: {
   docId: number;
   onClose: () => void;
   onLink: (id: number) => void;
+  onDelete: (doc: VaultDocument) => void;
 }) {
   const { data: doc, isLoading } = useVaultDocument(docId);
+  const { data: textData } = useVaultDocumentText(docId);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-gda-bg-base border-l border-border overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-gda-bg-base border-l border-border overflow-y-auto">
         <div className="p-6 space-y-6">
-          {/* Close */}
-          <div className="flex items-center justify-between">
-            <h2 className="font-mono text-sm font-bold text-foreground">
-              Document Detail
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground text-lg"
-            >
-              ×
-            </button>
-          </div>
-
           {isLoading || !doc ? (
             <div className="space-y-3">
-              {Array.from({ length: 6 }).map((_, i) => (
+              {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-6 bg-gda-panel" />
               ))}
             </div>
           ) : (
             <>
               {/* Header */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-sm text-foreground font-medium">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                  <span className="font-mono text-sm text-foreground font-medium truncate">
                     {doc.filename}
                   </span>
                   <span
@@ -422,11 +688,23 @@ function VaultDetailDrawer({
                   >
                     {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
                   </span>
+                  <span className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-border text-muted-foreground">
+                    {doc.doc_category === "regulatory"
+                      ? "Regulatory"
+                      : "Work Product"}
+                  </span>
                 </div>
-                <div className="text-xs text-muted-foreground font-mono">
-                  {formatBytes(doc.file_size_bytes)} · Uploaded{" "}
-                  {formatTimestamp(doc.uploaded_at)}
-                </div>
+                <button
+                  onClick={onClose}
+                  className="text-muted-foreground hover:text-foreground text-lg ml-2"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="text-xs text-muted-foreground font-mono">
+                {formatBytes(doc.file_size_bytes)} · Uploaded{" "}
+                {formatTimestamp(doc.uploaded_at)}
               </div>
 
               <hr className="border-border" />
@@ -443,30 +721,27 @@ function VaultDetailDrawer({
                 </div>
               )}
 
-              {/* AI Tags */}
-              {doc.ai_tags && doc.ai_tags.length > 0 && (
+              <hr className="border-border" />
+
+              {/* Regulatory Citations */}
+              {doc.regulatory_citation && (
                 <div className="space-y-1">
                   <h3 className="font-mono text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    AI Tags
+                    Regulatory Citations
                   </h3>
                   <div className="flex flex-wrap gap-1">
-                    {doc.ai_tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-gda-cyan/10 border border-gda-cyan/30 px-2 py-0.5 text-[11px] text-gda-cyan font-mono"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                    <span className="rounded px-2 py-0.5 text-[11px] font-mono border border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan">
+                      {doc.regulatory_citation}
+                    </span>
                   </div>
                 </div>
               )}
 
-              {/* AI Entities */}
+              {/* Key Entities */}
               {doc.ai_entities && doc.ai_entities.length > 0 && (
                 <div className="space-y-1">
                   <h3 className="font-mono text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    AI Entities
+                    Key Entities
                   </h3>
                   <div className="rounded border border-border overflow-hidden">
                     <table className="w-full text-xs">
@@ -508,14 +783,16 @@ function VaultDetailDrawer({
 
               <hr className="border-border" />
 
-              {/* Linked Records */}
+              {/* Auto-Routing / Linked Records */}
               <div className="space-y-2">
                 <h3 className="font-mono text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Linked Records
+                  Auto-Routing
                 </h3>
                 <div className="space-y-1 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Opportunity:</span>
+                    <span className="text-muted-foreground">
+                      Linked Opportunity:
+                    </span>
                     {doc.opp_title ? (
                       <Link
                         href={`/opportunities?id=${doc.linked_opportunity_id}`}
@@ -525,7 +802,9 @@ function VaultDetailDrawer({
                       </Link>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">
+                          Not linked
+                        </span>
                         <button
                           onClick={() => onLink(doc.id)}
                           className="text-gda-cyan text-[11px] font-mono hover:underline"
@@ -536,7 +815,9 @@ function VaultDetailDrawer({
                     )}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Capture:</span>
+                    <span className="text-muted-foreground">
+                      Linked Capture:
+                    </span>
                     {doc.capture_title ? (
                       <Link
                         href={`/capture?opp=${doc.linked_capture_id}`}
@@ -546,23 +827,9 @@ function VaultDetailDrawer({
                       </Link>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">—</span>
-                        <button
-                          onClick={() => onLink(doc.id)}
-                          className="text-gda-cyan text-[11px] font-mono hover:underline"
-                        >
-                          Link
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Award:</span>
-                    {doc.award_title ? (
-                      <span className="text-foreground">{doc.award_title}</span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">
+                          Not linked
+                        </span>
                         <button
                           onClick={() => onLink(doc.id)}
                           className="text-gda-cyan text-[11px] font-mono hover:underline"
@@ -573,6 +840,18 @@ function VaultDetailDrawer({
                     )}
                   </div>
                 </div>
+              </div>
+
+              <hr className="border-border" />
+
+              {/* Full Text */}
+              <div className="space-y-1">
+                <h3 className="font-mono text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Full Text
+                </h3>
+                <pre className="rounded border border-border bg-gda-panel p-3 font-mono text-xs text-foreground leading-relaxed whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
+                  {textData?.extracted_text ?? doc.extracted_text ?? "No text extracted."}
+                </pre>
               </div>
 
               <hr className="border-border" />
@@ -594,9 +873,6 @@ function VaultDetailDrawer({
                             Actor
                           </th>
                           <th className="px-2 py-1 text-left font-medium">
-                            Detail
-                          </th>
-                          <th className="px-2 py-1 text-left font-medium">
                             Timestamp
                           </th>
                         </tr>
@@ -615,9 +891,6 @@ function VaultDetailDrawer({
                             <td className="px-2 py-1 text-muted-foreground">
                               {a.actor}
                             </td>
-                            <td className="px-2 py-1 text-muted-foreground truncate max-w-[150px]">
-                              {a.detail ?? "—"}
-                            </td>
                             <td className="px-2 py-1 text-muted-foreground font-mono">
                               {formatTimestamp(a.created_at)}
                             </td>
@@ -626,6 +899,18 @@ function VaultDetailDrawer({
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+
+              {/* Delete button */}
+              {!doc.is_system_doc && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => onDelete(doc)}
+                    className="rounded border border-gda-red/40 bg-gda-red/10 px-4 py-1.5 text-xs font-mono text-gda-red hover:bg-gda-red/20 transition-colors"
+                  >
+                    Delete Document
+                  </button>
                 </div>
               )}
             </>
@@ -640,10 +925,13 @@ function VaultDetailDrawer({
 
 function UploadModal({ onClose }: { onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null);
-  const [docType, setDocType] = useState("other");
   const [dragOver, setDragOver] = useState(false);
   const upload = useUploadVaultDocument();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [uploadPhase, setUploadPhase] = useState<string | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -654,15 +942,33 @@ function UploadModal({ onClose }: { onClose: () => void }) {
 
   const handleSubmit = useCallback(() => {
     if (!file) return;
+    setUploadPhase("Uploading…");
     upload.mutate(
-      { file, docType },
+      { file, docType: "other" },
       {
-        onSuccess: () => {
-          onClose();
+        onSuccess: (data) => {
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
+          setUploadPhase(null);
+          if (data.routing?.routing_rationale) {
+            // show success with routing info
+          }
+        },
+        onError: () => {
+          timersRef.current.forEach(clearTimeout);
+          timersRef.current = [];
+          setUploadPhase(null);
         },
       },
     );
-  }, [file, docType, upload, onClose]);
+    // Simulate phase transitions for UX
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [
+      setTimeout(() => setUploadPhase("Extracting text…"), 1000),
+      setTimeout(() => setUploadPhase("AI parsing…"), 3000),
+      setTimeout(() => setUploadPhase("Auto-routing…"), 5000),
+    ];
+  }, [file, upload]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -670,7 +976,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
       <div className="relative w-full max-w-md bg-gda-bg-base border border-border rounded-lg p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-mono text-sm font-bold text-foreground">
-            Upload Document
+            Upload {"&"} Route
           </h2>
           <button
             onClick={onClose}
@@ -679,6 +985,11 @@ function UploadModal({ onClose }: { onClose: () => void }) {
             ×
           </button>
         </div>
+
+        <p className="text-xs text-muted-foreground">
+          AI will auto-detect the document type and route it to matching
+          opportunities.
+        </p>
 
         {/* Drop zone */}
         <div
@@ -724,32 +1035,14 @@ function UploadModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Doc type */}
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground font-mono">
-            Document Type (required)
-          </label>
-          <select
-            value={docType}
-            onChange={(e) => setDocType(e.target.value)}
-            className="w-full rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
-          >
-            {DOC_TYPES.filter((t) => t !== "All Types").map((t) => (
-              <option key={t} value={t}>
-                {DOC_TYPE_LABELS[t] ?? t}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Progress / error */}
-        {upload.isPending && (
+        {upload.isPending && uploadPhase && (
           <div className="space-y-1">
             <div className="h-2 w-full rounded-full bg-gda-panel overflow-hidden">
               <div className="h-full bg-gda-green animate-pulse w-2/3 rounded-full" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Uploading and parsing with AI…
+            <p className="text-xs text-muted-foreground font-mono">
+              {uploadPhase}
             </p>
           </div>
         )}
@@ -761,13 +1054,31 @@ function UploadModal({ onClose }: { onClose: () => void }) {
         )}
 
         {upload.isSuccess && upload.data && (
-          <div className="rounded border border-gda-green/30 bg-gda-green/5 p-3 space-y-1">
+          <div className="rounded border border-gda-green/30 bg-gda-green/5 p-3 space-y-2">
             <p className="text-xs font-mono text-gda-green font-medium">
               Upload complete
             </p>
             {upload.data.ai_summary && (
               <p className="text-xs text-foreground leading-relaxed">
                 {upload.data.ai_summary}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground font-mono">
+              Type detected:{" "}
+              <span className="text-foreground">
+                {DOC_TYPE_LABELS[upload.data.doc_type] ?? upload.data.doc_type}
+              </span>
+            </p>
+            {upload.data.routing?.routing_rationale ? (
+              <p className="text-xs text-muted-foreground">
+                Routed:{" "}
+                <span className="text-gda-green">
+                  {upload.data.routing.routing_rationale}
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Unrouted — link manually
               </p>
             )}
           </div>
@@ -786,90 +1097,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
             disabled={!file || upload.isPending}
             className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
           >
-            {upload.isPending ? "Uploading…" : "Upload"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Audit Modal ───────────────────────────────────────────── */
-
-function AuditModal({
-  docId,
-  onClose,
-}: {
-  docId: number;
-  onClose: () => void;
-}) {
-  const { data: doc } = useVaultDocument(docId);
-  const auditTrail = doc?.audit_trail ?? [];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-gda-bg-base border border-border rounded-lg p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-mono text-sm font-bold text-foreground">
-            Audit Trail — {doc?.filename ?? "..."}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-lg"
-          >
-            ×
-          </button>
-        </div>
-
-        {auditTrail.length > 0 ? (
-          <div className="rounded border border-border overflow-hidden max-h-80 overflow-y-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-gda-panel text-muted-foreground">
-                  <th className="px-2 py-1.5 text-left font-medium">Action</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Actor</th>
-                  <th className="px-2 py-1.5 text-left font-medium">Detail</th>
-                  <th className="px-2 py-1.5 text-left font-medium">
-                    Timestamp
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditTrail.map((a) => (
-                  <tr
-                    key={a.id}
-                    className="border-b border-border last:border-0"
-                  >
-                    <td className="px-2 py-1.5">
-                      <span className="text-[11px] uppercase tracking-wide font-mono text-foreground">
-                        {a.action}
-                      </span>
-                    </td>
-                    <td className="px-2 py-1.5 text-muted-foreground">
-                      {a.actor}
-                    </td>
-                    <td className="px-2 py-1.5 text-muted-foreground truncate max-w-[150px]">
-                      {a.detail ?? "—"}
-                    </td>
-                    <td className="px-2 py-1.5 text-muted-foreground font-mono whitespace-nowrap">
-                      {formatTimestamp(a.created_at)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">No audit entries yet.</p>
-        )}
-
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className="rounded border border-border px-3 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Close
+            {upload.isPending ? "Processing…" : "Upload & Route"}
           </button>
         </div>
       </div>

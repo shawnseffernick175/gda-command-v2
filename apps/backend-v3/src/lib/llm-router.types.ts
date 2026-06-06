@@ -34,7 +34,8 @@ export type Task =
   | 'competitor_analysis'
   | 'contact_enrich'
   | 'match_analysis'
-  | 'vault_document_parse';
+  | 'vault_document_parse'
+  | 'vault_smart_route';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -313,8 +314,30 @@ export interface VaultDocumentParseOutput {
   summary: string;
   tags: string[];
   entities: { name: string; type: string; value: string }[];
+  regulatory_citations: string[];
   doc_type_confirmed: string;
+  key_dates: { label: string; date: string }[];
+  dollar_amounts: { label: string; amount: string }[];
   model_used: string;
+}
+
+export interface VaultSmartRouteInput {
+  filename: string;
+  ai_summary: string;
+  extracted_text_preview: string;
+  matching_opportunities: { id: number; title: string; agency: string }[];
+  matching_captures: { id: number; title: string }[];
+  regulatory_citations: string[];
+}
+
+export interface VaultSmartRouteOutput {
+  doc_type: string;
+  doc_category: string;
+  linked_opportunity_id: number | null;
+  linked_capture_id: number | null;
+  regulatory_citation: string | null;
+  routing_rationale: string;
+  confidence: string;
 }
 
 export interface RiskGenerationInput {
@@ -611,6 +634,7 @@ export interface TaskInputMap {
   contact_enrich: ContactEnrichInput;
   match_analysis: MatchAnalysisInput;
   vault_document_parse: VaultDocumentParseInput;
+  vault_smart_route: VaultSmartRouteInput;
 }
 
 export interface TaskOutputMap {
@@ -629,6 +653,7 @@ export interface TaskOutputMap {
   contact_enrich: ContactEnrichOutput;
   match_analysis: MatchAnalysisOutput;
   vault_document_parse: VaultDocumentParseOutput;
+  vault_smart_route: VaultSmartRouteOutput;
 }
 
 // ---------------------------------------------------------------------------

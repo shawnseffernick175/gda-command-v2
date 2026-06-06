@@ -6,11 +6,14 @@ import type {
   VaultDocument,
   VaultPaginatedResponse,
   VaultAuditEntry,
+  VaultDocumentText,
+  RegulatoryCatalogEntry,
 } from "@/lib/types";
 
 export interface UseVaultDocumentsParams {
   doc_type?: string;
   q?: string;
+  category?: string;
   limit?: number;
   page?: number;
 }
@@ -22,6 +25,7 @@ export function useVaultDocuments(params: UseVaultDocumentsParams = {}) {
       apiGet<VaultPaginatedResponse>("/v3/vault", {
         doc_type: params.doc_type || undefined,
         q: params.q || undefined,
+        category: params.category || undefined,
         limit: params.limit ?? 50,
         page: params.page ?? 1,
       }),
@@ -39,6 +43,14 @@ export function useVaultDocument(id: number | null) {
   return useQuery({
     queryKey: ["vault", "detail", id],
     queryFn: () => apiGet<VaultDocument>(`/v3/vault/${id}`),
+    enabled: id !== null,
+  });
+}
+
+export function useVaultDocumentText(id: number | null) {
+  return useQuery({
+    queryKey: ["vault", "text", id],
+    queryFn: () => apiGet<VaultDocumentText>(`/v3/vault/${id}/text`),
     enabled: id !== null,
   });
 }
@@ -121,5 +133,15 @@ export function useDeleteVaultDocument() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["vault"] });
     },
+  });
+}
+
+export function useRegulatoryCatalog(params: { category?: string } = {}) {
+  return useQuery({
+    queryKey: ["vault", "regulatory-catalog", params],
+    queryFn: () =>
+      apiGet<RegulatoryCatalogEntry[]>("/v3/vault/regulatory/catalog", {
+        category: params.category || undefined,
+      }),
   });
 }

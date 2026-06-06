@@ -26,6 +26,7 @@ import type {
   ContactEnrichOutput,
   MatchAnalysisOutput,
   VaultDocumentParseOutput,
+  VaultSmartRouteOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -225,9 +226,22 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       summary: 'Mock document analysis — contract for IT modernization services.',
       tags: ['IT modernization', 'DoD', 'NAICS 541512'],
       entities: [{ name: 'Department of Defense', type: 'party', value: 'Contracting Agency' }],
+      regulatory_citations: ['FAR 15.304'],
       doc_type_confirmed: 'contract',
+      key_dates: [{ label: 'Period of Performance Start', date: '2025-01-01' }],
+      dollar_amounts: [{ label: 'Total Contract Value', amount: '$5,000,000' }],
       model_used: 'mock-model',
     } satisfies VaultDocumentParseOutput,
+
+    vault_smart_route: {
+      doc_type: 'contract',
+      doc_category: 'work_product',
+      linked_opportunity_id: null,
+      linked_capture_id: null,
+      regulatory_citation: null,
+      routing_rationale: 'Document classified as work product contract based on content analysis.',
+      confidence: 'high',
+    } satisfies VaultSmartRouteOutput,
   };
 
   return {
