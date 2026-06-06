@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 
 /** Map from task to prompt_library key for read-through lookup. */
@@ -79,10 +79,15 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
 
-  vault_document_parse: `You are a document analyst at a defense contracting firm.
+  vault_document_parse: `You are a defense contracting document analyst at Envision.
 
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
+
+  vault_smart_route: `You are a defense contracting document analyst at Envision.
+
+Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
+Write as a sharp defense contracting analyst. Be direct and specific.`,
 
   competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
@@ -153,15 +158,38 @@ Filename: ${input.filename}
 Extracted text (first 6000 chars):
 ${text}
 
-Extract and return JSON:
+Parse this document and extract all relevant intelligence. Return JSON:
 {
-  "summary": "2–3 sentence executive summary of this document",
-  "tags": ["key_term_1", "key_term_2", ...],
+  "summary": "2-3 sentence executive summary",
+  "tags": ["up to 10 relevant tags"],
   "entities": [
-    {"name": "...", "type": "party|dollar_amount|date|contract_number|naics|vehicle", "value": "..."}
+    {"name": "...", "type": "party|dollar_amount|date|contract_number|naics|vehicle|clause_number", "value": "..."}
   ],
-  "doc_type_confirmed": "contract|proposal|invoice|certificate|teaming_agreement|rfp|other",
+  "regulatory_citations": ["FAR 15.304", "DFARS 252.204-7012"],
+  "doc_type_confirmed": "contract|proposal|invoice|certificate|teaming_agreement|rfp|past_performance|color_review|bid_protest|market_research|other",
+  "key_dates": [{"label": "...", "date": "YYYY-MM-DD"}],
+  "dollar_amounts": [{"label": "...", "amount": "..."}],
   "model_used": "{model}"
+}`;
+}
+
+function buildVaultSmartRoutePrompt(input: VaultSmartRouteInput): string {
+  return `Document filename: ${input.filename}
+Document summary: ${input.ai_summary}
+Extracted text (first 1000 chars): ${input.extracted_text_preview}
+Possible matching opportunities: ${JSON.stringify(input.matching_opportunities)}
+Possible matching captures: ${JSON.stringify(input.matching_captures)}
+Regulatory citations found: ${input.regulatory_citations.join(', ')}
+
+Classify this document and determine where it belongs. Return JSON:
+{
+  "doc_type": "contract|proposal|invoice|certificate|teaming_agreement|rfp|past_performance|color_review|bid_protest|market_research|other",
+  "doc_category": "work_product|regulatory",
+  "linked_opportunity_id": null or number,
+  "linked_capture_id": null or number,
+  "regulatory_citation": "primary citation if regulatory, else null",
+  "routing_rationale": "1 sentence explaining why",
+  "confidence": "high|medium|low"
 }`;
 }
 
@@ -203,6 +231,8 @@ export async function callAnthropic(opts: {
     ? buildMatchAnalysisPrompt(opts.input as MatchAnalysisInput)
     : opts.task === 'vault_document_parse'
     ? buildVaultDocumentParsePrompt(opts.input as VaultDocumentParseInput)
+    : opts.task === 'vault_smart_route'
+    ? buildVaultSmartRoutePrompt(opts.input as VaultSmartRouteInput)
     : JSON.stringify(opts.input);
 
   try {

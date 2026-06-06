@@ -540,12 +540,17 @@ export interface VaultDocument {
   id: number;
   filename: string;
   doc_type: string;
+  doc_category: string;
+  is_system_doc: boolean;
   file_size_bytes: number | null;
   file_path: string | null;
   extracted_text: string | null;
   ai_summary: string | null;
   ai_tags: string[] | null;
   ai_entities: VaultEntity[] | null;
+  regulatory_citation: string | null;
+  effective_date: string | null;
+  applicable_naics: string[] | null;
   linked_opportunity_id: number | null;
   linked_capture_id: number | null;
   linked_award_id: number | null;
@@ -557,6 +562,17 @@ export interface VaultDocument {
   capture_title?: string | null;
   award_title?: string | null;
   audit_trail?: VaultAuditEntry[];
+  routing?: {
+    linked_opportunity_id: number | null;
+    linked_capture_id: number | null;
+    routing_rationale: string | null;
+  };
+}
+
+export interface VaultDocumentText {
+  extracted_text: string | null;
+  filename: string;
+  doc_type: string;
 }
 
 export interface VaultPaginatedResponse {
@@ -564,6 +580,23 @@ export interface VaultPaginatedResponse {
   total: number;
   page: number;
   totalPages: number;
+}
+
+export interface RegulatoryCatalogEntry {
+  id: number;
+  citation: string;
+  title: string;
+  category: string;
+  summary: string | null;
+  url: string | null;
+  effective_date: string | null;
+  ndaa_year: number | null;
+  eo_number: string | null;
+  gao_docket: string | null;
+  applies_to: string[] | null;
+  key_clauses: { clause: string; topic: string }[] | null;
+  is_active: boolean;
+  created_at: string;
 }
 
 /* ── Daily Briefing (F-460b) ──────────────────────────────────── */

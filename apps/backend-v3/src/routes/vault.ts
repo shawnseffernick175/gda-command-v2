@@ -1,13 +1,18 @@
 /**
- * Vault routes — document upload, AI parse on ingest, linkage, audit trail.
+ * Vault routes — document upload, AI parse + smart ingest router,
+ * full-text search, regulatory catalog, in-browser reader, linkage, audit.
  *
  * Endpoints:
- *   GET    /v3/vault            — list documents with filters + pagination
- *   GET    /v3/vault/:id        — single document with audit trail
- *   POST   /v3/vault/upload     — multipart upload → extract → AI parse
- *   PATCH  /v3/vault/:id/link   — link to opportunity / capture / award
- *   GET    /v3/vault/:id/audit  — audit trail for a document
- *   DELETE /v3/vault/:id        — soft delete
+ *   GET    /v3/vault                  — list documents (FTS when q provided)
+ *   GET    /v3/vault/count            — total document count
+ *   GET    /v3/vault/:id              — single document with audit trail
+ *   GET    /v3/vault/:id/text         — extracted text for in-browser reading
+ *   POST   /v3/vault/upload           — multipart upload → extract → AI parse → smart route
+ *   PATCH  /v3/vault/:id/link         — link to opportunity / capture / award
+ *   GET    /v3/vault/:id/audit        — audit trail for a document
+ *   DELETE /v3/vault/:id              — soft delete (blocked for system docs)
+ *   GET    /v3/vault/regulatory/catalog — regulatory reference catalog
+ *   GET    /v3/vault/regulatory/search — search regulatory catalog + docs
  */
 
 import type { FastifyInstance } from 'fastify';
@@ -25,21 +30,35 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
 const VALID_DOC_TYPES = [
   'contract', 'proposal', 'invoice', 'certificate',
-  'teaming_agreement', 'rfp', 'other',
+  'teaming_agreement', 'rfp', 'past_performance', 'color_review',
+  'bid_protest', 'market_research', 'other',
+  'far', 'dfars', 'dfars_pgi', 'ndaa', 'executive_order', 'gao_decision',
+  'dod_policy', 'cmmc', 'cui_policy', 'itar_ear', 'usd_policy', 'other_regulatory',
 ] as const;
 
 type DocType = typeof VALID_DOC_TYPES[number];
+
+const WORK_PRODUCT_TYPES = [
+  'contract', 'proposal', 'invoice', 'certificate',
+  'teaming_agreement', 'rfp', 'past_performance', 'color_review',
+  'bid_protest', 'market_research', 'other',
+] as const;
 
 interface VaultDocumentRow {
   id: number;
   filename: string;
   doc_type: string;
+  doc_category: string;
+  is_system_doc: boolean;
   file_size_bytes: string | null;
   file_path: string | null;
   extracted_text: string | null;
   ai_summary: string | null;
   ai_tags: string[] | null;
   ai_entities: { name: string; type: string; value: string }[] | null;
+  regulatory_citation: string | null;
+  effective_date: string | null;
+  applicable_naics: string[] | null;
   linked_opportunity_id: number | null;
   linked_capture_id: number | null;
   linked_award_id: number | null;
@@ -47,7 +66,6 @@ interface VaultDocumentRow {
   uploaded_at: string;
   updated_at: string;
   deleted_at: string | null;
-  // joined fields
   opp_title?: string | null;
   capture_title?: string | null;
   award_title?: string | null;
@@ -59,6 +77,23 @@ interface AuditRow {
   action: string;
   actor: string;
   detail: string | null;
+  created_at: string;
+}
+
+interface RegulatoryCatalogRow {
+  id: number;
+  citation: string;
+  title: string;
+  category: string;
+  summary: string | null;
+  url: string | null;
+  effective_date: string | null;
+  ndaa_year: number | null;
+  eo_number: string | null;
+  gao_docket: string | null;
+  applies_to: string[] | null;
+  key_clauses: { clause: string; topic: string }[] | null;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -97,6 +132,128 @@ async function insertAudit(
   );
 }
 
+function extractRegCitations(text: string): string[] {
+  const patterns = [
+    /FAR\s+\d+\.\d+/gi,
+    /DFARS\s+\d+\.\d+[-\d]*/gi,
+    /10\s+U\.S\.C\.\s*§?\s*\d+/gi,
+    /NDAA\s+(FY\s*)?\d{4}/gi,
+    /Executive\s+Order\s+\d+/gi,
+    /EO\s+\d{5}/gi,
+    /NIST\s+SP\s+800-\d+/gi,
+  ];
+  const found = new Set<string>();
+  for (const p of patterns) {
+    const matches = text.match(p);
+    if (matches) matches.forEach(m => found.add(m.trim()));
+  }
+  return [...found];
+}
+
+async function smartIngestRouter(
+  docId: number,
+  filename: string,
+  extractedText: string | null,
+  aiSummary: string | null,
+): Promise<{ linked_opportunity_id: number | null; linked_capture_id: number | null; routing_rationale: string | null }> {
+  const searchText = extractedText?.slice(0, 500) ?? filename;
+
+  let opps: { id: number; title: string; agency: string }[] = [];
+  let captures: { id: number; title: string }[] = [];
+
+  try {
+    const oppRes = await pool.query<{ id: number; title: string; agency: string }>(
+      `SELECT id, title, agency FROM opportunities
+       WHERE to_tsvector('english', coalesce(title,'') || ' ' || coalesce(agency,''))
+       @@ plainto_tsquery('english', $1) LIMIT 3`,
+      [searchText],
+    );
+    opps = oppRes.rows;
+  } catch { /* no matches */ }
+
+  try {
+    const capRes = await pool.query<{ id: number; title: string }>(
+      `SELECT id, title FROM captures
+       WHERE to_tsvector('english', coalesce(title,''))
+       @@ plainto_tsquery('english', $1) LIMIT 3`,
+      [filename],
+    );
+    captures = capRes.rows;
+  } catch { /* no matches */ }
+
+  const citations = extractRegCitations(extractedText ?? '');
+
+  try {
+    const routingResult = await llmRouter.route({
+      task: 'vault_smart_route',
+      input: {
+        filename,
+        ai_summary: aiSummary ?? '',
+        extracted_text_preview: extractedText?.slice(0, 1000) ?? '',
+        matching_opportunities: opps,
+        matching_captures: captures,
+        regulatory_citations: citations,
+      },
+    });
+
+    if (routingResult.ok && routingResult.output) {
+      const out = routingResult.output as {
+        doc_type?: string;
+        doc_category?: string;
+        linked_opportunity_id?: number | null;
+        linked_capture_id?: number | null;
+        regulatory_citation?: string | null;
+        routing_rationale?: string | null;
+      };
+
+      const sets: string[] = ['updated_at = NOW()'];
+      const params: unknown[] = [];
+      let idx = 1;
+
+      if (out.doc_type) {
+        sets.push(`doc_type = $${idx++}`);
+        params.push(out.doc_type);
+      }
+      if (out.doc_category) {
+        sets.push(`doc_category = $${idx++}`);
+        params.push(out.doc_category);
+      }
+      if (out.linked_opportunity_id) {
+        sets.push(`linked_opportunity_id = $${idx++}`);
+        params.push(out.linked_opportunity_id);
+      }
+      if (out.linked_capture_id) {
+        sets.push(`linked_capture_id = $${idx++}`);
+        params.push(out.linked_capture_id);
+      }
+      if (out.regulatory_citation) {
+        sets.push(`regulatory_citation = $${idx++}`);
+        params.push(out.regulatory_citation);
+      }
+
+      if (sets.length > 1) {
+        params.push(docId);
+        await pool.query(
+          `UPDATE vault_documents SET ${sets.join(', ')} WHERE id = $${idx}`,
+          params,
+        );
+      }
+
+      await insertAudit(docId, 'auto_routed', 'system', out.routing_rationale ?? 'Smart ingest routing completed');
+
+      return {
+        linked_opportunity_id: out.linked_opportunity_id ?? null,
+        linked_capture_id: out.linked_capture_id ?? null,
+        routing_rationale: out.routing_rationale ?? null,
+      };
+    }
+  } catch (err) {
+    logger.warn({ err, filename }, 'Smart ingest routing failed — document stored without auto-routing');
+  }
+
+  return { linked_opportunity_id: null, linked_capture_id: null, routing_rationale: null };
+}
+
 export async function vaultRoutes(app: FastifyInstance): Promise<void> {
   await app.register(fastifyMultipart, {
     limits: { fileSize: MAX_FILE_SIZE },
@@ -104,10 +261,11 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
   mkdirSync(UPLOAD_DIR, { recursive: true });
 
-  // GET /v3/vault — list documents
+  // GET /v3/vault — list documents with FTS
   app.get('/v3/vault', async (req, reply) => {
     const query = req.query as Record<string, string | undefined>;
     const docType = query.doc_type;
+    const category = query.category;
     const search = query.q;
     const limit = Math.min(Math.max(Number(query.limit) || 50, 1), 200);
     const page = Math.max(Number(query.page) || 1, 1);
@@ -117,17 +275,19 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     const params: unknown[] = [];
     let idx = 1;
 
+    if (category && (category === 'work_product' || category === 'regulatory')) {
+      conditions.push(`d.doc_category = $${idx++}`);
+      params.push(category);
+    }
+
     if (docType && VALID_DOC_TYPES.includes(docType as DocType)) {
       conditions.push(`d.doc_type = $${idx++}`);
       params.push(docType);
     }
 
     if (search) {
-      conditions.push(
-        `(d.filename ILIKE $${idx} OR d.ai_summary ILIKE $${idx} OR d.ai_tags::text ILIKE $${idx})`,
-      );
-      params.push(`%${search}%`);
-      idx++;
+      conditions.push(`d.full_text_search @@ plainto_tsquery('english', $${idx++})`);
+      params.push(search);
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
@@ -137,14 +297,16 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     const total = countRes.rows[0]?.total ?? 0;
 
     const dataSql = `
-      SELECT d.*,
+      SELECT d.id, d.filename, d.doc_type, d.doc_category, d.is_system_doc,
+        d.file_size_bytes, d.file_path, d.ai_summary, d.ai_tags, d.ai_entities,
+        d.regulatory_citation, d.effective_date, d.applicable_naics,
+        d.linked_opportunity_id, d.linked_capture_id, d.linked_award_id,
+        d.uploaded_by, d.uploaded_at, d.updated_at, d.deleted_at,
         o.title AS opp_title,
-        cap.id AS capture_exists,
         (SELECT title FROM opportunities WHERE id = d.linked_capture_id LIMIT 1) AS capture_title,
         a_ref.awardee_name AS award_title
       FROM vault_documents d
       LEFT JOIN opportunities o ON o.id = d.linked_opportunity_id
-      LEFT JOIN captures cap ON cap.id = d.linked_capture_id
       LEFT JOIN awards a_ref ON a_ref.id = d.linked_award_id
       ${where}
       ORDER BY d.uploaded_at DESC
@@ -174,6 +336,75 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(
       successEnvelope(
         { count: res.rows[0]?.count ?? 0 },
+        req.requestId,
+      ),
+    );
+  });
+
+  // GET /v3/vault/regulatory/catalog
+  app.get('/v3/vault/regulatory/catalog', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+    const category = query.category;
+
+    let sql = 'SELECT * FROM vault_regulatory_catalog WHERE is_active = true';
+    const params: unknown[] = [];
+
+    if (category) {
+      sql += ' AND category = $1';
+      params.push(category);
+    }
+
+    sql += ' ORDER BY category, citation';
+
+    const res = await pool.query<RegulatoryCatalogRow>(sql, params);
+    return reply.send(successEnvelope(res.rows, req.requestId));
+  });
+
+  // GET /v3/vault/regulatory/search
+  app.get('/v3/vault/regulatory/search', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+    const search = query.q;
+
+    if (!search) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'Search query (q) is required', req.requestId),
+      );
+    }
+
+    const catalogSql = `
+      SELECT * FROM vault_regulatory_catalog
+      WHERE is_active = true
+        AND (
+          citation ILIKE $1
+          OR title ILIKE $1
+          OR summary ILIKE $1
+        )
+      ORDER BY category, citation
+    `;
+
+    const docSql = `
+      SELECT d.id, d.filename, d.doc_type, d.doc_category, d.ai_summary,
+        d.regulatory_citation, d.uploaded_at
+      FROM vault_documents d
+      WHERE d.deleted_at IS NULL
+        AND d.doc_category = 'regulatory'
+        AND d.full_text_search @@ plainto_tsquery('english', $1)
+      ORDER BY d.uploaded_at DESC
+      LIMIT 20
+    `;
+
+    const pattern = `%${search}%`;
+    const [catalogRes, docRes] = await Promise.all([
+      pool.query<RegulatoryCatalogRow>(catalogSql, [pattern]),
+      pool.query<VaultDocumentRow>(docSql, [search]),
+    ]);
+
+    return reply.send(
+      successEnvelope(
+        {
+          catalog: catalogRes.rows,
+          documents: docRes.rows,
+        },
         req.requestId,
       ),
     );
@@ -215,7 +446,26 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  // POST /v3/vault/upload — multipart file upload
+  // GET /v3/vault/:id/text — full extracted text for in-browser reading
+  app.get('/v3/vault/:id/text', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const res = await pool.query<{ extracted_text: string | null; filename: string; doc_type: string }>(
+      `SELECT extracted_text, filename, doc_type FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+
+    if (!res.rows[0]) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Document not found', req.requestId),
+      );
+    }
+
+    return reply.send(
+      successEnvelope(res.rows[0], req.requestId),
+    );
+  });
+
+  // POST /v3/vault/upload — multipart file upload with smart ingest routing
   app.post('/v3/vault/upload', async (req, reply) => {
     const data = await req.file();
     if (!data) {
@@ -229,10 +479,12 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       ? (docTypeField as { value: string }).value
       : 'other';
 
-    if (!VALID_DOC_TYPES.includes(docType as DocType)) {
-      return reply.status(400).send(
-        errorEnvelope('VALIDATION_ERROR', `Invalid doc_type: ${docType}`, req.requestId),
-      );
+    if (!WORK_PRODUCT_TYPES.includes(docType as typeof WORK_PRODUCT_TYPES[number]) && docType !== 'other') {
+      if (!VALID_DOC_TYPES.includes(docType as DocType)) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', `Invalid doc_type: ${docType}`, req.requestId),
+        );
+      }
     }
 
     const filename = data.filename;
@@ -290,20 +542,25 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    const regCitations = extractRegCitations(extractedText);
+
     const insertRes = await pool.query<{ id: number }>(
       `INSERT INTO vault_documents
-        (filename, doc_type, file_size_bytes, file_path, extracted_text, ai_summary, ai_tags, ai_entities, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (filename, doc_type, doc_category, file_size_bytes, file_path, extracted_text,
+         ai_summary, ai_tags, ai_entities, regulatory_citation, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id`,
       [
         filename,
         docTypeConfirmed,
+        'work_product',
         fileSizeBytes,
         `vault/${storedName}`,
         extractedText || null,
         aiSummary,
         aiTags ? JSON.stringify(aiTags) : null,
         aiEntities ? JSON.stringify(aiEntities) : null,
+        regCitations.length > 0 ? regCitations[0] : null,
         'admin',
       ],
     );
@@ -315,13 +572,26 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       await insertAudit(docId, 'ai_parsed', 'system', 'AI analysis completed on ingest');
     }
 
+    // Smart ingest routing (async, non-blocking for response)
+    const routingResult = await smartIngestRouter(docId, filename, extractedText || null, aiSummary);
+
     const created = await pool.query<VaultDocumentRow>(
-      `SELECT * FROM vault_documents WHERE id = $1`,
+      `SELECT d.*, o.title AS opp_title,
+        (SELECT title FROM opportunities WHERE id = d.linked_capture_id LIMIT 1) AS capture_title
+       FROM vault_documents d
+       LEFT JOIN opportunities o ON o.id = d.linked_opportunity_id
+       WHERE d.id = $1`,
       [docId],
     );
 
     return reply.status(201).send(
-      successEnvelope(created.rows[0], req.requestId),
+      successEnvelope(
+        {
+          ...created.rows[0],
+          routing: routingResult,
+        },
+        req.requestId,
+      ),
     );
   });
 
@@ -391,9 +661,28 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  // DELETE /v3/vault/:id — soft delete
+  // DELETE /v3/vault/:id — soft delete (blocked for system docs)
   app.delete('/v3/vault/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
+
+    // Check if system doc
+    const checkRes = await pool.query<{ is_system_doc: boolean }>(
+      `SELECT is_system_doc FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+
+    if (!checkRes.rows[0]) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Document not found', req.requestId),
+      );
+    }
+
+    if (checkRes.rows[0].is_system_doc) {
+      return reply.status(403).send(
+        errorEnvelope('VALIDATION_ERROR', 'System documents cannot be deleted', req.requestId),
+      );
+    }
+
     const res = await pool.query<VaultDocumentRow>(
       `UPDATE vault_documents SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
       [id],
@@ -408,7 +697,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     await insertAudit(Number(id), 'deleted', 'admin', null);
 
     return reply.send(
-      successEnvelope({ deleted: true }, req.requestId),
+      successEnvelope({ success: true }, req.requestId),
     );
   });
 }

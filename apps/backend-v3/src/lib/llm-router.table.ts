@@ -113,6 +113,13 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     timeout_ms: 15_000,
     fallback: null,
   },
+  {
+    task: 'vault_smart_route',
+    provider: 'anthropic',
+    model: 'claude-haiku-4-5',
+    timeout_ms: 15_000,
+    fallback: null,
+  },
 ] as const;
 
 /** Lookup helper — O(1) via pre-built map. */
