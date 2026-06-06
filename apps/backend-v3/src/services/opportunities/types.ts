@@ -162,12 +162,17 @@ export interface ListFilters {
   department?: string;
   naics?: string;
   grade?: string;
+  grades?: string[];
   due_before?: string;
   due_after?: string;
+  due?: string;
   set_aside?: string;
+  set_asides?: string[];
   min_value?: number;
   max_value?: number;
   hot?: string;
+  sources?: string[];
+  stage?: string;
   limit?: number;
   cursor?: string;
   page?: number;
@@ -182,11 +187,21 @@ export interface PaginatedResult<T> {
   };
 }
 
+export interface OpportunityMeta {
+  total_count: number;
+  due_this_week: number;
+  unscored_count: number;
+  total_value: number;
+  grade_a_count: number;
+  stage_counts: Record<string, number>;
+}
+
 export interface PagedResult<T> {
   items: T[];
   total: number;
   page: number;
   totalPages: number;
+  meta?: OpportunityMeta;
 }
 
 export const ANALYSIS_AFFECTING_FIELDS = new Set([

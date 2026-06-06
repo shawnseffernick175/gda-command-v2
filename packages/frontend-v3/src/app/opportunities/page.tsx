@@ -1,17 +1,19 @@
 "use client";
 
-import { Suspense, useState, useRef, useCallback } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { Suspense, useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useOpportunitiesPaged, useOpportunity, useAnalyzeOpportunity, useUpdateStage } from "@/hooks/use-opportunities";
+import {
+  useOpportunitiesInfinite,
+  useOpportunity,
+  useAnalyzeOpportunity,
+  useUpdateStage,
+  type OpportunityMeta,
+} from "@/hooks/use-opportunities";
 import { useAskAi } from "@/hooks/use-llm";
-import { Pagination } from "@/components/shared/Pagination";
-import { BandBadge } from "@/components/band-badge";
-import { ScoreDisplay } from "@/components/score-display";
+import { apiPost } from "@/lib/api";
 import { SourceChip } from "@/components/shared/source-chip";
-import { StageDropdown } from "@/components/shared/stage-dropdown";
 import { ErrorState } from "@/components/shared/error-state";
-import { OpportunityCard } from "@/components/OpportunityCard";
 import { useVaultDocuments } from "@/hooks/use-vault";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +25,7 @@ import type {
   DoctrineFitLabel,
   LlmAnalysis,
   ShipleyDimension,
+  OpportunitySummary,
 } from "@/lib/types";
 
 export default function OpportunitiesPage() {
@@ -41,228 +44,381 @@ function OpportunitiesContent() {
   return <OpportunityList />;
 }
 
-type ViewMode = "cards" | "table";
+/* ── Stage tabs config ──────────────────────────────────────────── */
 
-function getInitialViewMode(): ViewMode {
-  if (typeof window === "undefined") return "cards";
-  const saved = localStorage.getItem("opp_view_mode");
-  return saved === "table" ? "table" : "cards";
+const STAGE_TABS = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "qualifying", label: "Interest" },
+  { key: "pursuit", label: "Qualified" },
+  { key: "proposal", label: "Capture" },
+  { key: "submitted", label: "Proposal" },
+  { key: "won", label: "Won" },
+  { key: "lost", label: "Lost" },
+] as const;
+
+/* ── Urgency heat helpers ───────────────────────────────────────── */
+
+function getHeatColor(opp: OpportunitySummary): string | null {
+  const daysLeft = getDaysLeft(opp);
+  if (daysLeft !== null && (daysLeft <= 7 || daysLeft < 0)) return "border-l-gda-red";
+  if (daysLeft !== null && daysLeft <= 30) return "border-l-gda-amber";
+  const grade = opp.pwin?.band === "forecast" ? "A" : opp.pwin?.band === "signal" ? "B" : null;
+  const pipelineStage = opp.pipeline_stage;
+  if (grade === "A" && !pipelineStage) return "border-l-gda-cyan";
+  if (grade === "A" && pipelineStage) return "border-l-gda-green";
+  return null;
 }
 
-function useViewMode(): [ViewMode, (m: ViewMode) => void] {
-  const [mode, setModeState] = useState<ViewMode>(getInitialViewMode);
-  const setMode = useCallback((m: ViewMode) => {
-    setModeState(m);
-    localStorage.setItem("opp_view_mode", m);
-  }, []);
-  return [mode, setMode];
+function getEffectiveDueDate(opp: OpportunitySummary): string | null {
+  return opp.response_due_at ?? opp.due_date ?? null;
 }
 
-function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
-  return (
-    <div className="inline-flex rounded border border-border overflow-hidden text-xs font-mono">
-      <button
-        type="button"
-        onClick={() => onChange("table")}
-        className={cn(
-          "px-2.5 py-1 transition-colors",
-          mode === "table" ? "bg-gda-green/15 text-gda-green" : "text-muted-foreground hover:bg-gda-panel"
-        )}
-      >
-        Table
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("cards")}
-        className={cn(
-          "px-2.5 py-1 transition-colors",
-          mode === "cards" ? "bg-gda-green/15 text-gda-green" : "text-muted-foreground hover:bg-gda-panel"
-        )}
-      >
-        Cards
-      </button>
-    </div>
-  );
+function getEffectiveValue(opp: OpportunitySummary): number | null {
+  return opp.value_max ?? opp.value_min ?? opp.value ?? null;
 }
+
+function getDaysLeft(opp: OpportunitySummary): number | null {
+  const dd = getEffectiveDueDate(opp);
+  if (!dd) return null;
+  const due = new Date(dd);
+  const now = new Date();
+  return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function formatDaysLeft(opp: OpportunitySummary): { text: string; className: string } {
+  const days = getDaysLeft(opp);
+  if (days === null) return { text: "—", className: "text-muted-foreground" };
+  if (days < 0) return { text: "PAST DUE", className: "text-gda-red font-mono font-bold italic" };
+  if (days <= 7) return { text: `${days}d`, className: "text-gda-red font-mono font-bold" };
+  if (days <= 30) return { text: `${days}d`, className: "text-gda-amber font-mono" };
+  const d = new Date(getEffectiveDueDate(opp)!);
+  return {
+    text: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    className: "text-muted-foreground",
+  };
+}
+
+/* ── Stage badge colors ─────────────────────────────────────────── */
+
+const STAGE_BADGE_STYLES: Record<string, string> = {
+  qualifying: "border-muted text-muted-foreground",
+  pursuit: "border-gda-cyan text-gda-cyan",
+  proposal: "border-gda-amber text-gda-amber",
+  submitted: "border-gda-green text-gda-green",
+  won: "bg-gda-green/20 text-gda-green border-transparent",
+  lost: "bg-gda-red/10 text-gda-red border-transparent",
+};
+
+const STAGE_DISPLAY: Record<string, string> = {
+  qualifying: "Interest",
+  pursuit: "Qualified",
+  proposal: "Capture",
+  submitted: "Proposal",
+  evaluation: "Evaluation",
+  won: "Won",
+  lost: "Lost",
+};
+
+/* ── Value range options ────────────────────────────────────────── */
+
+const VALUE_RANGES = [
+  { label: "Any Value", min: undefined, max: undefined },
+  { label: "<$1M", min: undefined, max: 1_000_000 },
+  { label: "$1M–$10M", min: 1_000_000, max: 10_000_000 },
+  { label: "$10M–$50M", min: 10_000_000, max: 50_000_000 },
+  { label: "$50M–$100M", min: 50_000_000, max: 100_000_000 },
+  { label: ">$100M", min: 100_000_000, max: undefined },
+] as const;
+
+/* ── Due options ────────────────────────────────────────────────── */
+
+const DUE_OPTIONS = [
+  { label: "Any Due", value: "" },
+  { label: "This Week", value: "this_week" },
+  { label: "This Month", value: "this_month" },
+  { label: "Next 90 Days", value: "next_90" },
+  { label: "Past Due", value: "past_due" },
+] as const;
+
+/* ── Source options ──────────────────────────────────────────────── */
+
+const SOURCE_OPTIONS = ["SAM", "GovTribe", "GovWin", "manual"] as const;
+
+/* ── Set-aside options ──────────────────────────────────────────── */
+
+const SET_ASIDE_OPTIONS = [
+  "SDVOSB", "8(a)", "HUBZone", "WOSB", "SB", "Unrestricted",
+] as const;
+
+/* ── Grade options ──────────────────────────────────────────────── */
+
+const GRADE_OPTIONS = ["A", "B", "C", "D", "Unscored"] as const;
+
+/* ══════════════════════════════════════════════════════════════════ */
 
 function OpportunityList() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const pathname = usePathname();
 
-  const currentPage = Number(searchParams.get("page") ?? "1") || 1;
-  const [viewMode, setViewMode] = useViewMode();
-
+  // Filter state
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [dueSoonFilter, setDueSoonFilter] = useState(false);
-  const [dueBefore, setDueBefore] = useState<string | undefined>(undefined);
+  const [agencyFilter, setAgencyFilter] = useState("");
+  const [gradeFilter, setGradeFilter] = useState<string[]>([]);
+  const [setAsideFilter, setSetAsideFilter] = useState<string[]>([]);
+  const [valueRange, setValueRange] = useState(0);
+  const [dueFilter, setDueFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string[]>([]);
+  const [stageTab, setStageTab] = useState("all");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const scrollSentinelRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, error, refetch } = useOpportunitiesPaged({
-    q: debouncedQ || undefined,
-    grade: gradeFilter || undefined,
-    department: departmentFilter || undefined,
-    due_before: dueBefore,
-    limit: 100,
-    page: currentPage,
-  });
+  const filterParams = useMemo(() => {
+    const range = VALUE_RANGES[valueRange];
+    return {
+      q: debouncedQ || undefined,
+      agency: agencyFilter || undefined,
+      grades: gradeFilter.length > 0 ? gradeFilter : undefined,
+      set_asides: setAsideFilter.length > 0 ? setAsideFilter : undefined,
+      value_min: range?.min,
+      value_max: range?.max,
+      due: dueFilter || undefined,
+      sources: sourceFilter.length > 0 ? sourceFilter : undefined,
+      stage: stageTab !== "all" ? stageTab : undefined,
+      limit: 50,
+    };
+  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab]);
 
-  const items = data?.items ?? [];
-  const totalPages = data?.totalPages ?? 1;
-  const total = data?.total ?? 0;
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useOpportunitiesInfinite(filterParams);
 
-  const setPage = useCallback(
-    (page: number) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (page <= 1) {
-        params.delete("page");
-      } else {
-        params.set("page", String(page));
-      }
-      router.push(`${pathname}?${params.toString()}`);
-      listRef.current?.scrollIntoView({ behavior: "smooth" });
-    },
-    [searchParams, router, pathname],
+  const allItems = useMemo(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data],
   );
+  const meta: OpportunityMeta | undefined = data?.pages[0]?.meta;
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const sentinel = scrollSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setQ(val);
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        setDebouncedQ(val);
-        setPage(1);
-      }, 350);
+      debounceRef.current = setTimeout(() => setDebouncedQ(val), 300);
     },
-    [setPage],
+    [],
   );
 
-  const handleGradeChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setGradeFilter(e.target.value);
-      setPage(1);
-    },
-    [setPage],
-  );
-
-  const handleDepartmentChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setDepartmentFilter(e.target.value);
-      setPage(1);
-    },
-    [setPage],
-  );
-
-  const handleDepartmentClick = useCallback(
-    (dept: string) => {
-      setDepartmentFilter(dept);
-      setPage(1);
-    },
-    [setPage],
-  );
-
-  const handleDueSoonChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const checked = e.target.checked;
-      setDueSoonFilter(checked);
-      setDueBefore(
-        checked
-          ? new Date(Date.now() + 14 * 86400 * 1000).toISOString()
-          : undefined,
-      );
-      setPage(1);
-    },
-    [setPage],
-  );
+  const hasActiveFilters =
+    debouncedQ || agencyFilter || gradeFilter.length > 0 || setAsideFilter.length > 0 ||
+    valueRange !== 0 || dueFilter || sourceFilter.length > 0;
 
   const handleClearFilters = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setQ("");
     setDebouncedQ("");
-    setGradeFilter("");
-    setDepartmentFilter("");
-    setDueSoonFilter(false);
-    setDueBefore(undefined);
-    setPage(1);
-  }, [setPage]);
+    setAgencyFilter("");
+    setGradeFilter([]);
+    setSetAsideFilter([]);
+    setValueRange(0);
+    setDueFilter("");
+    setSourceFilter([]);
+  }, []);
+
+  const toggleArrayFilter = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
+      setter((prev) =>
+        prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+      );
+    },
+    [],
+  );
+
+  // Intelligence bar chip click handlers
+  const handleDueThisWeekClick = useCallback(() => {
+    setDueFilter((prev) => (prev === "this_week" ? "" : "this_week"));
+  }, []);
+
+  const handleUnscoredClick = useCallback(() => {
+    setGradeFilter((prev) =>
+      prev.includes("Unscored")
+        ? prev.filter((g) => g !== "Unscored")
+        : [...prev, "Unscored"],
+    );
+  }, []);
+
+  const handleGradeAClick = useCallback(() => {
+    setGradeFilter((prev) =>
+      prev.includes("A") ? prev.filter((g) => g !== "A") : [...prev, "A"],
+    );
+  }, []);
+
+  // Compute stage tab counts from meta
+  const getStageCount = useCallback(
+    (key: string): number => {
+      if (!meta) return 0;
+      if (key === "all") return meta.total_count;
+      if (key === "active") {
+        const sc = meta.stage_counts;
+        return Object.entries(sc)
+          .filter(([k]) => !["won", "lost"].includes(k))
+          .reduce((sum, [, v]) => sum + v, 0);
+      }
+      return meta.stage_counts[key] ?? 0;
+    },
+    [meta],
+  );
 
   return (
-    <div className="space-y-4" ref={listRef}>
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-lg font-bold text-foreground">
-          Opportunities
-        </h1>
-        <ViewToggle mode={viewMode} onChange={setViewMode} />
-      </div>
+    <div className="space-y-4">
+      {/* Page header */}
+      <h1 className="font-mono text-lg font-bold text-foreground">
+        Opportunities
+      </h1>
 
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      {/* Intelligence bar */}
+      {meta && (
+        <div className="flex flex-wrap gap-2">
+          <IntelChip
+            icon="#"
+            label={`${meta.total_count} Active`}
+            active={false}
+          />
+          <IntelChip
+            icon="!"
+            label={`${meta.due_this_week} Due This Week`}
+            active={dueFilter === "this_week"}
+            onClick={handleDueThisWeekClick}
+          />
+          <IntelChip
+            icon="?"
+            label={`${meta.unscored_count} Unscored`}
+            active={gradeFilter.includes("Unscored")}
+            onClick={handleUnscoredClick}
+          />
+          <IntelChip
+            icon="$"
+            label={`${formatMoney(meta.total_value)} Total Value`}
+            active={false}
+          />
+          <IntelChip
+            icon="A"
+            label={`${meta.grade_a_count} Grade A`}
+            active={gradeFilter.includes("A")}
+            onClick={handleGradeAClick}
+          />
+        </div>
+      )}
+
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-2 items-center">
         <input
           type="text"
-          placeholder="Search title or agency…"
+          placeholder="Search title, agency, solicitation #…"
           value={q}
           onChange={handleSearchChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 w-64"
+          className="flex-grow min-w-[200px] rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+        />
+        <input
+          type="text"
+          placeholder="Agency…"
+          value={agencyFilter}
+          onChange={(e) => setAgencyFilter(e.target.value)}
+          className="w-[130px] rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+        />
+        <MultiSelect
+          label="Grade"
+          options={GRADE_OPTIONS as unknown as string[]}
+          selected={gradeFilter}
+          onToggle={(v) => toggleArrayFilter(setGradeFilter, v)}
+        />
+        <MultiSelect
+          label="Set-Aside"
+          options={SET_ASIDE_OPTIONS as unknown as string[]}
+          selected={setAsideFilter}
+          onToggle={(v) => toggleArrayFilter(setSetAsideFilter, v)}
         />
         <select
-          value={gradeFilter}
-          onChange={handleGradeChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+          value={valueRange}
+          onChange={(e) => setValueRange(Number(e.target.value))}
+          className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
         >
-          <option value="">All Grades</option>
-          <option value="A">Grade A</option>
-          <option value="B">Grade B</option>
-          <option value="C">Grade C</option>
-          <option value="D">Grade D</option>
+          {VALUE_RANGES.map((r, i) => (
+            <option key={i} value={i}>{r.label}</option>
+          ))}
         </select>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-          <input
-            type="checkbox"
-            checked={dueSoonFilter}
-            onChange={handleDueSoonChange}
-            className="rounded border-border"
-          />
-          Due in 14 days
-        </label>
         <select
-          value={departmentFilter}
-          onChange={handleDepartmentChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+          value={dueFilter}
+          onChange={(e) => setDueFilter(e.target.value)}
+          className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
         >
-          <option value="">All Departments</option>
-          <option value="Department of Defense">Department of Defense</option>
-          <option value="Department of Homeland Security">Department of Homeland Security</option>
-          <option value="Department of Veterans Affairs">Department of Veterans Affairs</option>
-          <option value="Department of Health and Human Services">Department of Health and Human Services</option>
-          <option value="Department of Energy">Department of Energy</option>
-          <option value="Department of Justice">Department of Justice</option>
-          <option value="Department of State">Department of State</option>
-          <option value="Department of Treasury">Department of Treasury</option>
-          <option value="Department of Transportation">Department of Transportation</option>
-          <option value="Department of Commerce">Department of Commerce</option>
-          <option value="Department of Labor">Department of Labor</option>
-          <option value="Department of Education">Department of Education</option>
-          <option value="Department of Agriculture">Department of Agriculture</option>
-          <option value="Independent Agency">Independent Agency</option>
+          {DUE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
-        {(debouncedQ || gradeFilter || departmentFilter || dueSoonFilter) && (
+        <MultiSelect
+          label="Source"
+          options={SOURCE_OPTIONS as unknown as string[]}
+          selected={sourceFilter}
+          onToggle={(v) => toggleArrayFilter(setSourceFilter, v)}
+        />
+        {hasActiveFilters && (
           <button
             type="button"
             onClick={handleClearFilters}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >
-            Clear filters
+            Clear
           </button>
         )}
-        <span className="ml-auto text-[11px] text-muted-foreground">
-          {total.toLocaleString()} results
-        </span>
       </div>
 
+      {/* Stage tabs */}
+      <div className="border-b border-border flex gap-0 overflow-x-auto">
+        {STAGE_TABS.map((tab) => {
+          const count = getStageCount(tab.key);
+          const active = stageTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setStageTab(tab.key)}
+              className={cn(
+                "pb-2 px-3 text-xs font-mono whitespace-nowrap transition-colors",
+                active
+                  ? "border-b-2 border-gda-green text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tab.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Error */}
       {error && (
         <ErrorState
           message={(error as Error).message}
@@ -270,141 +426,300 @@ function OpportunityList() {
         />
       )}
 
-      {isLoading && !items.length ? (
+      {/* Loading skeleton */}
+      {isLoading && allItems.length === 0 ? (
         <div className="space-y-2">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-10 bg-gda-panel" />
           ))}
         </div>
-      ) : viewMode === "cards" ? (
+      ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {items.map((opp) => (
-              <OpportunityCard key={opp.internal_id} opp={opp} />
-            ))}
+          {/* Table */}
+          <div className="rounded border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
+                  <th className="w-[3px] p-0" />
+                  <th className="px-3 py-2 text-left font-medium">Title</th>
+                  <th className="px-3 py-2 text-left font-medium w-[140px]">Agency</th>
+                  <th className="px-3 py-2 text-left font-medium w-[100px]">Value</th>
+                  <th className="px-3 py-2 text-left font-medium w-[70px]">Grade</th>
+                  <th className="px-3 py-2 text-left font-medium w-[90px]">Stage</th>
+                  <th className="px-3 py-2 text-left font-medium w-[80px]">Due</th>
+                  <th className="px-3 py-2 text-left font-medium w-[60px]">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allItems.map((opp) => (
+                  <OpportunityRow
+                    key={String(opp.internal_id ?? opp.id)}
+                    opp={opp}
+                    onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+                  />
+                ))}
+              </tbody>
+            </table>
+            {allItems.length === 0 && !isLoading && (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No opportunities match your filter.
+              </div>
+            )}
           </div>
-          {items.length === 0 && !isLoading && (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              No opportunities match your filter.
+
+          {/* Infinite scroll sentinel */}
+          <div ref={scrollSentinelRef} className="h-1" />
+          {isFetchingNextPage && (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 bg-gda-panel" />
+              ))}
             </div>
           )}
         </>
-      ) : (
-        <div className="rounded border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium">Title</th>
-                <th className="px-3 py-2 text-left font-medium">Department</th>
-                <th className="px-3 py-2 text-left font-medium">Value</th>
-                <th className="px-3 py-2 text-left font-medium">Grade/Band</th>
-                <th className="px-3 py-2 text-left text-[11px] font-medium">Doctrine</th>
-                <th className="px-3 py-2 text-left font-medium">Due</th>
-                <th className="px-3 py-2 text-left font-medium">Source</th>
-                <th className="px-3 py-2 text-left font-medium">Stage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((opp) => {
-                const deadlineWarning = opp.deadline_warning === true;
-                return (
-                  <tr
-                    key={opp.internal_id}
-                    className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9"
-                  >
-                    <td className="px-3 py-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Link
-                          href={`/opportunities?id=${opp.id}`}
-                          className="text-foreground hover:text-gda-green truncate block max-w-xs"
-                        >
-                          {opp.title}
-                        </Link>
-                        {deadlineWarning && (
-                          <span className="shrink-0 rounded bg-red-500/15 border border-red-500/40 px-1 py-0.5 text-[11px] font-mono font-bold uppercase text-red-400">
-                            DEADLINE
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[120px]">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDepartmentClick(opp.department ?? "Independent Agency");
-                        }}
-                        className="hover:text-gda-green transition-colors text-left"
-                        title={`Filter by ${opp.department ?? "Independent Agency"}`}
-                      >
-                        {opp.department ?? "Independent Agency"}
-                      </button>
-                    </td>
-                    <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
-                      {formatMoney(opp.value)}
-                    </td>
-                    <td className="px-3 py-1.5 text-left">
-                      {opp.pwin ? (
-                        <div className="flex items-center gap-1">
-                          <ScoreDisplay score={opp.pwin.score} className="text-xs" />
-                          <BandBadge band={opp.pwin.band} />
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded border border-border bg-muted/20 px-1.5 py-0.5 text-[11px] text-muted-foreground animate-pulse">Analyzing…</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-left">
-                      {opp.doctrine_badge ? (
-                        <span className={`text-[11px] font-mono capitalize ${FIT_COLORS[opp.doctrine_badge.label]}`}>
-                          {opp.doctrine_badge.label}
-                        </span>
-                      ) : opp.doctrine_score != null ? (
-                        <span className="text-[11px] font-mono text-gda-cyan">
-                          {opp.doctrine_score}pt
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded border border-border bg-muted/20 px-1.5 py-0.5 text-[11px] text-muted-foreground animate-pulse">Analyzing…</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                      {opp.due_date
-                        ? new Date(opp.due_date).toLocaleDateString()
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      {opp.source ? (
-                        <SourceChip label={opp.source} kind="real" />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <StageDropdown value={opp.stage ?? "Interest"} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {items.length === 0 && !isLoading && (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              No opportunities match your filter.
-            </div>
-          )}
-        </div>
-      )}
-
-      {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setPage}
-        />
       )}
     </div>
   );
 }
 
+/* ── Intelligence chip ──────────────────────────────────────────── */
+
+function IntelChip({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        "bg-gda-panel border rounded px-3 py-1.5 text-xs font-mono transition-colors",
+        active
+          ? "border-gda-green text-gda-green bg-gda-green/10"
+          : "border-border text-foreground",
+        onClick
+          ? "cursor-pointer hover:border-gda-green/40"
+          : "cursor-default",
+      )}
+    >
+      {icon} {label}
+    </button>
+  );
+}
+
+/* ── Multi-select dropdown ──────────────────────────────────────── */
+
+function MultiSelect({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "rounded border bg-gda-panel px-2 py-1.5 text-xs transition-colors flex items-center gap-1",
+          selected.length > 0
+            ? "border-gda-green text-gda-green"
+            : "border-border text-foreground",
+        )}
+      >
+        {label}
+        {selected.length > 0 && (
+          <span className="bg-gda-green/20 text-gda-green rounded-full px-1 text-[11px]">
+            {selected.length}
+          </span>
+        )}
+        <span className="text-muted-foreground ml-0.5">▾</span>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 rounded border border-border bg-gda-panel shadow-lg py-1 min-w-[140px]">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onToggle(opt)}
+              className={cn(
+                "w-full text-left px-3 py-1 text-xs hover:bg-gda-green/10 transition-colors flex items-center gap-2",
+                selected.includes(opt) ? "text-gda-green" : "text-foreground",
+              )}
+            >
+              <span className="w-3">{selected.includes(opt) ? "x" : ""}</span>
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Table row with heat bar + hover actions ────────────────────── */
+
+function OpportunityRow({
+  opp,
+  onNavigate,
+}: {
+  opp: OpportunitySummary;
+  onNavigate: (id: number | string) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const heat = getHeatColor(opp);
+  const daysLeft = formatDaysLeft(opp);
+  const pipelineStage = opp.pipeline_stage;
+  const score = opp.pwin?.score;
+  const band = opp.pwin?.band;
+  const gradeLabel =
+    band === "forecast" ? "A" : band === "signal" ? "B" : band === "discovery" ? "C" : band === "pass" ? "D" : null;
+
+  const sources: string[] = [];
+  if (opp.data_source) sources.push(opp.data_source);
+  if (opp.source && opp.source !== opp.data_source) sources.push(opp.source);
+
+  return (
+    <tr
+      className={cn(
+        "border-b border-border hover:bg-gda-panel/50 transition-colors h-9",
+        heat ? `border-l-[3px] ${heat}` : "border-l-[3px] border-l-transparent",
+      )}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <td className="p-0 w-0" />
+      <td className="px-3 py-1.5">
+        <div>
+          <Link
+            href={`/opportunities?id=${opp.id}`}
+            className="text-foreground hover:text-gda-green truncate block max-w-xs text-sm"
+          >
+            {opp.title}
+          </Link>
+          <div className="flex items-center gap-2 mt-0.5">
+            {sources.length > 0 && (
+              <span className="text-[11px] font-mono text-muted-foreground/40">
+                {sources.map((s, i) => (
+                  <span key={s}>
+                    {i > 0 && "  "}  {s}
+                  </span>
+                ))}
+              </span>
+            )}
+            {opp.naics && (
+              <span className="text-[11px] font-mono text-muted-foreground/60">
+                NAICS {opp.naics}
+              </span>
+            )}
+            {opp.set_aside && (
+              <span className="text-[11px] font-mono text-muted-foreground/60">
+                {opp.set_aside}
+              </span>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[140px]">
+        {opp.agency ?? "---"}
+      </td>
+      <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
+        {formatMoney(getEffectiveValue(opp))}
+      </td>
+      <td className="px-3 py-1.5 text-left">
+        {score != null && gradeLabel ? (
+          <div className="flex items-center gap-1">
+            <span className="font-mono text-xs text-gda-green">{score}</span>
+            <span className="rounded border border-border px-1 py-0.5 text-[11px] font-mono">
+              {gradeLabel}
+            </span>
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">---</span>
+        )}
+      </td>
+      <td className="px-3 py-1.5">
+        {pipelineStage ? (
+          <span
+            className={cn(
+              "rounded border px-1.5 py-0.5 text-[11px] font-mono",
+              STAGE_BADGE_STYLES[pipelineStage] ?? "border-border text-muted-foreground",
+            )}
+          >
+            {STAGE_DISPLAY[pipelineStage] ?? pipelineStage}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">---</span>
+        )}
+      </td>
+      <td className="px-3 py-1.5">
+        <span className={cn("text-xs", daysLeft.className)}>{daysLeft.text}</span>
+      </td>
+      <td className="px-3 py-1.5">
+        {hovered ? (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onNavigate(opp.id)}
+              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
+              title="View detail"
+            >
+              {"->"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void apiPost("/v3/captures", { opportunity_id: String(opp.id) }).catch(() => {
+                  // capture may already exist or need pipeline item
+                });
+                onNavigate(opp.id);
+              }}
+              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
+              title="Start capture"
+            >
+              +
+            </button>
+          </div>
+        ) : (
+          <Link
+            href={`/opportunities?id=${opp.id}`}
+            className="text-[11px] font-mono text-muted-foreground hover:text-gda-green"
+          >
+            {"->"}
+          </Link>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+/* ── Detail page (F-621b redesign) ──────────────────────────────── */
 const FIT_COLORS: Record<DoctrineFitLabel, string> = {
   strong: "text-gda-green",
   moderate: "text-gda-cyan",
@@ -564,12 +879,12 @@ function OpportunityDetail({ id }: { id: string }) {
             </CardHeader>
             <CardContent className="space-y-1.5 text-xs">
               <MetaRow label="Value" value={formatMoney(opp.value)} mono />
-              <MetaRow label="Solicitation" value={opp.solicitation_number ?? "—"} mono />
-              <MetaRow label="Posted" value={opp.posted_at ? new Date(opp.posted_at).toLocaleDateString() : "—"} />
+              <MetaRow label="Solicitation" value={opp.solicitation_number ?? "---"} mono />
+              <MetaRow label="Posted" value={opp.posted_at ? new Date(opp.posted_at).toLocaleDateString() : "---"} />
               <MetaRow label="Set-Aside" value={opp.set_aside ?? "None"} />
-              <MetaRow label="Place" value={opp.place_of_performance ?? "—"} />
-              <MetaRow label="NAICS" value={opp.naics ?? "—"} mono />
-              <MetaRow label="Source" value={opp.source ?? "—"} />
+              <MetaRow label="Place" value={opp.place_of_performance ?? "---"} />
+              <MetaRow label="NAICS" value={opp.naics ?? "---"} mono />
+              <MetaRow label="Source" value={opp.source ?? "---"} />
               {/* Doctrine Fit — demoted to one line */}
               {(doctrine || doctrineScore != null) && (
                 <MetaRow

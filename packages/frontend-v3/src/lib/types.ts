@@ -13,18 +13,21 @@ export interface PwinScore {
 }
 
 export interface OpportunitySummary {
-  id: number;
-  internal_id: string;
+  id: number | string;
+  internal_id?: string;
   title: string;
   agency: string | null;
   department: string | null;
   naics: string | null;
   status: string | null;
   stage?: string | null;
-  value: number | null;
-  due_date: string | null;
+  value?: number | null;
+  value_min?: number | null;
+  value_max?: number | null;
+  due_date?: string | null;
+  response_due_at?: string | null;
   set_aside: string | null;
-  hot: boolean;
+  hot?: boolean;
   created_at: string;
   updated_at: string;
   pwin?: PwinScore | null;
@@ -32,8 +35,12 @@ export interface OpportunitySummary {
   doctrine_badge?: DoctrineBadge | null;
   capture_pwin?: number | null;
   source?: string | null;
+  data_source?: string | null;
+  solicitation_number?: string | null;
+  pipeline_stage?: string | null;
   days_in_stage?: number | null;
   deadline_warning?: boolean;
+  grade?: string | null;
 }
 
 export interface AnalysisTimeline {

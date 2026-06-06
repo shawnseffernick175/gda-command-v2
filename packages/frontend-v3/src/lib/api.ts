@@ -120,13 +120,18 @@ async function apiFetch<T>(
 
 export async function apiGet<T>(
   path: string,
-  params?: Record<string, string | number | boolean | undefined>,
+  params?: Record<string, string | number | boolean | string[] | undefined>,
 ): Promise<T> {
   let url = path;
   if (params) {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined) sp.set(k, String(v));
+      if (v === undefined) continue;
+      if (Array.isArray(v)) {
+        for (const item of v) sp.append(k, item);
+      } else {
+        sp.set(k, String(v));
+      }
     }
     const qs = sp.toString();
     if (qs) url += `?${qs}`;

@@ -516,22 +516,34 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/opportunities — list with filters + cursor pagination
   app.get('/v3/opportunities', async (req, reply) => {
-    const query = req.query as Record<string, string | undefined>;
+    const query = req.query as Record<string, string | string[] | undefined>;
+
+    const parseArray = (val: string | string[] | undefined): string[] | undefined => {
+      if (!val) return undefined;
+      if (Array.isArray(val)) return val;
+      return val.split(',');
+    };
+
     const filters: ListFilters = {
-      q: query.q,
-      status: query.status,
-      agency: query.agency,
-      department: query.department,
-      naics: query.naics,
-      grade: query.grade,
-      due_before: query.due_before,
-      due_after: query.due_after,
-      set_aside: query.set_aside,
-      min_value: query.min_value ? Number(query.min_value) : undefined,
-      max_value: query.max_value ? Number(query.max_value) : undefined,
-      hot: query.hot,
+      q: query.q as string | undefined,
+      status: query.status as string | undefined,
+      agency: query.agency as string | undefined,
+      department: query.department as string | undefined,
+      naics: query.naics as string | undefined,
+      grade: query.grade as string | undefined,
+      grades: parseArray(query['grade[]'] ?? query.grades),
+      due_before: query.due_before as string | undefined,
+      due_after: query.due_after as string | undefined,
+      due: query.due as string | undefined,
+      set_aside: query.set_aside as string | undefined,
+      set_asides: parseArray(query['set_aside[]'] ?? query.set_asides),
+      min_value: query.value_min ? Number(query.value_min) : (query.min_value ? Number(query.min_value) : undefined),
+      max_value: query.value_max ? Number(query.value_max) : (query.max_value ? Number(query.max_value) : undefined),
+      hot: query.hot as string | undefined,
+      sources: parseArray(query['source[]'] ?? query.sources),
+      stage: query.stage as string | undefined,
       limit: query.limit ? Number(query.limit) : undefined,
-      cursor: query.cursor,
+      cursor: query.cursor as string | undefined,
       page: query.page ? Number(query.page) : undefined,
     };
 

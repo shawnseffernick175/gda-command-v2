@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPut, apiPost, apiPatch } from "@/lib/api";
 import type {
   OpportunitySummary,
@@ -12,11 +12,21 @@ interface OpportunitiesPaginated {
   pagination: { limit: number; cursor: string | null; hasMore: boolean };
 }
 
+export interface OpportunityMeta {
+  total_count: number;
+  due_this_week: number;
+  unscored_count: number;
+  total_value: number;
+  grade_a_count: number;
+  stage_counts: Record<string, number>;
+}
+
 interface OpportunitiesPagedResponse {
   items: OpportunitySummary[];
   total: number;
   page: number;
   totalPages: number;
+  meta?: OpportunityMeta;
 }
 
 interface UseOpportunitiesParams {
@@ -51,7 +61,7 @@ export function useOpportunities(params: UseOpportunitiesParams = {}) {
   });
 }
 
-interface UseOpportunitiesPagedParams {
+export interface UseOpportunitiesPagedParams {
   q?: string;
   limit?: number;
   page?: number;
@@ -60,8 +70,15 @@ interface UseOpportunitiesPagedParams {
   department?: string;
   naics?: string;
   grade?: string;
+  grades?: string[];
   due_before?: string;
   due_after?: string;
+  due?: string;
+  set_asides?: string[];
+  value_min?: number;
+  value_max?: number;
+  sources?: string[];
+  stage?: string;
 }
 
 export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) {
@@ -77,13 +94,57 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         department: params.department,
         naics: params.naics,
         grade: params.grade,
+        "grade[]": params.grades,
         due_before: params.due_before,
         due_after: params.due_after,
+        due: params.due,
+        "set_aside[]": params.set_asides,
+        value_min: params.value_min,
+        value_max: params.value_max,
+        "source[]": params.sources,
+        stage: params.stage,
       }),
     refetchInterval: (query) => {
       const items = query.state.data?.items;
       if (!items) return false;
       const hasAnalyzing = items.some((i) => !i.pwin);
+      return hasAnalyzing ? 10_000 : false;
+    },
+  });
+}
+
+export function useOpportunitiesInfinite(params: Omit<UseOpportunitiesPagedParams, "page">) {
+  return useInfiniteQuery({
+    queryKey: ["opportunities-infinite", params],
+    queryFn: ({ pageParam = 1 }) =>
+      apiGet<OpportunitiesPagedResponse>("/v3/opportunities", {
+        q: params.q,
+        limit: params.limit ?? 50,
+        page: pageParam as number,
+        status: params.status,
+        agency: params.agency,
+        department: params.department,
+        naics: params.naics,
+        grade: params.grade,
+        "grade[]": params.grades,
+        due_before: params.due_before,
+        due_after: params.due_after,
+        due: params.due,
+        "set_aside[]": params.set_asides,
+        value_min: params.value_min,
+        value_max: params.value_max,
+        "source[]": params.sources,
+        stage: params.stage,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.page < lastPage.totalPages) return lastPage.page + 1;
+      return undefined;
+    },
+    refetchInterval: (query) => {
+      const pages = query.state.data?.pages;
+      if (!pages) return false;
+      const hasAnalyzing = pages.some((p) => p.items.some((i) => !i.pwin));
       return hasAnalyzing ? 10_000 : false;
     },
   });
@@ -118,6 +179,7 @@ export function useFieldOverride() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["opportunities"] });
       void qc.invalidateQueries({ queryKey: ["opportunities-paged"] });
+      void qc.invalidateQueries({ queryKey: ["opportunities-infinite"] });
       void qc.invalidateQueries({ queryKey: ["opportunity"] });
     },
   });
