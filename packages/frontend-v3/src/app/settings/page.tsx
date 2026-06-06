@@ -116,13 +116,13 @@ function SystemHealthSection({ sentinel }: { sentinel: ReturnType<typeof useSent
         const isExpanded = expanded === svc.key;
         const isSentinelRow = svc.key === "sentinel_monitor";
         const status = isSentinelRow
-          ? (sentinelStatus === "healthy" ? "Active" : sentinelStatus)
+          ? (sentinelStatus === "healthy" ? "Active" : sentinelStatus === "degraded" ? "Degraded" : sentinelStatus === "down" ? "Down" : "Unknown")
           : (overallHealthy ? "Healthy" : sentinelStatus === "down" ? "Down" : "Degraded");
         const dotColor = status === "Healthy" || status === "Active"
           ? "bg-gda-green"
-          : status === "Degraded" || status === "degraded"
+          : status === "Degraded"
             ? "bg-gda-amber"
-            : status === "Down" || status === "down"
+            : status === "Down"
               ? "bg-gda-red"
               : "bg-muted-foreground";
 
@@ -147,8 +147,10 @@ function SystemHealthSection({ sentinel }: { sentinel: ReturnType<typeof useSent
                     <p>Sources monitored: <span className="text-foreground font-mono">{sentinel.sources.length}</span></p>
                     <p>GovTribe credits: <span className="text-foreground font-mono">{sentinel.govtribe_credits.credits_used}/{sentinel.govtribe_credits.credits_budget}</span></p>
                   </>
-                ) : (
+                ) : status === "Healthy" ? (
                   <p>Service responding normally. No recent errors.</p>
+                ) : (
+                  <p>Status inferred from Sentinel overall health: <span className="text-foreground font-mono">{status}</span></p>
                 )}
               </div>
             )}
