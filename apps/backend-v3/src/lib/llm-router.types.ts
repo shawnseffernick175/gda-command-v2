@@ -35,7 +35,8 @@ export type Task =
   | 'contact_enrich'
   | 'match_analysis'
   | 'vault_document_parse'
-  | 'vault_smart_route';
+  | 'vault_smart_route'
+  | 'digest_lead';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -340,6 +341,35 @@ export interface VaultSmartRouteOutput {
   confidence: string;
 }
 
+export interface DigestLeadInput {
+  federal_register_notices: {
+    title: string;
+    abstract: string | null;
+    url: string | null;
+    date: string | null;
+  }[];
+  recent_opportunities: {
+    id: string;
+    title: string;
+    agency: string | null;
+    naics: string | null;
+    url: string | null;
+  }[];
+  regulatory_catalog: {
+    title: string;
+    url: string | null;
+    effective_date: string | null;
+  }[];
+}
+
+export interface DigestLeadOutput {
+  headline: string;
+  body: string;
+  source_label: string;
+  source_url: string | null;
+  related_opportunity_ids: string[];
+}
+
 export interface RiskGenerationInput {
   opportunity_id: string;
   opportunity_title: string;
@@ -635,6 +665,7 @@ export interface TaskInputMap {
   match_analysis: MatchAnalysisInput;
   vault_document_parse: VaultDocumentParseInput;
   vault_smart_route: VaultSmartRouteInput;
+  digest_lead: DigestLeadInput;
 }
 
 export interface TaskOutputMap {
@@ -654,6 +685,7 @@ export interface TaskOutputMap {
   match_analysis: MatchAnalysisOutput;
   vault_document_parse: VaultDocumentParseOutput;
   vault_smart_route: VaultSmartRouteOutput;
+  digest_lead: DigestLeadOutput;
 }
 
 // ---------------------------------------------------------------------------

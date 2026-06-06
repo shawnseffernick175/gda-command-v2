@@ -15,6 +15,7 @@ import {
   Newspaper,
   Terminal,
   Archive,
+  Radio,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -27,6 +28,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: "Launchpad", href: "/launchpad", icon: Rocket },
   { label: "Daily Brief", href: "/briefing", icon: Newspaper },
+  { label: "Digest", href: "/digest", icon: Radio },
   { label: "Fast Track", href: "/fast-track", icon: Zap },
   { label: "Opportunities", href: "/opportunities", icon: Search },
   { label: "Capture", href: "/capture", icon: Target },
