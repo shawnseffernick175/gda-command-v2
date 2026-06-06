@@ -65,6 +65,7 @@ const STAGE_ARROW_COLORS: Record<string, string> = {
   Qualified: "bg-gda-cyan/20 text-gda-cyan",
   Capture: "bg-gda-amber/20 text-gda-amber",
   Proposal: "bg-gda-green/20 text-gda-green",
+  Evaluation: "bg-gda-amber/20 text-gda-amber",
   Won: "bg-gda-green/20 text-gda-green",
 };
 

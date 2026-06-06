@@ -43,6 +43,7 @@ const STAGE_DISPLAY: Record<string, string> = {
   pursuit: 'Qualified',
   proposal: 'Capture',
   submitted: 'Proposal',
+  evaluation: 'Evaluation',
   won: 'Won',
 };
 
