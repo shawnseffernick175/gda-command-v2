@@ -10,13 +10,17 @@ export function AskAiPanel({
   objectId,
   context,
   className,
+  inputId,
+  alwaysOpen,
 }: {
   objectType: string;
   objectId: string;
   context?: Record<string, unknown>;
   className?: string;
+  inputId?: string;
+  alwaysOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!alwaysOpen);
   const [question, setQuestion] = useState("");
   const askAi = useAskAi();
 
@@ -30,7 +34,7 @@ export function AskAiPanel({
     });
   }
 
-  if (!open) {
+  if (!open && !alwaysOpen) {
     return (
       <Button
         variant="ghost"
@@ -64,6 +68,7 @@ export function AskAiPanel({
       </div>
       <div className="flex gap-2">
         <input
+          id={inputId}
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}

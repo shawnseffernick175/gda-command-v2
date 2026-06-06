@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPut } from "@/lib/api";
+import { apiGet, apiPut, apiPost, apiPatch } from "@/lib/api";
 import type {
   OpportunitySummary,
   OpportunityDetail,
@@ -119,6 +119,29 @@ export function useFieldOverride() {
       void qc.invalidateQueries({ queryKey: ["opportunities"] });
       void qc.invalidateQueries({ queryKey: ["opportunities-paged"] });
       void qc.invalidateQueries({ queryKey: ["opportunity"] });
+    },
+  });
+}
+
+export function useAnalyzeOpportunity() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiPost<OpportunityDetail>(`/v3/opportunities/${id}/analyze`),
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: ["opportunity", id] });
+    },
+  });
+}
+
+export function useUpdateStage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: string }) =>
+      apiPatch<Record<string, unknown>>(`/v3/opportunities/${id}`, { stage }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ["opportunity", vars.id] });
+      void qc.invalidateQueries({ queryKey: ["opportunities-paged"] });
     },
   });
 }

@@ -675,6 +675,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       'title', 'naics', 'agency', 'sub_agency', 'description',
       'set_aside', 'response_due_at', 'value_min', 'value_max',
       'solicitation_number', 'sam_notice_id', 'psc', 'incumbent', 'tags',
+      'stage',
     ];
 
     for (const field of allowedFields) {
