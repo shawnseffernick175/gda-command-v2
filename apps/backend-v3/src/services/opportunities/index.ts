@@ -16,6 +16,7 @@ import {
   type ListFilters,
   type PaginatedResult,
   type PagedResult,
+  type OpportunityMeta,
   type AnalysisBlock,
   type TeamingFlag,
 } from './types.js';
@@ -31,6 +32,7 @@ export type {
   ListFilters,
   PaginatedResult,
   PagedResult,
+  OpportunityMeta,
   AnalysisBlock,
   TeamingFlag,
 } from './types.js';
@@ -319,85 +321,217 @@ export async function listOpportunities(
   };
 }
 
-export async function listOpportunitiesPaged(
+function buildFilterConditions(
   filters: ListFilters,
-): Promise<PagedResult<OpportunitySummary>> {
-  const limit = Math.min(Math.max(filters.limit ?? 100, 1), 200);
-  const page = Math.max(filters.page ?? 1, 1);
-  const offset = (page - 1) * limit;
-
-  const conditions: string[] = ['deleted_at IS NULL'];
+): { conditions: string[]; params: unknown[]; paramIdx: number } {
+  const conditions: string[] = ['o.deleted_at IS NULL'];
   const params: unknown[] = [];
   let paramIdx = 1;
 
   if (filters.q) {
-    conditions.push(`(title ILIKE $${paramIdx} OR agency ILIKE $${paramIdx})`);
+    conditions.push(
+      `(o.title ILIKE $${paramIdx} OR o.agency ILIKE $${paramIdx} OR o.solicitation_number ILIKE $${paramIdx} OR o.description ILIKE $${paramIdx})`,
+    );
     params.push(`%${filters.q}%`);
     paramIdx++;
   }
   if (filters.status) {
-    conditions.push(`status = $${paramIdx++}`);
+    conditions.push(`o.status = $${paramIdx++}`);
     params.push(filters.status);
   }
   if (filters.agency) {
-    conditions.push(`agency ILIKE $${paramIdx++}`);
+    conditions.push(`o.agency ILIKE $${paramIdx++}`);
     params.push(`%${filters.agency}%`);
   }
   if (filters.department) {
-    conditions.push(`department = $${paramIdx++}`);
+    conditions.push(`o.department = $${paramIdx++}`);
     params.push(filters.department);
   }
   if (filters.naics) {
-    conditions.push(`naics ILIKE $${paramIdx++}`);
+    conditions.push(`o.naics ILIKE $${paramIdx++}`);
     params.push(`%${filters.naics}%`);
   }
   if (filters.grade) {
-    conditions.push(`grade = $${paramIdx++}`);
+    conditions.push(`o.grade = $${paramIdx++}`);
     params.push(filters.grade);
   }
+  if (filters.grades && filters.grades.length > 0) {
+    const hasUnscored = filters.grades.includes('Unscored');
+    const letterGrades = filters.grades.filter((g) => g !== 'Unscored');
+    const parts: string[] = [];
+    if (letterGrades.length > 0) {
+      parts.push(`o.grade = ANY($${paramIdx++})`);
+      params.push(letterGrades);
+    }
+    if (hasUnscored) {
+      parts.push(`o.grade IS NULL`);
+    }
+    if (parts.length > 0) {
+      conditions.push(`(${parts.join(' OR ')})`);
+    }
+  }
   if (filters.set_aside) {
-    conditions.push(`set_aside ILIKE $${paramIdx++}`);
+    conditions.push(`o.set_aside ILIKE $${paramIdx++}`);
     params.push(`%${filters.set_aside}%`);
   }
+  if (filters.set_asides && filters.set_asides.length > 0) {
+    const setAsideParts: string[] = [];
+    for (const sa of filters.set_asides) {
+      const idx = paramIdx++;
+      params.push(`%${sa}%`);
+      setAsideParts.push(`o.set_aside ILIKE $${idx}`);
+    }
+    conditions.push(`(${setAsideParts.join(' OR ')})`);
+  }
   if (filters.due_before) {
-    conditions.push(`response_due_at <= $${paramIdx++}`);
+    conditions.push(`o.response_due_at <= $${paramIdx++}`);
     params.push(filters.due_before);
   }
   if (filters.due_after) {
-    conditions.push(`response_due_at >= $${paramIdx++}`);
+    conditions.push(`o.response_due_at >= $${paramIdx++}`);
     params.push(filters.due_after);
   }
+  if (filters.due) {
+    const now = new Date();
+    switch (filters.due) {
+      case 'this_week': {
+        const weekEnd = new Date(now.getTime() + 7 * 86400_000);
+        conditions.push(`o.response_due_at >= $${paramIdx++}`);
+        params.push(now.toISOString());
+        conditions.push(`o.response_due_at <= $${paramIdx++}`);
+        params.push(weekEnd.toISOString());
+        break;
+      }
+      case 'this_month': {
+        const monthEnd = new Date(now.getTime() + 30 * 86400_000);
+        conditions.push(`o.response_due_at >= $${paramIdx++}`);
+        params.push(now.toISOString());
+        conditions.push(`o.response_due_at <= $${paramIdx++}`);
+        params.push(monthEnd.toISOString());
+        break;
+      }
+      case 'next_90': {
+        const ninetyEnd = new Date(now.getTime() + 90 * 86400_000);
+        conditions.push(`o.response_due_at >= $${paramIdx++}`);
+        params.push(now.toISOString());
+        conditions.push(`o.response_due_at <= $${paramIdx++}`);
+        params.push(ninetyEnd.toISOString());
+        break;
+      }
+      case 'past_due': {
+        conditions.push(`o.response_due_at < $${paramIdx++}`);
+        params.push(now.toISOString());
+        conditions.push(`o.status != 'awarded'`);
+        break;
+      }
+      default:
+        break;
+    }
+  }
   if (filters.min_value !== undefined) {
-    conditions.push(`value_max >= $${paramIdx++}`);
+    conditions.push(`o.value_max >= $${paramIdx++}`);
     params.push(filters.min_value);
   }
   if (filters.max_value !== undefined) {
-    conditions.push(`value_min <= $${paramIdx++}`);
+    conditions.push(`o.value_min <= $${paramIdx++}`);
     params.push(filters.max_value);
   }
   if (filters.hot === '1') {
-    conditions.push(`(grade = 'A')`);
+    conditions.push(`(o.grade = 'A')`);
   }
+  if (filters.sources && filters.sources.length > 0) {
+    conditions.push(`o.data_source = ANY($${paramIdx++})`);
+    params.push(filters.sources);
+  }
+  if (filters.stage) {
+    conditions.push(
+      `EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = $${paramIdx++})`,
+    );
+    params.push(filters.stage);
+  }
+
+  return { conditions, params, paramIdx };
+}
+
+export async function listOpportunitiesPaged(
+  filters: ListFilters,
+): Promise<PagedResult<OpportunitySummary>> {
+  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
+  const page = Math.max(filters.page ?? 1, 1);
+  const offset = (page - 1) * limit;
+
+  const { conditions, params, paramIdx } = buildFilterConditions(filters);
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const countSql = `SELECT COUNT(*)::int AS total FROM opportunities ${where}`;
-  const countRes = await pool.query<{ total: number }>(countSql, params);
-  const total = countRes.rows[0]?.total ?? 0;
+  const metaSql = `
+    SELECT
+      COUNT(*)::int AS total_count,
+      COUNT(*) FILTER (WHERE o.response_due_at IS NOT NULL AND o.response_due_at >= NOW() AND o.response_due_at <= NOW() + INTERVAL '7 days')::int AS due_this_week,
+      COUNT(*) FILTER (WHERE o.grade IS NULL)::int AS unscored_count,
+      COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)), 0)::bigint AS total_value,
+      COUNT(*) FILTER (WHERE o.grade = 'A')::int AS grade_a_count
+    FROM opportunities o ${where}
+  `;
+  const metaRes = await pool.query<{
+    total_count: number;
+    due_this_week: number;
+    unscored_count: number;
+    total_value: string;
+    grade_a_count: number;
+  }>(metaSql, params);
+  const metaRow = metaRes.rows[0];
+  const total = metaRow?.total_count ?? 0;
   const totalPages = Math.max(Math.ceil(total / limit), 1);
 
-  const dataSql = `SELECT *, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = opportunities.id)) AS has_pipeline_stage FROM opportunities ${where} ORDER BY id DESC LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`;
+  const stageCountsSql = `
+    SELECT pi.stage, COUNT(DISTINCT pi.opportunity_id)::int AS cnt
+    FROM pipeline_items pi
+    INNER JOIN opportunities o ON o.id = pi.opportunity_id
+    ${where}
+    GROUP BY pi.stage
+  `;
+  const stageRes = await pool.query<{ stage: string; cnt: number }>(stageCountsSql, params);
+  const stageCounts: Record<string, number> = {};
+  for (const row of stageRes.rows) {
+    stageCounts[row.stage] = row.cnt;
+  }
+
+  let dataParamIdx = paramIdx;
+  const dataSql = `
+    SELECT o.*,
+      (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage,
+      (SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1) AS pipeline_stage
+    FROM opportunities o ${where}
+    ORDER BY o.id DESC
+    LIMIT $${dataParamIdx} OFFSET $${dataParamIdx + 1}
+  `;
   const dataParams = [...params, limit, offset];
-  const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean }>(dataSql, dataParams);
+  const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean; pipeline_stage: string | null }>(dataSql, dataParams);
 
   const summaries = await Promise.all(
     res.rows.map(async (row) => {
       const sources = await resolveOpportunitySources(String(row.id));
-      return buildSummaryFromSources(row, sources, row.has_pipeline_stage);
+      const summary = buildSummaryFromSources(row, sources, row.has_pipeline_stage);
+      return {
+        ...summary,
+        data_source: row.data_source,
+        solicitation_number: row.solicitation_number,
+        pipeline_stage: row.pipeline_stage,
+      };
     }),
   );
 
-  return { items: summaries, total, page, totalPages };
+  const meta: OpportunityMeta = {
+    total_count: metaRow?.total_count ?? 0,
+    due_this_week: metaRow?.due_this_week ?? 0,
+    unscored_count: metaRow?.unscored_count ?? 0,
+    total_value: Number(metaRow?.total_value ?? 0),
+    grade_a_count: metaRow?.grade_a_count ?? 0,
+    stage_counts: stageCounts,
+  };
+
+  return { items: summaries, total, page, totalPages, meta };
 }
 
 export async function getOpportunityById(id: string): Promise<OpportunityRow | null> {

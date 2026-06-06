@@ -32,6 +32,9 @@ export interface OpportunitySummary {
   doctrine_badge?: DoctrineBadge | null;
   capture_pwin?: number | null;
   source?: string | null;
+  data_source?: string | null;
+  solicitation_number?: string | null;
+  pipeline_stage?: string | null;
   days_in_stage?: number | null;
   deadline_warning?: boolean;
 }
