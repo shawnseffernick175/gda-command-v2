@@ -6,6 +6,7 @@ export interface DoctrinePrinciple {
   name: string;
   short_form: string;
   long_form: string;
+  evaluation_prompt: string;
   display_order: number;
 }
 
@@ -52,5 +53,14 @@ export function useUpdateDoctrineConfig() {
     mutationFn: ({ key, value }: { key: string; value: unknown }) =>
       apiPatch<DoctrineConfigRow>(`/v3/doctrine/config/${key}`, { value }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["doctrine", "config"] }),
+  });
+}
+
+export function useUpdateDoctrinePrinciple() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, evaluation_prompt }: { id: string; evaluation_prompt: string }) =>
+      apiPatch<DoctrinePrinciple>(`/v3/doctrine/principles/${id}`, { evaluation_prompt }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["doctrine", "principles"] }),
   });
 }

@@ -4,7 +4,7 @@
  * and Evidence A/B/C rubric as enforceable rules.
  */
 
-export { getPrinciples, getExclusions, getConfig, updateConfig } from './config.js';
+export { getPrinciples, getExclusions, getConfig, updateConfig, updatePrincipleEvaluationPrompt } from './config.js';
 export {
   runDoctrineCheck,
   getEvaluationHistory,

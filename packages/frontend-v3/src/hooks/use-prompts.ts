@@ -118,3 +118,36 @@ export function useRestoreVersion() {
     },
   });
 }
+
+export interface BuildResult {
+  system_prompt: string;
+  user_prompt_template: string;
+  suggested_variables: PromptVariable[];
+  display_name: string;
+  model_used: string;
+}
+
+export function usePromptBuild() {
+  return useMutation({
+    mutationFn: (params: { topic: string; points: string[]; surface: string }) =>
+      apiPost<BuildResult>("/v3/prompts/build", params),
+  });
+}
+
+export function useCreatePrompt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: {
+      prompt_key: string;
+      display_name: string;
+      description?: string;
+      surface: string;
+      system_prompt: string;
+      user_prompt_template?: string;
+      variables?: PromptVariable[];
+    }) => apiPost<Prompt>("/v3/prompts", params),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["prompts"] });
+    },
+  });
+}

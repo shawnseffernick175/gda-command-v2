@@ -208,6 +208,135 @@ export async function promptLibraryRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // POST /v3/prompts/build — AI-generate a prompt from topic + bullet points
+  app.post('/v3/prompts/build', async (req, reply) => {
+    const body = req.body as { topic?: string; points?: string[]; surface?: string } | undefined;
+
+    if (!body?.topic?.trim()) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'topic is required', req.requestId));
+    }
+    if (!body.points?.length) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'at least one point is required', req.requestId));
+    }
+
+    const apiKey = process.env['OPENAI_API_KEY'];
+    if (!apiKey) {
+      return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'OPENAI_API_KEY not configured', req.requestId));
+    }
+
+    const builderSystemPrompt =
+      `You are a prompt engineer building precise LLM instructions for a defense contracting intelligence tool called GDA Command.\n` +
+      `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.\n` +
+      `Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.\n\n` +
+      `The user will give you a topic and a list of bullet points describing what they want the prompt to do.\n` +
+      `Build a complete, production-ready prompt from those inputs. Return JSON:\n` +
+      `{\n` +
+      `  "system_prompt": "full system prompt text",\n` +
+      `  "user_prompt_template": "user template with {VARIABLE} placeholders where appropriate",\n` +
+      `  "suggested_variables": [{"name": "VARIABLE_NAME", "description": "...", "example": "..."}],\n` +
+      `  "display_name": "short display name for the library"\n` +
+      `}`;
+
+    const userMessage = `Topic: ${body.topic.trim()}\n\nPoints:\n${body.points.map((p) => `- ${p}`).join('\n')}`;
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: builderSystemPrompt },
+            { role: 'user', content: userMessage },
+          ],
+          max_tokens: 4096,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => '');
+        return reply.status(502).send(errorEnvelope('INTERNAL_ERROR', `OpenAI API error ${response.status}: ${errBody}`, req.requestId));
+      }
+
+      const data = await response.json() as {
+        choices: Array<{ message: { content: string } }>;
+        model: string;
+      };
+
+      const rawContent = data.choices?.[0]?.message?.content ?? '{}';
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(rawContent) as Record<string, unknown>;
+      } catch {
+        return reply.status(502).send(errorEnvelope('INTERNAL_ERROR', 'Failed to parse AI response as JSON', req.requestId));
+      }
+
+      return reply.send(successEnvelope({
+        system_prompt: parsed.system_prompt ?? '',
+        user_prompt_template: parsed.user_prompt_template ?? '',
+        suggested_variables: parsed.suggested_variables ?? [],
+        display_name: parsed.display_name ?? body.topic.trim(),
+        model_used: data.model ?? 'gpt-4o-mini',
+      }, req.requestId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', `Build failed: ${message}`, req.requestId));
+    }
+  });
+
+  // POST /v3/prompts — create a new prompt in the library
+  app.post('/v3/prompts', async (req, reply) => {
+    const body = req.body as {
+      prompt_key?: string;
+      display_name?: string;
+      description?: string;
+      surface?: string;
+      system_prompt?: string;
+      user_prompt_template?: string;
+      variables?: unknown;
+    } | undefined;
+
+    if (!body?.prompt_key?.trim() || !body?.system_prompt?.trim()) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'prompt_key and system_prompt are required', req.requestId));
+    }
+
+    // Check for key collision — if key exists, append _2, _3, etc.
+    let finalKey = body.prompt_key.trim();
+    const { rows: existCheck } = await pool.query(
+      `SELECT prompt_key FROM prompt_library WHERE prompt_key LIKE $1 ORDER BY prompt_key`,
+      [`${finalKey}%`],
+    );
+    if (existCheck.length > 0) {
+      const existingKeys = new Set(existCheck.map((r) => (r as { prompt_key: string }).prompt_key));
+      if (existingKeys.has(finalKey)) {
+        let counter = 2;
+        while (existingKeys.has(`${finalKey}_${counter}`)) counter++;
+        finalKey = `${finalKey}_${counter}`;
+      }
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO prompt_library (prompt_key, display_name, description, surface, system_prompt, user_prompt_template, variables, is_active, version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, 1)
+       RETURNING *`,
+      [
+        finalKey,
+        body.display_name ?? body.prompt_key,
+        body.description ?? null,
+        body.surface ?? 'general',
+        body.system_prompt.trim(),
+        body.user_prompt_template ?? null,
+        body.variables ? JSON.stringify(body.variables) : null,
+      ],
+    );
+
+    return reply.status(201).send(successEnvelope(rows[0], req.requestId));
+  });
+
   // POST /v3/prompts/:key/restore/:version — restore a previous version
   app.post('/v3/prompts/:key/restore/:version', async (req, reply) => {
     const { key, version } = req.params as { key: string; version: string };
