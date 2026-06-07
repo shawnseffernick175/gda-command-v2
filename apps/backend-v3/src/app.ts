@@ -47,6 +47,7 @@ import { fastTrackSignalRoutes } from './routes/fast-track-signals.js';
 import { promptLibraryRoutes } from './routes/prompt-library.js';
 import { digestRoutes } from './routes/digest.js';
 import { ingestStatusRoutes } from './routes/ingest-status.js';
+import { vehicleRoutes } from './routes/vehicles.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -170,6 +171,7 @@ export async function buildApp() {
   await app.register(adminUsersRoutes);
   await app.register(promptLibraryRoutes);
   await app.register(digestRoutes);
+  await app.register(vehicleRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

@@ -16,6 +16,7 @@ import {
   Terminal,
   Archive,
   Radio,
+  Layers,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -31,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Digest", href: "/digest", icon: Radio },
   { label: "Fast Track", href: "/fast-track", icon: Zap },
   { label: "Opportunities", href: "/opportunities", icon: Search },
+  { label: "Vehicles", href: "/vehicles", icon: Layers },
   { label: "Capture", href: "/capture", icon: Target },
   { label: "Pipeline", href: "/pipeline", icon: BarChart3 },
   { label: "Awards & Intel", href: "/awards", icon: Trophy },
