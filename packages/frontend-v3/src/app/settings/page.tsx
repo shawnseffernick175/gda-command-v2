@@ -159,6 +159,8 @@ const DOCS_URLS: Record<string, string> = {
 
 const GOVTRIBE_CHILDREN = ["govtribe.contacts", "govtribe.vehicles", "govtribe.budget"];
 
+// Retained for future re-wiring of the integrations settings panel; not currently rendered.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function IntegrationsSection({ sentinel }: { sentinel: ReturnType<typeof useSentinel>["data"] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [govtribeOpen, setGovtribeOpen] = useState(false);
@@ -653,7 +655,7 @@ function NotificationsPanel() {
 
 /* ── Main Settings Page ─────────────────────────────────────────── */
 export default function SettingsPage() {
-  const { data: sentinel, isLoading: sentinelLoading } = useSentinel();
+  const { isLoading: sentinelLoading } = useSentinel();
   const { data: sysHealth } = useSystemHealth();
   const { data: principles, isLoading: principlesLoading } = useDoctrinePrinciples();
   const { data: configRows, isLoading: configLoading } = useDoctrineConfig();
