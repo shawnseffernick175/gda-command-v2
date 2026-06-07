@@ -40,7 +40,7 @@ function formatDelta(source: IngestSourceStatus): string {
   if (total > 0) return `+${total}`;
   // A run actually executed (we have a timestamp) but produced no new records:
   // confirm it was active rather than rendering an ambiguous "—".
-  if (source.last_run_at) return `${records.fetched} checked ✓`;
+  if (source.last_run_at) return `${records.fetched} checked`;
   // No run has ever executed for this source.
   return "—";
 }
