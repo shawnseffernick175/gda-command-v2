@@ -406,3 +406,49 @@ class TestGovtribeSearch:
         assert result.results == []
         assert result.warning is not None
         assert "500" in result.warning
+
+
+# ---------------------------------------------------------------------------
+# _build_langchain_tools (StructuredTool construction)
+# ---------------------------------------------------------------------------
+from unittest.mock import AsyncMock
+from langchain_core.tools import StructuredTool
+from src.agent import _build_langchain_tools
+
+
+class TestBuildLangchainTools:
+    def test_build_all_tools_no_error(self):
+        tools = _build_langchain_tools(None)
+        assert len(tools) == len(TOOL_REGISTRY)
+        for t in tools:
+            assert isinstance(t, StructuredTool)
+            assert t.name in TOOL_REGISTRY
+            assert t.coroutine is not None
+
+    def test_build_single_tool_filter(self):
+        tools = _build_langchain_tools(["sam_search"])
+        assert len(tools) == 1
+        assert tools[0].name == "sam_search"
+
+    @pytest.mark.anyio
+    async def test_tool_coroutine_returns_json(self):
+        """Build a tool and invoke its coroutine with a mocked fn."""
+        from src.tools.registry import ToolDef
+        from src.agent import _make_tool_coroutine
+        from src.tools.schemas import SamSearchInput, SamSearchOutput
+
+        mock_output = SamSearchOutput(results=[])
+        mock_fn = AsyncMock(return_value=mock_output)
+
+        tdef = ToolDef(
+            name="test_tool",
+            description="test",
+            input_schema=SamSearchInput,
+            output_schema=SamSearchOutput,
+            fn=mock_fn,
+        )
+        coro = _make_tool_coroutine(tdef)
+        result = await coro(query="test")
+        parsed = json.loads(result)
+        assert parsed["results"] == []
+        mock_fn.assert_awaited_once()
