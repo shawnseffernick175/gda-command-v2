@@ -300,8 +300,8 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  // POST /v3/competitors/:id/analyze — admin endpoint to trigger analysis for a single competitor by DB id
-  app.post('/v3/competitors/:id/analyze', async (req, reply) => {
+  // POST /v3/competitors/by-id/:id/analyze — admin endpoint to trigger analysis for a single competitor by DB id
+  app.post('/v3/competitors/by-id/:id/analyze', async (req, reply) => {
     const competitorId = (req.params as { id: string }).id;
 
     // Look up competitor name from competitor_analysis_cache or awards table
