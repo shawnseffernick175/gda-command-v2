@@ -8,10 +8,13 @@ import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
+import { Pagination } from "@/components/shared/Pagination";
 import { formatMoney } from "@/lib/format-money";
 import { apiGet } from "@/lib/api";
 import type { OpportunitySummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const PAGE_SIZE = 50;
 
 /* ── Types ──────────────────────────────────────────────────────── */
 
@@ -147,6 +150,7 @@ export default function PipelinePage() {
   const [search, setSearch] = useState("");
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [moversOpen, setMoversOpen] = useState(true);
+  const [page, setPage] = useState(1);
 
   const { data: summary, isLoading: summaryLoading } = usePipelineSummary();
 
@@ -165,6 +169,21 @@ export default function PipelinePage() {
     const raw = listData?.items ?? [];
     return [...raw].sort((a, b) => (b.pwin?.score ?? 0) - (a.pwin?.score ?? 0));
   }, [listData]);
+
+  // Reset to first page when the active filter changes. Adjust state during
+  // render (React's supported pattern) rather than in an effect.
+  const filterKey = `${search}|${activeStage ?? ""}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const pagedItems = useMemo(
+    () => items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [items, page],
+  );
 
   const maxStageCount = useMemo(() => {
     if (!summary) return 1;
@@ -372,7 +391,7 @@ export default function PipelinePage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((opp) => (
+              {pagedItems.map((opp) => (
                 <PipelineRow key={opp.internal_id ?? opp.id} opp={opp} />
               ))}
             </tbody>
@@ -380,6 +399,18 @@ export default function PipelinePage() {
           {items.length === 0 && (
             <div className="py-8 text-center text-sm text-muted-foreground">
               No opportunities match the current filters.
+            </div>
+          )}
+          {items.length > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
+              <span className="text-xs text-muted-foreground font-mono">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, items.length)} of {items.length}
+              </span>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+              />
             </div>
           )}
         </div>

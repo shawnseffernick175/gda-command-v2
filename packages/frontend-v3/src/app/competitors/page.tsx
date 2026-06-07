@@ -47,7 +47,7 @@ export default function CompetitorsPage() {
 
   const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
 
-  const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, limit: 100, page: currentPage });
+  const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, limit: 50, page: currentPage });
   const { data: countData } = useCompetitorsCount();
 
   const items = data?.items ?? [];
