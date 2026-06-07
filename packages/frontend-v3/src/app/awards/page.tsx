@@ -119,7 +119,7 @@ export default function AwardsPage() {
     recompete: tabQueryParams.recompete as string | undefined,
     has_incumbent: tabQueryParams.has_incumbent as boolean | undefined,
     pursuing: tabQueryParams.pursuing as boolean | undefined,
-    limit: 100,
+    limit: 50,
     page: currentPage,
   });
   const { data: countData } = useAwardsCount();

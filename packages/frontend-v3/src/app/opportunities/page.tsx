@@ -4,12 +4,13 @@ import { Suspense, useState, useRef, useCallback, useEffect, useMemo } from "rea
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  useOpportunitiesInfinite,
+  useOpportunitiesPaged,
   useOpportunity,
   useAnalyzeOpportunity,
   useUpdateStage,
   type OpportunityMeta,
 } from "@/hooks/use-opportunities";
+import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
 import { apiPost } from "@/lib/api";
@@ -175,8 +176,8 @@ function OpportunityList() {
   const [relevantOnly, setRelevantOnly] = useState(true);
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
+  const [page, setPage] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollSentinelRef = useRef<HTMLDivElement>(null);
 
   const filterParams = useMemo(() => {
     const range = VALUE_RANGES[valueRange];
@@ -195,40 +196,29 @@ function OpportunityList() {
     };
   }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly]);
 
+  // Any change to the active filter set returns the user to page 1.
+  // Adjust state during render (React's supported pattern) rather than in an
+  // effect, which avoids a cascading re-render.
+  const filterKey = JSON.stringify(filterParams);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
   const {
     data,
     isLoading,
     error,
     refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useOpportunitiesInfinite(filterParams);
+  } = useOpportunitiesPaged({ ...filterParams, page });
 
-  const allItems = useMemo(
-    () => data?.pages.flatMap((p) => p.items) ?? [],
-    [data],
-  );
-  const meta: OpportunityMeta | undefined = data?.pages[0]?.meta;
+  const allItems = useMemo(() => data?.items ?? [], [data]);
+  const meta: OpportunityMeta | undefined = data?.meta;
+  const totalPages = data?.totalPages ?? 1;
 
   // Vehicle grouping
   const { data: vehiclesData, isLoading: vehiclesLoading } = useVehicles();
-
-  // Infinite scroll observer
-  useEffect(() => {
-    const sentinel = scrollSentinelRef.current;
-    if (!sentinel) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          void fetchNextPage();
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -516,13 +506,17 @@ function OpportunityList() {
                 )}
               </div>
 
-              {/* Infinite scroll sentinel */}
-              <div ref={scrollSentinelRef} className="h-1" />
-              {isFetchingNextPage && (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 bg-gda-panel" />
-                  ))}
+              {/* Page selector */}
+              {allItems.length > 0 && (
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    Page {page} of {totalPages}
+                  </span>
+                  <Pagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
                 </div>
               )}
             </>
