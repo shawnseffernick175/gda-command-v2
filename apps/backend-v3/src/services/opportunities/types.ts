@@ -122,6 +122,8 @@ export interface OpportunityDetail extends OpportunitySummary {
   analysis: AnalysisBlock;
   llm_analysis?: unknown;
   llm_quality_flag?: string | null;
+  llm_error_kind?: string | null;
+  llm_error_message?: string | null;
 }
 
 export interface OpportunityCreateInput {

@@ -57,9 +57,9 @@ describe('Routing Table', () => {
     }
   });
 
-  it('opportunity_analysis timeout is 10s (R2 contract)', () => {
+  it('opportunity_analysis timeout is 75s (covers real Anthropic latency)', () => {
     const entry = getRoutingEntry('opportunity_analysis');
-    expect(entry.timeout_ms).toBe(10_000);
+    expect(entry.timeout_ms).toBe(75_000);
   });
 
   it('opportunity_analysis has fallback to haiku', () => {
@@ -132,14 +132,14 @@ describe('Mock Mode', () => {
 });
 
 describe('R2 Enforcement — opportunity_analysis wall-clock', () => {
-  it('routing table enforces 10s timeout', () => {
+  it('routing table enforces 75s timeout (covers sonnet ~47s + margin)', () => {
     const entry = getRoutingEntry('opportunity_analysis');
-    expect(entry.timeout_ms).toBe(10_000);
+    expect(entry.timeout_ms).toBe(75_000);
   });
 
-  it('fallback min_remaining_budget_ms is 500ms', () => {
+  it('fallback min_remaining_budget_ms is 30s (haiku needs ~24s)', () => {
     const entry = getRoutingEntry('opportunity_analysis');
-    expect(entry.fallback?.min_remaining_budget_ms).toBe(500);
+    expect(entry.fallback?.min_remaining_budget_ms).toBe(30_000);
   });
 });
 

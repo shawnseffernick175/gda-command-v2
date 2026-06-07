@@ -450,16 +450,30 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
         opts: { disable_router_retry: true, object_ref: `opp:${String(row.id)}` },
       });
 
-      analysis.llm_analysis = llmResult.ok ? llmResult.output : null;
+      if (llmResult.ok) {
+        analysis.llm_analysis = llmResult.output;
+        analysis.llm_error_kind = null;
+        analysis.llm_error_message = null;
+      } else {
+        analysis.llm_analysis = null;
+        analysis.llm_error_kind = llmResult.error_kind ?? 'PROVIDER_ERROR';
+        analysis.llm_error_message = llmResult.error_message ?? 'Unknown error';
+        logger.error(
+          { entityId, trace_id: llmResult.trace_id, error_kind: llmResult.error_kind, latency_ms: llmResult.latency_ms },
+          'LLM analysis failed — persisting error; deterministic score still written',
+        );
+      }
       analysis.llm_model_used = llmResult.model_used ?? null;
       analysis.llm_quality_flag = llmResult.quality_flag;
       analysis.llm_trace_id = llmResult.trace_id;
     } catch (err) {
-      logger.warn({ err, entityId }, 'LLM router call failed — continuing with deterministic analysis');
+      logger.error({ err, entityId }, 'LLM router call threw — continuing with deterministic analysis');
       analysis.llm_analysis = null;
       analysis.llm_model_used = null;
       analysis.llm_quality_flag = null;
       analysis.llm_trace_id = null;
+      analysis.llm_error_kind = 'PROVIDER_ERROR';
+      analysis.llm_error_message = err instanceof Error ? err.message : 'Unknown error';
     }
 
     const now = analysis.generated_at as string;
