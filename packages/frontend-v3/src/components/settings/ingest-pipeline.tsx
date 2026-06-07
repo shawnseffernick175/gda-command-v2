@@ -33,11 +33,16 @@ function formatNextRun(iso: string | null): string {
   return `In ${days}d`;
 }
 
-function formatDelta(records: IngestSourceStatus["records_last_run"]): string {
+function formatDelta(source: IngestSourceStatus): string {
+  const records = source.records_last_run;
   const total = records.new + records.updated;
-  if (records.fetched === 0) return "—";
-  if (total === 0) return `${records.fetched} checked`;
-  return `+${total}`;
+  // New records were written -> show the positive delta.
+  if (total > 0) return `+${total}`;
+  // A run actually executed (we have a timestamp) but produced no new records:
+  // confirm it was active rather than rendering an ambiguous "—".
+  if (source.last_run_at) return `${records.fetched} checked`;
+  // No run has ever executed for this source.
+  return "—";
 }
 
 function StatusDot({ status }: { status: IngestSourceStatus["status"] }) {
@@ -256,13 +261,10 @@ export function IngestPipelineSection() {
       {/* Source rows */}
       {sources.map((source) => {
         const isExpanded = expandedRow === source.source_key;
-        const delta = formatDelta(source.records_last_run);
-        const deltaColor =
-          delta === "—"
-            ? "text-muted-foreground"
-            : delta === "+0"
-            ? "text-muted-foreground"
-            : "text-gda-green";
+        const delta = formatDelta(source);
+        const deltaColor = delta.startsWith("+")
+          ? "text-gda-green"
+          : "text-muted-foreground";
 
         return (
           <div key={source.source_key}>
