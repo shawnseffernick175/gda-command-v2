@@ -18,8 +18,6 @@ import { logger } from '../lib/logger.js';
 import { runIngest, getRegisteredSources } from '../ingest/framework/registry.js';
 import { listAdapters } from '../ingest/adapter/registry.js';
 import { registerSAMSource } from '../ingest/sam/index.js';
-import { registerDIBBSSource } from '../ingest/dibbs/index.js';
-import { registerNECOSource } from '../ingest/neco/index.js';
 import { registerUSASpendingSource } from '../ingest/usaspending/index.js';
 import { registerFederalRegisterSource } from '../ingest/federal_register/index.js';
 import { registerSBIRSource } from '../ingest/sbir/index.js';
@@ -35,8 +33,6 @@ import { generateActionItems } from '../jobs/generateActionItems.js';
 import { runDigestRefresh } from './digest-refresh.js';
 import { runDailyBriefingCron } from './daily-briefing.js';
 
-const dibbsEnabled = process.env.ENABLE_DIBBS_INGEST === 'true';
-const necoEnabled = process.env.ENABLE_NECO_INGEST === 'true';
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
@@ -53,12 +49,6 @@ interface CronJob {
 const JOBS: CronJob[] = [
   { sourceKey: 'sam.gov', schedule: '0 */4 * * *', label: 'SAM.gov ingest (every 4 hours)' },
   { sourceKey: 'usaspending.gov', schedule: '0 7 * * *', label: 'USAspending daily awards ingest (03:00 ET)' },
-  ...(dibbsEnabled
-    ? [{ sourceKey: 'dibbs', schedule: '0 */6 * * *', label: 'DIBBS ingest (every 6 hours)' }]
-    : []),
-  ...(necoEnabled
-    ? [{ sourceKey: 'neco', schedule: '30 */6 * * *', label: 'NECO ingest (every 6 hours, offset)' }]
-    : []),
   { sourceKey: 'federalregister.gov', schedule: '15 */6 * * *', label: 'Federal Register ingest (every 6 hours)' },
   ...(sbirEnabled
     ? [{ sourceKey: 'sbir', schedule: '0 9 * * *', label: 'DoD SBIR/STTR open topics via DSIP (daily 05:00 ET)' }]
@@ -88,10 +78,6 @@ const JOBS: CronJob[] = [
 export function startCronScheduler(): void {
   registerSAMSource();
   registerUSASpendingSource();
-  // Source registration kept unconditionally so manual POST /v3/admin/ingest/run/dibbs|neco
-  // still resolves. Only the cron schedule is gated by the env flags above.
-  registerDIBBSSource();
-  registerNECOSource();
   registerFederalRegisterSource();
   registerSBIRSource();
   registerNSFSource();
@@ -188,8 +174,6 @@ export function startCronScheduler(): void {
     tasks.push(task);
     const cronLabel = job.sourceKey === 'sam.gov' ? 'sam.4h'
       : job.sourceKey === 'usaspending.gov' ? 'usaspending.daily'
-      : job.sourceKey === 'dibbs' ? 'dibbs.6h'
-      : job.sourceKey === 'neco' ? 'neco.6h'
       : job.sourceKey === 'federalregister.gov' ? 'federal_register.6h'
       : job.sourceKey === 'sbir' ? 'sbir.daily'
       : job.sourceKey === 'govtribe' ? 'govtribe.opps.mon_thu'

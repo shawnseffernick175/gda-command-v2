@@ -19,8 +19,6 @@ import type { JwtPayload } from '../middleware/auth.js';
 const SCHEDULE_MAP: Record<string, { cron: string; intervalHours: number }> = {
   'sam.gov': { cron: '0 */4 * * *', intervalHours: 4 },
   'usaspending.gov': { cron: '0 7 * * *', intervalHours: 24 },
-  'dibbs': { cron: '0 */6 * * *', intervalHours: 6 },
-  'neco': { cron: '30 */6 * * *', intervalHours: 6 },
   'federalregister.gov': { cron: '15 */6 * * *', intervalHours: 6 },
   'sbir': { cron: '0 9 * * *', intervalHours: 24 },
   'nsf': { cron: '0 8 * * *', intervalHours: 24 },
