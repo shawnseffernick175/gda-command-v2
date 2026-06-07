@@ -10,7 +10,7 @@ import uuid
 from typing import Any, AsyncGenerator, Annotated
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, BaseMessage
-from langchain_core.tools import tool as lc_tool
+from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langgraph.graph import StateGraph, START, END
@@ -75,6 +75,15 @@ def _build_llm(model_spec: str) -> ChatOpenAI | ChatAnthropic:
     )
 
 
+def _make_tool_coroutine(tool_def: ToolDef):
+    """Factory that returns a coroutine with *tool_def* correctly bound."""
+    async def _invoke(**kwargs: Any) -> str:
+        inp = tool_def.input_schema(**kwargs)
+        result = await tool_def.fn(inp)
+        return result.model_dump_json()
+    return _invoke
+
+
 def _build_langchain_tools(
     allowed: list[str] | None,
 ) -> list[Any]:
@@ -87,16 +96,14 @@ def _build_langchain_tools(
     )
 
     for name, tdef in registry_items.items():
-        input_schema = tdef.input_schema
-        fn = tdef.fn
-
-        @lc_tool(name=name, args_schema=input_schema, description=tdef.description)
-        async def _invoke(_tool_def: ToolDef = tdef, **kwargs: Any) -> str:
-            inp = _tool_def.input_schema(**kwargs)
-            result = await _tool_def.fn(inp)
-            return result.model_dump_json()
-
-        tools.append(_invoke)
+        tools.append(
+            StructuredTool.from_function(
+                coroutine=_make_tool_coroutine(tdef),
+                name=name,
+                description=tdef.description,
+                args_schema=tdef.input_schema,
+            )
+        )
 
     return tools
 
