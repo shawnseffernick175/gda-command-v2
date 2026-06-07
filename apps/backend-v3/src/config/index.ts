@@ -45,8 +45,8 @@ export const config = {
   gitSha: loadGitSha(),
   version: '3.0.0',
 
-  analysisVersion: env('ANALYSIS_VERSION', 'v0.0.1-stub'),
-  analysisTimeoutMs: envInt('ANALYSIS_TIMEOUT_MS', 10_000),
+  analysisVersion: env('ANALYSIS_VERSION', 'v1.0.0'),
+  analysisTimeoutMs: envInt('ANALYSIS_TIMEOUT_MS', 20_000),
   analysisPollIntervalMs: envInt('ANALYSIS_POLL_INTERVAL_MS', 100),
 
   logLevel: env('LOG_LEVEL', 'info'),

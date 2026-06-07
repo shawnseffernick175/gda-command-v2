@@ -80,6 +80,8 @@ export interface OpportunityDetail extends OpportunitySummary {
   analysis?: AnalysisBlock | null;
   llm_analysis?: LlmAnalysis | null;
   llm_quality_flag?: string | null;
+  llm_error_kind?: string | null;
+  llm_error_message?: string | null;
 }
 
 export interface PaginatedResponse<T> {

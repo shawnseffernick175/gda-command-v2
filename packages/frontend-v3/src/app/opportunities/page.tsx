@@ -1056,7 +1056,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
           {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending} onAnalyze={() => analyzeOpp.mutate(id)} />
+          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={opp.llm_error_kind} />
 
           {/* Competitive Intelligence */}
           <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
@@ -1203,11 +1203,13 @@ function DecisionBriefPanel({
   llm,
   analyzing,
   onAnalyze,
+  llmErrorKind,
 }: {
   llm?: LlmAnalysis | null;
   oppId: string;
   analyzing: boolean;
   onAnalyze: () => void;
+  llmErrorKind?: string | null;
 }) {
   if (!llm) {
     return (
@@ -1219,8 +1221,13 @@ function DecisionBriefPanel({
         </CardHeader>
         <CardContent className="text-center py-6">
           <p className="text-xs text-muted-foreground mb-3 font-mono">
-            {analyzing ? "Analysis running..." : "Analysis not yet available"}
+            {analyzing ? "Analysis running..." : "Analysis pending"}
           </p>
+          {llmErrorKind && !analyzing && (
+            <p className="text-[11px] text-muted-foreground/60 mb-2 font-mono">
+              {llmErrorKind}
+            </p>
+          )}
           {!analyzing && (
             <button
               type="button"

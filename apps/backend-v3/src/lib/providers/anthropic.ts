@@ -342,6 +342,16 @@ export async function callAnthropic(opts: {
   const stored = promptKey ? await getStoredPrompt(promptKey) : null;
   let systemPrompt = stored?.system_prompt ?? SYSTEM_PROMPTS[opts.task] ?? 'Return valid JSON matching the requested output schema.';
 
+  // For opportunity_analysis, ensure the stored prompt includes the JSON schema.
+  // If the operator set a custom prompt without a schema, augment it with the
+  // hardcoded schema block so Claude always returns parseable JSON.
+  if (opts.task === 'opportunity_analysis' && stored?.system_prompt) {
+    const hasJsonDirective = /return\s+(only\s+)?.*json/i.test(stored.system_prompt);
+    if (!hasJsonDirective && SYSTEM_PROMPTS['opportunity_analysis']) {
+      systemPrompt += '\n\n' + SYSTEM_PROMPTS['opportunity_analysis'];
+    }
+  }
+
   // F-620: Inject regulatory context from vault_regulatory_catalog
   const regOpts = getRegulatoryOptions(opts.task, opts.input);
   if (regOpts) {

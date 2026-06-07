@@ -205,6 +205,8 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
   const rawAnalysis = row.analysis as unknown as Record<string, unknown> | null;
   const llmAnalysis = rawAnalysis?.llm_analysis ?? null;
   const llmQualityFlag = (rawAnalysis?.llm_quality_flag as string | null) ?? null;
+  const llmErrorKind = (rawAnalysis?.llm_error_kind as string | null) ?? null;
+  const llmErrorMessage = (rawAnalysis?.llm_error_message as string | null) ?? null;
 
   return {
     ...summary,
@@ -219,6 +221,8 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
     analysis: enrichedAnalysis!,
     llm_analysis: llmAnalysis,
     llm_quality_flag: llmQualityFlag,
+    llm_error_kind: llmErrorKind,
+    llm_error_message: llmErrorMessage,
   };
 }
 

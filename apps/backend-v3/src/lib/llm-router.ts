@@ -125,7 +125,8 @@ async function callProvider(
 }
 
 /**
- * Parse JSON from LLM text response. Handles markdown code blocks.
+ * Parse JSON from LLM text response. Handles markdown code blocks
+ * and stray prose around a JSON object.
  */
 function parseJsonResponse(text: string): unknown {
   let cleaned = text.trim();
@@ -139,7 +140,17 @@ function parseJsonResponse(text: string): unknown {
     }
   }
   cleaned = cleaned.trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // Fallback: extract substring from first '{' to last '}' and retry
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+    }
+    throw new SyntaxError(`Failed to parse JSON from LLM response: ${cleaned.slice(0, 200)}`);
+  }
 }
 
 /**
