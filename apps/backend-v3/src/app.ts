@@ -19,6 +19,7 @@ import { soakRoutes } from './routes/soak.js';
 import { fastTrackRoutes } from './routes/fast-track.js';
 import { regulatoryRoutes } from './routes/regulatory.js';
 import { authRoutes } from './routes/auth.js';
+import { systemHealthRoutes } from './routes/health.js';
 import { adminIngestRoutes } from './routes/admin/ingest.js';
 import { ragRoutes } from './routes/rag.js';
 import { govtribeRoutes } from './routes/govtribe.js';
@@ -128,6 +129,7 @@ export async function buildApp() {
     return reply.status(statusCode).send(body);
   });
 
+  await app.register(systemHealthRoutes);
   await app.register(authRoutes);
   await app.register(systemRoutes);
   await app.register(opportunityRoutes);

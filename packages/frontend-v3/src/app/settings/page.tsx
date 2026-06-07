@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSentinel } from "@/hooks/use-sentinel";
+import { useSystemHealth } from "@/hooks/use-system-health";
 import {
   useDoctrinePrinciples,
   useDoctrineConfig,
@@ -109,7 +110,10 @@ const SYSTEM_SERVICES = [
   { key: "sentinel_monitor", label: "Sentinel Monitor", detail: "Background health checks" },
 ];
 
-function SystemHealthSection({ sentinel }: { sentinel: ReturnType<typeof useSentinel>["data"] }) {
+function SystemHealthSection({ sentinel, sysHealth }: {
+  sentinel: ReturnType<typeof useSentinel>["data"];
+  sysHealth: Record<string, string> | undefined;
+}) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const overallHealthy = sentinel?.overall === "healthy";
@@ -120,9 +124,13 @@ function SystemHealthSection({ sentinel }: { sentinel: ReturnType<typeof useSent
       {SYSTEM_SERVICES.map((svc) => {
         const isExpanded = expanded === svc.key;
         const isSentinelRow = svc.key === "sentinel_monitor";
-        const status = isSentinelRow
-          ? (sentinelStatus === "healthy" ? "Active" : sentinelStatus === "degraded" ? "Degraded" : sentinelStatus === "down" ? "Down" : "Unknown")
-          : (overallHealthy ? "Healthy" : sentinelStatus === "down" ? "Down" : "Degraded");
+        const status = (() => {
+          if (svc.key === "sentinel_monitor") return sentinelStatus === "healthy" ? "Active" : sentinelStatus === "degraded" ? "Degraded" : "Down";
+          const s = sysHealth?.[svc.key as keyof typeof sysHealth];
+          if (s === "up") return "Healthy";
+          if (s === "down") return "Down";
+          return sentinel ? "Healthy" : "Checking...";
+        })();
         const dotColor = status === "Healthy" || status === "Active"
           ? "bg-gda-green"
           : status === "Degraded"
@@ -647,6 +655,8 @@ function NotificationsPanel() {
 /* ── Main Settings Page ─────────────────────────────────────────── */
 export default function SettingsPage() {
   const { data: sentinel, isLoading: sentinelLoading } = useSentinel();
+  const { data: sysHealthResult } = useSystemHealth();
+  const sysHealth = sysHealthResult?.data;
   const { data: principles, isLoading: principlesLoading } = useDoctrinePrinciples();
   const { data: configRows, isLoading: configLoading } = useDoctrineConfig();
 
@@ -667,7 +677,7 @@ export default function SettingsPage() {
             ))}
           </div>
         ) : (
-          <SystemHealthSection sentinel={sentinel} />
+          <SystemHealthSection sentinel={sentinel} sysHealth={sysHealth} />
         )}
       </CollapseSection>
 
