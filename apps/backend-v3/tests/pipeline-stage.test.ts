@@ -3,27 +3,32 @@ import { normalizePipelineStage, pipelineStageToDisplay } from '../src/lib/pipel
 
 describe('normalizePipelineStage', () => {
   it('maps frontend labels to DB enums (case-insensitive)', () => {
-    expect(normalizePipelineStage('Qualified')).toBe('qualifying');
-    expect(normalizePipelineStage('qualified')).toBe('qualifying');
-    expect(normalizePipelineStage('QUALIFIED')).toBe('qualifying');
-    expect(normalizePipelineStage('Capture')).toBe('pursuit');
-    expect(normalizePipelineStage('Proposal')).toBe('proposal');
+    expect(normalizePipelineStage('Interest')).toBe('qualifying');
+    expect(normalizePipelineStage('Qualified')).toBe('pursuit');
+    expect(normalizePipelineStage('qualified')).toBe('pursuit');
+    expect(normalizePipelineStage('QUALIFIED')).toBe('pursuit');
+    expect(normalizePipelineStage('Capture')).toBe('proposal');
+    expect(normalizePipelineStage('Proposal')).toBe('submitted');
     expect(normalizePipelineStage('Won')).toBe('won');
     expect(normalizePipelineStage('Lost')).toBe('lost');
     expect(normalizePipelineStage('No-Bid')).toBe('no_bid');
     expect(normalizePipelineStage('no-bid')).toBe('no_bid');
-    expect(normalizePipelineStage('Interest')).toBe('qualifying');
   });
 
-  it('accepts DB enum values directly', () => {
+  it('accepts DB enum values directly (unambiguous ones)', () => {
     expect(normalizePipelineStage('qualifying')).toBe('qualifying');
     expect(normalizePipelineStage('pursuit')).toBe('pursuit');
-    expect(normalizePipelineStage('proposal')).toBe('proposal');
     expect(normalizePipelineStage('submitted')).toBe('submitted');
     expect(normalizePipelineStage('evaluation')).toBe('evaluation');
     expect(normalizePipelineStage('won')).toBe('won');
     expect(normalizePipelineStage('lost')).toBe('lost');
     expect(normalizePipelineStage('no_bid')).toBe('no_bid');
+  });
+
+  it('label mapping wins for "proposal" (frontend label → submitted)', () => {
+    // "Proposal" is the frontend label for the DB enum "submitted"
+    // Label mapping takes precedence over raw enum matching
+    expect(normalizePipelineStage('proposal')).toBe('submitted');
   });
 
   it('returns null for unknown input', () => {

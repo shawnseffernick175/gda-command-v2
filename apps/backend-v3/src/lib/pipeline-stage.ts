@@ -6,10 +6,10 @@
  */
 
 const LABEL_TO_ENUM: Record<string, string> = {
-  qualified: 'qualifying',
   interest: 'qualifying',
-  capture: 'pursuit',
-  proposal: 'proposal',
+  qualified: 'pursuit',
+  capture: 'proposal',
+  proposal: 'submitted',
   submitted: 'submitted',
   evaluation: 'evaluation',
   won: 'won',
@@ -36,11 +36,16 @@ const ENUM_TO_DISPLAY: Record<string, string> = {
 /**
  * Normalize a pipeline stage value from any recognised label or DB key
  * to the canonical DB enum.  Returns null for unknown input.
+ *
+ * Label mapping takes precedence over raw enum matching because the frontend
+ * sends display labels (e.g. "Proposal") that collide with DB enum names
+ * but map to a different stage ("Proposal" → submitted, not proposal).
  */
 export function normalizePipelineStage(input: string): string | null {
   const lower = input.toLowerCase().trim();
+  if (LABEL_TO_ENUM[lower] !== undefined) return LABEL_TO_ENUM[lower];
   if (VALID_ENUMS.has(lower)) return lower;
-  return LABEL_TO_ENUM[lower] ?? null;
+  return null;
 }
 
 /**
