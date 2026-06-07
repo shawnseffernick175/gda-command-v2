@@ -32,6 +32,8 @@ import { trainIfReady } from '../services/pwin/index.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
 import { runDigestRefresh } from './digest-refresh.js';
 import { runDailyBriefingCron } from './daily-briefing.js';
+import { runAnalyzerSelfCheck } from '../workers/self-check.js';
+import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
@@ -150,6 +152,19 @@ export function startCronScheduler(): void {
   });
   tasks.push(pwinRetrainTask);
   logger.info({ schedule: '0 2 * * *' }, '[cron] registered: pwin.retrain (0 2 * * *)');
+
+  // Analyzer self-check canary — every 30 minutes
+  const analyzerSelfCheckTask = cron.schedule('*/30 * * * *', async () => {
+    try {
+      logger.info('[cron] analyzer.selfcheck starting');
+      await runAnalyzerSelfCheck(pool);
+      logger.info('[cron] analyzer.selfcheck completed');
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_analyzer_selfcheck_error');
+    }
+  });
+  tasks.push(analyzerSelfCheckTask);
+  logger.info({ schedule: '*/30 * * * *' }, '[cron] registered: analyzer.selfcheck (*/30 * * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {

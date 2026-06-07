@@ -8,6 +8,7 @@ import { subscribeFastTrack } from './workers/fast-track.js';
 import { pool } from './lib/db.js';
 import { startCronScheduler, stopCronScheduler } from './cron/index.js';
 import { initRouter, validateKeys } from './lib/llm-router.js';
+import { assertAnalysisConfig } from './lib/config-guard.js';
 
 async function main(): Promise<void> {
   logger.info(
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
   );
 
   validateKeys();
+  assertAnalysisConfig();
   initRouter(pool);
 
   await initBoss();
