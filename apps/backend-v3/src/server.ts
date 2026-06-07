@@ -1,7 +1,7 @@
 import { buildApp } from './app.js';
 import { config } from './config/index.js';
 import { logger } from './lib/logger.js';
-import { initBoss, stopBoss } from './lib/queue.js';
+import { initBoss, stopBoss, requireBoss, QUEUE_NAMES, type AnalysisJobData } from './lib/queue.js';
 import { startWorker } from './workers/analysis.js';
 import { startSoakDigestWorker } from './workers/soak-digest.js';
 import { subscribeFastTrack } from './workers/fast-track.js';
@@ -44,6 +44,41 @@ async function main(): Promise<void> {
   await app.listen({ port: config.port, host: config.host });
   logger.info({ port: config.port, host: config.host }, 'Server listening');
 
+  // F-605: Backfill — enqueue analysis for opportunities missing analysis or on stale version
+  backfillAnalysis().catch((err) => {
+    logger.warn({ err }, 'Analysis backfill failed (non-critical)');
+  });
+}
+
+async function backfillAnalysis(): Promise<void> {
+  const res = await pool.query<{ id: string }>(
+    `SELECT id FROM opportunities
+     WHERE deleted_at IS NULL
+       AND (analysis IS NULL OR analysis_version != $1)
+     LIMIT 500`,
+    [config.analysisVersion],
+  );
+
+  if (res.rows.length === 0) return;
+
+  logger.info({ count: res.rows.length }, 'F-605 backfill: enqueueing stale/missing analysis');
+
+  const boss = requireBoss();
+  for (const row of res.rows) {
+    const jobData: AnalysisJobData = {
+      entityType: 'opportunity',
+      entityId: row.id,
+      priority: 'normal',
+      trigger: 'backfill',
+    };
+    void boss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, jobData, {
+      priority: 10,
+      retryLimit: 3,
+      retryDelay: 5,
+      retryBackoff: true,
+      singletonKey: `opp-${row.id}`,
+    });
+  }
 }
 
 main().catch((err) => {
