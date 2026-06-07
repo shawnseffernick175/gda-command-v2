@@ -83,13 +83,19 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
     );
     const latestRunMap = new Map(latestRuns.map((r) => [r.source_key, r]));
 
-    // Recent errors (last 24h)
+    // Recent errors (last 24h) — only show if no success has occurred since
     const { rows: errorRows } = await pool.query(
-      `SELECT source_key, error_text
-       FROM ingest_runs
-       WHERE status = 'error'
-         AND started_at > NOW() - INTERVAL '24 hours'
-       ORDER BY started_at DESC`,
+      `SELECT DISTINCT ON (source_key) source_key, error_text
+       FROM ingest_runs e
+       WHERE e.status = 'error'
+         AND e.started_at > NOW() - INTERVAL '24 hours'
+         AND NOT EXISTS (
+           SELECT 1 FROM ingest_runs s
+           WHERE s.source_key = e.source_key
+             AND s.status IN ('success', 'degraded')
+             AND s.started_at > e.started_at
+         )
+       ORDER BY source_key, started_at DESC`,
     );
     const recentErrors = new Map<string, string>();
     for (const r of errorRows) {
