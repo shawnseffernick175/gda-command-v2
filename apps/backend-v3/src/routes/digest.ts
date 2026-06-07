@@ -63,10 +63,10 @@ interface RegulatoryRow {
 interface UpcomingOppRow {
   id: string;
   title: string;
-  naics_code: string | null;
+  naics: string | null;
   agency: string | null;
   response_due_at: string | null;
-  source_url: string | null;
+  source_uri: string | null;
 }
 
 export async function digestRoutes(app: FastifyInstance): Promise<void> {
@@ -264,11 +264,12 @@ async function getRegulatoryTracker() {
 
 async function getUpcomingSolicitations() {
   const { rows } = await pool.query<UpcomingOppRow>(
-    `SELECT id::text, title, naics_code, agency_name as agency,
-            response_due_at::text, source_url
+    `SELECT id::text, title, naics, agency,
+            response_due_at::text, source_uri
      FROM opportunities
-     WHERE naics_code = ANY($1)
+     WHERE naics = ANY($1)
        AND response_due_at > NOW()
+       AND deleted_at IS NULL
      ORDER BY response_due_at ASC
      LIMIT 5`,
     [ENVISION_NAICS],

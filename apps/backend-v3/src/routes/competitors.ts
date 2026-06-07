@@ -414,11 +414,18 @@ async function runCompetitorAnalysis(competitorName: string): Promise<void> {
   logger.info({ competitorName }, 'competitor_analysis_generated');
 }
 
+const inflightCompetitorAnalyses = new Set<string>();
+
 function triggerMissingCompetitorAnalyses(rows: Array<{ name: string; competitor_analysis: unknown }>): void {
-  const missing = rows.filter((r) => r.competitor_analysis == null).slice(0, 5);
+  const missing = rows.filter((r) => r.competitor_analysis == null && !inflightCompetitorAnalyses.has(r.name)).slice(0, 5);
   for (const row of missing) {
-    void runCompetitorAnalysis(row.name).catch((err) => {
-      logger.warn({ err, competitor: row.name }, 'background_competitor_analysis_failed');
-    });
+    inflightCompetitorAnalyses.add(row.name);
+    void runCompetitorAnalysis(row.name)
+      .catch((err) => {
+        logger.warn({ err, competitor: row.name }, 'background_competitor_analysis_failed');
+      })
+      .finally(() => {
+        inflightCompetitorAnalyses.delete(row.name);
+      });
   }
 }

@@ -153,7 +153,7 @@ const SET_ASIDE_OPTIONS = [
 
 /* ── Grade options ──────────────────────────────────────────────── */
 
-const GRADE_OPTIONS = ["A", "B", "C", "D", "Unscored"] as const;
+const GRADE_OPTIONS = ["A", "B", "C", "D", "F", "Unscored"] as const;
 
 /* ══════════════════════════════════════════════════════════════════ */
 
