@@ -81,6 +81,29 @@ export const ENVISION_NAICS = [
 
 export type EnvisionNaicsCode = typeof ENVISION_NAICS[number];
 
+/**
+ * Primary competitive NAICS lanes — curated subset where Envision has
+ * demonstrated past performance and actively competes. Used for pWin
+ * scoring bonuses and teaming partner evaluation (where we check if an
+ * opp's NAICS is OUTSIDE our primary lanes to suggest partners).
+ * This is intentionally narrower than the full SAM registration.
+ */
+export const ENVISION_PRIMARY_NAICS = [
+  '541330', // Engineering Services
+  '541511', // Custom Computer Programming
+  '541512', // Computer Systems Design
+  '541519', // Other Computer Related Services
+  '541611', // Admin/General Management Consulting
+  '541613', // Marketing Consulting
+  '541614', // Logistics Consulting
+  '541690', // Other Scientific/Technical Consulting
+  '541715', // R&D Physical/Engineering/Life Sciences
+  '541990', // All Other Professional/Scientific/Technical
+  '561110', // Office Administrative Services
+  '561210', // Facilities Support Services
+  '611430', // Professional/Management Development Training
+] as const;
+
 /** String used in AI prompts — top 8 most relevant codes */
 export const ENVISION_NAICS_PROMPT_SUMMARY =
   'NAICS 541330 (Engineering), 541511/541512/541513/541519 (IT/Software), 541715 (R&D), ' +

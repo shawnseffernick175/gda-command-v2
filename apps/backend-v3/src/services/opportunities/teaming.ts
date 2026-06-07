@@ -7,7 +7,7 @@
  */
 
 import type { OpportunityRow, TeamingFlag } from './types.js';
-import { ENVISION_NAICS } from '../../constants/envision-naics.js';
+import { ENVISION_PRIMARY_NAICS } from '../../constants/envision-naics.js';
 
 const ENVISION_SET_ASIDES = new Set([
   'SDB',
@@ -20,7 +20,7 @@ const ENVISION_SET_ASIDES = new Set([
 const RIVERSTONE_CERTS = ['HUBZone', 'WOSB', 'SDB'];
 const PD_SYSTEMS_CERTS = ['V3 Veteran', 'SDVOSB'];
 
-const ENVISION_NAICS_SET = new Set<string>(ENVISION_NAICS);
+const ENVISION_NAICS_SET = new Set<string>(ENVISION_PRIMARY_NAICS);
 
 const PD_SYSTEMS_NAICS = new Set([
   '561210', '611430', '541715', '541330',
