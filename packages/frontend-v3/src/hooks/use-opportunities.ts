@@ -188,13 +188,25 @@ export function useFieldOverride() {
   });
 }
 
+interface AnalyzeResponse {
+  queued?: boolean;
+  opportunity_id?: string;
+  message?: string;
+}
+
 export function useAnalyzeOpportunity() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiPost<OpportunityDetail>(`/v3/opportunities/${id}/analyze`),
-    onSuccess: (_data, id) => {
+      apiPost<OpportunityDetail | AnalyzeResponse>(`/v3/opportunities/${id}/analyze`),
+    onSuccess: (data, id) => {
       void qc.invalidateQueries({ queryKey: ["opportunity", id] });
+      // If analysis was queued (202), poll for the result after a short delay
+      if (data && "queued" in data && data.queued) {
+        setTimeout(() => {
+          void qc.invalidateQueries({ queryKey: ["opportunity", id] });
+        }, 5_000);
+      }
     },
   });
 }

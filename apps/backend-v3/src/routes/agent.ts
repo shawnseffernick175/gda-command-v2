@@ -157,6 +157,101 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
+   * POST /v3/agent/ask — buffered JSON wrapper around agent-v3 /agent/run.
+   *
+   * Unlike /v3/agent/run (SSE passthrough), this endpoint collects the
+   * full SSE stream server-side and returns a single JSON response
+   * { answer } inside the standard successEnvelope.  Used by the Q&A
+   * panel so the frontend doesn't need to parse SSE.
+   */
+  app.post('/v3/agent/ask', async (req, reply) => {
+    const traceId = req.requestId;
+    const user = (req as typeof req & { user?: { sub: string } }).user;
+    const body = req.body as Record<string, unknown> | undefined;
+
+    if (!body || !body.task) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'body.task is required', traceId),
+      );
+    }
+
+    try {
+      const res = await undiciRequest(`${AGENT_BASE}/agent/run`, {
+        method: 'POST',
+        headers: {
+          ...agentHeaders(traceId),
+          'Content-Type': 'application/json',
+          'X-GDA-Caller': user?.sub ?? 'anonymous',
+        },
+        body: JSON.stringify(body),
+        headersTimeout: 10_000,
+        bodyTimeout: 120_000,
+      });
+
+      const raw = await res.body.text();
+
+      if (res.statusCode >= 400) {
+        logger.warn({ status: res.statusCode, body: raw.slice(0, 500) }, 'agent-v3 /agent/run returned error for /ask');
+        return reply.status(res.statusCode).send(
+          errorEnvelope('AGENT_UNAVAILABLE', 'Agent returned an error', traceId),
+        );
+      }
+
+      // Parse SSE: extract the last `data:` payload as the answer
+      const lines = raw.split('\n');
+      let lastData: string | null = null;
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          lastData = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          lastData = line.slice(5).trim();
+        }
+      }
+
+      let answer: string;
+      if (lastData) {
+        try {
+          const parsed = JSON.parse(lastData) as Record<string, unknown>;
+          // Unwrap envelope if present
+          if (parsed.success === true && parsed.data) {
+            const inner = parsed.data as Record<string, unknown>;
+            answer = String(inner.answer ?? inner.output ?? JSON.stringify(inner));
+          } else {
+            answer = String(parsed.answer ?? parsed.output ?? JSON.stringify(parsed));
+          }
+        } catch {
+          // Not JSON — use raw SSE payload as plain-text answer
+          answer = lastData;
+        }
+      } else if (raw.trim().length > 0) {
+        // No SSE framing — try parsing the entire response as JSON
+        try {
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          if (parsed.success === true && parsed.data) {
+            const inner = parsed.data as Record<string, unknown>;
+            answer = String(inner.answer ?? inner.output ?? JSON.stringify(inner));
+          } else {
+            answer = String(parsed.answer ?? parsed.output ?? JSON.stringify(parsed));
+          }
+        } catch {
+          answer = raw.trim();
+        }
+      } else {
+        answer = 'No response from analysis service.';
+      }
+
+      return reply.status(200).send(
+        successEnvelope({ answer, trace_id: traceId }, traceId),
+      );
+    } catch (err) {
+      logger.error({ err }, 'agent-v3 /agent/ask proxy failed');
+      return reply.status(502).send(
+        errorEnvelope('AGENT_UNAVAILABLE', 'Analysis service temporarily unavailable. Please retry.', traceId),
+      );
+    }
+  });
+
+  /**
    * Proxy GET /v3/agent/trace/:run_id → agent-v3 /agent/trace/:run_id
    */
   app.get<{ Params: { run_id: string } }>('/v3/agent/trace/:run_id', async (req, reply) => {

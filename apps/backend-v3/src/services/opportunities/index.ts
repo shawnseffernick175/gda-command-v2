@@ -7,6 +7,7 @@ import { resolveFieldSources, type SourceRef } from '../../lib/sources.js';
 import { evaluateTeamingFlags } from './teaming.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
+import { normalizePipelineStage } from '../../lib/pipeline-stage.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
   type OpportunityRow,
@@ -641,24 +642,7 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
   return opp;
 }
 
-// Map frontend display stage names to pipeline_items DB keys
-const STAGE_DISPLAY_TO_KEY: Record<string, string> = {
-  'Interest': 'qualifying',
-  'Qualified': 'pursuit',
-  'Capture': 'proposal',
-  'Proposal': 'submitted',
-  'Won': 'won',
-  'Lost': 'lost',
-  'No-Bid': 'lost',
-  // Also accept internal keys directly
-  'qualifying': 'qualifying',
-  'pursuit': 'pursuit',
-  'proposal': 'proposal',
-  'submitted': 'submitted',
-  'evaluation': 'evaluation',
-  'won': 'won',
-  'lost': 'lost',
-};
+// Stage normalisation delegated to lib/pipeline-stage.ts
 
 export async function updateOpportunity(
   id: string,
@@ -706,7 +690,10 @@ export async function updateOpportunity(
 
   // Write stage to pipeline_items (stages live there, not on opportunities)
   if (stageValue) {
-    const dbStage = STAGE_DISPLAY_TO_KEY[stageValue] ?? stageValue;
+    const dbStage = normalizePipelineStage(stageValue);
+    if (!dbStage) {
+      throw new Error(`Unknown pipeline stage: ${stageValue}`);
+    }
     const existing = await pool.query(
       `SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
       [id],
@@ -719,8 +706,8 @@ export async function updateOpportunity(
     } else {
       await pool.query(
         `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-         VALUES ($1, 'system', $2, $3)`,
-        [id, dbStage, row.source_id],
+         VALUES ($1, $2, $3, $4)`,
+        [id, 'Envision', dbStage, row.source_id],
       );
     }
   }

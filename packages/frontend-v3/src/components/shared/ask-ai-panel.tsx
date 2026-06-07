@@ -87,18 +87,8 @@ export function AskAiPanel({
       </div>
       {askAi.data && (
         <div className="rounded border border-border bg-gda-bg-base p-3 text-sm text-foreground">
-          {askAi.data.ok && askAi.data.output ? (
-            <div>
-              <p className="whitespace-pre-wrap">
-                {String(
-                  (askAi.data.output as Record<string, unknown>).answer ??
-                    JSON.stringify(askAi.data.output, null, 2),
-                )}
-              </p>
-              <p className="mt-2 text-[11px] text-muted-foreground italic">
-                Model: {askAi.data.model_used} · {askAi.data.latency_ms}ms
-              </p>
-            </div>
+          {askAi.data.answer ? (
+            <p className="whitespace-pre-wrap">{askAi.data.answer}</p>
           ) : (
             <p className="text-gda-amber italic">
               AI response pending — intelligence layer activating
