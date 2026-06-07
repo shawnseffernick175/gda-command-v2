@@ -4,7 +4,9 @@ import { pool } from "../lib/db.js";
 export async function systemHealthRoutes(fastify: FastifyInstance) {
   fastify.get("/v3/system/health", async (_req, reply) => {
     const checks = await Promise.allSettled([
-      pool.query("SELECT 1").then(() => ({ service: "database", status: "up" as const })),
+      pool.query("SELECT 1")
+        .then(() => ({ service: "database", status: "up" as const }))
+        .catch(() => ({ service: "database", status: "down" as const })),
       fetch("http://gda-agent-v3:8001/healthz", { signal: AbortSignal.timeout(3000) })
         .then((r) => ({ service: "agent_service", status: (r.ok ? "up" : "down") as "up" | "down" }))
         .catch(() => ({ service: "agent_service", status: "down" as const })),
@@ -17,8 +19,6 @@ export async function systemHealthRoutes(fastify: FastifyInstance) {
     for (const c of checks) {
       if (c.status === "fulfilled") {
         results[c.value.service] = c.value.status;
-      } else {
-        results["unknown"] = "down";
       }
     }
 
