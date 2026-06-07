@@ -136,7 +136,8 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
     const severity = govtribeEntry ? deriveSeverity(govtribeBudget.pct) : 'ok';
 
     // Derive overall health — core sources only, unknown sources never count as failures
-    const CORE_SOURCES = ["sam.gov", "usaspending.gov", "govtribe", "govwin"];
+    // GovTribe excluded — credit throttling causes expected stale periods
+    const CORE_SOURCES = ["sam.gov", "usaspending.gov", "govwin"];
     const coreEntries = entries.filter((e) => CORE_SOURCES.includes(e.source_key));
     const hasError = coreEntries.some((e) => e.status === 'error');
     const hasStale = coreEntries.some((e) => e.status === 'stale');
