@@ -10,6 +10,7 @@ import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGene
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
+import { ENVISION_NAICS_PROMPT_SUMMARY, ENVISION_COMPANY_CONTEXT } from '../../constants/envision-naics.js';
 
 /** Map from task to prompt_library key for read-through lookup. */
 const TASK_PROMPT_KEY: Partial<Record<Task, string>> = {
@@ -96,7 +97,7 @@ All fields are required. urgency must be one of: immediate, today, this_week.`,
 
   risk_generation: `You are a risk analyst specializing in federal government contracting proposals. Generate a comprehensive set of bid/performance risks for the given opportunity. Include both negative risks (threats) and positive risks (opportunities to exploit). Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly. Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
 
-  award_analysis: `You are a sharp defense contracting analyst briefing an executive at Envision (federal IT/consulting, NAICS 541511/541512/541519/541690, based in Alexandria VA). Analyze this USAspending award and return a structured assessment.
+  award_analysis: `You are a sharp defense contracting analyst briefing an executive at Envision — ${ENVISION_COMPANY_CONTEXT} (${ENVISION_NAICS_PROMPT_SUMMARY}). Analyze this USAspending award and return a structured assessment.
 
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
@@ -121,16 +122,16 @@ Write as a sharp defense contracting analyst. Be direct and specific.`,
 
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.
 
-You are analyzing a competitor in the federal IT/consulting market relative to Envision (NAICS 541511/541512/541519/541690, 8(a) eligible small business specializing in digital transformation and data analytics for DoD/federal agencies). Classify this competitor and provide actionable intelligence.`,
+You are analyzing a competitor in the federal defense services market relative to Envision (${ENVISION_NAICS_PROMPT_SUMMARY}). ${ENVISION_COMPANY_CONTEXT} Classify this competitor and provide actionable intelligence.`,
 
-  match_analysis: `You are a senior capture strategist at Envision, a defense IT and systems integration firm (NAICS: 541511, 541512, 541519, 541690).
+  match_analysis: `You are a senior capture strategist at Envision, a defense services and systems integration firm (${ENVISION_NAICS_PROMPT_SUMMARY}).
 
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, confident. No AI preamble, no hedging language, no bullet soup.`,
 
   digest_lead: `You are a defense contracting analyst at Envision.
-Summarize the most important federal market development from the last 24 hours that is relevant to IT services, cybersecurity, and defense contracting in NAICS codes 541511, 541512, 541519, and 541690.
-Lead with the so-what for a defense IT firm. Be specific. Cite the source document and date.
+Summarize the most important federal market development from the last 24 hours that is relevant to defense services, engineering, IT, training, and R&D contracting (${ENVISION_NAICS_PROMPT_SUMMARY}).
+Lead with the so-what for a defense services firm. Be specific. Cite the source document and date.
 Never fabricate facts, names, dollar amounts, dates, or citations. If no significant development occurred, say so explicitly.
 Write as a sharp analyst briefing an executive. No AI preamble. No hedging. Max 4 sentences for the body.
 
@@ -437,7 +438,7 @@ Award value: ${value}
 Award date: ${input.award_date ?? 'Unknown'}
 Period of performance end: ${input.period_of_performance_end ?? 'Unknown'}
 
-Envision's NAICS codes: 541511, 541512, 541519, 541690
+Envision's NAICS codes: ${ENVISION_NAICS_PROMPT_SUMMARY}
 
 Respond ONLY with valid JSON:
 {

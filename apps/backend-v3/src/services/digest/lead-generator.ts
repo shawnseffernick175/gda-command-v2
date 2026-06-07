@@ -11,8 +11,7 @@ import type { Pool } from 'pg';
 import { llmRouter } from '../../lib/llm-router.js';
 import { logger } from '../../lib/logger.js';
 import type { DigestLeadInput } from '../../lib/llm-router.types.js';
-
-const ENVISION_NAICS = ['541511', '541512', '541519', '541690'];
+import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 
 export interface DigestLeadStory {
   headline: string;
