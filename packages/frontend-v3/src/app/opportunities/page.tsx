@@ -862,6 +862,18 @@ function OpportunityRow({
       <td className="px-3 py-1.5">
         {hovered ? (
           <div className="flex items-center gap-1">
+            {opp.source_uri && (
+              <a
+                href={opp.source_uri}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] font-mono text-muted-foreground hover:text-gda-cyan transition-colors"
+                title="View source"
+                onClick={(e) => e.stopPropagation()}
+              >
+                ↗
+              </a>
+            )}
             <button
               type="button"
               onClick={() => onNavigate(opp.id)}
@@ -963,7 +975,7 @@ function OpportunityDetail({ id }: { id: string }) {
   if (!opp) return null;
 
   const llm = opp.llm_analysis as LlmAnalysis | null | undefined;
-  const currentStage = opp.stage ?? "Interest";
+  const currentStage = (opp.pipeline_stage ? (STAGE_DISPLAY[opp.pipeline_stage] ?? opp.pipeline_stage) : null) ?? opp.stage ?? "Interest";
   const timeline = opp.analysis?.timeline;
   const doctrine = opp.doctrine_badge;
   const doctrineScore = opp.doctrine_score;
@@ -1023,6 +1035,16 @@ function OpportunityDetail({ id }: { id: string }) {
             <Badge variant="outline" className="text-xs">{opp.set_aside}</Badge>
           )}
           {opp.source && <SourceChip label={opp.source} kind="real" />}
+          {opp.source_uri && (
+            <a
+              href={opp.source_uri}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-gda-cyan hover:text-gda-green transition-colors"
+            >
+              Source ↗
+            </a>
+          )}
           <DueCountdown dueDate={opp.response_deadline ?? opp.due_date} />
         </div>
       </div>

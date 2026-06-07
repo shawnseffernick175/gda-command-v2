@@ -426,7 +426,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
     const row = res.rows[0] as Record<string, unknown> | undefined;
     if (!row) {
       logger.warn({ entityId }, 'Opportunity not found — skipping analysis');
-      return;
+      continue;
     }
 
     const analysis = buildFullAnalysis(row, pwinWeights);
@@ -497,13 +497,18 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       logger.warn({ err, entityId }, 'Failed to write to analysis cache table — continuing with inline analysis');
     }
 
-    // Derive grade from pwin score
-    const pwinScore = typeof analysis.pwin === 'object' && analysis.pwin !== null
-      ? ((analysis.pwin as { score?: number | null }).score ?? 0)
+    // Standing rule: auto-Pass when response_due_at < 30 days from now
+    const pwinResult = analysis.pwin as { score?: number | null; band?: string } | null;
+    const isAutoPass = typeof pwinResult === 'object' && pwinResult !== null && pwinResult.band === 'pass';
+
+    const pwinScore = typeof pwinResult === 'object' && pwinResult !== null
+      ? (pwinResult.score ?? 0)
       : 0;
-    const grade = scoreToGrade(pwinScore);
+    const grade = isAutoPass ? 'F' : scoreToGrade(pwinScore);
     const gradeEvidence = JSON.stringify({
       pwin_score: pwinScore,
+      auto_pass: isAutoPass,
+      auto_pass_reason: isAutoPass ? 'response_due_at < 30 days — insufficient lead time' : null,
       naics_match: row.naics as string | null,
       set_aside_fit: row.set_aside as string | null,
       agency: row.agency as string | null,
@@ -832,7 +837,7 @@ export async function startWorker(): Promise<PgBoss> {
 
   await boss.work<AnalysisJobData>(
     QUEUE_NAMES.ANALYSIS_OPPORTUNITY,
-    { batchSize: 1 },
+    { batchSize: 15 },
     handleOpportunityAnalysis,
   );
   logger.info({ queue: QUEUE_NAMES.ANALYSIS_OPPORTUNITY }, 'Subscribed to queue');

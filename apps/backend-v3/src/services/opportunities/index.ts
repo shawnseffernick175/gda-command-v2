@@ -146,6 +146,7 @@ function buildSummaryFromSources(
     teaming_flags: teamingFlags,
     ai_analyzed_at: row.ai_analyzed_at,
     analysis_version: row.analysis_version,
+    source_uri: row.source_uri ?? null,
     deadline_warning: computeDeadlineWarning(row, hasPipelineStage),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -636,6 +637,25 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
   return opp;
 }
 
+// Map frontend display stage names to pipeline_items DB keys
+const STAGE_DISPLAY_TO_KEY: Record<string, string> = {
+  'Interest': 'qualifying',
+  'Qualified': 'pursuit',
+  'Capture': 'proposal',
+  'Proposal': 'submitted',
+  'Won': 'won',
+  'Lost': 'lost',
+  'No-Bid': 'lost',
+  // Also accept internal keys directly
+  'qualifying': 'qualifying',
+  'pursuit': 'pursuit',
+  'proposal': 'proposal',
+  'submitted': 'submitted',
+  'evaluation': 'evaluation',
+  'won': 'won',
+  'lost': 'lost',
+};
+
 export async function updateOpportunity(
   id: string,
   input: OpportunityUpdateInput,
@@ -645,7 +665,10 @@ export async function updateOpportunity(
   let paramIdx = 1;
   let analysisAffected = false;
 
-  const fields = Object.entries(input).filter(([, v]) => v !== undefined);
+  // Extract stage separately — it lives in pipeline_items, not the opportunities table
+  const stageValue = input.stage;
+
+  const fields = Object.entries(input).filter(([k, v]) => v !== undefined && k !== 'stage');
   let agencyValue: string | undefined;
   for (const [key, value] of fields) {
     if (key === 'tags') {
@@ -675,7 +698,30 @@ export async function updateOpportunity(
   params.push(id);
 
   const res = await pool.query<OpportunityRow>(sql, params);
-  return { row: res.rows[0]!, analysisAffected };
+  const row = res.rows[0]!;
+
+  // Write stage to pipeline_items (stages live there, not on opportunities)
+  if (stageValue) {
+    const dbStage = STAGE_DISPLAY_TO_KEY[stageValue] ?? stageValue;
+    const existing = await pool.query(
+      `SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
+      [id],
+    );
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE pipeline_items SET stage = $1, updated_at = NOW() WHERE id = $2`,
+        [dbStage, existing.rows[0].id],
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
+         VALUES ($1, 'system', $2, $3)`,
+        [id, dbStage, row.source_id],
+      );
+    }
+  }
+
+  return { row, analysisAffected };
 }
 
 export async function qualifyOpportunity(

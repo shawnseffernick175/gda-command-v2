@@ -35,7 +35,8 @@ function formatNextRun(iso: string | null): string {
 
 function formatDelta(records: IngestSourceStatus["records_last_run"]): string {
   const total = records.new + records.updated;
-  if (total === 0 && records.fetched === 0) return "—";
+  if (records.fetched === 0) return "—";
+  if (total === 0) return `${records.fetched} checked`;
   return `+${total}`;
 }
 
