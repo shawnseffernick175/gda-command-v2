@@ -10,6 +10,7 @@ import {
   useUpdateStage,
   type OpportunityMeta,
 } from "@/hooks/use-opportunities";
+import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
 import { apiPost } from "@/lib/api";
 import { SourceChip } from "@/components/shared/source-chip";
@@ -171,6 +172,7 @@ function OpportunityList() {
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
   const [relevantOnly, setRelevantOnly] = useState(true);
   const [stageTab, setStageTab] = useState("all");
+  const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSentinelRef = useRef<HTMLDivElement>(null);
 
@@ -206,6 +208,9 @@ function OpportunityList() {
     [data],
   );
   const meta: OpportunityMeta | undefined = data?.pages[0]?.meta;
+
+  // Vehicle grouping
+  const { data: vehiclesData, isLoading: vehiclesLoading } = useVehicles();
 
   // Infinite scroll observer
   useEffect(() => {
@@ -406,8 +411,8 @@ function OpportunityList() {
         )}
       </div>
 
-      {/* Stage tabs */}
-      <div className="border-b border-border flex gap-0 overflow-x-auto">
+      {/* Stage tabs + group toggle */}
+      <div className="border-b border-border flex gap-0 overflow-x-auto items-center">
         {STAGE_TABS.map((tab) => {
           const count = getStageCount(tab.key);
           const active = stageTab === tab.key;
@@ -427,6 +432,21 @@ function OpportunityList() {
             </button>
           );
         })}
+        <div className="ml-auto pl-3">
+          <button
+            type="button"
+            onClick={() => setGroupBy(g => g === "none" ? "vehicle" : "none")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors",
+              groupBy === "vehicle"
+                ? "border-gda-green text-gda-green bg-gda-green/10"
+                : "border-border text-muted-foreground hover:border-gda-green/50",
+            )}
+          >
+            <span>{groupBy === "vehicle" ? "\u229F" : "\u229E"}</span>
+            Group by Vehicle
+          </button>
+        </div>
       </div>
 
       {/* Error */}
@@ -437,55 +457,73 @@ function OpportunityList() {
         />
       )}
 
-      {/* Loading skeleton */}
-      {isLoading && allItems.length === 0 ? (
-        <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 bg-gda-panel" />
-          ))}
-        </div>
+      {/* Vehicle-grouped view */}
+      {groupBy === "vehicle" ? (
+        vehiclesLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 bg-gda-panel" />
+            ))}
+          </div>
+        ) : (
+          <VehicleGroupedView
+            vehicles={vehiclesData ?? []}
+            onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+          />
+        )
       ) : (
         <>
-          {/* Table */}
-          <div className="rounded border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                  <th className="w-[3px] p-0" />
-                  <th className="px-3 py-2 text-left font-medium">Title</th>
-                  <th className="px-3 py-2 text-left font-medium w-[140px]">Agency</th>
-                  <th className="px-3 py-2 text-left font-medium w-[100px]">Value</th>
-                  <th className="px-3 py-2 text-left font-medium w-[70px]">Grade</th>
-                  <th className="px-3 py-2 text-left font-medium w-[90px]">Stage</th>
-                  <th className="px-3 py-2 text-left font-medium w-[80px]">Due</th>
-                  <th className="px-3 py-2 text-left font-medium w-[60px]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allItems.map((opp) => (
-                  <OpportunityRow
-                    key={String(opp.internal_id ?? opp.id)}
-                    opp={opp}
-                    onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
-                  />
-                ))}
-              </tbody>
-            </table>
-            {allItems.length === 0 && !isLoading && (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                No opportunities match your filter.
-              </div>
-            )}
-          </div>
-
-          {/* Infinite scroll sentinel */}
-          <div ref={scrollSentinelRef} className="h-1" />
-          {isFetchingNextPage && (
+          {/* Loading skeleton */}
+          {isLoading && allItems.length === 0 ? (
             <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
+              {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 bg-gda-panel" />
               ))}
             </div>
+          ) : (
+            <>
+              {/* Table */}
+              <div className="rounded border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
+                      <th className="w-[3px] p-0" />
+                      <th className="px-3 py-2 text-left font-medium">Title</th>
+                      <th className="px-3 py-2 text-left font-medium w-[140px]">Agency</th>
+                      <th className="px-3 py-2 text-left font-medium w-[100px]">Value</th>
+                      <th className="px-3 py-2 text-left font-medium w-[70px]">Grade</th>
+                      <th className="px-3 py-2 text-left font-medium w-[90px]">Stage</th>
+                      <th className="px-3 py-2 text-left font-medium w-[80px]">Due</th>
+                      <th className="px-3 py-2 text-left font-medium w-[60px]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allItems.map((opp) => (
+                      <OpportunityRow
+                        key={String(opp.internal_id ?? opp.id)}
+                        opp={opp}
+                        onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+                {allItems.length === 0 && !isLoading && (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    No opportunities match your filter.
+                  </div>
+                )}
+              </div>
+
+              {/* Infinite scroll sentinel */}
+              <div ref={scrollSentinelRef} className="h-1" />
+              {isFetchingNextPage && (
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 bg-gda-panel" />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -590,6 +628,135 @@ function MultiSelect({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Vehicle grouped view ───────────────────────────────────────── */
+
+function VehicleGroupedView({
+  vehicles,
+  onNavigate,
+}: {
+  vehicles: VehicleSummary[];
+  onNavigate: (id: number | string) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {vehicles.map((vehicle) => (
+        <VehicleGroup key={vehicle.id} vehicle={vehicle} onNavigate={onNavigate} />
+      ))}
+    </div>
+  );
+}
+
+function VehicleGroup({
+  vehicle,
+  onNavigate,
+}: {
+  vehicle: VehicleSummary;
+  onNavigate: (id: number | string) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const { data: opportunities, isLoading } = useVehicleOpportunities(vehicle.id);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-gda-panel border border-border rounded-t text-left hover:border-gda-green/40 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-xs text-gda-green font-bold">{collapsed ? "\u25B6" : "\u25BC"}</span>
+          <div>
+            <span className="font-mono text-sm font-semibold text-foreground">{vehicle.short_name}</span>
+            <span className="ml-2 text-xs text-muted-foreground">{vehicle.name}</span>
+          </div>
+          {vehicle.agency && (
+            <span className="text-xs text-muted-foreground border border-border rounded px-1.5 py-0.5 font-mono">
+              {vehicle.agency}
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground border border-border rounded px-1.5 py-0.5 font-mono">
+            {vehicle.vehicle_type}
+          </span>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-mono text-muted-foreground">
+          <span>{vehicle.opportunity_count} opportunities</span>
+          {vehicle.pipeline_count > 0 && (
+            <span className="text-gda-green">{vehicle.pipeline_count} in pipeline</span>
+          )}
+        </div>
+      </button>
+
+      {!collapsed && (
+        <div className="border border-t-0 border-border rounded-b divide-y divide-border">
+          {isLoading ? (
+            <div className="px-4 py-3">
+              <Skeleton className="h-6 bg-gda-panel" />
+            </div>
+          ) : !opportunities || opportunities.length === 0 ? (
+            <div className="px-4 py-3 text-xs text-muted-foreground font-mono">
+              No open opportunities detected under this vehicle.
+            </div>
+          ) : (
+            opportunities.map((opp) => (
+              <VehicleOpportunityRow key={opp.id} opp={opp} onNavigate={onNavigate} />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VehicleOpportunityRow({
+  opp,
+  onNavigate,
+}: {
+  opp: VehicleOpportunity;
+  onNavigate: (id: number | string) => void;
+}) {
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-2 hover:bg-gda-panel/50 transition-colors cursor-pointer"
+      onClick={() => onNavigate(opp.id)}
+    >
+      <div className="flex-1 min-w-0">
+        <span className="text-sm text-foreground hover:text-gda-green truncate block">
+          {opp.title}
+        </span>
+        <div className="flex items-center gap-2 mt-0.5">
+          {opp.agency && (
+            <span className="text-[11px] font-mono text-muted-foreground">{opp.agency}</span>
+          )}
+          {opp.naics && (
+            <span className="text-[11px] font-mono text-muted-foreground/60">NAICS {opp.naics}</span>
+          )}
+          {opp.set_aside && (
+            <span className="text-[11px] font-mono text-muted-foreground/60">{opp.set_aside}</span>
+          )}
+          {opp.match_type && (
+            <span className="text-[11px] font-mono text-gda-green/70">{opp.match_type}</span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground shrink-0">
+        {opp.value_max && (
+          <span>{formatMoney(opp.value_max)}</span>
+        )}
+        {opp.pipeline_stage && (
+          <span className="rounded border border-border px-1.5 py-0.5 text-[11px]">
+            {opp.pipeline_stage}
+          </span>
+        )}
+        {opp.response_due_at && (
+          <span>
+            {new Date(opp.response_due_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

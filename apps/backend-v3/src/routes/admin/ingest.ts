@@ -9,6 +9,7 @@ import { logger } from '../../lib/logger.js';
 import { runIngest, getRegisteredSources } from '../../ingest/framework/registry.js';
 import { getRecentRuns, getIngestStatus } from '../../ingest/framework/run_logger.js';
 import { runBackfill } from '../../ingest/usaspending/backfill.js';
+import { backfillVehicleDetection } from '../../services/vehicles/detector.js';
 import type { JwtPayload } from '../../middleware/auth.js';
 
 function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
@@ -155,6 +156,26 @@ export async function adminIngestRoutes(app: FastifyInstance): Promise<void> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error({ error: message }, 'admin_backfill_usaspending_full_year_error');
+
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', message, req.requestId),
+      );
+    }
+  });
+
+  // POST /v3/admin/vehicles/backfill — tag existing opportunities with vehicle matches
+  app.post('/v3/admin/vehicles/backfill', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+
+    try {
+      const user = (req as FastifyRequest & { user?: JwtPayload }).user;
+      logger.info({ triggeredBy: user?.sub }, 'admin_vehicles_backfill_trigger');
+
+      const result = await backfillVehicleDetection();
+      return reply.send(successEnvelope(result, req.requestId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ error: message }, 'admin_vehicles_backfill_error');
 
       return reply.status(500).send(
         errorEnvelope('INTERNAL_ERROR', message, req.requestId),
