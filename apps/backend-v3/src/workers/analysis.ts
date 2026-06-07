@@ -426,7 +426,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
     const row = res.rows[0] as Record<string, unknown> | undefined;
     if (!row) {
       logger.warn({ entityId }, 'Opportunity not found — skipping analysis');
-      return;
+      continue;
     }
 
     const analysis = buildFullAnalysis(row, pwinWeights);

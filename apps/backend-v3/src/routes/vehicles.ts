@@ -28,7 +28,7 @@ export async function vehicleRoutes(fastify: FastifyInstance): Promise<void> {
           WHERE o.deleted_at IS NULL
         ) AS opportunity_count,
         COUNT(DISTINCT ovl.opportunity_id) FILTER (
-          WHERE o.deleted_at IS NULL AND o.status IS NOT NULL
+          WHERE o.deleted_at IS NULL AND EXISTS (SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)
         ) AS pipeline_count
       FROM contract_vehicles cv
       LEFT JOIN opportunity_vehicle_links ovl ON ovl.vehicle_id = cv.id
