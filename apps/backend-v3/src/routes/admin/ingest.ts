@@ -171,8 +171,16 @@ export async function adminIngestRoutes(app: FastifyInstance): Promise<void> {
       const user = (req as FastifyRequest & { user?: JwtPayload }).user;
       logger.info({ triggeredBy: user?.sub }, 'admin_vehicles_backfill_trigger');
 
-      const result = await backfillVehicleDetection();
-      return reply.send(successEnvelope(result, req.requestId));
+      // Fire-and-forget: respond 202 immediately, run backfill in background
+      void backfillVehicleDetection().then((result) => {
+        logger.info(result, 'admin_vehicles_backfill_complete');
+      }).catch((err) => {
+        logger.error({ error: err instanceof Error ? err.message : String(err) }, 'admin_vehicles_backfill_error');
+      });
+
+      return reply.status(202).send(
+        successEnvelope({ status: 'accepted', message: 'Vehicle backfill started in background' }, req.requestId),
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error({ error: message }, 'admin_vehicles_backfill_error');
