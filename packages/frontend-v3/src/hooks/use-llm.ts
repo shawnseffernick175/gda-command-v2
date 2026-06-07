@@ -45,7 +45,7 @@ export function useAskAi() {
       object_id: string;
       context?: Record<string, unknown>;
     }) =>
-      apiPost<LlmResponse>("/v3/agent/run", {
+      apiPost<{ answer: string; trace_id: string }>("/v3/agent/ask", {
         task: "ask_ai",
         input: params,
       }),

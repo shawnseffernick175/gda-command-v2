@@ -422,6 +422,7 @@ const STAGE_DISPLAY: Record<string, string> = {
   evaluation: "Evaluation",
   won: "Won",
   lost: "Lost",
+  no_bid: "No-Bid",
 };
 
 /* ── PipelineRow ──────────────────────────────────────────────── */

@@ -109,6 +109,7 @@ const STAGE_BADGE_STYLES: Record<string, string> = {
   submitted: "border-gda-green text-gda-green",
   won: "bg-gda-green/20 text-gda-green border-transparent",
   lost: "bg-gda-red/10 text-gda-red border-transparent",
+  no_bid: "bg-gda-red/10 text-gda-red border-transparent",
 };
 
 const STAGE_DISPLAY: Record<string, string> = {
@@ -119,6 +120,7 @@ const STAGE_DISPLAY: Record<string, string> = {
   evaluation: "Evaluation",
   won: "Won",
   lost: "Lost",
+  no_bid: "No-Bid",
 };
 
 /* ── Value range options ────────────────────────────────────────── */
@@ -1056,7 +1058,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
           {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={opp.llm_error_kind} />
+          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending || (analyzeOpp.isSuccess && analyzeOpp.data != null && "queued" in analyzeOpp.data)} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={opp.llm_error_kind} />
 
           {/* Competitive Intelligence */}
           <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
@@ -1221,7 +1223,7 @@ function DecisionBriefPanel({
         </CardHeader>
         <CardContent className="text-center py-6">
           <p className="text-xs text-muted-foreground mb-3 font-mono">
-            {analyzing ? "Analysis running..." : "Analysis pending"}
+            {analyzing ? "Analysis queued — refreshing shortly..." : "Analysis pending"}
           </p>
           {llmErrorKind && !analyzing && (
             <p className="text-[11px] text-muted-foreground/60 mb-2 font-mono">
@@ -1516,8 +1518,8 @@ function AskAiInline({ id, title, agency, pwin }: { id: string; title: string; a
         </div>
         {askAi.data && (
           <div className="rounded border border-border bg-gda-bg-base p-3 text-xs text-foreground whitespace-pre-wrap">
-            {askAi.data.ok && askAi.data.output
-              ? String((askAi.data.output as Record<string, unknown>).answer ?? JSON.stringify(askAi.data.output, null, 2))
+            {askAi.data.answer
+              ? askAi.data.answer
               : <span className="text-muted-foreground italic">Processing...</span>}
           </div>
         )}

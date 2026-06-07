@@ -52,6 +52,9 @@ const pool = new Pool({
   max: 5,
 });
 
+/** Minimum days-to-due before auto-No-Bid fires (standing rule). */
+const AUTO_NO_BID_DAYS_THRESHOLD = 30;
+
 let workerBossRef: PgBoss | null = null;
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -431,6 +434,34 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
 
     const analysis = buildFullAnalysis(row, pwinWeights);
 
+    // Standing rule: auto-No-Bid when response_due_at is < 30 days away (but still future)
+    const responseDueAt = row.response_due_at as string | null;
+    let isAutoNoBid = false;
+    let autoNoBidDays: number | null = null;
+    if (responseDueAt) {
+      const daysTodue = Math.floor(
+        (new Date(responseDueAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+      );
+      if (daysTodue >= 0 && daysTodue < AUTO_NO_BID_DAYS_THRESHOLD) {
+        isAutoNoBid = true;
+        autoNoBidDays = daysTodue;
+        analysis.auto_no_bid = true;
+        analysis.recommendation = 'No Bid';
+        analysis.llm_analysis = null;
+        analysis.llm_model_used = null;
+        analysis.llm_quality_flag = null;
+        analysis.llm_trace_id = null;
+        analysis.llm_error_kind = null;
+        analysis.llm_error_message = null;
+        logger.info(
+          { entityId, daysTodue },
+          `Auto-No-Bid: ${daysTodue} days to response deadline (<${AUTO_NO_BID_DAYS_THRESHOLD}-day threshold)`,
+        );
+      }
+    }
+
+    // LLM analysis — skip entirely for auto-No-Bid opportunities
+    if (!isAutoNoBid) {
     // LLM analysis — async, non-blocking on failure
     try {
       const llmResult = await llmRouter.route({
@@ -475,6 +506,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       analysis.llm_error_kind = 'PROVIDER_ERROR';
       analysis.llm_error_message = err instanceof Error ? err.message : 'Unknown error';
     }
+    } // end if (!isAutoNoBid)
 
     const now = analysis.generated_at as string;
 
@@ -511,9 +543,9 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       logger.warn({ err, entityId }, 'Failed to write to analysis cache table — continuing with inline analysis');
     }
 
-    // Standing rule: auto-Pass when response_due_at < 30 days from now
+    // Standing rule: auto-Pass when pwin band === 'pass' OR auto-No-Bid
     const pwinResult = analysis.pwin as { score?: number | null; band?: string } | null;
-    const isAutoPass = typeof pwinResult === 'object' && pwinResult !== null && pwinResult.band === 'pass';
+    const isAutoPass = isAutoNoBid || (typeof pwinResult === 'object' && pwinResult !== null && pwinResult.band === 'pass');
 
     const pwinScore = typeof pwinResult === 'object' && pwinResult !== null
       ? (pwinResult.score ?? 0)
@@ -522,7 +554,11 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
     const gradeEvidence = JSON.stringify({
       pwin_score: pwinScore,
       auto_pass: isAutoPass,
-      auto_pass_reason: isAutoPass ? 'response_due_at < 30 days — insufficient lead time' : null,
+      auto_no_bid: isAutoNoBid,
+      auto_no_bid_days: autoNoBidDays,
+      auto_pass_reason: isAutoNoBid
+        ? `Auto-No-Bid: ${autoNoBidDays} days to response deadline (<${AUTO_NO_BID_DAYS_THRESHOLD}-day threshold). Insufficient time to compete.`
+        : isAutoPass ? 'response_due_at < 30 days — insufficient lead time' : null,
       naics_match: row.naics as string | null,
       set_aside_fit: row.set_aside as string | null,
       agency: row.agency as string | null,
@@ -849,9 +885,10 @@ export async function startWorker(): Promise<PgBoss> {
 
   logger.info({ queues: Object.values(QUEUE_NAMES) }, 'Worker pg-boss started, queues registered');
 
+  // batchSize 10: bounds peak Anthropic API load/cost while clearing backlog faster than 1
   await boss.work<AnalysisJobData>(
     QUEUE_NAMES.ANALYSIS_OPPORTUNITY,
-    { batchSize: 15 },
+    { batchSize: 10 },
     handleOpportunityAnalysis,
   );
   logger.info({ queue: QUEUE_NAMES.ANALYSIS_OPPORTUNITY }, 'Subscribed to queue');

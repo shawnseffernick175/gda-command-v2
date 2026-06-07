@@ -20,6 +20,7 @@ import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js'
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { analysisCacheHits, analysisTimeoutCount } from '../lib/metrics.js';
 import { logger } from '../lib/logger.js';
+import { normalizePipelineStage } from '../lib/pipeline-stage.js';
 import { runDoctrineCheck } from '../services/doctrine/index.js';
 import {
   listOpportunities,
@@ -713,6 +714,19 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
           (input as Record<string, unknown>)[field] = body[field];
         }
       }
+    }
+
+    // Validate stage early so we return 400 instead of a DB constraint violation
+    if (input.stage && !normalizePipelineStage(input.stage)) {
+      return reply
+        .status(400)
+        .send(
+          errorEnvelope(
+            'VALIDATION_ERROR',
+            `Unknown pipeline stage "${input.stage}". Accepted values: Qualified, Capture, Proposal, Submitted, Evaluation, Won, Lost, No-Bid (or their DB keys).`,
+            req.requestId,
+          ),
+        );
     }
 
     const { row, analysisAffected } = await updateOpportunity(id, input);
