@@ -701,27 +701,9 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground">System configuration and integrations</p>
       </div>
 
-      {/* ── Ingest Pipeline ───────────────────────────────────── */}
-      <CollapseSection id="settings-ingest-pipeline" title="INGEST PIPELINE" defaultOpen={true}>
-        <IngestPipelineSection />
-      </CollapseSection>
-
-      {/* ── Integrations ──────────────────────────────────────── */}
-      <CollapseSection id="settings-integrations" title="INTEGRATIONS" defaultOpen={true}>
-        {sentinelLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-gda-bg-base" />
-            ))}
-          </div>
-        ) : (
-          <IntegrationsSection sentinel={sentinel} />
-        )}
-      </CollapseSection>
-
       {/* ── System Health ──────────────────────────────────────── */}
       <div id="sentinel" />
-      <CollapseSection id="settings-system-health" title="SYSTEM HEALTH" defaultOpen={false}>
+      <CollapseSection id="settings-system-health" title="SYSTEM HEALTH" defaultOpen={true}>
         {sentinelLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -731,6 +713,11 @@ export default function SettingsPage() {
         ) : (
           <SystemHealthSection sentinel={sentinel} sysHealth={sysHealth} />
         )}
+      </CollapseSection>
+
+      {/* ── Ingest Pipeline ───────────────────────────────────── */}
+      <CollapseSection id="settings-ingest-pipeline" title="INGEST PIPELINE" defaultOpen={true}>
+        <IngestPipelineSection />
       </CollapseSection>
 
       {/* ── Doctrine Configuration ─────────────────────────────── */}
