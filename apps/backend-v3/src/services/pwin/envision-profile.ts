@@ -6,17 +6,9 @@
  * Used by enrich-features.ts and (optionally) doctrine/evaluate.ts + teaming.ts.
  */
 
-export const ENVISION_NAICS_LANES = [
-  '541330',
-  '541512',
-  '541519',
-  '541611',
-  '541613',
-  '541690',
-  '541715',
-  '561210',
-  '611430',
-];
+import { ENVISION_PRIMARY_NAICS } from '../../constants/envision-naics.js';
+
+export const ENVISION_NAICS_LANES: string[] = [...ENVISION_PRIMARY_NAICS];
 
 export const ENVISION_KNOWN_CUSTOMERS = [
   'army','tacom','cascom','tradoc','uscg','usn','navy','fema','veterans affairs',

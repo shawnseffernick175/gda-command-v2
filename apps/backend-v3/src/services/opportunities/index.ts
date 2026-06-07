@@ -6,6 +6,7 @@ import { pool } from '../../lib/db.js';
 import { resolveFieldSources, type SourceRef } from '../../lib/sources.js';
 import { evaluateTeamingFlags } from './teaming.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
+import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
   type OpportunityRow,
@@ -37,7 +38,7 @@ export type {
   TeamingFlag,
 } from './types.js';
 
-const ENVISION_NAICS = ['541511', '541512', '541519', '541690'];
+
 
 const FIELD_SOURCE_TABLES: Record<string, { table: string; fk: string }> = {
   title: { table: 'opportunity_title_sources', fk: 'opportunity_id' },

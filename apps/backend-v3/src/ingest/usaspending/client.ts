@@ -6,6 +6,7 @@
 
 import { request } from 'undici';
 import { logger } from '../../lib/logger.js';
+import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 
 const BASE_URL =
   'https://api.usaspending.gov/api/v2/search/spending_by_award/';
@@ -24,7 +25,7 @@ const DOD_AGENCY_FILTER = [
   { type: 'awarding' as const, tier: 'toptier' as const, name: 'Department of Veterans Affairs' },
 ];
 
-const ENVISION_NAICS_CODES = ['541511', '541512', '541519', '541690'];
+
 
 /**
  * USAspending enforces single-group constraint on award_type_codes.
@@ -172,7 +173,7 @@ export async function fetchGroup(
         award_type_codes: typeCodes,
         time_period: [{ start_date: startDate, end_date: endDate, date_type: 'last_modified_date' }],
         agencies: DOD_AGENCY_FILTER,
-        naics_codes: ENVISION_NAICS_CODES,
+        naics_codes: [...ENVISION_NAICS],
       },
       fields: REQUESTED_FIELDS,
       page,

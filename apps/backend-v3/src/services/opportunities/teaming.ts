@@ -7,6 +7,7 @@
  */
 
 import type { OpportunityRow, TeamingFlag } from './types.js';
+import { ENVISION_PRIMARY_NAICS } from '../../constants/envision-naics.js';
 
 const ENVISION_SET_ASIDES = new Set([
   'SDB',
@@ -19,10 +20,7 @@ const ENVISION_SET_ASIDES = new Set([
 const RIVERSTONE_CERTS = ['HUBZone', 'WOSB', 'SDB'];
 const PD_SYSTEMS_CERTS = ['V3 Veteran', 'SDVOSB'];
 
-const ENVISION_NAICS = new Set([
-  '541330', '541611', '541512', '541519', '561210',
-  '541614', '541990', '561110',
-]);
+const ENVISION_NAICS_SET = new Set<string>(ENVISION_PRIMARY_NAICS);
 
 const PD_SYSTEMS_NAICS = new Set([
   '561210', '611430', '541715', '541330',
@@ -128,7 +126,7 @@ export function evaluateTeamingFlags(opp: OpportunityRow): TeamingFlag[] {
 
   if (opp.naics) {
     const n = opp.naics.trim();
-    if (!ENVISION_NAICS.has(n) && PD_SYSTEMS_NAICS.has(n)) {
+    if (!ENVISION_NAICS_SET.has(n) && PD_SYSTEMS_NAICS.has(n)) {
       if (!flags.some((f) => f.suggested_partner === 'pd_systems')) {
         flags.push({
           id: `tf_${opp.id}_${flagIdx++}`,
@@ -138,7 +136,7 @@ export function evaluateTeamingFlags(opp: OpportunityRow): TeamingFlag[] {
         });
       }
     }
-    if (!ENVISION_NAICS.has(n) && RIVERSTONE_NAICS.has(n)) {
+    if (!ENVISION_NAICS_SET.has(n) && RIVERSTONE_NAICS.has(n)) {
       if (!flags.some((f) => f.suggested_partner === 'riverstone')) {
         flags.push({
           id: `tf_${opp.id}_${flagIdx++}`,

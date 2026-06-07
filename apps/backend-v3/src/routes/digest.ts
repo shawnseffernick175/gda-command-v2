@@ -13,6 +13,7 @@ import { config } from '../config/index.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { generateDigestLead } from '../services/digest/lead-generator.js';
+import { ENVISION_NAICS } from '../constants/envision-naics.js';
 
 const { Pool } = pg;
 
@@ -20,9 +21,6 @@ const pool = new Pool({
   connectionString: config.databaseUrl,
   max: 3,
 });
-
-// Envision's NAICS codes
-const ENVISION_NAICS = ['541511', '541512', '541519', '541690'];
 
 type SignalCategory = 'solicitation' | 'gao_decision' | 'regulation' | 'budget' | 'agency_intel';
 

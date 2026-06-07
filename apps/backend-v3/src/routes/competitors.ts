@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
+import { ENVISION_COMPANY_CONTEXT } from '../constants/envision-naics.js';
 
 export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/competitors — aggregated from USAspending awards table
@@ -197,7 +198,7 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
         set_asides: stats.set_asides ?? [],
         contract_types: stats.contract_types ?? [],
         recompete_contracts: recompeteContracts,
-        envision_context: 'Envision is a small business IT/consulting firm competing for federal contracts. NAICS: 541511, 541512, 541519, 541690. Certified 8(a) eligible, specializes in digital transformation and data analytics for DoD/federal agencies.',
+        envision_context: ENVISION_COMPANY_CONTEXT,
       },
     });
 
@@ -276,7 +277,7 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
         competitor_agencies: stats.agencies ?? [],
         competitor_naics: stats.naics_codes ?? [],
         competitor_contract_types: stats.contract_types ?? [],
-        envision_context: 'Envision is a small business IT/consulting firm competing for federal contracts. NAICS: 541511, 541512, 541519, 541690. Certified 8(a) eligible, specializes in digital transformation and data analytics.',
+        envision_context: ENVISION_COMPANY_CONTEXT,
       },
     });
 
@@ -394,7 +395,7 @@ async function runCompetitorAnalysis(competitorName: string): Promise<void> {
         expiration_date: r.period_of_performance_end,
         agency: r.agency_name ?? '',
       })),
-      envision_context: 'Envision is a small business IT/consulting firm competing for federal contracts. NAICS: 541511, 541512, 541519, 541690. Certified 8(a) eligible, specializes in digital transformation and data analytics.',
+      envision_context: ENVISION_COMPANY_CONTEXT,
     },
   });
 
