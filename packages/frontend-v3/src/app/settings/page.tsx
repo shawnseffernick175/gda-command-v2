@@ -102,73 +102,37 @@ function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
 }
 
 /* ── System Health Section ─────────────────────────────────────── */
-const SYSTEM_SERVICES = [
-  { key: "backend_api", label: "Backend API", detail: "v3.0 · gda-v3.csr-llc.tech" },
-  { key: "database", label: "Database", detail: "gda_command_staging" },
-  { key: "agent_service", label: "Agent Service", detail: "port 8001" },
-  { key: "mcp_server", label: "MCP Server", detail: "gda-mcp.csr-llc.tech" },
-  { key: "sentinel_monitor", label: "Sentinel Monitor", detail: "Background health checks" },
-];
-
-function SystemHealthSection({ sentinel, sysHealth }: {
-  sentinel: ReturnType<typeof useSentinel>["data"];
+function SystemHealthSection({ sysHealth }: {
   sysHealth: SystemHealth | undefined;
 }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  const sentinelStatus = sentinel?.overall ?? "unknown";
+  const INFRA = [
+    { key: "backend_api",   label: "API" },
+    { key: "database",      label: "DB" },
+    { key: "agent_service", label: "Agent" },
+    { key: "mcp_server",    label: "MCP" },
+  ] as const;
 
   return (
-    <div className="space-y-2">
-      {SYSTEM_SERVICES.map((svc) => {
-        const isExpanded = expanded === svc.key;
-        const isSentinelRow = svc.key === "sentinel_monitor";
-        const status = (() => {
-          if (svc.key === "sentinel_monitor") return sentinelStatus === "healthy" ? "Active" : sentinelStatus === "degraded" ? "Degraded" : "Down";
+    <div className="space-y-3">
+      {/* Compact infra status bar */}
+      <div className="flex items-center gap-4 px-1">
+        {INFRA.map((svc) => {
           const s = sysHealth?.[svc.key as keyof typeof sysHealth];
-          if (s === "up") return "Healthy";
-          if (s === "down") return "Down";
-          return sentinel ? "Healthy" : "Checking...";
-        })();
-        const dotColor = status === "Healthy" || status === "Active"
-          ? "bg-gda-green"
-          : status === "Degraded"
-            ? "bg-gda-amber"
-            : status === "Down"
-              ? "bg-gda-red"
-              : "bg-muted-foreground";
-
-        return (
-          <div key={svc.key}>
-            <button
-              type="button"
-              onClick={() => setExpanded(isExpanded ? null : svc.key)}
-              className="flex w-full items-center gap-3 rounded border border-border bg-gda-bg-base px-4 py-2.5 text-left hover:bg-gda-panel/50 transition-colors cursor-pointer"
-            >
-              <span className={cn("h-2 w-2 rounded-full shrink-0", dotColor)} />
-              <span className="text-sm font-medium text-foreground flex-1">{svc.label}</span>
-              <span className="text-xs text-muted-foreground font-mono">{status}</span>
-              <span className="text-xs text-muted-foreground font-mono">{svc.detail}</span>
-              <span className={cn("text-xs text-muted-foreground transition-transform", isExpanded && "rotate-90")}>▸</span>
-            </button>
-            {isExpanded && (
-              <div className="ml-5 mt-1 rounded border border-border bg-gda-panel px-4 py-2 text-xs text-muted-foreground space-y-1">
-                {isSentinelRow && sentinel ? (
-                  <>
-                    <p>Overall: <span className="text-foreground font-mono">{sentinel.overall}</span></p>
-                    <p>Sources monitored: <span className="text-foreground font-mono">{sentinel.sources.length}</span></p>
-                    <p>GovTribe credits: <span className="text-foreground font-mono">{sentinel.govtribe_credits.credits_used}/{sentinel.govtribe_credits.credits_budget}</span></p>
-                  </>
-                ) : status === "Healthy" ? (
-                  <p>Service responding normally. No recent errors.</p>
-                ) : (
-                  <p>Status inferred from Sentinel overall health: <span className="text-foreground font-mono">{status}</span></p>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+          const up = s === "up";
+          const checking = s === undefined;
+          return (
+            <div key={svc.key} className="flex items-center gap-1.5">
+              <span className={cn(
+                "h-2 w-2 rounded-full shrink-0",
+                checking ? "bg-muted-foreground animate-pulse" : up ? "bg-gda-green" : "bg-gda-red"
+              )} />
+              <span className="font-mono text-[11px] text-muted-foreground">{svc.label}</span>
+            </div>
+          );
+        })}
+      </div>
+      {/* Ingest pipeline table */}
+      <IngestPipelineSection />
     </div>
   );
 }
@@ -711,13 +675,8 @@ export default function SettingsPage() {
             ))}
           </div>
         ) : (
-          <SystemHealthSection sentinel={sentinel} sysHealth={sysHealth} />
+          <SystemHealthSection sysHealth={sysHealth} />
         )}
-      </CollapseSection>
-
-      {/* ── Ingest Pipeline ───────────────────────────────────── */}
-      <CollapseSection id="settings-ingest-pipeline" title="INGEST PIPELINE" defaultOpen={true}>
-        <IngestPipelineSection />
       </CollapseSection>
 
       {/* ── Doctrine Configuration ─────────────────────────────── */}
