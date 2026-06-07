@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSentinel } from "@/hooks/use-sentinel";
-import { useSystemHealth } from "@/hooks/use-system-health";
+import { useSystemHealth, type SystemHealth } from "@/hooks/use-system-health";
 import {
   useDoctrinePrinciples,
   useDoctrineConfig,
@@ -112,11 +112,10 @@ const SYSTEM_SERVICES = [
 
 function SystemHealthSection({ sentinel, sysHealth }: {
   sentinel: ReturnType<typeof useSentinel>["data"];
-  sysHealth: Record<string, string> | undefined;
+  sysHealth: SystemHealth | undefined;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const overallHealthy = sentinel?.overall === "healthy";
   const sentinelStatus = sentinel?.overall ?? "unknown";
 
   return (
@@ -655,8 +654,7 @@ function NotificationsPanel() {
 /* ── Main Settings Page ─────────────────────────────────────────── */
 export default function SettingsPage() {
   const { data: sentinel, isLoading: sentinelLoading } = useSentinel();
-  const { data: sysHealthResult } = useSystemHealth();
-  const sysHealth = sysHealthResult?.data;
+  const { data: sysHealth } = useSystemHealth();
   const { data: principles, isLoading: principlesLoading } = useDoctrinePrinciples();
   const { data: configRows, isLoading: configLoading } = useDoctrineConfig();
 
