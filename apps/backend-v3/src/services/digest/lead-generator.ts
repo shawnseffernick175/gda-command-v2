@@ -46,7 +46,7 @@ export async function generateDigestLead(pool: Pool): Promise<DigestLeadStory> {
       [ENVISION_NAICS],
     ),
     pool.query<{ title: string; source_url: string | null; effective_date: string | null }>(
-      `SELECT title, source_url, effective_date::text
+      `SELECT title, url AS source_url, effective_date::text
        FROM vault_regulatory_catalog
        WHERE is_active = true AND created_at >= NOW() - INTERVAL '7 days'
        ORDER BY created_at DESC
