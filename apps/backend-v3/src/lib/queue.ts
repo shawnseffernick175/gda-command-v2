@@ -84,5 +84,5 @@ export interface AnalysisJobData {
   entityType: 'opportunity' | 'capture';
   entityId: string;
   priority: 'high' | 'normal';
-  trigger: 'detail-endpoint' | 'pre-warm' | 'model-version-bump' | 'periodic-refresh' | 'ingest' | 'backfill';
+  trigger: 'detail-endpoint' | 'pre-warm' | 'model-version-bump' | 'periodic-refresh' | 'ingest' | 'backfill' | 'manual';
 }

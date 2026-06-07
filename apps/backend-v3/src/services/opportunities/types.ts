@@ -28,6 +28,7 @@ export interface OpportunityRow {
   ai_analyzed_at: string | null;
   qualified_at: string | null;
   qualified_by: string | null;
+  source_uri: string | null;
   source_id: string;
   created_at: string;
   updated_at: string;
@@ -103,6 +104,7 @@ export interface OpportunitySummary {
   teaming_flags: TeamingFlag[];
   ai_analyzed_at: string | null;
   analysis_version: string | null;
+  source_uri: string | null;
   deadline_warning: boolean;
   created_at: string;
   updated_at: string;

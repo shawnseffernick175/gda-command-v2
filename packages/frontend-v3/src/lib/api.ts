@@ -101,6 +101,14 @@ async function apiFetch<T>(
     }
   }
 
+  const contentType = res.headers.get("Content-Type") ?? "";
+
+  // SSE / streaming responses: collect the stream, parse last SSE data payload
+  if (contentType.includes("text/event-stream")) {
+    const text = await res.text();
+    return parseSSEResponse<T>(text, res.status);
+  }
+
   const envelope = (await res.json()) as Envelope<T>;
 
   if (!envelope.success) {
@@ -114,6 +122,57 @@ async function apiFetch<T>(
   }
 
   return (envelope as SuccessEnvelope<T>).data;
+}
+
+/**
+ * Parse accumulated SSE text into the final data payload.
+ * Extracts the last complete JSON object from `data:` lines.
+ */
+function parseSSEResponse<T>(raw: string, status: number): T {
+  const lines = raw.split("\n");
+  let lastData: string | null = null;
+
+  for (const line of lines) {
+    if (line.startsWith("data: ")) {
+      lastData = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      lastData = line.slice(5).trim();
+    }
+  }
+
+  if (!lastData) {
+    throw new ApiError(
+      "SSE_EMPTY",
+      "No data received from streaming response",
+      status,
+    );
+  }
+
+  try {
+    const parsed = JSON.parse(lastData) as Record<string, unknown>;
+    // If the parsed object follows the envelope pattern, unwrap it
+    if ("success" in parsed && parsed.success === true && "data" in parsed) {
+      return (parsed as unknown as SuccessEnvelope<T>).data;
+    }
+    if ("success" in parsed && parsed.success === false) {
+      const err = parsed as unknown as ErrorEnvelope;
+      throw new ApiError(
+        err.error.code,
+        err.error.message,
+        status,
+        err.error.detail,
+      );
+    }
+    // Agent responses may not follow envelope pattern — return as-is
+    return parsed as T;
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError(
+      "SSE_PARSE_ERROR",
+      "Failed to parse streaming response",
+      status,
+    );
+  }
 }
 
 /* ── Typed helpers ────────────────────────────────────────────── */

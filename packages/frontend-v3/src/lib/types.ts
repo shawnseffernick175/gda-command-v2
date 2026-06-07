@@ -41,6 +41,7 @@ export interface OpportunitySummary {
   days_in_stage?: number | null;
   deadline_warning?: boolean;
   grade?: string | null;
+  source_uri?: string | null;
 }
 
 export interface AnalysisTimeline {

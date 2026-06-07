@@ -560,6 +560,15 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(200).send(successEnvelope(result, req.requestId));
   });
 
+  // Fetch the latest pipeline stage for an opportunity
+  async function getPipelineStage(oppId: string): Promise<string | null> {
+    const res = await pool.query<{ stage: string }>(
+      `SELECT stage FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
+      [oppId],
+    );
+    return res.rows[0]?.stage ?? null;
+  }
+
   // GET /v3/opportunities/:id — detail with 10s synchronous block (Addendum A.3)
   app.get<{ Params: { id: string } }>('/v3/opportunities/:id', async (req, reply) => {
     const { id } = req.params;
@@ -574,7 +583,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     if (isCacheFresh(row)) {
       analysisCacheHits.inc();
       const detail = await rowToDetail(row);
-      return reply.status(200).send(successEnvelope(detail, req.requestId));
+      const pipelineStage = await getPipelineStage(id);
+      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
     }
 
     // Enqueue high-priority analysis and block up to 10s
@@ -608,7 +618,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       });
 
       const detail = await rowToDetail(fresh);
-      return reply.status(200).send(successEnvelope(detail, req.requestId));
+      const pipelineStage = await getPipelineStage(id);
+      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
     }
 
     analysisTimeoutCount.inc();
@@ -712,7 +723,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const summary = await rowToSummary(row);
-    return reply.status(200).send(successEnvelope(summary, req.requestId));
+    const pipelineStage = await getPipelineStage(id);
+    return reply.status(200).send(successEnvelope({ ...summary, pipeline_stage: pipelineStage }, req.requestId));
   });
 
   // POST /v3/opportunities/:id/qualify — qualification action
@@ -741,6 +753,36 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         },
         req.requestId,
       ),
+    );
+  });
+
+  // POST /v3/opportunities/:id/analyze — manually trigger analysis for a single opportunity
+  app.post<{ Params: { id: string } }>('/v3/opportunities/:id/analyze', async (req, reply) => {
+    const { id } = req.params;
+
+    const existing = await getOpportunityById(id);
+    if (!existing) {
+      return reply
+        .status(404)
+        .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+    }
+
+    enqueueAnalysis(String(id), 'manual');
+
+    const fresh = await waitForAnalysis(
+      id,
+      config.analysisTimeoutMs,
+      config.analysisPollIntervalMs,
+    );
+
+    if (fresh) {
+      analysisCacheHits.inc();
+      const detail = await rowToDetail(fresh);
+      return reply.status(200).send(successEnvelope(detail, req.requestId));
+    }
+
+    return reply.status(202).send(
+      successEnvelope({ queued: true, opportunity_id: id, message: 'Analysis enqueued' }, req.requestId),
     );
   });
 
