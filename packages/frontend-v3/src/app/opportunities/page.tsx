@@ -862,20 +862,22 @@ function OpportunityRow({
         <span className={cn("text-xs", daysLeft.className)}>{daysLeft.text}</span>
       </td>
       <td className="px-3 py-1.5">
-        {hovered ? (
-          <div className="flex items-center gap-1">
-            {opp.source_uri && (
-              <a
-                href={opp.source_uri}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] font-mono text-muted-foreground hover:text-gda-cyan transition-colors"
-                title="View source"
-                onClick={(e) => e.stopPropagation()}
-              >
-                ↗
-              </a>
-            )}
+        <div className="flex items-center gap-1">
+          {/* Source link is always visible (not hover-gated) so the solicitation is one click away. */}
+          {opp.source_uri && (
+            <a
+              href={opp.source_uri}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-mono text-gda-cyan hover:underline transition-colors"
+              title="View solicitation"
+              onClick={(e) => e.stopPropagation()}
+            >
+              ↗
+            </a>
+          )}
+          {hovered && (
+            <>
             <button
               type="button"
               onClick={() => onNavigate(opp.id)}
@@ -897,15 +899,17 @@ function OpportunityRow({
             >
               +
             </button>
-          </div>
-        ) : (
-          <Link
-            href={`/opportunities?id=${opp.id}`}
-            className="text-[11px] font-mono text-muted-foreground hover:text-gda-green"
-          >
-            {"->"}
-          </Link>
-        )}
+            </>
+          )}
+          {!hovered && (
+            <Link
+              href={`/opportunities?id=${opp.id}`}
+              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green"
+            >
+              {"->"}
+            </Link>
+          )}
+        </div>
       </td>
     </tr>
   );
