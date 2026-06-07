@@ -60,6 +60,14 @@ let workerBossRef: PgBoss | null = null;
 
 const ENVISION_SET_ASIDES = new Set(['SDB', 'Small Business', 'SB', 'Minority-Owned', '8(a)']);
 
+function scoreToGrade(score: number): string {
+  if (score >= 80) return 'A';
+  if (score >= 65) return 'B';
+  if (score >= 50) return 'C';
+  if (score >= 35) return 'D';
+  return 'F';
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Incumbent extraction
 // ────────────────────────────────────────────────────────────────────────────
@@ -213,7 +221,7 @@ function assessBlackhat(
       },
       {
         kind: 'doctrine',
-        title: 'GDA Doctrine — Market/Mission/Brand Focus principle',
+        title: 'Envision Doctrine — Market/Mission/Brand Focus principle',
         url: '/docs/canonical/gda_company_profile_v1.md',
         retrieved_at: new Date().toISOString(),
       },
@@ -278,7 +286,7 @@ function buildWargame(
       },
       {
         kind: 'doctrine',
-        title: 'GDA Doctrine — Relentless Execution principle',
+        title: 'Envision Doctrine — Relentless Execution principle',
         url: '/docs/canonical/gda_company_profile_v1.md',
         retrieved_at: new Date().toISOString(),
       },
@@ -489,18 +497,51 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       logger.warn({ err, entityId }, 'Failed to write to analysis cache table — continuing with inline analysis');
     }
 
-    // Write analysis to opportunities table (inline JSONB for fast reads)
+    // Derive grade from pwin score
+    const pwinScore = typeof analysis.pwin === 'object' && analysis.pwin !== null
+      ? ((analysis.pwin as { score?: number | null }).score ?? 0)
+      : 0;
+    const grade = scoreToGrade(pwinScore);
+    const gradeEvidence = JSON.stringify({
+      pwin_score: pwinScore,
+      naics_match: row.naics as string | null,
+      set_aside_fit: row.set_aside as string | null,
+      agency: row.agency as string | null,
+    });
+
+    // Write analysis + grade to opportunities table (inline JSONB for fast reads)
     await pool.query(
       `UPDATE opportunities
        SET analysis = $1,
            analysis_version = $2,
            ai_analyzed_at = $3,
+           grade = $4,
+           grade_evidence = $5,
            updated_at = updated_at
-       WHERE id = $4 AND deleted_at IS NULL`,
-      [JSON.stringify(analysis), config.analysisVersion, now, entityId],
+       WHERE id = $6 AND deleted_at IS NULL`,
+      [JSON.stringify(analysis), config.analysisVersion, now, grade, gradeEvidence, entityId],
     );
 
-    logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin }, 'Opportunity analysis written');
+    // Write grade source citation
+    try {
+      const sourceRes = await pool.query<{ source_id: string }>(
+        `SELECT source_id FROM opportunities WHERE id = $1`,
+        [entityId],
+      );
+      const sourceId = sourceRes.rows[0]?.source_id;
+      if (sourceId) {
+        await pool.query(
+          `INSERT INTO opportunity_grade_sources (opportunity_id, source_id)
+           VALUES ($1, $2)
+           ON CONFLICT (opportunity_id, source_id) DO NOTHING`,
+          [entityId, sourceId],
+        );
+      }
+    } catch (err) {
+      logger.warn({ err, entityId }, 'Failed to write grade source — non-critical');
+    }
+
+    logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin, grade }, 'Opportunity analysis written');
 
     // Re-analyze any captures linked to this opportunity
     try {

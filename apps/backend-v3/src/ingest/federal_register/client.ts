@@ -9,16 +9,13 @@ import { logger } from '../../lib/logger.js';
 
 const BASE_URL = 'https://www.federalregister.gov/api/v1/documents.json';
 const PER_PAGE = 100;
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 5;
 const INITIAL_BACKOFF_MS = 1_000;
 const REQUEST_DELAY_MS = 300;
 
-const TOPIC_CONDITIONS = [
-  'procurement',
-  'government-contracts',
-  'acquisition-regulations',
-];
+// Topic conditions removed — Federal Register API rejects these slugs.
+// Rely on agency-scoped results only.
 
 export const FR_AGENCY_SLUGS = [
   'defense-department',
@@ -69,9 +66,6 @@ export function buildSearchUrl(fromDate: Date, page: number): string {
   params.set('page', String(page));
   params.set('order', 'newest');
 
-  for (const topic of TOPIC_CONDITIONS) {
-    params.append('conditions[topics][]', topic);
-  }
   for (const agency of FR_AGENCY_SLUGS) {
     params.append('conditions[agencies][]', agency);
   }
@@ -104,16 +98,24 @@ async function fetchWithRetry(url: string): Promise<FederalRegisterResponse> {
 
       if (statusCode === 429 || statusCode >= 500) {
         const text = await body.text().catch(() => '');
+        logger.warn(
+          { source: 'federal_register', statusCode, responseBody: text },
+          'federal_register_error_response',
+        );
         lastError = new Error(
-          `Federal Register API ${statusCode}: ${text.slice(0, 300)}`,
+          `Federal Register API ${statusCode}: ${text}`,
         );
         continue;
       }
 
       if (statusCode !== 200) {
         const text = await body.text().catch(() => '');
+        logger.error(
+          { source: 'federal_register', statusCode, responseBody: text },
+          'federal_register_client_error',
+        );
         throw new Error(
-          `Federal Register API ${statusCode}: ${text.slice(0, 300)}`,
+          `Federal Register API ${statusCode}: ${text}`,
         );
       }
 

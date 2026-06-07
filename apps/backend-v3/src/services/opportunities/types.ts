@@ -173,6 +173,7 @@ export interface ListFilters {
   hot?: string;
   sources?: string[];
   stage?: string;
+  relevantOnly?: boolean;
   limit?: number;
   cursor?: string;
   page?: number;

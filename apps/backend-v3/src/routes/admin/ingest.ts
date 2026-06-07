@@ -135,4 +135,30 @@ export async function adminIngestRoutes(app: FastifyInstance): Promise<void> {
       );
     }
   });
+
+  // POST /v3/admin/ingest/usaspending-backfill — full-year backfill (365 days)
+  app.post('/v3/admin/ingest/usaspending-backfill', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+
+    try {
+      const user = (req as FastifyRequest & { user?: JwtPayload }).user;
+      logger.info({ days: 365, triggeredBy: user?.sub }, 'admin_backfill_usaspending_full_year');
+
+      // Fire-and-forget: respond 202 immediately, run backfill in background
+      void runBackfill({ days: 365 }).catch((err) => {
+        logger.error({ error: err instanceof Error ? err.message : String(err) }, 'admin_backfill_usaspending_full_year_error');
+      });
+
+      return reply.status(202).send(
+        successEnvelope({ status: 'accepted', days: 365, message: 'Full-year backfill started in background' }, req.requestId),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error({ error: message }, 'admin_backfill_usaspending_full_year_error');
+
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', message, req.requestId),
+      );
+    }
+  });
 }

@@ -30,17 +30,18 @@ export async function generateDigestLead(pool: Pool): Promise<DigestLeadStory> {
   const [regNotices, recentOpps, regCatalog] = await Promise.all([
     pool.query<{ title: string; abstract: string | null; html_url: string | null; publication_date: string | null }>(
       `SELECT title, abstract, html_url, publication_date::text
-       FROM federal_register_notices
+       FROM regulatory_notices
        WHERE publication_date >= NOW() - INTERVAL '48 hours'
        ORDER BY publication_date DESC
        LIMIT 10`,
     ),
-    pool.query<{ id: string; title: string; agency_name: string | null; naics_code: string | null; source_url: string | null }>(
-      `SELECT id::text, title, agency_name, naics_code, source_url
+    pool.query<{ id: string; title: string; agency: string | null; naics: string | null; source_uri: string | null }>(
+      `SELECT id::text, title, agency, naics, source_uri
        FROM opportunities
-       WHERE naics_code = ANY($1)
-         AND posted_date >= NOW() - INTERVAL '48 hours'
-       ORDER BY posted_date DESC
+       WHERE naics = ANY($1)
+         AND posted_at >= NOW() - INTERVAL '48 hours'
+         AND deleted_at IS NULL
+       ORDER BY posted_at DESC
        LIMIT 10`,
       [ENVISION_NAICS],
     ),
@@ -63,9 +64,9 @@ export async function generateDigestLead(pool: Pool): Promise<DigestLeadStory> {
     recent_opportunities: recentOpps.rows.map((r) => ({
       id: r.id,
       title: r.title,
-      agency: r.agency_name,
-      naics: r.naics_code,
-      url: r.source_url,
+      agency: r.agency,
+      naics: r.naics,
+      url: r.source_uri,
     })),
     regulatory_catalog: regCatalog.rows.map((r) => ({
       title: r.title,

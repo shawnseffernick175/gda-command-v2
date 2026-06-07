@@ -16,10 +16,15 @@ const REQUEST_DELAY_MS = 250;
 const MAX_RETRIES = 5;
 const INITIAL_BACKOFF_MS = 1_000;
 
-/** DoD-only agency filter (defense focus per program spec). */
+/** Target agency filter — Envision-relevant federal agencies. */
 const DOD_AGENCY_FILTER = [
   { type: 'awarding' as const, tier: 'toptier' as const, name: 'Department of Defense' },
+  { type: 'awarding' as const, tier: 'toptier' as const, name: 'Department of Homeland Security' },
+  { type: 'awarding' as const, tier: 'toptier' as const, name: 'General Services Administration' },
+  { type: 'awarding' as const, tier: 'toptier' as const, name: 'Department of Veterans Affairs' },
 ];
+
+const ENVISION_NAICS_CODES = ['541511', '541512', '541519', '541690'];
 
 /**
  * USAspending enforces single-group constraint on award_type_codes.
@@ -167,6 +172,7 @@ export async function fetchGroup(
         award_type_codes: typeCodes,
         time_period: [{ start_date: startDate, end_date: endDate, date_type: 'last_modified_date' }],
         agencies: DOD_AGENCY_FILTER,
+        naics_codes: { require: ENVISION_NAICS_CODES, exclude: [] },
       },
       fields: REQUESTED_FIELDS,
       page,

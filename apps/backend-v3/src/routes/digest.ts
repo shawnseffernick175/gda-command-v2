@@ -63,10 +63,10 @@ interface RegulatoryRow {
 interface UpcomingOppRow {
   id: string;
   title: string;
-  naics_code: string | null;
+  naics: string | null;
   agency: string | null;
   response_due_at: string | null;
-  source_url: string | null;
+  source_uri: string | null;
 }
 
 export async function digestRoutes(app: FastifyInstance): Promise<void> {
@@ -152,17 +152,18 @@ async function getSignalFeed(opts: { limit: number; offset: number; category?: S
   if (!opts.category || opts.category === 'solicitation') {
     const solResult = await pool.query<{
       id: string; title: string; agency: string | null;
-      naics_code: string | null; posted_date: string | null;
-      source_url: string | null; type: string | null;
-      estimated_value_text: string | null;
+      naics: string | null; posted_at: string | null;
+      source_uri: string | null; opportunity_type: string | null;
+      value_max: number | null;
     }>(
-      `SELECT id::text, title, agency_name as agency, naics_code,
-              posted_date, source_url, type, estimated_value_text
+      `SELECT id::text, title, agency, naics,
+              posted_at::text, source_uri, opportunity_type, value_max
        FROM opportunities
-       WHERE naics_code = ANY($1)
-         AND type IN ('sources_sought', 'pre_solicitation', 'solicitation')
-         AND posted_date >= NOW() - INTERVAL '30 days'
-       ORDER BY posted_date DESC
+       WHERE naics = ANY($1)
+         AND opportunity_type IN ('sources_sought', 'pre_solicitation', 'solicitation')
+         AND posted_at >= NOW() - INTERVAL '30 days'
+         AND deleted_at IS NULL
+       ORDER BY posted_at DESC
        LIMIT $2 OFFSET $3`,
       [ENVISION_NAICS, opts.limit, opts.offset],
     );
@@ -173,11 +174,11 @@ async function getSignalFeed(opts: { limit: number; offset: number; category?: S
         type: 'solicitation',
         title: row.title,
         agency: row.agency,
-        naics_code: row.naics_code,
-        value_estimate: row.estimated_value_text,
-        source_url: row.source_url,
+        naics_code: row.naics,
+        value_estimate: row.value_max ? `$${row.value_max.toLocaleString()}` : null,
+        source_url: row.source_uri ?? null,
         ai_summary: null,
-        posted_at: row.posted_date ?? new Date().toISOString(),
+        posted_at: row.posted_at ?? new Date().toISOString(),
       });
     }
   }
@@ -212,12 +213,12 @@ async function getSignalFeed(opts: { limit: number; offset: number; category?: S
   if (!opts.category || opts.category === 'regulation') {
     const regResult = await pool.query<{
       id: number; title: string; document_number: string | null;
-      publication_date: string | null; source_url: string | null;
+      publication_date: string | null; html_url: string | null;
       abstract: string | null;
     }>(
       `SELECT id, title, document_number, publication_date::text,
-              html_url as source_url, abstract
-       FROM federal_register_notices
+              html_url, abstract
+       FROM regulatory_notices
        WHERE publication_date >= NOW() - INTERVAL '30 days'
        ORDER BY publication_date DESC
        LIMIT $1 OFFSET $2`,
@@ -232,7 +233,7 @@ async function getSignalFeed(opts: { limit: number; offset: number; category?: S
         agency: null,
         naics_code: null,
         value_estimate: null,
-        source_url: row.source_url,
+        source_url: row.html_url ?? null,
         ai_summary: row.abstract ? row.abstract.slice(0, 200) : null,
         posted_at: row.publication_date ?? new Date().toISOString(),
       });
@@ -263,11 +264,12 @@ async function getRegulatoryTracker() {
 
 async function getUpcomingSolicitations() {
   const { rows } = await pool.query<UpcomingOppRow>(
-    `SELECT id::text, title, naics_code, agency_name as agency,
-            response_due_at::text, source_url
+    `SELECT id::text, title, naics, agency,
+            response_due_at::text, source_uri
      FROM opportunities
-     WHERE naics_code = ANY($1)
+     WHERE naics = ANY($1)
        AND response_due_at > NOW()
+       AND deleted_at IS NULL
      ORDER BY response_due_at ASC
      LIMIT 5`,
     [ENVISION_NAICS],
