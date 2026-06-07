@@ -129,10 +129,12 @@ export async function sentinelRoutes(app: FastifyInstance): Promise<void> {
     const govtribeEntry = entries.find((e) => e.source_key === 'govtribe');
     const severity = govtribeEntry ? deriveSeverity(govtribeBudget.pct) : 'ok';
 
-    // Derive overall health
-    const hasError = entries.some((e) => e.status === 'error');
-    const hasStale = entries.some((e) => e.status === 'stale');
-    const overall = hasError ? 'down' : hasStale ? 'degraded' : 'healthy';
+    // Derive overall health — core sources only, unknown sources never count as failures
+    const CORE_SOURCES = ["sam.gov", "usaspending.gov", "govtribe", "govwin"];
+    const coreEntries = entries.filter((e) => CORE_SOURCES.includes(e.source_key));
+    const hasError = coreEntries.some((e) => e.status === 'error');
+    const hasStale = coreEntries.some((e) => e.status === 'stale');
+    const overall = hasError ? 'degraded' : hasStale ? 'degraded' : 'healthy';
 
     return reply.send(
       successEnvelope(
