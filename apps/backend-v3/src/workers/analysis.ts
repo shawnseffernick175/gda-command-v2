@@ -766,6 +766,58 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Backfill cron — drains ALL unscored/stale opportunities in batches of 500
+// Runs every 5 minutes so the queue stays fed until the backlog clears.
+// ────────────────────────────────────────────────────────────────────────────
+
+async function scheduleBackfillCron(boss: PgBoss): Promise<void> {
+  await boss.schedule(QUEUE_NAMES.ANALYSIS_BACKFILL, '*/5 * * * *', {}, {
+    retryLimit: 1,
+  });
+  await boss.work<Record<string, unknown>>(QUEUE_NAMES.ANALYSIS_BACKFILL, { batchSize: 1 }, async () => {
+    logger.info('Running analysis backfill sweep');
+    let totalEnqueued = 0;
+    let lastId = 0;
+
+    // Keyset pagination: loop in batches of 500 until exhausted
+    for (;;) {
+      const res = await pool.query<{ id: number }>(
+        `SELECT id FROM opportunities
+         WHERE deleted_at IS NULL
+           AND id > $1
+           AND (analysis IS NULL OR analysis_version != $2)
+         ORDER BY id
+         LIMIT 500`,
+        [lastId, config.analysisVersion],
+      );
+
+      if (res.rows.length === 0) break;
+
+      for (const row of res.rows) {
+        const jobData: AnalysisJobData = {
+          entityType: 'opportunity',
+          entityId: String(row.id),
+          priority: 'normal',
+          trigger: 'backfill',
+        };
+        await boss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, jobData, {
+          priority: 10,
+          retryLimit: 3,
+          retryDelay: 5,
+          retryBackoff: true,
+          singletonKey: `opp-${row.id}`,
+        });
+      }
+
+      totalEnqueued += res.rows.length;
+      lastId = res.rows[res.rows.length - 1]!.id;
+    }
+
+    logger.info({ count: totalEnqueued }, 'Analysis backfill sweep complete');
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Daily briefing cron (F-460b) — 10:00 UTC = 6:00 AM ET
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -859,6 +911,7 @@ export async function startWorker(): Promise<PgBoss> {
   // Schedule cron jobs for pre-warm sweeps
   await scheduleModelVersionBumpCron(boss);
   await schedulePeriodicRefreshCron(boss);
+  await scheduleBackfillCron(boss);
   await scheduleDailyBriefingCron(boss);
 
   return boss;
