@@ -524,6 +524,9 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       return val.split(',');
     };
 
+    const relevantOnlyRaw = query.relevant_only as string | undefined;
+    const relevantOnly = relevantOnlyRaw === 'false' ? false : true;
+
     const filters: ListFilters = {
       q: query.q as string | undefined,
       status: query.status as string | undefined,
@@ -542,6 +545,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       hot: query.hot as string | undefined,
       sources: parseArray(query['source[]'] ?? query.sources),
       stage: query.stage as string | undefined,
+      relevantOnly,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor as string | undefined,
       page: query.page ? Number(query.page) : undefined,
@@ -737,6 +741,53 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         },
         req.requestId,
       ),
+    );
+  });
+
+  // POST /v3/opportunities/:id/outcome — record win/loss/no_bid outcome for pWin feedback
+  app.post<{ Params: { id: string } }>('/v3/opportunities/:id/outcome', async (req, reply) => {
+    const { id } = req.params;
+    const body = req.body as Record<string, unknown> | undefined;
+
+    const validOutcomes = ['won', 'lost', 'no_bid'];
+    const outcome = body?.outcome as string | undefined;
+    if (!outcome || !validOutcomes.includes(outcome)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', `outcome must be one of: ${validOutcomes.join(', ')}`, req.requestId),
+      );
+    }
+
+    const existing = await getOpportunityById(id);
+    if (!existing) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId),
+      );
+    }
+
+    const analysis = existing.analysis as { pwin?: { score?: number } } | null;
+    const predictedPwin = analysis?.pwin?.score ?? null;
+    const predictedGrade = existing.grade ?? null;
+
+    await pool.query(
+      `INSERT INTO pwin_outcomes (opportunity_id, predicted_pwin, predicted_grade, actual_outcome, feedback_source)
+       VALUES ($1, $2, $3, $4, 'manual')
+       ON CONFLICT (opportunity_id)
+       DO UPDATE SET
+         predicted_pwin = EXCLUDED.predicted_pwin,
+         predicted_grade = EXCLUDED.predicted_grade,
+         actual_outcome = EXCLUDED.actual_outcome,
+         feedback_source = EXCLUDED.feedback_source,
+         recorded_at = NOW()`,
+      [id, predictedPwin, predictedGrade, outcome],
+    );
+
+    return reply.status(200).send(
+      successEnvelope({
+        opportunity_id: id,
+        predicted_pwin: predictedPwin,
+        predicted_grade: predictedGrade,
+        actual_outcome: outcome,
+      }, req.requestId),
     );
   });
 }

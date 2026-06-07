@@ -80,6 +80,7 @@ export function mapSAMOpportunity(raw: SAMOpportunityRaw): MappedOpportunity {
     data_source: 'sam.gov',
     opportunity_type,
     tags,
+    source_uri: sourceUrl,
   };
 
   const citations: SourceCitation[] = [];

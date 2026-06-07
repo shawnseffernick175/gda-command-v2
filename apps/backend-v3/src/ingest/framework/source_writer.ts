@@ -50,6 +50,7 @@ export interface OpportunityRow {
   data_source: string;
   tags: string[];
   opportunity_type?: string | null;
+  source_uri?: string | null;
 }
 
 export interface SourceCitation {
@@ -121,9 +122,9 @@ export async function upsertOpportunityWithSources(
          title, agency, sub_agency, department, solicitation_number,
          sam_notice_id, status, value_min, value_max, naics, psc,
          set_aside, place_of_performance, response_due_at, posted_at,
-         description, data_source, tags, source_id, opportunity_type
+         description, data_source, tags, source_id, opportunity_type, source_uri
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        ON CONFLICT (sam_notice_id) DO UPDATE SET
          title                = EXCLUDED.title,
          agency               = EXCLUDED.agency,
@@ -143,6 +144,7 @@ export async function upsertOpportunityWithSources(
          tags                 = EXCLUDED.tags,
          source_id            = EXCLUDED.source_id,
          opportunity_type     = EXCLUDED.opportunity_type,
+         source_uri           = COALESCE(EXCLUDED.source_uri, opportunities.source_uri),
          updated_at           = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
@@ -166,6 +168,7 @@ export async function upsertOpportunityWithSources(
         opp.tags.length > 0 ? `{${opp.tags.join(',')}}` : '{}',
         sourceId,
         opp.opportunity_type ?? null,
+        opp.source_uri ?? null,
       ],
     );
 

@@ -117,7 +117,7 @@ function buildDetailResponse(
     compliance_items: complianceItems,
     pwin: cache?.pwin ?? null,
     pwin_sources: cache?.pwin !== null && cache?.pwin !== undefined
-      ? [{ kind: 'internal', title: 'GDA Capture Analysis', url: `/v3/captures/${row.id}`, retrieved_at: cache.generated_at }]
+      ? [{ kind: 'internal', title: 'Envision Capture Analysis', url: `/v3/captures/${row.id}`, retrieved_at: cache.generated_at }]
       : [],
     source_url: `/v3/captures/${row.id}`,
     ai_analyzed_at: cache?.generated_at ?? null,
@@ -238,7 +238,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
             color_stage: r.color_stage,
             pwin: r.cached_pwin ?? null,
             pwin_sources: r.cached_pwin != null
-              ? [{ kind: 'internal', title: 'GDA Capture Analysis', url: `/v3/captures/${r.id as string}`, retrieved_at: r.ai_analyzed_at as string }]
+              ? [{ kind: 'internal', title: 'Envision Capture Analysis', url: `/v3/captures/${r.id as string}`, retrieved_at: r.ai_analyzed_at as string }]
               : [],
             source_url: `/v3/captures/${r.id as string}`,
             ai_analyzed_at: r.ai_analyzed_at ?? null,

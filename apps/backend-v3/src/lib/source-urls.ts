@@ -37,7 +37,7 @@ export function sourceLabelOf(source: string): string {
     case 'govtribe':
       return 'GovTribe';
     case 'fast_track':
-      return 'GDA Fast Track';
+      return 'Envision Fast Track';
     default:
       return source;
   }

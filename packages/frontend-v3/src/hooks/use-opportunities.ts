@@ -79,6 +79,7 @@ export interface UseOpportunitiesPagedParams {
   value_max?: number;
   sources?: string[];
   stage?: string;
+  relevant_only?: boolean;
 }
 
 export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) {
@@ -103,6 +104,7 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         value_max: params.value_max,
         "source[]": params.sources,
         stage: params.stage,
+        relevant_only: params.relevant_only === false ? "false" : undefined,
       }),
     refetchInterval: (query) => {
       const items = query.state.data?.items;
@@ -135,6 +137,7 @@ export function useOpportunitiesInfinite(params: Omit<UseOpportunitiesPagedParam
         value_max: params.value_max,
         "source[]": params.sources,
         stage: params.stage,
+        relevant_only: params.relevant_only === false ? "false" : undefined,
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {

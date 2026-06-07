@@ -37,6 +37,8 @@ export type {
   TeamingFlag,
 } from './types.js';
 
+const ENVISION_NAICS = ['541511', '541512', '541519', '541690'];
+
 const FIELD_SOURCE_TABLES: Record<string, { table: string; fk: string }> = {
   title: { table: 'opportunity_title_sources', fk: 'opportunity_id' },
   agency: { table: 'opportunity_agency_sources', fk: 'opportunity_id' },
@@ -275,6 +277,12 @@ export async function listOpportunities(
     conditions.push(`(grade = 'A')`);
   }
 
+  // C1: default NAICS filter — only show relevant IT/Consulting NAICS unless explicitly disabled
+  if (!filters.naics && filters.relevantOnly !== false) {
+    conditions.push(`naics = ANY($${paramIdx++})`);
+    params.push(ENVISION_NAICS);
+  }
+
   if (filters.cursor) {
     try {
       const decoded = JSON.parse(Buffer.from(filters.cursor, 'base64').toString('utf-8')) as {
@@ -439,6 +447,13 @@ function buildFilterConditions(
   if (filters.hot === '1') {
     conditions.push(`(o.grade = 'A')`);
   }
+
+  // C1: default NAICS filter — only show relevant IT/Consulting NAICS unless explicitly disabled
+  if (!filters.naics && filters.relevantOnly !== false) {
+    conditions.push(`o.naics = ANY($${paramIdx++})`);
+    params.push(ENVISION_NAICS);
+  }
+
   if (filters.sources && filters.sources.length > 0) {
     conditions.push(`o.data_source = ANY($${paramIdx++})`);
     params.push(filters.sources);

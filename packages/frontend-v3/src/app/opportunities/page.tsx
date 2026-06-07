@@ -169,6 +169,7 @@ function OpportunityList() {
   const [valueRange, setValueRange] = useState(0);
   const [dueFilter, setDueFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
+  const [relevantOnly, setRelevantOnly] = useState(true);
   const [stageTab, setStageTab] = useState("all");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSentinelRef = useRef<HTMLDivElement>(null);
@@ -185,9 +186,10 @@ function OpportunityList() {
       due: dueFilter || undefined,
       sources: sourceFilter.length > 0 ? sourceFilter : undefined,
       stage: stageTab !== "all" ? stageTab : undefined,
+      relevant_only: relevantOnly,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab]);
+  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly]);
 
   const {
     data,
@@ -384,6 +386,15 @@ function OpportunityList() {
           selected={sourceFilter}
           onToggle={(v) => toggleArrayFilter(setSourceFilter, v)}
         />
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={relevantOnly}
+            onChange={(e) => setRelevantOnly(e.target.checked)}
+            className="accent-gda-green h-3.5 w-3.5"
+          />
+          <span className="text-[11px] text-muted-foreground whitespace-nowrap">Relevant Only (IT/Consulting)</span>
+        </label>
         {hasActiveFilters && (
           <button
             type="button"
