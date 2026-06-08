@@ -9,6 +9,7 @@ import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../../lib/queue.js';
 import { mirrorOpportunityToUnified } from '../../services/opportunities/unified-mirror.js';
+import { evaluateRelevance } from '../../constants/relevance.js';
 
 function enqueueIngestAnalysis(oppId: string): void {
   try {
@@ -135,15 +136,23 @@ export async function upsertOpportunityWithSources(
     );
     const sourceId = sourceRows[0].id;
 
+    // PR-A4: evaluate relevance before upsert
+    const rel = evaluateRelevance({
+      naics: opp.naics,
+      set_aside: opp.set_aside,
+      response_due_at: opp.response_due_at,
+    });
+
     const { rows: upsertRows } = await client.query(
       `INSERT INTO opportunities (
          title, agency, sub_agency, department, solicitation_number,
          sam_notice_id, status, value_min, value_max, naics, psc,
          set_aside, place_of_performance, response_due_at, posted_at,
          description, data_source, tags, source_id, opportunity_type, source_uri,
-         department_name, agency_name, office, contracting_office, org_path
+         department_name, agency_name, office, contracting_office, org_path,
+         relevance_status, relevance_reason
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
        ON CONFLICT (sam_notice_id) DO UPDATE SET
          title                = EXCLUDED.title,
          agency               = EXCLUDED.agency,
@@ -169,6 +178,8 @@ export async function upsertOpportunityWithSources(
          office               = EXCLUDED.office,
          contracting_office   = EXCLUDED.contracting_office,
          org_path             = EXCLUDED.org_path,
+         relevance_status     = EXCLUDED.relevance_status,
+         relevance_reason     = EXCLUDED.relevance_reason,
          updated_at           = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
@@ -198,6 +209,8 @@ export async function upsertOpportunityWithSources(
         opp.office ?? null,
         opp.contracting_office ?? null,
         opp.org_path ?? null,
+        rel.status,
+        rel.reason,
       ],
     );
 
@@ -293,15 +306,23 @@ export async function upsertExternalOpportunity(
     );
     const sourceId = sourceRows[0].id;
 
+    // PR-A4: evaluate relevance before upsert
+    const rel = evaluateRelevance({
+      naics: opp.naics,
+      set_aside: opp.set_aside,
+      response_due_at: opp.response_due_at,
+    });
+
     const { rows: upsertRows } = await client.query(
       `INSERT INTO opportunities (
          title, agency, sub_agency, department, solicitation_number,
          external_id, status, value_min, value_max, naics, psc,
          set_aside, place_of_performance, response_due_at, posted_at,
          description, data_source, tags, source_id,
-         agency_subtype, opportunity_type, part_number, quantity
+         agency_subtype, opportunity_type, part_number, quantity,
+         relevance_status, relevance_reason
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
        ON CONFLICT (data_source, external_id) WHERE external_id IS NOT NULL DO UPDATE SET
          title                = EXCLUDED.title,
          agency               = EXCLUDED.agency,
@@ -323,6 +344,8 @@ export async function upsertExternalOpportunity(
          opportunity_type     = EXCLUDED.opportunity_type,
          part_number          = EXCLUDED.part_number,
          quantity             = EXCLUDED.quantity,
+         relevance_status     = EXCLUDED.relevance_status,
+         relevance_reason     = EXCLUDED.relevance_reason,
          updated_at           = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
@@ -349,6 +372,8 @@ export async function upsertExternalOpportunity(
         opp.opportunity_type,
         opp.part_number,
         opp.quantity,
+        rel.status,
+        rel.reason,
       ],
     );
 

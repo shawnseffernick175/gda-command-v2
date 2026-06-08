@@ -61,7 +61,8 @@ let workerBossRef: PgBoss | null = null;
 // Pwin deterministic model
 // ────────────────────────────────────────────────────────────────────────────
 
-const ENVISION_SET_ASIDES = new Set(['SDB', 'Small Business', 'SB', 'Minority-Owned', '8(a)']);
+// Set-aside list moved to constants/relevance.ts (PR-A4); re-exported here for pwin scoring.
+import { ENVISION_SET_ASIDES } from '../constants/relevance.js';
 
 function scoreToGrade(score: number): string {
   if (score >= 80) return 'A';
@@ -777,6 +778,7 @@ async function scheduleModelVersionBumpCron(boss: PgBoss): Promise<void> {
       `SELECT id FROM opportunities
        WHERE deleted_at IS NULL
          AND (analysis_version IS NULL OR analysis_version != $1)
+         AND (relevance_status IS NULL OR relevance_status = 'relevant')
        LIMIT 500`,
       [config.analysisVersion],
     );
@@ -821,6 +823,7 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
       `SELECT id FROM opportunities
        WHERE deleted_at IS NULL
          AND (ai_analyzed_at IS NULL OR ai_analyzed_at < NOW() - INTERVAL '24 hours')
+         AND (relevance_status IS NULL OR relevance_status = 'relevant')
        LIMIT 500`,
     );
     for (const row of res.rows) {
