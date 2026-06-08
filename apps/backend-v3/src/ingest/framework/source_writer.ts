@@ -64,6 +64,11 @@ export interface OpportunityRow {
   opportunity_type?: string | null;
   source_uri?: string | null;
   contacts?: MappedContact[];
+  department_name?: string | null;
+  agency_name?: string | null;
+  office?: string | null;
+  contracting_office?: string | null;
+  org_path?: string | null;
 }
 
 export interface SourceCitation {
@@ -135,9 +140,10 @@ export async function upsertOpportunityWithSources(
          title, agency, sub_agency, department, solicitation_number,
          sam_notice_id, status, value_min, value_max, naics, psc,
          set_aside, place_of_performance, response_due_at, posted_at,
-         description, data_source, tags, source_id, opportunity_type, source_uri
+         description, data_source, tags, source_id, opportunity_type, source_uri,
+         department_name, agency_name, office, contracting_office, org_path
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
        ON CONFLICT (sam_notice_id) DO UPDATE SET
          title                = EXCLUDED.title,
          agency               = EXCLUDED.agency,
@@ -158,6 +164,11 @@ export async function upsertOpportunityWithSources(
          source_id            = EXCLUDED.source_id,
          opportunity_type     = EXCLUDED.opportunity_type,
          source_uri           = COALESCE(EXCLUDED.source_uri, opportunities.source_uri),
+         department_name      = EXCLUDED.department_name,
+         agency_name          = EXCLUDED.agency_name,
+         office               = EXCLUDED.office,
+         contracting_office   = EXCLUDED.contracting_office,
+         org_path             = EXCLUDED.org_path,
          updated_at           = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
@@ -182,6 +193,11 @@ export async function upsertOpportunityWithSources(
         sourceId,
         opp.opportunity_type ?? null,
         opp.source_uri ?? null,
+        opp.department_name ?? null,
+        opp.agency_name ?? null,
+        opp.office ?? null,
+        opp.contracting_office ?? null,
+        opp.org_path ?? null,
       ],
     );
 

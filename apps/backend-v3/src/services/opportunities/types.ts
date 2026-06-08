@@ -6,6 +6,11 @@ export interface OpportunityRow {
   agency: string | null;
   department: string | null;
   sub_agency: string | null;
+  department_name: string | null;
+  agency_name: string | null;
+  office: string | null;
+  contracting_office: string | null;
+  org_path: string | null;
   solicitation_number: string | null;
   sam_notice_id: string | null;
   status: string;
@@ -88,6 +93,9 @@ export interface OpportunitySummary {
   agency: string | null;
   agency_sources: SourceRef[];
   department: string | null;
+  agency_name: string | null;
+  office: string | null;
+  contracting_office: string | null;
   naics: string | null;
   naics_sources: SourceRef[];
   set_aside: string | null;
@@ -113,6 +121,7 @@ export interface OpportunitySummary {
 export interface OpportunityDetail extends OpportunitySummary {
   sam_notice_id: string | null;
   sub_agency: string | null;
+  org_path: string | null;
   description: string | null;
   description_sources: SourceRef[];
   posted_at: string | null;

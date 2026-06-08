@@ -800,8 +800,8 @@ function OpportunityRow({
           </div>
         </div>
       </td>
-      <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[140px]">
-        {opp.agency ?? "---"}
+      <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[140px]" title={[opp.department, opp.agency_name, opp.contracting_office].filter(Boolean).join(' > ') || opp.agency || undefined}>
+        {opp.department ?? opp.agency ?? "---"}
       </td>
       <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
         {formatMoney(getEffectiveValue(opp))}
@@ -982,8 +982,10 @@ function OpportunityDetail({ id }: { id: string }) {
 
         {/* Badge strip */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {opp.agency && (
-            <Badge variant="outline" className="text-xs">{opp.agency}</Badge>
+          {(opp.department || opp.agency) && (
+            <Badge variant="outline" className="text-xs">
+              {[opp.department, opp.agency_name, opp.office, opp.contracting_office].filter(Boolean).join(' > ') || opp.agency}
+            </Badge>
           )}
           {opp.naics && (
             <Badge variant="outline" className="text-xs font-mono">NAICS {opp.naics}</Badge>
@@ -1035,6 +1037,10 @@ function OpportunityDetail({ id }: { id: string }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-1.5 text-xs">
+              <MetaRow label="Department" value={opp.department ?? "---"} />
+              <MetaRow label="Agency" value={opp.agency_name ?? opp.agency ?? "---"} />
+              {opp.office && <MetaRow label="Office" value={opp.office} />}
+              {opp.contracting_office && <MetaRow label="Contracting" value={opp.contracting_office} />}
               <MetaRow label="Value" value={formatMoney(opp.value)} mono />
               <MetaRow label="Solicitation" value={opp.solicitation_number ?? "---"} mono />
               <MetaRow label="Posted" value={opp.posted_at ? new Date(opp.posted_at).toLocaleDateString() : "---"} />

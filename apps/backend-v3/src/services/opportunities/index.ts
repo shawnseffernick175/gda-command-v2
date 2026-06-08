@@ -6,6 +6,7 @@ import { pool } from '../../lib/db.js';
 import { resolveFieldSources, type SourceRef } from '../../lib/sources.js';
 import { evaluateTeamingFlags } from './teaming.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
+import { parseFederalOrg } from '../../lib/orgHierarchy.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 import { normalizePipelineStage, ACTIVE_STAGE_KEYS } from '../../lib/pipeline-stage.js';
 import {
@@ -130,7 +131,10 @@ function buildSummaryFromSources(
     title_sources: sources.title_sources ?? [],
     agency: row.agency,
     agency_sources: sources.agency_sources ?? [],
-    department: row.department ?? mapAgencyToDepartment(row.agency),
+    department: row.department_name ?? mapAgencyToDepartment(row.agency),
+    agency_name: row.agency_name ?? row.agency ?? null,
+    office: row.office ?? null,
+    contracting_office: row.contracting_office ?? null,
     naics: row.naics,
     naics_sources: sources.naics_sources ?? [],
     set_aside: row.set_aside,
@@ -213,6 +217,7 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
     ...summary,
     sam_notice_id: row.sam_notice_id,
     sub_agency: row.sub_agency,
+    org_path: row.org_path ?? null,
     description: row.description,
     description_sources: sources.description_sources ?? [],
     posted_at: row.posted_at,
@@ -620,13 +625,18 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
   const sourceId = sourceRes.rows[0]!.id;
 
   const department = mapAgencyToDepartment(input.agency);
+  const parsed = parseFederalOrg({
+    agency: input.agency,
+    sub_agency: input.sub_agency,
+  });
 
   const res = await pool.query<OpportunityRow>(
     `INSERT INTO opportunities (
       title, agency, sub_agency, sam_notice_id, naics, description,
       set_aside, response_due_at, posted_at, value_min, value_max,
-      data_source, source_id, status, department
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery', $14)
+      data_source, source_id, status, department,
+      department_name, agency_name, office, contracting_office, org_path
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery', $14, $15, $16, $17, $18, $19)
     RETURNING *`,
     [
       input.title,
@@ -643,6 +653,11 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
       input.source,
       sourceId,
       department,
+      parsed.department_name,
+      parsed.agency_name,
+      parsed.office,
+      parsed.contracting_office,
+      parsed.org_path,
     ],
   );
 
@@ -712,10 +727,22 @@ export async function updateOpportunity(
     }
   }
 
-  // Re-map department when agency changes
+  // Re-map department + org hierarchy when agency changes
   if (agencyValue !== undefined) {
     setClauses.push(`department = $${paramIdx++}`);
     params.push(mapAgencyToDepartment(agencyValue));
+    const subAgValue = (input.sub_agency as string | undefined);
+    const parsed = parseFederalOrg({ agency: agencyValue, sub_agency: subAgValue });
+    setClauses.push(`department_name = $${paramIdx++}`);
+    params.push(parsed.department_name);
+    setClauses.push(`agency_name = $${paramIdx++}`);
+    params.push(parsed.agency_name);
+    setClauses.push(`office = $${paramIdx++}`);
+    params.push(parsed.office);
+    setClauses.push(`contracting_office = $${paramIdx++}`);
+    params.push(parsed.contracting_office);
+    setClauses.push(`org_path = $${paramIdx++}`);
+    params.push(parsed.org_path);
   }
 
   setClauses.push(`updated_at = NOW()`);
