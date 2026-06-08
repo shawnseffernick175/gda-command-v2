@@ -486,3 +486,39 @@ All 5 make-it-work PRs shipped, deployed, verified live:
 - PR-A5 #756 org hierarchy normalization (#29) - DONE
 Remaining: #30 clickability gaps = Track B (P1, next).
 DEFERRED follow-ups: (1) full db/v3 vs apps/backend-v3 migration-dir reconcile (audited); (2) backfill-org-hierarchy.ts OFFSET-pagination single-pass fix.
+
+---
+
+## TRACK B — Clickability (#30) — IN PROGRESS (2026-06-08)
+
+Full clickability audit done across all 16 files containing `cursor-pointer`. Result:
+all table rows, tiles, toggles, range inputs, file-upload labels/dropzones, and KPI links
+already have real handlers or <Link>. Only dead-click: SourceChip real-without-url fallthrough
+<span> inherits cursor-pointer/hover. Plus org breadcrumbs are display-only text that should
+be clickable (pairs with PR-A5 org columns). Note: components/OpportunityCard.tsx is defined
+but never imported (dead code) - left alone.
+
+### PR-B1 (spec: 2026-06-08_devin-spec_PR-B1_clickability.md)
+- Change 1: SourceChip - split `real` style into clickable (cursor-pointer+hover, used by <a>)
+  vs static (no pointer/hover, used by span when no url).
+- Change 2: opportunities/page.tsx - agency/org breadcrumbs click-to-filter via existing
+  agencyFilter -> `agency` query param. Three surfaces: list table cell (no stopProp needed),
+  detail badge strip (multi-segment buttons, back-to-list), compact card-grid row (needs
+  e.stopPropagation - parent div navigates).
+- Change 3: global convention only (no new lint/CI rule this PR - out of scope).
+- Devin session: devin-61edaddf286a440ea68e0715522fc02c (launched 2026-06-08).
+- Status: building. main HEAD before B1 = 412d5e7.
+
+### PR-B1 #759 — MERGED + DEPLOYED + VERIFIED (2026-06-08)
+- CI: 26/26 green. Diff in-scope: only source-chip.tsx + opportunities/page.tsx.
+- SourceChip: real base style stripped of cursor-pointer/hover; clickableReal appended ONLY
+  to the <a> branch (url present). Dead-click on real-without-url eliminated.
+- opportunities/page.tsx: agency click-to-filter on (a) list table cell (agency_name>department>agency),
+  (b) compact card-grid row (with e.stopPropagation), (c) detail badge multi-segment breadcrumb
+  (navigates to /opportunities?agency=<seg>). agencyFilter inits from ?agency searchParam; clear-filters
+  strips ?agency to avoid stale re-apply.
+- Merged: gh pr merge 759 --squash --admin --delete-branch. main HEAD = 0fc95e4.
+- Deployed: VPS reset to 0fc95e4, built+recreated frontend-v3 only (frontend-only change). Container
+  Up healthy. Live routes 200: /, /opportunities, /opportunities?agency=... deeplink resolves.
+- Devin session: devin-61edaddf286a440ea68e0715522fc02c (DONE).
+- TRACK B COMPLETE.
