@@ -60,7 +60,7 @@ describe('enrichContactsBatch', () => {
     expect(result.contacts_enriched).toBeGreaterThanOrEqual(2);
 
     // Verify both rows now have non-null ai_profile and ai_ran_at
-    const { rows } = await pool.query<{ name: string; ai_profile: unknown; ai_ran_at: Date | null }>(
+    const { rows } = await pool.query<{ name: string; ai_profile: { model_used?: string } | null; ai_ran_at: Date | null }>(
       `SELECT name, ai_profile, ai_ran_at
        FROM govtribe_contacts
        WHERE source_label = 'integration-test' AND name IN ('Alice Enrich-Test', 'Bob Enrich-Test')
@@ -71,6 +71,10 @@ describe('enrichContactsBatch', () => {
     for (const row of rows) {
       expect(row.ai_profile).not.toBeNull();
       expect(row.ai_ran_at).not.toBeNull();
+      // Provenance must reflect the router-resolved model ('mock-model'),
+      // NOT the model the LLM self-reported inside its JSON (mock embeds 'mock').
+      // Guards the #23 fix so the stale self-reported label can't return.
+      expect(row.ai_profile?.model_used).toBe('mock-model');
     }
   });
 
