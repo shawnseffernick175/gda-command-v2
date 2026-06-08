@@ -410,21 +410,27 @@ CREATE TABLE action_items (
   id              BIGSERIAL     PRIMARY KEY,
   title           TEXT          NOT NULL,
   body            TEXT,
+  detail          TEXT,                        -- v3 service detail column (parallel to legacy body)
   owner_email     TEXT          NOT NULL,      -- individual accountability (not committee)
+  owner           TEXT,                        -- v3 service owner column (synced with owner_email)
   status          TEXT          NOT NULL DEFAULT 'open'
-                                CHECK (status IN ('open', 'done', 'blocked')),
+                                CHECK (status IN ('open', 'in_progress', 'done', 'blocked')),
   priority        TEXT          NOT NULL DEFAULT 'normal'
-                                CHECK (priority IN ('critical', 'high', 'normal', 'low')),
+                                CHECK (priority IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW',
+                                                    'critical', 'high', 'normal', 'low')),
   due_date        TIMESTAMPTZ,
   origin          TEXT          NOT NULL DEFAULT 'manual'
                                 CHECK (origin IN ('email', 'manual', 'sentinel', 'launchpad', 'n8n')),
   origin_ref      TEXT,                        -- reference ID from the origin system
+  source          TEXT,                        -- v3 service source column (parallel to legacy origin)
   opportunity_id  BIGINT        REFERENCES opportunities(id),
   partner_context TEXT,                        -- e.g., "ask Angela about SHIELD task order capacity"
   source_type     TEXT,                        -- F-611: auto-gen source type (opportunity|risk|award|capture)
   is_auto         BOOLEAN       NOT NULL DEFAULT FALSE,  -- F-611: TRUE for system-generated items
   assignee_id     BIGINT        REFERENCES users(id),    -- F-611: assigned user for the action item
-  source_id       BIGINT        NOT NULL REFERENCES sources(id),
+  linked_record_type TEXT,                     -- v3: entity type for linked record (mirrors source_type)
+  linked_record_id   TEXT,                     -- v3: entity id for linked record (text, avoids legacy bigint FK)
+  source_id       BIGINT        REFERENCES sources(id),  -- nullable after v3_062 (v3 uses linked_record_id)
   created_by      BIGINT        REFERENCES users(id),
   completed_at    TIMESTAMPTZ,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -441,8 +447,11 @@ CREATE INDEX idx_actions_source      ON action_items (source_id);
 | Column | Purpose |
 |---|---|
 | `owner_email` | Individual owner — Doctrine "Relentless Execution" forbids committee-owned items |
-| `status` | Lifecycle: `open` → `done` / `blocked` |
-| `priority` | Triage level for launchpad sorting |
+| `owner` | v3 service owner column (synced with `owner_email` on write) |
+| `detail` | v3 service detail text (parallel to legacy `body`) |
+| `source` | v3 service source label (parallel to legacy `origin`) |
+| `status` | Lifecycle: `open` → `in_progress` → `done` / `blocked` |
+| `priority` | Triage level for launchpad sorting (accepts UPPER and lower case) |
 | `origin` | How the item was created: email drag, manual, sentinel alert, launchpad flag, n8n workflow |
 | `origin_ref` | Back-reference to the originating email/alert/flag ID |
 | `opportunity_id` | Optional FK linking the action item to a specific opportunity |
@@ -450,7 +459,9 @@ CREATE INDEX idx_actions_source      ON action_items (source_id);
 | `source_type` | F-611: auto-gen source type (`opportunity`, `risk`, `award`, `capture`) |
 | `is_auto` | F-611: `TRUE` for system-generated items, `FALSE` for manual |
 | `assignee_id` | F-611: FK to `users(id)` — assigned user for the action item |
-| `source_id` | **R1 FK** — cites the source of the action item |
+| `linked_record_type` | v3: entity type for linked record (mirrors `source_type`) |
+| `linked_record_id` | v3: text entity id for linked record (avoids legacy bigint `source_id` FK) |
+| `source_id` | **R1 FK** — cites the source of the action item (nullable after v3_062) |
 
 **Indexes:** Partial indexes on `status != 'done'` — active items are the hot set. Due date index supports launchpad "overdue items" queries.
 

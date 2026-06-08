@@ -151,8 +151,8 @@ export async function createActionItem(
   const now = new Date().toISOString();
 
   const res = await pool.query<ActionItemRow>(
-    `INSERT INTO action_items (title, detail, owner, status, priority, due_date, source, source_type, is_auto, assignee_id, linked_record_type, linked_record_id, created_at, updated_at)
-     VALUES ($1, $2, $3, 'open', $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
+    `INSERT INTO action_items (title, detail, owner, owner_email, status, priority, due_date, source, source_type, is_auto, assignee_id, linked_record_type, linked_record_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $3, 'open', $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
      RETURNING *`,
     [
       input.title.trim(),
@@ -219,7 +219,8 @@ export async function updateActionItem(
     await logAudit(id, 'status', row.status, input.status, actor);
   }
   if (input.owner !== undefined) {
-    sets.push(`owner = $${idx++}`);
+    sets.push(`owner = $${idx}`);
+    sets.push(`owner_email = $${idx++}`);
     vals.push(input.owner.trim());
     await logAudit(id, 'owner', row.owner, input.owner.trim(), actor);
   }
