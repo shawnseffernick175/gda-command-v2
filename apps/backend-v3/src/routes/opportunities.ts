@@ -16,7 +16,7 @@
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config/index.js';
 import { pool } from '../lib/db.js';
-import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js';
+import { requireBoss, QUEUE_NAMES, ANALYSIS_PRIORITY, type AnalysisJobData } from '../lib/queue.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { analysisCacheHits, analysisTimeoutCount } from '../lib/metrics.js';
 import { logger } from '../lib/logger.js';
@@ -87,21 +87,27 @@ async function waitForAnalysis(
 function enqueueAnalysis(id: string, trigger: AnalysisJobData['trigger']): void {
   try {
     const boss = requireBoss();
+    const isUserTriggered = trigger === 'detail-endpoint' || trigger === 'manual';
     const jobData: AnalysisJobData = {
       entityType: 'opportunity',
       entityId: id,
-      priority: trigger === 'detail-endpoint' ? 'high' : 'normal',
+      priority: isUserTriggered ? 'high' : 'normal',
       trigger,
     };
+    const priority = trigger === 'detail-endpoint'
+      ? ANALYSIS_PRIORITY.USER_DETAIL
+      : trigger === 'manual'
+        ? ANALYSIS_PRIORITY.USER_MANUAL
+        : ANALYSIS_PRIORITY.BACKFILL;
     void boss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, jobData, {
-      priority: trigger === 'detail-endpoint' ? 1 : 5,
+      priority,
       retryLimit: 3,
       retryDelay: 5,
       retryBackoff: true,
       singletonKey: `opp-${id}`,
     });
   } catch {
-    // pg-boss not initialized (e.g., during tests) — swallow
+    // pg-boss not initialized (e.g., during tests) -- swallow
   }
 }
 
@@ -798,6 +804,67 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(202).send(
       successEnvelope({ queued: true, opportunity_id: id, message: 'Analysis enqueued' }, req.requestId),
     );
+  });
+
+  // GET /v3/opportunities/:id/analysis-status -- poll endpoint for frontend thinking state
+  app.get<{ Params: { id: string } }>('/v3/opportunities/:id/analysis-status', async (req, reply) => {
+    const { id } = req.params;
+
+    const oppRes = await pool.query<{
+      llm_analysis: unknown;
+      llm_error_kind: string | null;
+      ai_analyzed_at: string | null;
+    }>(
+      `SELECT
+         (analysis->>'llm_analysis') IS NOT NULL AS has_llm_raw,
+         analysis->'llm_analysis' AS llm_analysis,
+         analysis->>'llm_error_kind' AS llm_error_kind,
+         ai_analyzed_at::text AS ai_analyzed_at
+       FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+
+    if (oppRes.rows.length === 0) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+    }
+
+    const opp = oppRes.rows[0]!;
+    const hasLlmAnalysis = opp.llm_analysis != null && opp.llm_analysis !== 'null';
+    const llmErrorKind = opp.llm_error_kind ?? null;
+    const analyzedAt = opp.ai_analyzed_at ?? null;
+
+    // Check if there is a pending/active pg-boss job for this opp
+    let jobActive = false;
+    try {
+      const jobRes = await pool.query<{ cnt: string }>(
+        `SELECT count(*)::text AS cnt FROM pgboss.job
+         WHERE name = $1
+           AND state IN ('created', 'retry', 'active')
+           AND singleton_key = $2`,
+        [QUEUE_NAMES.ANALYSIS_OPPORTUNITY, `opp-${id}`],
+      );
+      jobActive = Number(jobRes.rows[0]?.cnt ?? 0) > 0;
+    } catch {
+      // pgboss schema may not exist in some test envs
+    }
+
+    let state: 'idle' | 'analyzing' | 'done' | 'error';
+    if (jobActive) {
+      state = 'analyzing';
+    } else if (llmErrorKind) {
+      state = 'error';
+    } else if (hasLlmAnalysis && analyzedAt) {
+      state = 'done';
+    } else {
+      state = 'idle';
+    }
+
+    return reply.status(200).send(successEnvelope({
+      state,
+      has_llm_analysis: hasLlmAnalysis,
+      llm_error_kind: llmErrorKind,
+      analyzed_at: analyzedAt,
+    }, req.requestId));
   });
 
   // POST /v3/opportunities/:id/outcome — record win/loss/no_bid outcome for pWin feedback

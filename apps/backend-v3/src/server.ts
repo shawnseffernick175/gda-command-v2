@@ -1,7 +1,7 @@
 import { buildApp } from './app.js';
 import { config } from './config/index.js';
 import { logger } from './lib/logger.js';
-import { initBoss, stopBoss, requireBoss, QUEUE_NAMES, type AnalysisJobData } from './lib/queue.js';
+import { initBoss, stopBoss, requireBoss, QUEUE_NAMES, ANALYSIS_PRIORITY, type AnalysisJobData } from './lib/queue.js';
 import { startWorker } from './workers/analysis.js';
 import { startSoakDigestWorker } from './workers/soak-digest.js';
 import { subscribeFastTrack } from './workers/fast-track.js';
@@ -53,6 +53,20 @@ async function main(): Promise<void> {
 }
 
 async function backfillAnalysis(): Promise<void> {
+  const boss = requireBoss();
+
+  // Throttle: skip if backlog already large
+  const backlogRes = await pool.query<{ cnt: string }>(
+    `SELECT count(*)::text AS cnt FROM pgboss.job
+     WHERE name = $1 AND state IN ('created', 'retry')`,
+    [QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
+  );
+  const backlog = Number(backlogRes.rows[0]?.cnt ?? 0);
+  if (backlog > 1000) {
+    logger.info({ backlog }, 'F-605 backfill skipped - backlog exceeds threshold');
+    return;
+  }
+
   const res = await pool.query<{ id: string }>(
     `SELECT id FROM opportunities
      WHERE deleted_at IS NULL
@@ -65,7 +79,6 @@ async function backfillAnalysis(): Promise<void> {
 
   logger.info({ count: res.rows.length }, 'F-605 backfill: enqueueing stale/missing analysis');
 
-  const boss = requireBoss();
   for (const row of res.rows) {
     const jobData: AnalysisJobData = {
       entityType: 'opportunity',
@@ -74,7 +87,7 @@ async function backfillAnalysis(): Promise<void> {
       trigger: 'backfill',
     };
     void boss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, jobData, {
-      priority: 10,
+      priority: ANALYSIS_PRIORITY.BACKFILL,
       retryLimit: 3,
       retryDelay: 5,
       retryBackoff: true,

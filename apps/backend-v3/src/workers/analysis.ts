@@ -28,7 +28,7 @@ import PgBoss from 'pg-boss';
 import pg from 'pg';
 import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
-import { QUEUE_NAMES, registerQueues, type AnalysisJobData } from '../lib/queue.js';
+import { QUEUE_NAMES, ANALYSIS_PRIORITY, registerQueues, type AnalysisJobData } from '../lib/queue.js';
 import type { SourceRef } from '../lib/sources.js';
 import {
   buildStubDraftText,
@@ -760,6 +760,19 @@ async function scheduleModelVersionBumpCron(boss: PgBoss): Promise<void> {
   });
   await boss.work<Record<string, unknown>>(QUEUE_NAMES.ANALYSIS_MODEL_VERSION_SWEEP, { batchSize: 1 }, async () => {
     logger.info('Running model version bump sweep');
+
+    // Throttle: skip if backlog already large
+    const backlogRes = await pool.query<{ cnt: string }>(
+      `SELECT count(*)::text AS cnt FROM pgboss.job
+       WHERE name = $1 AND state IN ('created', 'retry')`,
+      [QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
+    );
+    const backlog = Number(backlogRes.rows[0]?.cnt ?? 0);
+    if (backlog > 1000) {
+      logger.info({ backlog }, 'Model version sweep skipped - backlog exceeds threshold');
+      return;
+    }
+
     const res = await pool.query<{ id: string }>(
       `SELECT id FROM opportunities
        WHERE deleted_at IS NULL
@@ -774,7 +787,7 @@ async function scheduleModelVersionBumpCron(boss: PgBoss): Promise<void> {
         priority: 'normal' as const,
         trigger: 'model-version-bump' as const,
       }, {
-        priority: 10,
+        priority: ANALYSIS_PRIORITY.BACKFILL,
         retryLimit: 3,
         retryDelay: 5,
         retryBackoff: true,
@@ -791,6 +804,19 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
   });
   await boss.work<Record<string, unknown>>(QUEUE_NAMES.ANALYSIS_PERIODIC_REFRESH, { batchSize: 1 }, async () => {
     logger.info('Running 24h periodic refresh sweep');
+
+    // Throttle: skip if backlog already large
+    const backlogRes = await pool.query<{ cnt: string }>(
+      `SELECT count(*)::text AS cnt FROM pgboss.job
+       WHERE name = $1 AND state IN ('created', 'retry')`,
+      [QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
+    );
+    const backlog = Number(backlogRes.rows[0]?.cnt ?? 0);
+    if (backlog > 1000) {
+      logger.info({ backlog }, 'Periodic refresh sweep skipped - backlog exceeds threshold');
+      return;
+    }
+
     const res = await pool.query<{ id: string }>(
       `SELECT id FROM opportunities
        WHERE deleted_at IS NULL
@@ -804,7 +830,7 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
         priority: 'normal' as const,
         trigger: 'periodic-refresh' as const,
       }, {
-        priority: 10,
+        priority: ANALYSIS_PRIORITY.SWEEP,
         retryLimit: 3,
         retryDelay: 5,
         retryBackoff: true,
@@ -882,6 +908,24 @@ export async function startWorker(): Promise<PgBoss> {
   workerBossRef = boss;
 
   await registerQueues(boss);
+
+  // Reclaim zombie active jobs stuck longer than 10 minutes
+  try {
+    const reclaimRes = await pool.query(
+      `UPDATE pgboss.job
+       SET state = 'created', started_on = NULL, retry_count = retry_count
+       WHERE name = $1
+         AND state = 'active'
+         AND started_on < NOW() - INTERVAL '10 minutes'`,
+      [QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
+    );
+    const reclaimed = reclaimRes.rowCount ?? 0;
+    if (reclaimed > 0) {
+      logger.info({ reclaimed }, 'Reclaimed zombie active analysis jobs on startup');
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Failed to reclaim zombie jobs on startup (non-critical)');
+  }
 
   logger.info({ queues: Object.values(QUEUE_NAMES) }, 'Worker pg-boss started, queues registered');
 

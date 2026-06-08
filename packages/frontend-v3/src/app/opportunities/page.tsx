@@ -1013,7 +1013,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
           {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending || (analyzeOpp.isSuccess && analyzeOpp.data != null && "queued" in analyzeOpp.data)} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={opp.llm_error_kind} />
+          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} />
 
           {/* Competitive Intelligence */}
           <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
@@ -1177,22 +1177,36 @@ function DecisionBriefPanel({
           </CardTitle>
         </CardHeader>
         <CardContent className="text-center py-6">
-          <p className="text-xs text-muted-foreground mb-3 font-mono">
-            {analyzing ? "Analysis queued — refreshing shortly..." : "Analysis pending"}
-          </p>
-          {llmErrorKind && !analyzing && (
-            <p className="text-[11px] text-muted-foreground/60 mb-2 font-mono">
-              {llmErrorKind}
-            </p>
-          )}
-          {!analyzing && (
-            <button
-              type="button"
-              onClick={onAnalyze}
-              className="rounded border border-gda-green/40 px-3 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/10 transition-colors"
-            >
-              Run Analysis
-            </button>
+          {analyzing ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded-full bg-gda-cyan animate-pulse" />
+                <p className="text-xs text-gda-cyan font-mono font-semibold">
+                  Analyzing... (thinking)
+                </p>
+              </div>
+              <p className="text-[11px] text-muted-foreground/60 font-mono">
+                AI analysis in progress - results will appear shortly
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground mb-3 font-mono">
+                Analysis pending
+              </p>
+              {llmErrorKind && (
+                <p className="text-[11px] text-gda-red/80 mb-2 font-mono">
+                  Error: {llmErrorKind}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={onAnalyze}
+                className="rounded border border-gda-green/40 px-3 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/10 transition-colors"
+              >
+                Run Analysis
+              </button>
+            </>
           )}
         </CardContent>
       </Card>
