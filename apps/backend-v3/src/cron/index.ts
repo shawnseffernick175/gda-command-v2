@@ -29,6 +29,7 @@ import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
+import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
 import { runDigestRefresh } from './digest-refresh.js';
 import { runDailyBriefingCron } from './daily-briefing.js';
@@ -115,6 +116,19 @@ export function startCronScheduler(): void {
   });
   tasks.push(briefingDeliveryTask);
   logger.info({ schedule: '0 11 * * 1-5' }, '[cron] registered: briefing.delivery (0 11 * * 1-5)');
+
+  // PWin batch scoring — daily at 01:00 UTC (before retrain at 02:00 and action-items at 06:30)
+  const pwinBatchScoreTask = cron.schedule('0 1 * * *', async () => {
+    try {
+      logger.info('[cron] pwin.batch-score starting');
+      await batchScoreOpportunities();
+      logger.info('[cron] pwin.batch-score completed');
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_pwin_batch_score_error');
+    }
+  });
+  tasks.push(pwinBatchScoreTask);
+  logger.info({ schedule: '0 1 * * *' }, '[cron] registered: pwin.batch-score (0 1 * * *)');
 
   // Action items auto-generation — every 6 hours
   const actionItemsGenTask = cron.schedule('30 */6 * * *', async () => {

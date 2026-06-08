@@ -50,6 +50,16 @@ const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_i
   'dod_rss': { source: 'dod_rss', field: 'external_id' },
 };
 
+/**
+ * Derive the unified link source + native id from a legacy opportunity row.
+ * Exported so batch-score can resolve the unified row for pwin writes.
+ */
+export function resolveUnifiedLink(
+  legacy: Pick<LegacyOpportunityRow, 'data_source' | 'sam_notice_id' | 'govtribe_id' | 'external_id'>,
+): { source: string; source_native_id: string } | null {
+  return resolveLink(legacy as LegacyOpportunityRow);
+}
+
 function resolveLink(legacy: LegacyOpportunityRow): { source: string; source_native_id: string } | null {
   const mapping = DATA_SOURCE_TO_LINK[legacy.data_source];
   if (!mapping) return null;
