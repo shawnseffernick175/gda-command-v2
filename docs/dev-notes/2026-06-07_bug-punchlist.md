@@ -538,3 +538,47 @@ but never imported (dead code) - left alone.
   "Scanned 500/1000/1200 (updated=1200), Done. Total updated: 1200" -> null_dept back to 0.
   Spot-check confirmed clean repopulation (DoD/DLA/VA hierarchy). Test fully reversible.
 - Status: RESOLVED. (Deferred #1 = full migration-dir reconcile remains open.)
+
+---
+
+## DEFERRED #1 RESOLVED - migration-directory reconcile (PR #761, 2026-06-08)
+ROOT CAUSE (fully diagnosed):
+- Two parallel migration systems exist:
+  1. Runner system: apps/backend-v3/migrations + src/lib/migrate.ts + pgmigrations table.
+     Used by Docker entrypoint.sh on every container start. THIS IS WHAT ACTUALLY RUNS NOW.
+  2. Legacy system: db/v3/migrations + db/v3/migrate.ts + v3_schema_migrations table.
+     Used by old scripts/deploy-prod.sh + some CI integration tests.
+- Runner dir had only 49 tracked .sql files, but live pgmigrations ledger = 74 applied.
+- The 25 missing files existed only in db/v3/migrations AND as UNTRACKED files on the VPS
+  runner dir (manually copied onto the box, never committed). That is how the live container
+  got all 74 and applied them.
+- IMPACT: a fresh container build (built only from committed apps/backend-v3/migrations) would
+  be MISSING 25 migrations (risks, financials, govtribe_contacts, vault_documents,
+  contract_vehicles, digest tables, etc). Disaster-recovery / fresh-env hazard.
+
+VERIFICATION done before fix:
+- All 32 shared files byte-identical across dirs (no content drift).
+- The 25 missing files in db/v3/migrations are BYTE-IDENTICAL to what the live container ran
+  (diffed against running container's /app/apps/backend-v3/migrations).
+- Applied order == filename-sorted order == union set == live ledger (74 names, no gaps/extras).
+- node-pg-migrate keys on migration NAME in pgmigrations; all 74 names already present on prod,
+  so re-adding files will NOT re-run them.
+
+FIX (PR #761): copied the 25 missing files into apps/backend-v3/migrations (pure addition).
+- Validated on a throwaway Postgres on the VPS: applied all 74 from scratch ->
+  "Applied 74 migration(s). Current version: v3_066_relevance_gate"; re-run "No migrations to run!";
+  105 tables; confirmed risks/govtribe_contacts/vault_documents/contract_vehicles/financial_plan/
+  financial_actuals/digest_cache/gao_decisions all exist. Test DB torn down.
+- CI: 18/18 functional checks pass incl Schema Migration Dry-Run, Migration Parity Check,
+  V3 Migration Smoke Test, Compose Drift, V3 Drift Detector. (Devin Review advisory bot was the
+  only pending item; not a merge gate.) Merged squash-admin. main HEAD = 039c43c.
+- Deployed: VPS git clean'd the untracked copies + reset to main (now 74 TRACKED), rebuilt+recreated
+  backend-v3. Entrypoint migration = "No migrations to run!" (clean no-op). New image has 74 files.
+  Live pgmigrations still 74. Backend healthy. Frontend 200, opportunities API 200.
+- Status: RESOLVED. Runner dir is now self-sufficient and reproduces the full live schema.
+
+REMAINING NOTE (minor, optional): db/v3/migrations (legacy, 63 files) and v3_schema_migrations
+table (79 rows) still exist for the legacy deploy-prod.sh path + integration tests. They are not
+on the live container deploy path. A future cleanup could deprecate the legacy system entirely,
+but that is NOT required for correctness and carries its own risk (CI tests reference it). Left
+as-is intentionally.
