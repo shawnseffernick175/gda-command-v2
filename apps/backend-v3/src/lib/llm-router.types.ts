@@ -36,7 +36,8 @@ export type Task =
   | 'match_analysis'
   | 'vault_document_parse'
   | 'vault_smart_route'
-  | 'digest_lead';
+  | 'digest_lead'
+  | 'competitor_contact_discovery';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -179,6 +180,29 @@ export interface SourceResearchInput {
   query: string;
   context: string | null;
   max_sources: number;
+}
+
+export interface CompetitorContactDiscoveryInput {
+  competitor_name: string;
+  agencies: string[];
+  naics: string[];
+  max_contacts: number;
+}
+
+export interface DiscoveredContact {
+  name: string;
+  title: string | null;
+  company: string;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  source_url: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface CompetitorContactDiscoveryOutput {
+  contacts: DiscoveredContact[];
+  sources_consulted: number;
 }
 
 export interface BlackHatAnalysisInput {
@@ -666,6 +690,7 @@ export interface TaskInputMap {
   vault_document_parse: VaultDocumentParseInput;
   vault_smart_route: VaultSmartRouteInput;
   digest_lead: DigestLeadInput;
+  competitor_contact_discovery: CompetitorContactDiscoveryInput;
 }
 
 export interface TaskOutputMap {
@@ -686,6 +711,7 @@ export interface TaskOutputMap {
   vault_document_parse: VaultDocumentParseOutput;
   vault_smart_route: VaultSmartRouteOutput;
   digest_lead: DigestLeadOutput;
+  competitor_contact_discovery: CompetitorContactDiscoveryOutput;
 }
 
 // ---------------------------------------------------------------------------

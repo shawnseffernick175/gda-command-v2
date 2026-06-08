@@ -19,6 +19,7 @@ import type {
   QualityFlag,
   SemanticEmbedInput,
   SourceResearchInput,
+  CompetitorContactDiscoveryInput,
 } from './llm-router.types.js';
 import { getRoutingEntry } from './llm-router.table.js';
 import { DEFAULT_RETRY_POLICY, withRetry, classifyError } from './llm-router.retry.js';
@@ -106,11 +107,25 @@ async function callProvider(
   }
 
   if (provider === 'perplexity') {
-    const researchInput = input as SourceResearchInput;
+    let systemPrompt: string;
+    let userContent: string;
+
+    if (task === 'competitor_contact_discovery') {
+      const ccdInput = input as CompetitorContactDiscoveryInput;
+      systemPrompt = 'You are a defense-industry business-development researcher. Given a competitor company and the agencies/NAICS where it wins federal contracts, find REAL, currently-employed people at that company relevant to federal business development, capture, or program management (e.g., VP Business Development, Capture Manager, Program Director, Group President). Return ONLY people you can support with a real, citable web source. NEVER invent a name, title, or email. Return strict JSON matching CompetitorContactDiscoveryOutput: contacts (array of {name, title, company, email, phone, linkedin_url, source_url, confidence}), sources_consulted. Every contact MUST include a real source_url. If you cannot find a real person, return an empty contacts array.';
+      userContent = `Company: ${ccdInput.competitor_name}\nWins in agencies: ${ccdInput.agencies.join(', ')}\nNAICS: ${ccdInput.naics.join(', ')}\nReturn up to ${ccdInput.max_contacts} contacts.`;
+    } else {
+      const researchInput = input as SourceResearchInput;
+      systemPrompt = 'You are a research assistant. Find relevant government contracting sources and return structured findings. Return JSON matching SourceResearchOutput: findings (array of {title, url, snippet, relevance_score}), summary, sources_consulted count.';
+      userContent = researchInput.context
+        ? `Query: ${researchInput.query}\nContext: ${researchInput.context}`
+        : `Query: ${researchInput.query}`;
+    }
+
     const result = await callPerplexity({
       model,
-      query: researchInput.query,
-      context: researchInput.context,
+      systemPrompt,
+      userContent,
       timeout_ms: timeoutMs,
     });
     const parsed = parseJsonResponse(result.text);

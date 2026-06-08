@@ -16,28 +16,26 @@ export interface PerplexityCallResult {
 }
 
 /**
- * Call Perplexity sonar-pro for source research.
+ * Call Perplexity sonar-pro.
  * Throws if PERPLEXITY_API_KEY is missing (only at call time, not startup).
  */
 export async function callPerplexity(opts: {
   model: string;
-  query: string;
-  context: string | null;
+  systemPrompt: string;
+  userContent: string;
   timeout_ms: number;
 }): Promise<PerplexityCallResult> {
   const apiKey = process.env['PERPLEXITY_API_KEY'];
   if (!apiKey) {
     throw Object.assign(
-      new Error('PERPLEXITY_API_KEY not configured — source_research unavailable'),
+      new Error('PERPLEXITY_API_KEY not configured — perplexity tasks unavailable'),
       { status: 401, __routerNoRetry: true }
     );
   }
 
-  const systemContent = 'You are a research assistant. Find relevant government contracting sources and return structured findings. Return JSON matching SourceResearchOutput: findings (array of {title, url, snippet, relevance_score}), summary, sources_consulted count.';
+  const systemContent = opts.systemPrompt;
 
-  const userContent = opts.context
-    ? `Query: ${opts.query}\nContext: ${opts.context}`
-    : `Query: ${opts.query}`;
+  const userContent = opts.userContent;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeout_ms);
