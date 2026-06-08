@@ -1,6 +1,5 @@
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
-import { v4 as uuidv4 } from 'uuid';
 
 export type ActionItemStatus = 'open' | 'in_progress' | 'done';
 
@@ -149,36 +148,33 @@ export async function createActionItem(
     );
   }
 
-  const id = uuidv4();
   const now = new Date().toISOString();
 
   const res = await pool.query<ActionItemRow>(
-    `INSERT INTO action_items (id, title, detail, owner, status, priority, due_date, source, source_id, source_type, is_auto, assignee_id, linked_record_type, linked_record_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+    `INSERT INTO action_items (title, detail, owner, owner_email, status, priority, due_date, source, source_type, is_auto, assignee_id, linked_record_type, linked_record_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $3, 'open', $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)
      RETURNING *`,
     [
-      id,
       input.title.trim(),
       input.detail?.trim() ?? null,
       input.owner.trim(),
       input.priority ?? 'MEDIUM',
       input.due_date ?? null,
       input.source ?? 'manual',
-      input.source_id ?? null,
       input.source_type ?? null,
       input.is_auto ?? false,
       input.assignee_id ?? null,
-      input.linked_record_type ?? null,
-      input.linked_record_id ?? null,
+      input.linked_record_type ?? input.source_type ?? null,
+      input.linked_record_id ?? input.source_id ?? null,
       now,
     ]
   );
 
   const row = res.rows[0]!;
 
-  await logAudit(id, 'status', null, 'open', actor);
+  await logAudit(row.id, 'status', null, 'open', actor);
 
-  logger.info({ actionItemId: id, actor }, 'Action item created');
+  logger.info({ actionItemId: row.id, actor }, 'Action item created');
   return row;
 }
 
@@ -223,7 +219,8 @@ export async function updateActionItem(
     await logAudit(id, 'status', row.status, input.status, actor);
   }
   if (input.owner !== undefined) {
-    sets.push(`owner = $${idx++}`);
+    sets.push(`owner = $${idx}`);
+    sets.push(`owner_email = $${idx++}`);
     vals.push(input.owner.trim());
     await logAudit(id, 'owner', row.owner, input.owner.trim(), actor);
   }
@@ -440,7 +437,7 @@ export async function findExistingAutoItem(
   const res = await pool.query<{ count: string }>(
     `SELECT COUNT(*) as count FROM action_items
      WHERE source_type = $1
-       AND source_id = $2
+       AND linked_record_id = $2
        AND title LIKE $3
        AND status NOT IN ('done')
        AND is_auto = TRUE`,
@@ -457,11 +454,10 @@ async function logAudit(
   actor: string
 ): Promise<void> {
   try {
-    const id = uuidv4();
     await pool.query(
-      `INSERT INTO action_item_audit (id, action_item_id, field, old_value, new_value, actor, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, actionItemId, field, oldValue, newValue, actor, new Date().toISOString()]
+      `INSERT INTO action_item_audit (action_item_id, field, old_value, new_value, actor, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [actionItemId, field, oldValue, newValue, actor, new Date().toISOString()]
     );
   } catch (err) {
     logger.warn({ err, actionItemId, field }, 'Failed to write audit log');

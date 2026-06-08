@@ -1,14 +1,10 @@
 /**
  * F-234: Action Items integration tests (migrated from tests/).
  *
- * No CREATE TABLE — tests use the real migration runner (v3_001–v3_008).
- *
- * NOTE: The action-items service layer references columns that do not exist
- * in the canonical v3_001 action_items table (e.g. `detail` → `body`,
- * `owner` → `owner_email`, `source` → `origin`). Any test that writes
- * (POST/PATCH) is skipped until the service is aligned with the real schema.
- * Validation and auth tests still run because they short-circuit before the
- * SQL INSERT/UPDATE.
+ * No CREATE TABLE — tests use the real migration runner (v3_001 onward).
+ * v3_062 aligns the live action_items schema with the v3 service layer,
+ * so POST/PATCH tests now run against the real columns (detail, owner,
+ * source, source_type, is_auto, linked_record_type, linked_record_id).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -95,7 +91,7 @@ describe('Contract: Action Items endpoints', () => {
     expect(typeof data.pagination.hasMore).toBe('boolean');
   });
 
-  it.skip('POST /v3/action-items returns 201 with SuccessEnvelope', async () => {
+  it('POST /v3/action-items returns 201 with SuccessEnvelope', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/v3/action-items',
@@ -159,7 +155,7 @@ describe('Contract: Action Items endpoints', () => {
     expect(body.error.message).toContain('individual');
   });
 
-  it.skip('PATCH /v3/action-items/:id returns 200 on valid update', async () => {
+  it('PATCH /v3/action-items/:id returns 200 on valid update', async () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/v3/action-items',
@@ -269,8 +265,7 @@ describe('Contract: Action Items endpoints', () => {
 // --------------------------------------------------------------------------
 // Integration: status transitions
 // --------------------------------------------------------------------------
-// Skipped: service INSERT/UPDATE use columns not in canonical v3_001 schema
-describe.skip('Integration: Action item status transitions', () => {
+describe('Integration: Action item status transitions', () => {
   it('open → in_progress → done transitions work', async () => {
     const createRes = await app.inject({
       method: 'POST',
@@ -373,8 +368,7 @@ describe.skip('Integration: Action item status transitions', () => {
     expect((JSON.parse(reopenWithForce.body) as SuccessBody).data.status).toBe('open');
   });
 
-  // action_item_audit table does not exist in canonical v3_001–v3_008 migrations
-  it.skip('status transitions are logged to audit', async () => {
+  it('status transitions are logged to audit', async () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/v3/action-items',
@@ -411,7 +405,6 @@ describe.skip('Integration: Action item status transitions', () => {
 // --------------------------------------------------------------------------
 // Integration: draft full flow (request → poll → result)
 // --------------------------------------------------------------------------
-// Skipped: depends on creating action items (blocked by schema drift)
 describe.skip('Integration: Draft endpoint full flow', () => {
   it('request → worker processes → draft has content', async () => {
     const createRes = await app.inject({
@@ -611,7 +604,7 @@ describe('Integration: Action item list filters', () => {
     }
   });
 
-  it.skip('filters by owner', async () => {
+  it('filters by owner', async () => {
     await app.inject({
       method: 'POST',
       url: '/v3/action-items',
@@ -659,7 +652,7 @@ describe('Integration: Action item list filters', () => {
     }
   });
 
-  it.skip('links action item to opportunity', async () => {
+  it('links action item to opportunity', async () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/v3/action-items',
@@ -704,5 +697,97 @@ describe('R1: Source citation on action items', () => {
       expect(sources[0].url).toBeTruthy();
       expect(sources[0].retrieved_at).toBeTruthy();
     }
+  });
+});
+
+// --------------------------------------------------------------------------
+// Integration: auto-item dedup via createActionItem + findExistingAutoItem
+// --------------------------------------------------------------------------
+describe('Integration: Auto-item dedup (v3_062 schema alignment)', () => {
+  it('createActionItem with is_auto=true + source_type writes without SQL error', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v3/action-items',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: JSON.stringify({
+        title: 'Expiring: Test Opportunity',
+        owner: 'shawn',
+        source: 'sentinel',
+        source_type: 'opportunity_expiring',
+        source_id: '9999',
+        is_auto: true,
+        linked_record_type: 'opportunity_expiring',
+        linked_record_id: '9999',
+      }),
+    });
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body) as SuccessBody;
+    expect(body.success).toBe(true);
+    const data = body.data as Record<string, unknown>;
+    expect(data.id).toBeTruthy();
+    expect(data.is_auto).toBe(true);
+    expect(data.source_type).toBe('opportunity_expiring');
+    expect(data.linked_record_id).toBe('9999');
+  });
+
+  it('findExistingAutoItem returns true after first create, second create is deduped', async () => {
+    const { createActionItem, findExistingAutoItem } = await import('../../src/services/action-items/index.js');
+
+    const first = await createActionItem({
+      title: 'Expiring: Dedup Test Opp',
+      owner: 'shawn',
+      source: 'sentinel',
+      source_type: 'opportunity_expiring',
+      source_id: '42',
+      is_auto: true,
+    }, 'test-actor');
+
+    expect(first.id).toBeTruthy();
+    expect(first.is_auto).toBe(true);
+
+    const exists = await findExistingAutoItem(
+      'opportunity_expiring',
+      '42',
+      'Expiring:',
+    );
+    expect(exists).toBe(true);
+
+    const existsWrongType = await findExistingAutoItem(
+      'award_recompete',
+      '42',
+      'Expiring:',
+    );
+    expect(existsWrongType).toBe(false);
+  });
+
+  it('id is DB-assigned bigint, not a UUID', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v3/action-items',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: JSON.stringify({ title: 'ID type test', owner: 'shawn' }),
+    });
+    const data = (JSON.parse(res.body) as SuccessBody).data as Record<string, unknown>;
+    const id = String(data.id);
+    expect(id).toMatch(/^\d+$/);
+  });
+
+  it('audit table receives entries on create and update', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v3/action-items',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: JSON.stringify({ title: 'Audit dedup test', owner: 'shawn' }),
+    });
+    const data = (JSON.parse(res.body) as SuccessBody).data as Record<string, unknown>;
+    const id = data.id as string;
+
+    const audit = await pool.query(
+      'SELECT * FROM action_item_audit WHERE action_item_id = $1',
+      [id],
+    );
+    expect(audit.rows.length).toBeGreaterThanOrEqual(1);
+    expect(audit.rows[0].field).toBe('status');
+    expect(audit.rows[0].new_value).toBe('open');
   });
 });
