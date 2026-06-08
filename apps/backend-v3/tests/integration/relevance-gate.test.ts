@@ -57,7 +57,7 @@ describe('relevance stamping on ingest', () => {
     const farFuture = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
     const srcRes = await pool.query<{ id: string }>(
       `INSERT INTO sources (kind, title, retrieved_at, confidence)
-       VALUES ('test', 'Relevance test source', NOW(), 'high')
+       VALUES ('internal', 'Relevance test source', NOW(), 'high')
        RETURNING id::text`,
     );
     const sourceId = srcRes.rows[0]!.id;
@@ -81,7 +81,7 @@ describe('relevance stamping on ingest', () => {
     const farFuture = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
     const srcRes = await pool.query<{ id: string }>(
       `INSERT INTO sources (kind, title, retrieved_at, confidence)
-       VALUES ('test', 'Off-profile test source', NOW(), 'high')
+       VALUES ('internal', 'Off-profile test source', NOW(), 'high')
        RETURNING id::text`,
     );
     const sourceId = srcRes.rows[0]!.id;
@@ -104,7 +104,7 @@ describe('relevance stamping on ingest', () => {
     const soon = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
     const srcRes = await pool.query<{ id: string }>(
       `INSERT INTO sources (kind, title, retrieved_at, confidence)
-       VALUES ('test', 'Auto-pass test source', NOW(), 'high')
+       VALUES ('internal', 'Auto-pass test source', NOW(), 'high')
        RETURNING id::text`,
     );
     const sourceId = srcRes.rows[0]!.id;
@@ -128,7 +128,7 @@ describe('analysis backfill filters by relevance_status', () => {
   it('backfill SELECT returns relevant opps but not off_profile or auto_pass', async () => {
     const srcRes = await pool.query<{ id: string }>(
       `INSERT INTO sources (kind, title, retrieved_at, confidence)
-       VALUES ('test', 'Backfill filter test', NOW(), 'high')
+       VALUES ('internal', 'Backfill filter test', NOW(), 'high')
        RETURNING id::text`,
     );
     const sourceId = srcRes.rows[0]!.id;
