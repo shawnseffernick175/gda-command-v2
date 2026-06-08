@@ -34,6 +34,7 @@ const ALL_TASKS: readonly Task[] = [
   'vault_smart_route',
   'digest_lead',
   'competitor_contact_discovery',
+  'partner_contact_discovery',
 ] as const;
 
 describe('Routing Table', () => {

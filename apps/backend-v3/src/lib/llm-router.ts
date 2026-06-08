@@ -20,6 +20,7 @@ import type {
   SemanticEmbedInput,
   SourceResearchInput,
   CompetitorContactDiscoveryInput,
+  PartnerContactDiscoveryInput,
 } from './llm-router.types.js';
 import { getRoutingEntry } from './llm-router.table.js';
 import { DEFAULT_RETRY_POLICY, withRetry, classifyError } from './llm-router.retry.js';
@@ -114,6 +115,10 @@ async function callProvider(
       const ccdInput = input as CompetitorContactDiscoveryInput;
       systemPrompt = 'You are a defense-industry business-development researcher. Given a competitor company and the agencies/NAICS where it wins federal contracts, find REAL, currently-employed people at that company relevant to federal business development, capture, or program management (e.g., VP Business Development, Capture Manager, Program Director, Group President). Return ONLY people you can support with a real, citable web source. NEVER invent a name, title, or email. Return strict JSON matching CompetitorContactDiscoveryOutput: contacts (array of {name, title, company, email, phone, linkedin_url, source_url, confidence}), sources_consulted. Every contact MUST include a real source_url. If you cannot find a real person, return an empty contacts array.';
       userContent = `Company: ${ccdInput.competitor_name}\nWins in agencies: ${ccdInput.agencies.join(', ')}\nNAICS: ${ccdInput.naics.join(', ')}\nReturn up to ${ccdInput.max_contacts} contacts.`;
+    } else if (task === 'partner_contact_discovery') {
+      const pcdInput = input as PartnerContactDiscoveryInput;
+      systemPrompt = 'You are a defense-industry teaming and business-development researcher. Given a small-business / set-aside federal contractor and the agencies/NAICS/set-aside categories where it wins work, find REAL, currently-employed people at that company relevant to teaming, partnerships, business development, or capture (e.g., President, VP Business Development, Director of Partnerships, Capture Manager, Contracts Manager). Return ONLY people you can support with a real, citable web source. NEVER invent a name, title, or email. Return strict JSON matching PartnerContactDiscoveryOutput: contacts (array of {name, title, company, email, phone, linkedin_url, source_url, confidence}), sources_consulted. Every contact MUST include a real source_url. If you cannot find a real person, return an empty contacts array.';
+      userContent = `Company: ${pcdInput.partner_name}\nWins in agencies: ${pcdInput.agencies.join(', ')}\nNAICS: ${pcdInput.naics.join(', ')}\nSet-aside categories: ${pcdInput.set_asides.join(', ')}\nReturn up to ${pcdInput.max_contacts} contacts.`;
     } else {
       const researchInput = input as SourceResearchInput;
       systemPrompt = 'You are a research assistant. Find relevant government contracting sources and return structured findings. Return JSON matching SourceResearchOutput: findings (array of {title, url, snippet, relevance_score}), summary, sources_consulted count.';

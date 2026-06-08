@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
+import { logger } from '../lib/logger.js';
 
 interface Certification {
   name: string;
@@ -134,5 +135,35 @@ export async function partnerRoutes(app: FastifyInstance): Promise<void> {
       );
     }
     return reply.status(200).send(successEnvelope(partner, req.requestId));
+  });
+
+  // POST /v3/partners/discover-contacts \u2014 discover teaming-partner contacts via web search
+  app.post('/v3/partners/discover-contacts', async (req, reply) => {
+    const body = req.body as {
+      limit?: number;
+      max_contacts?: number;
+      partners?: string[];
+    } | null;
+
+    const { discoverPartnerContacts } = await import(
+      '../services/contacts/partner-discovery.js'
+    );
+
+    try {
+      const result = await discoverPartnerContacts({
+        limit: body?.limit ?? 25,
+        max_contacts: body?.max_contacts ?? 5,
+        partners: body?.partners,
+      });
+      return reply.send(successEnvelope(result, req.requestId));
+    } catch (err) {
+      logger.error(
+        { error: err instanceof Error ? err.message : String(err) },
+        'discover_partner_contacts_route_error',
+      );
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', 'Partner contact discovery failed', req.requestId),
+      );
+    }
   });
 }

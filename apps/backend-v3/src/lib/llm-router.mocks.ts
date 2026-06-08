@@ -29,6 +29,7 @@ import type {
   VaultSmartRouteOutput,
   DigestLeadOutput,
   CompetitorContactDiscoveryOutput,
+  PartnerContactDiscoveryOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -267,6 +268,22 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       ],
       sources_consulted: 3,
     } satisfies CompetitorContactDiscoveryOutput,
+
+    partner_contact_discovery: {
+      contacts: [
+        {
+          name: 'John Doe',
+          title: 'Director of Partnerships',
+          company: 'Mock Partner LLC',
+          email: null,
+          phone: null,
+          linkedin_url: 'https://linkedin.com/in/johndoe',
+          source_url: 'https://www.mockpartner.com/team',
+          confidence: 'medium',
+        },
+      ],
+      sources_consulted: 3,
+    } satisfies PartnerContactDiscoveryOutput,
   };
 
   return {

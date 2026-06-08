@@ -134,6 +134,13 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     timeout_ms: 25_000,
     fallback: null,
   },
+  {
+    task: 'partner_contact_discovery',
+    provider: 'perplexity',
+    model: 'sonar-pro',
+    timeout_ms: 25_000,
+    fallback: null,
+  },
 ] as const;
 
 /** Lookup helper — O(1) via pre-built map. */
