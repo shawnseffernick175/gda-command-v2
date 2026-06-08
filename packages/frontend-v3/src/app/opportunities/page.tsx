@@ -225,7 +225,11 @@ function OpportunityList() {
     setValueRange(0);
     setDueFilter("");
     setSourceFilter([]);
-  }, []);
+    // Strip ?agency from the URL so a remount does not re-apply a stale filter
+    if (searchParams.get("agency")) {
+      router.replace("/opportunities");
+    }
+  }, [router, searchParams]);
 
   const toggleArrayFilter = useCallback(
     (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
@@ -832,7 +836,7 @@ function OpportunityRow({
               className="text-left text-xs text-muted-foreground hover:text-gda-green underline-offset-2 hover:underline cursor-pointer truncate block max-w-[140px]"
               onClick={() => onAgencyFilter?.(agencyText)}
             >
-              {opp.department ?? opp.agency ?? "---"}
+              {agencyText}
             </button>
           );
         })()}
