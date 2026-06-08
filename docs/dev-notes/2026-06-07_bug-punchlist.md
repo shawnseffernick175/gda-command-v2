@@ -380,7 +380,11 @@ NEXT: when CI fully green -> squash-merge (additive, safe) -> deploy backend-v3 
 
 **FIX (future):** stamp model_used from the router's resolved model (table.ts) after the call, overriding whatever the LLM wrote. Small change in the enrich path or batch service.
 
-**STATUS: NOTED — low priority.**
+**STATUS: RESOLVED + DEPLOYED + BACKFILLED 2026-06-08 (PR #763).**
+- FIX: both write paths (POST /v3/contacts/:id/enrich in routes/contacts.ts AND the batch service enrich-batch.ts, which also drives the nightly cron) now override model_used with the router-resolved result.model_used before persisting, instead of storing the LLM's self-reported value. The router already exposes the authoritative model on its result (RouteResponseOk.model_used).
+- TEST: extended contact-enrich-batch integration test to assert stored ai_profile.model_used == router-resolved model ('mock-model') and NOT the LLM-embedded value ('mock'). Locks in the fix. CI 18/18 green.
+- DEPLOYED: main 7ababe9; VPS backend-v3 rebuilt + recreated (healthy, ledger still 74).
+- BACKFILLED: live data was wildly inconsistent self-reported garbage ('GPT-4', 'claude-3.5-sonnet', 'intelligence_analyst', even full sentences) across all 118 enriched contacts. Ran a guarded jsonb_set UPDATE -> all 118 now report 'claude-haiku-4-5' (the true routed model). Enrichment content (role_summary, procurement_influence, etc.) preserved; only the provenance label rewritten.
 
 ---
 
