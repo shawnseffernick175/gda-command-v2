@@ -1,12 +1,14 @@
 /**
  * Migration test for v3_063: canonical pipeline stages.
  *
- * Self-contained: creates pipeline_items with the OLD pre-v3_063 shape,
+ * Self-contained: loads the old pipeline_items schema from a SQL fixture,
  * seeds rows at old stages, applies the migration, then asserts:
  * - Old stage values remapped to canonical keys
  * - Column default is 'interest'
  * - New CHECK accepts all 9 canonical keys
  * - New CHECK rejects bogus values
+ *
+ * No CREATE TABLE in this file -- old schema lives in fixtures/pipeline_items_old_schema.sql.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -25,47 +27,19 @@ const { Pool } = pg;
 
 let pool: InstanceType<typeof Pool>;
 
-function loadMigrationSql(): string {
-  return readFileSync(
-    resolve(__dirname, '../../migrations/v3_063_canonical_pipeline_stages.sql'),
-    'utf-8',
-  );
+function loadSql(relativePath: string): string {
+  return readFileSync(resolve(__dirname, relativePath), 'utf-8');
 }
 
 describe('v3_063 canonical pipeline stages migration', () => {
-  const migrationSql = loadMigrationSql();
+  const fixtureSql = loadSql('./fixtures/pipeline_items_old_schema.sql');
+  const migrationSql = loadSql('../../migrations/v3_063_canonical_pipeline_stages.sql');
 
   beforeAll(async () => {
     pool = new Pool({ connectionString: DB_URL, max: 3 });
 
-    // Drop if exists from prior test runs
-    await pool.query('DROP TABLE IF EXISTS pipeline_items CASCADE');
-
-    // Create pipeline_items with the OLD pre-v3_063 shape
-    await pool.query(`
-      CREATE TABLE pipeline_items (
-        id BIGSERIAL PRIMARY KEY,
-        opportunity_id BIGINT,
-        capture_owner TEXT,
-        stage TEXT NOT NULL DEFAULT 'qualifying'
-          CHECK (stage IN ('qualifying','pursuit','proposal','submitted','evaluation','won','lost')),
-        source_id BIGINT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-
-    // Seed rows at old stages
-    await pool.query(`
-      INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id) VALUES
-        (1, 'user-a', 'qualifying', 1),
-        (2, 'user-b', 'pursuit', 1),
-        (3, 'user-c', 'proposal', 1),
-        (4, 'user-d', 'submitted', 1),
-        (5, 'user-e', 'evaluation', 1),
-        (6, 'user-f', 'won', 1),
-        (7, 'user-g', 'lost', 1)
-    `);
+    // Set up old schema + seed data from fixture
+    await pool.query(fixtureSql);
 
     // Apply the migration
     await pool.query(migrationSql);
