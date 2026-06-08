@@ -6,11 +6,15 @@ on:
     paths:
       - 'apps/backend-v3/migrations/**'
       - 'apps/backend-v3/src/lib/migrate.ts'
+      - 'scripts/ci/check-migration-manifest.sh'
+      - 'scripts/ci/migration-manifest.txt'
   pull_request:
     branches: [main]
     paths:
       - 'apps/backend-v3/migrations/**'
       - 'apps/backend-v3/src/lib/migrate.ts'
+      - 'scripts/ci/check-migration-manifest.sh'
+      - 'scripts/ci/migration-manifest.txt'
       - 'db/v3/**'
 
 permissions:
@@ -36,6 +40,9 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v5
+
+      - name: Guard against migration-directory drift
+        run: bash scripts/ci/check-migration-manifest.sh
 
       - uses: actions/setup-node@v5
         with:
