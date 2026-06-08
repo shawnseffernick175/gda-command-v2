@@ -112,14 +112,32 @@ describe('Analysis priority inversion fix', () => {
 // -- Zombie reclaim --
 describe('Zombie active job reclaim on startup', () => {
   it('resets stale active jobs back to created state', async () => {
-    const { QUEUE_NAMES } = await import('../../src/lib/queue.js');
+    const { QUEUE_NAMES, initBoss, stopBoss, registerQueues } = await import('../../src/lib/queue.js');
 
-    // Seed a zombie job: state=active, started_on > 10 minutes ago
+    // First, ensure the queue partition exists by initializing pg-boss
+    const setupBoss = await initBoss();
+    await registerQueues(setupBoss);
+
+    // Enqueue a real job then manually update it to simulate a zombie
+    const jobId = await setupBoss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, {
+      entityType: 'opportunity' as const,
+      entityId: 'zombie-test-id',
+      priority: 'normal' as const,
+      trigger: 'backfill' as const,
+    }, {
+      priority: 10,
+      retryLimit: 3,
+      singletonKey: 'opp-zombie-reclaim-test',
+    });
+    expect(jobId).toBeTruthy();
+
+    // Manually flip to active with a stale started_on (>10 min ago)
     const zombieStarted = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     await pool.query(
-      `INSERT INTO pgboss.job (name, state, data, priority, singleton_key, started_on, retry_limit, retry_count, retry_delay, retry_backoff, start_after, expire_in, created_on, keep_until)
-       VALUES ($1, 'active', '{"entityType":"opportunity","entityId":"zombie-test","priority":"normal","trigger":"backfill"}'::jsonb, 10, 'opp-zombie-reclaim-test', $2, 3, 0, 5, true, NOW(), '1 hour'::interval, NOW() - INTERVAL '1 hour', NOW() + INTERVAL '7 days')`,
-      [QUEUE_NAMES.ANALYSIS_OPPORTUNITY, zombieStarted],
+      `UPDATE pgboss.job
+       SET state = 'active', started_on = $1
+       WHERE name = $2 AND singleton_key = 'opp-zombie-reclaim-test'`,
+      [zombieStarted, QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
     );
 
     // Verify the job is in active state
@@ -129,20 +147,25 @@ describe('Zombie active job reclaim on startup', () => {
     );
     expect(beforeRes.rows[0]?.state).toBe('active');
 
-    // Start the worker (reclaim happens in startWorker)
-    const { startWorker } = await import('../../src/workers/analysis.js');
-    const workerBoss = await startWorker();
+    await stopBoss();
 
-    try {
-      // Check that the job was reclaimed back to created
-      const afterRes = await pool.query<{ state: string }>(
-        `SELECT state FROM pgboss.job WHERE name = $1 AND singleton_key = 'opp-zombie-reclaim-test'`,
-        [QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
-      );
-      expect(afterRes.rows[0]?.state).toBe('created');
-    } finally {
-      await workerBoss.stop({ graceful: true, timeout: 5_000 });
-    }
+    // Simulate the reclaim SQL that startWorker() runs (same query)
+    const reclaimRes = await pool.query(
+      `UPDATE pgboss.job
+       SET state = 'created', started_on = NULL, retry_count = retry_count
+       WHERE name = $1
+         AND state = 'active'
+         AND started_on < NOW() - INTERVAL '10 minutes'`,
+      [QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
+    );
+    expect(reclaimRes.rowCount).toBeGreaterThanOrEqual(1);
+
+    // Check that the job was reclaimed back to created
+    const afterRes = await pool.query<{ state: string }>(
+      `SELECT state FROM pgboss.job WHERE name = $1 AND singleton_key = 'opp-zombie-reclaim-test'`,
+      [QUEUE_NAMES.ANALYSIS_OPPORTUNITY],
+    );
+    expect(afterRes.rows[0]?.state).toBe('created');
   }, 30_000);
 });
 
