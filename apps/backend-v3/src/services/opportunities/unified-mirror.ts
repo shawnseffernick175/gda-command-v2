@@ -44,6 +44,7 @@ const DATA_SOURCE_TO_LINK: Record<string, { source: string; field: 'sam_notice_i
   'govtribe': { source: 'govtribe', field: 'govtribe_id' },
   'arxiv': { source: 'arxiv', field: 'external_id' },
   'grants_gov': { source: 'grants_gov', field: 'external_id' },
+  'nsf': { source: 'nsf', field: 'external_id' },
   'nih': { source: 'nih', field: 'external_id' },
   'sbir': { source: 'sbir', field: 'external_id' },
   'dod_rss': { source: 'dod_rss', field: 'external_id' },
