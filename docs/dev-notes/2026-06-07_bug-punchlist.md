@@ -522,3 +522,19 @@ but never imported (dead code) - left alone.
   Up healthy. Live routes 200: /, /opportunities, /opportunities?agency=... deeplink resolves.
 - Devin session: devin-61edaddf286a440ea68e0715522fc02c (DONE).
 - TRACK B COMPLETE.
+
+---
+
+## DEFERRED #2 RESOLVED - backfill-org-hierarchy OFFSET fix (PR #760, 2026-06-08)
+- Root cause: WHERE department_name IS NULL + OFFSET. As rows get updated they drop out of
+  the filtered set, so a fixed OFFSET skips unprocessed rows -> gaps. Needed 7 passes to converge.
+  Also: rows parsing to null department_name would re-match forever in a naive no-OFFSET loop.
+- Fix: keyset pagination `WHERE id > $2::bigint ORDER BY id LIMIT N` (id is BIGSERIAL, pg returns
+  it as string; cursor kept as string, cast ::bigint in SQL). Always advances forward, single pass,
+  never re-visits a row (handles null-parse rows safely).
+- PR #760: 18/18 CI green. Single file, +25/-5. Merged squash-admin. main HEAD = 99e2aa6.
+- Deployed: backend-v3 rebuilt+recreated on VPS. Confirmed compiled dist has keyset, no OFFSET SQL.
+- VERIFIED single-pass convergence: nulled org cols on 1200 SAM rows (>2 batches), ran backfill ONCE:
+  "Scanned 500/1000/1200 (updated=1200), Done. Total updated: 1200" -> null_dept back to 0.
+  Spot-check confirmed clean repopulation (DoD/DLA/VA hierarchy). Test fully reversible.
+- Status: RESOLVED. (Deferred #1 = full migration-dir reconcile remains open.)
