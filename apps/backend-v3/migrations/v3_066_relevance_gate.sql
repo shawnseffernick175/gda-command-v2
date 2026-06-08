@@ -1,4 +1,4 @@
--- v3_065: Ingest-time relevance gate (PR-A4)
+-- v3_066: Ingest-time relevance gate (PR-A4)
 -- Adds relevance_status and relevance_reason columns to opportunities.
 -- Backfills existing rows using NAICS membership + deadline math.
 -- Idempotent: safe to re-run.
