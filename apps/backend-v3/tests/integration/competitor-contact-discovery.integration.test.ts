@@ -27,20 +27,29 @@ beforeAll(async () => {
 
   pool = new Pool({ connectionString: dbUrl, max: 5 });
 
-  // Seed awards for fake competitor (piid + last_mod_date required for unique constraint)
+  // Create a source row (awards.source_id is NOT NULL FK)
+  const { rows: srcRows } = await pool.query<{ id: number }>(
+    `INSERT INTO sources (kind, title, retrieved_at, confidence)
+     VALUES ('internal', 'competitor-discovery integration test', NOW(), 'high')
+     RETURNING id`,
+  );
+  const sourceId = srcRows[0].id;
+
+  // Seed awards for fake competitor
   await pool.query(
-    `INSERT INTO awards (piid, last_mod_date, awardee_name, agency_name, naics, value_obligated, award_date)
+    `INSERT INTO awards (piid, last_mod_date, awardee_name, agency_name, naics, value_obligated, award_date, source_id)
      VALUES
-       ('ACME-PIID-001', '2025-06-01', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 50000000, '2025-06-01'),
-       ('ACME-PIID-002', '2025-03-15', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Homeland Security', '541512', 25000000, '2025-03-15'),
-       ('ACME-PIID-003', '2025-01-10', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 30000000, '2025-01-10')`,
+       ('ACME-PIID-001', '2025-06-01', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 50000000, '2025-06-01', $1),
+       ('ACME-PIID-002', '2025-03-15', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Homeland Security', '541512', 25000000, '2025-03-15', $1),
+       ('ACME-PIID-003', '2025-01-10', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 30000000, '2025-01-10', $1)`,
+    [sourceId],
   );
 }, 120_000);
 
 afterAll(async () => {
   if (pool) {
     await pool.query(
-      `DELETE FROM govtribe_contacts WHERE contact_category = 'competitor' AND company = 'Mock Competitor Corp'`,
+      `DELETE FROM govtribe_contacts WHERE contact_category = 'competitor' AND company = 'ACME DEFENSE INTEGRATORS LLC'`,
     );
     await pool.query(
       `DELETE FROM awards WHERE piid IN ('ACME-PIID-001', 'ACME-PIID-002', 'ACME-PIID-003')`,
@@ -67,7 +76,7 @@ describe('discoverCompetitorContacts', () => {
     const { rows } = await pool.query(
       `SELECT name, company, contact_category, source_url, source_label, contact_type, is_manual, added_by
        FROM govtribe_contacts
-       WHERE contact_category = 'competitor' AND company = 'Mock Competitor Corp'`,
+       WHERE contact_category = 'competitor' AND company = 'ACME DEFENSE INTEGRATORS LLC'`,
     );
 
     expect(rows.length).toBeGreaterThanOrEqual(1);
@@ -102,10 +111,10 @@ describe('discoverCompetitorContacts', () => {
     // Count rows for this company
     const { rows } = await pool.query<{ count: number }>(
       `SELECT count(*)::int AS count FROM govtribe_contacts
-       WHERE contact_category = 'competitor' AND company = 'Mock Competitor Corp'`,
+       WHERE contact_category = 'competitor' AND company = 'ACME DEFENSE INTEGRATORS LLC'`,
     );
 
-    // The mock returns exactly one contact named 'Jane Smith' at 'Mock Competitor Corp'.
+    // The mock returns exactly one contact named 'Jane Smith'.
     // Idempotency means re-running should not create duplicates.
     expect(rows[0].count).toBe(1);
   });

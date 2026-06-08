@@ -147,7 +147,7 @@ async function upsertCompetitorContact(
   contact: DiscoveredContact,
   companyName: string,
 ): Promise<void> {
-  const company = contact.company || companyName;
+  const company = companyName || contact.company;
   let existingId: number | null = null;
 
   if (contact.email) {
