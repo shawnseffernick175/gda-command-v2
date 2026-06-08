@@ -88,6 +88,27 @@ jobs:
             exit 1
           fi
 
+      - name: Verify doctrine column types are TEXT (v3_065 guard)
+        env:
+          PGPASSWORD: gda_ci_pass
+        run: |
+          FAIL=0
+          for pair in "doctrine_evaluations:entity_id" "agent_decisions:entity_id" "agent_decisions:opportunity_id"; do
+            TABLE="${pair%%:*}"
+            COL="${pair##*:}"
+            TYPE=$(psql -h localhost -p 5433 -U gda_ci -d gda_ci -tAc \
+              "SELECT data_type FROM information_schema.columns
+               WHERE table_name = '$TABLE' AND column_name = '$COL'")
+            TYPE=$(echo "$TYPE" | xargs)
+            echo "$TABLE.$COL = $TYPE"
+            if [ "$TYPE" != "text" ]; then
+              echo "::error::$TABLE.$COL is '$TYPE', expected 'text'"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi
+          echo "All doctrine columns are TEXT."
+
       - name: Verify core V3 tables exist
         env:
           PGPASSWORD: gda_ci_pass
