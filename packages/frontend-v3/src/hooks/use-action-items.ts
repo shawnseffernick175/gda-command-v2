@@ -2,15 +2,29 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPatch } from "@/lib/api";
-import type { ActionItem, ActionItemDraft, PaginatedResponse } from "@/lib/types";
+import type { ActionItem, ActionItemDraft } from "@/lib/types";
 
-export function useActionItems(params: { status?: string; due?: string } = {}) {
+interface ActionItemsPagedResponse {
+  items: ActionItem[];
+  pagination: {
+    limit: number;
+    cursor: string | null;
+    hasMore: boolean;
+    page?: number;
+    totalPages?: number;
+    total?: number;
+  };
+}
+
+export function useActionItems(params: { status?: string; due?: string; page?: number } = {}) {
   return useQuery({
     queryKey: ["action-items", params],
     queryFn: () =>
-      apiGet<PaginatedResponse<ActionItem>>("/v3/action-items", {
+      apiGet<ActionItemsPagedResponse>("/v3/action-items", {
         status: params.status,
         due: params.due,
+        page: params.page,
+        limit: 50,
       }),
     refetchInterval: (query) => {
       const items = query.state.data?.items ?? [];

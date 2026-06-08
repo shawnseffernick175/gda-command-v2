@@ -12,10 +12,9 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     const query = req.query as {
       q?: string; agency?: string; category?: string;
       temperature?: string; linked?: string; source?: string;
-      limit?: string; cursor?: string;
+      limit?: string; cursor?: string; page?: string;
     };
-    const limit = Math.min(Number(query.limit ?? 100), 200);
-    const cursor = query.cursor ? Number(query.cursor) : null;
+    const page = query.page ? Number(query.page) : null;
 
     const conditions: string[] = ['1=1'];
     const params: unknown[] = [];
@@ -45,6 +44,111 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       params.push(`%${query.source}%`);
       conditions.push(`c.source_label ILIKE $${params.length}`);
     }
+
+    // --- Offset/page mode (mirrors Opportunities) ---
+    if (page && page >= 1) {
+      const limitN = Math.min(Number(query.limit ?? 50), 200);
+      const offset = (Math.max(page, 1) - 1) * limitN;
+      const whereClause = conditions.join(' AND ');
+
+      const countRes = await pool.query<{ total: number }>(
+        `SELECT COUNT(*)::int AS total FROM govtribe_contacts c WHERE ${whereClause}`,
+        params,
+      );
+      const total = countRes.rows[0]?.total ?? 0;
+      const totalPages = Math.max(Math.ceil(total / limitN), 1);
+
+      const dataParams = [...params, limitN, offset];
+      const sql = `
+        SELECT c.id, c.govtribe_id, c.name, c.title, c.agency, c.email, c.phone, c.contact_type,
+               c.source_url, c.last_seen_at, c.contact_category, c.company, c.linkedin_url,
+               c.notes, c.relationship_score, c.ai_profile, c.ai_ran_at, c.is_manual,
+               c.added_by, c.source_label,
+               c.relationship_temp, c.last_contacted_at, c.contact_notes,
+               c.linked_opportunity_ids, c.linked_capture_ids
+        FROM govtribe_contacts c
+        WHERE ${whereClause}
+        ORDER BY c.id DESC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+
+      const { rows } = await pool.query(sql, dataParams);
+      const items = rows;
+
+      /* ── Meta counts for intelligence bar ──────────────────────── */
+      const metaSql = `
+        SELECT
+          count(*)::int AS total_count,
+          count(*) FILTER (
+            WHERE relationship_temp = 'warm'
+              AND (last_contacted_at IS NULL OR last_contacted_at < NOW() - INTERVAL '90 days')
+          )::int AS warm_no_touch,
+          count(*) FILTER (
+            WHERE array_length(linked_opportunity_ids, 1) > 0
+              OR array_length(linked_capture_ids, 1) > 0
+          )::int AS linked_to_pursuits,
+          count(DISTINCT agency) FILTER (WHERE agency IS NOT NULL)::int AS agency_count
+        FROM govtribe_contacts`;
+      const { rows: metaRows } = await pool.query(metaSql);
+      const meta = metaRows[0] as {
+        total_count: number;
+        warm_no_touch: number;
+        linked_to_pursuits: number;
+        agency_count: number;
+      };
+
+      /* ── Resolve linked opportunity/capture titles ─────────────── */
+      const allOppIds = new Set<number>();
+      const allCapIds = new Set<number>();
+      for (const item of items as Array<{ linked_opportunity_ids: number[]; linked_capture_ids: number[] }>) {
+        for (const oid of (item.linked_opportunity_ids ?? [])) allOppIds.add(oid);
+        for (const cid of (item.linked_capture_ids ?? [])) allCapIds.add(cid);
+      }
+
+      let oppMap: Record<number, { id: number; title: string; stage: string | null }> = {};
+      if (allOppIds.size > 0) {
+        const oppIdArr = Array.from(allOppIds);
+        const { rows: oppRows } = await pool.query(
+          `SELECT id, title, stage FROM unified_opportunities WHERE id = ANY($1)`,
+          [oppIdArr],
+        );
+        for (const r of oppRows as Array<{ id: number; title: string; stage: string | null }>) {
+          oppMap[r.id] = r;
+        }
+      }
+
+      let capMap: Record<number, { id: number; title: string; color_stage: string | null }> = {};
+      if (allCapIds.size > 0) {
+        const capIdArr = Array.from(allCapIds);
+        const { rows: capRows } = await pool.query(
+          `SELECT c.id, p.title, c.color_stage FROM captures c JOIN pipeline_items p ON c.pipeline_item_id = p.id WHERE c.id = ANY($1)`,
+          [capIdArr],
+        );
+        for (const r of capRows as Array<{ id: number; title: string; color_stage: string | null }>) {
+          capMap[r.id] = r;
+        }
+      }
+
+      const enrichedItems = (items as Array<Record<string, unknown>>).map((item) => ({
+        ...item,
+        linked_opportunities: ((item.linked_opportunity_ids as number[]) ?? [])
+          .map((oid: number) => oppMap[oid])
+          .filter(Boolean),
+        linked_captures: ((item.linked_capture_ids as number[]) ?? [])
+          .map((cid: number) => capMap[cid])
+          .filter(Boolean),
+      }));
+
+      return reply.send(successEnvelope({
+        items: enrichedItems,
+        pagination: { hasMore: page < totalPages, cursor: null, page, totalPages, total },
+        meta,
+      }, req.requestId));
+    }
+
+    // --- Existing cursor mode (unchanged) ---
+    const limit = Math.min(Number(query.limit ?? 100), 200);
+    const cursor = query.cursor ? Number(query.cursor) : null;
+
     if (cursor) {
       params.push(cursor);
       conditions.push(`c.id < $${params.length}`);

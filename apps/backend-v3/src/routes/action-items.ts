@@ -34,6 +34,7 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
       linked_record_type?: string;
       limit?: string;
       cursor?: string;
+      page?: string;
     };
   }>('/v3/action-items', async (req, reply) => {
     const filters: ActionItemListFilters = {
@@ -43,6 +44,7 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
       linked_record_type: req.query.linked_record_type,
       limit: req.query.limit ? parseInt(req.query.limit, 10) : 50,
       cursor: req.query.cursor,
+      page: req.query.page ? parseInt(req.query.page, 10) : undefined,
     };
 
     const result = await listActionItems(filters);
@@ -65,6 +67,7 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
             limit: filters.limit,
             cursor: result.cursor,
             hasMore: result.hasMore,
+            ...(result.page != null ? { page: result.page, totalPages: result.totalPages, total: result.total } : {}),
           },
         },
         req.requestId

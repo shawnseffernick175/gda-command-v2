@@ -18,11 +18,12 @@ export interface UseContactsParams {
   source?: string;
   limit?: number;
   cursor?: number;
+  page?: number;
 }
 
 interface ContactsResponse {
   items: GovTriContact[];
-  pagination: { hasMore: boolean; cursor: number | null };
+  pagination: { hasMore: boolean; cursor: number | null; page?: number; totalPages?: number; total?: number };
   meta: ContactsMeta;
 }
 
@@ -37,8 +38,9 @@ export function useContacts(params: UseContactsParams = {}) {
         temperature: params.temperature || undefined,
         linked: params.linked || undefined,
         source: params.source || undefined,
-        limit: params.limit ?? 100,
-        cursor: params.cursor || undefined,
+        limit: params.page ? 50 : (params.limit ?? 100),
+        cursor: params.page ? undefined : (params.cursor || undefined),
+        page: params.page || undefined,
       }),
   });
 }
