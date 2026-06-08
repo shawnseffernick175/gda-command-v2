@@ -1039,7 +1039,7 @@ function OpportunityDetail({ id }: { id: string }) {
                 }
                 return segments.map((seg, idx) => (
                   <span key={seg.label}>
-                    {idx > 0 && <span className="text-muted-foreground"> &gt; </span>}
+                    {idx > 0 && <span className="text-muted-foreground">{" > "}</span>}
                     <button
                       type="button"
                       className="hover:text-gda-green cursor-pointer"
