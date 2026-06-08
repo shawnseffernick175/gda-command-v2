@@ -582,3 +582,38 @@ table (79 rows) still exist for the legacy deploy-prod.sh path + integration tes
 on the live container deploy path. A future cleanup could deprecate the legacy system entirely,
 but that is NOT required for correctness and carries its own risk (CI tests reference it). Left
 as-is intentionally.
+
+## CI GUARD: migration-directory drift prevention (PR #762) — COMPLETE
+Date: 2026-06-08. main HEAD -> 9ed8843. CI-only change, no deploy needed.
+
+Purpose: make the PR #761 drift class impossible to merge silently. Docker applies
+migrations only from apps/backend-v3/migrations/; files had been applied on the live
+VPS runner dir but never committed, so a fresh container couldn't reproduce live schema.
+
+Added:
+- scripts/ci/migration-manifest.txt: committed source-of-truth file set (74 files).
+- scripts/ci/check-migration-manifest.sh: guard (locale-pinned LC_ALL=C, self-documenting).
+- .github/workflows/v3-migration-dry-run.yml: runs guard as fast first step; triggers
+  also on guard/manifest changes. (Workflow file landed via Contents API PUT because the
+  git PAT lacks `workflow` push scope; API path has the scope.)
+
+Guard asserts:
+  1. Runner dir file set EXACTLY matches the committed manifest (added/removed migration
+     must update manifest in same commit -> deliberate, reviewable).
+  2. No sequence-number gaps in v3_NNN prefixes.
+  3. Duplicate sequence prefixes limited to known allow-list (v3_044, v3_046); new
+     accidental duplicates fail.
+
+To add a future migration: drop the .sql into apps/backend-v3/migrations/, then
+  ls apps/backend-v3/migrations/*.sql | xargs -n1 basename | sort > scripts/ci/migration-manifest.txt
+and commit both. CI stays green.
+
+Self-tested (all behaved as designed):
+  - baseline/clean: PASS
+  - delete committed file (the real drift bug): FAIL
+  - uncommitted/extra file not in manifest: FAIL
+  - injected sequence gap: FAIL
+  - new unexpected duplicate prefix (v3_050 x2): FAIL; known dups stay allow-listed.
+
+CI on PR #762: 15/15 functional checks green; "Devin Review" advisory pending (not a gate).
+Merged squash-admin, branch deleted.
