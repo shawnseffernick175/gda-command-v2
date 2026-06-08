@@ -202,4 +202,64 @@ describe('mapSAMOpportunity', () => {
     }));
     expect(empty.opportunity.opportunity_type).toBeNull();
   });
+
+  it('extracts pointOfContact into opportunity.contacts', () => {
+    const { opportunity } = mapSAMOpportunity(makeSAMRecord({
+      pointOfContact: [
+        { type: 'primary', fullName: 'Jane Doe', email: 'jane@army.mil', phone: '555-0100', title: 'Contracting Officer' },
+        { type: 'secondary', fullName: 'Bob Smith', email: 'bob@army.mil', phone: undefined, title: undefined },
+      ],
+    }));
+
+    expect(opportunity.contacts).toHaveLength(2);
+    const primary = opportunity.contacts![0];
+    expect(primary.name).toBe('Jane Doe');
+    expect(primary.email).toBe('jane@army.mil');
+    expect(primary.phone).toBe('555-0100');
+    expect(primary.title).toBe('Contracting Officer');
+    expect(primary.contactType).toBe('primary');
+    expect(primary.agency).toBe('DEPT OF THE ARMY');
+    expect(primary.sourceUrl).toBe('https://sam.gov/opp/abc123/view');
+    expect(primary.rawJson).toEqual({
+      type: 'primary', fullName: 'Jane Doe', email: 'jane@army.mil', phone: '555-0100', title: 'Contracting Officer',
+    });
+
+    const secondary = opportunity.contacts![1];
+    expect(secondary.name).toBe('Bob Smith');
+    expect(secondary.email).toBe('bob@army.mil');
+    expect(secondary.phone).toBeNull();
+    expect(secondary.title).toBeNull();
+    expect(secondary.contactType).toBe('secondary');
+  });
+
+  it('skips POCs with no email, no phone, and no name', () => {
+    const { opportunity } = mapSAMOpportunity(makeSAMRecord({
+      pointOfContact: [
+        { type: 'primary', fullName: '', email: '', phone: '', title: 'Ghost' },
+        { type: 'secondary', fullName: undefined, email: undefined, phone: undefined, title: 'Also Ghost' },
+        { type: 'primary', fullName: 'Real Person', email: 'real@army.mil', phone: undefined, title: undefined },
+      ],
+    }));
+
+    expect(opportunity.contacts).toHaveLength(1);
+    expect(opportunity.contacts![0].name).toBe('Real Person');
+  });
+
+  it('does not set contacts field when pointOfContact is absent', () => {
+    const { opportunity } = mapSAMOpportunity(makeSAMRecord({
+      pointOfContact: undefined,
+    }));
+
+    expect(opportunity.contacts).toBeUndefined();
+  });
+
+  it('does not set contacts field when all POCs are empty', () => {
+    const { opportunity } = mapSAMOpportunity(makeSAMRecord({
+      pointOfContact: [
+        { type: 'primary', fullName: '', email: '', phone: '' },
+      ],
+    }));
+
+    expect(opportunity.contacts).toBeUndefined();
+  });
 });
