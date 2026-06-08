@@ -27,13 +27,13 @@ beforeAll(async () => {
 
   pool = new Pool({ connectionString: dbUrl, max: 5 });
 
-  // Seed awards for fake competitor
+  // Seed awards for fake competitor (piid + last_mod_date required for unique constraint)
   await pool.query(
-    `INSERT INTO awards (awardee_name, agency_name, naics, value_obligated, award_date)
+    `INSERT INTO awards (piid, last_mod_date, awardee_name, agency_name, naics, value_obligated, award_date)
      VALUES
-       ('ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 50000000, '2025-06-01'),
-       ('ACME DEFENSE INTEGRATORS LLC', 'Department of Homeland Security', '541512', 25000000, '2025-03-15'),
-       ('ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 30000000, '2025-01-10')`,
+       ('ACME-PIID-001', '2025-06-01', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 50000000, '2025-06-01'),
+       ('ACME-PIID-002', '2025-03-15', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Homeland Security', '541512', 25000000, '2025-03-15'),
+       ('ACME-PIID-003', '2025-01-10', 'ACME DEFENSE INTEGRATORS LLC', 'Department of Defense', '541330', 30000000, '2025-01-10')`,
   );
 }, 120_000);
 
@@ -43,7 +43,7 @@ afterAll(async () => {
       `DELETE FROM govtribe_contacts WHERE contact_category = 'competitor' AND company = 'Mock Competitor Corp'`,
     );
     await pool.query(
-      `DELETE FROM awards WHERE awardee_name = 'ACME DEFENSE INTEGRATORS LLC'`,
+      `DELETE FROM awards WHERE piid IN ('ACME-PIID-001', 'ACME-PIID-002', 'ACME-PIID-003')`,
     );
     await pool.end();
   }
