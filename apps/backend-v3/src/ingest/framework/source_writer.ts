@@ -8,6 +8,7 @@
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../../lib/queue.js';
+import { mirrorOpportunityToUnified } from '../../services/opportunities/unified-mirror.js';
 
 function enqueueIngestAnalysis(oppId: string): void {
   try {
@@ -210,6 +211,33 @@ export async function upsertOpportunityWithSources(
     // F-605: auto-enqueue analysis on ingest
     enqueueIngestAnalysis(String(oppId));
 
+    // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
+    try {
+      await mirrorOpportunityToUnified(pool, {
+        id: oppId,
+        data_source: opp.data_source,
+        sam_notice_id: opp.sam_notice_id,
+        govtribe_id: null,
+        external_id: null,
+        title: opp.title,
+        agency: opp.agency,
+        sub_agency: opp.sub_agency,
+        naics: opp.naics,
+        psc: opp.psc,
+        set_aside: opp.set_aside,
+        value_min: opp.value_min,
+        value_max: opp.value_max,
+        posted_at: opp.posted_at,
+        response_due_at: opp.response_due_at,
+        status: opp.status,
+      });
+    } catch (mirrorErr) {
+      logger.error(
+        { oppId, error: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr) },
+        'unified_mirror_post_ingest_error',
+      );
+    }
+
     if (wasInserted) return 'inserted';
     return 'updated';
   } catch (err) {
@@ -327,6 +355,33 @@ export async function upsertExternalOpportunity(
 
     // F-605: auto-enqueue analysis on ingest
     enqueueIngestAnalysis(String(oppId));
+
+    // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
+    try {
+      await mirrorOpportunityToUnified(pool, {
+        id: oppId,
+        data_source: opp.data_source,
+        sam_notice_id: null,
+        govtribe_id: opp.data_source === 'govtribe' ? opp.external_id : null,
+        external_id: opp.external_id,
+        title: opp.title,
+        agency: opp.agency,
+        sub_agency: opp.sub_agency,
+        naics: opp.naics,
+        psc: opp.psc,
+        set_aside: opp.set_aside,
+        value_min: opp.value_min,
+        value_max: opp.value_max,
+        posted_at: opp.posted_at,
+        response_due_at: opp.response_due_at,
+        status: opp.status,
+      });
+    } catch (mirrorErr) {
+      logger.error(
+        { oppId, error: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr) },
+        'unified_mirror_post_ingest_error',
+      );
+    }
 
     if (wasInserted) return 'inserted';
     return 'updated';
