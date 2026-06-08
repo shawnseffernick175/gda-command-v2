@@ -6,6 +6,7 @@ import {
   createPipelineItem,
   updatePipelineItem,
 } from '../services/pipeline/index.js';
+import { pipelineStageToDisplay, ACTIVE_STAGE_KEYS } from '../lib/pipeline-stage.js';
 import type { JwtPayload } from '../middleware/auth.js';
 import type { Milestone } from '../services/pipeline/types.js';
 
@@ -37,17 +38,7 @@ interface UpdateBody {
   teaming_partners?: string[];
 }
 
-/* ── Stage display mapping (DB value → label used by frontend) ─── */
-const STAGE_DISPLAY: Record<string, string> = {
-  qualifying: 'Interest',
-  pursuit: 'Qualified',
-  proposal: 'Capture',
-  submitted: 'Proposal',
-  evaluation: 'Evaluation',
-  won: 'Won',
-};
-
-const ACTIVE_STAGES = ['qualifying', 'pursuit', 'proposal', 'submitted', 'evaluation'];
+const ACTIVE_STAGES: readonly string[] = ACTIVE_STAGE_KEYS;
 
 interface StageStats {
   count: number;
@@ -97,12 +88,12 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
     let proposalsOut = 0;
 
     for (const row of stagesRes.rows) {
-      const label = STAGE_DISPLAY[row.stage] ?? row.stage;
+      const label = pipelineStageToDisplay(row.stage);
       const val = Number(row.value);
       byStage[label] = { count: row.count, value: val };
       totalValue += val;
       if (ACTIVE_STAGES.includes(row.stage)) activePursuits += row.count;
-      if (row.stage === 'submitted') proposalsOut += row.count;
+      if (row.stage === 'post_submittal') proposalsOut += row.count;
     }
 
     // Weighted pipeline value: sum of (value × pwin/100) for non-lost
@@ -159,7 +150,7 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
         agency: r.agency,
         value: r.value != null ? Number(r.value) : null,
         stage: r.stage,
-        stage_label: STAGE_DISPLAY[r.stage] ?? r.stage,
+        stage_label: pipelineStageToDisplay(r.stage),
         moved_at: r.moved_at,
       }));
 

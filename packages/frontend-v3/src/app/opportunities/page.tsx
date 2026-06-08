@@ -23,6 +23,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import {
+  STAGE_TABS as CANONICAL_STAGE_TABS,
+  STAGE_ACTIONS as CANONICAL_STAGE_ACTIONS,
+  STAGE_BADGE_STYLES as CANONICAL_BADGE_STYLES,
+  ACTIVE_STAGES as CANONICAL_ACTIVE_STAGES,
+  stageKeyToLabel,
+  type ActiveStage,
+} from "@/lib/stages";
 import type {
   DoctrineFitLabel,
   LlmAnalysis,
@@ -46,18 +54,9 @@ function OpportunitiesContent() {
   return <OpportunityList />;
 }
 
-/* ── Stage tabs config ──────────────────────────────────────────── */
+/* ── Stage tabs config (from shared canonical model) ────────────── */
 
-const STAGE_TABS = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "qualifying", label: "Interest" },
-  { key: "pursuit", label: "Qualified" },
-  { key: "proposal", label: "Capture" },
-  { key: "submitted", label: "Proposal" },
-  { key: "won", label: "Won" },
-  { key: "lost", label: "Lost" },
-] as const;
+const STAGE_TABS = CANONICAL_STAGE_TABS;
 
 /* ── Urgency heat helpers ───────────────────────────────────────── */
 
@@ -101,28 +100,9 @@ function formatDaysLeft(opp: OpportunitySummary): { text: string; className: str
   };
 }
 
-/* ── Stage badge colors ─────────────────────────────────────────── */
+/* ── Stage badge colors (from shared canonical model) ───────────── */
 
-const STAGE_BADGE_STYLES: Record<string, string> = {
-  qualifying: "border-muted text-muted-foreground",
-  pursuit: "border-gda-cyan text-gda-cyan",
-  proposal: "border-gda-amber text-gda-amber",
-  submitted: "border-gda-green text-gda-green",
-  won: "bg-gda-green/20 text-gda-green border-transparent",
-  lost: "bg-gda-red/10 text-gda-red border-transparent",
-  no_bid: "bg-gda-red/10 text-gda-red border-transparent",
-};
-
-const STAGE_DISPLAY: Record<string, string> = {
-  qualifying: "Interest",
-  pursuit: "Qualified",
-  proposal: "Capture",
-  submitted: "Proposal",
-  evaluation: "Evaluation",
-  won: "Won",
-  lost: "Lost",
-  no_bid: "No-Bid",
-};
+const STAGE_BADGE_STYLES = CANONICAL_BADGE_STYLES;
 
 /* ── Value range options ────────────────────────────────────────── */
 
@@ -846,7 +826,7 @@ function OpportunityRow({
               STAGE_BADGE_STYLES[pipelineStage] ?? "border-border text-muted-foreground",
             )}
           >
-            {STAGE_DISPLAY[pipelineStage] ?? pipelineStage}
+            {stageKeyToLabel(pipelineStage)}
           </span>
         ) : (
           <span className="text-xs text-muted-foreground">---</span>
@@ -917,32 +897,9 @@ const FIT_COLORS: Record<DoctrineFitLabel, string> = {
   none: "text-muted-foreground",
 };
 
-// ─── Stage constants ─────────────────────────────────────────────────────────
-const STAGES = ["Interest", "Qualified", "Capture", "Proposal", "Won"] as const;
-type Stage = (typeof STAGES)[number];
-
-const STAGE_ACTIONS: Record<string, Array<{ label: string; stage?: string }>> = {
-  Interest: [
-    { label: "Qualify", stage: "Qualified" },
-    { label: "No-Bid", stage: "No-Bid" },
-    { label: "Add to Watch List" },
-  ],
-  Qualified: [
-    { label: "Start Capture", stage: "Capture" },
-    { label: "Request More Info" },
-    { label: "No-Bid", stage: "No-Bid" },
-  ],
-  Capture: [
-    { label: "Start Proposal", stage: "Proposal" },
-    { label: "Run Color Team" },
-    { label: "No-Bid", stage: "No-Bid" },
-  ],
-  Proposal: [
-    { label: "Submit", stage: "Won" },
-    { label: "Request Extension" },
-    { label: "Withdraw", stage: "Lost" },
-  ],
-};
+// Stage constants from shared canonical model
+const STAGES = CANONICAL_ACTIVE_STAGES;
+const STAGE_ACTIONS = CANONICAL_STAGE_ACTIONS;
 
 const SUGGESTION_CHIPS = [
   "What's Envision's win angle?",
@@ -975,7 +932,7 @@ function OpportunityDetail({ id }: { id: string }) {
   if (!opp) return null;
 
   const llm = opp.llm_analysis as LlmAnalysis | null | undefined;
-  const currentStage = (opp.pipeline_stage ? (STAGE_DISPLAY[opp.pipeline_stage] ?? opp.pipeline_stage) : null) ?? opp.stage ?? "Interest";
+  const currentStage = opp.pipeline_stage ? stageKeyToLabel(opp.pipeline_stage) : (opp.stage ?? "Interest");
   const timeline = opp.analysis?.timeline;
   const doctrine = opp.doctrine_badge;
   const doctrineScore = opp.doctrine_score;
@@ -997,7 +954,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* Stage Stepper */}
         <div className="mt-3 flex items-center gap-1">
           {STAGES.map((stage, idx) => {
-            const stageIdx = STAGES.indexOf(currentStage as Stage);
+            const stageIdx = STAGES.indexOf(currentStage as ActiveStage);
             const isCurrent = stage === currentStage;
             const isCompleted = idx < stageIdx;
             return (

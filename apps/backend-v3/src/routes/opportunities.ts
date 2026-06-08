@@ -561,13 +561,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(200).send(successEnvelope(result, req.requestId));
   });
 
-  // Fetch the latest pipeline stage for an opportunity
-  async function getPipelineStage(oppId: string): Promise<string | null> {
+  // Fetch the latest pipeline stage for an opportunity (defaults to 'interest')
+  async function getPipelineStage(oppId: string): Promise<string> {
     const res = await pool.query<{ stage: string }>(
       `SELECT stage FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
       [oppId],
     );
-    return res.rows[0]?.stage ?? null;
+    return res.rows[0]?.stage ?? 'interest';
   }
 
   // GET /v3/opportunities/:id — detail with 10s synchronous block (Addendum A.3)
@@ -723,7 +723,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         .send(
           errorEnvelope(
             'VALIDATION_ERROR',
-            `Unknown pipeline stage "${input.stage}". Accepted values: Qualified, Capture, Proposal, Submitted, Evaluation, Won, Lost, No-Bid (or their DB keys).`,
+            `Unknown pipeline stage "${input.stage}". Accepted values: Interest, Qualify, Pursue, Solicitation, Post-Submittal, Won, Lost, No Bid, Government Cancelled (or their DB keys).`,
             req.requestId,
           ),
         );

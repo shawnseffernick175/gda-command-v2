@@ -216,7 +216,52 @@ export function useUpdateStage() {
   return useMutation({
     mutationFn: ({ id, stage }: { id: string; stage: string }) =>
       apiPatch<Record<string, unknown>>(`/v3/opportunities/${id}`, { stage }),
-    onSuccess: (_data, vars) => {
+
+    onMutate: async (vars) => {
+      // Optimistic update: immediately reflect the new stage in caches
+      await qc.cancelQueries({ queryKey: ["opportunity", vars.id] });
+      await qc.cancelQueries({ queryKey: ["opportunities-paged"] });
+
+      const prevDetail = qc.getQueryData<OpportunityDetail>(["opportunity", vars.id]);
+      const prevPaged = qc.getQueriesData<OpportunitiesPagedResponse>({
+        queryKey: ["opportunities-paged"],
+      });
+
+      // Update detail cache
+      if (prevDetail) {
+        qc.setQueryData<OpportunityDetail>(["opportunity", vars.id], {
+          ...prevDetail,
+          pipeline_stage: vars.stage,
+        });
+      }
+
+      // Update list cache
+      for (const [key, data] of prevPaged) {
+        if (!data) continue;
+        qc.setQueryData<OpportunitiesPagedResponse>(key, {
+          ...data,
+          items: data.items.map((item) =>
+            String(item.id) === vars.id ? { ...item, pipeline_stage: vars.stage } : item,
+          ),
+        });
+      }
+
+      return { prevDetail, prevPaged };
+    },
+
+    onError: (_err, vars, ctx) => {
+      // Rollback on error
+      if (ctx?.prevDetail) {
+        qc.setQueryData(["opportunity", vars.id], ctx.prevDetail);
+      }
+      if (ctx?.prevPaged) {
+        for (const [key, data] of ctx.prevPaged) {
+          qc.setQueryData(key, data);
+        }
+      }
+    },
+
+    onSettled: (_data, _err, vars) => {
       void qc.invalidateQueries({ queryKey: ["opportunity", vars.id] });
       void qc.invalidateQueries({ queryKey: ["opportunities-paged"] });
     },

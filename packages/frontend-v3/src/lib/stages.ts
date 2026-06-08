@@ -1,8 +1,34 @@
 /**
- * Canonical stage model — tool-wide.
- * Active: Interest → Qualify → Pursue → Solicitation → Post-Submittal
- * Terminal: Won · Lost · No Bid · Government Cancelled
+ * Canonical stage model -- tool-wide.
+ * Active: Interest -> Qualify -> Pursue -> Solicitation -> Post-Submittal
+ * Terminal: Won, Lost, No Bid, Government Cancelled
  */
+
+/* ---- DB key constants --------------------------------------------------- */
+
+export const CANONICAL_STAGE_KEYS = [
+  "interest",
+  "qualify",
+  "pursue",
+  "solicitation",
+  "post_submittal",
+  "won",
+  "lost",
+  "no_bid",
+  "gov_cancelled",
+] as const;
+
+export type CanonicalStageKey = (typeof CANONICAL_STAGE_KEYS)[number];
+
+export const ACTIVE_STAGE_KEYS: readonly CanonicalStageKey[] = [
+  "interest",
+  "qualify",
+  "pursue",
+  "solicitation",
+  "post_submittal",
+] as const;
+
+/* ---- Display labels ----------------------------------------------------- */
 
 export const ACTIVE_STAGES = [
   "Interest",
@@ -24,6 +50,96 @@ export const ALL_STAGES = [...ACTIVE_STAGES, ...TERMINAL_STAGES] as const;
 export type ActiveStage = (typeof ACTIVE_STAGES)[number];
 export type TerminalStage = (typeof TERMINAL_STAGES)[number];
 export type Stage = (typeof ALL_STAGES)[number];
+
+/* ---- Key <-> label maps ------------------------------------------------- */
+
+export const DB_KEY_TO_LABEL: Record<CanonicalStageKey, Stage> = {
+  interest: "Interest",
+  qualify: "Qualify",
+  pursue: "Pursue",
+  solicitation: "Solicitation",
+  post_submittal: "Post-Submittal",
+  won: "Won",
+  lost: "Lost",
+  no_bid: "No Bid",
+  gov_cancelled: "Government Cancelled",
+};
+
+export const LABEL_TO_DB_KEY: Record<Stage, CanonicalStageKey> = {
+  Interest: "interest",
+  Qualify: "qualify",
+  Pursue: "pursue",
+  Solicitation: "solicitation",
+  "Post-Submittal": "post_submittal",
+  Won: "won",
+  Lost: "lost",
+  "No Bid": "no_bid",
+  "Government Cancelled": "gov_cancelled",
+};
+
+/* ---- Tab config --------------------------------------------------------- */
+
+export const STAGE_TABS: ReadonlyArray<{ key: string; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "interest", label: "Interest" },
+  { key: "qualify", label: "Qualify" },
+  { key: "pursue", label: "Pursue" },
+  { key: "solicitation", label: "Solicitation" },
+  { key: "post_submittal", label: "Post-Submittal" },
+  { key: "won", label: "Won" },
+  { key: "lost", label: "Lost" },
+  { key: "no_bid", label: "No Bid" },
+  { key: "gov_cancelled", label: "Government Cancelled" },
+];
+
+/* ---- Stage actions (canonical forward path) ----------------------------- */
+
+export const STAGE_ACTIONS: Record<
+  string,
+  ReadonlyArray<{ label: string; stage?: string }>
+> = {
+  Interest: [
+    { label: "Qualify", stage: "qualify" },
+    { label: "No Bid", stage: "no_bid" },
+    { label: "Add to Watch List" },
+  ],
+  Qualify: [
+    { label: "Advance to Pursue", stage: "pursue" },
+    { label: "No Bid", stage: "no_bid" },
+  ],
+  Pursue: [
+    { label: "Advance to Solicitation", stage: "solicitation" },
+    { label: "Run Color Team" },
+    { label: "No Bid", stage: "no_bid" },
+  ],
+  Solicitation: [
+    { label: "Move to Post-Submittal", stage: "post_submittal" },
+    { label: "No Bid", stage: "no_bid" },
+    { label: "Government Cancelled", stage: "gov_cancelled" },
+  ],
+  "Post-Submittal": [
+    { label: "Mark Won", stage: "won" },
+    { label: "Mark Lost", stage: "lost" },
+    { label: "Government Cancelled", stage: "gov_cancelled" },
+  ],
+};
+
+/* ---- Badge styles ------------------------------------------------------- */
+
+export const STAGE_BADGE_STYLES: Record<string, string> = {
+  interest: "border-muted text-muted-foreground",
+  qualify: "border-gda-cyan text-gda-cyan",
+  pursue: "border-gda-amber text-gda-amber",
+  solicitation: "border-gda-green text-gda-green",
+  post_submittal: "border-gda-green text-gda-green",
+  won: "bg-gda-green/20 text-gda-green border-transparent",
+  lost: "bg-gda-red/10 text-gda-red border-transparent",
+  no_bid: "bg-gda-red/10 text-gda-red border-transparent",
+  gov_cancelled: "bg-muted/10 text-muted-foreground border-transparent",
+};
+
+/* ---- Helpers ------------------------------------------------------------ */
 
 export function isTerminal(stage: string): boolean {
   return (TERMINAL_STAGES as readonly string[]).includes(stage);
@@ -72,4 +188,8 @@ export function stageBgColor(stage: string): string {
     default:
       return "bg-muted/10 border-border";
   }
+}
+
+export function stageKeyToLabel(dbKey: string): string {
+  return DB_KEY_TO_LABEL[dbKey as CanonicalStageKey] ?? dbKey;
 }
