@@ -7,7 +7,7 @@ import { resolveFieldSources, type SourceRef } from '../../lib/sources.js';
 import { evaluateTeamingFlags } from './teaming.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
-import { normalizePipelineStage } from '../../lib/pipeline-stage.js';
+import { normalizePipelineStage, ACTIVE_STAGE_KEYS } from '../../lib/pipeline-stage.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
   type OpportunityRow,
@@ -290,6 +290,29 @@ export async function listOpportunities(
     params.push(ENVISION_NAICS);
   }
 
+  // Stage filter (pipeline_items-based). Uses o.id since the main query aliases opportunities as o.
+  if (filters.stage === 'active') {
+    const activeList = ACTIVE_STAGE_KEYS.map((_, i) => `$${paramIdx + i}`).join(', ');
+    params.push(...ACTIVE_STAGE_KEYS);
+    paramIdx += ACTIVE_STAGE_KEYS.length;
+    conditions.push(
+      `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage IN (${activeList})) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
+    );
+  } else if (filters.stage) {
+    const normalized = normalizePipelineStage(filters.stage) ?? filters.stage;
+    if (normalized === 'interest') {
+      conditions.push(
+        `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = $${paramIdx++}) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
+      );
+      params.push(normalized);
+    } else {
+      conditions.push(
+        `EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = $${paramIdx++})`,
+      );
+      params.push(normalized);
+    }
+  }
+
   if (filters.cursor) {
     try {
       const decoded = JSON.parse(Buffer.from(filters.cursor, 'base64').toString('utf-8')) as {
@@ -304,10 +327,10 @@ export async function listOpportunities(
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const sql = `SELECT *, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = opportunities.id)) AS has_pipeline_stage FROM opportunities ${where} ORDER BY id DESC LIMIT $${paramIdx}`;
+  const sql = `SELECT o.*, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage, COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage FROM opportunities o ${where} ORDER BY o.id DESC LIMIT $${paramIdx}`;
   params.push(limit + 1);
 
-  const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean }>(sql, params);
+  const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean; pipeline_stage: string }>(sql, params);
   const rows = res.rows;
 
   const hasMore = rows.length > limit;
@@ -316,7 +339,8 @@ export async function listOpportunities(
   const summaries = await Promise.all(
     items.map(async (row) => {
       const sources = await resolveOpportunitySources(String(row.id));
-      return buildSummaryFromSources(row, sources, row.has_pipeline_stage);
+      const summary = buildSummaryFromSources(row, sources, row.has_pipeline_stage);
+      return { ...summary, pipeline_stage: row.pipeline_stage };
     }),
   );
 
@@ -466,14 +490,27 @@ function buildFilterConditions(
     params.push(filters.sources);
   }
   if (filters.stage === 'active') {
+    // Active = has an active-stage pipeline row OR has no pipeline row (defaults to interest)
+    const activeList = ACTIVE_STAGE_KEYS.map((_, i) => `$${paramIdx + i}`).join(', ');
+    params.push(...ACTIVE_STAGE_KEYS);
+    paramIdx += ACTIVE_STAGE_KEYS.length;
     conditions.push(
-      `EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage NOT IN ('won','lost'))`,
+      `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage IN (${activeList})) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
     );
   } else if (filters.stage) {
-    conditions.push(
-      `EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = $${paramIdx++})`,
-    );
-    params.push(filters.stage);
+    const normalized = normalizePipelineStage(filters.stage) ?? filters.stage;
+    if (normalized === 'interest') {
+      // Interest tab: match rows with pipeline stage = interest OR no pipeline row at all
+      conditions.push(
+        `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = $${paramIdx++}) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
+      );
+      params.push(normalized);
+    } else {
+      conditions.push(
+        `EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = $${paramIdx++})`,
+      );
+      params.push(normalized);
+    }
   }
 
   return { conditions, params, paramIdx };
@@ -514,13 +551,14 @@ export async function listOpportunitiesPaged(
   const total = metaRow?.total_count ?? 0;
   const totalPages = Math.max(Math.ceil(total / limit), 1);
 
-  // Stage counts use base filters (without stage) so all tab counts stay accurate
+  // Stage counts use base filters (without stage) so all tab counts stay accurate.
+  // Opps with no pipeline_items row count as 'interest'.
   const stageCountsSql = `
-    SELECT pi.stage, COUNT(DISTINCT pi.opportunity_id)::int AS cnt
-    FROM pipeline_items pi
-    INNER JOIN opportunities o ON o.id = pi.opportunity_id
+    SELECT COALESCE(pi.stage, 'interest') AS stage, COUNT(DISTINCT o.id)::int AS cnt
+    FROM opportunities o
+    LEFT JOIN pipeline_items pi ON pi.opportunity_id = o.id
     ${baseWhere}
-    GROUP BY pi.stage
+    GROUP BY COALESCE(pi.stage, 'interest')
   `;
   const stageRes = await pool.query<{ stage: string; cnt: number }>(stageCountsSql, baseParams);
   const stageCounts: Record<string, number> = {};
@@ -532,7 +570,7 @@ export async function listOpportunitiesPaged(
   const dataSql = `
     SELECT o.*,
       (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage,
-      (SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1) AS pipeline_stage
+      COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage
     FROM opportunities o ${where}
     ORDER BY o.id DESC
     LIMIT $${dataParamIdx} OFFSET $${dataParamIdx + 1}
@@ -728,6 +766,25 @@ export async function qualifyOpportunity(
     [now, qualifiedBy, id],
   );
   const row = res.rows[0]!;
+
+  // Also write pipeline_items at 'qualify' so the stage is visible in tabs
+  const existing = await pool.query(
+    `SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
+    [id],
+  );
+  if (existing.rows.length > 0) {
+    await pool.query(
+      `UPDATE pipeline_items SET stage = 'qualify', updated_at = NOW() WHERE id = $1`,
+      [existing.rows[0].id],
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
+       VALUES ($1, $2, 'qualify', $3)`,
+      [id, qualifiedBy, row.source_id],
+    );
+  }
+
   const teaming_flags = evaluateTeamingFlags(row);
   return { row, teaming_flags };
 }

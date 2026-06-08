@@ -13,6 +13,12 @@ import { formatMoney } from "@/lib/format-money";
 import { apiGet } from "@/lib/api";
 import type { OpportunitySummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  ACTIVE_STAGES,
+  LABEL_TO_DB_KEY,
+  stageKeyToLabel,
+  type ActiveStage,
+} from "@/lib/stages";
 
 const PAGE_SIZE = 50;
 
@@ -43,44 +49,43 @@ interface PipelineSummary {
   stage_movers: StageMover[];
 }
 
-/* ── Stage config ──────────────────────────────────────────────── */
+/* ── Stage config (canonical) ──────────────────────────────────── */
 
-const FUNNEL_STAGES = ["Interest", "Qualified", "Capture", "Proposal", "Won"] as const;
+const FUNNEL_STAGES = [...ACTIVE_STAGES, "Won" as const];
 
 const STAGE_BAR_COLORS: Record<string, string> = {
   Interest: "bg-muted-foreground/40",
-  Qualified: "bg-gda-cyan/40",
-  Capture: "bg-gda-amber/40",
-  Proposal: "bg-gda-green/40",
+  Qualify: "bg-gda-cyan/40",
+  Pursue: "bg-gda-amber/40",
+  Solicitation: "bg-gda-green/40",
+  "Post-Submittal": "bg-gda-green/40",
   Won: "bg-gda-green",
 };
 
 const STAGE_BADGE_COLORS: Record<string, string> = {
   Interest: "border-muted text-muted-foreground",
-  Qualified: "border-gda-cyan text-gda-cyan",
-  Capture: "border-gda-amber text-gda-amber",
-  Proposal: "border-gda-green text-gda-green",
+  Qualify: "border-gda-cyan text-gda-cyan",
+  Pursue: "border-gda-amber text-gda-amber",
+  Solicitation: "border-gda-green text-gda-green",
+  "Post-Submittal": "border-gda-green text-gda-green",
   Won: "bg-gda-green/20 text-gda-green border-transparent",
 };
 
 const STAGE_ARROW_COLORS: Record<string, string> = {
   Interest: "bg-muted text-muted-foreground",
-  Qualified: "bg-gda-cyan/20 text-gda-cyan",
-  Capture: "bg-gda-amber/20 text-gda-amber",
-  Proposal: "bg-gda-green/20 text-gda-green",
-  Evaluation: "bg-gda-amber/20 text-gda-amber",
+  Qualify: "bg-gda-cyan/20 text-gda-cyan",
+  Pursue: "bg-gda-amber/20 text-gda-amber",
+  Solicitation: "bg-gda-green/20 text-gda-green",
+  "Post-Submittal": "bg-gda-green/20 text-gda-green",
   Won: "bg-gda-green/20 text-gda-green",
 };
 
-/* ── Pipeline stage filter mapping ─────────────────────────────── */
+/* ── Pipeline stage filter mapping (canonical) ─────────────────── */
 
-const STAGE_TO_DB: Record<string, string> = {
-  Interest: "qualifying",
-  Qualified: "pursuit",
-  Capture: "proposal",
-  Proposal: "submitted",
-  Won: "won",
-};
+const STAGE_TO_DB: Record<string, string> = Object.fromEntries(
+  ACTIVE_STAGES.map((label) => [label, LABEL_TO_DB_KEY[label as ActiveStage]]),
+);
+STAGE_TO_DB["Won"] = "won";
 
 /* ── Urgency helpers ───────────────────────────────────────────── */
 
@@ -242,7 +247,7 @@ export default function PipelinePage() {
           <IntelChip
             label={String(summary.proposals_out)}
             sub="Proposals Out"
-            onClick={() => handleStageClick("Proposal")}
+            onClick={() => handleStageClick("Post-Submittal")}
           />
           <IntelChip
             label={String(summary.moved_this_week)}
@@ -445,16 +450,7 @@ function IntelChip({
 
 /* ── Stage display mapping ────────────────────────────────────── */
 
-const STAGE_DISPLAY: Record<string, string> = {
-  qualifying: "Interest",
-  pursuit: "Qualified",
-  proposal: "Capture",
-  submitted: "Proposal",
-  evaluation: "Evaluation",
-  won: "Won",
-  lost: "Lost",
-  no_bid: "No-Bid",
-};
+/* (removed -- using stageKeyToLabel from shared module) */
 
 /* ── PipelineRow ──────────────────────────────────────────────── */
 
@@ -465,7 +461,7 @@ function PipelineRow({ opp }: { opp: OpportunitySummary }) {
   const weightedValue = Math.round(rawValue * (pwinScore / 100));
   const daysLeft = formatDaysLeft(opp);
   const pipelineStage = opp.pipeline_stage;
-  const stageLabel = pipelineStage ? (STAGE_DISPLAY[pipelineStage] ?? pipelineStage) : null;
+  const stageLabel = pipelineStage ? stageKeyToLabel(pipelineStage) : null;
 
   return (
     <tr className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9">

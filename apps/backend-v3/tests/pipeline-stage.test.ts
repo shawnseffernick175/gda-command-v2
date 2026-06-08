@@ -1,34 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { normalizePipelineStage, pipelineStageToDisplay } from '../src/lib/pipeline-stage.js';
+import { normalizePipelineStage, pipelineStageToDisplay, CANONICAL_STAGE_KEYS } from '../src/lib/pipeline-stage.js';
 
 describe('normalizePipelineStage', () => {
-  it('maps frontend labels to DB enums (case-insensitive)', () => {
-    expect(normalizePipelineStage('Interest')).toBe('qualifying');
-    expect(normalizePipelineStage('Qualified')).toBe('pursuit');
-    expect(normalizePipelineStage('qualified')).toBe('pursuit');
-    expect(normalizePipelineStage('QUALIFIED')).toBe('pursuit');
-    expect(normalizePipelineStage('Capture')).toBe('proposal');
-    expect(normalizePipelineStage('Proposal')).toBe('submitted');
+  it('maps canonical display labels to DB keys (case-insensitive)', () => {
+    expect(normalizePipelineStage('Interest')).toBe('interest');
+    expect(normalizePipelineStage('Qualify')).toBe('qualify');
+    expect(normalizePipelineStage('qualify')).toBe('qualify');
+    expect(normalizePipelineStage('QUALIFY')).toBe('qualify');
+    expect(normalizePipelineStage('Pursue')).toBe('pursue');
+    expect(normalizePipelineStage('Solicitation')).toBe('solicitation');
+    expect(normalizePipelineStage('Post-Submittal')).toBe('post_submittal');
     expect(normalizePipelineStage('Won')).toBe('won');
     expect(normalizePipelineStage('Lost')).toBe('lost');
+    expect(normalizePipelineStage('No Bid')).toBe('no_bid');
     expect(normalizePipelineStage('No-Bid')).toBe('no_bid');
-    expect(normalizePipelineStage('no-bid')).toBe('no_bid');
+    expect(normalizePipelineStage('Government Cancelled')).toBe('gov_cancelled');
   });
 
-  it('accepts DB enum values directly (unambiguous ones)', () => {
-    expect(normalizePipelineStage('qualifying')).toBe('qualifying');
-    expect(normalizePipelineStage('pursuit')).toBe('pursuit');
-    expect(normalizePipelineStage('submitted')).toBe('submitted');
-    expect(normalizePipelineStage('evaluation')).toBe('evaluation');
-    expect(normalizePipelineStage('won')).toBe('won');
-    expect(normalizePipelineStage('lost')).toBe('lost');
-    expect(normalizePipelineStage('no_bid')).toBe('no_bid');
+  it('accepts DB keys directly', () => {
+    for (const key of CANONICAL_STAGE_KEYS) {
+      expect(normalizePipelineStage(key)).toBe(key);
+    }
   });
 
-  it('label mapping wins for "proposal" (frontend label → submitted)', () => {
-    // "Proposal" is the frontend label for the DB enum "submitted"
-    // Label mapping takes precedence over raw enum matching
-    expect(normalizePipelineStage('proposal')).toBe('submitted');
+  it('accepts common aliases', () => {
+    expect(normalizePipelineStage('Qualified')).toBe('qualify');
+    expect(normalizePipelineStage('Pursuit')).toBe('pursue');
+    expect(normalizePipelineStage('Submitted')).toBe('post_submittal');
+    expect(normalizePipelineStage('Post Submittal')).toBe('post_submittal');
+    expect(normalizePipelineStage('Gov Cancelled')).toBe('gov_cancelled');
+    expect(normalizePipelineStage('Cancelled')).toBe('gov_cancelled');
   });
 
   it('returns null for unknown input', () => {
@@ -40,23 +41,24 @@ describe('normalizePipelineStage', () => {
 
   it('trims whitespace', () => {
     expect(normalizePipelineStage('  Won  ')).toBe('won');
-    expect(normalizePipelineStage(' No-Bid ')).toBe('no_bid');
+    expect(normalizePipelineStage(' No Bid ')).toBe('no_bid');
   });
 });
 
 describe('pipelineStageToDisplay', () => {
-  it('maps DB enums to display labels', () => {
-    expect(pipelineStageToDisplay('qualifying')).toBe('Interest');
-    expect(pipelineStageToDisplay('pursuit')).toBe('Qualified');
-    expect(pipelineStageToDisplay('proposal')).toBe('Capture');
-    expect(pipelineStageToDisplay('submitted')).toBe('Proposal');
-    expect(pipelineStageToDisplay('evaluation')).toBe('Evaluation');
+  it('maps all canonical DB keys to display labels', () => {
+    expect(pipelineStageToDisplay('interest')).toBe('Interest');
+    expect(pipelineStageToDisplay('qualify')).toBe('Qualify');
+    expect(pipelineStageToDisplay('pursue')).toBe('Pursue');
+    expect(pipelineStageToDisplay('solicitation')).toBe('Solicitation');
+    expect(pipelineStageToDisplay('post_submittal')).toBe('Post-Submittal');
     expect(pipelineStageToDisplay('won')).toBe('Won');
     expect(pipelineStageToDisplay('lost')).toBe('Lost');
-    expect(pipelineStageToDisplay('no_bid')).toBe('No-Bid');
+    expect(pipelineStageToDisplay('no_bid')).toBe('No Bid');
+    expect(pipelineStageToDisplay('gov_cancelled')).toBe('Government Cancelled');
   });
 
-  it('falls back to raw value for unknown enum', () => {
+  it('falls back to raw value for unknown key', () => {
     expect(pipelineStageToDisplay('foo')).toBe('foo');
   });
 });
