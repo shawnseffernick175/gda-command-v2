@@ -108,7 +108,15 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       if (allOppIds.size > 0) {
         const oppIdArr = Array.from(allOppIds);
         const { rows: oppRows } = await pool.query(
-          `SELECT id, title, stage FROM unified_opportunities WHERE id = ANY($1)`,
+          `SELECT o.id,
+                  o.title,
+                  COALESCE(
+                    (SELECT pi.stage FROM pipeline_items pi
+                     WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1),
+                    o.status
+                  ) AS stage
+           FROM opportunities o
+           WHERE o.id = ANY($1)`,
           [oppIdArr],
         );
         for (const r of oppRows as Array<{ id: number; title: string; stage: string | null }>) {
@@ -206,7 +214,15 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     if (allOppIds.size > 0) {
       const oppIdArr = Array.from(allOppIds);
       const { rows: oppRows } = await pool.query(
-        `SELECT id, title, stage FROM unified_opportunities WHERE id = ANY($1)`,
+        `SELECT o.id,
+                o.title,
+                COALESCE(
+                  (SELECT pi.stage FROM pipeline_items pi
+                   WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1),
+                  o.status
+                ) AS stage
+         FROM opportunities o
+         WHERE o.id = ANY($1)`,
         [oppIdArr],
       );
       for (const r of oppRows as Array<{ id: number; title: string; stage: string | null }>) {
@@ -429,7 +445,18 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
 
     const [oppResult, capResult] = await Promise.all([
       pool.query(
-        `SELECT id, title, stage, value FROM unified_opportunities WHERE title ILIKE $1 ORDER BY id DESC LIMIT 20`,
+        `SELECT o.id,
+                o.title,
+                COALESCE(
+                  (SELECT pi.stage FROM pipeline_items pi
+                   WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1),
+                  o.status
+                ) AS stage,
+                o.value_max AS value
+         FROM opportunities o
+         WHERE o.title ILIKE $1
+         ORDER BY o.id DESC
+         LIMIT 20`,
         [pattern],
       ),
       pool.query(
