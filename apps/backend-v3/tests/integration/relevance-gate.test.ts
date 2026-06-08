@@ -173,7 +173,7 @@ describe('analysis backfill filters by relevance_status', () => {
          analysis, analysis_version
        ) VALUES (
          'Backfill Auto Pass', 'Department of the Army',
-         '541330', 'discovery', $1, $2,
+         '541330', 'discovery', $1, 'Test', $2,
          'auto_pass', 'auto_pass: past due', NULL, NULL
        ) RETURNING id::text`,
       [sourceId, farFuture],
