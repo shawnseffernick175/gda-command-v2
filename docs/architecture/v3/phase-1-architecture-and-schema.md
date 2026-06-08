@@ -233,6 +233,11 @@ CREATE TABLE opportunities (
   tags                TEXT[]        NOT NULL DEFAULT '{}',
   data_source         TEXT          NOT NULL DEFAULT 'manual',  -- ingest origin: 'sam', 'govtribe', 'govwin', 'dibbs', 'neco', 'manual'
   agency_subtype      TEXT,                    -- sub-classification: 'DLA', 'Navy', etc.
+  department_name     TEXT,                    -- clean cabinet department (e.g. 'Department of Defense')
+  agency_name         TEXT,                    -- sub-department / bureau (e.g. 'Department of the Navy')
+  office              TEXT,                    -- operational office in middle of org path
+  contracting_office  TEXT,                    -- final buying office (last path segment)
+  org_path            TEXT,                    -- full normalized slash-delimited org path
   opportunity_type    TEXT,                    -- e.g., 'RFQ', 'Synopsis'
   part_number         TEXT,                    -- DIBBS-specific part/NSN tracking
   quantity            NUMERIC,                 -- requested quantity (DIBBS/NECO)
@@ -260,6 +265,8 @@ CREATE INDEX idx_opps_response_due   ON opportunities (response_due_at DESC) WHE
 CREATE INDEX idx_opps_grade          ON opportunities (grade) WHERE deleted_at IS NULL;
 CREATE INDEX idx_opps_sam_notice     ON opportunities (sam_notice_id) WHERE sam_notice_id IS NOT NULL;
 CREATE INDEX idx_opps_agency_subtype ON opportunities (agency_subtype) WHERE agency_subtype IS NOT NULL;
+CREATE INDEX idx_opportunities_department_name ON opportunities (department_name);
+CREATE INDEX idx_opportunities_agency_name ON opportunities (agency_name);
 CREATE INDEX idx_opps_part_number    ON opportunities (part_number) WHERE part_number IS NOT NULL;
 CREATE UNIQUE INDEX idx_opps_ext_id  ON opportunities (data_source, external_id) WHERE external_id IS NOT NULL;
 CREATE INDEX idx_opps_govtribe_id   ON opportunities (govtribe_id) WHERE govtribe_id IS NOT NULL;
