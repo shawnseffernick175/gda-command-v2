@@ -244,6 +244,8 @@ CREATE TABLE opportunities (
   external_id         TEXT,                    -- non-SAM unique ID for dedup (DIBBS sol#, NECO RFQ#)
   source_uri          TEXT,                    -- deep-link to source page (GovTribe, GovWin, etc.)
   govtribe_id         TEXT,                    -- GovTribe entity ID for dedup + detail proxy
+  relevance_status    TEXT,                    -- ingest-time relevance gate: relevant/off_profile/unknown_naics/auto_pass
+  relevance_reason    TEXT,                    -- human-readable explanation of relevance_status
   analysis            JSONB,                   -- R2: cached auto-analysis result
   analysis_version    TEXT,                    -- analysis model version for cache invalidation
   ai_analyzed_at      TIMESTAMPTZ,             -- when analysis last ran

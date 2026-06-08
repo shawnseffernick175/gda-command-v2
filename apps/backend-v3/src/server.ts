@@ -71,6 +71,7 @@ async function backfillAnalysis(): Promise<void> {
     `SELECT id FROM opportunities
      WHERE deleted_at IS NULL
        AND (analysis IS NULL OR analysis_version != $1)
+       AND (relevance_status IS NULL OR relevance_status = 'relevant')
      LIMIT 500`,
     [config.analysisVersion],
   );
