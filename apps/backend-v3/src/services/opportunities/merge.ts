@@ -152,7 +152,7 @@ export function clearMergeCache(): void {
  * Fetch source records from the legacy `opportunities` table for each linked source.
  *
  * Join strategy: single query using CASE-based lookup.
- * - SAM → opportunities.sam_notice_id = source_native_id, data_source = 'sam_gov'
+ * - SAM → opportunities.sam_notice_id = source_native_id, data_source = 'sam.gov' (legacy: 'sam_gov')
  * - GovWin → opportunities.sam_notice_id = 'govwin-' || source_native_id
  * - GovTribe → opportunities.govtribe_id = source_native_id
  * - Fast Track → fast_track_assessments.input_hash = source_native_id
@@ -175,7 +175,7 @@ export async function fetchSourceRecords(
                   CASE WHEN value_min IS NOT NULL THEN (value_min * 100)::bigint ELSE NULL END AS estimated_value_cents,
                   posted_at::text, response_due_at::text, NULL AS award_at
            FROM opportunities
-           WHERE sam_notice_id = $1 AND data_source = 'sam_gov'
+           WHERE sam_notice_id = $1 AND data_source IN ('sam.gov', 'sam_gov')
            LIMIT 1`,
           [link.source_native_id],
         );
