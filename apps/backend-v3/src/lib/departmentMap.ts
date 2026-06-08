@@ -17,6 +17,7 @@ const DEPARTMENT_RULES: DepartmentRule[] = [
       'Department of Defense',
       'DoD',
       'DEPT OF DEFENSE',
+      'DEFENSE, DEPARTMENT OF',
       'Army',
       'Navy',
       'Air Force',
@@ -31,6 +32,7 @@ const DEPARTMENT_RULES: DepartmentRule[] = [
     department: 'Department of Homeland Security',
     patterns: [
       'Department of Homeland Security',
+      'HOMELAND SECURITY, DEPARTMENT OF',
       'DHS',
       'FEMA',
       'CBP',
@@ -41,12 +43,13 @@ const DEPARTMENT_RULES: DepartmentRule[] = [
   },
   {
     department: 'Department of Veterans Affairs',
-    patterns: ['Department of Veterans Affairs', 'VA'],
+    patterns: ['Department of Veterans Affairs', 'VETERANS AFFAIRS, DEPARTMENT OF', 'VA'],
   },
   {
     department: 'Department of Health and Human Services',
     patterns: [
       'Department of Health and Human Services',
+      'HEALTH AND HUMAN SERVICES, DEPARTMENT OF',
       'HHS',
       'NIH',
       'CDC',
@@ -55,39 +58,39 @@ const DEPARTMENT_RULES: DepartmentRule[] = [
   },
   {
     department: 'Department of Energy',
-    patterns: ['Department of Energy', 'DOE'],
+    patterns: ['Department of Energy', 'ENERGY, DEPARTMENT OF', 'DOE'],
   },
   {
     department: 'Department of Justice',
-    patterns: ['Department of Justice', 'DOJ', 'FBI', 'DEA', 'ATF'],
+    patterns: ['Department of Justice', 'JUSTICE, DEPARTMENT OF', 'DOJ', 'FBI', 'DEA', 'ATF'],
   },
   {
     department: 'Department of State',
-    patterns: ['Department of State', 'DOS'],
+    patterns: ['Department of State', 'STATE, DEPARTMENT OF', 'DOS'],
   },
   {
     department: 'Department of Treasury',
-    patterns: ['Department of Treasury', 'Treasury', 'IRS', 'FinCEN'],
+    patterns: ['Department of Treasury', 'TREASURY, DEPARTMENT OF', 'THE TREASURY, DEPARTMENT OF', 'Treasury', 'IRS', 'FinCEN'],
   },
   {
     department: 'Department of Transportation',
-    patterns: ['Department of Transportation', 'DOT', 'FAA'],
+    patterns: ['Department of Transportation', 'TRANSPORTATION, DEPARTMENT OF', 'DOT', 'FAA'],
   },
   {
     department: 'Department of Commerce',
-    patterns: ['Department of Commerce', 'DOC', 'NIST', 'NOAA', 'Census'],
+    patterns: ['Department of Commerce', 'COMMERCE, DEPARTMENT OF', 'DOC', 'NIST', 'NOAA', 'Census'],
   },
   {
     department: 'Department of Labor',
-    patterns: ['Department of Labor', 'DOL'],
+    patterns: ['Department of Labor', 'LABOR, DEPARTMENT OF', 'DOL'],
   },
   {
     department: 'Department of Education',
-    patterns: ['Department of Education', 'ED'],
+    patterns: ['Department of Education', 'EDUCATION, DEPARTMENT OF', 'ED'],
   },
   {
     department: 'Department of Agriculture',
-    patterns: ['Department of Agriculture', 'USDA'],
+    patterns: ['Department of Agriculture', 'AGRICULTURE, DEPARTMENT OF', 'USDA'],
   },
 ];
 

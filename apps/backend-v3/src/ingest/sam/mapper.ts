@@ -6,6 +6,7 @@
 
 import type { SAMOpportunityRaw } from './types.js';
 import type { OpportunityRow, SourceCitation, MappedContact } from '../framework/source_writer.js';
+import { parseFederalOrg } from '../../lib/orgHierarchy.js';
 
 export interface MappedOpportunity {
   opportunity: OpportunityRow;
@@ -60,12 +61,19 @@ export function mapSAMOpportunity(raw: SAMOpportunityRaw): MappedOpportunity {
   const tags: string[] = [];
   if (opportunity_type === 'sources_sought') tags.push('sources_sought');
 
+  const parsed = parseFederalOrg({ agency, sub_agency: subAgency, department });
+
   const opportunity: OpportunityRow = {
     sam_notice_id: raw.noticeId,
     title: raw.title ?? 'Untitled',
     agency,
     sub_agency: subAgency,
     department,
+    department_name: parsed.department_name,
+    agency_name: parsed.agency_name,
+    office: parsed.office,
+    contracting_office: parsed.contracting_office,
+    org_path: parsed.org_path,
     solicitation_number: raw.solicitationNumber ?? null,
     status: 'discovery',
     value_min: awardAmount,
@@ -86,6 +94,8 @@ export function mapSAMOpportunity(raw: SAMOpportunityRaw): MappedOpportunity {
   const citations: SourceCitation[] = [];
   citations.push({ field: 'title', source_url: sourceUrl });
   if (agency) citations.push({ field: 'agency', source_url: sourceUrl });
+  if (parsed.department_name) citations.push({ field: 'department_name', source_url: sourceUrl });
+  if (parsed.agency_name) citations.push({ field: 'agency_name', source_url: sourceUrl });
   if (opportunity.naics) citations.push({ field: 'naics', source_url: sourceUrl });
   if (opportunity.response_due_at) citations.push({ field: 'response_due_at', source_url: sourceUrl });
   if (opportunity.posted_at) citations.push({ field: 'posted_at', source_url: sourceUrl });
