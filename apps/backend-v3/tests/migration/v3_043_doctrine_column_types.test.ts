@@ -1,9 +1,9 @@
 /**
  * Migration test for v3_065 (doctrine ID type fix, F-602).
  *
- * Self-contained: creates minimal doctrine_evaluations and agent_decisions
- * tables with the ORIGINAL UUID-typed columns, applies v3_065, then asserts
- * the three columns are now TEXT.
+ * Self-contained: loads a fixture that creates minimal doctrine_evaluations and
+ * agent_decisions tables with the ORIGINAL UUID-typed columns, applies v3_065,
+ * then asserts the three columns are now TEXT.
  *
  * This guards against the "recorded but not executed" bug where the migration
  * tracker shows the migration as applied while the schema change never
@@ -36,6 +36,7 @@ interface ColumnInfo {
 }
 
 describe('v3_065 doctrine ID type fix -- column type assertions', () => {
+  const fixtureSql = loadSql('./fixtures/doctrine_tables_uuid_schema.sql');
   const migrationSql = loadSql(
     '../../migrations/v3_065_doctrine_id_types.sql',
   );
@@ -43,34 +44,20 @@ describe('v3_065 doctrine ID type fix -- column type assertions', () => {
   beforeAll(async () => {
     pool = new Pool({ connectionString: DB_URL, max: 3 });
 
-    // Create minimal tables with the ORIGINAL UUID-typed columns
-    // (mirrors v3_019_doctrine_rules.sql schema before the fix).
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS doctrine_evaluations (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        entity_kind TEXT NOT NULL,
-        entity_id UUID NOT NULL,
-        principle_scores JSONB NOT NULL DEFAULT '{}',
-        alignment_total INT NOT NULL DEFAULT 0,
-        evaluated_at TIMESTAMPTZ DEFAULT now()
-      );
-      CREATE TABLE IF NOT EXISTS agent_decisions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        opportunity_id UUID,
-        entity_id UUID,
-        kind TEXT NOT NULL DEFAULT 'override',
-        rationale TEXT NOT NULL DEFAULT '',
-        decided_by TEXT NOT NULL DEFAULT 'test',
-        decided_at TIMESTAMPTZ DEFAULT now()
-      );
-    `);
+    // Drop tables first to ensure clean state (may already exist from
+    // the full migration runner in some CI contexts).
+    await pool.query(
+      'DROP TABLE IF EXISTS agent_decisions; DROP TABLE IF EXISTS doctrine_evaluations;',
+    );
+
+    // Re-create with the original UUID-typed columns from fixture
+    await pool.query(fixtureSql);
 
     // Apply the migration
     await pool.query(migrationSql);
   });
 
   afterAll(async () => {
-    // Clean up test tables
     if (pool) {
       await pool
         .query(
