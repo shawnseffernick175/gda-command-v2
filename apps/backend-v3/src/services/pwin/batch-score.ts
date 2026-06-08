@@ -10,6 +10,7 @@ import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
 import { scoreV1Rules } from './rules-scorer.js';
 import { recommendStatus } from './promotion.js';
+import { resolveUnifiedLink } from '../opportunities/unified-mirror.js';
 import type { PwinWeights } from './pwin-weights.js';
 import {
   extractFeaturesFromOpportunity,
@@ -145,7 +146,8 @@ export async function batchScoreOpportunities(
     if (opts?.ids && opts.ids.length > 0) {
       query = `SELECT id, naics, agency, set_aside, value_min, value_max,
                       response_due_at, posted_at, incumbent, incumbent_confidence,
-                      solicitation_number, title, description, psc
+                      solicitation_number, title, description, psc,
+                      data_source, sam_notice_id, govtribe_id, external_id
                FROM opportunities
                WHERE deleted_at IS NULL AND id > $1 AND id = ANY($2)
                ORDER BY id LIMIT $3`;
@@ -153,7 +155,8 @@ export async function batchScoreOpportunities(
     } else {
       query = `SELECT id, naics, agency, set_aside, value_min, value_max,
                       response_due_at, posted_at, incumbent, incumbent_confidence,
-                      solicitation_number, title, description, psc
+                      solicitation_number, title, description, psc,
+                      data_source, sam_notice_id, govtribe_id, external_id
                FROM opportunities
                WHERE deleted_at IS NULL AND id > $1
                ORDER BY id LIMIT $2`;
@@ -196,6 +199,26 @@ export async function batchScoreOpportunities(
            WHERE id = $2 AND deleted_at IS NULL`,
           [JSON.stringify(pwinObj), r.id],
         );
+
+        // Write numeric pwin into unified_opportunities (link-resolved)
+        if (pwinObj.score != null) {
+          const link = resolveUnifiedLink({
+            data_source: r.data_source as string,
+            sam_notice_id: r.sam_notice_id as string | null,
+            govtribe_id: r.govtribe_id as string | null,
+            external_id: r.external_id as string | null,
+          });
+          if (link) {
+            await client.query(
+              `UPDATE unified_opportunities uo
+                 SET pwin = $1, updated_at = NOW()
+                 FROM unified_opportunity_links l
+                WHERE l.internal_id = uo.internal_id
+                  AND l.source = $2 AND l.source_native_id = $3`,
+              [Math.round(pwinObj.score), link.source, link.source_native_id],
+            );
+          }
+        }
 
         result.processed++;
         if (pwinObj.band === 'pass') {
