@@ -50,7 +50,7 @@ function OpportunitiesContent() {
   const searchParams = useSearchParams();
   const detailId = searchParams.get("id");
 
-  if (detailId) return <OpportunityDetail id={detailId} />;
+  if (detailId) return <OpportunityDetail key={detailId} id={detailId} />;
   return <OpportunityList />;
 }
 
