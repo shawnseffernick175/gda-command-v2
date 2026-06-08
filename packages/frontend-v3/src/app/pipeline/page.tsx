@@ -247,7 +247,7 @@ export default function PipelinePage() {
           <IntelChip
             label={String(summary.proposals_out)}
             sub="Proposals Out"
-            onClick={() => handleStageClick("Proposal")}
+            onClick={() => handleStageClick("Post-Submittal")}
           />
           <IntelChip
             label={String(summary.moved_this_week)}
