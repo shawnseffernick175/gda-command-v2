@@ -143,11 +143,12 @@ const GRADE_OPTIONS = ["A", "B", "C", "D", "F", "Unscored"] as const;
 
 function OpportunityList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Filter state
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
-  const [agencyFilter, setAgencyFilter] = useState("");
+  const [agencyFilter, setAgencyFilter] = useState(searchParams.get("agency") ?? "");
   const [gradeFilter, setGradeFilter] = useState<string[]>([]);
   const [setAsideFilter, setSetAsideFilter] = useState<string[]>([]);
   const [valueRange, setValueRange] = useState(0);
@@ -224,7 +225,11 @@ function OpportunityList() {
     setValueRange(0);
     setDueFilter("");
     setSourceFilter([]);
-  }, []);
+    // Strip ?agency from the URL so a remount does not re-apply a stale filter
+    if (searchParams.get("agency")) {
+      router.replace("/opportunities");
+    }
+  }, [router, searchParams]);
 
   const toggleArrayFilter = useCallback(
     (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
@@ -252,6 +257,11 @@ function OpportunityList() {
     setGradeFilter((prev) =>
       prev.includes("A") ? prev.filter((g) => g !== "A") : [...prev, "A"],
     );
+  }, []);
+
+  const applyAgencyFilter = useCallback((value: string) => {
+    setAgencyFilter(value);
+    setPage(1);
   }, []);
 
   // Compute stage tab counts from meta
@@ -441,6 +451,7 @@ function OpportunityList() {
           <VehicleGroupedView
             vehicles={vehiclesData ?? []}
             onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+            onAgencyFilter={applyAgencyFilter}
           />
         )
       ) : (
@@ -475,6 +486,7 @@ function OpportunityList() {
                         key={String(opp.internal_id ?? opp.id)}
                         opp={opp}
                         onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+                        onAgencyFilter={applyAgencyFilter}
                       />
                     ))}
                   </tbody>
@@ -613,14 +625,16 @@ function MultiSelect({
 function VehicleGroupedView({
   vehicles,
   onNavigate,
+  onAgencyFilter,
 }: {
   vehicles: VehicleSummary[];
   onNavigate: (id: number | string) => void;
+  onAgencyFilter?: (value: string) => void;
 }) {
   return (
     <div className="space-y-4">
       {vehicles.map((vehicle) => (
-        <VehicleGroup key={vehicle.id} vehicle={vehicle} onNavigate={onNavigate} />
+        <VehicleGroup key={vehicle.id} vehicle={vehicle} onNavigate={onNavigate} onAgencyFilter={onAgencyFilter} />
       ))}
     </div>
   );
@@ -629,9 +643,11 @@ function VehicleGroupedView({
 function VehicleGroup({
   vehicle,
   onNavigate,
+  onAgencyFilter,
 }: {
   vehicle: VehicleSummary;
   onNavigate: (id: number | string) => void;
+  onAgencyFilter?: (value: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const { data: opportunities, isLoading } = useVehicleOpportunities(vehicle.id);
@@ -678,7 +694,7 @@ function VehicleGroup({
             </div>
           ) : (
             opportunities.map((opp) => (
-              <VehicleOpportunityRow key={opp.id} opp={opp} onNavigate={onNavigate} />
+              <VehicleOpportunityRow key={opp.id} opp={opp} onNavigate={onNavigate} onAgencyFilter={onAgencyFilter} />
             ))
           )}
         </div>
@@ -690,9 +706,11 @@ function VehicleGroup({
 function VehicleOpportunityRow({
   opp,
   onNavigate,
+  onAgencyFilter,
 }: {
   opp: VehicleOpportunity;
   onNavigate: (id: number | string) => void;
+  onAgencyFilter?: (value: string) => void;
 }) {
   return (
     <div
@@ -705,7 +723,13 @@ function VehicleOpportunityRow({
         </span>
         <div className="flex items-center gap-2 mt-0.5">
           {opp.agency && (
-            <span className="text-[11px] font-mono text-muted-foreground">{opp.agency}</span>
+            <button
+              type="button"
+              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); onAgencyFilter?.(opp.agency!); }}
+            >
+              {opp.agency}
+            </button>
           )}
           {opp.naics && (
             <span className="text-[11px] font-mono text-muted-foreground/60">NAICS {opp.naics}</span>
@@ -742,9 +766,11 @@ function VehicleOpportunityRow({
 function OpportunityRow({
   opp,
   onNavigate,
+  onAgencyFilter,
 }: {
   opp: OpportunitySummary;
   onNavigate: (id: number | string) => void;
+  onAgencyFilter?: (value: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const heat = getHeatColor(opp);
@@ -801,7 +827,19 @@ function OpportunityRow({
         </div>
       </td>
       <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[140px]" title={[opp.department, opp.agency_name, opp.contracting_office].filter(Boolean).join(' > ') || opp.agency || undefined}>
-        {opp.department ?? opp.agency ?? "---"}
+        {(() => {
+          const agencyText = opp.agency_name ?? opp.department ?? opp.agency;
+          if (!agencyText) return "---";
+          return (
+            <button
+              type="button"
+              className="text-left text-xs text-muted-foreground hover:text-gda-green underline-offset-2 hover:underline cursor-pointer truncate block max-w-[140px]"
+              onClick={() => onAgencyFilter?.(agencyText)}
+            >
+              {agencyText}
+            </button>
+          );
+        })()}
       </td>
       <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
         {formatMoney(getEffectiveValue(opp))}
@@ -909,6 +947,7 @@ const SUGGESTION_CHIPS = [
 ];
 
 function OpportunityDetail({ id }: { id: string }) {
+  const router = useRouter();
   const { data: opp, isLoading, error } = useOpportunity(id);
   const analyzeOpp = useAnalyzeOpportunity();
   const updateStage = useUpdateStage();
@@ -984,7 +1023,37 @@ function OpportunityDetail({ id }: { id: string }) {
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {(opp.department || opp.agency) && (
             <Badge variant="outline" className="text-xs">
-              {[opp.department, opp.agency_name, opp.office, opp.contracting_office].filter(Boolean).join(' > ') || opp.agency}
+              {(() => {
+                const segments = [
+                  { label: "department", value: opp.department },
+                  { label: "agency_name", value: opp.agency_name },
+                  { label: "office", value: opp.office },
+                  { label: "contracting_office", value: opp.contracting_office },
+                ].filter((s) => Boolean(s.value));
+                if (segments.length === 0 && opp.agency) {
+                  return (
+                    <button
+                      type="button"
+                      className="hover:text-gda-green cursor-pointer"
+                      onClick={() => router.push(`/opportunities?agency=${encodeURIComponent(opp.agency!)}`)}
+                    >
+                      {opp.agency}
+                    </button>
+                  );
+                }
+                return segments.map((seg, idx) => (
+                  <span key={seg.label}>
+                    {idx > 0 && <span className="text-muted-foreground">{" > "}</span>}
+                    <button
+                      type="button"
+                      className="hover:text-gda-green cursor-pointer"
+                      onClick={() => router.push(`/opportunities?agency=${encodeURIComponent(seg.value!)}`)}
+                    >
+                      {seg.value}
+                    </button>
+                  </span>
+                ));
+              })()}
             </Badge>
           )}
           {opp.naics && (
