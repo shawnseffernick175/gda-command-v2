@@ -6,6 +6,15 @@
  * Idempotent -- only touches rows where department_name IS NULL.
  * Batched in chunks of 500 to avoid long transactions.
  *
+ * Pagination uses a keyset cursor on id (WHERE id > lastId) rather than
+ * OFFSET. OFFSET is unsafe here: the WHERE filter (department_name IS NULL)
+ * matches a shrinking set as rows are updated, so a fixed OFFSET skips past
+ * unprocessed rows and leaves gaps (the original bug needed 7 passes to
+ * converge). Keyset pagination always advances past the last id seen, so it
+ * converges in a single pass and never re-visits a row -- even rows whose
+ * parse yields a null department_name (which would otherwise re-match the
+ * filter forever).
+ *
  * Usage: npx tsx src/scripts/backfill-org-hierarchy.ts
  */
 
@@ -23,7 +32,11 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: databaseUrl, max: 5 });
 
   let updated = 0;
-  let offset = 0;
+  let scanned = 0;
+  // id is BIGSERIAL; pg returns it as a string. Keep the cursor as a string
+  // and pass it as a bigint param. Start at 0 so the first batch begins at the
+  // lowest id.
+  let lastId = '0';
 
   console.log('[backfill-org-hierarchy] Starting backfill of SAM.gov org hierarchy...');
 
@@ -39,9 +52,10 @@ async function main(): Promise<void> {
        FROM opportunities
        WHERE data_source = 'sam.gov'
          AND department_name IS NULL
+         AND id > $2::bigint
        ORDER BY id
-       LIMIT $1 OFFSET $2`,
-      [BATCH_SIZE, offset],
+       LIMIT $1`,
+      [BATCH_SIZE, lastId],
     );
 
     if (rows.length === 0) break;
@@ -73,8 +87,14 @@ async function main(): Promise<void> {
       updated++;
     }
 
-    offset += rows.length;
-    console.log(`[backfill-org-hierarchy] Processed ${offset} rows (updated=${updated})`);
+    // Advance the keyset cursor past the last id in this batch. Because we
+    // always move forward on id, rows already visited (including those whose
+    // parse left department_name null) are never selected again.
+    const last = rows[rows.length - 1];
+    if (!last) break;
+    lastId = last.id;
+    scanned += rows.length;
+    console.log(`[backfill-org-hierarchy] Scanned ${scanned} rows (updated=${updated}, cursor=${lastId})`);
   }
 
   console.log(`[backfill-org-hierarchy] Done. Total updated: ${updated}`);
