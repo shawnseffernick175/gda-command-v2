@@ -36,6 +36,7 @@ import { runDailyBriefingCron } from './daily-briefing.js';
 import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
+import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
@@ -213,6 +214,25 @@ export function startCronScheduler(): void {
   });
   tasks.push(partnerContactTask);
   logger.info({ schedule: '0 4 * * *' }, '[cron] registered: partner-contact-discovery (0 4 * * *)');
+
+  // Contact enrichment batch -- daily at 05:00 UTC (one hour after partner discovery)
+  const contactEnrichBatchTask = cron.schedule('0 5 * * *', async () => {
+    try {
+      logger.info('[cron] contact-enrich-batch starting');
+      const result = await enrichContactsBatch({
+        categories: ['competitor', 'teaming_partner'],
+        only_unenriched: true,
+      });
+      logger.info(
+        { considered: result.contacts_considered, enriched: result.contacts_enriched, failed: result.contacts_failed },
+        '[cron] contact-enrich-batch completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_contact_enrich_batch_error');
+    }
+  });
+  tasks.push(contactEnrichBatchTask);
+  logger.info({ schedule: '0 5 * * *' }, '[cron] registered: contact-enrich-batch (0 5 * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {

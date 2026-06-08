@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
+import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 
 const VALID_CATEGORIES = ['government', 'teaming_partner', 'competitor', 'industry', 'internal', 'other'] as const;
 type ContactCategory = typeof VALID_CATEGORIES[number];
@@ -325,6 +326,23 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
 
     const { rows } = await pool.query(sql, params);
     return reply.status(201).send(successEnvelope(rows[0], req.requestId));
+  });
+
+  // POST /v3/contacts/enrich-batch -- batch AI enrichment
+  app.post('/v3/contacts/enrich-batch', async (req, reply) => {
+    const body = req.body as {
+      categories?: string[];
+      limit?: number;
+      only_unenriched?: boolean;
+    } | null;
+
+    const result = await enrichContactsBatch({
+      categories: body?.categories,
+      limit: body?.limit,
+      only_unenriched: body?.only_unenriched,
+    });
+
+    return reply.send(successEnvelope(result, req.requestId));
   });
 
   // PATCH /v3/contacts/:id — update editable fields
