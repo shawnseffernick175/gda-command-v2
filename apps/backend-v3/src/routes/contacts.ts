@@ -128,7 +128,11 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       if (allCapIds.size > 0) {
         const capIdArr = Array.from(allCapIds);
         const { rows: capRows } = await pool.query(
-          `SELECT c.id, p.title, c.color_stage FROM captures c JOIN pipeline_items p ON c.pipeline_item_id = p.id WHERE c.id = ANY($1)`,
+          `SELECT c.id, o.title, c.color_stage
+           FROM captures c
+           JOIN pipeline_items p ON c.pipeline_item_id = p.id
+           LEFT JOIN opportunities o ON o.id = p.opportunity_id
+           WHERE c.id = ANY($1)`,
           [capIdArr],
         );
         for (const r of capRows as Array<{ id: number; title: string; color_stage: string | null }>) {
@@ -234,7 +238,11 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     if (allCapIds.size > 0) {
       const capIdArr = Array.from(allCapIds);
       const { rows: capRows } = await pool.query(
-        `SELECT c.id, p.title, c.color_stage FROM captures c JOIN pipeline_items p ON c.pipeline_item_id = p.id WHERE c.id = ANY($1)`,
+        `SELECT c.id, o.title, c.color_stage
+         FROM captures c
+         JOIN pipeline_items p ON c.pipeline_item_id = p.id
+         LEFT JOIN opportunities o ON o.id = p.opportunity_id
+         WHERE c.id = ANY($1)`,
         [capIdArr],
       );
       for (const r of capRows as Array<{ id: number; title: string; color_stage: string | null }>) {
@@ -460,7 +468,13 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
         [pattern],
       ),
       pool.query(
-        `SELECT c.id, p.title, c.color_stage AS stage FROM captures c JOIN pipeline_items p ON c.pipeline_item_id = p.id WHERE p.title ILIKE $1 ORDER BY c.id DESC LIMIT 20`,
+        `SELECT c.id, o.title, c.color_stage AS stage
+         FROM captures c
+         JOIN pipeline_items p ON c.pipeline_item_id = p.id
+         LEFT JOIN opportunities o ON o.id = p.opportunity_id
+         WHERE o.title ILIKE $1
+         ORDER BY c.id DESC
+         LIMIT 20`,
         [pattern],
       ),
     ]);
