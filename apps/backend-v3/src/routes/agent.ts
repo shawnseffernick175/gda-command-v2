@@ -13,6 +13,7 @@ import { request as undiciRequest } from 'undici';
 import { config } from '../config/index.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
+import { getOpportunityById } from '../services/opportunities/index.js';
 
 const AGENT_BASE = config.agentV3Url;
 
@@ -175,6 +176,62 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
+    // The frontend sends { task: "ask_ai", input: { prompt, object_type, object_id } }.
+    // agent-v3 /agent/run expects { task: <instruction string>, context: {...} } and
+    // ignores any `input` field, so forwarding the raw body produces an ungrounded
+    // answer (the literal string "ask_ai" becomes the task). Translate here: use the
+    // user's prompt as the real task, and when an opportunity is referenced, fetch it
+    // and pass the key fields as context so the agent can ground its answer.
+    const input = (body.input ?? {}) as Record<string, unknown>;
+    const promptText = String(
+      input.prompt ?? input.question ?? input.query ?? body.task,
+    );
+
+    const context: Record<string, unknown> = {};
+    const objectType = input.object_type ?? input.objectType;
+    const objectId = input.object_id ?? input.objectId;
+    if (objectType) context.object_type = objectType;
+    if (objectId) context.object_id = objectId;
+
+    if (objectType === 'opportunity' && objectId != null) {
+      try {
+        const opp = await getOpportunityById(String(objectId));
+        if (opp) {
+          context.opportunity = {
+            id: opp.id,
+            title: opp.title,
+            agency: opp.agency,
+            department: opp.department,
+            solicitation_number: opp.solicitation_number,
+            status: opp.status,
+            grade: opp.grade,
+            naics: opp.naics,
+            psc: opp.psc,
+            set_aside: opp.set_aside,
+            value_min: opp.value_min,
+            value_max: opp.value_max,
+            response_due_at: opp.response_due_at,
+            posted_at: opp.posted_at,
+            place_of_performance: opp.place_of_performance,
+            incumbent: opp.incumbent,
+            source_uri: opp.source_uri,
+            description: opp.description ? opp.description.slice(0, 4000) : null,
+            analysis: opp.analysis ?? null,
+          };
+        } else {
+          logger.warn({ objectId }, 'agent /ask: referenced opportunity not found');
+        }
+      } catch (err) {
+        // Grounding is best-effort — if the lookup fails, still answer without it.
+        logger.warn({ err, objectId }, 'agent /ask: failed to load opportunity context');
+      }
+    }
+
+    const agentPayload = {
+      task: promptText,
+      context: Object.keys(context).length > 0 ? context : null,
+    };
+
     try {
       const res = await undiciRequest(`${AGENT_BASE}/agent/run`, {
         method: 'POST',
@@ -183,7 +240,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
           'Content-Type': 'application/json',
           'X-GDA-Caller': user?.sub ?? 'anonymous',
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(agentPayload),
         headersTimeout: 10_000,
         bodyTimeout: 120_000,
       });
