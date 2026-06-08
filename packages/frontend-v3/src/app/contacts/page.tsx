@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/error-state";
+import { Pagination } from "@/components/shared/Pagination";
 import type {
   GovTriContact,
   ContactCategory,
@@ -608,8 +609,7 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
 export default function ContactsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [cursor, setCursor] = useState<number | undefined>(undefined);
-  const [previousItems, setPreviousItems] = useState<GovTriContact[]>([]);
+  const [page, setPage] = useState(1);
   const [activeCategory, setActiveCategory] = useState<ContactCategory | "all">("all");
   const [activeTemp, setActiveTemp] = useState<RelationshipTemp | "all">("all");
   const [activeLinked, setActiveLinked] = useState<"yes" | "no" | "">("");
@@ -621,19 +621,25 @@ export default function ContactsPage() {
 
   const deleteMutation = useDeleteContact();
 
-  const params = useMemo(
+  const filterParams = useMemo(
     () => ({
       q: searchQuery || undefined,
       category: activeCategory,
       temperature: activeTemp !== "all" ? activeTemp : undefined,
       linked: activeLinked || undefined,
       source: activeSource || undefined,
-      cursor,
     }),
-    [searchQuery, activeCategory, activeTemp, activeLinked, activeSource, cursor],
+    [searchQuery, activeCategory, activeTemp, activeLinked, activeSource],
   );
 
-  const { data, isLoading, error, refetch } = useContacts(params);
+  const filterKey = JSON.stringify(filterParams);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const { data, isLoading, error, refetch } = useContacts({ ...filterParams, page });
   const { data: countData } = useContactsCount(activeCategory);
 
   const meta: ContactsMeta = data?.meta ?? {
@@ -643,15 +649,8 @@ export default function ContactsPage() {
     agency_count: 0,
   };
 
-  const allItems = useMemo(() => {
-    const combined = [...previousItems, ...(data?.items ?? [])];
-    const seen = new Set<number>();
-    return combined.filter((item) => {
-      if (seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    });
-  }, [previousItems, data?.items]);
+  const allItems = data?.items ?? [];
+  const totalPages = data?.pagination?.totalPages ?? 1;
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -659,8 +658,6 @@ export default function ContactsPage() {
       setSearchInput(val);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        setCursor(undefined);
-        setPreviousItems([]);
         setSearchQuery(val);
       }, 350);
     },
@@ -674,22 +671,12 @@ export default function ContactsPage() {
     setActiveSource("");
     setSearchInput("");
     setSearchQuery("");
-    setCursor(undefined);
-    setPreviousItems([]);
   }, []);
-
-  const handleLoadMore = useCallback(() => {
-    if (data?.pagination?.cursor) {
-      setPreviousItems((prev) => [...prev, ...(data?.items ?? [])]);
-      setCursor(data.pagination.cursor);
-    }
-  }, [data]);
 
   const handleToggleExpand = useCallback((id: number) => {
     setExpandedId((prev) => (prev === id ? null : id));
   }, []);
 
-  const hasMore = data?.pagination?.hasMore ?? false;
   const totalCount = countData?.count ?? meta.total_count;
   const isEmpty = !isLoading && !error && totalCount === 0;
 
@@ -743,8 +730,6 @@ export default function ContactsPage() {
             value={activeCategory}
             onChange={(e) => {
               setActiveCategory(e.target.value as ContactCategory | "all");
-              setCursor(undefined);
-              setPreviousItems([]);
             }}
             className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
           >
@@ -759,8 +744,6 @@ export default function ContactsPage() {
             value={activeTemp}
             onChange={(e) => {
               setActiveTemp(e.target.value as RelationshipTemp | "all");
-              setCursor(undefined);
-              setPreviousItems([]);
             }}
             className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
           >
@@ -774,8 +757,6 @@ export default function ContactsPage() {
             value={activeLinked}
             onChange={(e) => {
               setActiveLinked(e.target.value as "yes" | "no" | "");
-              setCursor(undefined);
-              setPreviousItems([]);
             }}
             className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
           >
@@ -787,8 +768,6 @@ export default function ContactsPage() {
             value={activeSource}
             onChange={(e) => {
               setActiveSource(e.target.value);
-              setCursor(undefined);
-              setPreviousItems([]);
             }}
             className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
           >
@@ -973,18 +952,12 @@ export default function ContactsPage() {
             </table>
           </div>
 
-          {/* Load more */}
-          {hasMore && (
-            <div className="flex justify-center">
-              <button
-                onClick={handleLoadMore}
-                disabled={isLoading}
-                className="rounded border border-border px-4 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-              >
-                {isLoading ? "Loading\u2026" : "Load More"}
-              </button>
-            </div>
-          )}
+          {/* Pagination */}
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
         </>
       )}
 

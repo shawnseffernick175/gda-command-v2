@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Pagination } from "@/components/shared/Pagination";
 import { cn } from "@/lib/utils";
 import type { ActionItem, ActionItemDraft, ActionItemPriority } from "@/lib/types";
 import Link from "next/link";
@@ -64,14 +65,24 @@ function isOverdue(item: ActionItem): boolean {
 
 export default function ActionItemsPage() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [page, setPage] = useState(1);
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
+  const filterKey = statusFilter ?? "__all__";
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
   const { data, isLoading, error, refetch } = useActionItems({
     status: statusFilter,
+    page,
   });
 
   const items = data?.items ?? [];
+  const totalPages = data?.pagination?.totalPages ?? 1;
   const updateItem = useUpdateActionItem();
 
   return (
@@ -117,25 +128,33 @@ export default function ActionItemsPage() {
           description="Action items are created from pursuits, captures, and reviews."
         />
       ) : (
-        <Card className="border-border bg-gda-panel overflow-hidden">
-          <CardContent className="p-0">
-            <div className="divide-y divide-border">
-              {items.map((item) => (
-                <ActionItemRow
-                  key={item.id}
-                  item={item}
-                  highlighted={String(item.id) === highlightId}
-                  onToggle={(id, status) =>
-                    updateItem.mutate({ id, status })
-                  }
-                  onAssign={(id, assignee_id) =>
-                    updateItem.mutate({ id, assignee_id })
-                  }
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <>
+          <Card className="border-border bg-gda-panel overflow-hidden">
+            <CardContent className="p-0">
+              <div className="divide-y divide-border">
+                {items.map((item) => (
+                  <ActionItemRow
+                    key={item.id}
+                    item={item}
+                    highlighted={String(item.id) === highlightId}
+                    onToggle={(id, status) =>
+                      updateItem.mutate({ id, status })
+                    }
+                    onAssign={(id, assignee_id) =>
+                      updateItem.mutate({ id, assignee_id })
+                    }
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );

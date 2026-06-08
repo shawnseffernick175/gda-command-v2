@@ -58,6 +58,7 @@ export interface ActionItemListFilters {
   linked_record_type?: string;
   limit: number;
   cursor?: string;
+  page?: number;
 }
 
 interface AssigneeInfo {
@@ -264,7 +265,7 @@ export async function updateActionItem(
 
 export async function listActionItems(
   filters: ActionItemListFilters
-): Promise<{ items: ActionItemRow[]; hasMore: boolean; cursor: string | null }> {
+): Promise<{ items: ActionItemRow[]; hasMore: boolean; cursor: string | null; total?: number; page?: number; totalPages?: number }> {
   const conditions: string[] = [];
   const vals: unknown[] = [];
   let idx = 1;
@@ -288,6 +289,43 @@ export async function listActionItems(
     conditions.push(`linked_record_type = $${idx++}`);
     vals.push(filters.linked_record_type);
   }
+
+  // --- Offset/page mode (mirrors Opportunities) ---
+  if (filters.page) {
+    const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
+    const page = Math.max(filters.page, 1);
+    const offset = (page - 1) * limit;
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countRes = await pool.query<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM action_items ${where}`,
+      vals,
+    );
+    const total = countRes.rows[0]?.total ?? 0;
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+    const dataVals = [...vals, limit, offset];
+    const res = await pool.query<ActionItemRow>(
+      `SELECT * FROM action_items ${where}
+       ORDER BY
+         CASE priority
+           WHEN 'CRITICAL' THEN 0
+           WHEN 'HIGH'     THEN 1
+           WHEN 'MEDIUM'   THEN 2
+           WHEN 'LOW'      THEN 3
+           ELSE 4
+         END,
+         due_date ASC NULLS LAST,
+         created_at DESC
+       LIMIT $${idx} OFFSET $${idx + 1}`,
+      dataVals,
+    );
+
+    return { items: res.rows, hasMore: page < totalPages, cursor: null, total, page, totalPages };
+  }
+
+  // --- Existing cursor mode (unchanged) ---
   if (filters.cursor) {
     conditions.push(`id < $${idx++}`);
     vals.push(filters.cursor);
