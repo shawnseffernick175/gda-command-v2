@@ -328,6 +328,36 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
       successEnvelope({ status: 'accepted', competitor_name: competitorName }, req.requestId),
     );
   });
+
+  // POST /v3/competitors/discover-contacts — discover competitor contacts via web search
+  app.post('/v3/competitors/discover-contacts', async (req, reply) => {
+    const body = req.body as {
+      limit?: number;
+      max_contacts?: number;
+      competitors?: string[];
+    } | null;
+
+    const { discoverCompetitorContacts } = await import(
+      '../services/contacts/competitor-discovery.js'
+    );
+
+    try {
+      const result = await discoverCompetitorContacts({
+        limit: body?.limit ?? 25,
+        max_contacts: body?.max_contacts ?? 5,
+        competitors: body?.competitors,
+      });
+      return reply.send(successEnvelope(result, req.requestId));
+    } catch (err) {
+      logger.error(
+        { error: err instanceof Error ? err.message : String(err) },
+        'discover_contacts_route_error',
+      );
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', 'Contact discovery failed', req.requestId),
+      );
+    }
+  });
 }
 
 async function runCompetitorAnalysis(competitorName: string): Promise<void> {
