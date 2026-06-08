@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPut, apiPost, apiPatch } from "@/lib/api";
 import type {
@@ -194,21 +195,92 @@ interface AnalyzeResponse {
   message?: string;
 }
 
+export interface AnalysisStatusResponse {
+  state: "idle" | "analyzing" | "done" | "error";
+  has_llm_analysis: boolean;
+  llm_error_kind: string | null;
+  analyzed_at: string | null;
+}
+
 export function useAnalyzeOpportunity() {
   const qc = useQueryClient();
-  return useMutation({
+  const [pollingId, setPollingId] = useState<string | null>(null);
+  const [analysisState, setAnalysisState] = useState<AnalysisStatusResponse["state"]>("idle");
+  const [llmError, setLlmError] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startRef = useRef<number>(0);
+
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setPollingId(null);
+  }, []);
+
+  const startPolling = useCallback((id: string) => {
+    stopPolling();
+    setPollingId(id);
+    setAnalysisState("analyzing");
+    setLlmError(null);
+    startRef.current = Date.now();
+
+    intervalRef.current = setInterval(async () => {
+      const elapsed = Date.now() - startRef.current;
+      if (elapsed > 120_000) {
+        setAnalysisState("idle");
+        stopPolling();
+        return;
+      }
+      try {
+        const res = await apiGet<AnalysisStatusResponse>(
+          `/v3/opportunities/${id}/analysis-status`,
+        );
+        if (res.state === "done") {
+          setAnalysisState("done");
+          stopPolling();
+          void qc.invalidateQueries({ queryKey: ["opportunity", id] });
+        } else if (res.state === "error") {
+          setAnalysisState("error");
+          setLlmError(res.llm_error_kind);
+          stopPolling();
+          void qc.invalidateQueries({ queryKey: ["opportunity", id] });
+        }
+        // stay in analyzing while state is 'analyzing'
+      } catch {
+        // network error -- keep polling
+      }
+    }, 3_000);
+  }, [stopPolling, qc]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  const mutation = useMutation({
     mutationFn: (id: string) =>
       apiPost<OpportunityDetail | AnalyzeResponse>(`/v3/opportunities/${id}/analyze`),
     onSuccess: (data, id) => {
-      void qc.invalidateQueries({ queryKey: ["opportunity", id] });
-      // If analysis was queued (202), poll for the result after a short delay
       if (data && "queued" in data && data.queued) {
-        setTimeout(() => {
-          void qc.invalidateQueries({ queryKey: ["opportunity", id] });
-        }, 5_000);
+        startPolling(id);
+      } else {
+        // Got immediate result
+        void qc.invalidateQueries({ queryKey: ["opportunity", id] });
       }
     },
   });
+
+  return {
+    ...mutation,
+    analysisState,
+    pollingId,
+    llmError,
+    startPolling,
+    stopPolling,
+  };
 }
 
 export function useUpdateStage() {

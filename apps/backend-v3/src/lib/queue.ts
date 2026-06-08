@@ -86,3 +86,18 @@ export interface AnalysisJobData {
   priority: 'high' | 'normal';
   trigger: 'detail-endpoint' | 'pre-warm' | 'model-version-bump' | 'periodic-refresh' | 'ingest' | 'backfill' | 'manual';
 }
+
+/**
+ * pg-boss priority constants for the analysis queue.
+ * Higher number = higher priority (served first).
+ */
+export const ANALYSIS_PRIORITY = {
+  /** User opened the detail page - highest priority */
+  USER_DETAIL: 100,
+  /** User manually clicked Analyze */
+  USER_MANUAL: 90,
+  /** Backfill on startup / model-version sweep */
+  BACKFILL: 10,
+  /** Periodic refresh sweep */
+  SWEEP: 5,
+} as const;
