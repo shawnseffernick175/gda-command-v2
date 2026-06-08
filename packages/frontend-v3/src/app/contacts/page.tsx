@@ -530,9 +530,16 @@ function ByAgencyView({
                       />
                     </td>
                     <td className="px-2 py-2 text-xs">
-                      <button className="text-gda-cyan hover:underline text-left">
-                        {c.name ?? "\u2014"}
-                      </button>
+                      <span className="flex items-center gap-1.5">
+                        <button className="text-gda-cyan hover:underline text-left">
+                          {c.name ?? "\u2014"}
+                        </button>
+                        {c.source_label && (
+                          <Badge variant="outline" className="border-border text-muted-foreground text-[11px] px-1 py-0 leading-tight">
+                            {c.source_label}
+                          </Badge>
+                        )}
+                      </span>
                     </td>
                     <td className="px-2 py-2 text-xs text-muted-foreground">
                       {c.title ?? "\u2014"}
@@ -774,6 +781,7 @@ export default function ContactsPage() {
             <option value="">Source</option>
             <option value="GovTribe">GovTribe</option>
             <option value="GovWin">GovWin</option>
+            <option value="sam.gov">SAM.gov</option>
             <option value="Manual">Manual</option>
             <option value="Imported">Imported</option>
           </select>
@@ -873,9 +881,16 @@ export default function ContactsPage() {
                           </td>
                           {/* Name */}
                           <td className="px-3 py-2 text-xs">
-                            <button className="text-gda-cyan hover:underline text-left">
-                              {c.name ?? "\u2014"}
-                            </button>
+                            <span className="flex items-center gap-1.5">
+                              <button className="text-gda-cyan hover:underline text-left">
+                                {c.name ?? "\u2014"}
+                              </button>
+                              {c.source_label && (
+                                <Badge variant="outline" className="border-border text-muted-foreground text-[11px] px-1 py-0 leading-tight">
+                                  {c.source_label}
+                                </Badge>
+                              )}
+                            </span>
                           </td>
                           {/* Title / Role */}
                           <td className="px-3 py-2 text-xs text-muted-foreground">

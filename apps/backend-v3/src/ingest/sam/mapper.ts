@@ -5,7 +5,7 @@
  */
 
 import type { SAMOpportunityRaw } from './types.js';
-import type { OpportunityRow, SourceCitation } from '../framework/source_writer.js';
+import type { OpportunityRow, SourceCitation, MappedContact } from '../framework/source_writer.js';
 
 export interface MappedOpportunity {
   opportunity: OpportunityRow;
@@ -91,6 +91,33 @@ export function mapSAMOpportunity(raw: SAMOpportunityRaw): MappedOpportunity {
   if (opportunity.posted_at) citations.push({ field: 'posted_at', source_url: sourceUrl });
   if (opportunity.value_min !== null) citations.push({ field: 'value_min', source_url: sourceUrl });
   if (opportunity.value_max !== null) citations.push({ field: 'value_max', source_url: sourceUrl });
+
+  // Extract point-of-contact data into opportunity.contacts
+  const contacts: MappedContact[] = [];
+  if (raw.pointOfContact) {
+    for (const poc of raw.pointOfContact) {
+      const pocName = poc.fullName?.trim() || null;
+      const pocEmail = poc.email?.trim() || null;
+      const pocPhone = poc.phone?.trim() || null;
+
+      // Skip entirely if no email, no phone, and no name
+      if (!pocEmail && !pocPhone && !pocName) continue;
+
+      contacts.push({
+        name: pocName,
+        title: poc.title?.trim() || null,
+        email: pocEmail,
+        phone: pocPhone,
+        contactType: poc.type?.trim() || null,
+        agency,
+        sourceUrl,
+        rawJson: poc,
+      });
+    }
+  }
+  if (contacts.length > 0) {
+    opportunity.contacts = contacts;
+  }
 
   return { opportunity, citations };
 }

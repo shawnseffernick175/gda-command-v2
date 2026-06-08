@@ -30,6 +30,17 @@ function enqueueIngestAnalysis(oppId: string): void {
   }
 }
 
+export interface MappedContact {
+  name: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  contactType: string | null;
+  agency: string | null;
+  sourceUrl: string;
+  rawJson?: unknown;
+}
+
 export interface OpportunityRow {
   sam_notice_id: string;
   title: string;
@@ -51,6 +62,7 @@ export interface OpportunityRow {
   tags: string[];
   opportunity_type?: string | null;
   source_uri?: string | null;
+  contacts?: MappedContact[];
 }
 
 export interface SourceCitation {
@@ -189,6 +201,12 @@ export async function upsertOpportunityWithSources(
 
     await client.query('COMMIT');
 
+    // Upsert contacts outside the opportunity transaction so a bad
+    // contact never rolls back the opportunity write.
+    if (opp.contacts && opp.contacts.length > 0) {
+      await upsertContactsForOpportunity(oppId, opp.data_source, opp.contacts);
+    }
+
     // F-605: auto-enqueue analysis on ingest
     enqueueIngestAnalysis(String(oppId));
 
@@ -325,5 +343,104 @@ export async function upsertExternalOpportunity(
     throw err;
   } finally {
     client.release();
+  }
+}
+
+/**
+ * Upsert contacts tied to an opportunity into govtribe_contacts.
+ * Runs outside the opportunity transaction — a bad contact row
+ * never aborts the opportunity write. Errors are logged and skipped.
+ */
+async function upsertContactsForOpportunity(
+  oppId: number,
+  dataSource: string,
+  contacts: MappedContact[],
+): Promise<void> {
+  for (const contact of contacts) {
+    try {
+      let existingId: number | null = null;
+
+      // Dedup: prefer email match, fall back to (name, agency)
+      if (contact.email) {
+        const { rows } = await pool.query<{ id: number }>(
+          `SELECT id FROM govtribe_contacts
+           WHERE source_label = $1 AND email IS NOT NULL AND lower(email) = lower($2)
+           LIMIT 1`,
+          [dataSource, contact.email],
+        );
+        existingId = rows[0]?.id ?? null;
+      } else if (contact.name) {
+        const { rows } = await pool.query<{ id: number }>(
+          `SELECT id FROM govtribe_contacts
+           WHERE source_label = $1 AND lower(name) = lower($2)
+             AND agency IS NOT DISTINCT FROM $3
+           LIMIT 1`,
+          [dataSource, contact.name, contact.agency],
+        );
+        existingId = rows[0]?.id ?? null;
+      }
+
+      if (existingId) {
+        await pool.query(
+          `UPDATE govtribe_contacts SET
+             name = COALESCE($1, name),
+             title = COALESCE($2, title),
+             phone = COALESCE($3, phone),
+             contact_type = COALESCE($4, contact_type),
+             source_url = COALESCE($5, source_url),
+             raw_json = COALESCE($6, raw_json),
+             last_seen_at = NOW(),
+             linked_opportunity_ids = (
+               SELECT ARRAY(SELECT DISTINCT unnest(linked_opportunity_ids || $7::int))
+               FROM govtribe_contacts WHERE id = $8
+             )
+           WHERE id = $8`,
+          [
+            contact.name,
+            contact.title,
+            contact.phone,
+            contact.contactType,
+            contact.sourceUrl,
+            contact.rawJson ? JSON.stringify(contact.rawJson) : null,
+            oppId,
+            existingId,
+          ],
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO govtribe_contacts (
+             govtribe_id, source_label, contact_category, contact_type,
+             name, title, email, phone, agency, source_url, raw_json,
+             linked_opportunity_ids, last_seen_at
+           ) VALUES (
+             NULL, $1, 'government', $2,
+             $3, $4, $5, $6, $7, $8, $9,
+             ARRAY[$10::int], NOW()
+           )`,
+          [
+            dataSource,
+            contact.contactType,
+            contact.name,
+            contact.title,
+            contact.email,
+            contact.phone,
+            contact.agency,
+            contact.sourceUrl,
+            contact.rawJson ? JSON.stringify(contact.rawJson) : null,
+            oppId,
+          ],
+        );
+      }
+    } catch (err) {
+      logger.error(
+        {
+          oppId,
+          contactName: contact.name,
+          contactEmail: contact.email,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        'source_writer_contact_row_error',
+      );
+    }
   }
 }
