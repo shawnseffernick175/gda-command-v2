@@ -37,7 +37,8 @@ export type Task =
   | 'vault_document_parse'
   | 'vault_smart_route'
   | 'digest_lead'
-  | 'competitor_contact_discovery';
+  | 'competitor_contact_discovery'
+  | 'partner_contact_discovery';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -201,6 +202,19 @@ export interface DiscoveredContact {
 }
 
 export interface CompetitorContactDiscoveryOutput {
+  contacts: DiscoveredContact[];
+  sources_consulted: number;
+}
+
+export interface PartnerContactDiscoveryInput {
+  partner_name: string;
+  agencies: string[];
+  naics: string[];
+  set_asides: string[];
+  max_contacts: number;
+}
+
+export interface PartnerContactDiscoveryOutput {
   contacts: DiscoveredContact[];
   sources_consulted: number;
 }
@@ -691,6 +705,7 @@ export interface TaskInputMap {
   vault_smart_route: VaultSmartRouteInput;
   digest_lead: DigestLeadInput;
   competitor_contact_discovery: CompetitorContactDiscoveryInput;
+  partner_contact_discovery: PartnerContactDiscoveryInput;
 }
 
 export interface TaskOutputMap {
@@ -712,6 +727,7 @@ export interface TaskOutputMap {
   vault_smart_route: VaultSmartRouteOutput;
   digest_lead: DigestLeadOutput;
   competitor_contact_discovery: CompetitorContactDiscoveryOutput;
+  partner_contact_discovery: PartnerContactDiscoveryOutput;
 }
 
 // ---------------------------------------------------------------------------

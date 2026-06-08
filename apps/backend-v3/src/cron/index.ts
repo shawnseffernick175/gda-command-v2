@@ -35,6 +35,7 @@ import { runDigestRefresh } from './digest-refresh.js';
 import { runDailyBriefingCron } from './daily-briefing.js';
 import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
+import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
@@ -196,6 +197,22 @@ export function startCronScheduler(): void {
   });
   tasks.push(competitorContactTask);
   logger.info({ schedule: '0 3 * * *' }, '[cron] registered: competitor-contact-discovery (0 3 * * *)');
+
+  // Partner contact discovery \u2014 daily at 04:00 UTC (one hour after competitor discovery)
+  const partnerContactTask = cron.schedule('0 4 * * *', async () => {
+    try {
+      logger.info('[cron] partner-contact-discovery starting');
+      const result = await discoverPartnerContacts({ limit: 25, max_contacts: 5 });
+      logger.info(
+        { companies: result.companies_processed, contacts: result.contacts_written, skipped: result.companies_skipped_no_results },
+        '[cron] partner-contact-discovery completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_partner_contact_discovery_error');
+    }
+  });
+  tasks.push(partnerContactTask);
+  logger.info({ schedule: '0 4 * * *' }, '[cron] registered: partner-contact-discovery (0 4 * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {
