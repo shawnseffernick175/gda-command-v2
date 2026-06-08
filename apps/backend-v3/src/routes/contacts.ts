@@ -546,7 +546,10 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
-    const aiProfile = result.output;
+    // Stamp the actual router-resolved model over whatever the LLM self-reported
+    // in its JSON (it tends to write a generic "gpt-4"). Provenance must reflect
+    // the model the router truly used (see llm-router.table.ts routing).
+    const aiProfile = { ...result.output, model_used: result.model_used };
     await pool.query(
       'UPDATE govtribe_contacts SET ai_profile = $1, ai_ran_at = NOW() WHERE id = $2',
       [JSON.stringify(aiProfile), Number(id)],

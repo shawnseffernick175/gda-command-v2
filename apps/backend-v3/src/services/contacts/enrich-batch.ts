@@ -74,9 +74,12 @@ export async function enrichContactsBatch(
       });
 
       if (result.ok) {
+        // Stamp the actual router-resolved model over whatever the LLM
+        // self-reported in its JSON (it tends to write a generic "gpt-4").
+        const aiProfile = { ...result.output, model_used: result.model_used };
         await pool.query(
           'UPDATE govtribe_contacts SET ai_profile = $1, ai_ran_at = NOW() WHERE id = $2',
-          [JSON.stringify(result.output), c.id],
+          [JSON.stringify(aiProfile), c.id],
         );
         contactsEnriched++;
       } else {
