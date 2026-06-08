@@ -41,19 +41,14 @@ afterAll(async () => {
 }, 30_000);
 
 describe('F-231 Drafts Integration (real Postgres, canonical v3_001–v3_008 schema)', () => {
-  it('POST /v3/action-items returns 500 — schema drift: code inserts into nonexistent columns', async () => {
-    // createActionItem() inserts (id, title, detail, owner, status, due_date,
-    // source, source_id, linked_record_type, linked_record_id) but v3_001
-    // action_items has (id BIGSERIAL, title, body, owner_email, status,
-    // source_id, origin, ...). Columns detail/owner/source/linked_record_*
-    // do not exist → INSERT fails.
+  it('POST /v3/action-items returns 201 after v3_062 schema alignment', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/v3/action-items',
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ title: 'Draft-test reply', owner: 'shawn' }),
     });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(201);
   });
 
   it('POST /v3/action-items/:id/drafts returns 201 — F-231 fixed the drift', async () => {
