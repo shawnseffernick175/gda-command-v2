@@ -1,10 +1,12 @@
 /**
  * Migration test for v3_063: canonical pipeline stages.
  *
- * Validates:
- * - Old stage values are mapped to canonical keys
- * - New CHECK constraint accepts all 9 canonical keys
- * - Default is 'interest'
+ * Self-contained: creates pipeline_items with the OLD pre-v3_063 shape,
+ * seeds rows at old stages, applies the migration, then asserts:
+ * - Old stage values remapped to canonical keys
+ * - Column default is 'interest'
+ * - New CHECK accepts all 9 canonical keys
+ * - New CHECK rejects bogus values
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -23,13 +25,110 @@ const { Pool } = pg;
 
 let pool: InstanceType<typeof Pool>;
 
+function loadMigrationSql(): string {
+  return readFileSync(
+    resolve(__dirname, '../../migrations/v3_063_canonical_pipeline_stages.sql'),
+    'utf-8',
+  );
+}
+
 describe('v3_063 canonical pipeline stages migration', () => {
+  const migrationSql = loadMigrationSql();
+
   beforeAll(async () => {
     pool = new Pool({ connectionString: DB_URL, max: 3 });
+
+    // Drop if exists from prior test runs
+    await pool.query('DROP TABLE IF EXISTS pipeline_items CASCADE');
+
+    // Create pipeline_items with the OLD pre-v3_063 shape
+    await pool.query(`
+      CREATE TABLE pipeline_items (
+        id BIGSERIAL PRIMARY KEY,
+        opportunity_id BIGINT,
+        capture_owner TEXT,
+        stage TEXT NOT NULL DEFAULT 'qualifying'
+          CHECK (stage IN ('qualifying','pursuit','proposal','submitted','evaluation','won','lost')),
+        source_id BIGINT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Seed rows at old stages
+    await pool.query(`
+      INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id) VALUES
+        (1, 'user-a', 'qualifying', 1),
+        (2, 'user-b', 'pursuit', 1),
+        (3, 'user-c', 'proposal', 1),
+        (4, 'user-d', 'submitted', 1),
+        (5, 'user-e', 'evaluation', 1),
+        (6, 'user-f', 'won', 1),
+        (7, 'user-g', 'lost', 1)
+    `);
+
+    // Apply the migration
+    await pool.query(migrationSql);
   });
 
   afterAll(async () => {
     if (pool) await pool.end();
+  });
+
+  it('remaps qualifying to interest', async () => {
+    const res = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = 1',
+    );
+    expect(res.rows[0]!.stage).toBe('interest');
+  });
+
+  it('remaps pursuit to qualify', async () => {
+    const res = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = 2',
+    );
+    expect(res.rows[0]!.stage).toBe('qualify');
+  });
+
+  it('remaps proposal to pursue', async () => {
+    const res = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = 3',
+    );
+    expect(res.rows[0]!.stage).toBe('pursue');
+  });
+
+  it('remaps submitted to post_submittal', async () => {
+    const res = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = 4',
+    );
+    expect(res.rows[0]!.stage).toBe('post_submittal');
+  });
+
+  it('remaps evaluation to post_submittal', async () => {
+    const res = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = 5',
+    );
+    expect(res.rows[0]!.stage).toBe('post_submittal');
+  });
+
+  it('preserves won and lost as-is', async () => {
+    const won = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = 6',
+    );
+    expect(won.rows[0]!.stage).toBe('won');
+
+    const lost = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = 7',
+    );
+    expect(lost.rows[0]!.stage).toBe('lost');
+  });
+
+  it('column default is interest', async () => {
+    const res = await pool.query<{ column_default: string }>(
+      `SELECT column_default FROM information_schema.columns
+       WHERE table_name = 'pipeline_items' AND column_name = 'stage'`,
+    );
+    expect(res.rows.length).toBe(1);
+    expect(res.rows[0]!.column_default).toContain('interest');
   });
 
   it('CHECK constraint accepts all 9 canonical keys', async () => {
@@ -38,7 +137,6 @@ describe('v3_063 canonical pipeline stages migration', () => {
       'won', 'lost', 'no_bid', 'gov_cancelled',
     ];
 
-    // Read constraint info from DB
     const constraintRes = await pool.query<{ consrc: string }>(
       `SELECT pg_get_constraintdef(oid) AS consrc
        FROM pg_constraint
@@ -53,19 +151,19 @@ describe('v3_063 canonical pipeline stages migration', () => {
     }
   });
 
-  it('column default is interest', async () => {
-    const defaultRes = await pool.query<{ column_default: string }>(
-      `SELECT column_default FROM information_schema.columns
-       WHERE table_name = 'pipeline_items' AND column_name = 'stage'`,
-    );
-    expect(defaultRes.rows.length).toBe(1);
-    expect(defaultRes.rows[0]!.column_default).toContain('interest');
+  it('CHECK constraint rejects bogus stage value', async () => {
+    await expect(
+      pool.query(
+        `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
+         VALUES (99, 'user-x', 'bogus', 1)`,
+      ),
+    ).rejects.toThrow();
   });
 
-  it('old stage values do not exist after migration', async () => {
+  it('no old stage values remain after migration', async () => {
     const oldValues = ['qualifying', 'pursuit', 'proposal', 'submitted', 'evaluation'];
     const res = await pool.query<{ cnt: number }>(
-      `SELECT COUNT(*)::int AS cnt FROM pipeline_items WHERE stage = ANY($1)`,
+      'SELECT COUNT(*)::int AS cnt FROM pipeline_items WHERE stage = ANY($1)',
       [oldValues],
     );
     expect(res.rows[0]!.cnt).toBe(0);
