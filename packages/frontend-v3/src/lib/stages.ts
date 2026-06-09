@@ -91,6 +91,10 @@ export const STAGE_TABS: ReadonlyArray<{ key: string; label: string }> = [
   { key: "lost", label: "Lost" },
   { key: "no_bid", label: "No Bid" },
   { key: "gov_cancelled", label: "Government Cancelled" },
+  // 'passed' is a relevance-derived view (auto_pass: in-NAICS but past due /
+  // too little lead time), not a pipeline stage. Auto-passed opps are excluded
+  // from every other tab and surfaced here.
+  { key: "passed", label: "Passed" },
 ];
 
 /* ---- Stage actions (canonical forward path) ----------------------------- */

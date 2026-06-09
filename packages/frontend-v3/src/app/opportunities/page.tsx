@@ -272,7 +272,7 @@ function OpportunityList() {
       if (key === "active") {
         const sc = meta.stage_counts;
         return Object.entries(sc)
-          .filter(([k]) => !["won", "lost", "no_bid", "gov_cancelled"].includes(k))
+          .filter(([k]) => !["won", "lost", "no_bid", "gov_cancelled", "passed"].includes(k))
           .reduce((sum, [, v]) => sum + v, 0);
       }
       return meta.stage_counts[key] ?? 0;
