@@ -980,12 +980,13 @@ function OpportunityDetail({ id }: { id: string }) {
     <div className="space-y-4">
       {/* ─── Header Strip ─────────────────────────────────────────────── */}
       <div>
-        <Link
-          href="/opportunities"
-          className="text-xs text-muted-foreground hover:text-gda-green"
+        <button
+          type="button"
+          onClick={() => router.push("/opportunities")}
+          className="cursor-pointer text-xs text-muted-foreground hover:text-gda-green"
         >
           ← Opportunities
-        </Link>
+        </button>
         <h1 className="mt-1 font-mono text-lg font-bold text-foreground">
           {opp.title}
         </h1>
