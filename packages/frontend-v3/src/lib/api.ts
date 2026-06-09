@@ -109,7 +109,33 @@ async function apiFetch<T>(
     return parseSSEResponse<T>(text, res.status);
   }
 
-  const envelope = (await res.json()) as Envelope<T>;
+  // Defensive: an upstream proxy, SPA fallback, or gateway error can return
+  // an HTML body (e.g. "<html>...") instead of our JSON envelope. Calling
+  // res.json() on that throws a cryptic "Unexpected token '<'" SyntaxError.
+  // Detect a non-JSON body and surface a clean, actionable ApiError instead.
+  let envelope: Envelope<T>;
+  if (!contentType.includes("application/json")) {
+    const body = await res.text();
+    const snippet = body.slice(0, 200).replace(/\s+/g, " ").trim();
+    throw new ApiError(
+      res.ok ? "BAD_RESPONSE" : "UPSTREAM_ERROR",
+      res.ok
+        ? "Server returned a non-JSON response"
+        : `Request failed (${res.status})`,
+      res.status,
+      snippet || null,
+    );
+  }
+  try {
+    envelope = (await res.json()) as Envelope<T>;
+  } catch {
+    throw new ApiError(
+      "BAD_RESPONSE",
+      "Server returned an invalid response",
+      res.status,
+      null,
+    );
+  }
 
   if (!envelope.success) {
     const err = envelope as ErrorEnvelope;
