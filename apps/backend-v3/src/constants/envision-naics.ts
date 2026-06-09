@@ -50,10 +50,21 @@ export const ENVISION_NAICS_PROMPT_SUMMARY =
   '541715/541714 (R&D), 511210/513210 (Software Publishers), 518210 (Data Processing/Hosting), ' +
   'GSA MAS 54151S (IT Professional Services), 54151HACS (Highly Adaptive Cybersecurity)';
 
-/** Envision company context string for AI prompts */
+/**
+ * Envision company context string for AI prompts.
+ * Set-aside status validated against SAM.gov entity VNMLXFMQD976 / CAGE 4JB87
+ * (Jun 2026): Self-Certified Small Disadvantaged Business, Black-American-owned /
+ * Minority-Owned, For-Profit S-Corp. NO SBA program certs (no 8(a), HUBZone,
+ * WOSB, or SDVOSB). SDVOSB/HUBZone access is via teaming partners only
+ * (PD Systems = SDVOSB/Veteran, Riverstone = HUBZone), not Envision itself.
+ */
 export const ENVISION_COMPANY_CONTEXT =
-  'Envision is a Service-Disabled Veteran-Owned Small Business (SDVOSB) competing for federal ' +
-  'defense and civilian contracts across engineering services, IT/software development, ' +
-  'data processing and hosting, R&D, and management consulting. Contract vehicles include ' +
-  'GSA MAS (IT Professional Services 54151S, Highly Adaptive Cybersecurity 54151HACS). ' +
+  'Envision is a Small Disadvantaged Business (self-certified SDB), Black-American-owned ' +
+  'and Minority-Owned small business competing for federal defense and civilian contracts ' +
+  'across engineering services, IT/software development, data processing and hosting, R&D, ' +
+  'and management consulting. Envision holds no SBA program set-aside certifications ' +
+  '(no 8(a), HUBZone, WOSB, or SDVOSB); it primes full-and-open and small-business set-asides ' +
+  'where it qualifies as small, and teams with certified partners (PD Systems for SDVOSB/Veteran, ' +
+  'Riverstone for HUBZone) on those set-asides. Contract vehicles include GSA MAS ' +
+  '(IT Professional Services 54151S, Highly Adaptive Cybersecurity 54151HACS). ' +
   'Primary customers: DoD, Army, Navy, DHS, FAA, GSA. Based in the DC metro area.';
