@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPut, apiPost, apiPatch } from "@/lib/api";
+import { apiGet, apiPut, apiPost, apiPatch, ApiError } from "@/lib/api";
 import type {
   OpportunitySummary,
   OpportunityDetail,
@@ -159,6 +159,23 @@ export function useOpportunity(id: string) {
     queryKey: ["opportunity", id],
     queryFn: () => apiGet<OpportunityDetail>(`/v3/opportunities/${id}`),
     enabled: !!id,
+    // The detail endpoint blocks while analysis runs and returns 503
+    // ANALYSIS_TIMEOUT if it isn't ready in time. Analysis lands seconds later,
+    // so poll a handful of times instead of dead-ending on "Analysis not ready".
+    retry: (failureCount, error) => {
+      const isAnalysisTimeout =
+        error instanceof ApiError &&
+        (error.code === "ANALYSIS_TIMEOUT" || error.status === 503);
+      if (isAnalysisTimeout) return failureCount < 5;
+      return failureCount < 1;
+    },
+    retryDelay: (failureCount, error) => {
+      const isAnalysisTimeout =
+        error instanceof ApiError &&
+        (error.code === "ANALYSIS_TIMEOUT" || error.status === 503);
+      // Fixed short backoff while analysis completes; default for other errors.
+      return isAnalysisTimeout ? 3_000 : Math.min(1_000 * 2 ** failureCount, 5_000);
+    },
   });
 }
 
