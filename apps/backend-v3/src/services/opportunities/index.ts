@@ -8,7 +8,7 @@ import { evaluateTeamingFlags } from './teaming.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { parseFederalOrg } from '../../lib/orgHierarchy.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
-import { normalizePipelineStage, ACTIVE_STAGE_KEYS } from '../../lib/pipeline-stage.js';
+import { normalizePipelineStage, ACTIVE_STAGE_KEYS, isTerminalStage } from '../../lib/pipeline-stage.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
   type OpportunityRow,
@@ -739,10 +739,14 @@ export async function updateOpportunity(
   let paramIdx = 1;
   let analysisAffected = false;
 
-  // Extract stage separately — it lives in pipeline_items, not the opportunities table
+  // Extract stage separately - it lives in pipeline_items, not the opportunities table.
+  // capture_owner is attribution metadata, not a column on opportunities.
   const stageValue = input.stage;
+  const captureOwner = input.capture_owner ?? 'system';
 
-  const fields = Object.entries(input).filter(([k, v]) => v !== undefined && k !== 'stage');
+  const fields = Object.entries(input).filter(
+    ([k, v]) => v !== undefined && k !== 'stage' && k !== 'capture_owner',
+  );
   let agencyValue: string | undefined;
   for (const [key, value] of fields) {
     if (key === 'tags') {
@@ -805,7 +809,18 @@ export async function updateOpportunity(
         `UPDATE pipeline_items SET stage = $1, updated_at = NOW() WHERE id = $2`,
         [dbStage, existing.rows[0].id],
       );
+    } else if (isTerminalStage(dbStage)) {
+      // Terminal decisions (No Bid, Lost, Won, Government Cancelled) are explicit
+      // owner verdicts that may be recorded directly from the Interest list, even
+      // when the opportunity was never formally qualified. Create the card so the
+      // decision persists into its terminal tab.
+      await pool.query(
+        `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
+         VALUES ($1, $2, $3, $4)`,
+        [id, captureOwner, dbStage, row.source_id],
+      );
     } else {
+      // Forward-progression stages still require prior qualification.
       throw Object.assign(
         new Error(
           'Opportunity is not in the pipeline. Qualify it first before setting a pipeline stage.',

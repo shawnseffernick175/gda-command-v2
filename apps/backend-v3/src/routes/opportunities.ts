@@ -734,6 +734,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    // Attribute owner for any stage change that must create a pipeline card.
+    const patchUser = (req as typeof req & { user?: { sub: string } }).user;
+    input.capture_owner = (body.capture_owner as string) ?? patchUser?.sub ?? 'system';
+
     // Validate stage early so we return 400 instead of a DB constraint violation
     if (input.stage && !normalizePipelineStage(input.stage)) {
       return reply
