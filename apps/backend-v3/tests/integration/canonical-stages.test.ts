@@ -60,32 +60,69 @@ beforeEach(async () => {
 });
 
 describe('Canonical pipeline stages: PATCH + filter', () => {
-  it('PATCH stage=qualify creates a pipeline_items row; list stage=qualify returns the opp', async () => {
+  it('PATCH stage on an unqualified opp is REJECTED (409) and creates no pipeline card', async () => {
     const oppId = await insertTestOpportunity();
 
-    // PATCH the stage to 'qualify'
+    // Attempt to set a pipeline stage before qualifying -> must be refused.
     const patchRes = await app.inject({
       method: 'PATCH',
       url: `/v3/opportunities/${oppId}`,
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ stage: 'qualify' }),
     });
-    expect(patchRes.statusCode).toBe(200);
-    const patchBody = JSON.parse(patchRes.body) as { data: { pipeline_stage: string } };
-    expect(patchBody.data.pipeline_stage).toBe('qualify');
+    expect(patchRes.statusCode).toBe(409);
+    const patchBody = JSON.parse(patchRes.body) as { error: { code: string } };
+    expect(patchBody.error.code).toBe('CONFLICT');
 
-    // Verify pipeline_items row exists with canonical key
+    // No pipeline card should have been created.
     const piRes = await pool.query<{ stage: string }>(
       'SELECT stage FROM pipeline_items WHERE opportunity_id = $1',
       [oppId],
     );
-    expect(piRes.rows.length).toBeGreaterThan(0);
-    expect(piRes.rows[0]!.stage).toBe('qualify');
+    expect(piRes.rows.length).toBe(0);
+  });
 
-    // GET list filtered by stage=qualify should include this opp
+  it('qualify creates the pipeline card; THEN PATCH stage moves it between stages', async () => {
+    const oppId = await insertTestOpportunity();
+
+    // Qualify -> the only path that admits an opp into the pipeline.
+    const qualRes = await app.inject({
+      method: 'POST',
+      url: `/v3/opportunities/${oppId}/qualify`,
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: JSON.stringify({ qualified_by: 'tester' }),
+    });
+    expect(qualRes.statusCode).toBe(200);
+
+    const afterQual = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = $1',
+      [oppId],
+    );
+    expect(afterQual.rows.length).toBe(1);
+    expect(afterQual.rows[0]!.stage).toBe('qualify');
+
+    // Now a stage PATCH should MOVE the existing card, not create a second one.
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: `/v3/opportunities/${oppId}`,
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: JSON.stringify({ stage: 'pursue' }),
+    });
+    expect(patchRes.statusCode).toBe(200);
+    const patchBody = JSON.parse(patchRes.body) as { data: { pipeline_stage: string } };
+    expect(patchBody.data.pipeline_stage).toBe('pursue');
+
+    const piRes = await pool.query<{ stage: string }>(
+      'SELECT stage FROM pipeline_items WHERE opportunity_id = $1',
+      [oppId],
+    );
+    expect(piRes.rows.length).toBe(1);
+    expect(piRes.rows[0]!.stage).toBe('pursue');
+
+    // GET list filtered by stage=pursue should include this opp
     const listRes = await app.inject({
       method: 'GET',
-      url: `/v3/opportunities?stage=qualify&relevant_only=false`,
+      url: `/v3/opportunities?stage=pursue&relevant_only=false`,
       headers: authHeader(),
     });
     expect(listRes.statusCode).toBe(200);
@@ -94,7 +131,7 @@ describe('Canonical pipeline stages: PATCH + filter', () => {
     };
     const found = listBody.data.items.find((i) => String(i.id) === oppId);
     expect(found).toBeTruthy();
-    expect(found!.pipeline_stage).toBe('qualify');
+    expect(found!.pipeline_stage).toBe('pursue');
   });
 
   it('unstaged opp appears in interest list and has pipeline_stage=interest in detail', async () => {
@@ -133,6 +170,15 @@ describe('Canonical pipeline stages: PATCH + filter', () => {
 
   it('PATCH accepts display labels (e.g. "Pursue") and normalizes to DB key', async () => {
     const oppId = await insertTestOpportunity();
+
+    // Admit into the pipeline first (qualify is the only entry path).
+    const qualRes = await app.inject({
+      method: 'POST',
+      url: `/v3/opportunities/${oppId}/qualify`,
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: JSON.stringify({ qualified_by: 'tester' }),
+    });
+    expect(qualRes.statusCode).toBe(200);
 
     const patchRes = await app.inject({
       method: 'PATCH',

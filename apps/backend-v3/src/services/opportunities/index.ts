@@ -753,7 +753,11 @@ export async function updateOpportunity(
   const res = await pool.query<OpportunityRow>(sql, params);
   const row = res.rows[0]!;
 
-  // Write stage to pipeline_items (stages live there, not on opportunities)
+  // Write stage to pipeline_items (stages live there, not on opportunities).
+  // GUARD: an opportunity enters the pipeline ONLY when the owner qualifies it.
+  // A stage update may MOVE an existing card between stages, but it must NEVER
+  // create a card for an opportunity that was never qualified. If no card exists,
+  // refuse -- the owner must qualify first.
   if (stageValue) {
     const dbStage = normalizePipelineStage(stageValue);
     if (!dbStage) {
@@ -769,10 +773,11 @@ export async function updateOpportunity(
         [dbStage, existing.rows[0].id],
       );
     } else {
-      await pool.query(
-        `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-         VALUES ($1, $2, $3, $4)`,
-        [id, 'Envision', dbStage, row.source_id],
+      throw Object.assign(
+        new Error(
+          'Opportunity is not in the pipeline. Qualify it first before setting a pipeline stage.',
+        ),
+        { statusCode: 409 },
       );
     }
   }
