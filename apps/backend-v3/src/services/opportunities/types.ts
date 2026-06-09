@@ -116,6 +116,8 @@ export interface OpportunitySummary {
   deadline_warning: boolean;
   created_at: string;
   updated_at: string;
+  /** Latest cached win-probability for list display (0-100 score + band). */
+  pwin?: { score: number; band: string } | null;
 }
 
 export interface OpportunityDetail extends OpportunitySummary {
@@ -197,7 +199,22 @@ export interface ListFilters {
   limit?: number;
   cursor?: string;
   page?: number;
+  /** Column to sort the list by. Defaults to recency (id desc). */
+  sort_by?: SortField;
+  /** Sort direction. Defaults to desc. */
+  sort_dir?: 'asc' | 'desc';
 }
+
+/** Sortable columns surfaced on the opportunities list. */
+export type SortField =
+  | 'value'
+  | 'pwin'
+  | 'stage'
+  | 'due'
+  | 'agency'
+  | 'set_aside'
+  | 'title'
+  | 'recency';
 
 export interface PaginatedResult<T> {
   items: T[];

@@ -17,6 +17,7 @@ import {
   type OpportunityCreateInput,
   type OpportunityUpdateInput,
   type ListFilters,
+  type SortField,
   type PaginatedResult,
   type PagedResult,
   type OpportunityMeta,
@@ -33,6 +34,7 @@ export type {
   OpportunityCreateInput,
   OpportunityUpdateInput,
   ListFilters,
+  SortField,
   PaginatedResult,
   PagedResult,
   OpportunityMeta,
@@ -156,6 +158,57 @@ function buildSummaryFromSources(
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+/**
+ * Convert a cached pwin value (stored 0..1) into the list-display shape
+ * { score: 0..100, band }. Returns null when no score is cached.
+ * Band thresholds mirror the detail view grade mapping.
+ */
+function attachPwin(raw: string | number | null | undefined): { score: number; band: string } | null {
+  if (raw === null || raw === undefined) return null;
+  const frac = typeof raw === 'string' ? Number(raw) : raw;
+  if (!Number.isFinite(frac)) return null;
+  const score = Math.round(frac * 100);
+  const band =
+    score >= 65 ? 'forecast' : score >= 45 ? 'signal' : score >= 25 ? 'discovery' : 'pass';
+  return { score, band };
+}
+
+/**
+ * Build a safe ORDER BY clause from a whitelisted sort field + direction.
+ * Defaults to recency (id desc). NULLS are always sorted last so unscored /
+ * undated rows do not dominate the top of an ascending sort.
+ */
+function buildOrderByClause(
+  sortBy: SortField | undefined,
+  sortDir: 'asc' | 'desc' | undefined,
+): string {
+  const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+  const nulls = 'NULLS LAST';
+  const pwinExpr =
+    `(SELECT ac.pwin FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1)`;
+  const stageExpr =
+    `COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest')`;
+  switch (sortBy) {
+    case 'value':
+      return `ORDER BY COALESCE(o.value_max, o.value_min) ${dir} ${nulls}, o.id DESC`;
+    case 'pwin':
+      return `ORDER BY ${pwinExpr} ${dir} ${nulls}, o.id DESC`;
+    case 'stage':
+      return `ORDER BY ${stageExpr} ${dir} ${nulls}, o.id DESC`;
+    case 'due':
+      return `ORDER BY o.response_due_at ${dir} ${nulls}, o.id DESC`;
+    case 'agency':
+      return `ORDER BY COALESCE(o.agency_name, o.agency) ${dir} ${nulls}, o.id DESC`;
+    case 'set_aside':
+      return `ORDER BY o.set_aside ${dir} ${nulls}, o.id DESC`;
+    case 'title':
+      return `ORDER BY o.title ${dir} ${nulls}, o.id DESC`;
+    case 'recency':
+    default:
+      return `ORDER BY o.id ${dir}`;
+  }
 }
 
 export async function rowToSummary(row: OpportunityRow): Promise<OpportunitySummary> {
@@ -605,16 +658,20 @@ export async function listOpportunitiesPaged(
   stageCounts['passed'] = passedRes.rows[0]?.cnt ?? 0;
 
   let dataParamIdx = paramIdx;
+  const orderBy = buildOrderByClause(filters.sort_by, filters.sort_dir);
   const dataSql = `
     SELECT o.*,
       (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage,
-      COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage
+      COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage,
+      (SELECT ac.pwin FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1) AS pwin_score
     FROM opportunities o ${where}
-    ORDER BY o.id DESC
+    ${orderBy}
     LIMIT $${dataParamIdx} OFFSET $${dataParamIdx + 1}
   `;
   const dataParams = [...params, limit, offset];
-  const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean; pipeline_stage: string | null }>(dataSql, dataParams);
+  const res = await pool.query<
+    OpportunityRow & { has_pipeline_stage: boolean; pipeline_stage: string | null; pwin_score: string | number | null }
+  >(dataSql, dataParams);
 
   const summaries = await Promise.all(
     res.rows.map(async (row) => {
@@ -625,6 +682,7 @@ export async function listOpportunitiesPaged(
         data_source: row.data_source,
         solicitation_number: row.solicitation_number,
         pipeline_stage: row.pipeline_stage,
+        pwin: attachPwin(row.pwin_score),
       };
     }),
   );
