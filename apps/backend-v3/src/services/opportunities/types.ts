@@ -118,6 +118,13 @@ export interface OpportunitySummary {
   updated_at: string;
   /** Latest cached win-probability for list display (0-100 score + band). */
   pwin?: { score: number; band: string } | null;
+  /** Envision set-aside eligibility for list display (prime/team/ineligible/unrestricted). */
+  eligibility?: {
+    status: 'prime' | 'team' | 'ineligible' | 'unrestricted';
+    label: string;
+    partner: string | null;
+    rationale: string;
+  } | null;
 }
 
 export interface OpportunityDetail extends OpportunitySummary {

@@ -103,8 +103,16 @@ function formatDaysLeft(opp: OpportunitySummary): { text: string; className: str
 
 /* ── Stage badge colors (from shared canonical model) ───────────── */
 
+// Map a partner key to a short display name for the eligibility tag.
+function partnerLabel(key: string): string {
+  if (key === "pd_systems") return "PD Sys";
+  if (key === "riverstone") return "Riverstone";
+  return key;
+}
+
 // Map a verbose set-aside string (e.g. "Total Small Business Set-Aside (FAR 19.5)")
 // to a compact tag. Returns null when there is no set-aside (unrestricted).
+// Used as a fallback when backend eligibility is not present on a row.
 function shortSetAside(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const s = raw.toLowerCase();
@@ -814,6 +822,9 @@ function OpportunityRow({
         : score >= 45
           ? "text-gda-amber"
           : "text-red-400";
+  // Eligibility lens: prefer backend-resolved eligibility; fall back to a plain
+  // set-aside tag for any older cached rows that lack the field.
+  const elig = opp.eligibility ?? null;
   const setAsideLabel = shortSetAside(opp.set_aside);
 
   const sources: string[] = [];
@@ -910,7 +921,34 @@ function OpportunityRow({
         </select>
       </td>
       <td className="px-3 py-1.5">
-        {setAsideLabel ? (
+        {elig ? (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-mono whitespace-nowrap",
+              elig.status === "prime"
+                ? "border-gda-green/40 bg-gda-green/10 text-gda-green"
+                : elig.status === "team"
+                  ? "border-gda-amber/40 bg-gda-amber/10 text-gda-amber"
+                  : elig.status === "ineligible"
+                    ? "border-border text-muted-foreground/60"
+                    : "border-border text-muted-foreground",
+            )}
+            title={elig.rationale}
+          >
+            {elig.status === "prime" && <span>Prime</span>}
+            {elig.status === "team" && (
+              <span>
+                Team{elig.partner ? ` (${partnerLabel(elig.partner)})` : ""}
+              </span>
+            )}
+            {elig.status === "ineligible" && <span>No bid</span>}
+            {elig.status === "unrestricted" ? (
+              <span>Open</span>
+            ) : (
+              <span className="opacity-70">{elig.label}</span>
+            )}
+          </span>
+        ) : setAsideLabel ? (
           <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-mono text-foreground">
             {setAsideLabel}
           </span>

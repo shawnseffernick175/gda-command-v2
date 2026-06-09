@@ -12,6 +12,15 @@ export interface PwinScore {
   incumbent_competitor?: string | null;
 }
 
+export type EligibilityStatus = "prime" | "team" | "ineligible" | "unrestricted";
+
+export interface SetAsideEligibility {
+  status: EligibilityStatus;
+  label: string;
+  partner: string | null;
+  rationale: string;
+}
+
 export interface OpportunitySummary {
   id: number | string;
   internal_id?: string;
@@ -30,6 +39,7 @@ export interface OpportunitySummary {
   due_date?: string | null;
   response_due_at?: string | null;
   set_aside: string | null;
+  eligibility?: SetAsideEligibility | null;
   hot?: boolean;
   created_at: string;
   updated_at: string;

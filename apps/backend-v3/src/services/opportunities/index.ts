@@ -5,6 +5,7 @@
 import { pool } from '../../lib/db.js';
 import { resolveFieldSources, type SourceRef } from '../../lib/sources.js';
 import { evaluateTeamingFlags } from './teaming.js';
+import { resolveSetAsideEligibility } from './eligibility.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { parseFederalOrg } from '../../lib/orgHierarchy.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
@@ -157,6 +158,7 @@ function buildSummaryFromSources(
     deadline_warning: computeDeadlineWarning(row, hasPipelineStage),
     created_at: row.created_at,
     updated_at: row.updated_at,
+    eligibility: resolveSetAsideEligibility(row.set_aside, row.naics),
   };
 }
 

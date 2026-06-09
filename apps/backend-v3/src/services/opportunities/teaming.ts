@@ -9,12 +9,14 @@
 import type { OpportunityRow, TeamingFlag } from './types.js';
 import { ENVISION_PRIMARY_NAICS } from '../../constants/envision-naics.js';
 
+// Set-asides Envision can prime on its own (self-cert SDB + small-business lanes).
+// 8(a)/HUBZone/WOSB/SDVOSB are intentionally excluded: Envision holds no such
+// SBA program cert, so those are teaming-only (see eligibility.ts).
 const ENVISION_SET_ASIDES = new Set([
   'SDB',
   'Small Business',
   'SB',
   'Minority-Owned',
-  '8(a)',
 ]);
 
 const RIVERSTONE_CERTS = ['HUBZone', 'WOSB', 'SDB'];
