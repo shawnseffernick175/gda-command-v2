@@ -431,7 +431,7 @@ export async function listUnifiedOpportunities(
     const linkRes = await pool.query(
       `SELECT internal_id, source, source_native_id
          FROM unified_opportunity_links
-        WHERE internal_id = ANY($1::text[])`,
+        WHERE internal_id = ANY($1::uuid[])`,
       [ids],
     );
     const linksByInternalId = new Map<
