@@ -171,6 +171,8 @@ export interface OpportunityUpdateInput {
   incumbent?: string;
   tags?: string[];
   stage?: string;
+  /** Owner attribution used when a stage change must create a pipeline card. */
+  capture_owner?: string;
 }
 
 export interface ListFilters {
