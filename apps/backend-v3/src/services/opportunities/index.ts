@@ -297,6 +297,15 @@ export async function listOpportunities(
     params.push(ENVISION_NAICS);
   }
 
+  // Passed view: auto-passed opps get their own 'Passed' tab; excluded from
+  // every other view so they drop out of the working list. (Mirror of the
+  // paged builder.)
+  if (filters.stage === 'passed') {
+    conditions.push(`relevance_status = 'auto_pass'`);
+  } else {
+    conditions.push(`(relevance_status IS DISTINCT FROM 'auto_pass')`);
+  }
+
   // Stage filter (pipeline_items-based). Uses o.id since the main query aliases opportunities as o.
   if (filters.stage === 'active') {
     const activeList = ACTIVE_STAGE_KEYS.map((_, i) => `$${paramIdx + i}`).join(', ');
@@ -305,7 +314,7 @@ export async function listOpportunities(
     conditions.push(
       `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage IN (${activeList})) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
     );
-  } else if (filters.stage) {
+  } else if (filters.stage && filters.stage !== 'passed') {
     const normalized = normalizePipelineStage(filters.stage) ?? filters.stage;
     if (normalized === 'interest') {
       conditions.push(
@@ -496,6 +505,15 @@ function buildFilterConditions(
     conditions.push(`o.data_source = ANY($${paramIdx++})`);
     params.push(filters.sources);
   }
+  // Passed view: auto-passed opps (in-NAICS but past due / too little lead time)
+  // get their own 'Passed' tab. In every other view (all, active, specific
+  // stages, default), exclude auto_pass so passed opps drop out of the working
+  // list. relevance_status is stamped at ingest by evaluateRelevance.
+  if (filters.stage === 'passed') {
+    conditions.push(`o.relevance_status = 'auto_pass'`);
+  } else {
+    conditions.push(`(o.relevance_status IS DISTINCT FROM 'auto_pass')`);
+  }
   if (filters.stage === 'active') {
     // Active = has an active-stage pipeline row OR has no pipeline row (defaults to interest)
     const activeList = ACTIVE_STAGE_KEYS.map((_, i) => `$${paramIdx + i}`).join(', ');
@@ -504,7 +522,7 @@ function buildFilterConditions(
     conditions.push(
       `(EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage IN (${activeList})) OR NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id))`,
     );
-  } else if (filters.stage) {
+  } else if (filters.stage && filters.stage !== 'passed') {
     const normalized = normalizePipelineStage(filters.stage) ?? filters.stage;
     if (normalized === 'interest') {
       // Interest tab: match rows with pipeline stage = interest OR no pipeline row at all
@@ -572,6 +590,19 @@ export async function listOpportunitiesPaged(
   for (const row of stageRes.rows) {
     stageCounts[row.stage] = row.cnt;
   }
+
+  // 'passed' is a relevance-derived view (auto_pass), not a pipeline stage, so
+  // it is absent from the stage-count GROUP BY above (auto_pass rows are
+  // excluded by buildFilterConditions for every non-passed view). Count it
+  // separately using the same base filters but forcing the passed view.
+  const passedFilters = { ...filters, stage: 'passed' };
+  const { conditions: passedConditions, params: passedParams } = buildFilterConditions(passedFilters);
+  const passedWhere = passedConditions.length > 0 ? `WHERE ${passedConditions.join(' AND ')}` : '';
+  const passedRes = await pool.query<{ cnt: number }>(
+    `SELECT COUNT(*)::int AS cnt FROM opportunities o ${passedWhere}`,
+    passedParams,
+  );
+  stageCounts['passed'] = passedRes.rows[0]?.cnt ?? 0;
 
   let dataParamIdx = paramIdx;
   const dataSql = `
