@@ -35,6 +35,7 @@ import {
   type OpportunityCreateInput,
   type OpportunityUpdateInput,
   type ListFilters,
+  type SortField,
 } from '../services/opportunities/index.js';
 import {
   getUnifiedOpportunityDetail,
@@ -59,6 +60,15 @@ import {
   isOverridableField,
   OVERRIDABLE_FIELDS,
 } from '../services/opportunities/field-override.js';
+
+const VALID_SORT_FIELDS: readonly SortField[] = [
+  'value', 'pwin', 'stage', 'due', 'agency', 'set_aside', 'title', 'recency',
+];
+
+function normalizeSortField(raw: string | undefined): SortField | undefined {
+  if (!raw) return undefined;
+  return (VALID_SORT_FIELDS as readonly string[]).includes(raw) ? (raw as SortField) : undefined;
+}
 
 function isCacheFresh(row: OpportunityRow): boolean {
   if (!row.analysis || !row.analysis_version || !row.ai_analyzed_at) return false;
@@ -556,6 +566,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor as string | undefined,
       page: query.page ? Number(query.page) : undefined,
+      sort_by: normalizeSortField(query.sort_by as string | undefined),
+      sort_dir: query.sort_dir === 'asc' ? 'asc' : query.sort_dir === 'desc' ? 'desc' : undefined,
     };
 
     if (filters.page) {

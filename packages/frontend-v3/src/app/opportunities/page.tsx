@@ -13,7 +13,6 @@ import {
 import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
-import { apiPost } from "@/lib/api";
 import { SourceChip } from "@/components/shared/source-chip";
 import { ErrorState } from "@/components/shared/error-state";
 import { useVaultDocuments } from "@/hooks/use-vault";
@@ -29,6 +28,8 @@ import {
   STAGE_BADGE_STYLES as CANONICAL_BADGE_STYLES,
   ACTIVE_STAGES as CANONICAL_ACTIVE_STAGES,
   stageKeyToLabel,
+  CANONICAL_STAGE_KEYS,
+  DB_KEY_TO_LABEL,
   type ActiveStage,
 } from "@/lib/stages";
 import type {
@@ -102,6 +103,21 @@ function formatDaysLeft(opp: OpportunitySummary): { text: string; className: str
 
 /* ── Stage badge colors (from shared canonical model) ───────────── */
 
+// Map a verbose set-aside string (e.g. "Total Small Business Set-Aside (FAR 19.5)")
+// to a compact tag. Returns null when there is no set-aside (unrestricted).
+function shortSetAside(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const s = raw.toLowerCase();
+  if (s.includes("service-disabled") || s.includes("sdvosb")) return "SDVOSB";
+  if (s.includes("8(a)") || s.includes("8a")) return "8(a)";
+  if (s.includes("hubzone")) return "HUBZone";
+  if (s.includes("women") || s.includes("wosb") || s.includes("edwosb")) return "WOSB";
+  if (s.includes("veteran") || s.includes("vosb")) return "VOSB";
+  if (s.includes("small business") || s.includes("sba") || s.includes(" sb")) return "SB";
+  // Unknown but present: trim to a short token so the column stays tidy.
+  return raw.length > 14 ? `${raw.slice(0, 13)}.` : raw;
+}
+
 const STAGE_BADGE_STYLES = CANONICAL_BADGE_STYLES;
 
 /* ── Value range options ────────────────────────────────────────── */
@@ -115,29 +131,11 @@ const VALUE_RANGES = [
   { label: ">$100M", min: 100_000_000, max: undefined },
 ] as const;
 
-/* ── Due options ────────────────────────────────────────────────── */
-
-const DUE_OPTIONS = [
-  { label: "Any Due", value: "" },
-  { label: "This Week", value: "this_week" },
-  { label: "This Month", value: "this_month" },
-  { label: "Next 90 Days", value: "next_90" },
-  { label: "Past Due", value: "past_due" },
-] as const;
-
-/* ── Source options ──────────────────────────────────────────────── */
-
-const SOURCE_OPTIONS = ["SAM", "GovTribe", "GovWin", "manual"] as const;
-
-/* ── Set-aside options ──────────────────────────────────────────── */
+/* ── Set-aside filter options (header dropdown) ─────────────────── */
 
 const SET_ASIDE_OPTIONS = [
-  "SDVOSB", "8(a)", "HUBZone", "WOSB", "SB", "Unrestricted",
+  "SDVOSB", "8(a)", "HUBZone", "WOSB", "VOSB", "SB",
 ] as const;
-
-/* ── Grade options ──────────────────────────────────────────────── */
-
-const GRADE_OPTIONS = ["A", "B", "C", "D", "F", "Unscored"] as const;
 
 /* ══════════════════════════════════════════════════════════════════ */
 
@@ -158,7 +156,22 @@ function OpportunityList() {
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const [page, setPage] = useState(1);
+  // Column sort state. null sortBy = default recency order.
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Click a column to sort. Same column toggles direction; new column starts desc.
+  const handleSort = useCallback((field: string) => {
+    setSortBy((prevField) => {
+      if (prevField === field) {
+        setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+        return field;
+      }
+      setSortDir("desc");
+      return field;
+    });
+  }, []);
 
   const filterParams = useMemo(() => {
     const range = VALUE_RANGES[valueRange];
@@ -173,9 +186,11 @@ function OpportunityList() {
       sources: sourceFilter.length > 0 ? sourceFilter : undefined,
       stage: stageTab !== "all" ? stageTab : undefined,
       relevant_only: relevantOnly,
+      sort_by: sortBy ?? undefined,
+      sort_dir: sortBy ? sortDir : undefined,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly]);
+  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, sortBy, sortDir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -321,7 +336,7 @@ function OpportunityList() {
         </div>
       )}
 
-      {/* Filter bar */}
+      {/* Filter bar (column-level filters live in the table headers now) */}
       <div className="flex flex-wrap gap-2 items-center">
         <input
           type="text"
@@ -329,49 +344,6 @@ function OpportunityList() {
           value={q}
           onChange={handleSearchChange}
           className="flex-grow min-w-[200px] rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
-        />
-        <input
-          type="text"
-          placeholder="Agency…"
-          value={agencyFilter}
-          onChange={(e) => setAgencyFilter(e.target.value)}
-          className="w-[130px] rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
-        />
-        <MultiSelect
-          label="Grade"
-          options={GRADE_OPTIONS as unknown as string[]}
-          selected={gradeFilter}
-          onToggle={(v) => toggleArrayFilter(setGradeFilter, v)}
-        />
-        <MultiSelect
-          label="Set-Aside"
-          options={SET_ASIDE_OPTIONS as unknown as string[]}
-          selected={setAsideFilter}
-          onToggle={(v) => toggleArrayFilter(setSetAsideFilter, v)}
-        />
-        <select
-          value={valueRange}
-          onChange={(e) => setValueRange(Number(e.target.value))}
-          className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
-        >
-          {VALUE_RANGES.map((r, i) => (
-            <option key={i} value={i}>{r.label}</option>
-          ))}
-        </select>
-        <select
-          value={dueFilter}
-          onChange={(e) => setDueFilter(e.target.value)}
-          className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
-        >
-          {DUE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <MultiSelect
-          label="Source"
-          options={SOURCE_OPTIONS as unknown as string[]}
-          selected={sourceFilter}
-          onToggle={(v) => toggleArrayFilter(setSourceFilter, v)}
         />
         <label className="flex items-center gap-1.5 cursor-pointer select-none">
           <input
@@ -465,19 +437,32 @@ function OpportunityList() {
             </div>
           ) : (
             <>
-              {/* Table */}
-              <div className="rounded border border-border overflow-hidden">
+              {/* Table. Header row stays pinned while the body scrolls. */}
+              <div className="rounded border border-border overflow-auto max-h-[calc(100vh-260px)]">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-20">
                     <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                      <th className="w-[3px] p-0" />
-                      <th className="px-3 py-2 text-left font-medium">Title</th>
-                      <th className="px-3 py-2 text-left font-medium w-[140px]">Agency</th>
-                      <th className="px-3 py-2 text-left font-medium w-[100px]">Value</th>
-                      <th className="px-3 py-2 text-left font-medium w-[70px]">Grade</th>
-                      <th className="px-3 py-2 text-left font-medium w-[90px]">Stage</th>
-                      <th className="px-3 py-2 text-left font-medium w-[80px]">Due</th>
-                      <th className="px-3 py-2 text-left font-medium w-[60px]">Actions</th>
+                      <th className="w-[3px] p-0 bg-gda-bg-base" />
+                      <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                      <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
+                      <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                      <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                      <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="150px" />
+                      <SortableHeader
+                        label="Set-Aside"
+                        field="set_aside"
+                        sortBy={sortBy}
+                        sortDir={sortDir}
+                        onSort={handleSort}
+                        width="120px"
+                        filter={{
+                          options: SET_ASIDE_OPTIONS,
+                          selected: setAsideFilter,
+                          onToggle: (v) => toggleArrayFilter(setSetAsideFilter, v),
+                        }}
+                      />
+                      <SortableHeader label="Due" field="due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                      <th className="px-3 py-2 text-left font-medium w-[60px] bg-gda-bg-base">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -552,71 +537,114 @@ function IntelChip({
   );
 }
 
-/* ── Multi-select dropdown ──────────────────────────────────────── */
+/* ── Sortable / filterable table header ─────────────────────────── */
 
-function MultiSelect({
+function SortableHeader({
   label,
-  options,
-  selected,
-  onToggle,
+  field,
+  sortBy,
+  sortDir,
+  onSort,
+  width,
+  align = "left",
+  filter,
 }: {
   label: string;
-  options: string[];
-  selected: string[];
-  onToggle: (value: string) => void;
+  field?: string;
+  sortBy: string | null;
+  sortDir: "asc" | "desc";
+  onSort: (field: string) => void;
+  width?: string;
+  align?: "left" | "right";
+  filter?: {
+    options: readonly string[];
+    selected: string[];
+    onToggle: (value: string) => void;
+  };
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const ref = useRef<HTMLTableCellElement>(null);
+  const active = field != null && sortBy === field;
 
   useEffect(() => {
+    if (!menuOpen) return;
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+        setMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [menuOpen]);
+
+  // ASCII carets only (no unicode glyphs, to satisfy the forbidden-token check).
+  const caret = active ? (sortDir === "asc" ? "^" : "v") : "";
+  const filterCount = filter?.selected.length ?? 0;
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "rounded border bg-gda-panel px-2 py-1.5 text-xs transition-colors flex items-center gap-1",
-          selected.length > 0
-            ? "border-gda-green text-gda-green"
-            : "border-border text-foreground",
+    <th
+      ref={ref}
+      className={cn(
+        "relative px-3 py-2 font-medium",
+        align === "right" ? "text-right" : "text-left",
+      )}
+      style={width ? { width } : undefined}
+    >
+      <div className={cn("flex items-center gap-1", align === "right" && "justify-end")}>
+        {field ? (
+          <button
+            type="button"
+            onClick={() => onSort(field)}
+            className={cn(
+              "flex items-center gap-1 transition-colors hover:text-foreground",
+              active ? "text-gda-green" : "text-muted-foreground",
+            )}
+            title={`Sort by ${label}`}
+          >
+            <span>{label}</span>
+            {caret && <span className="font-mono text-[10px]">{caret}</span>}
+          </button>
+        ) : (
+          <span className="text-muted-foreground">{label}</span>
         )}
-      >
-        {label}
-        {selected.length > 0 && (
-          <span className="bg-gda-green/20 text-gda-green rounded-full px-1 text-[11px]">
-            {selected.length}
-          </span>
+        {filter && (
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            className={cn(
+              "flex items-center font-mono text-[10px] transition-colors hover:text-foreground",
+              filterCount > 0 ? "text-gda-green" : "text-muted-foreground/60",
+            )}
+            title={`Filter ${label}`}
+          >
+            <span>{"\u25BE"}</span>
+            {filterCount > 0 && (
+              <span className="ml-0.5 rounded-full bg-gda-green/20 px-1 text-gda-green">
+                {filterCount}
+              </span>
+            )}
+          </button>
         )}
-        <span className="text-muted-foreground ml-0.5">▾</span>
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 rounded border border-border bg-gda-panel shadow-lg py-1 min-w-[140px]">
-          {options.map((opt) => (
+      </div>
+      {filter && menuOpen && (
+        <div className="absolute top-full left-0 mt-1 z-50 rounded border border-border bg-gda-panel shadow-lg py-1 min-w-[150px] font-normal normal-case">
+          {filter.options.map((opt) => (
             <button
               key={opt}
               type="button"
-              onClick={() => onToggle(opt)}
+              onClick={() => filter.onToggle(opt)}
               className={cn(
                 "w-full text-left px-3 py-1 text-xs hover:bg-gda-green/10 transition-colors flex items-center gap-2",
-                selected.includes(opt) ? "text-gda-green" : "text-foreground",
+                filter.selected.includes(opt) ? "text-gda-green" : "text-foreground",
               )}
             >
-              <span className="w-3">{selected.includes(opt) ? "x" : ""}</span>
+              <span className="w-3">{filter.selected.includes(opt) ? "x" : ""}</span>
               {opt}
             </button>
           ))}
         </div>
       )}
-    </div>
+    </th>
   );
 }
 
@@ -772,14 +800,21 @@ function OpportunityRow({
   onNavigate: (id: number | string) => void;
   onAgencyFilter?: (value: string) => void;
 }) {
-  const [hovered, setHovered] = useState(false);
+  const updateStage = useUpdateStage();
   const heat = getHeatColor(opp);
   const daysLeft = formatDaysLeft(opp);
   const pipelineStage = opp.pipeline_stage;
   const score = opp.pwin?.score;
-  const band = opp.pwin?.band;
-  const gradeLabel =
-    band === "forecast" ? "A" : band === "signal" ? "B" : band === "discovery" ? "C" : band === "pass" ? "D" : null;
+  // Pwin color band: green (strong), amber (moderate), red (weak).
+  const pwinClass =
+    score == null
+      ? "text-muted-foreground"
+      : score >= 65
+        ? "text-gda-green"
+        : score >= 45
+          ? "text-gda-amber"
+          : "text-red-400";
+  const setAsideLabel = shortSetAside(opp.set_aside);
 
   const sources: string[] = [];
   if (opp.data_source) sources.push(opp.data_source);
@@ -791,8 +826,6 @@ function OpportunityRow({
         "border-b border-border hover:bg-gda-panel/50 transition-colors h-9",
         heat ? `border-l-[3px] ${heat}` : "border-l-[3px] border-l-transparent",
       )}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       <td className="p-0 w-0" />
       <td className="px-3 py-1.5">
@@ -845,37 +878,60 @@ function OpportunityRow({
         {formatMoney(getEffectiveValue(opp))}
       </td>
       <td className="px-3 py-1.5 text-left">
-        {score != null && gradeLabel ? (
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-xs text-gda-green">{score}</span>
-            <span className="rounded border border-border px-1 py-0.5 text-[11px] font-mono">
-              {gradeLabel}
-            </span>
-          </div>
+        {score != null ? (
+          <span className={cn("font-mono text-xs tabular-nums", pwinClass)}>{score}%</span>
         ) : (
           <span className="text-xs text-muted-foreground">---</span>
         )}
       </td>
       <td className="px-3 py-1.5">
-        {pipelineStage ? (
-          <span
-            className={cn(
-              "rounded border px-1.5 py-0.5 text-[11px] font-mono",
-              STAGE_BADGE_STYLES[pipelineStage] ?? "border-border text-muted-foreground",
-            )}
-          >
-            {stageKeyToLabel(pipelineStage)}
+        {/* Inline stage select: change stage without opening the opp. */}
+        <select
+          value={pipelineStage ?? ""}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next) updateStage.mutate({ id: String(opp.id), stage: next });
+          }}
+          disabled={updateStage.isPending}
+          className={cn(
+            "w-full rounded border bg-gda-panel px-1.5 py-0.5 text-[11px] font-mono cursor-pointer focus:outline-none focus:ring-1 focus:ring-gda-green/50",
+            pipelineStage
+              ? (STAGE_BADGE_STYLES[pipelineStage] ?? "border-border text-foreground")
+              : "border-border text-muted-foreground",
+          )}
+        >
+          {!pipelineStage && <option value="">---</option>}
+          {CANONICAL_STAGE_KEYS.map((key) => (
+            <option key={key} value={key}>
+              {DB_KEY_TO_LABEL[key]}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-3 py-1.5">
+        {setAsideLabel ? (
+          <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-mono text-foreground">
+            {setAsideLabel}
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">---</span>
+          <span className="text-[11px] font-mono text-muted-foreground">Unrestricted</span>
         )}
       </td>
       <td className="px-3 py-1.5">
         <span className={cn("text-xs", daysLeft.className)}>{daysLeft.text}</span>
       </td>
       <td className="px-3 py-1.5">
-        <div className="flex items-center gap-1">
-          {/* Source link is always visible (not hover-gated) so the solicitation is one click away. */}
+        {/* Decluttered: two left-aligned actions, always visible. */}
+        <div className="flex items-center justify-start gap-2">
+          <Link
+            href={`/opportunities?id=${opp.id}`}
+            className="text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
+            title="View detail"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {"->"}
+          </Link>
           {opp.source_uri && (
             <a
               href={opp.source_uri}
@@ -885,41 +941,8 @@ function OpportunityRow({
               title="View solicitation"
               onClick={(e) => e.stopPropagation()}
             >
-              ↗
+              src
             </a>
-          )}
-          {hovered && (
-            <>
-            <button
-              type="button"
-              onClick={() => onNavigate(opp.id)}
-              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
-              title="View detail"
-            >
-              {"->"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                void apiPost("/v3/captures", { opportunity_id: String(opp.id) }).catch(() => {
-                  // capture may already exist or need pipeline item
-                });
-                onNavigate(opp.id);
-              }}
-              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
-              title="Start capture"
-            >
-              +
-            </button>
-            </>
-          )}
-          {!hovered && (
-            <Link
-              href={`/opportunities?id=${opp.id}`}
-              className="text-[11px] font-mono text-muted-foreground hover:text-gda-green"
-            >
-              {"->"}
-            </Link>
           )}
         </div>
       </td>
