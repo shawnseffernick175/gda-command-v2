@@ -6,6 +6,7 @@ export type ErrorCode =
   | 'UNAUTHORIZED'
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
+  | 'CONFLICT'
   | 'ANALYSIS_TIMEOUT'
   | 'DRAFT_NOT_READY'
   | 'INTERNAL_ERROR'

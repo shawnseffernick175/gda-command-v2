@@ -735,7 +735,20 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         );
     }
 
-    const { row, analysisAffected } = await updateOpportunity(id, input);
+    let row;
+    let analysisAffected;
+    try {
+      ({ row, analysisAffected } = await updateOpportunity(id, input));
+    } catch (err) {
+      const e = err as Error & { statusCode?: number };
+      // Pipeline-entry guard: stage set on an opportunity with no pipeline card.
+      if (e.statusCode === 409) {
+        return reply
+          .status(409)
+          .send(errorEnvelope('CONFLICT', e.message, req.requestId));
+      }
+      throw err;
+    }
 
     // Pre-warm: enqueue analysis ONLY when analysis-affecting fields changed
     if (analysisAffected) {
