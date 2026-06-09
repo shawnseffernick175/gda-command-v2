@@ -1084,7 +1084,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
           {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} />
+          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
 
           {/* Competitive Intelligence */}
           <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
@@ -1236,14 +1236,73 @@ function DecisionBriefPanel({
   analyzing,
   onAnalyze,
   llmErrorKind,
+  relevanceStatus,
+  relevanceReason,
 }: {
   llm?: LlmAnalysis | null;
   oppId: string;
   analyzing: boolean;
   onAnalyze: () => void;
   llmErrorKind?: string | null;
+  relevanceStatus?: string | null;
+  relevanceReason?: string | null;
 }) {
   if (!llm) {
+    // Pre-assessment gate: opportunities that failed the cheap relevance
+    // filter are shown as a fast verdict instead of triggering an expensive
+    // full analysis. Only 'relevant' (or null/unknown legacy rows) get the
+    // Run Analysis path below.
+    const isPreAssessed =
+      relevanceStatus === "off_profile" ||
+      relevanceStatus === "auto_pass" ||
+      relevanceStatus === "unknown_naics";
+    if (isPreAssessed) {
+      const preLabel =
+        relevanceStatus === "auto_pass"
+          ? "Auto-passed"
+          : relevanceStatus === "off_profile"
+            ? "Off profile"
+            : "NAICS unverified";
+      const preColor =
+        relevanceStatus === "auto_pass"
+          ? "border-gda-amber/40 text-gda-amber"
+          : "border-gda-red/40 text-gda-red";
+      return (
+        <Card className="border-border bg-gda-panel">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+              Decision Brief
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 py-4">
+            <div>
+              <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">
+                Pre-Assessment
+              </p>
+              <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", preColor)}>
+                {preLabel}
+              </Badge>
+            </div>
+            {relevanceReason && (
+              <p className="text-xs text-muted-foreground leading-relaxed font-mono">
+                {relevanceReason}
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground/60 font-mono">
+              Skipped full analysis (not a fit). Run a full analysis manually if you disagree.
+            </p>
+            <button
+              type="button"
+              onClick={onAnalyze}
+              disabled={analyzing}
+              className="rounded border border-gda-green/30 px-3 py-1.5 text-xs font-mono text-gda-green/80 hover:bg-gda-green/10 transition-colors disabled:opacity-50"
+            >
+              {analyzing ? "Analyzing..." : "Analyze Anyway"}
+            </button>
+          </CardContent>
+        </Card>
+      );
+    }
     return (
       <Card className="border-border bg-gda-panel">
         <CardHeader className="pb-2">

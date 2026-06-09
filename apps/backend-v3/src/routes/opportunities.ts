@@ -594,6 +594,26 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
     }
 
+    // Pre-assessment gate: the cheap, deterministic ingest-time relevance filter
+    // (evaluateRelevance) already judged this opportunity. Only opps marked
+    // 'relevant' (or not yet evaluated -> null) warrant the expensive Tier-2
+    // analysis (pwin/incumbent/competitors/blackhat/wargame). For off_profile,
+    // auto_pass, and unknown_naics, return the detail immediately with the
+    // existing pre-assessment instead of blocking on full analysis. This keeps
+    // opening any opportunity instant and reserves the analysis worker for the
+    // handful of opps that actually matter.
+    const relevanceStatus = (row as { relevance_status?: string | null }).relevance_status ?? null;
+    const skipFullAnalysis =
+      relevanceStatus === 'off_profile' ||
+      relevanceStatus === 'auto_pass' ||
+      relevanceStatus === 'unknown_naics';
+    if (skipFullAnalysis) {
+      analysisCacheHits.inc();
+      const detail = await rowToDetail(row);
+      const pipelineStage = await getPipelineStage(id);
+      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
+    }
+
     // Enqueue user-detail-priority analysis (ANALYSIS_PRIORITY.USER_DETAIL = 100)
     // and block up to the configured timeout. NOTE: this previously hardcoded
     // pgboss priority: 1, which is BELOW backfill (10) and sweep (5) -- so an

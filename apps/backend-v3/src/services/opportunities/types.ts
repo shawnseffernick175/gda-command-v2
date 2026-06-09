@@ -133,6 +133,11 @@ export interface OpportunityDetail extends OpportunitySummary {
   llm_quality_flag?: string | null;
   llm_error_kind?: string | null;
   llm_error_message?: string | null;
+  // Cheap ingest-time pre-assessment (evaluateRelevance). Surfaced so the UI can
+  // show why an opportunity was auto-passed / marked off-profile without running
+  // the expensive Tier-2 analysis.
+  relevance_status?: string | null;
+  relevance_reason?: string | null;
 }
 
 export interface OpportunityCreateInput {
