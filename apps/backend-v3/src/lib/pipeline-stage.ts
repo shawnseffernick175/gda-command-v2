@@ -30,6 +30,22 @@ export const ACTIVE_STAGE_KEYS: readonly CanonicalStageKey[] = [
   'post_submittal',
 ] as const;
 
+/**
+ * Terminal decision stages. These are explicit owner decisions (including
+ * No Bid) that are allowed to create a pipeline card even when none exists,
+ * unlike forward-progression stages which require prior qualification.
+ */
+export const TERMINAL_STAGE_KEYS: readonly CanonicalStageKey[] = [
+  'won',
+  'lost',
+  'no_bid',
+  'gov_cancelled',
+] as const;
+
+export function isTerminalStage(key: string): boolean {
+  return (TERMINAL_STAGE_KEYS as readonly string[]).includes(key);
+}
+
 const DB_KEY_TO_DISPLAY: Record<CanonicalStageKey, string> = {
   interest: 'Interest',
   qualify: 'Qualify',
