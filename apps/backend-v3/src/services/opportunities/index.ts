@@ -229,6 +229,8 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
     llm_quality_flag: llmQualityFlag,
     llm_error_kind: llmErrorKind,
     llm_error_message: llmErrorMessage,
+    relevance_status: (row as { relevance_status?: string | null }).relevance_status ?? null,
+    relevance_reason: (row as { relevance_reason?: string | null }).relevance_reason ?? null,
   };
 }
 
