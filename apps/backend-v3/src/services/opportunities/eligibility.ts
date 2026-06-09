@@ -76,16 +76,31 @@ export function resolveSetAsideEligibility(
   setAside: string | null | undefined,
   naics: string | null | undefined,
 ): SetAsideEligibility {
-  if (!setAside || setAside.trim() === '') {
+  const trimmed = (setAside ?? '').trim();
+
+  // Treat empty AND the common "no set-aside" phrasings as full and open.
+  // SAM/GovWin frequently store unrestricted as text rather than null.
+  const lower = trimmed.toLowerCase();
+  const isNoSetAside =
+    trimmed === '' ||
+    lower === 'n/a' ||
+    lower === 'none' ||
+    lower.includes('no set aside') ||
+    lower.includes('no set-aside') ||
+    lower.includes('not a set aside') ||
+    lower.includes('not set aside') ||
+    lower.includes('unrestricted') ||
+    lower.includes('full and open');
+  if (isNoSetAside) {
     return {
       status: 'unrestricted',
-      label: 'Unrestricted',
+      label: 'Open',
       partner: null,
       rationale: 'No set-aside; full and open competition.',
     };
   }
 
-  const { tag, program } = classifySetAside(setAside.trim());
+  const { tag, program } = classifySetAside(trimmed);
 
   // Programs Envision cannot prime (no cert) -> team-only via a partner.
   if (program === '8a' || program === 'hubzone' || program === 'wosb' ||
@@ -141,6 +156,6 @@ export function resolveSetAsideEligibility(
     status: 'ineligible',
     label: tag,
     partner: null,
-    rationale: `Set-aside "${setAside.trim()}" is not a lane Envision can prime; review for teaming.`,
+    rationale: `Set-aside "${trimmed}" is not a lane Envision can prime; review for teaming.`,
   };
 }
