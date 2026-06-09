@@ -594,21 +594,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
     }
 
-    // Enqueue high-priority analysis and block up to 10s
-    const boss = requireBoss();
-    const jobData: AnalysisJobData = {
-      entityType: 'opportunity',
-      entityId: id,
-      priority: 'high',
-      trigger: 'detail-endpoint',
-    };
-    await boss.send(QUEUE_NAMES.ANALYSIS_OPPORTUNITY, jobData, {
-      priority: 1,
-      retryLimit: 3,
-      retryDelay: 5,
-      retryBackoff: true,
-      singletonKey: `opp-${id}`,
-    });
+    // Enqueue user-detail-priority analysis (ANALYSIS_PRIORITY.USER_DETAIL = 100)
+    // and block up to the configured timeout. NOTE: this previously hardcoded
+    // pgboss priority: 1, which is BELOW backfill (10) and sweep (5) -- so an
+    // opened opportunity sat behind the entire backfill queue and always timed
+    // out with "Analysis not ready" whenever a backfill was in flight. Route
+    // through enqueueAnalysis so the user's open correctly jumps the queue.
+    enqueueAnalysis(id, 'detail-endpoint');
 
     const fresh = await waitForAnalysis(
       id,
