@@ -66,6 +66,15 @@ describe('validateAndRecompute', () => {
     expect(result.posted_at).toBeNull();
   });
 
+  it('R3+R1 interaction: does NOT null valid response_due_at when R3 nulls junk posted_at', () => {
+    const junkPosted = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const validDue = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString();
+    const row = makeRow({ posted_at: junkPosted, response_due_at: validDue });
+    const result = validateAndRecompute(row);
+    expect(result.posted_at).toBeNull();
+    expect(result.response_due_at).toBe(validDue);
+  });
+
   it('R4: swaps value_min and value_max when min > max', () => {
     const row = makeRow({ value_min: 100, value_max: 10 });
     const result = validateAndRecompute(row);
@@ -87,11 +96,19 @@ describe('validateAndRecompute', () => {
     expect(result.value_max).toBeNull();
   });
 
-  it('R6: nulls naics when not 6 digits and preserves raw in tags', () => {
+  it('R6: nulls naics when not 6 digits and preserves sanitized raw in tags', () => {
     const row = makeRow({ naics: '12345' });
     const result = validateAndRecompute(row);
     expect(result.naics).toBeNull();
     expect(result.tags).toContain('bad_naics:12345');
+  });
+
+  it('R6: sanitizes commas in bad naics tag to prevent PG array corruption', () => {
+    const row = makeRow({ naics: '541330,236220' });
+    const result = validateAndRecompute(row);
+    expect(result.naics).toBeNull();
+    expect(result.tags).toContain('bad_naics:541330_236220');
+    expect(result.tags.every(t => !t.includes(','))).toBe(true);
   });
 
   it('R6: trims valid naics whitespace', () => {

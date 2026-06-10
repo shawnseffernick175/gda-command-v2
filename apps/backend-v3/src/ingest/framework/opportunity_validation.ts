@@ -105,7 +105,7 @@ export function validateAndRecompute<T extends OpportunityValidationFields>(opp:
   if (dueAt !== null && dueAt.getTime() > now + TEN_YEARS_MS) {
     logger.warn({ ...ctx, response_due_at: out.response_due_at }, 'opp validator: response_due_at >10y out, nulled');
     out.response_due_at = null;
-  } else if (dueAt !== null && postedAt !== null && dueAt.getTime() < postedAt.getTime()) {
+  } else if (dueAt !== null && postedAt !== null && out.posted_at !== null && dueAt.getTime() < postedAt.getTime()) {
     logger.warn(
       { ...ctx, response_due_at: out.response_due_at, posted_at: out.posted_at },
       'opp validator: response_due_at < posted_at, response_due_at nulled',
@@ -136,7 +136,8 @@ export function validateAndRecompute<T extends OpportunityValidationFields>(opp:
     const naics = out.naics.trim();
     if (!NAICS_RE.test(naics)) {
       logger.warn({ ...ctx, naics: out.naics }, 'opp validator: naics not 6-digit, nulled (raw preserved in tags)');
-      if (!out.tags.includes(`bad_naics:${naics}`)) out.tags.push(`bad_naics:${naics}`);
+      const sanitized = naics.replace(/[,{}"\\]/g, '_');
+      if (!out.tags.includes(`bad_naics:${sanitized}`)) out.tags.push(`bad_naics:${sanitized}`);
       out.naics = null;
     } else {
       out.naics = naics;
