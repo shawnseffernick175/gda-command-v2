@@ -923,52 +923,80 @@ function DocumentReaderDrawer({
 
 /* ── Upload Modal ──────────────────────────────────────────── */
 
+type QueuedFile = {
+  file: File;
+  status: "queued" | "uploading" | "done" | "error";
+  message?: string;
+};
+
 function UploadModal({ onClose }: { onClose: () => void }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [queue, setQueue] = useState<QueuedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [running, setRunning] = useState(false);
   const upload = useUploadVaultDocument();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploadPhase, setUploadPhase] = useState<string | null>(null);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped) setFile(dropped);
+  const addFiles = useCallback((files: FileList | File[]) => {
+    const incoming = Array.from(files).map<QueuedFile>((file) => ({
+      file,
+      status: "queued",
+    }));
+    if (incoming.length === 0) return;
+    setQueue((prev) => [...prev, ...incoming]);
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    if (!file) return;
-    setUploadPhase("Uploading…");
-    upload.mutate(
-      { file, docType: "other" },
-      {
-        onSuccess: (data) => {
-          timersRef.current.forEach(clearTimeout);
-          timersRef.current = [];
-          setUploadPhase(null);
-          if (data.routing?.routing_rationale) {
-            // show success with routing info
-          }
-        },
-        onError: () => {
-          timersRef.current.forEach(clearTimeout);
-          timersRef.current = [];
-          setUploadPhase(null);
-        },
-      },
-    );
-    // Simulate phase transitions for UX
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [
-      setTimeout(() => setUploadPhase("Extracting text…"), 1000),
-      setTimeout(() => setUploadPhase("AI parsing…"), 3000),
-      setTimeout(() => setUploadPhase("Auto-routing…"), 5000),
-    ];
-  }, [file, upload]);
+  const removeAt = useCallback((idx: number) => {
+    setQueue((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+    },
+    [addFiles],
+  );
+
+  // Upload every queued file sequentially through the existing
+  // extract -> AI parse -> smart-route pipeline. Sequential keeps server
+  // load predictable and gives clear per-file status.
+  const handleSubmit = useCallback(async () => {
+    if (running) return;
+    setRunning(true);
+    for (let i = 0; i < queue.length; i++) {
+      if (queue[i].status === "done") continue;
+      setQueue((prev) =>
+        prev.map((q, idx) => (idx === i ? { ...q, status: "uploading" } : q)),
+      );
+      try {
+        const data = await upload.mutateAsync({
+          file: queue[i].file,
+          docType: "other",
+        });
+        const routed = data.routing?.routing_rationale
+          ? "routed"
+          : "stored";
+        setQueue((prev) =>
+          prev.map((q, idx) =>
+            idx === i ? { ...q, status: "done", message: routed } : q,
+          ),
+        );
+      } catch (err) {
+        setQueue((prev) =>
+          prev.map((q, idx) =>
+            idx === i
+              ? { ...q, status: "error", message: (err as Error).message }
+              : q,
+          ),
+        );
+      }
+    }
+    setRunning(false);
+  }, [queue, upload, running]);
+
+  const pending = queue.filter((q) => q.status !== "done").length;
+  const doneCount = queue.filter((q) => q.status === "done").length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -987,8 +1015,9 @@ function UploadModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          AI will auto-detect the document type and route it to matching
-          opportunities.
+          Add one or more files. AI will auto-detect each document type and
+          route it to matching opportunities. Financial files update the
+          Financials tab automatically.
         </p>
 
         {/* Drop zone */}
@@ -1000,7 +1029,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
             dragOver
               ? "border-gda-green bg-gda-green/5"
               : "border-border hover:border-gda-cyan/40"
@@ -1009,79 +1038,78 @@ function UploadModal({ onClose }: { onClose: () => void }) {
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,.docx,.xlsx,.txt,.csv"
+            multiple
+            accept=".pdf,.docx,.xlsx,.txt,.csv,.zip"
             className="hidden"
             onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) setFile(f);
+              if (e.target.files?.length) addFiles(e.target.files);
+              e.target.value = "";
             }}
           />
-          {file ? (
-            <div className="space-y-1">
-              <p className="text-sm text-foreground font-mono">{file.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatBytes(file.size)}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">
-                Drag and drop a file here or click to browse
-              </p>
-              <p className="text-xs text-muted-foreground">
-                PDF, DOCX, XLSX, TXT, CSV — max 20MB
-              </p>
-            </div>
-          )}
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">
+              Drag and drop files here or click to browse
+            </p>
+            <p className="text-xs text-muted-foreground">
+              PDF, DOCX, XLSX, TXT, CSV, ZIP - max 20MB each
+            </p>
+          </div>
         </div>
 
-        {/* Progress / error */}
-        {upload.isPending && uploadPhase && (
-          <div className="space-y-1">
-            <div className="h-2 w-full rounded-full bg-gda-panel overflow-hidden">
-              <div className="h-full bg-gda-green animate-pulse w-2/3 rounded-full" />
-            </div>
-            <p className="text-xs text-muted-foreground font-mono">
-              {uploadPhase}
-            </p>
-          </div>
-        )}
-
-        {upload.isError && (
-          <p className="text-xs text-gda-red">
-            {(upload.error as Error).message}
-          </p>
-        )}
-
-        {upload.isSuccess && upload.data && (
-          <div className="rounded border border-gda-green/30 bg-gda-green/5 p-3 space-y-2">
-            <p className="text-xs font-mono text-gda-green font-medium">
-              Upload complete
-            </p>
-            {upload.data.ai_summary && (
-              <p className="text-xs text-foreground leading-relaxed">
-                {upload.data.ai_summary}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground font-mono">
-              Type detected:{" "}
-              <span className="text-foreground">
-                {DOC_TYPE_LABELS[upload.data.doc_type] ?? upload.data.doc_type}
-              </span>
-            </p>
-            {upload.data.routing?.routing_rationale ? (
-              <p className="text-xs text-muted-foreground">
-                Routed:{" "}
-                <span className="text-gda-green">
-                  {upload.data.routing.routing_rationale}
+        {/* Queued files */}
+        {queue.length > 0 && (
+          <div className="max-h-48 space-y-1 overflow-auto">
+            {queue.map((q, idx) => (
+              <div
+                key={`${q.file.name}-${idx}`}
+                className="flex items-center justify-between gap-2 rounded border border-border bg-gda-panel/40 px-2 py-1.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-xs text-foreground">
+                    {q.file.name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {formatBytes(q.file.size)}
+                    {q.message ? ` - ${q.message}` : ""}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 font-mono text-[10px] ${
+                    q.status === "done"
+                      ? "text-gda-green"
+                      : q.status === "error"
+                        ? "text-gda-red"
+                        : q.status === "uploading"
+                          ? "text-gda-cyan"
+                          : "text-muted-foreground"
+                  }`}
+                >
+                  {q.status === "done"
+                    ? "done"
+                    : q.status === "error"
+                      ? "failed"
+                      : q.status === "uploading"
+                        ? "..."
+                        : "queued"}
                 </span>
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Unrouted — link manually
-              </p>
-            )}
+                {!running && q.status !== "done" && (
+                  <button
+                    onClick={() => removeAt(idx)}
+                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Remove"
+                  >
+                    x
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
+        )}
+
+        {doneCount > 0 && (
+          <p className="text-xs font-mono text-gda-green">
+            {doneCount} of {queue.length} uploaded
+          </p>
         )}
 
         {/* Submit */}
@@ -1090,14 +1118,18 @@ function UploadModal({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             className="rounded border border-border px-3 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
           >
-            Cancel
+            {doneCount > 0 && pending === 0 ? "Close" : "Cancel"}
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!file || upload.isPending}
+            disabled={pending === 0 || running}
             className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
           >
-            {upload.isPending ? "Processing…" : "Upload & Route"}
+            {running
+              ? "Processing..."
+              : pending > 1
+                ? `Upload & Route All (${pending})`
+                : "Upload & Route"}
           </button>
         </div>
       </div>
