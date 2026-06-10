@@ -94,7 +94,7 @@ export async function overrideRoutes(app: FastifyInstance): Promise<void> {
             id,
             currentGrade,
             cache?.pwin ?? null,
-            opp.grade_evidence ? JSON.stringify({ grade_evidence: opp.grade_evidence }) : null,
+            opp.grade_evidence ? JSON.stringify({ grade_evidence: JSON.parse(opp.grade_evidence as string) }) : null,
             cache?.version ?? null,
             cache?.generated_at ?? null,
             newGrade,
@@ -289,26 +289,33 @@ export async function overrideRoutes(app: FastifyInstance): Promise<void> {
         stage_pct: string;
       }>(`
         WITH grade_totals AS (
-          SELECT COUNT(DISTINCT opportunity_id) AS overridden
-          FROM opportunity_decision_overrides
-          WHERE field_name = 'grade'
+          SELECT COUNT(DISTINCT odo.opportunity_id) AS overridden
+          FROM opportunity_decision_overrides odo
+          JOIN opportunities o ON o.id = odo.opportunity_id AND o.deleted_at IS NULL
+          WHERE odo.field_name = 'grade'
         ),
         stage_totals AS (
-          SELECT COUNT(DISTINCT opportunity_id) AS overridden
-          FROM opportunity_decision_overrides
-          WHERE field_name = 'pipeline_stage'
+          SELECT COUNT(DISTINCT odo.opportunity_id) AS overridden
+          FROM opportunity_decision_overrides odo
+          JOIN opportunities o ON o.id = odo.opportunity_id AND o.deleted_at IS NULL
+          WHERE odo.field_name = 'pipeline_stage'
         ),
         scored_opps AS (
           SELECT COUNT(*) AS total FROM opportunities WHERE grade IS NOT NULL AND deleted_at IS NULL
+        ),
+        pipeline_opps AS (
+          SELECT COUNT(DISTINCT pi.opportunity_id) AS total
+          FROM pipeline_items pi
+          JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
         )
         SELECT
           CASE WHEN so.total = 0 THEN 100
                ELSE ROUND(((so.total - gt.overridden)::numeric / so.total) * 100, 1)
           END AS grade_pct,
-          CASE WHEN so.total = 0 THEN 100
-               ELSE ROUND(((so.total - st.overridden)::numeric / so.total) * 100, 1)
+          CASE WHEN po.total = 0 THEN 100
+               ELSE ROUND(((po.total - st.overridden)::numeric / po.total) * 100, 1)
           END AS stage_pct
-        FROM scored_opps so, grade_totals gt, stage_totals st
+        FROM scored_opps so, grade_totals gt, stage_totals st, pipeline_opps po
       `);
       const agreement = agreementRes.rows[0];
 
