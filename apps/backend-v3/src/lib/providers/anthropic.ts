@@ -118,15 +118,36 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst. Be direct and specific.`,
 
-  financial_statement_extract: `You are a financial analyst at Envision extracting structured figures from a financial statement.
+  financial_statement_extract: `You are a financial analyst at Envision extracting structured KPI figures from real month-end accounting exports (Income Statements, Balance Sheets, GL detail, cost reports, target-vs-actual workbooks).
 
-Extract quarterly (and annual if present) PLAN vs ACTUAL figures for Orders, Sales, EBIT, Gross Margin %, and ROS %.
-Map columns and labels intelligently: Revenue = Sales; Bookings = Orders; Operating Income = EBIT; GM% = Gross Margin %; ROS%/Return on Sales = ROS %.
-Convert dollars to absolute numbers (e.g. "$1.2M" -> 1200000; a value of "595" under a "$000s" header -> 595000).
-Express percentages as plain numbers (38.1 not 0.381). If a value is missing, use null.
-Distinguish PLAN/Budget/Forecast figures (kind "plan") from ACTUAL/Reported figures (kind "actual").
-Set is_financial=false if the document is not a financial statement.
-NEVER fabricate figures. Return JSON exactly matching the requested schema (include every key).`,
+KPIs to map (one row per period+kind): Orders, Sales, EBIT, Gross Margin %, ROS %.
+Map labels intelligently:
+- Sales = total Revenue. On an account-level Income Statement, derive Sales from the "Totals for F/S Line" / "F/S Group" / "Major" revenue subtotals (e.g. Government Revenue + Commercial Revenue), or from the Gross Margin "Revenue" group total. Pick the broadest revenue total, do not sum overlapping subtotals twice.
+- EBIT = Operating Income / Income from Operations.
+- Gross Margin % = GM% (gross profit / revenue * 100 if only dollars are shown).
+- ROS % = Return on Sales / Net Margin.
+- Orders = Bookings, ONLY if the document states them. Never derive or fabricate Orders.
+
+ACTUALS-ONLY documents (most month-end Income Statements): emit kind="actual" rows even when there is NO plan/budget column. Do not require a plan column to exist.
+
+TARGET vs ACTUAL files (filenames containing "TGT vs ACT", "L1-TARGET", "L1-ACTUAL", or columns labeled Target/Plan/Budget vs Actual): emit a kind="plan" row for the TARGET/PLAN/BUDGET figures and a kind="actual" row for the ACTUAL figures.
+
+PERIOD AND QUARTER:
+- Fiscal calendar uses CALENDAR quarters. quarter = ceil(month / 3): Jan/Feb/Mar -> 1, Apr/May/Jun -> 2, Jul/Aug/Sep -> 3, Oct/Nov/Dec -> 4.
+- Infer fiscal_year and month from filename tokens (MAR-2026, MAR-26, JAN-26, FEB-26) and/or the statement period header (e.g. "03/01/26 / 03/31/26" -> March 2026). A two-digit year YY means 20YY.
+- So MAR-2026/MAR-26 -> fiscal_year=2026, quarter=1; JAN-26 and FEB-26 also -> 2026 Q1.
+- period: a human-readable label like "FY26 Q1" (or "FY26 Mar" for a single month). Keep it consistent with fiscal_year and quarter.
+- If a row's month cannot be determined, set quarter=null (ingest will skip it) but still set fiscal_year if known.
+
+MONTH vs YTD: when an Income Statement shows BOTH a monthly period column and a "Current Fiscal YTD" column, use the MONTH figure as the primary row value (monthly uploads accumulate per quarter). Do not use the YTD column as the row value.
+
+NON-KPI documents: Balance Sheets, GL Detail, Service Center Cost Reports, Statement of Indirect Expense, and any statement with no Orders/Sales/EBIT/GM/ROS mapping -> return is_financial=true and rows=[]. Do NOT fabricate KPI rows for these. An empty rows array is the correct, expected answer and will not clear existing data.
+
+Set is_financial=false ONLY if the document is not a financial statement at all.
+
+NUMBER FORMAT: dollars to absolute numbers ("4,067,049.06" -> 4067049.06; "$1.2M" -> 1200000; "595" under a "$000s" header -> 595000). Percentages as plain numbers (38.1 not 0.381). Missing values -> null.
+
+NEVER fabricate figures, periods, or KPIs. Return JSON exactly matching the requested schema (include every key on every row).`,
 
   competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
@@ -334,7 +355,12 @@ function buildFinancialStatementExtractPrompt(input: FinancialStatementExtractIn
 Extracted text (first 12000 chars):
 ${text}
 
-Extract the financial figures and return JSON:
+Use BOTH the filename and the statement text to determine period, fiscal_year, and quarter (quarter = ceil(month/3), two-digit year YY -> 20YY).
+- If this is an actuals-only Income Statement, derive Sales from the revenue "Totals for F/S Line" / group subtotals and emit kind="actual" rows (use the monthly column, not the Current Fiscal YTD column).
+- If this is a TARGET-vs-ACTUAL or L1-TARGET/L1-ACTUAL file, emit a kind="plan" row for target/plan and a kind="actual" row for actual.
+- If this is a Balance Sheet, GL Detail, Cost Report, or Statement of Indirect Expense with no Orders/Sales/EBIT/GM/ROS mapping, set is_financial=true and return rows=[] (do not fabricate).
+
+Return JSON exactly matching this schema:
 {
   "is_financial": true or false,
   "currency": "USD",

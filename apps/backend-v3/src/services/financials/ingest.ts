@@ -6,10 +6,11 @@
  * existing columns are preserved via COALESCE so a partial upload does not
  * zero out previously ingested figures.
  *
- * Owner choice: real uploaded data replaces the seed/demo rows. Before the
- * first real upsert we clear rows flagged is_seed=true (see migration
- * v3_068_financials_seed_flag.sql). After the seed rows are gone this delete
- * is a no-op, so it is safe to run on every ingest.
+ * Owner choice: real uploaded data replaces the seed/demo rows. We clear rows
+ * flagged is_seed=true (see migration v3_068_financials_seed_flag.sql) ONLY
+ * after the first real row is successfully upserted. An empty or all-failed
+ * extract (rows=[]) leaves existing data intact so a non-KPI upload (balance
+ * sheet, GL detail) never blanks the Financials tab.
  */
 
 import { pool } from '../../lib/db.js';
@@ -72,23 +73,35 @@ export async function ingestFinancialRows(
   let plan = 0;
   let actual = 0;
 
-  // Replace seed/demo data on the first real ingest. No-op once seed rows gone.
-  await pool.query(`DELETE FROM financial_plan WHERE is_seed = true`);
-  await pool.query(`DELETE FROM financial_actuals WHERE is_seed = true`);
+  // Clear seed/demo rows ONLY after a real row is successfully upserted. An empty
+  // extract (rows=[]) or an all-failed extract must leave existing data intact,
+  // otherwise a balance sheet / GL upload with no KPI mapping would blank the tab.
+  let seedCleared = false;
+  async function clearSeedOnce(): Promise<void> {
+    if (seedCleared) return;
+    await pool.query(`DELETE FROM financial_plan WHERE is_seed = true`);
+    await pool.query(`DELETE FROM financial_actuals WHERE is_seed = true`);
+    seedCleared = true;
+  }
 
-  for (const row of rows) {
-    if (row.quarter === null || row.quarter === undefined) continue;
+  if (rows.length > 0) {
+    for (const row of rows) {
+      if (row.quarter === null || row.quarter === undefined) continue;
 
-    try {
-      if (row.kind === 'plan') {
-        await upsertRow('financial_plan', PLAN_COLUMNS, row);
-        plan += 1;
-      } else if (row.kind === 'actual') {
-        await upsertRow('financial_actuals', ACTUAL_COLUMNS, row);
-        actual += 1;
+      try {
+        if (row.kind === 'plan') {
+          await upsertRow('financial_plan', PLAN_COLUMNS, row);
+          plan += 1;
+        } else if (row.kind === 'actual') {
+          await upsertRow('financial_actuals', ACTUAL_COLUMNS, row);
+          actual += 1;
+        } else {
+          continue;
+        }
+        await clearSeedOnce();
+      } catch (err) {
+        logger.warn({ err, period: row.period, kind: row.kind }, 'Financial row upsert failed');
       }
-    } catch (err) {
-      logger.warn({ err, period: row.period, kind: row.kind }, 'Financial row upsert failed');
     }
   }
 

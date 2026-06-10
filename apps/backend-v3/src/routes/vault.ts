@@ -119,7 +119,7 @@ async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<str
   }
 
   if (ext === 'xlsx') {
-    const ExcelJS = await import('exceljs');
+    const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buf as unknown as ArrayBuffer);
     const blocks: string[] = [];
