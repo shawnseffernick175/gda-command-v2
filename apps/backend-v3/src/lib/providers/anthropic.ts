@@ -121,16 +121,39 @@ Write as a sharp defense contracting analyst. Be direct and specific.`,
   financial_statement_extract: `You are a financial analyst at Envision extracting structured KPI figures from real month-end accounting exports (Income Statements, Balance Sheets, GL detail, cost reports, target-vs-actual workbooks).
 
 KPIs to map (one row per period+kind): Orders, Sales, EBIT, Gross Margin %, ROS %.
-Map labels intelligently:
-- Sales = total Revenue. On an account-level Income Statement, derive Sales from the "Totals for F/S Line" / "F/S Group" / "Major" revenue subtotals (e.g. Government Revenue + Commercial Revenue), or from the Gross Margin "Revenue" group total. Pick the broadest revenue total, do not sum overlapping subtotals twice.
-- EBIT = Operating Income / Income from Operations.
-- Gross Margin % = GM% (gross profit / revenue * 100 if only dollars are shown).
-- ROS % = Return on Sales / Net Margin.
-- Orders = Bookings, ONLY if the document states them. Never derive or fabricate Orders.
+
+SALES (Revenue): On an account-level Income Statement, Sales = the SUM of every "Totals for F/S Line" subtotal row that sits under the F/S Group "Revenue". This typically means Government Revenue + Commercial Revenue + Rate Variance. Add these revenue line totals together; do not double-count by also adding individual accounts that already roll into those line totals, and do not pick a single revenue account on its own.
+
+DIRECT COSTS: Total Direct Costs = the SUM of every "Totals for F/S Line" subtotal under the F/S Group "Direct Costs" (e.g. Direct Labor + Direct Travel + Direct Consultants + Direct Materials + Subcontractor Labor + Other Direct Costs + Subcontractor Travel + Subcontractor Materials).
+
+COST OF OPERATIONS: = the SUM of the "Totals for F/S Line" subtotals under the F/S Group "Cost of Operations" (Fringe + Overhead + G&A).
+
+GROSS MARGIN (derive, do NOT copy a line value):
+- Gross Margin Dollars (GM$) = Sales - Total Direct Costs.
+- Gross Margin % = GM$ / Sales * 100, expressed as a PLAIN PERCENT number (e.g. 12.3, NOT 0.123 and NOT 1.05).
+- NEVER copy a single account, a Rate Variance line, a ROS value, or any single subtotal into gross_margin. gross_margin is ALWAYS computed as (Sales - Direct Costs) / Sales * 100.
+
+EBIT (Operating Income):
+- Operating Income (EBIT) = GM$ - Cost of Operations (Fringe + Overhead + G&A).
+- If the statement explicitly labels an "Operating Income" / "Income from Operations" line, use it; otherwise compute it as above.
+
+ROS:
+- ROS % = Operating Income (EBIT) / Sales * 100, as a PLAIN PERCENT number (e.g. 1.0, NOT 0.01).
+
+ORDERS:
+- Orders = Bookings, ONLY if the document states them. Never derive or fabricate Orders. Leave null if absent.
+
+WORKED EXAMPLE (account-level Income Statement, March 2026 month column):
+- F/S Group "Revenue": Government Revenue 4,067,049.06 + Commercial Revenue 21,567.50 + Rate Variance 100,149.91 => Sales = 4,188,766.47
+- F/S Group "Direct Costs" line totals sum => Total Direct Costs = 3,673,672.19
+- GM$ = 4,188,766.47 - 3,673,672.19 = 515,094.28 => gross_margin = 515094.28 / 4188766.47 * 100 = 12.3
+- F/S Group "Cost of Operations": Fringe 178,139.49 + Overhead 92,750.67 + G&A 200,425.10 = 471,315.26
+- EBIT = 515,094.28 - 471,315.26 = 43,779.02 => ros = 43779.02 / 4188766.47 * 100 = 1.0
+- Row: sales=4188766.47, gross_margin=12.3, ebit=43779.02, ros=1.0, kind="actual".
 
 ACTUALS-ONLY documents (most month-end Income Statements): emit kind="actual" rows even when there is NO plan/budget column. Do not require a plan column to exist.
 
-TARGET vs ACTUAL files (filenames containing "TGT vs ACT", "L1-TARGET", "L1-ACTUAL", or columns labeled Target/Plan/Budget vs Actual): emit a kind="plan" row for the TARGET/PLAN/BUDGET figures and a kind="actual" row for the ACTUAL figures.
+TARGET / PLAN files: If the FILENAME contains any of TGT, TARGET, BUDGET, PLAN, FORECAST, PROJ, or L1-TARGET, OR the content has columns labeled Target / Plan / Budget / Forecast (vs Actual): emit a kind="plan" row built from the TARGET/PLAN/BUDGET/FORECAST column or file. If the same file ALSO carries an actual column (e.g. "TGT vs ACT MAR-26.xlsx" has both a target column and an actual column), additionally emit a separate kind="actual" row from the actual column. So "TGT vs ACT MAR-26.xlsx" yields BOTH a plan row and an actual row for FY26 Q1. A file named "L1-TARGET ..." yields a plan row; "L1-ACTUAL ..." yields an actual row. Parse whatever KPI columns exist (revenue/sales at minimum); leave any KPI that is not present null, never fabricate it.
 
 PERIOD AND QUARTER:
 - Fiscal calendar uses CALENDAR quarters. quarter = ceil(month / 3): Jan/Feb/Mar -> 1, Apr/May/Jun -> 2, Jul/Aug/Sep -> 3, Oct/Nov/Dec -> 4.
@@ -139,13 +162,13 @@ PERIOD AND QUARTER:
 - period: a human-readable label like "FY26 Q1" (or "FY26 Mar" for a single month). Keep it consistent with fiscal_year and quarter.
 - If a row's month cannot be determined, set quarter=null (ingest will skip it) but still set fiscal_year if known.
 
-MONTH vs YTD: when an Income Statement shows BOTH a monthly period column and a "Current Fiscal YTD" column, use the MONTH figure as the primary row value (monthly uploads accumulate per quarter). Do not use the YTD column as the row value.
+MONTH vs YTD: when an Income Statement shows BOTH a monthly period column (e.g. 03/01/26-03/31/26) and a "Current Fiscal YTD" column, use the MONTH column figures as the primary row value (monthly uploads accumulate per quarter). Do NOT use the YTD column and do NOT blend YTD into the month row. Compute Sales, Direct Costs, GM$, GM%, EBIT, and ROS entirely from the MONTH column.
 
 NON-KPI documents: Balance Sheets, GL Detail, Service Center Cost Reports, Statement of Indirect Expense, and any statement with no Orders/Sales/EBIT/GM/ROS mapping -> return is_financial=true and rows=[]. Do NOT fabricate KPI rows for these. An empty rows array is the correct, expected answer and will not clear existing data.
 
 Set is_financial=false ONLY if the document is not a financial statement at all.
 
-NUMBER FORMAT: dollars to absolute numbers ("4,067,049.06" -> 4067049.06; "$1.2M" -> 1200000; "595" under a "$000s" header -> 595000). Percentages as plain numbers (38.1 not 0.381). Missing values -> null.
+NUMBER FORMAT: dollars to absolute numbers ("4,067,049.06" -> 4067049.06; "$1.2M" -> 1200000; "595" under a "$000s" header -> 595000). Percentages (gross_margin, ros) as plain numbers (12.3 not 0.123). Missing values -> null.
 
 NEVER fabricate figures, periods, or KPIs. Return JSON exactly matching the requested schema (include every key on every row).`,
 
@@ -356,8 +379,8 @@ Extracted text (first 12000 chars):
 ${text}
 
 Use BOTH the filename and the statement text to determine period, fiscal_year, and quarter (quarter = ceil(month/3), two-digit year YY -> 20YY).
-- If this is an actuals-only Income Statement, derive Sales from the revenue "Totals for F/S Line" / group subtotals and emit kind="actual" rows (use the monthly column, not the Current Fiscal YTD column).
-- If this is a TARGET-vs-ACTUAL or L1-TARGET/L1-ACTUAL file, emit a kind="plan" row for target/plan and a kind="actual" row for actual.
+- If this is an actuals-only Income Statement, emit kind="actual" rows using the MONTH column (not the Current Fiscal YTD column). Sales = sum of all "Totals for F/S Line" rows under F/S Group "Revenue". Direct Costs = sum of all "Totals for F/S Line" rows under F/S Group "Direct Costs". gross_margin = (Sales - Direct Costs) / Sales * 100 as a plain percent (e.g. 12.3). EBIT = (Sales - Direct Costs) - Cost of Operations (Fringe + Overhead + G&A). ros = EBIT / Sales * 100. Never copy a single account or a Rate Variance line into gross_margin.
+- If the filename contains TGT, TARGET, BUDGET, PLAN, FORECAST, PROJ, or L1-TARGET, OR the content has Target/Plan/Budget/Forecast columns, emit a kind="plan" row from the target/plan figures. If an actual column is also present in the same file (e.g. "TGT vs ACT MAR-26.xlsx"), ALSO emit a separate kind="actual" row. An "L1-TARGET ..." file yields a plan row; an "L1-ACTUAL ..." file yields an actual row.
 - If this is a Balance Sheet, GL Detail, Cost Report, or Statement of Indirect Expense with no Orders/Sales/EBIT/GM/ROS mapping, set is_financial=true and return rows=[] (do not fabricate).
 
 Return JSON exactly matching this schema:
