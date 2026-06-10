@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   useVaultDocuments,
   useVaultCount,
+  useVaultCountsByBucket,
   useVaultDocument,
   useVaultDocumentText,
   useUploadVaultDocument,
@@ -22,45 +23,44 @@ import type { VaultDocument, RegulatoryCatalogEntry } from "@/lib/types";
 
 /* ── Constants ─────────────────────────────────────────────── */
 
-const DOC_TYPES = [
-  "All Types",
-  "contract",
-  "proposal",
-  "invoice",
-  "certificate",
-  "teaming_agreement",
-  "rfp",
-  "past_performance",
-  "color_review",
+const VAULT_BUCKETS = [
   "bid_protest",
+  "capability_statement",
+  "certificate",
+  "color_review",
+  "contract",
+  "correspondence",
+  "financial",
   "market_research",
+  "past_performance",
+  "personnel",
+  "policy_regulatory",
+  "proposal",
+  "rfp",
+  "subcontract_teaming",
+  "technical_artifact",
+  "training_material",
   "other",
 ] as const;
 
 const DOC_TYPE_LABELS: Record<string, string> = {
-  contract: "Contract",
-  proposal: "Proposal",
-  invoice: "Invoice",
-  certificate: "Certificate",
-  teaming_agreement: "Teaming Agreement",
-  rfp: "RFP",
-  past_performance: "Past Performance",
-  color_review: "Color Review",
   bid_protest: "Bid Protest",
+  capability_statement: "Capability Statement",
+  certificate: "Certificate",
+  color_review: "Color Review",
+  contract: "Contract",
+  correspondence: "Correspondence",
+  financial: "Financial",
   market_research: "Market Research",
+  past_performance: "Past Performance",
+  personnel: "Personnel",
+  policy_regulatory: "Policy / Regulatory",
+  proposal: "Proposal",
+  rfp: "RFP / Solicitation",
+  subcontract_teaming: "Subcontract / Teaming",
+  technical_artifact: "Technical Artifact",
+  training_material: "Training Material",
   other: "Other",
-  far: "FAR",
-  dfars: "DFARS",
-  dfars_pgi: "DFARS PGI",
-  ndaa: "NDAA",
-  executive_order: "Exec Order",
-  gao_decision: "GAO Decision",
-  dod_policy: "DoD Policy",
-  cmmc: "CMMC",
-  cui_policy: "CUI Policy",
-  itar_ear: "ITAR/EAR",
-  usd_policy: "USD Policy",
-  other_regulatory: "Other Reg",
 };
 
 const REGULATORY_CATEGORIES: Record<string, string> = {
@@ -84,12 +84,13 @@ function docTypeBadgeClass(dt: string): string {
       return "border-gda-cyan/30 text-gda-cyan bg-gda-cyan/10";
     case "proposal":
     case "past_performance":
+    case "capability_statement":
       return "border-gda-green/30 text-gda-green bg-gda-green/10";
-    case "invoice":
+    case "financial":
     case "bid_protest":
       return "border-gda-amber/30 text-gda-amber bg-gda-amber/10";
     case "certificate":
-    case "teaming_agreement":
+    case "subcontract_teaming":
     case "color_review":
       return "border-gda-green/30 text-gda-green bg-gda-green/10";
     default:
@@ -134,7 +135,9 @@ export default function VaultPage() {
   const [activeTab, setActiveTab] = useState<"work_product" | "regulatory">(
     "work_product",
   );
-  const [docTypeFilter, setDocTypeFilter] = useState("All Types");
+  const [docTypeFilter, setDocTypeFilter] = useState<string | undefined>(
+    undefined,
+  );
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
@@ -144,14 +147,20 @@ export default function VaultPage() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, error, refetch } = useVaultDocuments({
-    doc_type: docTypeFilter === "All Types" ? undefined : docTypeFilter,
+    doc_type: docTypeFilter || undefined,
     q: searchQuery || undefined,
-    category: activeTab,
+    category: activeTab === "regulatory" ? "regulatory" : undefined,
     limit: 50,
     page: currentPage,
   });
   const { data: countData } = useVaultCount();
+  const { data: bucketCounts } = useVaultCountsByBucket();
   const deleteDoc = useDeleteVaultDocument();
+
+  const totalCount = useMemo(() => {
+    if (!bucketCounts) return countData?.count ?? 0;
+    return Object.values(bucketCounts).reduce((a, b) => a + b, 0);
+  }, [bucketCounts, countData]);
 
   const items = data?.items ?? [];
   const totalPages = data?.totalPages ?? 1;
@@ -222,6 +231,7 @@ export default function VaultPage() {
         <button
           onClick={() => {
             setActiveTab("work_product");
+            setDocTypeFilter(undefined);
             setPage(1);
           }}
           className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
@@ -235,6 +245,7 @@ export default function VaultPage() {
         <button
           onClick={() => {
             setActiveTab("regulatory");
+            setDocTypeFilter(undefined);
             setPage(1);
           }}
           className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
@@ -247,6 +258,41 @@ export default function VaultPage() {
         </button>
       </div>
 
+      {/* Bucket chip bar */}
+      {activeTab === "work_product" && (
+        <div className="flex flex-wrap gap-1">
+          <button
+            onClick={() => {
+              setDocTypeFilter(undefined);
+              setPage(1);
+            }}
+            className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
+              !docTypeFilter
+                ? "border-accent bg-accent/10 text-accent"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All ({totalCount})
+          </button>
+          {VAULT_BUCKETS.map((b) => (
+            <button
+              key={b}
+              onClick={() => {
+                setDocTypeFilter(b);
+                setPage(1);
+              }}
+              className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
+                docTypeFilter === b
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {DOC_TYPE_LABELS[b]} ({bucketCounts?.[b] ?? 0})
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Search bar */}
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
@@ -255,28 +301,12 @@ export default function VaultPage() {
           </span>
           <input
             type="text"
-            placeholder="Search documents…"
+            placeholder="Search documents\u2026"
             value={searchInput}
             onChange={handleSearchChange}
             className="w-full rounded border border-border bg-gda-panel pl-8 pr-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
           />
         </div>
-        {activeTab === "work_product" && (
-          <select
-            value={docTypeFilter}
-            onChange={(e) => {
-              setDocTypeFilter(e.target.value);
-              setPage(1);
-            }}
-            className="rounded border border-border bg-gda-panel px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
-          >
-            {DOC_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t === "All Types" ? t : DOC_TYPE_LABELS[t] ?? t}
-              </option>
-            ))}
-          </select>
-        )}
       </div>
 
       {/* Error */}
@@ -381,6 +411,7 @@ function WorkProductTable({
           <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
             <th className="px-3 py-2 text-left font-medium">Filename</th>
             <th className="px-3 py-2 text-left font-medium">Type</th>
+            <th className="px-3 py-2 text-center font-medium" title="AI ingestion status">AI</th>
             <th className="px-3 py-2 text-left font-medium">Linked To</th>
             <th className="px-3 py-2 text-left font-medium">Regulatory Refs</th>
             <th className="px-3 py-2 text-left font-medium">Uploaded</th>
@@ -407,6 +438,20 @@ function WorkProductTable({
                 >
                   {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
                 </span>
+              </td>
+              <td className="px-3 py-2 text-center">
+                {doc.ai_summary && doc.ai_tags ? (
+                  <span
+                    title={`AI ingested \u00b7 ${(doc.ai_tags as string[]).length} tags`}
+                    className="text-gda-green"
+                  >
+                    \u2713
+                  </span>
+                ) : (
+                  <span title="AI pending" className="text-muted-foreground">
+                    \u231b
+                  </span>
+                )}
               </td>
               <td className="px-3 py-2 text-xs">
                 <LinkedTo doc={doc} />
@@ -693,6 +738,21 @@ function DocumentReaderDrawer({
                       ? "Regulatory"
                       : "Work Product"}
                   </span>
+                  {doc.ai_summary && doc.ai_tags ? (
+                    <span
+                      title={`AI ingested \u00b7 ${(doc.ai_tags as string[]).length} tags`}
+                      className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-gda-green/30 bg-gda-green/10 text-gda-green"
+                    >
+                      AI \u2713
+                    </span>
+                  ) : (
+                    <span
+                      title="AI pending"
+                      className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-border text-muted-foreground"
+                    >
+                      AI \u231b
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={onClose}
@@ -933,6 +993,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
   const [queue, setQueue] = useState<QueuedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [running, setRunning] = useState(false);
+  const [selectedBucket, setSelectedBucket] = useState<string>("other");
   const upload = useUploadVaultDocument();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -972,7 +1033,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
       try {
         const data = await upload.mutateAsync({
           file: queue[i].file,
-          docType: "other",
+          docType: selectedBucket,
         });
         const routed = data.routing?.routing_rationale
           ? "routed"
@@ -993,7 +1054,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
       }
     }
     setRunning(false);
-  }, [queue, upload, running]);
+  }, [queue, upload, running, selectedBucket]);
 
   const pending = queue.filter((q) => q.status !== "done").length;
   const doneCount = queue.filter((q) => q.status === "done").length;
@@ -1015,10 +1076,32 @@ function UploadModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Add one or more files. AI will auto-detect each document type and
-          route it to matching opportunities. Financial files update the
-          Financials tab automatically.
+          Add one or more files. AI will still summarize and tag documents, but
+          the bucket you choose here is final.
         </p>
+
+        {/* Bucket dropdown */}
+        <div>
+          <label className="block text-xs font-medium mb-1 text-foreground">
+            Bucket
+          </label>
+          <select
+            value={selectedBucket}
+            onChange={(e) => setSelectedBucket(e.target.value)}
+            className="w-full rounded border border-border bg-gda-panel px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
+            required
+          >
+            {VAULT_BUCKETS.map((b) => (
+              <option key={b} value={b}>
+                {DOC_TYPE_LABELS[b]}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            AI will still summarize and tag the document, but the bucket you
+            choose here is final.
+          </p>
+        </div>
 
         {/* Drop zone */}
         <div
@@ -1068,13 +1151,13 @@ function UploadModal({ onClose }: { onClose: () => void }) {
                   <p className="truncate font-mono text-xs text-foreground">
                     {q.file.name}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     {formatBytes(q.file.size)}
                     {q.message ? ` - ${q.message}` : ""}
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 font-mono text-[10px] ${
+                  className={`shrink-0 font-mono text-[11px] ${
                     q.status === "done"
                       ? "text-gda-green"
                       : q.status === "error"

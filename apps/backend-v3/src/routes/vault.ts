@@ -29,21 +29,17 @@ import { ingestFinancialRows } from '../services/financials/ingest.js';
 const UPLOAD_DIR = join(process.cwd(), 'data', 'vault');
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
-const VALID_DOC_TYPES = [
-  'contract', 'proposal', 'invoice', 'certificate',
-  'teaming_agreement', 'rfp', 'past_performance', 'color_review',
-  'bid_protest', 'market_research', 'other',
-  'far', 'dfars', 'dfars_pgi', 'ndaa', 'executive_order', 'gao_decision',
-  'dod_policy', 'cmmc', 'cui_policy', 'itar_ear', 'usd_policy', 'other_regulatory',
+export const VAULT_BUCKETS = [
+  'bid_protest', 'capability_statement', 'certificate', 'color_review',
+  'contract', 'correspondence', 'financial', 'market_research',
+  'past_performance', 'personnel', 'policy_regulatory', 'proposal',
+  'rfp', 'subcontract_teaming', 'technical_artifact', 'training_material',
+  'other',
 ] as const;
+export type VaultBucket = typeof VAULT_BUCKETS[number];
 
-type DocType = typeof VALID_DOC_TYPES[number];
-
-const WORK_PRODUCT_TYPES = [
-  'contract', 'proposal', 'invoice', 'certificate',
-  'teaming_agreement', 'rfp', 'past_performance', 'color_review',
-  'bid_protest', 'market_research', 'other',
-] as const;
+const VALID_DOC_TYPES = VAULT_BUCKETS;
+type DocType = VaultBucket;
 
 interface VaultDocumentRow {
   id: number;
@@ -213,6 +209,7 @@ async function smartIngestRouter(
   filename: string,
   extractedText: string | null,
   aiSummary: string | null,
+  userSuppliedBucket = false,
 ): Promise<{ linked_opportunity_id: number | null; linked_capture_id: number | null; routing_rationale: string | null }> {
   const searchText = extractedText?.slice(0, 500) ?? filename;
 
@@ -270,11 +267,12 @@ async function smartIngestRouter(
       const params: unknown[] = [];
       let idx = 1;
 
-      if (out.doc_type) {
+      // Only allow LLM to reclassify if user did not explicitly choose a bucket
+      if (out.doc_type && !userSuppliedBucket) {
         sets.push(`doc_type = $${idx++}`);
         params.push(out.doc_type);
       }
-      if (out.doc_category) {
+      if (out.doc_category && !userSuppliedBucket) {
         sets.push(`doc_category = $${idx++}`);
         params.push(out.doc_category);
       }
@@ -398,6 +396,20 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
         { count: res.rows[0]?.count ?? 0 },
         req.requestId,
       ),
+    );
+  });
+
+  // GET /v3/vault/counts-by-bucket — per-bucket document counts
+  app.get('/v3/vault/counts-by-bucket', async (req, reply) => {
+    const res = await pool.query<{ doc_type: string; count: number }>(
+      `SELECT doc_type, COUNT(*)::int AS count FROM vault_documents WHERE deleted_at IS NULL GROUP BY doc_type ORDER BY doc_type`,
+    );
+    const counts: Record<string, number> = {};
+    for (const row of res.rows) {
+      counts[row.doc_type] = row.count;
+    }
+    return reply.send(
+      successEnvelope(counts, req.requestId),
     );
   });
 
@@ -539,12 +551,10 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       ? (docTypeField as { value: string }).value
       : 'other';
 
-    if (!WORK_PRODUCT_TYPES.includes(docType as typeof WORK_PRODUCT_TYPES[number]) && docType !== 'other') {
-      if (!VALID_DOC_TYPES.includes(docType as DocType)) {
-        return reply.status(400).send(
-          errorEnvelope('VALIDATION_ERROR', `Invalid doc_type: ${docType}`, req.requestId),
-        );
-      }
+    if (!VALID_DOC_TYPES.includes(docType as DocType)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', `Invalid doc_type: ${docType}`, req.requestId),
+      );
     }
 
     const filename = data.filename;
@@ -578,6 +588,8 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     let aiSummary: string | null = null;
     let aiTags: string[] | null = null;
     let aiEntities: { name: string; type: string; value: string }[] | null = null;
+    // User's bucket choice wins — LLM inference is stored for transparency only
+    const userSuppliedBucket = docType !== 'other';
     let docTypeConfirmed = docType;
 
     if (extractedText.length > 0) {
@@ -595,7 +607,13 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
           aiSummary = llmResult.output.summary;
           aiTags = llmResult.output.tags;
           aiEntities = llmResult.output.entities;
-          docTypeConfirmed = llmResult.output.doc_type_confirmed || docType;
+          // Only use LLM's doc_type if user did not explicitly pick a bucket
+          if (!userSuppliedBucket) {
+            const llmBucket = llmResult.output.doc_type_confirmed;
+            if (llmBucket && VALID_DOC_TYPES.includes(llmBucket as DocType)) {
+              docTypeConfirmed = llmBucket;
+            }
+          }
         }
       } catch (err) {
         logger.warn({ err, filename }, 'AI parse failed — storing document without analysis');
@@ -613,7 +631,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       [
         filename,
         docTypeConfirmed,
-        'work_product',
+        docTypeConfirmed === 'policy_regulatory' ? 'regulatory' : 'work_product',
         fileSizeBytes,
         `vault/${storedName}`,
         extractedText || null,
@@ -643,7 +661,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       // whether a given document actually yields KPI rows.
       const looksFinancial =
         /financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\bact\b/i.test(filename) ||
-        docTypeConfirmed === 'invoice';
+        docTypeConfirmed === 'financial';
       if (looksFinancial) {
         try {
           const finResult = await llmRouter.route({
@@ -667,7 +685,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Smart ingest routing (async, non-blocking for response)
-    const routingResult = await smartIngestRouter(docId, filename, extractedText || null, aiSummary);
+    const routingResult = await smartIngestRouter(docId, filename, extractedText || null, aiSummary, userSuppliedBucket);
 
     const created = await pool.query<VaultDocumentRow>(
       `SELECT d.*, o.title AS opp_title,

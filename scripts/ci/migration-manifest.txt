@@ -73,3 +73,8 @@ v3_064_org_hierarchy.sql
 v3_065_doctrine_id_types.sql
 v3_066_relevance_gate.sql
 v3_067_relevance_renaics.sql
+v3_068_financials_seed_flag.sql
+v3_069_financials_reseed.sql
+v3_070_financials_period_unique.sql
+v3_071_financials_source_dimension.sql
+v3_072_vault_buckets_v2.sql
