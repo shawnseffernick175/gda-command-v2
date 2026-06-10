@@ -121,6 +121,13 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     fallback: null,
   },
   {
+    task: 'financial_statement_extract',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    timeout_ms: 30_000,
+    fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
+  },
+  {
     task: 'digest_lead',
     provider: 'anthropic',
     model: 'claude-sonnet-4-5',

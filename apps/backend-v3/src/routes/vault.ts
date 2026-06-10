@@ -24,6 +24,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { logger } from '../lib/logger.js';
+import { ingestFinancialRows } from '../services/financials/ingest.js';
 
 const UPLOAD_DIR = join(process.cwd(), 'data', 'vault');
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -115,6 +116,63 @@ async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<str
 
   if (ext === 'txt' || ext === 'csv') {
     return buf.toString('utf-8');
+  }
+
+  if (ext === 'xlsx') {
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buf as unknown as ArrayBuffer);
+    const blocks: string[] = [];
+    let total = 0;
+    const MAX = 200_000;
+    for (const sheet of workbook.worksheets) {
+      if (total >= MAX) break;
+      const lines: string[] = [`## Sheet: ${sheet.name}`];
+      sheet.eachRow({ includeEmpty: false }, (row) => {
+        const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+        const cells = values.map((v) => {
+          if (v === null || v === undefined) return '';
+          if (typeof v === 'object') {
+            const o = v as { text?: string; result?: unknown; richText?: { text: string }[] };
+            if (typeof o.text === 'string') return o.text;
+            if (Array.isArray(o.richText)) return o.richText.map((r) => r.text).join('');
+            if (o.result !== undefined && o.result !== null) return String(o.result);
+            return '';
+          }
+          return String(v);
+        });
+        if (cells.some((c) => c.trim().length > 0)) {
+          lines.push(cells.join(' | '));
+        }
+      });
+      const block = lines.join('\n');
+      blocks.push(block);
+      total += block.length;
+    }
+    return blocks.join('\n\n').slice(0, MAX);
+  }
+
+  if (ext === 'zip') {
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip(buf);
+    const allowed = new Set(['pdf', 'xlsx', 'csv', 'txt', 'docx']);
+    const parts: string[] = [];
+    for (const entry of zip.getEntries()) {
+      if (entry.isDirectory) continue;
+      const entryName = entry.entryName;
+      if (entryName.startsWith('__MACOSX')) continue;
+      const entryExt = entryName.toLowerCase().split('.').pop();
+      if (!entryExt || !allowed.has(entryExt)) continue;
+      try {
+        const inner = await extractTextFromBuffer(entry.getData(), entryName);
+        if (inner.trim().length > 0) {
+          parts.push(`## File: ${entryName}\n${inner}`);
+        }
+      } catch {
+        /* skip unreadable entry */
+      }
+    }
+    return parts.join('\n\n').slice(0, 200_000);
   }
 
   return '';
@@ -572,6 +630,33 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
     if (aiSummary) {
       await insertAudit(docId, 'ai_parsed', 'system', 'AI analysis completed on ingest');
+    }
+
+    // Financial statement extraction + ingest (best-effort, must not fail upload)
+    if (extractedText.length > 0) {
+      const looksFinancial =
+        /financ|p&l|income|balance|budget|forecast/i.test(filename) ||
+        docTypeConfirmed === 'invoice';
+      if (looksFinancial) {
+        try {
+          const finResult = await llmRouter.route({
+            task: 'financial_statement_extract',
+            input: { filename, extracted_text: extractedText },
+          });
+
+          if (finResult.ok && finResult.output.is_financial && finResult.output.rows.length > 0) {
+            const counts = await ingestFinancialRows(finResult.output.rows);
+            await insertAudit(
+              docId,
+              'financials_ingested',
+              'system',
+              `plan=${counts.plan}, actual=${counts.actual}`,
+            );
+          }
+        } catch (err) {
+          logger.warn({ err, filename }, 'Financial extraction/ingest failed - upload not affected');
+        }
+      }
     }
 
     // Smart ingest routing (async, non-blocking for response)

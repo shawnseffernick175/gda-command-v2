@@ -27,6 +27,7 @@ import type {
   MatchAnalysisOutput,
   VaultDocumentParseOutput,
   VaultSmartRouteOutput,
+  FinancialStatementExtractOutput,
   DigestLeadOutput,
   CompetitorContactDiscoveryOutput,
   PartnerContactDiscoveryOutput,
@@ -245,6 +246,38 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       routing_rationale: 'Document classified as work product contract based on content analysis.',
       confidence: 'high',
     } satisfies VaultSmartRouteOutput,
+
+    financial_statement_extract: {
+      is_financial: true,
+      currency: 'USD',
+      rows: [
+        {
+          period: 'FY26 Q1',
+          fiscal_year: 2026,
+          quarter: 1,
+          kind: 'plan',
+          orders: 580000,
+          sales: 510000,
+          ebit: 68000,
+          gross_margin: 37.5,
+          ros: 13.3,
+        },
+        {
+          period: 'FY26 Q1',
+          fiscal_year: 2026,
+          quarter: 1,
+          kind: 'actual',
+          orders: 595000,
+          sales: 518000,
+          ebit: 71200,
+          gross_margin: 38.1,
+          ros: 13.7,
+        },
+      ],
+      notes: 'Mock financial extraction - one plan and one actual row for FY26 Q1.',
+      model_used: 'mock-model',
+    } satisfies FinancialStatementExtractOutput,
+
     digest_lead: {
       headline: 'No significant developments in the last 24 hours',
       body: 'No new federal register notices, solicitations, or regulatory changes affecting Envision\u2019s NAICS space were published in the last 24 hours.',

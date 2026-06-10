@@ -36,6 +36,7 @@ export type Task =
   | 'match_analysis'
   | 'vault_document_parse'
   | 'vault_smart_route'
+  | 'financial_statement_extract'
   | 'digest_lead'
   | 'competitor_contact_discovery'
   | 'partner_contact_discovery';
@@ -379,6 +380,29 @@ export interface VaultSmartRouteOutput {
   confidence: string;
 }
 
+export interface FinancialStatementExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface FinancialStatementExtractOutput {
+  is_financial: boolean;
+  currency: string;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    kind: 'plan' | 'actual';
+    orders: number | null;
+    sales: number | null;
+    ebit: number | null;
+    gross_margin: number | null;
+    ros: number | null;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
 export interface DigestLeadInput {
   federal_register_notices: {
     title: string;
@@ -703,6 +727,7 @@ export interface TaskInputMap {
   match_analysis: MatchAnalysisInput;
   vault_document_parse: VaultDocumentParseInput;
   vault_smart_route: VaultSmartRouteInput;
+  financial_statement_extract: FinancialStatementExtractInput;
   digest_lead: DigestLeadInput;
   competitor_contact_discovery: CompetitorContactDiscoveryInput;
   partner_contact_discovery: PartnerContactDiscoveryInput;
@@ -725,6 +750,7 @@ export interface TaskOutputMap {
   match_analysis: MatchAnalysisOutput;
   vault_document_parse: VaultDocumentParseOutput;
   vault_smart_route: VaultSmartRouteOutput;
+  financial_statement_extract: FinancialStatementExtractOutput;
   digest_lead: DigestLeadOutput;
   competitor_contact_discovery: CompetitorContactDiscoveryOutput;
   partner_contact_discovery: PartnerContactDiscoveryOutput;
