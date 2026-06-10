@@ -1,0 +1,399 @@
+"use client";
+
+import { useState } from "react";
+import { useOverrideSummary } from "@/hooks/use-overrides";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+
+type Range = "7d" | "30d" | "all";
+
+const RANGES: { label: string; value: Range }[] = [
+  { label: "Last 7 days", value: "7d" },
+  { label: "Last 30 days", value: "30d" },
+  { label: "All time", value: "all" },
+];
+
+const GRADES = ["A", "B", "C", "D", "F"];
+const STAGES = [
+  "interest",
+  "qualify",
+  "pursue",
+  "solicitation",
+  "post_submittal",
+  "won",
+  "lost",
+  "no_bid",
+  "gov_cancelled",
+];
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function emDash(val: number): string {
+  return val === 0 ? "\u2014" : String(val);
+}
+
+export default function OverridesPage() {
+  const [range, setRange] = useState<Range>("30d");
+  const { data, isLoading } = useOverrideSummary(range);
+
+  const mostCommonDisagreement = data?.grade_pivot?.[0]
+    ? `${data.grade_pivot[0].ai_value}\u2192${data.grade_pivot[0].human_value}: ${data.grade_pivot[0].count} times`
+    : "\u2014";
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="font-mono text-lg font-bold text-foreground">
+          Override Audit
+        </h1>
+        <div className="flex gap-2">
+          {RANGES.map((r) => (
+            <button
+              key={r.value}
+              onClick={() => setRange(r.value)}
+              className={cn(
+                "rounded px-3 py-1 text-xs font-medium transition-colors",
+                range === r.value
+                  ? "bg-gda-green text-white"
+                  : "border border-border bg-white text-muted-foreground hover:bg-gda-bg-base",
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded" />
+          ))}
+        </div>
+      ) : data ? (
+        <>
+          {/* KPI Strip */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Total Overrides
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <span className="text-2xl font-bold tabular-nums">
+                  {emDash(
+                    range === "7d"
+                      ? data.totals.last_7d
+                      : range === "30d"
+                        ? data.totals.last_30d
+                        : data.totals.all_time,
+                  )}
+                </span>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Grade Agreement Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <span className="text-2xl font-bold tabular-nums">
+                  {data.agreement_rate.grade_pct === 0
+                    ? "\u2014"
+                    : `${data.agreement_rate.grade_pct}%`}
+                </span>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Stage Agreement Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <span className="text-2xl font-bold tabular-nums">
+                  {data.agreement_rate.stage_pct === 0
+                    ? "\u2014"
+                    : `${data.agreement_rate.stage_pct}%`}
+                </span>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Most Common Disagreement
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <span className="text-lg font-bold">{mostCommonDisagreement}</span>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Grade Pivot Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">
+                Grade Override Matrix
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Rows = AI grade, Columns = Human override
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PivotTable
+                rowLabels={GRADES}
+                colLabels={GRADES}
+                data={data.grade_pivot}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Stage Pivot Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">
+                Stage Override Matrix
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Rows = Previous stage, Columns = Human override
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PivotTable
+                rowLabels={STAGES}
+                colLabels={STAGES}
+                data={data.stage_pivot}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Top NAICS Disagreements */}
+          {data.top_disagreement_naics.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">
+                  Top 10 NAICS — AI Disagreements
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {data.top_disagreement_naics.map((row) => (
+                    <div
+                      key={row.naics}
+                      className="flex items-center gap-3"
+                    >
+                      <span className="w-20 text-xs font-medium tabular-nums">
+                        {row.naics}
+                      </span>
+                      <div className="flex-1">
+                        <div
+                          className="h-5 rounded bg-gda-green/20"
+                          style={{
+                            width: `${Math.min(100, (row.count / (data.top_disagreement_naics[0]?.count || 1)) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="w-8 text-right text-xs tabular-nums">
+                        {row.count}
+                      </span>
+                      <span className="w-16 text-right text-xs text-muted-foreground">
+                        {row.most_common}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Agency Disagreements */}
+          {data.top_disagreement_agency.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">
+                  Top 10 Agencies — AI Disagreements
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {data.top_disagreement_agency.map((row) => (
+                    <div
+                      key={row.agency}
+                      className="flex items-center gap-3"
+                    >
+                      <span className="w-48 truncate text-xs font-medium">
+                        {row.agency}
+                      </span>
+                      <div className="flex-1">
+                        <div
+                          className="h-5 rounded bg-gda-green/20"
+                          style={{
+                            width: `${Math.min(100, (row.count / (data.top_disagreement_agency[0]?.count || 1)) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="w-8 text-right text-xs tabular-nums">
+                        {row.count}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Recent Overrides Feed */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">
+                Recent Overrides
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {data.recent.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No overrides recorded yet. Overrides appear here when you
+                  change an opportunity&apos;s grade or pipeline stage from the
+                  system-suggested value.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-left uppercase tracking-wider text-muted-foreground">
+                        <th className="pb-2 pr-4">Date</th>
+                        <th className="pb-2 pr-4">Opportunity</th>
+                        <th className="pb-2 pr-4">Field</th>
+                        <th className="pb-2 pr-4">Override</th>
+                        <th className="pb-2">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.recent.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="border-b border-border last:border-0"
+                        >
+                          <td className="py-2 pr-4 tabular-nums">
+                            {formatDate(row.created_at)}
+                          </td>
+                          <td className="py-2 pr-4">
+                            <Link
+                              href={`/opportunities/${row.opportunity_id}`}
+                              className="text-gda-green hover:underline"
+                            >
+                              {row.opportunity_title}
+                            </Link>
+                          </td>
+                          <td className="py-2 pr-4 capitalize">
+                            {row.field_name === "pipeline_stage"
+                              ? "Stage"
+                              : "Grade"}
+                          </td>
+                          <td className="py-2 pr-4 font-medium">
+                            AI: {row.ai_value ?? "none"} → You:{" "}
+                            {row.human_value}
+                          </td>
+                          <td className="max-w-[200px] truncate py-2 text-muted-foreground">
+                            {row.reason || "\u2014"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function PivotTable({
+  rowLabels,
+  colLabels,
+  data,
+}: {
+  rowLabels: string[];
+  colLabels: string[];
+  data: { ai_value: string; human_value: string; count: number }[];
+}) {
+  const lookup = new Map<string, number>();
+  let maxCount = 0;
+  for (const row of data) {
+    const key = `${row.ai_value}|${row.human_value}`;
+    lookup.set(key, row.count);
+    if (row.count > maxCount) maxCount = row.count;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr>
+            <th className="pb-1 pr-2 text-left uppercase tracking-wider text-muted-foreground">
+              AI \ Human
+            </th>
+            {colLabels.map((col) => (
+              <th
+                key={col}
+                className="pb-1 text-center uppercase tracking-wider text-muted-foreground"
+              >
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rowLabels.map((row) => (
+            <tr key={row} className="border-b border-border last:border-0">
+              <td className="py-1 pr-2 font-medium">{row}</td>
+              {colLabels.map((col) => {
+                const count = lookup.get(`${row}|${col}`) ?? 0;
+                const isDiagonal = row === col;
+                const intensity =
+                  maxCount > 0 ? Math.min(1, count / maxCount) : 0;
+                return (
+                  <td
+                    key={col}
+                    className={cn(
+                      "py-1 text-center tabular-nums",
+                      isDiagonal && count > 0 && "bg-green-100",
+                      !isDiagonal &&
+                        count > 0 &&
+                        intensity > 0.5 &&
+                        "bg-red-100",
+                      !isDiagonal &&
+                        count > 0 &&
+                        intensity <= 0.5 &&
+                        "bg-yellow-50",
+                    )}
+                  >
+                    {count === 0 ? "\u2014" : count}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

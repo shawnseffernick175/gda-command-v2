@@ -855,6 +855,7 @@ export async function updateOpportunity(
   // A stage update may MOVE an existing card between stages, but it must NEVER
   // create a card for an opportunity that was never qualified. If no card exists,
   // refuse -- the owner must qualify first.
+  // TODO(override-capture): route through override service when called from user-facing paths
   if (stageValue) {
     const dbStage = normalizePipelineStage(stageValue);
     if (!dbStage) {
