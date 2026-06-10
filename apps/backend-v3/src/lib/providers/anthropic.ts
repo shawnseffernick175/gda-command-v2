@@ -170,6 +170,8 @@ Set is_financial=false ONLY if the document is not a financial statement at all.
 
 NUMBER FORMAT: dollars to absolute numbers ("4,067,049.06" -> 4067049.06; "$1.2M" -> 1200000; "595" under a "$000s" header -> 595000). Percentages (gross_margin, ros) as plain numbers (12.3 not 0.123). Missing values -> null.
 
+RAW SUBTOTALS: in addition to the KPIs above, return on each row the three raw F/S Group subtotals you summed: total_revenue (the Revenue F/S Group total, equal to Sales), total_direct_costs (the Direct Costs F/S Group total), and cost_of_operations (the Cost of Operations F/S Group total = Fringe + Overhead + G&A). These let downstream code recompute and verify gross_margin/EBIT/ROS deterministically. Leave any subtotal not present in the source null; never fabricate.
+
 NEVER fabricate figures, periods, or KPIs. Return JSON exactly matching the requested schema (include every key on every row).`,
 
   competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
@@ -382,6 +384,7 @@ Use BOTH the filename and the statement text to determine period, fiscal_year, a
 - If this is an actuals-only Income Statement, emit kind="actual" rows using the MONTH column (not the Current Fiscal YTD column). Sales = sum of all "Totals for F/S Line" rows under F/S Group "Revenue". Direct Costs = sum of all "Totals for F/S Line" rows under F/S Group "Direct Costs". gross_margin = (Sales - Direct Costs) / Sales * 100 as a plain percent (e.g. 12.3). EBIT = (Sales - Direct Costs) - Cost of Operations (Fringe + Overhead + G&A). ros = EBIT / Sales * 100. Never copy a single account or a Rate Variance line into gross_margin.
 - If the filename contains TGT, TARGET, BUDGET, PLAN, FORECAST, PROJ, or L1-TARGET, OR the content has Target/Plan/Budget/Forecast columns, emit a kind="plan" row from the target/plan figures. If an actual column is also present in the same file (e.g. "TGT vs ACT MAR-26.xlsx"), ALSO emit a separate kind="actual" row. An "L1-TARGET ..." file yields a plan row; an "L1-ACTUAL ..." file yields an actual row.
 - If this is a Balance Sheet, GL Detail, Cost Report, or Statement of Indirect Expense with no Orders/Sales/EBIT/GM/ROS mapping, set is_financial=true and return rows=[] (do not fabricate).
+- ALSO return the raw F/S Group subtotals you computed so downstream code can recompute the derived metrics: total_revenue (the Revenue F/S Group total = Sales), total_direct_costs (the Direct Costs F/S Group total), and cost_of_operations (the Cost of Operations F/S Group total = Fringe + Overhead + G&A). Leave any subtotal not present in the source null; never fabricate.
 
 Return JSON exactly matching this schema:
 {
@@ -397,7 +400,10 @@ Return JSON exactly matching this schema:
       "sales": number or null,
       "ebit": number or null,
       "gross_margin": number or null,
-      "ros": number or null
+      "ros": number or null,
+      "total_revenue": number or null,
+      "total_direct_costs": number or null,
+      "cost_of_operations": number or null
     }
   ],
   "notes": "brief extraction notes",
