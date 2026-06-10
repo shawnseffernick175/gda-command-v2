@@ -2,10 +2,26 @@
  * Financials ingest service.
  *
  * Upserts extracted financial rows into financial_plan / financial_actuals,
- * keyed on (period, fiscal_year, quarter) so distinct periods (e.g. FY26 Mar vs
- * FY26 Q1) coexist instead of clobbering each other. Only non-null values are written, and
+ * keyed on (source, period, fiscal_year, quarter) so distinct source-series
+ * (official income_statement P&L vs l1_actual project ledger vs l1_target plan)
+ * AND distinct periods (e.g. FY26 Mar vs the FY26 Q1 quarter total) all coexist
+ * instead of clobbering each other. Only non-null values are written, and
  * existing columns are preserved via COALESCE so a partial upload does not
  * zero out previously ingested figures.
+ *
+ * `source` is orthogonal to kind: income_statement and l1_actual are both
+ * kind=actual but two distinct rows for the same month. See migration
+ * v3_071_financials_source_dimension.sql.
+ *
+ * QUARTER TOTAL (deterministic recompute, not a DB view): after the month rows
+ * are upserted, recomputeQuarterTotals() derives one quarter-total row per
+ * (source, fiscal_year, quarter) by SUMMING that source's month rows in DOLLARS
+ * and recomputing GM%/ROS% from the summed dollars -- never by averaging the
+ * AI's per-month percentages. A recompute (vs a view) is used because the
+ * read routes and the KPI-header join query the tables directly and need the
+ * quarter row materialized with the same columns as month rows. The quarter row
+ * has period "FY26 Q1" (LIKE '%Q%') and month rows do not, so the sum that
+ * builds it excludes prior quarter rows and never double-counts.
  *
  * Owner choice: real uploaded data replaces the seed/demo rows. We clear rows
  * flagged is_seed=true (see migration v3_068_financials_seed_flag.sql) ONLY
@@ -169,13 +185,28 @@ const ACTUAL_COLUMNS: Record<string, keyof FinancialRow> = {
   actual_ros: 'ros',
 };
 
+const VALID_SOURCES = new Set(['income_statement', 'l1_actual', 'l1_target']);
+
+/**
+ * Resolve the source-series discriminator for a row. Prefer the model's value
+ * when it is one of the known sources; otherwise fall back to a sensible default
+ * derived from kind so older mocks / partial extracts still store a coherent
+ * series (plan -> l1_target, actual -> income_statement). source is orthogonal
+ * to kind, so this default is only a fallback.
+ */
+function resolveSource(row: FinancialRow): string {
+  const s = row.source;
+  if (typeof s === 'string' && VALID_SOURCES.has(s)) return s;
+  return row.kind === 'plan' ? 'l1_target' : 'income_statement';
+}
+
 async function upsertRow(
   table: 'financial_plan' | 'financial_actuals',
   columnMap: Record<string, keyof FinancialRow>,
   row: FinancialRow,
 ): Promise<boolean> {
-  const cols: string[] = ['period', 'fiscal_year', 'quarter'];
-  const params: unknown[] = [row.period, row.fiscal_year, row.quarter];
+  const cols: string[] = ['source', 'period', 'fiscal_year', 'quarter'];
+  const params: unknown[] = [resolveSource(row), row.period, row.fiscal_year, row.quarter];
 
   for (const [dbCol, srcKey] of Object.entries(columnMap)) {
     const value = row[srcKey];
@@ -185,8 +216,9 @@ async function upsertRow(
     }
   }
 
+  const keyCols = new Set(['source', 'period', 'fiscal_year', 'quarter']);
   const placeholders = cols.map((_c, i) => `$${i + 1}`);
-  const valueCols = cols.filter((c) => c !== 'period' && c !== 'fiscal_year' && c !== 'quarter');
+  const valueCols = cols.filter((c) => !keyCols.has(c));
   const updates = ['period = EXCLUDED.period'];
   for (const c of valueCols) {
     updates.push(`${c} = COALESCE(EXCLUDED.${c}, ${table}.${c})`);
@@ -194,11 +226,108 @@ async function upsertRow(
 
   const sql = `INSERT INTO ${table} (${cols.join(', ')})
     VALUES (${placeholders.join(', ')})
-    ON CONFLICT (period, fiscal_year, quarter)
+    ON CONFLICT (source, period, fiscal_year, quarter)
     DO UPDATE SET ${updates.join(', ')}`;
 
   await pool.query(sql, params);
   return true;
+}
+
+/**
+ * Deterministic quarter-total recompute (layer 4). For every (source,
+ * fiscal_year, quarter) that has month rows, sum the month rows' DOLLAR figures
+ * (orders, sales, ebit) and recompute GM%/ROS% from the summed dollars, then
+ * upsert a single quarter-total row with period "FY<yy> Q<quarter>". Month rows
+ * are those whose period does NOT contain 'Q' (e.g. "FY26 Mar"); the quarter row
+ * itself contains 'Q' and is excluded from the sum, so re-running is idempotent
+ * and never double-counts.
+ *
+ * GM%/ROS% come from SUMMED dollars, never from averaging the per-month
+ * percentages. GM$ for the quarter is sum(sales) - sum(direct costs); since the
+ * stored month rows do not retain a direct-cost column, we reconstruct quarter
+ * GM$ from each month's own (sales, gross_margin) -> month GM$ = sales*gm/100,
+ * sum those, then quarter GM% = sum(GM$)/sum(sales)*100. ROS% = sum(ebit)/
+ * sum(sales)*100. Orders are summed only when present on every month (else null).
+ */
+async function recomputeQuarterTotals(
+  table: 'financial_plan' | 'financial_actuals',
+  prefix: 'plan' | 'actual',
+): Promise<void> {
+  const groups = await pool.query<{ source: string; fiscal_year: number; quarter: number }>(
+    `SELECT DISTINCT source, fiscal_year, quarter
+       FROM ${table}
+      WHERE quarter IS NOT NULL
+        AND period NOT LIKE '%Q%'`,
+  );
+
+  for (const g of groups.rows) {
+    const months = await pool.query<{
+      orders: string | null;
+      sales: string | null;
+      ebit: string | null;
+      gross_margin: string | null;
+    }>(
+      `SELECT ${prefix}_orders AS orders, ${prefix}_sales AS sales,
+              ${prefix}_ebit AS ebit, ${prefix}_gross_margin AS gross_margin
+         FROM ${table}
+        WHERE source = $1 AND fiscal_year = $2 AND quarter = $3
+          AND period NOT LIKE '%Q%'`,
+      [g.source, g.fiscal_year, g.quarter],
+    );
+    if (months.rows.length === 0) continue;
+
+    let sumSales = 0;
+    let sumEbit = 0;
+    let sumGmDollars = 0;
+    let sumOrders = 0;
+    let allOrdersPresent = true;
+    for (const m of months.rows) {
+      const sales = m.sales === null ? null : Number(m.sales);
+      const ebit = m.ebit === null ? null : Number(m.ebit);
+      const gm = m.gross_margin === null ? null : Number(m.gross_margin);
+      const orders = m.orders === null ? null : Number(m.orders);
+      if (isFiniteNumber(sales)) {
+        sumSales += sales;
+        if (isFiniteNumber(gm)) sumGmDollars += (sales * gm) / 100;
+      }
+      if (isFiniteNumber(ebit)) sumEbit += ebit;
+      if (isFiniteNumber(orders)) sumOrders += orders;
+      else allOrdersPresent = false;
+    }
+
+    const quarterGm = sumSales !== 0 ? round3((sumGmDollars / sumSales) * 100) : null;
+    const quarterRos = sumSales !== 0 ? round3((sumEbit / sumSales) * 100) : null;
+    const quarterPeriod = `FY${String(g.fiscal_year).slice(-2)} Q${g.quarter}`;
+
+    const cols = [`source`, `period`, `fiscal_year`, `quarter`, `${prefix}_sales`, `${prefix}_ebit`];
+    const params: unknown[] = [g.source, quarterPeriod, g.fiscal_year, g.quarter, sumSales, sumEbit];
+    if (allOrdersPresent) {
+      cols.push(`${prefix}_orders`);
+      params.push(sumOrders);
+    }
+    if (quarterGm !== null) {
+      cols.push(`${prefix}_gross_margin`);
+      params.push(quarterGm);
+    }
+    if (quarterRos !== null) {
+      cols.push(`${prefix}_ros`);
+      params.push(quarterRos);
+    }
+
+    const keyCols = new Set(['source', 'period', 'fiscal_year', 'quarter']);
+    const placeholders = cols.map((_c, i) => `$${i + 1}`);
+    const updates = ['period = EXCLUDED.period'];
+    for (const c of cols.filter((c) => !keyCols.has(c))) {
+      updates.push(`${c} = EXCLUDED.${c}`);
+    }
+    await pool.query(
+      `INSERT INTO ${table} (${cols.join(', ')})
+        VALUES (${placeholders.join(', ')})
+        ON CONFLICT (source, period, fiscal_year, quarter)
+        DO UPDATE SET ${updates.join(', ')}`,
+      params,
+    );
+  }
 }
 
 export async function ingestFinancialRows(
@@ -255,6 +384,15 @@ export async function ingestFinancialRows(
         logger.warn({ err, period: row.period, kind: row.kind }, 'Financial row upsert failed');
       }
     }
+  }
+
+  // Layer 4: rebuild quarter-total rows from the freshly upserted month rows.
+  // Idempotent; recomputes GM%/ROS% from summed dollars per source.
+  try {
+    if (plan > 0) await recomputeQuarterTotals('financial_plan', 'plan');
+    if (actual > 0) await recomputeQuarterTotals('financial_actuals', 'actual');
+  } catch (err) {
+    logger.warn({ err }, 'Quarter-total recompute failed');
   }
 
   return { plan, actual, rejected };

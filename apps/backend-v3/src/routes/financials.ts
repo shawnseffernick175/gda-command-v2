@@ -4,6 +4,11 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 
 export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/kpi/header
+  // Headline KPIs come from the official Income Statement actuals (source=
+  // income_statement) compared against the L1-TARGET plan (source=l1_target),
+  // using the latest QUARTER-total row (period LIKE '%Q%') so cards show the
+  // quarter, not a single month. Restricting both sides to one source each
+  // keeps the join 1:1 now that multiple source-series coexist per quarter.
   app.get('/v3/kpi/header', async (req, reply) => {
     const { rows } = await pool.query(
       `SELECT
@@ -13,7 +18,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
          p.plan_orders, p.plan_sales, p.plan_ebit,
          p.plan_gross_margin, p.plan_ros
        FROM financial_actuals a
-       JOIN financial_plan p ON p.fiscal_year = a.fiscal_year AND p.quarter = a.quarter
+       JOIN financial_plan p
+         ON p.fiscal_year = a.fiscal_year AND p.quarter = a.quarter
+        AND p.source = 'l1_target' AND p.period LIKE '%Q%'
+       WHERE a.source = 'income_statement' AND a.period LIKE '%Q%'
        ORDER BY a.fiscal_year DESC, a.quarter DESC
        LIMIT 1`,
     );
@@ -58,6 +66,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/forecast
+  // Quarter-level plan vs actuals. Use the l1_target plan quarter rows against
+  // the income_statement actuals quarter rows (period LIKE '%Q%') so the join
+  // stays 1:1 per quarter now that several source-series coexist.
   app.get('/v3/financials/forecast', async (req, reply) => {
     const { rows } = await pool.query(
       `SELECT
@@ -68,7 +79,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
          COALESCE(a.actual_sales, 0)  AS actual_sales,
          (a.id IS NOT NULL) AS has_actuals
        FROM financial_plan p
-       LEFT JOIN financial_actuals a ON a.fiscal_year = p.fiscal_year AND a.quarter = p.quarter
+       LEFT JOIN financial_actuals a
+         ON a.fiscal_year = p.fiscal_year AND a.quarter = p.quarter
+        AND a.source = 'income_statement' AND a.period LIKE '%Q%'
+       WHERE p.source = 'l1_target' AND p.period LIKE '%Q%'
        ORDER BY p.fiscal_year, p.quarter`,
     );
 
@@ -85,17 +99,26 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/trend
+  // Returns month rows AND the derived quarter-total rows for every actuals
+  // source-series (income_statement, l1_actual). `source` and `is_quarter` are
+  // exposed so the Financials tab can label the series and visually separate the
+  // quarter total from its months. Ordered source, then chronologically with the
+  // quarter total (period LIKE '%Q%') last within each fiscal_year+quarter.
   app.get('/v3/financials/trend', async (req, reply) => {
     const { rows } = await pool.query(
-      `SELECT period, actual_orders AS orders, actual_sales AS sales,
+      `SELECT source, period, fiscal_year, quarter,
+              (period LIKE '%Q%') AS is_quarter,
+              actual_orders AS orders, actual_sales AS sales,
               actual_ebit AS ebit, actual_gross_margin AS gross_margin,
               actual_ros AS ros
        FROM financial_actuals
-       ORDER BY fiscal_year, quarter`,
+       ORDER BY source, fiscal_year, quarter, (period LIKE '%Q%'), period`,
     );
 
     const items = rows.map((r) => ({
+      source: r.source as string,
       period: r.period as string,
+      is_quarter: Boolean(r.is_quarter),
       orders: Number(r.orders),
       sales: Number(r.sales),
       ebit: Number(r.ebit),

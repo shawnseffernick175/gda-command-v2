@@ -149,13 +149,13 @@ WORKED EXAMPLE (account-level Income Statement, March 2026 month column):
 - GM$ = 4,188,766.47 - 3,673,672.19 = 515,094.28 => gross_margin = 515094.28 / 4188766.47 * 100 = 12.3
 - F/S Group "Cost of Operations": Fringe 178,139.49 + Overhead 92,750.67 + G&A 200,425.10 = 471,315.26
 - EBIT = 515,094.28 - 471,315.26 = 43,779.02 => ros = 43779.02 / 4188766.47 * 100 = 1.0
-- Row: sales=4188766.47, gross_margin=12.3, ebit=43779.02, ros=1.0, kind="actual".
+- Row: sales=4188766.47, gross_margin=12.3, ebit=43779.02, ros=1.0, kind="actual", source="income_statement", fiscal_year=2026, quarter=1, period="FY26 Mar".
 
 WORKED EXAMPLE (L1-TARGET Proj Revenue Summary, Grand Total row, March 2026):
 - Target Period Costs (Grand Total) = 4,044,837.49 ; Target Period Profit = 43,779.07 ; Target Period Revenue (w/o PY Rev) = 4,088,616.56
 - sales = total_revenue = 4088616.56 ; total_direct_costs = 4044837.49 ; ebit = 43779.07 ; cost_of_operations = null
 - gross_margin = (4088616.56 - 4044837.49) / 4088616.56 * 100 = 1.071 ; ros = 43779.07 / 4088616.56 * 100 = 1.071
-- Row: sales=4088616.56, total_revenue=4088616.56, total_direct_costs=4044837.49, ebit=43779.07, gross_margin=1.071, ros=1.071, kind="plan", fiscal_year=2026, quarter=1, period="FY26 Q1".
+- Row: sales=4088616.56, total_revenue=4088616.56, total_direct_costs=4044837.49, ebit=43779.07, gross_margin=1.071, ros=1.071, kind="plan", source="l1_target", fiscal_year=2026, quarter=1, period="FY26 Mar".
 
 ACTUALS-ONLY documents (most month-end Income Statements): emit kind="actual" rows even when there is NO plan/budget column. Do not require a plan column to exist.
 
@@ -175,8 +175,16 @@ PERIOD AND QUARTER:
 - Fiscal calendar uses CALENDAR quarters. quarter = ceil(month / 3): Jan/Feb/Mar -> 1, Apr/May/Jun -> 2, Jul/Aug/Sep -> 3, Oct/Nov/Dec -> 4.
 - Infer fiscal_year and month from filename tokens (MAR-2026, MAR-26, JAN-26, FEB-26) and/or the statement period header (e.g. "03/01/26 / 03/31/26" -> March 2026). A two-digit year YY means 20YY.
 - So MAR-2026/MAR-26 -> fiscal_year=2026, quarter=1; JAN-26 and FEB-26 also -> 2026 Q1.
-- period: a human-readable label like "FY26 Q1" (or "FY26 Mar" for a single month). Keep it consistent with fiscal_year and quarter.
+- period: ALWAYS the MONTH label, never the quarter. Use "FY<YY> <Mon>" with a three-letter month: "FY26 Jan", "FY26 Feb", "FY26 Mar", etc. Each monthly statement and EACH month in a Trend Income Stmt is its own row with its own month period. Do NOT stamp "FY26 Q1" on a monthly row -- the quarter total is derived downstream by summing the months; you only ever emit MONTH rows.
+- quarter is still set on every row (ceil(month/3)) so downstream code can group months into the right quarter, but the period label stays the month.
 - If a row's month cannot be determined, set quarter=null (ingest will skip it) but still set fiscal_year if known.
+
+SOURCE (series discriminator, orthogonal to kind -- set on EVERY row):
+- "income_statement": an official month-end Income Statement / P&L with F/S Group structure (Revenue / Direct Costs / Cost of Operations). Also use this for the monthly rows of a "Trend Income Stmt" (the trend IS a sequence of monthly income-statement actuals). kind="actual".
+- "l1_actual": an L1-ACTUAL project-revenue ledger / Proj Revenue Summary reporting ACTUAL project revenue and cost. kind="actual".
+- "l1_target": an L1-TARGET / Proj Revenue Summary plan (the "Target Period" columns). kind="plan".
+- Derive source from the FILENAME first (L1-ACTUAL -> l1_actual; L1-TARGET -> l1_target; Income Statement / Trend Income Stmt -> income_statement), falling back to content structure. If genuinely ambiguous, set source = "income_statement" for kind=actual and "l1_target" for kind=plan.
+- TREND INCOME STMT: a sheet/section listing several months side by side (e.g. Jan, Feb, Mar columns) each with its own Sales/GM/EBIT. Emit ONE row per month: source="income_statement", kind="actual", period="FY26 Jan"/"FY26 Feb"/"FY26 Mar", quarter=ceil(month/3). Compute each month's gross_margin from that month's own Sales and Direct Costs; never average across months.
 
 MONTH vs YTD: when an Income Statement shows BOTH a monthly period column (e.g. 03/01/26-03/31/26) and a "Current Fiscal YTD" column, use the MONTH column figures as the primary row value (monthly uploads accumulate per quarter). Do NOT use the YTD column and do NOT blend YTD into the month row. Compute Sales, Direct Costs, GM$, GM%, EBIT, and ROS entirely from the MONTH column.
 
@@ -405,6 +413,8 @@ Use BOTH the filename and the statement text to determine period, fiscal_year, a
 - If this is a "TGT vs ACT" / cost-rate build-up workbook (TGT-YTD / ACT-YTD / VAR sections, cost elements like DL Offsite, DL Onsite, Subcontractor, Consultant, Dir Travel, Sub Material, Direct Material, ODC across DIRECT/OH/SMH/G&A/Total Cost columns) with NO revenue/sales line, set is_financial=true and return rows=[]. Do NOT copy a cost subtotal (Total Cost / total direct costs) into sales or total_revenue. A row where sales equals total_direct_costs means you fabricated revenue from a cost -- do not emit it.
 - If this is a Balance Sheet, GL Detail, Cost Report, or Statement of Indirect Expense with no Orders/Sales/EBIT/GM/ROS mapping, set is_financial=true and return rows=[] (do not fabricate).
 - ALSO return the raw F/S Group subtotals you computed so downstream code can recompute the derived metrics: total_revenue (the Revenue F/S Group total = Sales), total_direct_costs (the Direct Costs F/S Group total), and cost_of_operations (the Cost of Operations F/S Group total = Fringe + Overhead + G&A). Leave any subtotal not present in the source null; never fabricate.
+- period MUST be the MONTH label ("FY26 Jan"/"FY26 Feb"/"FY26 Mar", three-letter month), never "FY26 Q1". Emit one row per month; a Trend Income Stmt yields one income_statement actual row per month. The quarter total is derived downstream by summing months -- do not emit it yourself.
+- source (orthogonal to kind, set on every row): "income_statement" for an official Income Statement / P&L and for each Trend Income Stmt month (kind=actual); "l1_actual" for an L1-ACTUAL project-revenue ledger (kind=actual); "l1_target" for an L1-TARGET / Proj Revenue Summary plan (kind=plan). Derive from the filename first (L1-ACTUAL/L1-TARGET/Income Statement/Trend), else from content. If ambiguous use income_statement for actual rows and l1_target for plan rows.
 
 Return JSON exactly matching this schema:
 {
@@ -412,10 +422,11 @@ Return JSON exactly matching this schema:
   "currency": "USD",
   "rows": [
     {
-      "period": "FY26 Q1",
+      "period": "FY26 Mar",
       "fiscal_year": 2026,
       "quarter": 1 or null,
       "kind": "plan" or "actual",
+      "source": "income_statement" or "l1_actual" or "l1_target",
       "orders": number or null,
       "sales": number or null,
       "ebit": number or null,

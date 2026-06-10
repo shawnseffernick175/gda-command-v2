@@ -252,10 +252,11 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       currency: 'USD',
       rows: [
         {
-          period: 'FY26 Q1',
+          period: 'FY26 Mar',
           fiscal_year: 2026,
           quarter: 1,
           kind: 'plan',
+          source: 'l1_target',
           orders: 580000,
           sales: 510000,
           ebit: 68000,
@@ -263,10 +264,11 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
           ros: 13.3,
         },
         {
-          period: 'FY26 Q1',
+          period: 'FY26 Mar',
           fiscal_year: 2026,
           quarter: 1,
           kind: 'actual',
+          source: 'income_statement',
           orders: 595000,
           sales: 518000,
           ebit: 71200,
@@ -277,7 +279,7 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
           cost_of_operations: 471315.26,
         },
       ],
-      notes: 'Mock financial extraction - one plan and one actual row for FY26 Q1.',
+      notes: 'Mock financial extraction - one plan and one actual month row for FY26 Mar.',
       model_used: 'mock-model',
     } satisfies FinancialStatementExtractOutput,
 

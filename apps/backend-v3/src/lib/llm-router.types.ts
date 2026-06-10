@@ -393,6 +393,11 @@ export interface FinancialStatementExtractOutput {
     fiscal_year: number;
     quarter: number | null;
     kind: 'plan' | 'actual';
+    // Source-series discriminator, orthogonal to kind. Distinguishes the same
+    // period's official Income Statement P&L from the L1-ACTUAL project-revenue
+    // ledger and the L1-TARGET plan so they coexist instead of clobbering. When
+    // the model omits it, ingest derives a sensible default from kind.
+    source?: 'income_statement' | 'l1_actual' | 'l1_target' | null;
     orders: number | null;
     sales: number | null;
     ebit: number | null;

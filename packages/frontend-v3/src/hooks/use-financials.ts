@@ -13,7 +13,9 @@ interface ForecastItem {
 }
 
 interface TrendItem {
+  source: string;
   period: string;
+  is_quarter: boolean;
   orders: number;
   sales: number;
   ebit: number;
