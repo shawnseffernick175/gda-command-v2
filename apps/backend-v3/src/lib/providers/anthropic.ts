@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, FinancialStatementExtractInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -117,6 +117,16 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst. Be direct and specific.`,
+
+  financial_statement_extract: `You are a financial analyst at Envision extracting structured figures from a financial statement.
+
+Extract quarterly (and annual if present) PLAN vs ACTUAL figures for Orders, Sales, EBIT, Gross Margin %, and ROS %.
+Map columns and labels intelligently: Revenue = Sales; Bookings = Orders; Operating Income = EBIT; GM% = Gross Margin %; ROS%/Return on Sales = ROS %.
+Convert dollars to absolute numbers (e.g. "$1.2M" -> 1200000; a value of "595" under a "$000s" header -> 595000).
+Express percentages as plain numbers (38.1 not 0.381). If a value is missing, use null.
+Distinguish PLAN/Budget/Forecast figures (kind "plan") from ACTUAL/Reported figures (kind "actual").
+Set is_financial=false if the document is not a financial statement.
+NEVER fabricate figures. Return JSON exactly matching the requested schema (include every key).`,
 
   competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
@@ -318,6 +328,34 @@ Classify this document and determine where it belongs. Return JSON:
 }`;
 }
 
+function buildFinancialStatementExtractPrompt(input: FinancialStatementExtractInput): string {
+  const text = input.extracted_text.slice(0, 12000);
+  return `Filename: ${input.filename}
+Extracted text (first 12000 chars):
+${text}
+
+Extract the financial figures and return JSON:
+{
+  "is_financial": true or false,
+  "currency": "USD",
+  "rows": [
+    {
+      "period": "FY26 Q1",
+      "fiscal_year": 2026,
+      "quarter": 1 or null,
+      "kind": "plan" or "actual",
+      "orders": number or null,
+      "sales": number or null,
+      "ebit": number or null,
+      "gross_margin": number or null,
+      "ros": number or null
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
 export interface AnthropicCallResult {
   text: string;
   tokens_input: number;
@@ -377,6 +415,8 @@ export async function callAnthropic(opts: {
     ? buildVaultDocumentParsePrompt(opts.input as VaultDocumentParseInput)
     : opts.task === 'vault_smart_route'
     ? buildVaultSmartRoutePrompt(opts.input as VaultSmartRouteInput)
+    : opts.task === 'financial_statement_extract'
+    ? buildFinancialStatementExtractPrompt(opts.input as FinancialStatementExtractInput)
     : JSON.stringify(opts.input);
 
   try {
