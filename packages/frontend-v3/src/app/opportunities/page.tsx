@@ -801,7 +801,7 @@ function VehicleOpportunityRow({
 
 function OpportunityRow({
   opp,
-  onNavigate,
+  onNavigate: _onNavigate,
   onAgencyFilter,
 }: {
   opp: OpportunitySummary;
