@@ -10,6 +10,7 @@ import { logger } from '../../lib/logger.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../../lib/queue.js';
 import { mirrorOpportunityToUnified } from '../../services/opportunities/unified-mirror.js';
 import { evaluateRelevance } from '../../constants/relevance.js';
+import { validateAndRecompute, rejectReason } from './opportunity_validation.js';
 
 function enqueueIngestAnalysis(oppId: string): void {
   try {
@@ -127,21 +128,39 @@ export async function upsertOpportunityWithSources(
   try {
     await client.query('BEGIN');
 
+    // Layer 2 — deterministic recompute / normalize. Pure, no DB.
+    const validated = validateAndRecompute(opp);
+
+    // Layer 3 — storability guard. Rejected rows go in with relevance_status
+    // = 'rejected' + the reason in relevance_reason for human audit, then we
+    // skip every other side effect (no contacts, no analysis enqueue, no
+    // unified mirror).
+    const xReason = rejectReason(validated);
+
     const sourceUrl = citations[0]?.source_url ?? null;
     const { rows: sourceRows } = await client.query(
       `INSERT INTO sources (kind, url, title, confidence, meta)
        VALUES ($1, $2, $3, 'high', '{}')
        RETURNING id`,
-      [sourceKind, sourceUrl, `SAM.gov Notice ${opp.sam_notice_id}`],
+      [sourceKind, sourceUrl, `SAM.gov Notice ${validated.sam_notice_id}`],
     );
     const sourceId = sourceRows[0].id;
 
     // PR-A4: evaluate relevance before upsert
-    const rel = evaluateRelevance({
-      naics: opp.naics,
-      set_aside: opp.set_aside,
-      response_due_at: opp.response_due_at,
-    });
+    const rel = xReason !== null
+      ? { status: 'rejected', reason: xReason }
+      : evaluateRelevance({
+          naics: validated.naics,
+          set_aside: validated.set_aside,
+          response_due_at: validated.response_due_at,
+        });
+
+    if (xReason !== null) {
+      logger.warn(
+        { sam_notice_id: validated.sam_notice_id, reason: xReason },
+        'opportunity row rejected by validation guard (stored with relevance_status=rejected)',
+      );
+    }
 
     const { rows: upsertRows } = await client.query(
       `INSERT INTO opportunities (
@@ -183,32 +202,32 @@ export async function upsertOpportunityWithSources(
          updated_at           = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
-        opp.title,
-        opp.agency,
-        opp.sub_agency,
-        opp.department,
-        opp.solicitation_number,
-        opp.sam_notice_id,
-        opp.status,
-        opp.value_min,
-        opp.value_max,
-        opp.naics,
-        opp.psc,
-        opp.set_aside,
-        opp.place_of_performance,
-        opp.response_due_at,
-        opp.posted_at,
-        opp.description,
-        opp.data_source,
-        opp.tags.length > 0 ? `{${opp.tags.join(',')}}` : '{}',
+        validated.title,
+        validated.agency,
+        validated.sub_agency,
+        validated.department,
+        validated.solicitation_number,
+        validated.sam_notice_id,
+        validated.status,
+        validated.value_min,
+        validated.value_max,
+        validated.naics,
+        validated.psc,
+        validated.set_aside,
+        validated.place_of_performance,
+        validated.response_due_at,
+        validated.posted_at,
+        validated.description,
+        validated.data_source,
+        validated.tags.length > 0 ? `{${validated.tags.join(',')}}` : '{}',
         sourceId,
-        opp.opportunity_type ?? null,
-        opp.source_uri ?? null,
-        opp.department_name ?? null,
-        opp.agency_name ?? null,
-        opp.office ?? null,
-        opp.contracting_office ?? null,
-        opp.org_path ?? null,
+        validated.opportunity_type ?? null,
+        validated.source_uri ?? null,
+        validated.department_name ?? null,
+        validated.agency_name ?? null,
+        validated.office ?? null,
+        validated.contracting_office ?? null,
+        validated.org_path ?? null,
         rel.status,
         rel.reason,
       ],
@@ -231,40 +250,42 @@ export async function upsertOpportunityWithSources(
 
     await client.query('COMMIT');
 
-    // Upsert contacts outside the opportunity transaction so a bad
-    // contact never rolls back the opportunity write.
-    if (opp.contacts && opp.contacts.length > 0) {
-      await upsertContactsForOpportunity(oppId, opp.data_source, opp.contacts);
-    }
+    if (xReason === null) {
+      // Upsert contacts outside the opportunity transaction so a bad
+      // contact never rolls back the opportunity write.
+      if (validated.contacts && validated.contacts.length > 0) {
+        await upsertContactsForOpportunity(oppId, validated.data_source, validated.contacts);
+      }
 
-    // F-605: auto-enqueue analysis on ingest
-    enqueueIngestAnalysis(String(oppId));
+      // F-605: auto-enqueue analysis on ingest
+      enqueueIngestAnalysis(String(oppId));
 
-    // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
-    try {
-      await mirrorOpportunityToUnified(pool, {
-        id: oppId,
-        data_source: opp.data_source,
-        sam_notice_id: opp.sam_notice_id,
-        govtribe_id: null,
-        external_id: null,
-        title: opp.title,
-        agency: opp.agency,
-        sub_agency: opp.sub_agency,
-        naics: opp.naics,
-        psc: opp.psc,
-        set_aside: opp.set_aside,
-        value_min: opp.value_min,
-        value_max: opp.value_max,
-        posted_at: opp.posted_at,
-        response_due_at: opp.response_due_at,
-        status: opp.status,
-      });
-    } catch (mirrorErr) {
-      logger.error(
-        { oppId, error: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr) },
-        'unified_mirror_post_ingest_error',
-      );
+      // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
+      try {
+        await mirrorOpportunityToUnified(pool, {
+          id: oppId,
+          data_source: validated.data_source,
+          sam_notice_id: validated.sam_notice_id,
+          govtribe_id: null,
+          external_id: null,
+          title: validated.title,
+          agency: validated.agency,
+          sub_agency: validated.sub_agency,
+          naics: validated.naics,
+          psc: validated.psc,
+          set_aside: validated.set_aside,
+          value_min: validated.value_min,
+          value_max: validated.value_max,
+          posted_at: validated.posted_at,
+          response_due_at: validated.response_due_at,
+          status: validated.status,
+        });
+      } catch (mirrorErr) {
+        logger.error(
+          { oppId, error: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr) },
+          'unified_mirror_post_ingest_error',
+        );
+      }
     }
 
     if (wasInserted) return 'inserted';
@@ -297,21 +318,38 @@ export async function upsertExternalOpportunity(
   try {
     await client.query('BEGIN');
 
+    // Layer 2 — deterministic recompute / normalize. Pure, no DB.
+    const validated = validateAndRecompute(opp);
+
+    // Layer 3 — storability guard. Rejected rows go in with relevance_status
+    // = 'rejected' + the reason in relevance_reason for human audit, then we
+    // skip every other side effect (no analysis enqueue, no unified mirror).
+    const xReason = rejectReason(validated);
+
     const sourceUrl = citations[0]?.source_url ?? null;
     const { rows: sourceRows } = await client.query(
       `INSERT INTO sources (kind, url, title, confidence, meta)
        VALUES ($1, $2, $3, 'high', '{}')
        RETURNING id`,
-      [sourceKind, sourceUrl, `${sourceKind.toUpperCase()} ${opp.external_id}`],
+      [sourceKind, sourceUrl, `${sourceKind.toUpperCase()} ${validated.external_id}`],
     );
     const sourceId = sourceRows[0].id;
 
     // PR-A4: evaluate relevance before upsert
-    const rel = evaluateRelevance({
-      naics: opp.naics,
-      set_aside: opp.set_aside,
-      response_due_at: opp.response_due_at,
-    });
+    const rel = xReason !== null
+      ? { status: 'rejected', reason: xReason }
+      : evaluateRelevance({
+          naics: validated.naics,
+          set_aside: validated.set_aside,
+          response_due_at: validated.response_due_at,
+        });
+
+    if (xReason !== null) {
+      logger.warn(
+        { external_id: validated.external_id, data_source: validated.data_source, reason: xReason },
+        'opportunity row rejected by validation guard (stored with relevance_status=rejected)',
+      );
+    }
 
     const { rows: upsertRows } = await client.query(
       `INSERT INTO opportunities (
@@ -349,29 +387,29 @@ export async function upsertExternalOpportunity(
          updated_at           = NOW()
        RETURNING id, (xmax = 0) AS was_inserted`,
       [
-        opp.title,
-        opp.agency,
-        opp.sub_agency,
-        opp.department,
-        opp.solicitation_number,
-        opp.external_id,
-        opp.status,
-        opp.value_min,
-        opp.value_max,
-        opp.naics,
-        opp.psc,
-        opp.set_aside,
-        opp.place_of_performance,
-        opp.response_due_at,
-        opp.posted_at,
-        opp.description,
-        opp.data_source,
-        opp.tags.length > 0 ? `{${opp.tags.join(',')}}` : '{}',
+        validated.title,
+        validated.agency,
+        validated.sub_agency,
+        validated.department,
+        validated.solicitation_number,
+        validated.external_id,
+        validated.status,
+        validated.value_min,
+        validated.value_max,
+        validated.naics,
+        validated.psc,
+        validated.set_aside,
+        validated.place_of_performance,
+        validated.response_due_at,
+        validated.posted_at,
+        validated.description,
+        validated.data_source,
+        validated.tags.length > 0 ? `{${validated.tags.join(',')}}` : '{}',
         sourceId,
-        opp.agency_subtype,
-        opp.opportunity_type,
-        opp.part_number,
-        opp.quantity,
+        validated.agency_subtype,
+        validated.opportunity_type,
+        validated.part_number,
+        validated.quantity,
         rel.status,
         rel.reason,
       ],
@@ -394,34 +432,36 @@ export async function upsertExternalOpportunity(
 
     await client.query('COMMIT');
 
-    // F-605: auto-enqueue analysis on ingest
-    enqueueIngestAnalysis(String(oppId));
+    if (xReason === null) {
+      // F-605: auto-enqueue analysis on ingest
+      enqueueIngestAnalysis(String(oppId));
 
-    // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
-    try {
-      await mirrorOpportunityToUnified(pool, {
-        id: oppId,
-        data_source: opp.data_source,
-        sam_notice_id: null,
-        govtribe_id: opp.data_source === 'govtribe' ? opp.external_id : null,
-        external_id: opp.external_id,
-        title: opp.title,
-        agency: opp.agency,
-        sub_agency: opp.sub_agency,
-        naics: opp.naics,
-        psc: opp.psc,
-        set_aside: opp.set_aside,
-        value_min: opp.value_min,
-        value_max: opp.value_max,
-        posted_at: opp.posted_at,
-        response_due_at: opp.response_due_at,
-        status: opp.status,
-      });
-    } catch (mirrorErr) {
-      logger.error(
-        { oppId, error: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr) },
-        'unified_mirror_post_ingest_error',
-      );
+      // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
+      try {
+        await mirrorOpportunityToUnified(pool, {
+          id: oppId,
+          data_source: validated.data_source,
+          sam_notice_id: null,
+          govtribe_id: validated.data_source === 'govtribe' ? validated.external_id : null,
+          external_id: validated.external_id,
+          title: validated.title,
+          agency: validated.agency,
+          sub_agency: validated.sub_agency,
+          naics: validated.naics,
+          psc: validated.psc,
+          set_aside: validated.set_aside,
+          value_min: validated.value_min,
+          value_max: validated.value_max,
+          posted_at: validated.posted_at,
+          response_due_at: validated.response_due_at,
+          status: validated.status,
+        });
+      } catch (mirrorErr) {
+        logger.error(
+          { oppId, error: mirrorErr instanceof Error ? mirrorErr.message : String(mirrorErr) },
+          'unified_mirror_post_ingest_error',
+        );
+      }
     }
 
     if (wasInserted) return 'inserted';
