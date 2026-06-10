@@ -268,8 +268,8 @@ export default function OverridesPage() {
               {data.recent.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No overrides recorded yet. Overrides appear here when you
-                  change an opportunity's grade or pipeline stage from the
-                  system-suggested value.
+                  change an opportunity{"\u2019"}s grade or pipeline stage from
+                  the system-suggested value.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
