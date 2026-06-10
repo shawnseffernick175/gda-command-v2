@@ -13,10 +13,10 @@
  *   npm run --workspace=apps/backend-v3 backfill:validate-opps -- --apply
  */
 
-import { validateAndRecompute, rejectReason, type OpportunityValidationFields } from '../src/ingest/framework/opportunity_validation.js';
-import { evaluateRelevance } from '../src/constants/relevance.js';
-import { pool } from '../src/lib/db.js';
-import { logger } from '../src/lib/logger.js';
+import { validateAndRecompute, rejectReason, type OpportunityValidationFields } from '../ingest/framework/opportunity_validation.js';
+import { evaluateRelevance } from '../constants/relevance.js';
+import { pool } from '../lib/db.js';
+import { logger } from '../lib/logger.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -546,7 +546,7 @@ async function main(): Promise<void> {
   report.sample_diffs = samples;
 
   // Write report
-  const logsDir = path.resolve(import.meta.dirname, '..', 'logs');
+  const logsDir = path.resolve(import.meta.dirname, '..', '..', 'logs');
   fs.mkdirSync(logsDir, { recursive: true });
   const reportFileName = `backfill_${startedAt.replace(/[:.]/g, '-')}.json`;
   const reportPath = path.join(logsDir, reportFileName);

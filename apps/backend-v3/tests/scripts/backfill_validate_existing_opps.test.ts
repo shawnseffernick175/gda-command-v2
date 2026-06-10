@@ -142,7 +142,7 @@ async function runBackfill(apply = false): Promise<void> {
   // Dynamically import the script by invalidating module cache
   // We need to re-import the pool with the test DATABASE_URL
   const { execSync } = await import('node:child_process');
-  const scriptPath = path.resolve(import.meta.dirname, '../../scripts/backfill_validate_existing_opps.ts');
+  const scriptPath = path.resolve(import.meta.dirname, '../../src/scripts/backfill_validate_existing_opps.ts');
   const args = apply ? '--apply' : '';
   execSync(
     `npx tsx ${scriptPath} ${args}`,
