@@ -621,3 +621,35 @@ Self-tested (all behaved as designed):
 
 CI on PR #762: 15/15 functional checks green; "Devin Review" advisory pending (not a gate).
 Merged squash-admin, branch deleted.
+
+---
+
+## 21. Opportunity ingest had no self-validation guard (RESOLVED 2026-06-10)
+- WHAT: Opportunity mappers wrote whatever they extracted from source APIs straight to
+  `opportunities` — no defensive layer between mapper output and DB insert. Live data
+  showed 136 rows with response_due_at < posted_at, 2 rows with due >10 years out,
+  37 rows with posted_at >7 days in the future, 115 rows with malformed NAICS, and 156
+  rows with no agency/agency_name/department_name. Mirror of "Financials had no
+  self-validation" gap.
+- FIX: PR #784 (merged main @ bdbf1c6, 2026-06-10) — ported the financials
+  validateAndRecompute + rejectReason pattern to opportunity ingest. New module
+  `apps/backend-v3/src/ingest/framework/opportunity_validation.ts` is generic over
+  OpportunityRow (SAM) and ExternalOpportunityRow (all external sources) via a shared
+  OpportunityValidationFields interface. Wired into BOTH writer entry points
+  (upsertOpportunityWithSources, upsertExternalOpportunity).
+- BEHAVIOR: Bad rows are quarantined (relevance_status='rejected' + relevance_reason
+  for human audit) rather than silently dropped. All post-COMMIT side effects
+  (contacts upsert, analysis enqueue, unified-mirror) gated on validation pass.
+- TESTS: 23 vitest cases covering R1-R8 + X1-X2 rules + invariants (immutable input,
+  never-throws table-test, generic-over-types). All green.
+- DEPLOY: Backend container rebuilt and restarted 2026-06-10 ~19:59 UTC. /v3/health
+  returns ok. SAM ingest cron picked up the new validator at 20:00 UTC.
+- SCOPE NOTE: Validator runs at write-time only. The 446 pre-existing anomaly rows
+  on disk are not retroactively fixed; they will be cleaned as SAM cron updates them
+  over time. A one-shot backfill script is a separate follow-up (NOTED, not yet
+  filed).
+- CI NOTE: Merged with admin override. The two failing CI checks (Compose Drift Check,
+  LLM Router Gates F-215 D4) are pre-existing failures on main, unrelated to this PR
+  — Devin only touched 4 files, none of which are compose or LLM router config.
+  Separate cleanup needed for those gates.
+- STATUS: DEPLOYED
