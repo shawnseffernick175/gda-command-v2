@@ -241,3 +241,69 @@ The architect will merge if and only if:
 7. No files outside the scope listed in §2 are modified
 
 End of spec.
+
+---
+
+## 13. Addendum — NAICS re-scoring (added 2026-06-10 PM)
+
+The NAICS allowlist was widened on 2026-06-10 (commit 35cc425, PR #785) from 10 codes to 18 codes, sourced from the public Envision capability statement. As a result, ~11,735 existing rows are currently marked `relevance_status='off_profile'` against the OLD allowlist. Many of those rows have NAICS codes that are now in scope.
+
+**Add to the main loop (§5, step c):**
+
+After computing the validator diff, also re-evaluate relevance:
+
+```typescript
+import { evaluateRelevance } from '../src/constants/relevance.js';
+
+// ... inside the per-row block, AFTER validateAndRecompute and BEFORE the writes:
+const newRelevance = evaluateRelevance({
+  naics: validated.naics,
+  set_aside: validated.set_aside,
+  response_due_at: validated.response_due_at,
+});
+
+const relevanceChanged =
+  newRelevance.status !== row.relevance_status ||
+  newRelevance.reason !== row.relevance_reason;
+```
+
+**Apply rules (extends §5, step d):**
+
+- If `relevanceChanged` AND NOT `hasInPipeline` AND `xReason === null`:
+  - UPDATE opportunities SET relevance_status = newRelevance.status, relevance_reason = newRelevance.reason, relevant = newRelevance.relevant, auto_pass = newRelevance.auto_pass WHERE id = :id
+- If `relevanceChanged` AND `hasInPipeline`:
+  - Log a warn but do NOT change relevance fields (pipeline-protection per §7 extends to relevance changes too)
+- If `xReason !== null`, the existing quarantine logic in §5 wins — `relevance_status='rejected'` overrides any re-scored value.
+
+**Extend §5 report:**
+
+Add these counters to the report:
+```
+"rows_relevance_changed": N,
+"relevance_breakdown": {
+  "off_profile_to_relevant": N,         // <- the headline number
+  "off_profile_to_auto_pass": N,
+  "unknown_naics_to_relevant": N,
+  "relevant_to_off_profile": N,         // should be 0 because we only widened
+  "relevant_to_auto_pass": N,           // time has passed since original ingest
+  "skipped_due_to_pipeline": N,
+  "skipped_due_to_quarantine": N
+}
+```
+
+**Extend §8 sample_diffs:**
+
+Add 5 rows showing `off_profile → relevant` transitions to the sample for spot-checking.
+
+**Extend §9 tests:**
+
+Add test cases:
+- 8. NAICS re-score moves off_profile → relevant when validated.naics is in the (new) allowlist
+- 9. NAICS re-score does NOT change a row that is `hasInPipeline=true`
+- 10. NAICS re-score does NOT touch rows that are quarantined by X1/X2 (quarantine wins)
+
+**Acceptance criteria (§12) — addendum:**
+
+Item 8: Re-scoring follows the rules above and is exercised by tests 8-10. The `relevance_breakdown` block is populated in the report.
+
+End of addendum.
