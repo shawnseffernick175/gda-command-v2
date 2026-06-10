@@ -39,6 +39,13 @@ export function useVaultCount() {
   });
 }
 
+export function useVaultCountsByBucket() {
+  return useQuery({
+    queryKey: ["vault", "counts-by-bucket"],
+    queryFn: () => apiGet<Record<string, number>>("/v3/vault/counts-by-bucket"),
+  });
+}
+
 export function useVaultDocument(id: number | null) {
   return useQuery({
     queryKey: ["vault", "detail", id],

@@ -73,3 +73,4 @@ v3_064_org_hierarchy.sql
 v3_065_doctrine_id_types.sql
 v3_066_relevance_gate.sql
 v3_067_relevance_renaics.sql
+v3_070_vault_buckets_v2.sql
