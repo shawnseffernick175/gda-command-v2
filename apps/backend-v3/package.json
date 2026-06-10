@@ -20,7 +20,8 @@
     "migrate:legacy:report": "tsx src/migration/run.ts --report-only",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "audit:schema": "tsx tests/audit-schema.ts",
-    "backfill:unified": "tsx src/scripts/backfill-unified-opportunities.ts"
+    "backfill:unified": "tsx src/scripts/backfill-unified-opportunities.ts",
+    "backfill:validate-opps": "tsx scripts/backfill_validate_existing_opps.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
