@@ -2,7 +2,8 @@
  * Financials ingest service.
  *
  * Upserts extracted financial rows into financial_plan / financial_actuals,
- * keyed on (fiscal_year, quarter). Only non-null values are written, and
+ * keyed on (period, fiscal_year, quarter) so distinct periods (e.g. FY26 Mar vs
+ * FY26 Q1) coexist instead of clobbering each other. Only non-null values are written, and
  * existing columns are preserved via COALESCE so a partial upload does not
  * zero out previously ingested figures.
  *
@@ -101,6 +102,57 @@ export function validateAndRecompute(row: FinancialRow): FinancialRow {
   return out;
 }
 
+/**
+ * Deterministic storability guard (layer 3). Rejects rows that carry no usable
+ * KPI signal so hallucinated / implausible artifacts never reach the tables.
+ * Returns a reason string when the row must be rejected, or null when it is safe
+ * to store.
+ *
+ * Takes BOTH the raw extracted row and the recomputed row. The TGT-vs-ACT failure
+ * signature is a cost/rate build-up file with no real revenue line: the model
+ * copies the total direct-cost subtotal into BOTH sales and total_direct_costs,
+ * so revenue == cost. validateAndRecompute then derives gross_margin=0 and a
+ * spurious negative EBIT (= -cost_of_operations), which is NOT a real profit
+ * signal. We detect the artifact on the RAW row (revenue == cost, no model EBIT,
+ * no model gross_margin) so the recompute's fabricated EBIT cannot mask it.
+ */
+export function rejectReason(raw: FinancialRow, row: FinancialRow): string | null {
+  const sales = isFiniteNumber(row.sales) ? row.sales : null;
+  const totalRevenue = isFiniteNumber(row.total_revenue) ? row.total_revenue : null;
+  const ebit = isFiniteNumber(row.ebit) ? row.ebit : null;
+  const gm = isFiniteNumber(row.gross_margin) ? row.gross_margin : null;
+  const ros = isFiniteNumber(row.ros) ? row.ros : null;
+  const revenueBasis = sales !== null ? sales : totalRevenue;
+
+  // (1) Nothing to store: no revenue/sales AND no EBIT AND no gross margin.
+  if ((revenueBasis === null || revenueBasis === 0) && ebit === null && gm === null) {
+    return 'no usable signal (no revenue/sales, no ebit, no gross_margin)';
+  }
+
+  // (2) revenue == cost, no profit, no margin -- the TGT-vs-ACT artifact.
+  // Evaluated on the RAW model output: total_revenue and total_direct_costs
+  // present and equal (within 0.5%), with no genuine model EBIT and no genuine
+  // model gross_margin. This is a cost build-up where revenue was fabricated
+  // from a cost subtotal; the recompute's derived EBIT/GM are not real signal.
+  const rawRevenue = isFiniteNumber(raw.total_revenue) ? raw.total_revenue : null;
+  const rawDirectCosts = isFiniteNumber(raw.total_direct_costs) ? raw.total_direct_costs : null;
+  const rawEbit = isFiniteNumber(raw.ebit) ? raw.ebit : null;
+  const rawGm = isFiniteNumber(raw.gross_margin) ? raw.gross_margin : null;
+  if (rawRevenue !== null && rawDirectCosts !== null && rawRevenue !== 0) {
+    const relDiff = Math.abs(rawRevenue - rawDirectCosts) / Math.abs(rawRevenue);
+    if (relDiff <= 0.005 && rawEbit === null && (rawGm === null || rawGm === 0)) {
+      return 'revenue == direct costs with no ebit and no gross margin (cost build-up artifact)';
+    }
+  }
+
+  // (3) No usable KPI at all after recompute: gross_margin AND ebit AND ros null.
+  if (gm === null && ebit === null && ros === null) {
+    return 'no usable KPI signal (gross_margin, ebit, ros all null)';
+  }
+
+  return null;
+}
+
 const PLAN_COLUMNS: Record<string, keyof FinancialRow> = {
   plan_orders: 'orders',
   plan_sales: 'sales',
@@ -142,7 +194,7 @@ async function upsertRow(
 
   const sql = `INSERT INTO ${table} (${cols.join(', ')})
     VALUES (${placeholders.join(', ')})
-    ON CONFLICT (fiscal_year, quarter)
+    ON CONFLICT (period, fiscal_year, quarter)
     DO UPDATE SET ${updates.join(', ')}`;
 
   await pool.query(sql, params);
@@ -151,9 +203,10 @@ async function upsertRow(
 
 export async function ingestFinancialRows(
   rows: FinancialStatementExtractOutput['rows'],
-): Promise<{ plan: number; actual: number }> {
+): Promise<{ plan: number; actual: number; rejected: number }> {
   let plan = 0;
   let actual = 0;
+  let rejected = 0;
 
   // Clear seed/demo rows ONLY after a real row is successfully upserted. An empty
   // extract (rows=[]) or an all-failed extract must leave existing data intact,
@@ -174,6 +227,19 @@ export async function ingestFinancialRows(
       // they are stored. Never persist hallucinated or out-of-range metrics.
       const row = validateAndRecompute(rawRow);
 
+      // Layer 3: storability guard. Reject (skip, do not store) rows with no
+      // usable signal -- e.g. the TGT-vs-ACT cost build-up artifact where the
+      // model copied a cost subtotal into sales. Continue ingest; never throw.
+      const reason = rejectReason(rawRow, row);
+      if (reason !== null) {
+        rejected += 1;
+        logger.warn(
+          { period: row.period, fiscal_year: row.fiscal_year, quarter: row.quarter, kind: row.kind, reason },
+          'implausible financial row rejected (not stored)',
+        );
+        continue;
+      }
+
       try {
         if (row.kind === 'plan') {
           await upsertRow('financial_plan', PLAN_COLUMNS, row);
@@ -191,5 +257,5 @@ export async function ingestFinancialRows(
     }
   }
 
-  return { plan, actual };
+  return { plan, actual, rejected };
 }

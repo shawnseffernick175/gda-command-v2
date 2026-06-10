@@ -657,7 +657,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
               docId,
               'financials_ingested',
               'system',
-              `plan=${counts.plan}, actual=${counts.actual}`,
+              `plan=${counts.plan}, actual=${counts.actual}, rejected=${counts.rejected}`,
             );
           }
         } catch (err) {
