@@ -1,4 +1,4 @@
--- v3_070: Vault redesign — 17 unified buckets
+-- v3_072: Vault redesign — 17 unified buckets
 -- 2026-06-10
 
 BEGIN;
@@ -86,15 +86,20 @@ UPDATE vault_documents
   SET doc_category = 'work_product'
   WHERE doc_type != 'policy_regulatory';
 
--- 6) Audit log entry for migrated rows
+-- 6) Audit log entry for migrated rows (match by new bucket values that
+--    could only exist after auto-migration, excluding pre-existing types)
 INSERT INTO vault_audit_trail (document_id, action, actor, detail, created_at)
 SELECT
   id,
   'auto_migrated',
-  'system:v3_070',
+  'system:v3_072',
   'Reclassified during vault-buckets-v2 migration',
   NOW()
 FROM vault_documents
-WHERE updated_at >= NOW() - INTERVAL '5 seconds';
+WHERE doc_type IN (
+  'financial', 'subcontract_teaming', 'policy_regulatory',
+  'capability_statement', 'correspondence', 'personnel',
+  'technical_artifact', 'training_material'
+);
 
 COMMIT;

@@ -1097,7 +1097,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
               </option>
             ))}
           </select>
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <p className="text-[11px] text-muted-foreground mt-1">
             AI will still summarize and tag the document, but the bucket you
             choose here is final.
           </p>
@@ -1151,13 +1151,13 @@ function UploadModal({ onClose }: { onClose: () => void }) {
                   <p className="truncate font-mono text-xs text-foreground">
                     {q.file.name}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     {formatBytes(q.file.size)}
                     {q.message ? ` - ${q.message}` : ""}
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 font-mono text-[10px] ${
+                  className={`shrink-0 font-mono text-[11px] ${
                     q.status === "done"
                       ? "text-gda-green"
                       : q.status === "error"

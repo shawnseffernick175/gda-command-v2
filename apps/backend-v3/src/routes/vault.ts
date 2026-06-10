@@ -209,6 +209,7 @@ async function smartIngestRouter(
   filename: string,
   extractedText: string | null,
   aiSummary: string | null,
+  userSuppliedBucket = false,
 ): Promise<{ linked_opportunity_id: number | null; linked_capture_id: number | null; routing_rationale: string | null }> {
   const searchText = extractedText?.slice(0, 500) ?? filename;
 
@@ -266,11 +267,12 @@ async function smartIngestRouter(
       const params: unknown[] = [];
       let idx = 1;
 
-      if (out.doc_type) {
+      // Only allow LLM to reclassify if user did not explicitly choose a bucket
+      if (out.doc_type && !userSuppliedBucket) {
         sets.push(`doc_type = $${idx++}`);
         params.push(out.doc_type);
       }
-      if (out.doc_category) {
+      if (out.doc_category && !userSuppliedBucket) {
         sets.push(`doc_category = $${idx++}`);
         params.push(out.doc_category);
       }
@@ -683,7 +685,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Smart ingest routing (async, non-blocking for response)
-    const routingResult = await smartIngestRouter(docId, filename, extractedText || null, aiSummary);
+    const routingResult = await smartIngestRouter(docId, filename, extractedText || null, aiSummary, userSuppliedBucket);
 
     const created = await pool.query<VaultDocumentRow>(
       `SELECT d.*, o.title AS opp_title,
