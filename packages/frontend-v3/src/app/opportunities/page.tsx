@@ -801,7 +801,8 @@ function VehicleOpportunityRow({
 
 function OpportunityRow({
   opp,
-  onNavigate: _onNavigate,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onNavigate,
   onAgencyFilter,
 }: {
   opp: OpportunitySummary;
