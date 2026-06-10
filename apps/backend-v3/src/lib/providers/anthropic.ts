@@ -151,9 +151,25 @@ WORKED EXAMPLE (account-level Income Statement, March 2026 month column):
 - EBIT = 515,094.28 - 471,315.26 = 43,779.02 => ros = 43779.02 / 4188766.47 * 100 = 1.0
 - Row: sales=4188766.47, gross_margin=12.3, ebit=43779.02, ros=1.0, kind="actual".
 
+WORKED EXAMPLE (L1-TARGET Proj Revenue Summary, Grand Total row, March 2026):
+- Target Period Costs (Grand Total) = 4,044,837.49 ; Target Period Profit = 43,779.07 ; Target Period Revenue (w/o PY Rev) = 4,088,616.56
+- sales = total_revenue = 4088616.56 ; total_direct_costs = 4044837.49 ; ebit = 43779.07 ; cost_of_operations = null
+- gross_margin = (4088616.56 - 4044837.49) / 4088616.56 * 100 = 1.071 ; ros = 43779.07 / 4088616.56 * 100 = 1.071
+- Row: sales=4088616.56, total_revenue=4088616.56, total_direct_costs=4044837.49, ebit=43779.07, gross_margin=1.071, ros=1.071, kind="plan", fiscal_year=2026, quarter=1, period="FY26 Q1".
+
 ACTUALS-ONLY documents (most month-end Income Statements): emit kind="actual" rows even when there is NO plan/budget column. Do not require a plan column to exist.
 
 TARGET / PLAN files: If the FILENAME contains any of TGT, TARGET, BUDGET, PLAN, FORECAST, PROJ, or L1-TARGET, OR the content has columns labeled Target / Plan / Budget / Forecast (vs Actual): emit a kind="plan" row built from the TARGET/PLAN/BUDGET/FORECAST column or file. If the same file ALSO carries an actual column (e.g. "TGT vs ACT MAR-26.xlsx" has both a target column and an actual column), additionally emit a separate kind="actual" row from the actual column. So "TGT vs ACT MAR-26.xlsx" yields BOTH a plan row and an actual row for FY26 Q1. A file named "L1-TARGET ..." yields a plan row; "L1-ACTUAL ..." yields an actual row. Parse whatever KPI columns exist (revenue/sales at minimum); leave any KPI that is not present null, never fabricate it.
+
+L1-TARGET / PROJ REVENUE SUMMARY layout (no F/S Group structure): These target workbooks are a per-project table (often a sheet like "DataSetLandTbl") with one row per project plus a single "Grand Total" row, and column headers of the form:
+  Project | Target Period Costs | Target Period Profit | Target Period Revenue (w/o PY Rev) | Target YTD Costs | Target YTD Profit | Target YTD Revenue (w/o PY Rev)
+There is NO "F/S Group Revenue" and NO "Totals for F/S Line" here. Map the GRAND TOTAL row (never an individual project row) for the kind="plan" row as follows, using the "Target Period" (the month) columns as the primary period values:
+- sales = total_revenue = "Target Period Revenue (w/o PY Rev)" Grand Total.
+- total_direct_costs = "Target Period Costs" Grand Total. (These target files report a single combined cost figure; treat it as direct/total costs.)
+- ebit = "Target Period Profit" Grand Total (the workbook's profit column IS operating profit for the period).
+- gross_margin and ros are DERIVED downstream from the components; you may set gross_margin = (sales - total_direct_costs)/sales*100 and ros = ebit/sales*100, but always also return total_revenue, total_direct_costs, and ebit so deterministic code can recompute and override.
+- Leave cost_of_operations null for these files (the cost is reported as one combined number, not split into Fringe/Overhead/G&A).
+Use the "Target Period" (month) Grand Total for the row value, consistent with how monthly actuals are mapped to the quarter. Do NOT instead use the "Target YTD" columns for the row value (YTD would double-count across monthly uploads at the same fiscal_year+quarter grain).
 
 PERIOD AND QUARTER:
 - Fiscal calendar uses CALENDAR quarters. quarter = ceil(month / 3): Jan/Feb/Mar -> 1, Apr/May/Jun -> 2, Jul/Aug/Sep -> 3, Oct/Nov/Dec -> 4.
@@ -383,6 +399,7 @@ ${text}
 Use BOTH the filename and the statement text to determine period, fiscal_year, and quarter (quarter = ceil(month/3), two-digit year YY -> 20YY).
 - If this is an actuals-only Income Statement, emit kind="actual" rows using the MONTH column (not the Current Fiscal YTD column). Sales = sum of all "Totals for F/S Line" rows under F/S Group "Revenue". Direct Costs = sum of all "Totals for F/S Line" rows under F/S Group "Direct Costs". gross_margin = (Sales - Direct Costs) / Sales * 100 as a plain percent (e.g. 12.3). EBIT = (Sales - Direct Costs) - Cost of Operations (Fringe + Overhead + G&A). ros = EBIT / Sales * 100. Never copy a single account or a Rate Variance line into gross_margin.
 - If the filename contains TGT, TARGET, BUDGET, PLAN, FORECAST, PROJ, or L1-TARGET, OR the content has Target/Plan/Budget/Forecast columns, emit a kind="plan" row from the target/plan figures. If an actual column is also present in the same file (e.g. "TGT vs ACT MAR-26.xlsx"), ALSO emit a separate kind="actual" row. An "L1-TARGET ..." file yields a plan row; an "L1-ACTUAL ..." file yields an actual row.
+- For an L1-TARGET / Proj Revenue Summary workbook (per-project table with a Grand Total row and "Target Period Costs/Profit/Revenue (w/o PY Rev)" columns and no F/S Group structure), build the plan row from the GRAND TOTAL row using the "Target Period" (month) columns: sales=total_revenue="Target Period Revenue (w/o PY Rev)", total_direct_costs="Target Period Costs", ebit="Target Period Profit", cost_of_operations=null. Do not use the "Target YTD" columns for the row value.
 - If this is a Balance Sheet, GL Detail, Cost Report, or Statement of Indirect Expense with no Orders/Sales/EBIT/GM/ROS mapping, set is_financial=true and return rows=[] (do not fabricate).
 - ALSO return the raw F/S Group subtotals you computed so downstream code can recompute the derived metrics: total_revenue (the Revenue F/S Group total = Sales), total_direct_costs (the Direct Costs F/S Group total), and cost_of_operations (the Cost of Operations F/S Group total = Fringe + Overhead + G&A). Leave any subtotal not present in the source null; never fabricate.
 

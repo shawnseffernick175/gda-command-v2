@@ -634,8 +634,15 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
     // Financial statement extraction + ingest (best-effort, must not fail upload)
     if (extractedText.length > 0) {
+      // Target/plan workbooks (L1-TARGET, TGT vs ACT, Proj Revenue Summary) do
+      // not contain "financ/income/budget" tokens in their filenames, so the
+      // original gate never invoked extraction for them and financial_plan
+      // stayed empty. Widen the gate to the same plan-detection tokens the
+      // extract prompt keys on (TGT/TARGET/PLAN/PROJ/ACT/L1-TARGET) plus the
+      // existing actuals tokens. The extract prompt remains the authority on
+      // whether a given document actually yields KPI rows.
       const looksFinancial =
-        /financ|p&l|income|balance|budget|forecast/i.test(filename) ||
+        /financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\bact\b/i.test(filename) ||
         docTypeConfirmed === 'invoice';
       if (looksFinancial) {
         try {
