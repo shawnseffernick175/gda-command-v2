@@ -398,6 +398,12 @@ export interface FinancialStatementExtractOutput {
     ebit: number | null;
     gross_margin: number | null;
     ros: number | null;
+    // Optional F/S Group subtotals so deterministic code can recompute derived
+    // metrics (gross_margin, ebit, ros) instead of trusting the model. Additive:
+    // existing consumers/mocks remain valid when these are absent.
+    total_revenue?: number | null;
+    total_direct_costs?: number | null;
+    cost_of_operations?: number | null;
   }[];
   notes: string;
   model_used: string;

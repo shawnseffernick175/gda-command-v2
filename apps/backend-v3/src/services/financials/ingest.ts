@@ -19,6 +19,88 @@ import type { FinancialStatementExtractOutput } from '../../lib/llm-router.types
 
 type FinancialRow = FinancialStatementExtractOutput['rows'][number];
 
+const METRIC_MIN = -100;
+const METRIC_MAX = 100;
+
+function isFiniteNumber(v: number | null | undefined): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+function round3(v: number): number {
+  return Math.round(v * 1000) / 1000;
+}
+
+/**
+ * Deterministic self-validation guard (layer 2). The model EXTRACTS; this pure
+ * function RECOMPUTES derived metrics from the raw F/S Group subtotals and
+ * overrides the model when components are available. Implausible values that
+ * cannot be recomputed are nulled (never stored). Returns a new row; never
+ * fabricates a value from nothing.
+ */
+export function validateAndRecompute(row: FinancialRow): FinancialRow {
+  const out: FinancialRow = { ...row };
+  const docContext = { period: row.period, fiscal_year: row.fiscal_year, quarter: row.quarter, kind: row.kind };
+
+  const totalRevenue = isFiniteNumber(out.total_revenue) ? out.total_revenue : null;
+  const totalDirectCosts = isFiniteNumber(out.total_direct_costs) ? out.total_direct_costs : null;
+  const costOfOps = isFiniteNumber(out.cost_of_operations) ? out.cost_of_operations : null;
+
+  let gmDollars: number | null = null;
+
+  // (a) Recompute gross_margin from components and OVERRIDE the model value.
+  if (totalRevenue !== null && totalDirectCosts !== null && totalRevenue !== 0) {
+    gmDollars = totalRevenue - totalDirectCosts;
+    const recomputedGm = round3((gmDollars / totalRevenue) * 100);
+
+    // (d) Cross-check: if the model offered a gross_margin that disagrees with
+    // the recomputed one by more than 1.0 absolute points, that is the
+    // "AI hallucination caught" signal. We always trust the recomputed value.
+    if (isFiniteNumber(out.gross_margin) && Math.abs(out.gross_margin - recomputedGm) > 1.0) {
+      logger.warn(
+        { ...docContext, ai_gross_margin: out.gross_margin, recomputed_gross_margin: recomputedGm },
+        'AI gross_margin disagrees with recomputed value; trusting recomputed',
+      );
+    }
+    out.gross_margin = recomputedGm;
+
+    // EBIT = GM$ - Cost of Operations. Override when model EBIT is null or off
+    // by more than 1% of revenue.
+    if (costOfOps !== null) {
+      const recomputedEbit = round3(gmDollars - costOfOps);
+      const tolerance = Math.abs(totalRevenue) * 0.01;
+      if (!isFiniteNumber(out.ebit) || Math.abs(out.ebit - recomputedEbit) > tolerance) {
+        out.ebit = recomputedEbit;
+      }
+    }
+  }
+
+  // (b) Recompute ros from sales (or total_revenue) and ebit when ros is null
+  // or implausible (out of [-100, 100]).
+  const salesBasis = isFiniteNumber(out.sales) ? out.sales : totalRevenue;
+  const rosImplausible = isFiniteNumber(out.ros) && (out.ros < METRIC_MIN || out.ros > METRIC_MAX);
+  if (
+    salesBasis !== null &&
+    salesBasis !== 0 &&
+    isFiniteNumber(out.ebit) &&
+    (!isFiniteNumber(out.ros) || rosImplausible)
+  ) {
+    out.ros = round3((out.ebit / salesBasis) * 100);
+  }
+
+  // (c) Sanity clamp: gross_margin and ros must be within [-100, 100]. If still
+  // out of range here it could not be recomputed from components -> null + warn.
+  if (isFiniteNumber(out.gross_margin) && (out.gross_margin < METRIC_MIN || out.gross_margin > METRIC_MAX)) {
+    logger.warn({ ...docContext, field: 'gross_margin', value: out.gross_margin }, 'implausible financial metric nulled');
+    out.gross_margin = null;
+  }
+  if (isFiniteNumber(out.ros) && (out.ros < METRIC_MIN || out.ros > METRIC_MAX)) {
+    logger.warn({ ...docContext, field: 'ros', value: out.ros }, 'implausible financial metric nulled');
+    out.ros = null;
+  }
+
+  return out;
+}
+
 const PLAN_COLUMNS: Record<string, keyof FinancialRow> = {
   plan_orders: 'orders',
   plan_sales: 'sales',
@@ -85,8 +167,12 @@ export async function ingestFinancialRows(
   }
 
   if (rows.length > 0) {
-    for (const row of rows) {
-      if (row.quarter === null || row.quarter === undefined) continue;
+    for (const rawRow of rows) {
+      if (rawRow.quarter === null || rawRow.quarter === undefined) continue;
+
+      // Layer 2: deterministically verify/recompute the model's numbers before
+      // they are stored. Never persist hallucinated or out-of-range metrics.
+      const row = validateAndRecompute(rawRow);
 
       try {
         if (row.kind === 'plan') {
