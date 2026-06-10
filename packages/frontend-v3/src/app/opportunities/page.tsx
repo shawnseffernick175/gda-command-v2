@@ -610,7 +610,7 @@ function SortableHeader({
             title={`Sort by ${label}`}
           >
             <span>{label}</span>
-            {caret && <span className="font-mono text-[10px]">{caret}</span>}
+            {caret && <span className="font-mono text-[11px]">{caret}</span>}
           </button>
         ) : (
           <span className="text-muted-foreground">{label}</span>
