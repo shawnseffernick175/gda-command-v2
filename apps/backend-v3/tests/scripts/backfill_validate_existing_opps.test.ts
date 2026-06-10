@@ -418,5 +418,10 @@ describe('backfill_validate_existing_opps', () => {
     // Quarantine wins — status should be 'rejected', not 'relevant'
     expect(row.relevance_status).toBe('rejected');
     expect(row.relevance_reason).toContain('no title and no description');
+
+    // Verify the skipped_due_to_quarantine counter is populated
+    const report = getLatestReport() as Record<string, unknown>;
+    const relB = report['relevance_breakdown'] as Record<string, number>;
+    expect(relB.skipped_due_to_quarantine).toBeGreaterThanOrEqual(1);
   }, 60_000);
 });

@@ -306,10 +306,11 @@ async function main(): Promise<void> {
           response_due_at: validated.response_due_at,
         });
 
-        const relevanceChanged =
-          (xReason === null) &&
-          (newRelevance.status !== row.relevance_status ||
-           newRelevance.reason !== row.relevance_reason);
+        const wouldRelevanceChange =
+          newRelevance.status !== row.relevance_status ||
+          newRelevance.reason !== row.relevance_reason;
+
+        const relevanceChanged = (xReason === null) && wouldRelevanceChange;
 
         // Compute diff
         const rules = attributeRules(row, validated);
@@ -344,7 +345,7 @@ async function main(): Promise<void> {
         const hasQuarantine = xReason !== null;
         const hasRelevanceChange = relevanceChanged;
 
-        if (!hasDataChanges && !hasQuarantine && !hasRelevanceChange) {
+        if (!hasDataChanges && !hasQuarantine && !hasRelevanceChange && !wouldRelevanceChange) {
           report.rows_unchanged++;
           continue;
         }
@@ -476,7 +477,7 @@ async function main(): Promise<void> {
             { opportunity_id: row.id, old_status: row.relevance_status, new_status: newRelevance.status },
             'backfill: relevance change skipped due to pipeline protection',
           );
-        } else if (hasRelevanceChange && hasQuarantine) {
+        } else if (wouldRelevanceChange && hasQuarantine) {
           report.relevance_breakdown.skipped_due_to_quarantine++;
         }
 
