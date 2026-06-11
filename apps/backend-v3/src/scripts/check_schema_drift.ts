@@ -128,26 +128,20 @@ function collectFiles(dirs: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// SQL extraction & reference collection
+// SQL extraction helpers
 // ---------------------------------------------------------------------------
 
 const SQL_KEYWORDS =
-  /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|FROM|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|OUTER\s+JOIN|CROSS\s+JOIN|FULL\s+JOIN|SET|WHERE|ORDER\s+BY|GROUP\s+BY|ON|INTO|VALUES)\b/i;
-
-/** Matches `table.column` patterns in SQL-like strings */
-const TABLE_DOT_COL = /\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b/gi;
+  /\b(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM|FROM|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|OUTER\s+JOIN|CROSS\s+JOIN|FULL\s+JOIN|WHERE|ORDER\s+BY|GROUP\s+BY|INTO|VALUES)\b/i;
 
 /** Matches table names after FROM / JOIN / INTO / UPDATE */
 const TABLE_AFTER_KEYWORD =
   /\b(?:FROM|JOIN|INTO|UPDATE)\s+([a-z_][a-z0-9_]*)\b/gi;
 
-/** Matches column names in SELECT ... FROM, WHERE, SET, ON, ORDER BY, GROUP BY contexts */
-const COL_IN_CLAUSE =
-  /\b(?:SELECT|WHERE|SET|ON|ORDER\s+BY|GROUP\s+BY)\s+([\s\S]*?)(?:\bFROM\b|\bWHERE\b|\bSET\b|\bLIMIT\b|\bORDER\b|\bGROUP\b|\bHAVING\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|;|$)/gi;
+/** Matches `table.column` patterns in SQL-like strings */
+const TABLE_DOT_COL = /\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b/gi;
 
-const BARE_IDENT = /\b([a-z_][a-z0-9_]*)\b/gi;
-
-/** SQL keywords and common noise to skip when looking for bare identifiers */
+/** SQL keywords and identifiers to skip */
 const SQL_NOISE = new Set([
   'select', 'from', 'where', 'and', 'or', 'not', 'in', 'is', 'null',
   'true', 'false', 'as', 'on', 'set', 'into', 'values', 'insert',
@@ -178,48 +172,70 @@ const SQL_NOISE = new Set([
   'unbounded', 'current', 'row', 'exclude', 'ties', 'no', 'others',
 ]);
 
+function isStringLikelySql(s: string): boolean {
+  return SQL_KEYWORDS.test(s);
+}
+
+/**
+ * Remove ${...} template literal interpolations (including nested braces)
+ * so that JS expressions inside template strings are not parsed as SQL.
+ */
+function stripInterpolations(s: string): string {
+  let result = '';
+  let i = 0;
+  while (i < s.length) {
+    if (s[i] === '$' && s[i + 1] === '{') {
+      // Skip past the interpolation, tracking brace depth
+      let depth = 1;
+      i += 2;
+      while (i < s.length && depth > 0) {
+        if (s[i] === '{') depth++;
+        else if (s[i] === '}') depth--;
+        i++;
+      }
+      // Replace interpolation with a placeholder that won't match SQL patterns
+      result += ' __INTERP__ ';
+    } else {
+      result += s[i];
+      i++;
+    }
+  }
+  return result;
+}
+
 interface Ref {
   table: string;
   column: string | null;
   line: number;
 }
 
-function isStringLikelySql(s: string): boolean {
-  return SQL_KEYWORDS.test(s);
-}
-
 /**
- * Extracts string literal and template literal bodies from a source line.
- * Simplified — grabs content between quotes/backticks.
+ * Extract SQL references from a string known to contain SQL keywords.
+ *
+ * Strategy:
+ * - table.column: only flag if `table` is a KNOWN schema table (catches real
+ *   column drift). Unknown table prefixes (e.g. SQL aliases like `o.id`,
+ *   `pi.opportunity_id`) are ignored — they are not schema references.
+ * - FROM/JOIN/INTO/UPDATE table: flag unknown tables (but skip short aliases
+ *   ≤2 chars and noise words).
  */
-function extractStrings(line: string): string[] {
-  const results: string[] = [];
-  // Template literals and regular strings — simplified extraction
-  const patterns = [
-    /`([^`]*)`/g,
-    /'([^']*)'/g,
-    /"([^"]*)"/g,
-  ];
-  for (const re of patterns) {
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(line)) !== null) {
-      if (m[1]) results.push(m[1]);
-    }
-  }
-  return results;
-}
-
-function extractRefsFromSql(sql: string, lineNum: number): Ref[] {
+function extractRefsFromSql(
+  sql: string,
+  lineNum: number,
+  schema: SchemaMap,
+): Ref[] {
   const refs: Ref[] = [];
   const seen = new Set<string>();
 
-  // 1. table.column references
   let m: RegExpExecArray | null;
+
+  // 1. table.column — only check if table is in the schema
   TABLE_DOT_COL.lastIndex = 0;
   while ((m = TABLE_DOT_COL.exec(sql)) !== null) {
     const table = m[1].toLowerCase();
     const col = m[2].toLowerCase();
     if (SQL_NOISE.has(table)) continue;
+    if (!(table in schema)) continue; // alias or JS object — skip
     const key = `${table}.${col}`;
     if (!seen.has(key)) {
       seen.add(key);
@@ -232,6 +248,8 @@ function extractRefsFromSql(sql: string, lineNum: number): Ref[] {
   while ((m = TABLE_AFTER_KEYWORD.exec(sql)) !== null) {
     const table = m[1].toLowerCase();
     if (SQL_NOISE.has(table)) continue;
+    if (table.length <= 2) continue; // short aliases like o, l, pi
+    if (table === '__interp__') continue;
     const key = `table:${table}`;
     if (!seen.has(key)) {
       seen.add(key);
@@ -243,48 +261,47 @@ function extractRefsFromSql(sql: string, lineNum: number): Ref[] {
 }
 
 // ---------------------------------------------------------------------------
-// Multi-line SQL string handling
+// File scanning
 // ---------------------------------------------------------------------------
 
-/**
- * Scans a file for SQL strings, handling multi-line template literals.
- * Returns all table/column references found.
- */
-function scanFile(filePath: string): Ref[] {
+function scanFile(filePath: string, schema: SchemaMap): Ref[] {
   const content = fs.readFileSync(filePath, 'utf-8');
-  const lines = content.split('\n');
   const allRefs: Ref[] = [];
 
-  // Strategy 1: scan for multi-line template literals containing SQL
+  // Strategy 1: multi-line template literals containing SQL
   const templateLiteralRe = /`([\s\S]*?)`/g;
   let tm: RegExpExecArray | null;
   while ((tm = templateLiteralRe.exec(content)) !== null) {
-    const body = tm[1];
+    const raw = tm[1];
+    const body = stripInterpolations(raw);
     if (!isStringLikelySql(body)) continue;
-    // Determine line number of the start of this match
     const startOffset = tm.index;
     let lineNum = 1;
     for (let i = 0; i < startOffset; i++) {
       if (content[i] === '\n') lineNum++;
     }
-    const refs = extractRefsFromSql(body, lineNum);
+    const refs = extractRefsFromSql(body, lineNum, schema);
     allRefs.push(...refs);
   }
 
-  // Strategy 2: scan individual lines for single-line string literals
+  // Strategy 2: single-line string literals (single and double quoted)
+  const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Single-quoted and double-quoted strings
-    const strings = extractStrings(line).filter(
-      (s) => !s.includes('`') && isStringLikelySql(s),
-    );
-    for (const s of strings) {
-      const refs = extractRefsFromSql(s, i + 1);
-      allRefs.push(...refs);
+    const patterns = [/'([^']*)'/g, /"([^"]*)"/g];
+    for (const re of patterns) {
+      let sm: RegExpExecArray | null;
+      while ((sm = re.exec(line)) !== null) {
+        const s = sm[1];
+        if (s && isStringLikelySql(s)) {
+          const refs = extractRefsFromSql(s, i + 1, schema);
+          allRefs.push(...refs);
+        }
+      }
     }
   }
 
-  // Deduplicate refs (template literal scan may overlap with line scan)
+  // Deduplicate
   const deduped: Ref[] = [];
   const seenKeys = new Set<string>();
   for (const ref of allRefs) {
@@ -314,14 +331,10 @@ function checkRefs(
     const table = ref.table;
     const col = ref.column;
 
-    // Check allowlist
     if (allowlist.has(table)) continue;
     if (col && allowlist.has(`${table}.${col}`)) continue;
 
-    // Check table existence
     if (!(table in schema)) {
-      // Only flag as unknown_table if we have no column (pure table ref)
-      // For table.column refs, we flag as unknown_table too since the table doesn't exist
       const reference = col ? `${table}.${col}` : table;
       violations.push({
         file: filePath,
@@ -332,7 +345,6 @@ function checkRefs(
       continue;
     }
 
-    // Check column existence
     if (col && !schema[table].includes(col)) {
       violations.push({
         file: filePath,
@@ -353,7 +365,6 @@ function checkRefs(
 function main(): void {
   const { schemaPath, scanDirs, allowlistPath } = parseArgs(process.argv);
 
-  // Load schema
   if (!fs.existsSync(schemaPath)) {
     console.error(`Schema file not found: ${schemaPath}`);
     process.exit(2);
@@ -362,27 +373,23 @@ function main(): void {
   const tableCount = Object.keys(schema).length;
   console.log(`Loaded schema: ${tableCount} tables from ${schemaPath}`);
 
-  // Load allowlist
   const allowlist = loadAllowlist(allowlistPath);
   console.log(
     `Loaded allowlist: ${allowlist.size} entries from ${allowlistPath}`,
   );
 
-  // Collect files
   const files = collectFiles(scanDirs);
   console.log(
     `Scanning ${files.length} .ts/.tsx files in: ${scanDirs.join(', ')}`,
   );
 
-  // Scan and check
   const allViolations: Violation[] = [];
   for (const file of files) {
-    const refs = scanFile(file);
+    const refs = scanFile(file, schema);
     const violations = checkRefs(refs, schema, allowlist, file);
     allViolations.push(...violations);
   }
 
-  // Report
   if (allViolations.length > 0) {
     console.log('');
     console.log(`Schema drift detected: ${allViolations.length} violation(s)`);
