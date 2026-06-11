@@ -173,7 +173,7 @@ export async function fetchGroup(
         award_type_codes: typeCodes,
         time_period: [{ start_date: startDate, end_date: endDate, date_type: 'last_modified_date' }],
         agencies: DOD_AGENCY_FILTER,
-        naics_codes: [...ENVISION_NAICS],
+        naics_codes: [...ENVISION_NAICS].filter(code => /^\d{6}$/.test(code)),
       },
       fields: REQUESTED_FIELDS,
       page,
