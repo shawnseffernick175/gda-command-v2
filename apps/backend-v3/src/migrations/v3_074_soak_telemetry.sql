@@ -20,4 +20,4 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS soak_metrics AS
     percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)       AS p95_ms,
     api_version
   FROM soak_events
-  GROUP BY 1, 2, 4;
+  GROUP BY 1, 2, 5;
