@@ -21,7 +21,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "audit:schema": "tsx tests/audit-schema.ts",
     "backfill:unified": "tsx src/scripts/backfill-unified-opportunities.ts",
-    "backfill:validate-opps": "tsx src/scripts/backfill_validate_existing_opps.ts"
+    "backfill:validate-opps": "tsx src/scripts/backfill_validate_existing_opps.ts",
+    "backfill:incumbent": "tsx src/scripts/backfill_incumbent.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
@@ -35,6 +36,7 @@
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "exceljs": "^4.4.0",
+    "fast-xml-parser": "^5.8.0",
     "fastify": "^5.2.1",
     "fuzzball": "^2.2.6",
     "jsonwebtoken": "^9.0.2",

@@ -37,6 +37,7 @@ import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
+import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
@@ -246,6 +247,22 @@ export function startCronScheduler(): void {
   });
   tasks.push(soakMetricsRefreshTask);
   logger.info({ schedule: '30 2 * * *' }, '[cron] registered: soak-metrics-refresh (30 2 * * *)');
+
+  // Incumbent enrichment — daily at 06:00 UTC (02:00 ET, after USAspending refresh + contact jobs)
+  const incumbentEnrichTask = cron.schedule('0 6 * * *', async () => {
+    try {
+      logger.info('[cron] incumbent-enrichment starting');
+      const result = await runIncumbentEnrichment();
+      logger.info(
+        { enriched: result.enriched, no_match: result.no_match, rate_limited: result.rate_limited, errors: result.errors },
+        '[cron] incumbent-enrichment completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_incumbent_enrichment_error');
+    }
+  });
+  tasks.push(incumbentEnrichTask);
+  logger.info({ schedule: '0 6 * * *' }, '[cron] registered: incumbent-enrichment (0 6 * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {

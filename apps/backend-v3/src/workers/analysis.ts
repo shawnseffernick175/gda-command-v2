@@ -73,7 +73,9 @@ function scoreToGrade(score: number): string {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Incumbent extraction
+// Incumbent extraction — reads from the enriched columns populated by
+// the incumbent-enrichment worker (FPDS + USAspending pipeline).
+// Falls back to source citation stubs when columns are still empty.
 // ────────────────────────────────────────────────────────────────────────────
 
 function extractIncumbent(row: Record<string, unknown>): {
@@ -81,42 +83,44 @@ function extractIncumbent(row: Record<string, unknown>): {
   sources: SourceRef[];
 } {
   const existing = row.incumbent as string | null;
+  const incumbentSource = row.incumbent_source as string | null;
+  const incumbentConfidence = row.incumbent_confidence as string | null;
+
   if (existing && existing !== 'Unknown (stub)') {
+    // Determine source URL from incumbent_source field
+    let sourceUrl = `https://www.fpds.gov/ezsearch/search.do?q=${encodeURIComponent((row.solicitation_number as string) ?? (row.agency as string) ?? '')}`;
+    let sourceKind: 'fpds' | 'usaspending' = 'fpds';
+
+    if (incumbentSource) {
+      const pipeIdx = incumbentSource.indexOf('|');
+      if (pipeIdx > 0) {
+        sourceUrl = incumbentSource.slice(pipeIdx + 1);
+      }
+      if (incumbentSource.startsWith('usaspending:')) {
+        sourceKind = 'usaspending';
+      }
+    }
+
     return {
       incumbent: existing,
       sources: [
         {
-          kind: 'fpds',
-          title: `FPDS predecessor contract for ${(row.solicitation_number as string) ?? (row.agency as string) ?? 'opportunity'}`,
-          url: `https://www.fpds.gov/ezsearch/search.do?q=${encodeURIComponent((row.solicitation_number as string) ?? (row.agency as string) ?? '')}`,
+          kind: sourceKind,
+          title: `Incumbent: ${existing} (confidence: ${incumbentConfidence ?? 'unknown'}) via ${sourceKind === 'usaspending' ? 'USAspending.gov' : 'FPDS'} lookup`,
+          url: sourceUrl,
           retrieved_at: new Date().toISOString(),
         },
       ],
     };
   }
 
-  // Derive from agency + NAICS combination
-  const agency = (row.agency as string)?.toLowerCase() ?? '';
-  if (agency.includes('army')) {
-    return {
-      incumbent: 'Incumbent analysis pending — Army contract history',
-      sources: [
-        {
-          kind: 'fpds',
-          title: 'FPDS Army contract history lookup',
-          url: 'https://www.fpds.gov/ezsearch/search.do?q=Army',
-          retrieved_at: new Date().toISOString(),
-        },
-      ],
-    };
-  }
-
+  // No enriched incumbent yet — return a pending stub
   return {
     incumbent: null,
     sources: [
       {
         kind: 'internal',
-        title: 'No incumbent data available — FPDS search yielded no match',
+        title: 'Incumbent pending — enrichment pipeline will populate via FPDS/USAspending',
         url: '/audit/analysis/incumbent-search',
         retrieved_at: new Date().toISOString(),
       },
