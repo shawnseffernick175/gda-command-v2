@@ -1,0 +1,329 @@
+{
+  "started_at": "2026-06-11T00:09:43.718Z",
+  "ended_at": "2026-06-11T00:09:52.789Z",
+  "mode": "apply",
+  "total_rows_scanned": 15097,
+  "rows_unchanged": 7069,
+  "rows_data_normalized": 253,
+  "rows_quarantined": 0,
+  "rows_skipped_quarantine_due_to_pipeline": 0,
+  "rows_relevance_changed": 7122,
+  "rule_breakdown": {
+    "R1_due_before_posted_nulled": 121,
+    "R2_due_10y_out_nulled": 2,
+    "R3_posted_7d_future_nulled": 37,
+    "R4_value_swapped": 0,
+    "R5_value_out_of_range_nulled": 0,
+    "R6_bad_naics_nulled": 96,
+    "R7_agency_fallback_filled": 0,
+    "R8_set_aside_trimmed": 0,
+    "X1_no_title_no_description": 0,
+    "X2_stale_junk": 0
+  },
+  "relevance_breakdown": {
+    "off_profile_to_relevant": 63,
+    "off_profile_to_auto_pass": 174,
+    "unknown_naics_to_relevant": 0,
+    "relevant_to_off_profile": 5,
+    "relevant_to_auto_pass": 2,
+    "skipped_due_to_pipeline": 835,
+    "skipped_due_to_quarantine": 0
+  },
+  "sample_diffs": [
+    {
+      "opportunity_id": "22",
+      "rules_fired": [
+        "R1"
+      ],
+      "changes": {
+        "response_due_at": {
+          "old": "2026-05-28T03:59:00.000Z",
+          "new": null
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false
+    },
+    {
+      "opportunity_id": "134",
+      "rules_fired": [
+        "R1"
+      ],
+      "changes": {
+        "response_due_at": {
+          "old": "2026-05-29T17:00:00.000Z",
+          "new": null
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 237990 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 237990 not in Envision registration"
+      }
+    },
+    {
+      "opportunity_id": "160",
+      "rules_fired": [
+        "R1"
+      ],
+      "changes": {
+        "response_due_at": {
+          "old": "2025-06-17T15:30:00.000Z",
+          "new": null
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 334515 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 334515 not in Envision registration (set_aside=No Set aside used)"
+      }
+    },
+    {
+      "opportunity_id": "327",
+      "rules_fired": [
+        "R1"
+      ],
+      "changes": {
+        "response_due_at": {
+          "old": "2026-06-01T19:00:00.000Z",
+          "new": null
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 336413 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 336413 not in Envision registration"
+      }
+    },
+    {
+      "opportunity_id": "471",
+      "rules_fired": [
+        "R1"
+      ],
+      "changes": {
+        "response_due_at": {
+          "old": "2026-05-15T17:00:00.000Z",
+          "new": null
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 332439 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 332439 not in Envision registration"
+      }
+    },
+    {
+      "opportunity_id": "64",
+      "rules_fired": [
+        "R6"
+      ],
+      "changes": {
+        "naics": {
+          "old": "51711",
+          "new": null
+        },
+        "tags": {
+          "old": [
+            "sources_sought"
+          ],
+          "new": [
+            "sources_sought",
+            "bad_naics:51711"
+          ]
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "unknown_naics",
+        "old_reason": "off_profile: NAICS 51711 not in Envision pursuit profile",
+        "new_reason": "unknown_naics: no NAICS code provided"
+      }
+    },
+    {
+      "opportunity_id": "223",
+      "rules_fired": [
+        "R6"
+      ],
+      "changes": {
+        "naics": {
+          "old": "56211",
+          "new": null
+        },
+        "tags": {
+          "old": [],
+          "new": [
+            "bad_naics:56211"
+          ]
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "unknown_naics",
+        "old_reason": "off_profile: NAICS 56211 not in Envision pursuit profile",
+        "new_reason": "unknown_naics: no NAICS code provided"
+      }
+    },
+    {
+      "opportunity_id": "260",
+      "rules_fired": [
+        "R6"
+      ],
+      "changes": {
+        "naics": {
+          "old": "54171",
+          "new": null
+        },
+        "tags": {
+          "old": [],
+          "new": [
+            "bad_naics:54171"
+          ]
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "unknown_naics",
+        "old_reason": "off_profile: NAICS 54171 not in Envision pursuit profile",
+        "new_reason": "unknown_naics: no NAICS code provided"
+      }
+    },
+    {
+      "opportunity_id": "487",
+      "rules_fired": [
+        "R6"
+      ],
+      "changes": {
+        "naics": {
+          "old": "53112",
+          "new": null
+        },
+        "tags": {
+          "old": [],
+          "new": [
+            "bad_naics:53112"
+          ]
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "unknown_naics",
+        "old_reason": "off_profile: NAICS 53112 not in Envision pursuit profile",
+        "new_reason": "unknown_naics: no NAICS code provided"
+      }
+    },
+    {
+      "opportunity_id": "511",
+      "rules_fired": [
+        "R6"
+      ],
+      "changes": {
+        "naics": {
+          "old": "81121",
+          "new": null
+        },
+        "tags": {
+          "old": [
+            "sources_sought"
+          ],
+          "new": [
+            "sources_sought",
+            "bad_naics:81121"
+          ]
+        }
+      },
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "unknown_naics",
+        "old_reason": "off_profile: NAICS 81121 not in Envision pursuit profile",
+        "new_reason": "unknown_naics: no NAICS code provided"
+      }
+    },
+    {
+      "opportunity_id": "1",
+      "rules_fired": [],
+      "changes": {},
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 332996 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 332996 not in Envision registration"
+      }
+    },
+    {
+      "opportunity_id": "2",
+      "rules_fired": [],
+      "changes": {},
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 336413 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 336413 not in Envision registration (set_aside=No Set aside used)"
+      }
+    },
+    {
+      "opportunity_id": "3",
+      "rules_fired": [],
+      "changes": {},
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 114119 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 114119 not in Envision registration"
+      }
+    },
+    {
+      "opportunity_id": "4",
+      "rules_fired": [],
+      "changes": {},
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 336110 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 336110 not in Envision registration (set_aside=Total Small Business Set-Aside (FAR 19.5))"
+      }
+    },
+    {
+      "opportunity_id": "5",
+      "rules_fired": [],
+      "changes": {},
+      "reject_reason": null,
+      "preserved_due_to_pipeline": false,
+      "relevance_change": {
+        "old_status": "off_profile",
+        "new_status": "off_profile",
+        "old_reason": "off_profile: NAICS 336412 not in Envision pursuit profile",
+        "new_reason": "off_profile: NAICS 336412 not in Envision registration"
+      }
+    }
+  ]
+}
