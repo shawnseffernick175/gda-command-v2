@@ -2,7 +2,7 @@
  * Unit tests for the ID resolution shim (Cleanup PR 3).
  *
  * Covers:
- *   - Bigint path: numeric string returns parsed integer (no DB call)
+ *   - Bigint path: numeric string returns as-is (no DB call, no numeric conversion)
  *   - UUID path: valid UUID resolves via unified_opportunity_links lookup
  *   - UUID not found: valid UUID with no matching row returns null
  *   - Garbage string: returns null (no DB call)
@@ -58,22 +58,23 @@ describe('UUID_RE', () => {
 // ─── resolveOpportunityId ─────────────────────────────────────────────────────
 
 describe('resolveOpportunityId', () => {
-  it('bigint path: numeric string returns parsed integer without DB call', async () => {
+  it('bigint path: numeric string returns the string as-is without DB call', async () => {
     const result = await resolveOpportunityId(mockPool, '133532');
-    expect(result).toBe(133532);
+    expect(result).toBe('133532');
     expect(mockPool.query).not.toHaveBeenCalled();
   });
 
-  it('bigint path: large numeric string returns parsed integer', async () => {
-    const result = await resolveOpportunityId(mockPool, '9999999999');
-    expect(result).toBe(9999999999);
+  it('bigint path: large numeric string preserves precision (no parseInt)', async () => {
+    const largeId = '9007199254740993';
+    const result = await resolveOpportunityId(mockPool, largeId);
+    expect(result).toBe(largeId);
     expect(mockPool.query).not.toHaveBeenCalled();
   });
 
-  it('UUID path: valid UUID resolves to opportunity_id via unified_opportunity_links', async () => {
+  it('UUID path: valid UUID resolves to opportunity_id string via unified_opportunity_links', async () => {
     queryRows = [{ opportunity_id: 133532 }];
     const result = await resolveOpportunityId(mockPool, '5c88bb80-e14d-4409-ba52-12b7445b25e3');
-    expect(result).toBe(133532);
+    expect(result).toBe('133532');
     expect(mockPool.query).toHaveBeenCalledTimes(1);
     expect(lastQuerySql).toContain('unified_opportunity_links');
     expect(lastQueryParams).toEqual(['5c88bb80-e14d-4409-ba52-12b7445b25e3']);
