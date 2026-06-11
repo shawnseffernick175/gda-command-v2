@@ -46,7 +46,7 @@ export async function vehicleRoutes(fastify: FastifyInstance): Promise<void> {
     const result = await pool.query(
       `SELECT
         o.id, o.title, o.agency, o.naics, o.value_min, o.value_max,
-        o.response_due_at, o.posted_at, o.status AS pipeline_stage,
+        o.response_due_at, o.posted_at, COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage,
         o.set_aside, o.source_uri, ovl.match_type, ovl.match_evidence
       FROM opportunities o
       JOIN opportunity_vehicle_links ovl ON ovl.opportunity_id = o.id
