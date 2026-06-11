@@ -55,4 +55,6 @@ export const config = {
 
   agentV3Url: env('AGENT_V3_URL', 'http://gda-agent-v3:8001'),
   agentServiceToken: env('AGENT_SERVICE_TOKEN', ''),
+
+  fpdsApiBaseUrl: env('FPDS_API_BASE_URL', 'https://www.fpds.gov/ezsearch/fpdsportal'),
 } as const;

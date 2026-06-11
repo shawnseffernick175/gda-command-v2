@@ -80,3 +80,4 @@ v3_071_financials_source_dimension.sql
 v3_072_vault_buckets_v2.sql
 v3_073_opportunity_decision_overrides.sql
 v3_074_soak_telemetry.sql
+v3_075_incumbent_indexes.sql
