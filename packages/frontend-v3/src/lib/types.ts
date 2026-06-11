@@ -10,6 +10,8 @@ export interface PwinScore {
   model_version: string;
   scored_at: string;
   incumbent_competitor?: string | null;
+  // TODO: incumbent_source will be populated once issue #793 (incumbent enrichment) ships
+  incumbent_source?: string | null;
 }
 
 export type EligibilityStatus = "prime" | "team" | "ineligible" | "unrestricted";
@@ -55,6 +57,7 @@ export interface OpportunitySummary {
   deadline_warning?: boolean;
   grade?: string | null;
   source_uri?: string | null;
+  ai_analyzed_at?: string | null;
 }
 
 export interface AnalysisTimeline {
