@@ -244,12 +244,19 @@ function extractRefsFromSql(
   }
 
   // 2. table references after FROM / JOIN / INTO / UPDATE
+  //    Only flag names that look like real DB tables: known schema tables,
+  //    or snake_case identifiers (contain underscore). Single English words
+  //    like "the", "cache", "analysis" are skipped — they appear in LLM
+  //    prompt template literals that also contain SQL keywords.
   TABLE_AFTER_KEYWORD.lastIndex = 0;
   while ((m = TABLE_AFTER_KEYWORD.exec(sql)) !== null) {
     const table = m[1].toLowerCase();
     if (SQL_NOISE.has(table)) continue;
     if (table.length <= 2) continue; // short aliases like o, l, pi
     if (table === '__interp__') continue;
+    const isKnownTable = table in schema;
+    const looksLikeTable = table.includes('_');
+    if (!isKnownTable && !looksLikeTable) continue;
     const key = `table:${table}`;
     if (!seen.has(key)) {
       seen.add(key);

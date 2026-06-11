@@ -4,9 +4,31 @@
 # Lines starting with # are comments.
 
 # pgboss tables are managed by the pg-boss library in its own schema; not in public schema
+pgboss
 pgboss.job
 pgboss.schedule
 pgboss.subscription
 
+# Legacy/migration tables — queried by migration scripts against LEGACY_DATABASE_URL,
+# not the current public schema. These tables do not exist post-migration.
+sam_opportunities
+gda_opportunity_tracker
+gda_capture_plans
+gda_action_items
+source_registry
+gda_teaming_partners
+v3_opportunities
+v3_captures
+v3_action_items
+migration_partners
+
 # analysis_jobs exists in DB but has zero app callers (WARNING-5, deferred)
 analysis_jobs
+
+# pg_extension is a system catalog table, not in public schema
+pg_extension
+
+# migration helper CTEs / subquery aliases used in migration scripts
+scored_opps
+soak_events
+soak_metrics
