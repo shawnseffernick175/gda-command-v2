@@ -234,6 +234,19 @@ export function startCronScheduler(): void {
   tasks.push(contactEnrichBatchTask);
   logger.info({ schedule: '0 5 * * *' }, '[cron] registered: contact-enrich-batch (0 5 * * *)');
 
+  // Soak telemetry materialized view refresh — daily at 02:30 UTC (offset from pwin retrain at 02:00)
+  const soakMetricsRefreshTask = cron.schedule('30 2 * * *', async () => {
+    try {
+      logger.info('[cron] soak-metrics-refresh starting');
+      await pool.query('REFRESH MATERIALIZED VIEW soak_metrics;');
+      logger.info('[cron] soak_metrics materialized view refreshed');
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_soak_metrics_refresh_error');
+    }
+  });
+  tasks.push(soakMetricsRefreshTask);
+  logger.info({ schedule: '30 2 * * *' }, '[cron] registered: soak-metrics-refresh (30 2 * * *)');
+
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {
       logger.warn({ sourceKey: job.sourceKey }, 'cron_source_not_found');
