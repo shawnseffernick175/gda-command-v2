@@ -163,7 +163,7 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
     const recompeteResult = await pool.query(
       `SELECT
         piid AS contract_id,
-        agency_name AS title,
+        piid AS title,
         coalesce(value_obligated, 0)::numeric AS value,
         period_of_performance_end AS expiration_date,
         agency_name AS agency

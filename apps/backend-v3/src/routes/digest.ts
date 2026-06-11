@@ -251,7 +251,7 @@ async function getSignalFeed(opts: { limit: number; offset: number; category?: S
 
 async function getRegulatoryTracker() {
   const { rows } = await pool.query<RegulatoryRow>(
-    `SELECT id, citation AS title, category AS document_type, effective_date, url AS source_url, NULL AS status
+    `SELECT id, title, category AS document_type, effective_date::text, url AS source_url, NULL AS status
      FROM vault_regulatory_catalog
      WHERE is_active = true
      ORDER BY effective_date ASC NULLS LAST
