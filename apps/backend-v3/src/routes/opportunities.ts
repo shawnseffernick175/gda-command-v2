@@ -60,6 +60,7 @@ import {
   isOverridableField,
   OVERRIDABLE_FIELDS,
 } from '../services/opportunities/field-override.js';
+import { resolveOpportunityId, UUID_RE } from '../services/opportunities/resolve-id.js';
 
 const VALID_SORT_FIELDS: readonly SortField[] = [
   'value', 'pwin', 'stage', 'due', 'agency', 'set_aside', 'title', 'recency',
@@ -590,7 +591,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/opportunities/:id — detail with 10s synchronous block (Addendum A.3)
   app.get<{ Params: { id: string } }>('/v3/opportunities/:id', async (req, reply) => {
-    const { id } = req.params;
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
 
     const row = await getOpportunityById(id);
     if (!row) {
@@ -710,7 +717,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
   // PATCH /v3/opportunities/:id — update
   app.patch<{ Params: { id: string } }>('/v3/opportunities/:id', async (req, reply) => {
-    const { id } = req.params;
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
     const body = req.body as Record<string, unknown> | undefined;
 
     if (!body || Object.keys(body).length === 0) {
@@ -790,7 +803,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /v3/opportunities/:id/qualify — qualification action
   app.post<{ Params: { id: string } }>('/v3/opportunities/:id/qualify', async (req, reply) => {
-    const { id } = req.params;
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
     const body = req.body as Record<string, unknown> | undefined;
 
     const existing = await getOpportunityById(id);
@@ -819,7 +838,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /v3/opportunities/:id/analyze — manually trigger analysis for a single opportunity
   app.post<{ Params: { id: string } }>('/v3/opportunities/:id/analyze', async (req, reply) => {
-    const { id } = req.params;
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
 
     const existing = await getOpportunityById(id);
     if (!existing) {
@@ -828,7 +853,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
     }
 
-    enqueueAnalysis(String(id), 'manual');
+    enqueueAnalysis(id, 'manual');
 
     const fresh = await waitForAnalysis(
       id,
@@ -849,7 +874,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/opportunities/:id/analysis-status -- poll endpoint for frontend thinking state
   app.get<{ Params: { id: string } }>('/v3/opportunities/:id/analysis-status', async (req, reply) => {
-    const { id } = req.params;
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
 
     const oppRes = await pool.query<{
       llm_analysis: unknown;
@@ -910,7 +941,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /v3/opportunities/:id/outcome — record win/loss/no_bid outcome for pWin feedback
   app.post<{ Params: { id: string } }>('/v3/opportunities/:id/outcome', async (req, reply) => {
-    const { id } = req.params;
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
     const body = req.body as Record<string, unknown> | undefined;
 
     const validOutcomes = ['won', 'lost', 'no_bid'];
