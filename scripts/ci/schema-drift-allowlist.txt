@@ -1,0 +1,12 @@
+# Schema drift allowlist
+# Format: one entry per line. Either "table" to suppress all references to a table,
+# or "table.column" to suppress a specific column reference.
+# Lines starting with # are comments.
+
+# pgboss tables are managed by the pg-boss library in its own schema; not in public schema
+pgboss.job
+pgboss.schedule
+pgboss.subscription
+
+# analysis_jobs exists in DB but has zero app callers (WARNING-5, deferred)
+analysis_jobs

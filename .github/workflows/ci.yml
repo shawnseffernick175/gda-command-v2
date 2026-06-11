@@ -277,3 +277,41 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=high
+
+  schema-drift:
+    name: Schema Drift Check
+    runs-on: ubuntu-latest
+    needs: build
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: gda
+          POSTGRES_PASSWORD: gda_ci_password
+          POSTGRES_DB: gda_command
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gda -d gda_command"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build backend-v3
+        working-directory: apps/backend-v3
+        run: npx tsc
+      - name: Apply migrations for schema snapshot
+        working-directory: apps/backend-v3
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+        run: npx tsx src/lib/migrate.ts
+      - name: Run schema drift check
+        env:
+          DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
+        run: bash scripts/ci/check-schema-drift.sh
