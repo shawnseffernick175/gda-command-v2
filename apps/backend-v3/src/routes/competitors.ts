@@ -162,8 +162,8 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
     // Fetch re-compete contracts (period_of_performance_end within 18 months)
     const recompeteResult = await pool.query(
       `SELECT
-        contract_number AS contract_id,
-        description AS title,
+        piid AS contract_id,
+        piid AS title,
         coalesce(value_obligated, 0)::numeric AS value,
         period_of_performance_end AS expiration_date,
         agency_name AS agency
@@ -216,11 +216,11 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
 
     // Upsert cache (7-day TTL)
     await pool.query(
-      `INSERT INTO competitor_analysis_cache (competitor_name, awardee_uei, competitor_analysis, competitor_analysis_run_at, expires_at)
-       VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '7 days')
+      `INSERT INTO competitor_analysis_cache (competitor_name, competitor_analysis, competitor_analysis_run_at, expires_at)
+       VALUES ($1, $2, NOW(), NOW() + INTERVAL '7 days')
        ON CONFLICT (competitor_name)
-       DO UPDATE SET competitor_analysis = $3, awardee_uei = $2, competitor_analysis_run_at = NOW(), expires_at = NOW() + INTERVAL '7 days'`,
-      [competitorName, stats.awardee_uei ?? null, JSON.stringify(analysis)],
+       DO UPDATE SET competitor_analysis = $2, competitor_analysis_run_at = NOW(), expires_at = NOW() + INTERVAL '7 days'`,
+      [competitorName, JSON.stringify(analysis)],
     );
 
     return reply.send(
@@ -435,11 +435,11 @@ async function runCompetitorAnalysis(competitorName: string): Promise<void> {
   }
 
   await pool.query(
-    `INSERT INTO competitor_analysis_cache (competitor_name, awardee_uei, competitor_analysis, competitor_analysis_run_at, expires_at)
-     VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '7 days')
+    `INSERT INTO competitor_analysis_cache (competitor_name, competitor_analysis, competitor_analysis_run_at, expires_at)
+     VALUES ($1, $2, NOW(), NOW() + INTERVAL '7 days')
      ON CONFLICT (competitor_name)
-     DO UPDATE SET competitor_analysis = $3, awardee_uei = $2, competitor_analysis_run_at = NOW(), expires_at = NOW() + INTERVAL '7 days'`,
-    [competitorName, stats.awardee_uei ?? null, JSON.stringify(result.output)],
+     DO UPDATE SET competitor_analysis = $2, competitor_analysis_run_at = NOW(), expires_at = NOW() + INTERVAL '7 days'`,
+    [competitorName, JSON.stringify(result.output)],
   );
 
   logger.info({ competitorName }, 'competitor_analysis_generated');

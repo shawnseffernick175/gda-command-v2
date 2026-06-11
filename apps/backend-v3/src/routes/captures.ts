@@ -569,8 +569,8 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Capture not found', req.requestId));
     }
 
-    const oppRes = await pool.query<{ title: string; description: string | null; solicitation_number: string | null; naics_codes: string[] | null; set_aside: string | null; place_of_performance: string | null; incumbent_competitor: string | null }>(
-      `SELECT title, description, solicitation_number, naics_codes, set_aside, place_of_performance, incumbent_competitor FROM opportunities WHERE id = $1`,
+    const oppRes = await pool.query<{ title: string; description: string | null; solicitation_number: string | null; naics_codes: string[] | null; set_aside: string | null; place_of_performance: string | null; incumbent: string | null }>(
+      `SELECT title, description, solicitation_number, naics, ARRAY[naics] AS naics_codes, set_aside, place_of_performance, incumbent FROM opportunities WHERE id = $1`,
       [capture.opportunity_id]
     );
     const opp = oppRes.rows[0];
@@ -597,7 +597,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
         description: opp.description ?? '',
         solicitation_number: opp.solicitation_number,
         analysis_summary: analysisSummary,
-        incumbent_info: opp.incumbent_competitor,
+        incumbent_info: opp.incumbent,
         competitor_landscape: null,
         envision_capabilities: [
           'DoD program support', 'systems engineering', 'logistics', 'technical services'
