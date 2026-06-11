@@ -14,6 +14,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
 import { SourceChip } from "@/components/shared/source-chip";
+import { FieldStatusBadge } from "@/components/field-status-badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { useVaultDocuments } from "@/hooks/use-vault";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -779,18 +780,22 @@ function VehicleOpportunityRow({
         </div>
       </div>
       <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground shrink-0">
-        {opp.value_max && (
-          <span>{formatMoney(opp.value_max)}</span>
+        {(opp.value_max || opp.value_min) ? (
+          <span>{formatMoney(opp.value_max ?? opp.value_min)}</span>
+        ) : (
+          <FieldStatusBadge reason="no_source_data" />
         )}
         {opp.pipeline_stage && (
           <span className="rounded border border-border px-1.5 py-0.5 text-[11px]">
             {opp.pipeline_stage}
           </span>
         )}
-        {opp.response_due_at && (
+        {opp.response_due_at ? (
           <span>
             {new Date(opp.response_due_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
+        ) : (
+          <FieldStatusBadge reason="no_source_data" />
         )}
       </div>
     </div>
@@ -893,7 +898,7 @@ function OpportunityRow({
         {score != null ? (
           <span className={cn("font-mono text-xs tabular-nums", pwinClass)}>{score}%</span>
         ) : (
-          <span className="text-xs text-muted-foreground">---</span>
+          <FieldStatusBadge reason={opp.ai_analyzed_at == null ? "pending_analysis" : "no_source_data"} />
         )}
       </td>
       <td className="px-3 py-1.5">
@@ -1136,7 +1141,17 @@ function OpportunityDetail({ id }: { id: string }) {
               Source ↗
             </a>
           )}
-          <DueCountdown dueDate={opp.response_deadline ?? opp.due_date} />
+          {(opp.response_deadline ?? opp.due_date) ? (
+            <DueCountdown dueDate={opp.response_deadline ?? opp.due_date} />
+          ) : (
+            <FieldStatusBadge
+              reason={
+                opp.relevance_reason && /R[13]/.test(opp.relevance_reason)
+                  ? "validation_cleared"
+                  : "no_source_data"
+              }
+            />
+          )}
         </div>
       </div>
 
@@ -1173,7 +1188,14 @@ function OpportunityDetail({ id }: { id: string }) {
               <MetaRow label="Agency" value={opp.agency_name ?? opp.agency ?? "---"} />
               {opp.office && <MetaRow label="Office" value={opp.office} />}
               {opp.contracting_office && <MetaRow label="Contracting" value={opp.contracting_office} />}
-              <MetaRow label="Value" value={formatMoney(opp.value)} mono />
+              {opp.value_max || opp.value_min || opp.value ? (
+                <MetaRow label="Value" value={formatMoney(opp.value_max ?? opp.value_min ?? opp.value ?? null)} mono />
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Value</span>
+                  <FieldStatusBadge reason="no_source_data" />
+                </div>
+              )}
               <MetaRow label="Solicitation" value={opp.solicitation_number ?? "---"} mono />
               <MetaRow label="Posted" value={opp.posted_at ? new Date(opp.posted_at).toLocaleDateString() : "---"} />
               <MetaRow label="Set-Aside" value={opp.set_aside ?? "None"} />
@@ -1530,12 +1552,19 @@ function CompetitiveIntelPanel({
             Competitive landscape not yet analyzed
           </p>
         )}
-        {incumbent && (
-          <div>
-            <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Incumbent</p>
+        <div>
+          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Incumbent</p>
+          {incumbent ? (
             <span className="text-xs text-foreground font-mono">{incumbent}</span>
-          </div>
-        )}
+          ) : (
+            <FieldStatusBadge
+              reason={
+                /* TODO: use opp.pwin?.incumbent_source once issue #793 ships */
+                "no_source_data"
+              }
+            />
+          )}
+        </div>
       </CardContent>
     </Card>
   );
