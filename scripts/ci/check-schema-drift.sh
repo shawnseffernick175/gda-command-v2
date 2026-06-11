@@ -11,8 +11,8 @@ set -euo pipefail
 # Requires: DATABASE_URL env var pointing at the staging (or CI) database.
 # --------------------------------------------------------------------------
 
-SCHEMA_OUT="dist/schema-snapshot.json"
-CHECKER="dist/scripts/check_schema_drift.js"
+SCHEMA_OUT="apps/backend-v3/dist/schema-snapshot.json"
+CHECKER="apps/backend-v3/dist/scripts/check_schema_drift.js"
 ALLOWLIST="scripts/ci/schema-drift-allowlist.txt"
 
 # --- Step 1: dump schema to JSON -----------------------------------------
