@@ -20,17 +20,24 @@ const US_STATE_CODES = new Set([
   'DC','PR','GU','VI','AS','MP',
 ]);
 
-const STATE_REGEX = /(?:^|,\s*)([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*$/;
-
 /**
  * Extract a 2-letter US state/territory code from free-form
  * place_of_performance text. Returns null when unparseable.
+ *
+ * Handles multiple formats:
+ *   "Norfolk, VA"              → "VA"
+ *   "Norfolk, VA 23501"        → "VA"
+ *   "Aberdeen, MD, 21005, US"  → "MD"  (GovTribe)
+ *   "VA"                       → "VA"
  */
 export function parseStateCode(pop: string | null | undefined): string | null {
   if (!pop || pop.trim().length === 0) return null;
-  const match = STATE_REGEX.exec(pop.trim().toUpperCase());
-  if (!match?.[1]) return null;
-  return US_STATE_CODES.has(match[1]) ? match[1] : null;
+  const segments = pop.toUpperCase().split(',').map((s) => s.trim());
+  for (const seg of segments) {
+    const token = seg.replace(/\s+\d{5}(?:-\d{4})?$/, '').trim();
+    if (token.length === 2 && US_STATE_CODES.has(token)) return token;
+  }
+  return null;
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────

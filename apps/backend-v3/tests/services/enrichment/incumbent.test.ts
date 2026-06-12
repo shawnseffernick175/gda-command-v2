@@ -327,4 +327,16 @@ describe('parseStateCode', () => {
   it('handles whitespace-padded input', () => {
     expect(parseStateCode('  Norfolk, VA  ')).toBe('VA');
   });
+
+  it('parses GovTribe format "Aberdeen, MD, 21005, US" → "MD"', () => {
+    expect(parseStateCode('Aberdeen, MD, 21005, US')).toBe('MD');
+  });
+
+  it('parses GovTribe format without zip "Norfolk, VA, US" → "VA"', () => {
+    expect(parseStateCode('Norfolk, VA, US')).toBe('VA');
+  });
+
+  it('returns null for "Multiple Locations, USA"', () => {
+    expect(parseStateCode('Multiple Locations, USA')).toBeNull();
+  });
 });
