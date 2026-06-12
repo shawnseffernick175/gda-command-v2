@@ -61,6 +61,14 @@ export interface CreditBudgetStatus {
   last_call_at: string | null;
 }
 
+export interface DailyBudgetStatus {
+  remainingCredits: number;
+  daysRemaining: number;
+  dailyAllowance: number;
+  todaySpent: number;
+  todayAvailable: number;
+}
+
 export interface McpToolCallResult<T = unknown> {
   data: T | null;
   decision: BudgetDecision;
@@ -133,6 +141,41 @@ export function getCycleCreditCap(): number {
 
 export function isCycleCapExceeded(): boolean {
   return cycleCreditsUsed >= CYCLE_CREDIT_CAP;
+}
+
+/* ── Daily-pace budget helpers ──────────────────────────────────────── */
+
+/**
+ * Pure computation of daily budget pacing. Exported for unit testing.
+ * All date math uses UTC.
+ */
+export function computeDailyBudget(
+  budget: number,
+  creditsUsed: number,
+  todaySpent: number,
+  now: Date = new Date(),
+): DailyBudgetStatus {
+  const remainingCredits = budget - creditsUsed;
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const dayOfMonth = now.getUTCDate();
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const daysRemaining = daysInMonth - dayOfMonth + 1;
+  const dailyAllowance = daysRemaining > 0 ? Math.max(0, Math.floor(remainingCredits / daysRemaining)) : 0;
+  const todayAvailable = Math.max(0, dailyAllowance - todaySpent);
+
+  return { remainingCredits, daysRemaining, dailyAllowance, todaySpent, todayAvailable };
+}
+
+export async function getDailyBudgetStatus(budgetStatus: CreditBudgetStatus): Promise<DailyBudgetStatus> {
+  const { rows } = await pool.query(
+    `SELECT COALESCE(SUM(cost_credits), 0) AS spent_today
+     FROM govtribe_credit_ledger
+     WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+       AND decision = 'called'`,
+  );
+  const todaySpent = Number(rows[0].spent_today);
+  return computeDailyBudget(budgetStatus.credits_budget, budgetStatus.credits_used, todaySpent);
 }
 
 /* ── Ledger + cache ────────────────────────────────────────────────── */
@@ -326,7 +369,25 @@ export async function mcpCallTool<T = unknown>(
     };
   }
 
-  if (budgetStatus.pct >= 95 && !critical) {
+  // Daily-pace-aware budget gate (replaces static pct thresholds)
+  const dailyStatus = await getDailyBudgetStatus(budgetStatus);
+  logger.info(
+    {
+      source: 'govtribe',
+      tool: toolName,
+      dailyAllowance: dailyStatus.dailyAllowance,
+      todaySpent: dailyStatus.todaySpent,
+      todayAvailable: dailyStatus.todayAvailable,
+      daysRemaining: dailyStatus.daysRemaining,
+      remainingCredits: dailyStatus.remainingCredits,
+      estimatedCost,
+      critical,
+    },
+    'govtribe_mcp_daily_budget_check',
+  );
+
+  // Hard stop: no credits left (even critical calls stop here)
+  if (dailyStatus.remainingCredits <= 0) {
     await logCreditUsage(toolName, estimatedCost, 'skipped_halted');
     const cached = await getCachedResponse(toolName, cacheId);
     return {
@@ -338,12 +399,13 @@ export async function mcpCallTool<T = unknown>(
     };
   }
 
-  if (budgetStatus.pct >= 80 && !critical) {
-    await logCreditUsage(toolName, estimatedCost, 'skipped_low_budget');
+  // Daily pace gate: today's allowance exhausted (non-critical only)
+  if (dailyStatus.todayAvailable < estimatedCost && !critical) {
+    await logCreditUsage(toolName, estimatedCost, 'skipped_halted');
     const cached = await getCachedResponse(toolName, cacheId);
     return {
       data: (cached as T) ?? null,
-      decision: 'skipped_low_budget',
+      decision: 'skipped_halted',
       from_cache: cached !== null,
       credits_used: 0,
       budget_status: budgetStatus,
