@@ -5,8 +5,6 @@ import { useFinancialsTrend } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
-// Pure CSS spark-line trend chart — no external charting library
-
 interface TrendPoint {
   source: string;
   period: string;
@@ -18,8 +16,6 @@ interface TrendPoint {
   ros: number;
 }
 
-// Human-readable labels for the actuals source-series. Falls back to the raw
-// source key for any series not enumerated here.
 const SOURCE_LABELS: Record<string, string> = {
   income_statement: "Income Statement",
   l1_actual: "Project Revenue (L1-ACTUAL)",
@@ -53,7 +49,11 @@ function SparkLine({ points, max, color }: { points: number[]; max: number; colo
   );
 }
 
-export function TrendChart() {
+export function TrendChart({
+  onPeriodClick,
+}: {
+  onPeriodClick?: (period: string) => void;
+}) {
   const { data, isLoading } = useFinancialsTrend();
 
   if (isLoading) {
@@ -66,14 +66,10 @@ export function TrendChart() {
     return <p className="text-xs text-muted-foreground py-4 text-center">No trend data yet</p>;
   }
 
-  // Sparklines track the Income Statement month series (the official actuals).
-  // Fall back to whatever month rows exist if that series is absent.
   const monthRows = items.filter((i) => !i.is_quarter);
   const sparkRows = monthRows.filter((i) => i.source === "income_statement");
   const spark = sparkRows.length > 0 ? sparkRows : monthRows;
 
-  // Group every row (months + quarter total) by source for the table, preserving
-  // the backend's chronological-then-quarter-last ordering within each group.
   const sources = Array.from(new Set(items.map((i) => i.source)));
   const grouped = sources.map((s) => ({
     source: s,
@@ -89,7 +85,7 @@ export function TrendChart() {
       label: "Orders",
       values: spark.map((i) => i.orders),
       max: maxOrders,
-      color: "#22d3ee", // allowed-hex — SVG stroke, no CSS token equivalent
+      color: "var(--color-gda-cyan)",
       textClass: "text-gda-cyan",
       format: formatMoney,
     },
@@ -97,7 +93,7 @@ export function TrendChart() {
       label: "Sales",
       values: spark.map((i) => i.sales),
       max: maxSales,
-      color: "#4ade80", // allowed-hex — SVG stroke, no CSS token equivalent
+      color: "var(--color-gda-green-muted)",
       textClass: "text-gda-green",
       format: formatMoney,
     },
@@ -105,11 +101,13 @@ export function TrendChart() {
       label: "EBIT",
       values: spark.map((i) => i.ebit),
       max: maxEbit,
-      color: "#f59e0b", // allowed-hex — SVG stroke, no CSS token equivalent
+      color: "var(--color-gda-amber)",
       textClass: "text-amber-400",
       format: formatMoney,
     },
   ];
+
+  const clickable = !!onPeriodClick;
 
   return (
     <div className="space-y-4">
@@ -122,10 +120,10 @@ export function TrendChart() {
           return (
             <div key={m.label} className="rounded border border-border bg-gda-panel p-3 space-y-1">
               <p className="text-[11px] text-muted-foreground">{m.label}</p>
-              <p className={cn("font-mono text-base font-bold", m.textClass)}>
+              <p className={cn("text-base font-bold", m.textClass)}>
                 {m.format(latest)}
               </p>
-              <div className={cn("text-[11px] font-mono", delta >= 0 ? "text-gda-green" : "text-red-400")}>
+              <div className={cn("text-[11px]", delta >= 0 ? "text-gda-green" : "text-red-400")}>
                 {delta >= 0 ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}% vs prior period
               </div>
               <SparkLine points={m.values} max={m.max} color={m.color} />
@@ -134,8 +132,13 @@ export function TrendChart() {
         })}
       </div>
 
-      {/* Full data table, grouped by source-series. Month rows show first, the
-          derived quarter total (is_quarter) is emphasized below its months. */}
+      {clickable && (
+        <p className="text-[11px] text-muted-foreground text-center">
+          Click a row to see period details
+        </p>
+      )}
+
+      {/* Full data table */}
       <div className="rounded border border-border overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
@@ -152,7 +155,7 @@ export function TrendChart() {
             {grouped.map((g) => (
               <Fragment key={g.source}>
                 <tr className="border-b border-border bg-gda-bg-base">
-                  <td colSpan={6} className="px-3 py-1.5 text-left font-mono text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <td colSpan={6} className="px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                     {sourceLabel(g.source)}
                   </td>
                 </tr>
@@ -160,20 +163,23 @@ export function TrendChart() {
                   <tr
                     key={`${g.source}-${item.period}`}
                     className={cn(
-                      "border-b border-border hover:bg-gda-panel/50",
+                      "border-b border-border",
                       item.is_quarter && "bg-gda-panel/40 font-bold",
+                      clickable && "cursor-pointer hover:bg-gda-panel/50",
+                      !clickable && "hover:bg-gda-panel/50",
                     )}
+                    onClick={clickable ? () => onPeriodClick(item.period) : undefined}
                   >
-                    <td className="px-3 py-2 text-left font-mono text-foreground">{item.period}</td>
+                    <td className="px-3 py-2 text-left text-foreground">{item.period}</td>
                     <td className="px-3 py-2 text-left text-gda-cyan">{formatMoney(item.orders)}</td>
                     <td className="px-3 py-2 text-left text-gda-green">{formatMoney(item.sales)}</td>
                     <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-amber-400" : "text-red-400")}>
                       {formatMoney(item.ebit)}
                     </td>
-                    <td className="px-3 py-2 text-left text-foreground font-mono">
+                    <td className="px-3 py-2 text-left text-foreground tabular-nums">
                       {item.gross_margin.toFixed(1)}%
                     </td>
-                    <td className="px-3 py-2 text-left text-foreground font-mono">
+                    <td className="px-3 py-2 text-left text-foreground tabular-nums">
                       {item.ros.toFixed(1)}%
                     </td>
                   </tr>

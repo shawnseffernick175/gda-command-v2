@@ -4,9 +4,11 @@ import { useFinancialsForecast } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
-// Pure CSS/SVG bar chart — no external charting library, no bundle cost
-
-export function ForecastChart() {
+export function ForecastChart({
+  onPeriodClick,
+}: {
+  onPeriodClick?: (period: string) => void;
+}) {
   const { data, isLoading } = useFinancialsForecast();
 
   if (isLoading) {
@@ -19,11 +21,12 @@ export function ForecastChart() {
     return <p className="text-xs text-muted-foreground py-4 text-center">No forecast data yet</p>;
   }
 
-  // Find max for scaling
   const maxVal = Math.max(
     ...items.flatMap((i) => [i.actual_orders ?? 0, i.plan_orders]),
     1,
   );
+
+  const clickable = !!onPeriodClick;
 
   return (
     <div className="w-full space-y-4">
@@ -35,8 +38,14 @@ export function ForecastChart() {
             ? Math.round(((item.actual_orders ?? 0) / maxVal) * 100)
             : 0;
           return (
-            <div key={item.period} className="flex flex-col items-center gap-1 flex-1 min-w-0 h-full justify-end">
-              {/* Bar pair */}
+            <div
+              key={item.period}
+              className={cn(
+                "flex flex-col items-center gap-1 flex-1 min-w-0 h-full justify-end",
+                clickable && "cursor-pointer",
+              )}
+              onClick={clickable ? () => onPeriodClick(item.period) : undefined}
+            >
               <div className="flex items-end gap-1 w-full justify-center h-40">
                 {/* Actual */}
                 <div className="relative flex flex-col justify-end w-5 h-full group">
@@ -65,7 +74,6 @@ export function ForecastChart() {
                   </div>
                 </div>
               </div>
-              {/* Period label */}
               <span className="text-[11px] text-muted-foreground text-center leading-tight">{item.period}</span>
             </div>
           );
@@ -82,9 +90,14 @@ export function ForecastChart() {
           <span className="w-3 h-3 rounded bg-muted/50 border border-border/40" />
           <span className="text-[11px] text-muted-foreground">Plan Orders</span>
         </div>
+        {clickable && (
+          <span className="text-[11px] text-muted-foreground ml-auto">
+            Click a bar to drill down
+          </span>
+        )}
       </div>
 
-      {/* Data table fallback */}
+      {/* Data table */}
       <div className="rounded border border-border overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
@@ -99,8 +112,16 @@ export function ForecastChart() {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.period} className="border-b border-border hover:bg-gda-panel/50">
-                <td className="px-3 py-2 text-left font-mono text-foreground">{item.period}</td>
+              <tr
+                key={item.period}
+                className={cn(
+                  "border-b border-border",
+                  clickable && "cursor-pointer hover:bg-gda-panel/50",
+                  !clickable && "hover:bg-gda-panel/50",
+                )}
+                onClick={clickable ? () => onPeriodClick(item.period) : undefined}
+              >
+                <td className="px-3 py-2 text-left text-foreground">{item.period}</td>
                 <td className="px-3 py-2 text-left text-foreground">{formatMoney(item.plan_orders)}</td>
                 <td className={cn("px-3 py-2 text-left", item.has_actuals ? "text-gda-cyan" : "text-muted-foreground")}>
                   {item.has_actuals ? formatMoney(item.actual_orders ?? 0) : "—"}
@@ -111,7 +132,7 @@ export function ForecastChart() {
                 </td>
                 <td className="px-3 py-2 text-left">
                   <span className={cn(
-                    "rounded border px-1.5 py-0.5 text-[11px] font-mono",
+                    "rounded border px-1.5 py-0.5 text-[11px]",
                     item.has_actuals ? "border-gda-green/40 text-gda-green" : "border-border text-muted-foreground"
                   )}>
                     {item.has_actuals ? "actuals" : "plan only"}
