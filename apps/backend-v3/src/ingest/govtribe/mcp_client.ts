@@ -171,7 +171,8 @@ export async function getDailyBudgetStatus(budgetStatus: CreditBudgetStatus): Pr
   const { rows } = await pool.query(
     `SELECT COALESCE(SUM(cost_credits), 0) AS spent_today
      FROM govtribe_credit_ledger
-     WHERE created_at >= date_trunc('day', NOW())`,
+     WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+       AND decision = 'called'`,
   );
   const todaySpent = Number(rows[0].spent_today);
   return computeDailyBudget(budgetStatus.credits_budget, budgetStatus.credits_used, todaySpent);
