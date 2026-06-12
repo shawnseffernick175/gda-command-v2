@@ -82,12 +82,12 @@ export async function runIncumbentEnrichment(): Promise<EnrichmentReport> {
       solicitation_number: string | null;
       naics: string | null;
       agency: string | null;
-      place_of_performance_state: string | null;
+      place_of_performance: string | null;
       value_min: string | null;
       value_max: string | null;
     }>(
       `SELECT id, solicitation_number, naics, agency,
-              place_of_performance_state,
+              place_of_performance,
               value_min::text, value_max::text
        FROM opportunities
        WHERE deleted_at IS NULL
@@ -112,7 +112,7 @@ export async function runIncumbentEnrichment(): Promise<EnrichmentReport> {
         solicitation_number: row.solicitation_number,
         naics: row.naics,
         agency: row.agency,
-        place_of_performance_state: row.place_of_performance_state,
+        place_of_performance: row.place_of_performance,
         value_min: row.value_min != null ? Number(row.value_min) : null,
         value_max: row.value_max != null ? Number(row.value_max) : null,
       };

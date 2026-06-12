@@ -9,6 +9,37 @@ import { request } from 'undici';
 import { logger } from '../../lib/logger.js';
 import { searchFpdsAwards, type FpdsSearchParams } from '../../integrations/fpds/client.js';
 
+// ── State code parser ─────────────────────────────────────────────────────────
+
+const US_STATE_CODES = new Set([
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  'DC','PR','GU','VI','AS','MP',
+]);
+
+/**
+ * Extract a 2-letter US state/territory code from free-form
+ * place_of_performance text. Returns null when unparseable.
+ *
+ * Handles multiple formats:
+ *   "Norfolk, VA"              → "VA"
+ *   "Norfolk, VA 23501"        → "VA"
+ *   "Aberdeen, MD, 21005, US"  → "MD"  (GovTribe)
+ *   "VA"                       → "VA"
+ */
+export function parseStateCode(pop: string | null | undefined): string | null {
+  if (!pop || pop.trim().length === 0) return null;
+  const segments = pop.toUpperCase().split(',').map((s) => s.trim());
+  for (const seg of segments) {
+    const token = seg.replace(/\s+\d{5}(?:-\d{4})?$/, '').trim();
+    if (token.length === 2 && US_STATE_CODES.has(token)) return token;
+  }
+  return null;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type IncumbentConfidence = 'high' | 'medium' | 'low';
@@ -24,7 +55,7 @@ export interface OpportunityForIncumbent {
   solicitation_number: string | null;
   naics: string | null;
   agency: string | null;
-  place_of_performance_state: string | null;
+  place_of_performance: string | null;
   value_min: number | null;
   value_max: number | null;
 }
@@ -122,19 +153,18 @@ function buildUSASpendingFilters(
       if (!opp.solicitation_number) return null;
       filters['keyword'] = opp.solicitation_number;
       break;
-    case 'naics_agency_pop':
+    case 'naics_agency_pop': {
       if (!opp.naics || !opp.agency) return null;
       filters['naics_codes'] = [opp.naics];
-      // Agency search uses keyword since API filters are limited
       filters['keyword'] = opp.agency;
-      if (opp.place_of_performance_state) {
+      const usaState = parseStateCode(opp.place_of_performance);
+      if (usaState) {
         filters['place_of_performance_locations'] = [
-          { country: 'USA', state: opp.place_of_performance_state },
+          { country: 'USA', state: usaState },
         ];
-      } else {
-        return null;
       }
       break;
+    }
     case 'naics_agency_value':
       if (!opp.naics || !opp.agency) return null;
       filters['naics_codes'] = [opp.naics];
@@ -215,16 +245,16 @@ async function searchFpds(
       if (!opp.solicitation_number) return null;
       params.solicitationId = opp.solicitation_number;
       break;
-    case 'naics_agency_pop':
+    case 'naics_agency_pop': {
       if (!opp.naics || !opp.agency) return null;
       params.naicsCode = opp.naics;
       params.agency = opp.agency;
-      if (opp.place_of_performance_state) {
-        params.placeOfPerformanceState = opp.place_of_performance_state;
-      } else {
-        return null;
+      const fpdsState = parseStateCode(opp.place_of_performance);
+      if (fpdsState) {
+        params.placeOfPerformanceState = fpdsState;
       }
       break;
+    }
     case 'naics_agency_value':
       if (!opp.naics || !opp.agency) return null;
       params.naicsCode = opp.naics;
