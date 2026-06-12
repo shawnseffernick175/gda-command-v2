@@ -1,14 +1,23 @@
 /**
- * CI guard: schema drift detector
+ * CI guard: schema drift detector (v2 — bare column detection)
  *
  * Scans .ts/.tsx source files for SQL column/table references and
  * cross-references them against a schema snapshot JSON file.
+ *
+ * v2 adds bare-column detection: when a query has a single unambiguous
+ * FROM table (no JOINs, no subqueries), bare identifiers in SELECT and
+ * WHERE clauses are validated against that table's columns.
  *
  * Usage:
  *   node dist/scripts/check_schema_drift.js \
  *     --schema dist/schema-snapshot.json \
  *     --scan apps/backend-v3/src packages/frontend-v3/src \
  *     --allowlist scripts/ci/schema-drift-allowlist.txt
+ *
+ * Allowlist formats:
+ *   table                         — suppress all refs to a table
+ *   table.column                  — suppress a specific qualified ref
+ *   bare-column:table:column      — suppress a bare column ref for a table
  */
 
 import fs from 'node:fs';
@@ -91,16 +100,29 @@ function loadSchema(filePath: string): SchemaMap {
 // Allowlist loader
 // ---------------------------------------------------------------------------
 
-function loadAllowlist(filePath: string): Set<string> {
-  const entries = new Set<string>();
-  if (!fs.existsSync(filePath)) return entries;
+interface Allowlists {
+  general: Set<string>;
+  bareColumn: Set<string>;
+}
+
+function loadAllowlist(filePath: string): Allowlists {
+  const general = new Set<string>();
+  const bareColumn = new Set<string>();
+  if (!fs.existsSync(filePath)) return { general, bareColumn };
   const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
   for (const raw of lines) {
     const line = raw.trim();
     if (line === '' || line.startsWith('#')) continue;
-    entries.add(line.toLowerCase());
+    const lower = line.toLowerCase();
+    if (lower.startsWith('bare-column:')) {
+      // bare-column:table:column → "table:column"
+      const rest = lower.slice('bare-column:'.length);
+      bareColumn.add(rest);
+    } else {
+      general.add(lower);
+    }
   }
-  return entries;
+  return { general, bareColumn };
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +229,203 @@ interface Ref {
   table: string;
   column: string | null;
   line: number;
+  bare?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Bare-column detection helpers (v2)
+// ---------------------------------------------------------------------------
+
+/** Detect whether the query is single-table (no JOINs, no subqueries). */
+const JOIN_RE = /\bJOIN\b/i;
+const SUBQUERY_RE = /\(\s*SELECT\b/i;
+const FROM_TABLE_RE = /\bFROM\s+([a-z_][a-z0-9_]*)\b/gi;
+
+function getSingleFromTable(
+  sql: string,
+  schema: SchemaMap,
+): string | null {
+  if (JOIN_RE.test(sql)) return null;
+  if (SUBQUERY_RE.test(sql)) return null;
+
+  FROM_TABLE_RE.lastIndex = 0;
+  const tables: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = FROM_TABLE_RE.exec(sql)) !== null) {
+    const t = m[1].toLowerCase();
+    if (SQL_NOISE.has(t)) continue;
+    if (t === '__interp__') continue;
+    tables.push(t);
+  }
+
+  if (tables.length !== 1) return null;
+  const table = tables[0];
+  return table in schema ? table : null;
+}
+
+/** Bare identifier pattern */
+const BARE_IDENT_RE = /^[a-z_][a-z0-9_]*$/;
+
+/**
+ * Tokenize a SELECT projection list by commas, respecting parenthesis depth.
+ * Returns individual projection expressions.
+ */
+function tokenizeProjection(projectionStr: string): string[] {
+  const tokens: string[] = [];
+  let depth = 0;
+  let current = '';
+
+  for (const ch of projectionStr) {
+    if (ch === '(') {
+      depth++;
+      current += ch;
+    } else if (ch === ')') {
+      depth--;
+      current += ch;
+    } else if (ch === ',' && depth === 0) {
+      tokens.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) tokens.push(current.trim());
+  return tokens;
+}
+
+/**
+ * Extract bare identifiers from a single projection expression.
+ * Strips casts (::type), aliases (AS name), and extracts identifiers
+ * from inside function wrappers.
+ */
+function extractBareIdents(expr: string): string[] {
+  // Skip "*"
+  if (expr.trim() === '*') return [];
+
+  // Strip trailing alias: remove "AS identifier" at the end
+  let cleaned = expr.replace(/\bAS\s+[a-z_][a-z0-9_]*\s*$/i, '').trim();
+
+  // Strip type casts (::type, ::type[])
+  cleaned = cleaned.replace(/::[a-z_][a-z0-9_]*(\[\])?/gi, '');
+
+  // If this is a function call like COUNT(col), COALESCE(a, b), extract inner args
+  const funcMatch = cleaned.match(/^[a-z_][a-z0-9_]*\s*\((.*)\)\s*$/i);
+  if (funcMatch) {
+    const inner = funcMatch[1].trim();
+    // Handle COUNT(*), etc.
+    if (inner === '*') return [];
+    // Recursively tokenize inner args
+    const innerTokens = tokenizeProjection(inner);
+    const idents: string[] = [];
+    for (const t of innerTokens) {
+      idents.push(...extractBareIdents(t));
+    }
+    return idents;
+  }
+
+  // If remaining is a simple bare identifier, return it
+  const trimmed = cleaned.trim().toLowerCase();
+  if (BARE_IDENT_RE.test(trimmed)) {
+    return [trimmed];
+  }
+
+  return [];
+}
+
+/** Extract the SELECT projection string (between SELECT and FROM). */
+function extractSelectProjection(sql: string): string | null {
+  const match = sql.match(/\bSELECT\s+(DISTINCT\s+)?(.*?)\bFROM\b/is);
+  if (!match) return null;
+  return match[2].trim();
+}
+
+/** Extract WHERE clause (between WHERE and ORDER BY / GROUP BY / LIMIT / end). */
+function extractWhereClause(sql: string): string | null {
+  const match = sql.match(
+    /\bWHERE\b\s+(.*?)(?:\bORDER\s+BY\b|\bGROUP\s+BY\b|\bLIMIT\b|\bHAVING\b|\bRETURNING\b|$)/is,
+  );
+  if (!match) return null;
+  return match[1].trim();
+}
+
+/**
+ * Extract bare column identifiers from a WHERE clause.
+ * Looks for patterns: <ident> <op> and AND/OR <ident> <op>
+ */
+function extractWhereIdents(whereStr: string): string[] {
+  // Strip type casts
+  let cleaned = whereStr.replace(/::[a-z_][a-z0-9_]*(\[\])?/gi, '');
+  // Strip string literals to avoid false positives
+  cleaned = cleaned.replace(/'[^']*'/g, ' __STR__ ');
+  // Strip JSON path operators (->>, ->) and their operands
+  cleaned = cleaned.replace(/->>?\s*'[^']*'/g, ' ');
+  cleaned = cleaned.replace(/->>?\s*[a-z_][a-z0-9_]*/gi, ' ');
+
+  const idents: string[] = [];
+  // Match bare identifiers that appear before an operator or IS
+  const whereIdentRe =
+    /\b([a-z_][a-z0-9_]*)\s*(?:=|!=|<>|>=|<=|>|<|\bIS\b|\bIN\b|\bLIKE\b|\bILIKE\b|\bBETWEEN\b|\bSIMILAR\b)/gi;
+  let wm: RegExpExecArray | null;
+  while ((wm = whereIdentRe.exec(cleaned)) !== null) {
+    const ident = wm[1].toLowerCase();
+    if (ident === '__str__' || ident === '__interp__') continue;
+    if (BARE_IDENT_RE.test(ident) && !ident.includes('.')) {
+      idents.push(ident);
+    }
+  }
+  return idents;
+}
+
+/**
+ * Extract bare-column refs from a single-table query.
+ * Returns Ref[] with bare=true for each bare identifier that doesn't match
+ * the table's column list.
+ */
+function extractBareColumnRefs(
+  sql: string,
+  lineNum: number,
+  schema: SchemaMap,
+): Ref[] {
+  const table = getSingleFromTable(sql, schema);
+  if (!table) return [];
+
+  const refs: Ref[] = [];
+  const seen = new Set<string>();
+
+  // --- SELECT clause bare columns ---
+  const projection = extractSelectProjection(sql);
+  if (projection && projection.trim() !== '*') {
+    const tokens = tokenizeProjection(projection);
+    for (const tok of tokens) {
+      const idents = extractBareIdents(tok);
+      for (const ident of idents) {
+        if (SQL_NOISE.has(ident)) continue;
+        if (ident === '__interp__') continue;
+        const key = `bare:${table}.${ident}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          refs.push({ table, column: ident, line: lineNum, bare: true });
+        }
+      }
+    }
+  }
+
+  // --- WHERE clause bare columns ---
+  const whereClause = extractWhereClause(sql);
+  if (whereClause) {
+    const whereIdents = extractWhereIdents(whereClause);
+    for (const ident of whereIdents) {
+      if (SQL_NOISE.has(ident)) continue;
+      if (ident === '__interp__') continue;
+      const key = `bare:${table}.${ident}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        refs.push({ table, column: ident, line: lineNum, bare: true });
+      }
+    }
+  }
+
+  return refs;
 }
 
 /**
@@ -218,6 +437,8 @@ interface Ref {
  *   `pi.opportunity_id`) are ignored — they are not schema references.
  * - FROM/JOIN/INTO/UPDATE table: flag unknown tables (but skip short aliases
  *   ≤2 chars and noise words).
+ * - (v2) Bare column refs in single-table queries: validated against the
+ *   FROM table's column list.
  */
 function extractRefsFromSql(
   sql: string,
@@ -244,10 +465,6 @@ function extractRefsFromSql(
   }
 
   // 2. table references after FROM / JOIN / INTO / UPDATE
-  //    Only flag names that look like real DB tables: known schema tables,
-  //    or snake_case identifiers (contain underscore). Single English words
-  //    like "the", "cache", "analysis" are skipped — they appear in LLM
-  //    prompt template literals that also contain SQL keywords.
   TABLE_AFTER_KEYWORD.lastIndex = 0;
   while ((m = TABLE_AFTER_KEYWORD.exec(sql)) !== null) {
     const table = m[1].toLowerCase();
@@ -263,6 +480,10 @@ function extractRefsFromSql(
       refs.push({ table, column: null, line: lineNum });
     }
   }
+
+  // 3. (v2) Bare column refs in single-table queries
+  const bareRefs = extractBareColumnRefs(sql, lineNum, schema);
+  refs.push(...bareRefs);
 
   return refs;
 }
@@ -329,7 +550,7 @@ function scanFile(filePath: string, schema: SchemaMap): Ref[] {
 function checkRefs(
   refs: Ref[],
   schema: SchemaMap,
-  allowlist: Set<string>,
+  allowlists: Allowlists,
   filePath: string,
 ): Violation[] {
   const violations: Violation[] = [];
@@ -338,10 +559,17 @@ function checkRefs(
     const table = ref.table;
     const col = ref.column;
 
-    if (allowlist.has(table)) continue;
-    if (col && allowlist.has(`${table}.${col}`)) continue;
+    if (allowlists.general.has(table)) continue;
+    if (col && allowlists.general.has(`${table}.${col}`)) continue;
+
+    // bare-column allowlist: "table:column"
+    if (ref.bare && col && allowlists.bareColumn.has(`${table}:${col}`)) {
+      continue;
+    }
 
     if (!(table in schema)) {
+      // bare refs always have a known table (enforced in extractBareColumnRefs)
+      if (ref.bare) continue;
       const reference = col ? `${table}.${col}` : table;
       violations.push({
         file: filePath,
@@ -353,10 +581,11 @@ function checkRefs(
     }
 
     if (col && !schema[table].includes(col)) {
+      const reference = ref.bare ? `${col} (bare ref → ${table})` : `${table}.${col}`;
       violations.push({
         file: filePath,
         line: ref.line,
-        reference: `${table}.${col}`,
+        reference,
         reason: 'unknown_column',
       });
     }
@@ -364,6 +593,25 @@ function checkRefs(
 
   return violations;
 }
+
+// ---------------------------------------------------------------------------
+// Exports for testing
+// ---------------------------------------------------------------------------
+
+export {
+  extractRefsFromSql,
+  extractBareColumnRefs,
+  extractBareIdents,
+  extractSelectProjection,
+  extractWhereIdents,
+  getSingleFromTable,
+  tokenizeProjection,
+  checkRefs,
+  loadAllowlist,
+  stripInterpolations,
+  SQL_NOISE,
+};
+export type { SchemaMap, Violation, Ref, Allowlists };
 
 // ---------------------------------------------------------------------------
 // Main
@@ -380,9 +628,9 @@ function main(): void {
   const tableCount = Object.keys(schema).length;
   console.log(`Loaded schema: ${tableCount} tables from ${schemaPath}`);
 
-  const allowlist = loadAllowlist(allowlistPath);
+  const allowlists = loadAllowlist(allowlistPath);
   console.log(
-    `Loaded allowlist: ${allowlist.size} entries from ${allowlistPath}`,
+    `Loaded allowlist: ${allowlists.general.size + allowlists.bareColumn.size} entries from ${allowlistPath}`,
   );
 
   const files = collectFiles(scanDirs);
@@ -393,7 +641,7 @@ function main(): void {
   const allViolations: Violation[] = [];
   for (const file of files) {
     const refs = scanFile(file, schema);
-    const violations = checkRefs(refs, schema, allowlist, file);
+    const violations = checkRefs(refs, schema, allowlists, file);
     allViolations.push(...violations);
   }
 
@@ -417,4 +665,10 @@ function main(): void {
   process.exit(0);
 }
 
-main();
+// Only run main when executed directly (not when imported for tests)
+const isDirectRun =
+  process.argv[1]?.endsWith('check_schema_drift.js') ||
+  process.argv[1]?.endsWith('check_schema_drift.ts');
+if (isDirectRun) {
+  main();
+}
