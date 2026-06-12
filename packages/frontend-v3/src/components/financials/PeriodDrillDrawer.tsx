@@ -6,7 +6,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { usePeriodDetail } from "@/hooks/use-financials";
+import {
+  usePeriodDetail,
+  useCostDetail,
+  useIndirectExpenses,
+} from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +24,8 @@ export function PeriodDrillDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const { data, isLoading } = usePeriodDetail(open ? period : null);
+  const { data: costData } = useCostDetail(open ? period : null);
+  const { data: sieData } = useIndirectExpenses(open ? period : null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,6 +69,120 @@ export function PeriodDrillDrawer({
                   actuals={data.actuals[0]}
                   plan={data.plans[0]}
                 />
+              </div>
+            )}
+
+            {/* Cost Detail rows for this period */}
+            {costData && costData.items.length > 0 && (
+              <div>
+                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                  Cost Detail (TGT vs ACT)
+                </h3>
+                <div className="rounded border border-border overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+                        <th className="px-3 py-2 text-left font-medium">
+                          Element
+                        </th>
+                        <th className="px-3 py-2 text-left font-medium">
+                          Pool
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Target
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Actual
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Variance
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {costData.items.map((r) => (
+                        <tr
+                          key={`${r.cost_element}-${r.pool}`}
+                          className="border-b border-border"
+                        >
+                          <td className="px-3 py-1.5 text-foreground">
+                            {r.cost_element}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {r.pool}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-muted-foreground tabular-nums">
+                            {formatMoney(r.target_amount)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-foreground tabular-nums">
+                            {formatMoney(r.actual_amount)}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-3 py-1.5 text-right tabular-nums",
+                              r.variance_amount > 0
+                                ? "text-gda-red"
+                                : "text-gda-green-muted",
+                            )}
+                          >
+                            {formatMoney(r.variance_amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Indirect Expense rows for this period */}
+            {sieData && sieData.items.length > 0 && (
+              <div>
+                <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                  Indirect Expenses (SIE)
+                </h3>
+                <div className="rounded border border-border overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+                        <th className="px-3 py-2 text-left font-medium">
+                          Pool
+                        </th>
+                        <th className="px-3 py-2 text-left font-medium">
+                          Account
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Actual
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Budget
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sieData.items.map((r) => (
+                        <tr
+                          key={`${r.pool}-${r.account_code ?? ""}-${r.account_name}`}
+                          className="border-b border-border"
+                        >
+                          <td className="px-3 py-1.5 text-foreground font-medium">
+                            {r.pool}
+                          </td>
+                          <td className="px-3 py-1.5 text-muted-foreground">
+                            {r.account_code ? `${r.account_code} ` : ""}
+                            {r.account_name}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-foreground tabular-nums">
+                            {formatMoney(r.current_period_actual)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-muted-foreground tabular-nums">
+                            {formatMoney(r.current_period_budget)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 

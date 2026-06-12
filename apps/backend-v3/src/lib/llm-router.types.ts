@@ -37,6 +37,9 @@ export type Task =
   | 'vault_document_parse'
   | 'vault_smart_route'
   | 'financial_statement_extract'
+  | 'balance_sheet_extract'
+  | 'cost_detail_extract'
+  | 'sie_extract'
   | 'digest_lead'
   | 'competitor_contact_discovery'
   | 'partner_contact_discovery';
@@ -383,6 +386,73 @@ export interface VaultSmartRouteOutput {
 export interface FinancialStatementExtractInput {
   filename: string;
   extracted_text: string;
+}
+
+export interface BalanceSheetExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface BalanceSheetExtractOutput {
+  is_balance_sheet: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    cash: number;
+    accounts_receivable: number;
+    total_current_assets: number;
+    total_assets: number;
+    accounts_payable: number;
+    total_current_liabilities: number;
+    total_liabilities: number;
+    total_equity: number;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
+export interface CostDetailExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface CostDetailExtractOutput {
+  is_cost_detail: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number;
+    cost_element: string;
+    pool: string;
+    target_amount: number;
+    actual_amount: number;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
+export interface SieExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface SieExtractOutput {
+  is_sie: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number;
+    pool: string;
+    account_code: string | null;
+    account_name: string;
+    current_period_actual: number;
+    current_period_budget: number;
+    ytd_actual: number;
+    ytd_budget: number;
+  }[];
+  notes: string;
+  model_used: string;
 }
 
 export interface FinancialStatementExtractOutput {
@@ -739,6 +809,9 @@ export interface TaskInputMap {
   vault_document_parse: VaultDocumentParseInput;
   vault_smart_route: VaultSmartRouteInput;
   financial_statement_extract: FinancialStatementExtractInput;
+  balance_sheet_extract: BalanceSheetExtractInput;
+  cost_detail_extract: CostDetailExtractInput;
+  sie_extract: SieExtractInput;
   digest_lead: DigestLeadInput;
   competitor_contact_discovery: CompetitorContactDiscoveryInput;
   partner_contact_discovery: PartnerContactDiscoveryInput;
@@ -762,6 +835,9 @@ export interface TaskOutputMap {
   vault_document_parse: VaultDocumentParseOutput;
   vault_smart_route: VaultSmartRouteOutput;
   financial_statement_extract: FinancialStatementExtractOutput;
+  balance_sheet_extract: BalanceSheetExtractOutput;
+  cost_detail_extract: CostDetailExtractOutput;
+  sie_extract: SieExtractOutput;
   digest_lead: DigestLeadOutput;
   competitor_contact_discovery: CompetitorContactDiscoveryOutput;
   partner_contact_discovery: PartnerContactDiscoveryOutput;

@@ -2,7 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
-import type { PeriodDetailData } from "@/lib/types";
+import type {
+  PeriodDetailData,
+  CostDetailItem,
+  IndirectExpenseItem,
+  IndirectExpenseTrendItem,
+} from "@/lib/types";
 
 export interface ForecastItem {
   period: string;
@@ -36,6 +41,50 @@ export function useFinancialsTrend() {
   return useQuery({
     queryKey: ["financials", "trend"],
     queryFn: () => apiGet<{ items: TrendItem[] }>("/v3/financials/trend"),
+    retry: false,
+  });
+}
+
+export function useCostDetail(period?: string | null) {
+  return useQuery({
+    queryKey: ["financials", "cost-detail", period ?? "all"],
+    queryFn: () => {
+      const qs = period ? `?period=${encodeURIComponent(period)}` : "";
+      return apiGet<{ items: CostDetailItem[] }>(`/v3/financials/cost-detail${qs}`);
+    },
+    retry: false,
+  });
+}
+
+export function useCostDetailTrend() {
+  return useQuery({
+    queryKey: ["financials", "cost-detail", "trend"],
+    queryFn: () =>
+      apiGet<{ items: CostDetailItem[] }>("/v3/financials/cost-detail/trend"),
+    retry: false,
+  });
+}
+
+export function useIndirectExpenses(period?: string | null) {
+  return useQuery({
+    queryKey: ["financials", "indirect-expenses", period ?? "all"],
+    queryFn: () => {
+      const qs = period ? `?period=${encodeURIComponent(period)}` : "";
+      return apiGet<{ items: IndirectExpenseItem[] }>(
+        `/v3/financials/indirect-expenses${qs}`,
+      );
+    },
+    retry: false,
+  });
+}
+
+export function useIndirectExpensesTrend() {
+  return useQuery({
+    queryKey: ["financials", "indirect-expenses", "trend"],
+    queryFn: () =>
+      apiGet<{ items: IndirectExpenseTrendItem[] }>(
+        "/v3/financials/indirect-expenses/trend",
+      ),
     retry: false,
   });
 }

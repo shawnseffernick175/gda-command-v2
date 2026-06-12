@@ -406,6 +406,45 @@ export interface BalanceSheetData {
   trend: BalanceSheetRow[];
 }
 
+/* ── Cost Detail (TGT vs ACT) ─────────────────────────────────── */
+
+export interface CostDetailItem {
+  period: string;
+  fiscal_year: number;
+  quarter: number;
+  cost_element: string;
+  pool: string;
+  target_amount: number;
+  actual_amount: number;
+  variance_amount: number;
+}
+
+/* ── Indirect Expenses (SIE) ──────────────────────────────────── */
+
+export interface IndirectExpenseItem {
+  period: string;
+  fiscal_year: number;
+  quarter: number;
+  pool: string;
+  account_code: string | null;
+  account_name: string;
+  current_period_actual: number;
+  current_period_budget: number;
+  ytd_actual: number;
+  ytd_budget: number;
+}
+
+export interface IndirectExpenseTrendItem {
+  period: string;
+  fiscal_year: number;
+  quarter: number;
+  pool: string;
+  period_actual: number;
+  period_budget: number;
+  ytd_actual: number;
+  ytd_budget: number;
+}
+
 /* ── Period Detail (drill-down) ───────────────────────────────── */
 
 export interface PeriodDetailMetrics {
