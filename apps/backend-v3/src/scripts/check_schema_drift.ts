@@ -356,7 +356,10 @@ function extractWhereIdents(whereStr: string): string[] {
   // Strip type casts
   let cleaned = whereStr.replace(/::[a-z_][a-z0-9_]*(\[\])?/gi, '');
   // Strip string literals to avoid false positives
-  cleaned = cleaned.replace(/'[^']*'/g, '__STR__');
+  cleaned = cleaned.replace(/'[^']*'/g, ' __STR__ ');
+  // Strip JSON path operators (->>, ->) and their operands
+  cleaned = cleaned.replace(/->>?\s*'[^']*'/g, ' ');
+  cleaned = cleaned.replace(/->>?\s*[a-z_][a-z0-9_]*/gi, ' ');
 
   const idents: string[] = [];
   // Match bare identifiers that appear before an operator or IS
@@ -365,6 +368,7 @@ function extractWhereIdents(whereStr: string): string[] {
   let wm: RegExpExecArray | null;
   while ((wm = whereIdentRe.exec(cleaned)) !== null) {
     const ident = wm[1].toLowerCase();
+    if (ident === '__str__' || ident === '__interp__') continue;
     if (BARE_IDENT_RE.test(ident) && !ident.includes('.')) {
       idents.push(ident);
     }

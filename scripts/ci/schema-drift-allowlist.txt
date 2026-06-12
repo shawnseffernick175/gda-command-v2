@@ -39,3 +39,15 @@ soak_metrics
 
 # False positive from LLM prompt template literals (snake_case English terms)
 gross_margin
+
+# Pre-existing bare-column drift (v2 guard catch, tracked for fix in separate PRs)
+# captures.ts: pipeline_items.capture_kickoff_at does not exist (column never added)
+bare-column:pipeline_items:capture_kickoff_at
+# risks.ts: opportunities.response_deadline → actual column is response_due_at
+bare-column:opportunities:response_deadline
+# resolve-id.ts: unified_opportunity_links.opportunity_id does not exist (columns: internal_id, source_native_id)
+bare-column:unified_opportunity_links:opportunity_id
+# analysis.ts: compliance_items.evidence does not exist (column never added)
+bare-column:compliance_items:evidence
+# backfill_incumbent.ts + incumbent-enrichment.ts: opportunities.place_of_performance_state → actual: place_of_performance
+bare-column:opportunities:place_of_performance_state

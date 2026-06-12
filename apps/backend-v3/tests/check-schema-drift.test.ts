@@ -185,6 +185,16 @@ describe('extractWhereIdents', () => {
     const result = extractWhereIdents('value_min::int > 0');
     expect(result).toContain('value_min');
   });
+
+  it('does not emit __str__ placeholder as an identifier', () => {
+    const result = extractWhereIdents("settings->>'briefing_auto_delivery' = 'true'");
+    expect(result).not.toContain('__str__');
+  });
+
+  it('does not emit __interp__ placeholder as an identifier', () => {
+    const result = extractWhereIdents('status = __INTERP__');
+    expect(result).not.toContain('__interp__');
+  });
 });
 
 // ---------------------------------------------------------------------------
