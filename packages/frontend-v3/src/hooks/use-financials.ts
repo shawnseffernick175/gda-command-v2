@@ -52,6 +52,7 @@ export function useCostDetail(period?: string | null) {
       const qs = period ? `?period=${encodeURIComponent(period)}` : "";
       return apiGet<{ items: CostDetailItem[] }>(`/v3/financials/cost-detail${qs}`);
     },
+    enabled: period !== null && period !== undefined,
     retry: false,
   });
 }
@@ -74,6 +75,7 @@ export function useIndirectExpenses(period?: string | null) {
         `/v3/financials/indirect-expenses${qs}`,
       );
     },
+    enabled: period !== null && period !== undefined,
     retry: false,
   });
 }

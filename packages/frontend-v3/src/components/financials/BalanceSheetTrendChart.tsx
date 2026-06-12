@@ -21,13 +21,13 @@ echarts.use([
 ]);
 
 const SERIES_CONFIG = [
-  { key: "cash" as const, label: "Cash", color: "#01696F" },
+  { key: "cash" as const, label: "Cash", color: "var(--color-fin-teal)" },
   {
     key: "accounts_receivable" as const,
     label: "Accounts Receivable",
-    color: "#7A7974",
+    color: "var(--color-fin-stone)",
   },
-  { key: "total_assets" as const, label: "Total Assets", color: "#28251D" },
+  { key: "total_assets" as const, label: "Total Assets", color: "var(--color-fin-ink)" },
 ];
 
 export function BalanceSheetTrendChart() {
@@ -68,7 +68,7 @@ export function BalanceSheetTrendChart() {
     legend: {
       data: SERIES_CONFIG.map((c) => c.label),
       bottom: 0,
-      textStyle: { color: "#7A7974", fontSize: 11 },
+      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
     },
     grid: {
       left: 60,
@@ -79,17 +79,17 @@ export function BalanceSheetTrendChart() {
     xAxis: {
       type: "category" as const,
       data: periods,
-      axisLabel: { color: "#7A7974", fontSize: 11 },
-      axisLine: { lineStyle: { color: "#D4D1CA" } },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     yAxis: {
       type: "value" as const,
       axisLabel: {
-        color: "#7A7974",
+        color: "var(--color-fin-stone)",
         fontSize: 11,
         formatter: (v: number) => formatMoney(v),
       },
-      splitLine: { lineStyle: { color: "#D4D1CA", type: "dashed" as const } },
+      splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     series,
   };

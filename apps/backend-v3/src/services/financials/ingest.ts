@@ -505,7 +505,7 @@ export async function ingestSieRows(
             current_period_actual, current_period_budget, ytd_actual, ytd_budget,
             source, source_doc_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'sie', $11)
-         ON CONFLICT (source, period, pool, account_code, account_name)
+         ON CONFLICT (source, period, pool, COALESCE(account_code, ''), account_name)
          DO UPDATE SET
            current_period_actual = EXCLUDED.current_period_actual,
            current_period_budget = EXCLUDED.current_period_budget,

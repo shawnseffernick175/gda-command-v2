@@ -21,10 +21,12 @@ echarts.use([
 ]);
 
 const POOL_COLORS: Record<string, string> = {
-  Fringe: "#01696F",
-  OH: "#7A7974",
-  "G&A": "#A12C7B",
+  Fringe: "var(--color-fin-teal)",
+  OH: "var(--color-fin-stone)",
+  "G&A": "var(--color-fin-plum)",
 };
+
+const FALLBACK_COLOR = "var(--color-fin-sand)";
 
 export function IndirectExpensePanel() {
   const { data, isLoading } = useIndirectExpensesTrend();
@@ -54,7 +56,7 @@ export function IndirectExpensePanel() {
       return item?.period_actual ?? 0;
     }),
     itemStyle: {
-      color: POOL_COLORS[pool] ?? "#D4D1CA",
+      color: POOL_COLORS[pool] ?? FALLBACK_COLOR,
     },
   }));
 
@@ -66,7 +68,7 @@ export function IndirectExpensePanel() {
       return item?.period_budget ?? 0;
     }),
     itemStyle: {
-      color: POOL_COLORS[pool] ?? "#D4D1CA",
+      color: POOL_COLORS[pool] ?? FALLBACK_COLOR,
       opacity: 0.3,
     },
   }));
@@ -85,7 +87,7 @@ export function IndirectExpensePanel() {
     legend: {
       data: pools,
       bottom: 0,
-      textStyle: { color: "#7A7974", fontSize: 11 },
+      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
     },
     grid: {
       left: 60,
@@ -96,17 +98,17 @@ export function IndirectExpensePanel() {
     xAxis: {
       type: "category" as const,
       data: periods,
-      axisLabel: { color: "#7A7974", fontSize: 11 },
-      axisLine: { lineStyle: { color: "#D4D1CA" } },
+      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+      axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
     },
     yAxis: {
       type: "value" as const,
       axisLabel: {
-        color: "#7A7974",
+        color: "var(--color-fin-stone)",
         fontSize: 11,
         formatter: (v: number) => formatMoney(v),
       },
-      splitLine: { lineStyle: { color: "#D4D1CA", type: "dashed" as const } },
+      splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
     },
     series: [...series, ...budgetSeries],
   };

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS indirect_expense_actuals (
   source TEXT NOT NULL DEFAULT 'sie',
   source_doc_id BIGINT REFERENCES vault_documents(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (source, period, pool, account_code, account_name)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS indirect_expense_actuals_upsert_key
+  ON indirect_expense_actuals (source, period, pool, COALESCE(account_code, ''), account_name);
 CREATE INDEX IF NOT EXISTS indirect_expense_actuals_period_idx ON indirect_expense_actuals (fiscal_year, quarter, period);
