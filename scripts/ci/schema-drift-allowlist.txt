@@ -1,6 +1,10 @@
 # Schema drift allowlist
-# Format: one entry per line. Either "table" to suppress all references to a table,
-# or "table.column" to suppress a specific column reference.
+#
+# Formats:
+#   table                         — suppress all refs to a table
+#   table.column                  — suppress a specific qualified column ref
+#   bare-column:table:column      — suppress a bare column ref for a specific table (v2)
+#
 # Lines starting with # are comments.
 
 # pgboss tables are managed by the pg-boss library in its own schema; not in public schema
