@@ -17,7 +17,7 @@ vi.mock('../../../src/integrations/fpds/client.js', () => ({
   searchFpdsAwards: vi.fn(),
 }));
 
-import { lookupIncumbent, type OpportunityForIncumbent } from '../../../src/services/enrichment/incumbent.js';
+import { lookupIncumbent, parseStateCode, type OpportunityForIncumbent } from '../../../src/services/enrichment/incumbent.js';
 import { request } from 'undici';
 import { searchFpdsAwards } from '../../../src/integrations/fpds/client.js';
 
@@ -30,7 +30,7 @@ function makeOpp(overrides: Partial<OpportunityForIncumbent> = {}): OpportunityF
     solicitation_number: 'W56KGZ-25-R-0001',
     naics: '541330',
     agency: 'Department of Defense',
-    place_of_performance_state: 'VA',
+    place_of_performance: 'Norfolk, VA',
     value_min: 1_000_000,
     value_max: 5_000_000,
     ...overrides,
@@ -199,10 +199,10 @@ describe('lookupIncumbent', () => {
     await expect(lookupIncumbent(makeOpp())).rejects.toThrow();
   });
 
-  it('skips POP-based search when place_of_performance_state is null', async () => {
+  it('proceeds without state filter when place_of_performance is unparseable', async () => {
     // Solicitation search returns empty
     mockedRequest.mockResolvedValueOnce(mockUSASpendingEmpty() as never);
-    // Should skip NAICS+agency+POP (null state) and go to value range
+    // NAICS+agency+POP (no state filter) returns match
     mockedRequest.mockResolvedValueOnce(
       mockUSASpendingResponse([
         {
@@ -215,13 +215,13 @@ describe('lookupIncumbent', () => {
     );
 
     const result = await lookupIncumbent(
-      makeOpp({ place_of_performance_state: null }),
+      makeOpp({ place_of_performance: 'Multiple Locations, USA' }),
     );
 
     expect(result).not.toBeNull();
     expect(result!.name).toBe('Booz Allen Hamilton');
-    // Without POP, it should match on value range (low confidence)
-    expect(result!.confidence).toBe('low');
+    // Without parseable state the POP-level search still fires (medium confidence)
+    expect(result!.confidence).toBe('medium');
   });
 
   it('skips solicitation search when solicitation_number is null', async () => {
@@ -244,5 +244,87 @@ describe('lookupIncumbent', () => {
     expect(result).not.toBeNull();
     expect(result!.name).toBe('Deloitte');
     expect(result!.confidence).toBe('medium');
+  });
+
+  it('proceeds without state filter when place_of_performance is null', async () => {
+    // Solicitation search returns empty
+    mockedRequest.mockResolvedValueOnce(mockUSASpendingEmpty() as never);
+    // NAICS+agency+POP (no state filter) returns match
+    mockedRequest.mockResolvedValueOnce(
+      mockUSASpendingResponse([
+        {
+          'Award ID': 'CONT_AWD_NULLPOP',
+          'Recipient Name': 'Northrop Grumman',
+          'Start Date': '2023-05-01',
+          'generated_internal_id': 'CONT_AWD_NULLPOP_ID',
+        },
+      ]) as never,
+    );
+
+    const result = await lookupIncumbent(
+      makeOpp({ place_of_performance: null }),
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe('Northrop Grumman');
+    expect(result!.confidence).toBe('medium');
+  });
+});
+
+describe('parseStateCode', () => {
+  it('parses "Norfolk, VA" → "VA"', () => {
+    expect(parseStateCode('Norfolk, VA')).toBe('VA');
+  });
+
+  it('parses "Norfolk, VA 23501" → "VA"', () => {
+    expect(parseStateCode('Norfolk, VA 23501')).toBe('VA');
+  });
+
+  it('parses "Washington, DC" → "DC"', () => {
+    expect(parseStateCode('Washington, DC')).toBe('DC');
+  });
+
+  it('parses "Washington, DC 20301" → "DC"', () => {
+    expect(parseStateCode('Washington, DC 20301')).toBe('DC');
+  });
+
+  it('parses bare state code "VA" → "VA"', () => {
+    expect(parseStateCode('VA')).toBe('VA');
+  });
+
+  it('returns null for "Multiple Locations"', () => {
+    expect(parseStateCode('Multiple Locations')).toBeNull();
+  });
+
+  it('returns null for null input', () => {
+    expect(parseStateCode(null)).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(parseStateCode('')).toBeNull();
+  });
+
+  it('returns null for invalid two-letter code "foo bar XX"', () => {
+    expect(parseStateCode('foo bar XX')).toBeNull();
+  });
+
+  it('returns null for full state name "Norfolk, Virginia"', () => {
+    expect(parseStateCode('Norfolk, Virginia')).toBeNull();
+  });
+
+  it('parses zip+4 format "Norfolk, VA 23501-1234" → "VA"', () => {
+    expect(parseStateCode('Norfolk, VA 23501-1234')).toBe('VA');
+  });
+
+  it('parses territory code "San Juan, PR" → "PR"', () => {
+    expect(parseStateCode('San Juan, PR')).toBe('PR');
+  });
+
+  it('handles lowercase input "norfolk, va" → "VA"', () => {
+    expect(parseStateCode('norfolk, va')).toBe('VA');
+  });
+
+  it('handles whitespace-padded input', () => {
+    expect(parseStateCode('  Norfolk, VA  ')).toBe('VA');
   });
 });
