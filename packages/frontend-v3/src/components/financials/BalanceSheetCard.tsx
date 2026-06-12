@@ -106,7 +106,7 @@ export function BalanceSheetCard() {
           <SparkLine
             points={trend.map((r) => r.total_assets).reverse()}
             max={totalAssetsMax}
-            color="#01696F"
+            color="var(--color-gda-cyan)"
           />
         </div>
       )}
