@@ -370,12 +370,65 @@ export interface ActionItem {
 
 /* ── KPI Header ───────────────────────────────────────────────── */
 
+export interface KpiMetric {
+  value: number;
+  delta: number | null;
+  plan: number | null;
+}
+
 export interface KpiHeaderData {
-  orders: { value: number; delta: number; plan: number };
-  sales: { value: number; delta: number; plan: number };
-  ebit: { value: number; delta: number; plan: number };
-  gross_margin: { value: number; delta: number; plan: number };
-  ros: { value: number; delta: number; plan: number };
+  period?: string;
+  orders: KpiMetric;
+  sales: KpiMetric;
+  ebit: KpiMetric;
+  gross_margin: KpiMetric;
+  ros: KpiMetric;
+}
+
+/* ── Balance Sheet ────────────────────────────────────────────── */
+
+export interface BalanceSheetRow {
+  period: string;
+  fiscal_year: number;
+  quarter: number | null;
+  cash: number;
+  accounts_receivable: number;
+  total_current_assets: number;
+  total_assets: number;
+  accounts_payable: number;
+  total_current_liabilities: number;
+  total_liabilities: number;
+  total_equity: number;
+}
+
+export interface BalanceSheetData {
+  latest: BalanceSheetRow | null;
+  trend: BalanceSheetRow[];
+}
+
+/* ── Period Detail (drill-down) ───────────────────────────────── */
+
+export interface PeriodDetailMetrics {
+  source: string;
+  orders: number;
+  sales: number;
+  ebit: number;
+  gross_margin: number;
+  ros: number;
+}
+
+export interface PeriodDetailDoc {
+  id: number;
+  filename: string;
+  doc_type: string;
+  uploaded_at: string;
+}
+
+export interface PeriodDetailData {
+  period: string;
+  actuals: PeriodDetailMetrics[];
+  plans: PeriodDetailMetrics[];
+  source_documents: PeriodDetailDoc[];
 }
 
 /* ── Contacts (pending backend) ───────────────────────────────── */

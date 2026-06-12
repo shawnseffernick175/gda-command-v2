@@ -2,8 +2,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
+import type { PeriodDetailData } from "@/lib/types";
 
-interface ForecastItem {
+export interface ForecastItem {
   period: string;
   plan_orders: number;
   plan_sales: number;
@@ -12,7 +13,7 @@ interface ForecastItem {
   has_actuals: boolean;
 }
 
-interface TrendItem {
+export interface TrendItem {
   source: string;
   period: string;
   is_quarter: boolean;
@@ -35,6 +36,18 @@ export function useFinancialsTrend() {
   return useQuery({
     queryKey: ["financials", "trend"],
     queryFn: () => apiGet<{ items: TrendItem[] }>("/v3/financials/trend"),
+    retry: false,
+  });
+}
+
+export function usePeriodDetail(period: string | null) {
+  return useQuery({
+    queryKey: ["financials", "period-detail", period],
+    queryFn: () =>
+      apiGet<PeriodDetailData>(
+        `/v3/financials/period-detail?period=${encodeURIComponent(period!)}`,
+      ),
+    enabled: !!period,
     retry: false,
   });
 }

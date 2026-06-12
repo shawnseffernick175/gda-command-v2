@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useKpiHeader } from "@/hooks/use-kpi";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
-import type { KpiHeaderData } from "@/lib/types";
+
+type KpiMetricKey = "orders" | "sales" | "ebit" | "gross_margin" | "ros";
 
 interface KpiItem {
   label: string;
-  key: keyof KpiHeaderData;
+  key: KpiMetricKey;
   definition: string;
   source: string;
   format: (v: number) => string;
