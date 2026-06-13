@@ -262,6 +262,121 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
+  // GET /v3/financials/cost-detail?period=FY26+Jan
+  // Cost element × pool matrix for a specific period
+  app.get('/v3/financials/cost-detail', async (req, reply) => {
+    const period = (req.query as Record<string, string>).period;
+    const whereClause = period ? 'WHERE period = $1' : '';
+    const params = period ? [period] : [];
+
+    const { rows } = await pool.query(
+      `SELECT period, fiscal_year, quarter, cost_element, pool,
+              target_amount, actual_amount, variance_amount
+       FROM cost_detail_actuals
+       ${whereClause}
+       ORDER BY cost_element, pool`,
+      params,
+    );
+
+    const items = rows.map((r) => ({
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: Number(r.quarter),
+      cost_element: r.cost_element as string,
+      pool: r.pool as string,
+      target_amount: Number(r.target_amount),
+      actual_amount: Number(r.actual_amount),
+      variance_amount: Number(r.variance_amount),
+    }));
+
+    return reply.send(successEnvelope({ items }, req.requestId));
+  });
+
+  // GET /v3/financials/cost-detail/trend
+  // All periods, all cost elements
+  app.get('/v3/financials/cost-detail/trend', async (req, reply) => {
+    const { rows } = await pool.query(
+      `SELECT period, fiscal_year, quarter, cost_element, pool,
+              target_amount, actual_amount, variance_amount
+       FROM cost_detail_actuals
+       ORDER BY fiscal_year, quarter, period, cost_element, pool`,
+    );
+
+    const items = rows.map((r) => ({
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: Number(r.quarter),
+      cost_element: r.cost_element as string,
+      pool: r.pool as string,
+      target_amount: Number(r.target_amount),
+      actual_amount: Number(r.actual_amount),
+      variance_amount: Number(r.variance_amount),
+    }));
+
+    return reply.send(successEnvelope({ items }, req.requestId));
+  });
+
+  // GET /v3/financials/indirect-expenses?period=FY26+Jan
+  // Indirect expense breakdown by pool for a specific period
+  app.get('/v3/financials/indirect-expenses', async (req, reply) => {
+    const period = (req.query as Record<string, string>).period;
+    const whereClause = period ? 'WHERE period = $1' : '';
+    const params = period ? [period] : [];
+
+    const { rows } = await pool.query(
+      `SELECT period, fiscal_year, quarter, pool, account_code, account_name,
+              current_period_actual, current_period_budget,
+              ytd_actual, ytd_budget
+       FROM indirect_expense_actuals
+       ${whereClause}
+       ORDER BY pool, account_code NULLS LAST, account_name`,
+      params,
+    );
+
+    const items = rows.map((r) => ({
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: Number(r.quarter),
+      pool: r.pool as string,
+      account_code: r.account_code as string | null,
+      account_name: r.account_name as string,
+      current_period_actual: Number(r.current_period_actual),
+      current_period_budget: Number(r.current_period_budget),
+      ytd_actual: Number(r.ytd_actual),
+      ytd_budget: Number(r.ytd_budget),
+    }));
+
+    return reply.send(successEnvelope({ items }, req.requestId));
+  });
+
+  // GET /v3/financials/indirect-expenses/trend
+  // Time series of total indirect by pool
+  app.get('/v3/financials/indirect-expenses/trend', async (req, reply) => {
+    const { rows } = await pool.query(
+      `SELECT period, fiscal_year, quarter, pool,
+              SUM(current_period_actual) AS period_actual,
+              SUM(current_period_budget) AS period_budget,
+              SUM(ytd_actual) AS ytd_actual,
+              SUM(ytd_budget) AS ytd_budget
+       FROM indirect_expense_actuals
+       GROUP BY period, fiscal_year, quarter, pool
+       ORDER BY fiscal_year, quarter, period, pool`,
+    );
+
+    const items = rows.map((r) => ({
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: Number(r.quarter),
+      pool: r.pool as string,
+      period_actual: Number(r.period_actual),
+      period_budget: Number(r.period_budget),
+      ytd_actual: Number(r.ytd_actual),
+      ytd_budget: Number(r.ytd_budget),
+    }));
+
+    return reply.send(successEnvelope({ items }, req.requestId));
+  });
+
   // GET /v3/financials/data-coverage
   // Shows which periods have actuals, which have plan, and which vault
   // uploads are financial-type (for the Data Coverage callout).

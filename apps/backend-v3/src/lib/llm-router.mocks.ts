@@ -28,6 +28,9 @@ import type {
   VaultDocumentParseOutput,
   VaultSmartRouteOutput,
   FinancialStatementExtractOutput,
+  BalanceSheetExtractOutput,
+  CostDetailExtractOutput,
+  SieExtractOutput,
   DigestLeadOutput,
   CompetitorContactDiscoveryOutput,
   PartnerContactDiscoveryOutput,
@@ -282,6 +285,64 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       notes: 'Mock financial extraction - one plan and one actual month row for FY26 Mar.',
       model_used: 'mock-model',
     } satisfies FinancialStatementExtractOutput,
+
+    balance_sheet_extract: {
+      is_balance_sheet: true,
+      rows: [
+        {
+          period: 'FY26 Mar',
+          fiscal_year: 2026,
+          quarter: 1,
+          cash: 1500000,
+          accounts_receivable: 2500000,
+          total_current_assets: 4500000,
+          total_assets: 6000000,
+          accounts_payable: 800000,
+          total_current_liabilities: 1200000,
+          total_liabilities: 2000000,
+          total_equity: 4000000,
+        },
+      ],
+      notes: 'Mock balance sheet extraction.',
+      model_used: 'mock-model',
+    } satisfies BalanceSheetExtractOutput,
+
+    cost_detail_extract: {
+      is_cost_detail: true,
+      rows: [
+        {
+          period: 'FY26 Mar',
+          fiscal_year: 2026,
+          quarter: 1,
+          cost_element: 'DL Onsite',
+          pool: 'DIRECT',
+          target_amount: 120000,
+          actual_amount: 115000,
+        },
+      ],
+      notes: 'Mock cost detail extraction.',
+      model_used: 'mock-model',
+    } satisfies CostDetailExtractOutput,
+
+    sie_extract: {
+      is_sie: true,
+      rows: [
+        {
+          period: 'FY26 Jan',
+          fiscal_year: 2026,
+          quarter: 1,
+          pool: 'Fringe',
+          account_code: '600001',
+          account_name: 'PTO Vacation',
+          current_period_actual: 15000,
+          current_period_budget: 16000,
+          ytd_actual: 15000,
+          ytd_budget: 16000,
+        },
+      ],
+      notes: 'Mock SIE extraction.',
+      model_used: 'mock-model',
+    } satisfies SieExtractOutput,
 
     digest_lead: {
       headline: 'No significant developments in the last 24 hours',

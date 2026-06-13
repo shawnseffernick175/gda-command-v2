@@ -9,6 +9,9 @@ import { ForecastChart } from "@/components/financials/ForecastChart";
 import { TrendChart } from "@/components/financials/TrendChart";
 import { Q1HeroCard } from "@/components/financials/Q1HeroCard";
 import { BalanceSheetCard } from "@/components/financials/BalanceSheetCard";
+import { BalanceSheetTrendChart } from "@/components/financials/BalanceSheetTrendChart";
+import { CostDetailMatrix } from "@/components/financials/CostDetailMatrix";
+import { IndirectExpensePanel } from "@/components/financials/IndirectExpensePanel";
 import { PeriodDrillDrawer } from "@/components/financials/PeriodDrillDrawer";
 
 export default function FinancialsPage() {
@@ -104,7 +107,24 @@ export default function FinancialsPage() {
         title="Balance Sheet"
         defaultOpen={false}
       >
+        <BalanceSheetTrendChart />
         <BalanceSheetCard />
+      </CollapseSection>
+
+      <CollapseSection
+        id="fin-cost-detail"
+        title="Cost Detail (TGT vs ACT)"
+        defaultOpen={false}
+      >
+        <CostDetailMatrix />
+      </CollapseSection>
+
+      <CollapseSection
+        id="fin-indirect-expenses"
+        title="Indirect Expenses (SIE)"
+        defaultOpen={false}
+      >
+        <IndirectExpensePanel />
       </CollapseSection>
 
       {/* Period drill-down drawer */}

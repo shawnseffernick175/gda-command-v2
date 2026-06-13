@@ -32,7 +32,7 @@
 
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
-import type { FinancialStatementExtractOutput } from '../../lib/llm-router.types.js';
+import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput } from '../../lib/llm-router.types.js';
 
 type FinancialRow = FinancialStatementExtractOutput['rows'][number];
 
@@ -396,4 +396,134 @@ export async function ingestFinancialRows(
   }
 
   return { plan, actual, rejected };
+}
+
+// ---------------------------------------------------------------------------
+// Balance Sheet ingest
+// ---------------------------------------------------------------------------
+
+type BalanceSheetRow = BalanceSheetExtractOutput['rows'][number];
+
+export async function ingestBalanceSheetRows(
+  rows: BalanceSheetRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  let count = 0;
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year) continue;
+    try {
+      const params = [
+        row.period, row.fiscal_year, row.quarter,
+        row.cash, row.accounts_receivable, row.total_current_assets, row.total_assets,
+        row.accounts_payable, row.total_current_liabilities, row.total_liabilities, row.total_equity,
+        sourceDocId ?? null,
+      ];
+      await pool.query(
+        `INSERT INTO balance_sheet_actuals
+           (source, period, fiscal_year, quarter,
+            cash, accounts_receivable, total_current_assets, total_assets,
+            accounts_payable, total_current_liabilities, total_liabilities, total_equity,
+            source_doc_id)
+         VALUES ('balance_sheet', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (source, period, fiscal_year, quarter)
+         DO UPDATE SET
+           cash = EXCLUDED.cash,
+           accounts_receivable = EXCLUDED.accounts_receivable,
+           total_current_assets = EXCLUDED.total_current_assets,
+           total_assets = EXCLUDED.total_assets,
+           accounts_payable = EXCLUDED.accounts_payable,
+           total_current_liabilities = EXCLUDED.total_current_liabilities,
+           total_liabilities = EXCLUDED.total_liabilities,
+           total_equity = EXCLUDED.total_equity,
+           source_doc_id = EXCLUDED.source_doc_id`,
+        params,
+      );
+      count++;
+    } catch (err) {
+      logger.warn({ err, period: row.period }, 'Balance sheet row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Cost Detail (TGT vs ACT) ingest
+// ---------------------------------------------------------------------------
+
+type CostDetailRow = CostDetailExtractOutput['rows'][number];
+
+export async function ingestCostDetailRows(
+  rows: CostDetailRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  let count = 0;
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year || !row.cost_element || !row.pool) continue;
+    try {
+      await pool.query(
+        `INSERT INTO cost_detail_actuals
+           (period, fiscal_year, quarter, cost_element, pool,
+            target_amount, actual_amount, source, source_doc_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'tgt_vs_act', $8)
+         ON CONFLICT (source, period, cost_element, pool)
+         DO UPDATE SET
+           target_amount = EXCLUDED.target_amount,
+           actual_amount = EXCLUDED.actual_amount,
+           source_doc_id = EXCLUDED.source_doc_id`,
+        [
+          row.period, row.fiscal_year, row.quarter,
+          row.cost_element, row.pool,
+          row.target_amount, row.actual_amount,
+          sourceDocId ?? null,
+        ],
+      );
+      count++;
+    } catch (err) {
+      logger.warn({ err, period: row.period, cost_element: row.cost_element }, 'Cost detail row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// SIE (Statement of Indirect Expenses) ingest
+// ---------------------------------------------------------------------------
+
+type SieRow = SieExtractOutput['rows'][number];
+
+export async function ingestSieRows(
+  rows: SieRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  let count = 0;
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year || !row.pool || !row.account_name) continue;
+    try {
+      await pool.query(
+        `INSERT INTO indirect_expense_actuals
+           (period, fiscal_year, quarter, pool, account_code, account_name,
+            current_period_actual, current_period_budget, ytd_actual, ytd_budget,
+            source, source_doc_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'sie', $11)
+         ON CONFLICT (source, period, pool, COALESCE(account_code, ''), account_name)
+         DO UPDATE SET
+           current_period_actual = EXCLUDED.current_period_actual,
+           current_period_budget = EXCLUDED.current_period_budget,
+           ytd_actual = EXCLUDED.ytd_actual,
+           ytd_budget = EXCLUDED.ytd_budget,
+           source_doc_id = EXCLUDED.source_doc_id`,
+        [
+          row.period, row.fiscal_year, row.quarter,
+          row.pool, row.account_code, row.account_name,
+          row.current_period_actual, row.current_period_budget,
+          row.ytd_actual, row.ytd_budget,
+          sourceDocId ?? null,
+        ],
+      );
+      count++;
+    } catch (err) {
+      logger.warn({ err, period: row.period, pool: row.pool }, 'SIE row upsert failed');
+    }
+  }
+  return count;
 }

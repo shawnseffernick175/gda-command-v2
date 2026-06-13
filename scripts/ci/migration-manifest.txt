@@ -82,3 +82,5 @@ v3_073_opportunity_decision_overrides.sql
 v3_074_soak_telemetry.sql
 v3_075_incumbent_indexes.sql
 v3_076_balance_sheet_actuals.sql
+v3_077_cost_detail_actuals.sql
+v3_078_indirect_expense_actuals.sql

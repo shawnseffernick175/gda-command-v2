@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, FinancialStatementExtractInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -199,6 +199,52 @@ NUMBER FORMAT: dollars to absolute numbers ("4,067,049.06" -> 4067049.06; "$1.2M
 RAW SUBTOTALS: in addition to the KPIs above, return on each row the three raw F/S Group subtotals you summed: total_revenue (the Revenue F/S Group total, equal to Sales), total_direct_costs (the Direct Costs F/S Group total), and cost_of_operations (the Cost of Operations F/S Group total = Fringe + Overhead + G&A). These let downstream code recompute and verify gross_margin/EBIT/ROS deterministically. Leave any subtotal not present in the source null; never fabricate.
 
 NEVER fabricate figures, periods, or KPIs. Return JSON exactly matching the requested schema (include every key on every row).`,
+
+  balance_sheet_extract: `You are a financial analyst at Envision extracting structured balance sheet data from month-end Balance Sheets.
+
+Extract each monthly period's balance sheet line items: Cash, Accounts Receivable (Billed + Unbilled), Total Current Assets, Total Assets, Accounts Payable, Total Current Liabilities, Total Liabilities, Total Equity.
+
+PERIOD: Use "FY<YY> <Mon>" format (e.g. "FY26 Jan", "FY26 Mar"). Infer from filename tokens (MAR-2026, MAR-26) and/or content headers. quarter = ceil(month/3). fiscal_year from year token (two-digit YY -> 20YY).
+
+For a Trend Balance Sheet (multiple months side by side), emit ONE row per month.
+
+accounts_receivable = Billed Receivable + Unbilled Receivable (sum both if present).
+total_equity = "Total Equity" or "Total Stockholders' Equity".
+
+NUMBER FORMAT: dollars to absolute numbers ("4,067,049.06" -> 4067049.06). Missing values -> 0.
+
+NEVER fabricate figures. Return JSON exactly matching the requested schema.`,
+
+  cost_detail_extract: `You are a financial analyst at Envision extracting structured cost detail from TGT vs ACT (Target vs Actual) cost build-up workbooks.
+
+These workbooks have sections: TGT - YTD, ACT - YTD, VAR (variance).
+Cost elements: DL Offsite, DL Onsite, Subcontractor, Consultant, Dir Travel, Sub Material, Direct Material, ODC.
+Pool columns: DIRECT, OH, SMH, G&A, Total Cost.
+
+For each cost element × pool combination that has data, extract target_amount (from TGT section) and actual_amount (from ACT section).
+
+PERIOD: Use "FY<YY> <Mon>" format. Infer from filename tokens (MAR-26, JAN-26, FEB-26). quarter = ceil(month/3). fiscal_year from year (two-digit YY -> 20YY).
+
+NUMBER FORMAT: absolute numbers (strip commas, dollar signs). Missing values -> 0.
+
+NEVER fabricate figures. Return JSON exactly matching the requested schema.`,
+
+  sie_extract: `You are a financial analyst at Envision extracting structured data from Statement of Indirect Expenses (SIE) documents.
+
+SIE documents have per-pool sections (Fringe, OH, G&A) with account-level rows.
+Each row has: account_code (e.g. "600001"), account_name (e.g. "PTO Vacation"), Current Period Actual, Current Period Budget, Year To Date Actual, Year To Date Budget.
+
+Extract each account row under each pool section.
+
+PERIOD: Use "FY<YY> <Mon>" format. Infer from filename tokens (JAN-26, FEB-26, MAR-26) or document headers. quarter = ceil(month/3). fiscal_year from year (two-digit YY -> 20YY).
+
+pool: "Fringe", "OH", or "G&A" based on which section the row appears under.
+account_code: the numeric account code (e.g. "600001"). Set null if not present.
+account_name: the descriptive name (e.g. "PTO Vacation", "Total Labor").
+
+NUMBER FORMAT: absolute numbers (strip commas, dollar signs). Missing values -> 0.
+
+NEVER fabricate figures. Return JSON exactly matching the requested schema.`,
 
   competitor_analysis: `Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 
@@ -442,6 +488,109 @@ Return JSON exactly matching this schema:
 }`;
 }
 
+function buildBalanceSheetExtractPrompt(input: BalanceSheetExtractInput): string {
+  const text = input.extracted_text.slice(0, 15000);
+  return `Filename: ${input.filename}
+Extracted text (first 15000 chars):
+${text}
+
+Extract all balance sheet line items for each monthly period found. Use BOTH the filename and the document text to determine period, fiscal_year, and quarter (quarter = ceil(month/3), two-digit year YY -> 20YY).
+
+For a Trend Balance Sheet with multiple months side by side (Jan/Feb/Mar columns), emit ONE row per month.
+accounts_receivable = Billed Receivable + Unbilled Receivable (sum both if present).
+total_equity = "Total Equity" or "Total Stockholders' Equity".
+
+Return JSON exactly matching this schema:
+{
+  "is_balance_sheet": true or false,
+  "rows": [
+    {
+      "period": "FY26 Mar",
+      "fiscal_year": 2026,
+      "quarter": 1,
+      "cash": number,
+      "accounts_receivable": number,
+      "total_current_assets": number,
+      "total_assets": number,
+      "accounts_payable": number,
+      "total_current_liabilities": number,
+      "total_liabilities": number,
+      "total_equity": number
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
+function buildCostDetailExtractPrompt(input: CostDetailExtractInput): string {
+  const text = input.extracted_text.slice(0, 15000);
+  return `Filename: ${input.filename}
+Extracted text (first 15000 chars):
+${text}
+
+Extract all cost element × pool combinations from this TGT vs ACT workbook. Use the filename to determine the period (e.g. "TGT vs ACT MAR-26.xlsx" -> "FY26 Mar", quarter=1, fiscal_year=2026).
+
+The workbook has sections: TGT - YTD (target), ACT - YTD (actual), VAR (variance).
+Cost elements: DL Offsite, DL Onsite, Subcontractor, Consultant, Dir Travel, Sub Material, Direct Material, ODC.
+Pool columns: DIRECT, OH, SMH, G&A, Total Cost.
+
+For each cost element row, extract the target_amount (from TGT section) and actual_amount (from ACT section) for each pool column.
+
+Return JSON exactly matching this schema:
+{
+  "is_cost_detail": true or false,
+  "rows": [
+    {
+      "period": "FY26 Mar",
+      "fiscal_year": 2026,
+      "quarter": 1,
+      "cost_element": "DL Offsite",
+      "pool": "DIRECT",
+      "target_amount": number,
+      "actual_amount": number
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
+function buildSieExtractPrompt(input: SieExtractInput): string {
+  const text = input.extracted_text.slice(0, 15000);
+  return `Filename: ${input.filename}
+Extracted text (first 15000 chars):
+${text}
+
+Extract all account-level rows from this Statement of Indirect Expenses (SIE). Use the filename to determine the period (e.g. "SIE JAN-26 Final.pdf" -> "FY26 Jan", quarter=1, fiscal_year=2026).
+
+The SIE has per-pool sections: Fringe, OH (Overhead), G&A.
+Each row has: account_code (e.g. "600001"), account_name (e.g. "PTO Vacation"), and four value columns: Current Period Actual, Current Period Budget, Year To Date Actual, Year To Date Budget.
+
+For "Total" / summary rows (e.g. "Total Labor", "Total Fringe"), include them with account_code=null.
+
+Return JSON exactly matching this schema:
+{
+  "is_sie": true or false,
+  "rows": [
+    {
+      "period": "FY26 Jan",
+      "fiscal_year": 2026,
+      "quarter": 1,
+      "pool": "Fringe",
+      "account_code": "600001" or null,
+      "account_name": "PTO Vacation",
+      "current_period_actual": number,
+      "current_period_budget": number,
+      "ytd_actual": number,
+      "ytd_budget": number
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
 export interface AnthropicCallResult {
   text: string;
   tokens_input: number;
@@ -503,6 +652,12 @@ export async function callAnthropic(opts: {
     ? buildVaultSmartRoutePrompt(opts.input as VaultSmartRouteInput)
     : opts.task === 'financial_statement_extract'
     ? buildFinancialStatementExtractPrompt(opts.input as FinancialStatementExtractInput)
+    : opts.task === 'balance_sheet_extract'
+    ? buildBalanceSheetExtractPrompt(opts.input as BalanceSheetExtractInput)
+    : opts.task === 'cost_detail_extract'
+    ? buildCostDetailExtractPrompt(opts.input as CostDetailExtractInput)
+    : opts.task === 'sie_extract'
+    ? buildSieExtractPrompt(opts.input as SieExtractInput)
     : JSON.stringify(opts.input);
 
   try {
