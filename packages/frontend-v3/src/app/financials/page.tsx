@@ -158,10 +158,10 @@ export default function FinancialsPage() {
       {/* Page title + subtitle */}
       <div>
         <h1 className="text-lg font-semibold text-foreground">
-          {tabTitle(activeTab)} &mdash; {fy}
+          {tabTitle(activeTab)} {"\u2014"} {fy}
         </h1>
         <p className="text-[12px] text-muted-foreground">
-          Envision Innovative Solutions (OU3) &mdash; 7% YoY Growth Target
+          Envision Innovative Solutions (OU3) {"\u2014"} 7% YoY Growth Target
         </p>
       </div>
 

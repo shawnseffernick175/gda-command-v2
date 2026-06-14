@@ -22,7 +22,7 @@ export function NumberCell({
         className={cn("text-muted-foreground", className)}
         title={tooltip ?? "Data not available"}
       >
-        &mdash;
+        {"\u2014"}
       </span>
     );
   }

@@ -84,7 +84,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
               {gapPercent}%
             </span>
           ) : (
-            <span>&mdash;</span>
+            <span>{"\u2014"}</span>
           )}
         </span>
       </div>
