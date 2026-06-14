@@ -12,6 +12,7 @@ import {
   useUploadVaultDocument,
   useLinkVaultDocument,
   useDeleteVaultDocument,
+  useUpdateVaultDocType,
   useRegulatoryCatalog,
 } from "@/hooks/use-vault";
 import { Pagination } from "@/components/shared/Pagination";
@@ -19,6 +20,14 @@ import { PendingState } from "@/components/shared/pending-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 import type { VaultDocument, RegulatoryCatalogEntry } from "@/lib/types";
 
 /* ── Constants ─────────────────────────────────────────────── */
@@ -372,6 +381,15 @@ export default function VaultPage() {
 
 /* ── Work Product Table ────────────────────────────────────── */
 
+/* ── Doc Type Sorted Options ─────────────────────────────── */
+
+const DOC_TYPE_OPTIONS = [...VAULT_BUCKETS]
+  .sort((a, b) => {
+    if (a === "other") return 1;
+    if (b === "other") return -1;
+    return (DOC_TYPE_LABELS[a] ?? a).localeCompare(DOC_TYPE_LABELS[b] ?? b);
+  });
+
 function WorkProductTable({
   items,
   isLoading,
@@ -385,6 +403,7 @@ function WorkProductTable({
   onDelete: (doc: VaultDocument) => void;
   onLink: (id: number) => void;
 }) {
+  const updateDocType = useUpdateVaultDocType();
   if (isLoading && !items.length) {
     return (
       <div className="space-y-2">
@@ -433,11 +452,35 @@ function WorkProductTable({
                 </button>
               </td>
               <td className="px-3 py-2">
-                <span
-                  className={`inline-block rounded px-2 py-0.5 text-[11px] font-mono border ${docTypeBadgeClass(doc.doc_type)}`}
+                <Select
+                  value={doc.doc_type}
+                  onValueChange={(val) => {
+                    if (!val || val === doc.doc_type) return;
+                    updateDocType.mutate(
+                      { id: doc.id, doc_type: val },
+                      {
+                        onError: () => {
+                          toast.error("Could not update category. Try again.");
+                        },
+                      },
+                    );
+                  }}
                 >
-                  {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
-                </span>
+                  <SelectTrigger
+                    size="sm"
+                    className={`text-[11px] font-mono border rounded px-2 py-0.5 h-auto min-h-0 gap-1 ${docTypeBadgeClass(doc.doc_type)}`}
+                    disabled={updateDocType.isPending && updateDocType.variables?.id === doc.id}
+                  >
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent align="start" alignItemWithTrigger={false}>
+                    {DOC_TYPE_OPTIONS.map((dt) => (
+                      <SelectItem key={dt} value={dt}>
+                        {DOC_TYPE_LABELS[dt] ?? dt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </td>
               <td className="px-3 py-2 text-center">
                 {doc.ai_summary && doc.ai_tags ? (

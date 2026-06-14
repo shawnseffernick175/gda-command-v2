@@ -6,6 +6,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { AuthGate } from "@/components/shell/auth-gate";
 import { AppShell } from "@/components/shell/app-shell";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "sonner";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export function Providers({ children }: { children: ReactNode }) {
             <AppShell>{children}</AppShell>
           </AuthGate>
         </TooltipProvider>
+        <Toaster position="bottom-right" richColors />
       </AuthProvider>
     </QueryProvider>
   );
