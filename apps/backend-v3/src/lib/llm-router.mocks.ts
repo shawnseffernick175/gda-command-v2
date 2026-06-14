@@ -34,6 +34,7 @@ import type {
   DigestLeadOutput,
   CompetitorContactDiscoveryOutput,
   PartnerContactDiscoveryOutput,
+  FinancialAnalyzeOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -383,6 +384,11 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       ],
       sources_consulted: 3,
     } satisfies PartnerContactDiscoveryOutput,
+
+    financial_analyze: {
+      analysis: 'Mock CFO analysis: Envision financial performance is on plan for the current period.',
+      generated_at: new Date().toISOString(),
+    } satisfies FinancialAnalyzeOutput,
   };
 
   return {

@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, FinancialAnalyzeInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -270,6 +270,18 @@ Return JSON exactly matching this schema:
   "source_label": "string — short label for the source (e.g. 'DoD CIO', 'Federal Register')",
   "source_url": "string|null — URL to the source document if available",
   "related_opportunity_ids": ["string"] — IDs of related opportunities from the input, empty array if none
+}`,
+
+  financial_analyze: `You are a CFO analyzing Envision Innovative Solutions' monthly financials. ${ENVISION_COMPANY_CONTEXT}
+
+Identify money losers, recommend actions. Cite the specific contracts/cost pools and figures from the data provided. Gov/military exec tone — no jargon, no emoji.
+
+Never fabricate figures. If a value is null, note it as "not yet ingested" rather than guessing.
+
+Return JSON exactly matching this schema:
+{
+  "analysis": "string — 3-6 paragraph CFO analysis with specific recommendations",
+  "generated_at": "string — ISO 8601 timestamp"
 }`,
 };
 
@@ -591,6 +603,24 @@ Return JSON exactly matching this schema:
 }`;
 }
 
+function buildFinancialAnalyzePrompt(input: FinancialAnalyzeInput): string {
+  const fmt = (v: number | null, unit: string) => v !== null ? `${v.toLocaleString()}${unit}` : 'not yet ingested';
+  const lines = [
+    `YTD Revenue: ${fmt(input.ytd_revenue, '')}`,
+    `YTD Expenses: ${fmt(input.ytd_expenses, '')}`,
+    `YTD Profit: ${fmt(input.ytd_profit, '')}`,
+    `Margin: ${fmt(input.margin, '%')}`,
+    `Funded Backlog: ${fmt(input.funded_backlog, '')}`,
+  ];
+  if (input.contracts.length > 0) {
+    lines.push('', 'Cost Pools / Contracts:');
+    for (const c of input.contracts) {
+      lines.push(`  ${c.name}: revenue=${fmt(c.revenue, '')} cost=${fmt(c.cost, '')} profit=${fmt(c.profit, '')} margin=${fmt(c.margin, '%')}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 export interface AnthropicCallResult {
   text: string;
   tokens_input: number;
@@ -658,6 +688,8 @@ export async function callAnthropic(opts: {
     ? buildCostDetailExtractPrompt(opts.input as CostDetailExtractInput)
     : opts.task === 'sie_extract'
     ? buildSieExtractPrompt(opts.input as SieExtractInput)
+    : opts.task === 'financial_analyze'
+    ? buildFinancialAnalyzePrompt(opts.input as FinancialAnalyzeInput)
     : JSON.stringify(opts.input);
 
   try {
