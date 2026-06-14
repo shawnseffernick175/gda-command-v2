@@ -1,139 +1,186 @@
 "use client";
 
-import { useState } from "react";
-import { useKpiHeader } from "@/hooks/use-kpi";
-import { CollapseSection } from "@/components/shared/collapse-section";
-import { formatMoney } from "@/lib/format-money";
-import { FinancialCard } from "@/components/financials/FinancialCard";
-import { ForecastChart } from "@/components/financials/ForecastChart";
-import { TrendChart } from "@/components/financials/TrendChart";
-import { Q1HeroCard } from "@/components/financials/Q1HeroCard";
-import { BalanceSheetCard } from "@/components/financials/BalanceSheetCard";
-import { BalanceSheetTrendChart } from "@/components/financials/BalanceSheetTrendChart";
-import { CostDetailMatrix } from "@/components/financials/CostDetailMatrix";
-import { IndirectExpensePanel } from "@/components/financials/IndirectExpensePanel";
-import { PeriodDrillDrawer } from "@/components/financials/PeriodDrillDrawer";
+import { useState, useCallback } from "react";
+import { StatusStrip } from "@/components/financials/StatusStrip";
+import { AiAnalyzeModal } from "@/components/financials/AiAnalyzeModal";
+import { ContractWaterfallTab } from "@/components/financials/tabs/ContractWaterfallTab";
+import { AopExecutionTab } from "@/components/financials/tabs/AopExecutionTab";
+import { AopCaptureTab } from "@/components/financials/tabs/AopCaptureTab";
+import { P2FinancialsTab } from "@/components/financials/tabs/P2FinancialsTab";
+import { DefinitionsTab } from "@/components/financials/tabs/DefinitionsTab";
+import {
+  useAiAnalyze,
+  useP2Financials,
+} from "@/hooks/use-financial-bible";
+import { cn } from "@/lib/utils";
+
+type Tab =
+  | "waterfall"
+  | "execution"
+  | "capture"
+  | "p2"
+  | "definitions";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "waterfall", label: "Contract Waterfall" },
+  { id: "execution", label: "AOP Execution" },
+  { id: "capture", label: "AOP Capture" },
+  { id: "p2", label: "Monthly Financials" },
+  { id: "definitions", label: "Definitions" },
+];
+
+type CalendarMode = "FY" | "CY";
+
+const YEARS = ["26", "27", "28"] as const;
+
+function tabTitle(tab: Tab): string {
+  switch (tab) {
+    case "waterfall":
+      return "Contract Waterfall";
+    case "execution":
+      return "AOP Execution";
+    case "capture":
+      return "AOP Capture";
+    case "p2":
+      return "Monthly Financials";
+    case "definitions":
+      return "Definitions";
+  }
+}
 
 export default function FinancialsPage() {
-  const { data, isLoading } = useKpiHeader();
-  const [drillPeriod, setDrillPeriod] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("p2");
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("FY");
+  const [selectedYear, setSelectedYear] = useState<string>("26");
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
-  const hasData = !!data;
+  const aiAnalyze = useAiAnalyze();
+  const p2Data = useP2Financials();
+
+  const fy = `${calendarMode}${selectedYear}`;
+
+  const handleAiAnalyze = useCallback(() => {
+    const kpi = p2Data.data?.kpi;
+    const costPools = p2Data.data?.cost_by_pool ?? [];
+
+    aiAnalyze.mutate({
+      ytd_revenue: kpi?.ytd_revenue,
+      ytd_expenses: kpi?.ytd_expenses,
+      ytd_profit: kpi?.ytd_profit,
+      margin: kpi?.ytd_margin,
+      contracts: costPools.map((c) => ({
+        name: c.pool,
+        revenue: null,
+        cost: c.actual,
+        profit: null,
+        margin: null,
+      })),
+    });
+
+    setAiModalOpen(true);
+  }, [p2Data.data, aiAnalyze]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-lg font-semibold text-foreground">
-        Financial Bible
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        Single source of truth for Orders, Sales, EBIT, Gross Margin, and ROS.
-        All figures sourced from uploaded financials.
-      </p>
+    <div className="space-y-4">
+      {/* Status Strip */}
+      <StatusStrip />
 
-      {/* Q1 Hero Card — always show when data exists */}
-      {isLoading ? (
-        <div className="h-32 animate-pulse rounded bg-gda-panel" />
-      ) : hasData ? (
-        <Q1HeroCard data={data} />
-      ) : null}
+      {/* Tab bar with AI Analyze + Year Selector */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* Left: AI Analyze button + tabs */}
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="rounded px-3 py-1.5 text-[13px] font-medium text-white transition-colors bg-fin-navy hover:bg-fin-navy-hover"
+            onClick={handleAiAnalyze}
+          >
+            AI Analyze
+          </button>
 
-      {/* KPI Cards */}
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded bg-gda-panel" />
-          ))}
+          <nav className="flex items-center gap-4">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={cn(
+                  "border-b-2 pb-1 text-[13px] font-medium transition-colors",
+                  activeTab === tab.id
+                    ? "border-gda-cyan text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
         </div>
-      ) : hasData ? (
-        <div className="grid gap-4 md:grid-cols-5">
-          <FinancialCard
-            label="Orders"
-            value={formatMoney(data.orders.value)}
-            plan={data.orders.plan !== null ? formatMoney(data.orders.plan) : null}
-            delta={data.orders.delta}
-          />
-          <FinancialCard
-            label="Sales"
-            value={formatMoney(data.sales.value)}
-            plan={data.sales.plan !== null ? formatMoney(data.sales.plan) : null}
-            delta={data.sales.delta}
-          />
-          <FinancialCard
-            label="EBIT"
-            value={formatMoney(data.ebit.value)}
-            plan={data.ebit.plan !== null ? formatMoney(data.ebit.plan) : null}
-            delta={data.ebit.delta}
-          />
-          <FinancialCard
-            label="Gross Margin"
-            value={`${data.gross_margin.value.toFixed(1)}%`}
-            plan={data.gross_margin.plan !== null ? `${data.gross_margin.plan.toFixed(1)}%` : null}
-            delta={data.gross_margin.delta}
-          />
-          <FinancialCard
-            label="ROS"
-            value={`${data.ros.value.toFixed(1)}%`}
-            plan={data.ros.plan !== null ? `${data.ros.plan.toFixed(1)}%` : null}
-            delta={data.ros.delta}
-          />
+
+        {/* Right: FY/CY toggle + year buttons */}
+        <div className="flex items-center gap-2">
+          <div className="flex rounded border border-border">
+            {(["FY", "CY"] as CalendarMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={cn(
+                  "px-2 py-1 text-[12px] font-medium transition-colors",
+                  calendarMode === mode
+                    ? "bg-card text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setCalendarMode(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1">
+            {YEARS.map((yr) => (
+              <button
+                key={yr}
+                type="button"
+                className={cn(
+                  "rounded px-2 py-1 text-[12px] font-medium transition-colors",
+                  selectedYear === yr
+                    ? "bg-card text-foreground border border-border"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setSelectedYear(yr)}
+              >
+                {yr}
+              </button>
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="rounded border border-dashed border-border bg-gda-panel/30 p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            No financial data available yet. Upload financial documents to the Vault
-            to populate this dashboard.
-          </p>
-        </div>
-      )}
+      </div>
 
-      <CollapseSection
-        id="fin-pipeline-forecast"
-        title="Pipeline Forecast vs Plan"
-        defaultOpen={true}
-      >
-        <ForecastChart onPeriodClick={setDrillPeriod} />
-      </CollapseSection>
+      {/* Page title + subtitle */}
+      <div>
+        <h1 className="text-lg font-semibold text-foreground">
+          {tabTitle(activeTab)} &mdash; {fy}
+        </h1>
+        <p className="text-[12px] text-muted-foreground">
+          Envision Innovative Solutions (OU3) &mdash; 7% YoY Growth Target
+        </p>
+      </div>
 
-      <CollapseSection
-        id="fin-trend"
-        title="Historical Trend"
-        defaultOpen={true}
-      >
-        <TrendChart onPeriodClick={setDrillPeriod} />
-      </CollapseSection>
+      {/* Tab content */}
+      <div className="min-h-[300px]">
+        {activeTab === "waterfall" && <ContractWaterfallTab fy={fy} />}
+        {activeTab === "execution" && <AopExecutionTab fy={fy} />}
+        {activeTab === "capture" && <AopCaptureTab fy={fy} />}
+        {activeTab === "p2" && <P2FinancialsTab />}
+        {activeTab === "definitions" && <DefinitionsTab />}
+      </div>
 
-      <CollapseSection
-        id="fin-balance-sheet"
-        title="Balance Sheet"
-        defaultOpen={false}
-      >
-        <BalanceSheetTrendChart />
-        <BalanceSheetCard />
-      </CollapseSection>
-
-      <CollapseSection
-        id="fin-cost-detail"
-        title="Cost Detail (TGT vs ACT)"
-        defaultOpen={false}
-      >
-        <CostDetailMatrix />
-      </CollapseSection>
-
-      <CollapseSection
-        id="fin-indirect-expenses"
-        title="Indirect Expenses (SIE)"
-        defaultOpen={false}
-      >
-        <IndirectExpensePanel />
-      </CollapseSection>
-
-      {/* Period drill-down drawer */}
-      <PeriodDrillDrawer
-        period={drillPeriod}
-        open={drillPeriod !== null}
-        onOpenChange={(open) => {
-          if (!open) setDrillPeriod(null);
-        }}
+      {/* AI Analyze Modal */}
+      <AiAnalyzeModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        analysis={aiAnalyze.data?.analysis ?? null}
+        generatedAt={aiAnalyze.data?.generated_at ?? null}
+        isLoading={aiAnalyze.isPending}
       />
     </div>
   );

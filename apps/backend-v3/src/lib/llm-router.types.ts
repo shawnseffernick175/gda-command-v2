@@ -42,7 +42,8 @@ export type Task =
   | 'sie_extract'
   | 'digest_lead'
   | 'competitor_contact_discovery'
-  | 'partner_contact_discovery';
+  | 'partner_contact_discovery'
+  | 'financial_analyze';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -221,6 +222,26 @@ export interface PartnerContactDiscoveryInput {
 export interface PartnerContactDiscoveryOutput {
   contacts: DiscoveredContact[];
   sources_consulted: number;
+}
+
+export interface FinancialAnalyzeInput {
+  ytd_revenue: number | null;
+  ytd_expenses: number | null;
+  ytd_profit: number | null;
+  margin: number | null;
+  funded_backlog: number | null;
+  contracts: Array<{
+    name: string;
+    revenue: number | null;
+    cost: number | null;
+    profit: number | null;
+    margin: number | null;
+  }>;
+}
+
+export interface FinancialAnalyzeOutput {
+  analysis: string;
+  generated_at: string;
 }
 
 export interface BlackHatAnalysisInput {
@@ -815,6 +836,7 @@ export interface TaskInputMap {
   digest_lead: DigestLeadInput;
   competitor_contact_discovery: CompetitorContactDiscoveryInput;
   partner_contact_discovery: PartnerContactDiscoveryInput;
+  financial_analyze: FinancialAnalyzeInput;
 }
 
 export interface TaskOutputMap {
@@ -841,6 +863,7 @@ export interface TaskOutputMap {
   digest_lead: DigestLeadOutput;
   competitor_contact_discovery: CompetitorContactDiscoveryOutput;
   partner_contact_discovery: PartnerContactDiscoveryOutput;
+  financial_analyze: FinancialAnalyzeOutput;
 }
 
 // ---------------------------------------------------------------------------

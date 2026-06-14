@@ -762,6 +762,134 @@ export interface RegulatoryCatalogEntry {
   created_at: string;
 }
 
+/* ── Financial Bible v3 ───────────────────────────────────────── */
+
+export interface FinancialMeta {
+  sources: Array<{
+    vault_doc_id?: number;
+    filename?: string;
+    ingested_at?: string;
+    parser?: string;
+    table?: string;
+    row_count?: number;
+    type?: string;
+    label?: string;
+    stages?: string[];
+  }>;
+  last_refresh: string | number | null;
+  period: string | null;
+}
+
+export interface IngestionStatus {
+  docs_ingested: number;
+  docs_total: number;
+  max_period: string | null;
+  last_refresh: string | null;
+  doc_filenames: string[];
+}
+
+export interface ContractVehicleRow {
+  id: number;
+  name: string;
+  short_name: string;
+  contract_number: string | null;
+  vehicle_type: string;
+  agency: string | null;
+  naics_primary: string | null;
+  expiration_date: string | null;
+  ceiling_value: number | null;
+  is_active: boolean;
+  notes: string | null;
+}
+
+export interface ContractWaterfallData {
+  contracts: ContractVehicleRow[];
+  meta: FinancialMeta;
+}
+
+export interface AopExecutionItem {
+  period: string;
+  cost_element: string;
+  pool: string;
+  planned: number;
+  actual: number;
+  variance: number;
+}
+
+export interface AopExecutionData {
+  items: AopExecutionItem[];
+  periods: string[];
+  meta: FinancialMeta;
+}
+
+export interface AopCaptureItem {
+  id: number;
+  title: string;
+  agency: string | null;
+  stage: string;
+  value: number | null;
+  pwin: number | null;
+  capture_owner: string;
+  milestone_90day: string | null;
+  solicitation_number: string | null;
+  response_due_at: string | null;
+}
+
+export interface AopCaptureData {
+  items: AopCaptureItem[];
+  meta: FinancialMeta;
+}
+
+export interface CostByPool {
+  pool: string;
+  target: number;
+  actual: number;
+  variance: number;
+}
+
+export interface P2MonthlyActual {
+  period: string;
+  source: string;
+  orders: number;
+  sales: number;
+  ebit: number;
+  gross_margin: number;
+  ros: number;
+}
+
+export interface P2FinancialsData {
+  kpi: {
+    ytd_revenue: number;
+    ytd_expenses: number;
+    ytd_profit: number;
+    ytd_margin: number;
+    period: string;
+  } | null;
+  plan: {
+    plan_sales: number;
+    plan_ebit: number;
+    plan_gross_margin: number;
+  } | null;
+  monthly_actuals: P2MonthlyActual[];
+  cost_by_pool: CostByPool[];
+  meta: FinancialMeta;
+}
+
+export interface FinancialDefinition {
+  term: string;
+  definition: string;
+}
+
+export interface DefinitionsData {
+  definitions: FinancialDefinition[];
+  meta: FinancialMeta;
+}
+
+export interface AiAnalyzeResponse {
+  analysis: string;
+  generated_at: string;
+}
+
 /* ── Daily Briefing (F-460b) ──────────────────────────────────── */
 
 export interface BriefingAction {
