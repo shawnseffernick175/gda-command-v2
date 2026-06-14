@@ -185,7 +185,7 @@ function RisksRegisterContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-mono text-lg font-bold text-foreground">Risk Register</h1>
+          <h2 className="font-mono text-lg font-bold text-foreground">Risk Register</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Track, score, and mitigate capture risks
           </p>
