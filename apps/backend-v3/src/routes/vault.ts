@@ -707,6 +707,79 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
+  // PATCH /v3/vault/documents/:id — update doc_type / doc_category
+  app.patch('/v3/vault/documents/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = req.body as {
+      doc_type?: string;
+      doc_category?: string;
+    };
+
+    if (!body.doc_type && !body.doc_category) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'No fields to update', req.requestId),
+      );
+    }
+
+    if (body.doc_type && !VALID_DOC_TYPES.includes(body.doc_type as DocType)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', `Invalid doc_type: ${body.doc_type}`, req.requestId),
+      );
+    }
+
+    // Fetch current row for audit trail (from→to)
+    const currentRes = await pool.query<{ doc_type: string; doc_category: string }>(
+      `SELECT doc_type, doc_category FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+
+    if (!currentRes.rows[0]) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Document not found', req.requestId),
+      );
+    }
+
+    const prev = currentRes.rows[0];
+    const sets: string[] = ['updated_at = NOW()'];
+    const params: unknown[] = [];
+    let idx = 1;
+
+    if (body.doc_type) {
+      sets.push(`doc_type = $${idx++}`);
+      params.push(body.doc_type);
+    }
+    if (body.doc_category) {
+      sets.push(`doc_category = $${idx++}`);
+      params.push(body.doc_category);
+    }
+
+    params.push(id);
+    const sql = `UPDATE vault_documents SET ${sets.join(', ')} WHERE id = $${idx} AND deleted_at IS NULL RETURNING id, doc_type, doc_category, updated_at`;
+    const res = await pool.query<{ id: number; doc_type: string; doc_category: string; updated_at: string }>(sql, params);
+
+    if (!res.rows[0]) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Document not found', req.requestId),
+      );
+    }
+
+    // Audit log entry
+    const changes: string[] = [];
+    if (body.doc_type && body.doc_type !== prev.doc_type) {
+      changes.push(`doc_type: ${prev.doc_type} → ${body.doc_type}`);
+    }
+    if (body.doc_category && body.doc_category !== prev.doc_category) {
+      changes.push(`doc_category: ${prev.doc_category} → ${body.doc_category}`);
+    }
+    if (changes.length > 0) {
+      await insertAudit(Number(id), 'category_changed', 'admin', changes.join('; '));
+    }
+
+    return reply.send(
+      successEnvelope(res.rows[0], req.requestId),
+    );
+  });
+
   // PATCH /v3/vault/:id/link — link to opportunity/capture/award
   app.patch('/v3/vault/:id/link', async (req, reply) => {
     const { id } = req.params as { id: string };

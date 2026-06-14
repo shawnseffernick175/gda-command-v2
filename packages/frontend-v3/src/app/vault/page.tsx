@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,6 +12,7 @@ import {
   useUploadVaultDocument,
   useLinkVaultDocument,
   useDeleteVaultDocument,
+  useUpdateVaultDocType,
   useRegulatoryCatalog,
 } from "@/hooks/use-vault";
 import { Pagination } from "@/components/shared/Pagination";
@@ -19,6 +20,7 @@ import { PendingState } from "@/components/shared/pending-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+
 import type { VaultDocument, RegulatoryCatalogEntry } from "@/lib/types";
 
 /* ── Constants ─────────────────────────────────────────────── */
@@ -372,6 +374,15 @@ export default function VaultPage() {
 
 /* ── Work Product Table ────────────────────────────────────── */
 
+/* ── Doc Type Sorted Options ─────────────────────────────── */
+
+const DOC_TYPE_OPTIONS = [...VAULT_BUCKETS]
+  .sort((a, b) => {
+    if (a === "other") return 1;
+    if (b === "other") return -1;
+    return (DOC_TYPE_LABELS[a] ?? a).localeCompare(DOC_TYPE_LABELS[b] ?? b);
+  });
+
 function WorkProductTable({
   items,
   isLoading,
@@ -385,6 +396,14 @@ function WorkProductTable({
   onDelete: (doc: VaultDocument) => void;
   onLink: (id: number) => void;
 }) {
+  const updateDocType = useUpdateVaultDocType();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!errorMsg) return;
+    const t = setTimeout(() => setErrorMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [errorMsg]);
   if (isLoading && !items.length) {
     return (
       <div className="space-y-2">
@@ -405,7 +424,12 @@ function WorkProductTable({
   }
 
   return (
-    <div className="rounded border border-border overflow-hidden">
+    <div className="rounded border border-border overflow-hidden relative">
+      {errorMsg && (
+        <div className="absolute top-2 right-2 z-50 bg-red-900/90 text-red-100 text-xs px-3 py-2 rounded shadow-lg">
+          {errorMsg}
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
@@ -433,11 +457,29 @@ function WorkProductTable({
                 </button>
               </td>
               <td className="px-3 py-2">
-                <span
-                  className={`inline-block rounded px-2 py-0.5 text-[11px] font-mono border ${docTypeBadgeClass(doc.doc_type)}`}
+                <select
+                  value={doc.doc_type}
+                  disabled={updateDocType.isPending && updateDocType.variables?.id === doc.id}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val || val === doc.doc_type) return;
+                    updateDocType.mutate(
+                      { id: doc.id, doc_type: val },
+                      {
+                        onError: () => {
+                          setErrorMsg("Could not update category. Try again.");
+                        },
+                      },
+                    );
+                  }}
+                  className={`text-[11px] font-mono border rounded px-2 py-0.5 cursor-pointer appearance-none bg-transparent pr-5 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_4px_center] ${docTypeBadgeClass(doc.doc_type)}`}
                 >
-                  {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
-                </span>
+                  {DOC_TYPE_OPTIONS.map((dt) => (
+                    <option key={dt} value={dt}>
+                      {DOC_TYPE_LABELS[dt] ?? dt}
+                    </option>
+                  ))}
+                </select>
               </td>
               <td className="px-3 py-2 text-center">
                 {doc.ai_summary && doc.ai_tags ? (

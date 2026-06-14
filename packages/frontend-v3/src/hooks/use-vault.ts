@@ -143,6 +143,56 @@ export function useDeleteVaultDocument() {
   });
 }
 
+export function useUpdateVaultDocType() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      doc_type,
+    }: {
+      id: number;
+      doc_type: string;
+    }) =>
+      apiPatch<{ id: number; doc_type: string; doc_category: string; updated_at: string }>(
+        `/v3/vault/documents/${id}`,
+        { doc_type },
+      ),
+    onMutate: async ({ id, doc_type }) => {
+      await queryClient.cancelQueries({ queryKey: ["vault"] });
+
+      const previousQueries = queryClient.getQueriesData<VaultPaginatedResponse>({
+        queryKey: ["vault"],
+      });
+
+      queryClient.setQueriesData<VaultPaginatedResponse>(
+        { queryKey: ["vault"] },
+        (old) => {
+          if (!old?.items) return old;
+          return {
+            ...old,
+            items: old.items.map((item) =>
+              item.id === id ? { ...item, doc_type } : item,
+            ),
+          };
+        },
+      );
+
+      return { previousQueries };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousQueries) {
+        for (const [key, data] of context.previousQueries) {
+          queryClient.setQueryData(key, data);
+        }
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["vault"] });
+    },
+  });
+}
+
 export function useRegulatoryCatalog(params: { category?: string } = {}) {
   return useQuery({
     queryKey: ["vault", "regulatory-catalog", params],
