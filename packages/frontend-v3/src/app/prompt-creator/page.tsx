@@ -799,7 +799,7 @@ export default function PromptCreatorPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border sticky-page-header">
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pt-6 sticky-page-header">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <h1 className="font-mono text-base font-bold text-foreground">Prompt Creator</h1>
