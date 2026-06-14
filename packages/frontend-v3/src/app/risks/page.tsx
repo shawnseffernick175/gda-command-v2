@@ -589,29 +589,32 @@ export default function RisksPage() {
   return (
     <div className="space-y-6">
       {/* Tab row */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setActiveTab("register")}
-          className={cn(
-            "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
-            activeTab === "register"
-              ? "border-gda-green text-gda-green"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Risk Register
-        </button>
-        <button
-          onClick={() => setActiveTab("pwin")}
-          className={cn(
-            "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
-            activeTab === "pwin"
-              ? "border-gda-green text-gda-green"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Pwin Weights
-        </button>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        <h1 className="font-mono text-lg font-bold text-foreground">Risks</h1>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab("register")}
+            className={cn(
+              "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
+              activeTab === "register"
+                ? "border-gda-green text-gda-green"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Risk Register
+          </button>
+          <button
+            onClick={() => setActiveTab("pwin")}
+            className={cn(
+              "rounded-t border-b-2 px-4 py-1.5 text-xs font-mono font-medium transition-colors",
+              activeTab === "pwin"
+                ? "border-gda-green text-gda-green"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Pwin Weights
+          </button>
+        </div>
       </div>
 
       {activeTab === "register" && <RisksRegisterContent />}

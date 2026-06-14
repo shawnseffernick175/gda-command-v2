@@ -199,101 +199,104 @@ export default function AwardsPage() {
 
   return (
     <div className="space-y-4" ref={listRef}>
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <h1 className="font-mono text-lg font-bold text-foreground">
-          Competitive Intel — Awards
-        </h1>
-        {countData && (
-          <Badge variant="outline" className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]">
-            {countData.count.toLocaleString()} USAspending awards
-          </Badge>
-        )}
-      </div>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <h1 className="font-mono text-lg font-bold text-foreground">
+            Competitive Intel — Awards
+          </h1>
+          {countData && (
+            <Badge variant="outline" className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]">
+              {countData.count.toLocaleString()} USAspending awards
+            </Badge>
+          )}
+        </div>
 
-      {/* Intelligence Bar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <IntelChip
-          label={meta ? `${meta.total_count.toLocaleString()} Total Awards` : "—"}
-          onClick={() => handleTabChange("all")}
-          active={activeTab === "all"}
-        />
-        <IntelChip
-          label={meta ? `${meta.expiring_90d} Expiring <90 Days` : "—"}
-          onClick={() => handleTabChange("90d")}
-          active={activeTab === "90d"}
-          colorClass="text-gda-red border-gda-red/30"
-        />
-        <IntelChip
-          label={meta ? `${meta.expiring_1yr} Expiring <1yr` : "—"}
-          onClick={() => handleTabChange("1yr")}
-          active={activeTab === "1yr"}
-          colorClass="text-gda-amber border-gda-amber/30"
-        />
-        <IntelChip
-          label={meta ? `${formatMoney(meta.total_value)} Tracked Value` : "—"}
-          onClick={() => handleTabChange("all")}
-        />
-        <IntelChip
-          label={meta ? `${meta.incumbents_identified} Incumbents Identified` : "—"}
-          onClick={() => handleTabChange("incumbents")}
-          active={activeTab === "incumbents"}
-        />
-      </div>
+        {/* Intelligence Bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <IntelChip
+            label={meta ? `${meta.total_count.toLocaleString()} Total Awards` : "—"}
+            onClick={() => handleTabChange("all")}
+            active={activeTab === "all"}
+          />
+          <IntelChip
+            label={meta ? `${meta.expiring_90d} Expiring <90 Days` : "—"}
+            onClick={() => handleTabChange("90d")}
+            active={activeTab === "90d"}
+            colorClass="text-gda-red border-gda-red/30"
+          />
+          <IntelChip
+            label={meta ? `${meta.expiring_1yr} Expiring <1yr` : "—"}
+            onClick={() => handleTabChange("1yr")}
+            active={activeTab === "1yr"}
+            colorClass="text-gda-amber border-gda-amber/30"
+          />
+          <IntelChip
+            label={meta ? `${formatMoney(meta.total_value)} Tracked Value` : "—"}
+            onClick={() => handleTabChange("all")}
+          />
+          <IntelChip
+            label={meta ? `${meta.incumbents_identified} Incumbents Identified` : "—"}
+            onClick={() => handleTabChange("incumbents")}
+            active={activeTab === "incumbents"}
+          />
+        </div>
 
-      {/* Tab Filters */}
-      <div className="flex items-center gap-1 border-b border-border">
-        {TAB_DEFS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabChange(tab.key)}
-            className={cn(
-              "px-3 py-1.5 text-xs font-mono transition-colors border-b-2",
-              activeTab === tab.key
-                ? "border-gda-cyan text-gda-cyan"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-              tab.colorClass && activeTab === tab.key ? tab.colorClass : "",
-            )}
-          >
-            {tab.label(meta)}
-          </button>
-        ))}
-      </div>
-
-      {/* Search + Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          placeholder="Search awards…"
-          value={searchInput}
-          onChange={handleSearchChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-56"
-        />
-        <input
-          type="text"
-          placeholder="Filter by incumbent…"
-          value={incumbentInput}
-          onChange={handleIncumbentChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-48"
-        />
-        <select
-          value={String(valueRangeIdx)}
-          onChange={handleValueRangeChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
-        >
-          {VALUE_RANGES.map((r, i) => (
-            <option key={r.label} value={String(i)}>
-              {r.label}
-            </option>
+        {/* Tab Filters */}
+        <div className="flex items-center gap-1 border-b border-border">
+          {TAB_DEFS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => handleTabChange(tab.key)}
+              className={cn(
+                "px-3 py-1.5 text-xs font-mono transition-colors border-b-2",
+                activeTab === tab.key
+                  ? "border-gda-cyan text-gda-cyan"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+                tab.colorClass && activeTab === tab.key ? tab.colorClass : "",
+              )}
+            >
+              {tab.label(meta)}
+            </button>
           ))}
-        </select>
-        <input
-          type="text"
-          placeholder="NAICS code…"
-          value={naicsInput}
-          onChange={handleNaicsChange}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-32"
-        />
+        </div>
+
+        {/* Search + Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search awards…"
+            value={searchInput}
+            onChange={handleSearchChange}
+            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-56"
+          />
+          <input
+            type="text"
+            placeholder="Filter by incumbent…"
+            value={incumbentInput}
+            onChange={handleIncumbentChange}
+            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-48"
+          />
+          <select
+            value={String(valueRangeIdx)}
+            onChange={handleValueRangeChange}
+            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
+          >
+            {VALUE_RANGES.map((r, i) => (
+              <option key={r.label} value={String(i)}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="NAICS code…"
+            value={naicsInput}
+            onChange={handleNaicsChange}
+            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-32"
+          />
+        </div>
       </div>
 
       {error && (

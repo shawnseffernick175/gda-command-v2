@@ -10,9 +10,11 @@ export default function VehiclesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-mono text-lg font-bold text-foreground">
-        Contract Vehicles
-      </h1>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 sticky-page-header">
+        <h1 className="font-mono text-lg font-bold text-foreground">
+          Contract Vehicles
+        </h1>
+      </div>
 
       {error && (
         <ErrorState

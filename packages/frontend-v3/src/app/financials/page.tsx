@@ -82,87 +82,90 @@ export default function FinancialsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Status Strip */}
-      <StatusStrip />
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        {/* Status Strip */}
+        <StatusStrip />
 
-      {/* Tab bar with AI Analyze + Year Selector */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* Left: AI Analyze button + tabs */}
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            className="rounded px-3 py-1.5 text-[13px] font-medium text-white transition-colors bg-fin-navy hover:bg-fin-navy-hover"
-            onClick={handleAiAnalyze}
-          >
-            AI Analyze
-          </button>
+        {/* Tab bar with AI Analyze + Year Selector */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Left: AI Analyze button + tabs */}
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              className="rounded px-3 py-1.5 text-[13px] font-medium text-white transition-colors bg-fin-navy hover:bg-fin-navy-hover"
+              onClick={handleAiAnalyze}
+            >
+              AI Analyze
+            </button>
 
-          <nav className="flex items-center gap-4">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={cn(
-                  "border-b-2 pb-1 text-[13px] font-medium transition-colors",
-                  activeTab === tab.id
-                    ? "border-gda-cyan text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+            <nav className="flex items-center gap-4">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={cn(
+                    "border-b-2 pb-1 text-[13px] font-medium transition-colors",
+                    activeTab === tab.id
+                      ? "border-gda-cyan text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Right: FY/CY toggle + year buttons */}
+          <div className="flex items-center gap-2">
+            <div className="flex rounded border border-border">
+              {(["FY", "CY"] as CalendarMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={cn(
+                    "px-2 py-1 text-[12px] font-medium transition-colors",
+                    calendarMode === mode
+                      ? "bg-card text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => setCalendarMode(mode)}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1">
+              {YEARS.map((yr) => (
+                <button
+                  key={yr}
+                  type="button"
+                  className={cn(
+                    "rounded px-2 py-1 text-[12px] font-medium transition-colors",
+                    selectedYear === yr
+                      ? "bg-card text-foreground border border-border"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => setSelectedYear(yr)}
+                >
+                  {yr}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Right: FY/CY toggle + year buttons */}
-        <div className="flex items-center gap-2">
-          <div className="flex rounded border border-border">
-            {(["FY", "CY"] as CalendarMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={cn(
-                  "px-2 py-1 text-[12px] font-medium transition-colors",
-                  calendarMode === mode
-                    ? "bg-card text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setCalendarMode(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1">
-            {YEARS.map((yr) => (
-              <button
-                key={yr}
-                type="button"
-                className={cn(
-                  "rounded px-2 py-1 text-[12px] font-medium transition-colors",
-                  selectedYear === yr
-                    ? "bg-card text-foreground border border-border"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setSelectedYear(yr)}
-              >
-                {yr}
-              </button>
-            ))}
-          </div>
+        {/* Page title + subtitle */}
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">
+            {tabTitle(activeTab)} {"\u2014"} {fy}
+          </h1>
+          <p className="text-[12px] text-muted-foreground">
+            Envision Innovative Solutions (OU3) {"\u2014"} 7% YoY Growth Target
+          </p>
         </div>
-      </div>
-
-      {/* Page title + subtitle */}
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">
-          {tabTitle(activeTab)} {"\u2014"} {fy}
-        </h1>
-        <p className="text-[12px] text-muted-foreground">
-          Envision Innovative Solutions (OU3) {"\u2014"} 7% YoY Growth Target
-        </p>
       </div>
 
       {/* Tab content */}

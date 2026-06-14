@@ -705,16 +705,18 @@ export default function FastTrackPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Page Header ──────────────────────────────────────── */}
-      <div>
-        <h1 className="font-mono text-lg font-bold text-foreground">Fast Track</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Need Sensing — monitor emerging technology & requirement signals, match them, and surface the right pursuit vehicle
-        </p>
-      </div>
+      {/* ── Sticky Page Header ──────────────────────────────── */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-6 sticky-page-header">
+        <div>
+          <h1 className="font-mono text-lg font-bold text-foreground">Fast Track</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Need Sensing — monitor emerging technology & requirement signals, match them, and surface the right pursuit vehicle
+          </p>
+        </div>
 
-      {/* ── Pipeline Side Tabs ────────────────────────────────── */}
-      <SideTabSwitcher activeSide={activeSide} onChange={setActiveSide} />
+        {/* ── Pipeline Side Tabs ────────────────────────────────── */}
+        <SideTabSwitcher activeSide={activeSide} onChange={setActiveSide} />
+      </div>
 
       {/* ── NEED SENSING: Technology Pipeline ────────────────── */}
       <CollapseSection

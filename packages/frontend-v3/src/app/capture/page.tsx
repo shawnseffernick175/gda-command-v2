@@ -79,32 +79,34 @@ function CaptureList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-lg font-bold text-foreground">
-          Capture
-        </h1>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => { setModalEntryPoint("full_pipeline"); setShowModal(true); }}
-            className="rounded border border-gda-green/30 bg-gda-green/10 px-3 py-1.5 text-xs font-medium text-gda-green hover:bg-gda-green/20"
-          >
-            Start Full Capture
-          </button>
-          <button
-            type="button"
-            onClick={() => { setModalEntryPoint("white_only"); setShowModal(true); }}
-            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs font-medium text-foreground hover:bg-gda-panel/80"
-          >
-            White Review Only
-          </button>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-3 sticky-page-header">
+        <div className="flex items-center justify-between">
+          <h1 className="font-mono text-lg font-bold text-foreground">
+            Capture
+          </h1>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setModalEntryPoint("full_pipeline"); setShowModal(true); }}
+              className="rounded border border-gda-green/30 bg-gda-green/10 px-3 py-1.5 text-xs font-medium text-gda-green hover:bg-gda-green/20"
+            >
+              Start Full Capture
+            </button>
+            <button
+              type="button"
+              onClick={() => { setModalEntryPoint("white_only"); setShowModal(true); }}
+              className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs font-medium text-foreground hover:bg-gda-panel/80"
+            >
+              White Review Only
+            </button>
+          </div>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Pursuits in Capture (Pursue stage and beyond). pwin set here via Shipley
+          drivers — pursuit without a capture plan shows {"\u201C"}—{"\u201D"} and is
+          unforecastable.
+        </p>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Pursuits in Capture (Pursue stage and beyond). pwin set here via Shipley
-        drivers — pursuit without a capture plan shows {"\u201C"}—{"\u201D"} and is
-        unforecastable.
-      </p>
 
       {isLoading ? (
         <div className="space-y-2">

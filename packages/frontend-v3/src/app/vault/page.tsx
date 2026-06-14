@@ -203,59 +203,61 @@ export default function VaultPage() {
 
   return (
     <div className="space-y-6" ref={listRef}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="font-mono text-lg font-bold text-foreground">Vault</h1>
-          {countData && (
-            <Badge
-              variant="outline"
-              className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="font-mono text-lg font-bold text-foreground">Vault</h1>
+            {countData && (
+              <Badge
+                variant="outline"
+                className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
+              >
+                {countData.count} documents
+              </Badge>
+            )}
+          </div>
+          {activeTab === "work_product" && (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
             >
-              {countData.count} documents
-            </Badge>
+              Upload Document
+            </button>
           )}
         </div>
-        {activeTab === "work_product" && (
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
-          >
-            Upload Document
-          </button>
-        )}
-      </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border">
-        <button
-          onClick={() => {
-            setActiveTab("work_product");
-            setDocTypeFilter(undefined);
-            setPage(1);
-          }}
-          className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
-            activeTab === "work_product"
-              ? "border-gda-green text-gda-green"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Work Product
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab("regulatory");
-            setDocTypeFilter(undefined);
-            setPage(1);
-          }}
-          className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
-            activeTab === "regulatory"
-              ? "border-gda-cyan text-gda-cyan"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Regulatory Library
-        </button>
+        {/* Tabs */}
+        <div className="flex items-center gap-1 border-b border-border">
+          <button
+            onClick={() => {
+              setActiveTab("work_product");
+              setDocTypeFilter(undefined);
+              setPage(1);
+            }}
+            className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === "work_product"
+                ? "border-gda-green text-gda-green"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Work Product
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("regulatory");
+              setDocTypeFilter(undefined);
+              setPage(1);
+            }}
+            className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === "regulatory"
+                ? "border-gda-cyan text-gda-cyan"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Regulatory Library
+          </button>
+        </div>
       </div>
 
       {/* Bucket chip bar */}

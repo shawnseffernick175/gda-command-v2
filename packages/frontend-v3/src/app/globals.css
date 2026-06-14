@@ -138,3 +138,9 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  .sticky-page-header {
+    position: static !important;
+  }
+}

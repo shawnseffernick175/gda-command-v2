@@ -87,26 +87,28 @@ export default function ActionItemsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-mono text-lg font-bold text-foreground">
-        Action Items
-      </h1>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        <h1 className="font-mono text-lg font-bold text-foreground">
+          Action Items
+        </h1>
 
-      <div className="flex gap-2">
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.label}
-            type="button"
-            onClick={() => setStatusFilter(f.value)}
-            className={cn(
-              "rounded px-2.5 py-1 text-xs font-mono transition-colors",
-              statusFilter === f.value
-                ? "bg-gda-green/20 text-gda-green border border-gda-green/30"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
+        <div className="flex gap-2">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.label}
+              type="button"
+              onClick={() => setStatusFilter(f.value)}
+              className={cn(
+                "rounded px-2.5 py-1 text-xs font-mono transition-colors",
+                statusFilter === f.value
+                  ? "bg-gda-green/20 text-gda-green border border-gda-green/30"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
