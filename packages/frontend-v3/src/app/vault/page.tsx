@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -20,13 +20,7 @@ import { PendingState } from "@/components/shared/pending-state";
 import { ErrorState } from "@/components/shared/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
-import { toast } from "sonner";
+
 import type { VaultDocument, RegulatoryCatalogEntry } from "@/lib/types";
 
 /* ── Constants ─────────────────────────────────────────────── */
@@ -403,6 +397,13 @@ function WorkProductTable({
   onLink: (id: number) => void;
 }) {
   const updateDocType = useUpdateVaultDocType();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!errorMsg) return;
+    const t = setTimeout(() => setErrorMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [errorMsg]);
   if (isLoading && !items.length) {
     return (
       <div className="space-y-2">
@@ -423,7 +424,12 @@ function WorkProductTable({
   }
 
   return (
-    <div className="rounded border border-border overflow-hidden">
+    <div className="rounded border border-border overflow-hidden relative">
+      {errorMsg && (
+        <div className="absolute top-2 right-2 z-50 bg-red-900/90 text-red-100 text-xs px-3 py-2 rounded shadow-lg">
+          {errorMsg}
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
@@ -451,37 +457,30 @@ function WorkProductTable({
                 </button>
               </td>
               <td className="px-3 py-2">
-                <Select
+                <select
                   value={doc.doc_type}
-                  onValueChange={(val) => {
+                  disabled={updateDocType.isPending && updateDocType.variables?.id === doc.id}
+                  onChange={(e) => {
+                    const val = e.target.value;
                     if (!val || val === doc.doc_type) return;
                     updateDocType.mutate(
                       { id: doc.id, doc_type: val },
                       {
                         onError: () => {
-                          toast.error("Could not update category. Try again.");
+                          setErrorMsg("Could not update category. Try again.");
                         },
                       },
                     );
                   }}
+                  className={`text-[11px] font-mono border rounded px-2 py-0.5 cursor-pointer appearance-none bg-transparent pr-5 ${docTypeBadgeClass(doc.doc_type)}`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center' }}
                 >
-                  <SelectTrigger
-                    size="sm"
-                    className={`text-[11px] font-mono border rounded px-2 py-0.5 h-auto min-h-0 gap-1 ${docTypeBadgeClass(doc.doc_type)}`}
-                    disabled={updateDocType.isPending && updateDocType.variables?.id === doc.id}
-                  >
-                    <span className="pointer-events-none truncate">
-                      {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent align="start" alignItemWithTrigger={false}>
-                    {DOC_TYPE_OPTIONS.map((dt) => (
-                      <SelectItem key={dt} value={dt}>
-                        {DOC_TYPE_LABELS[dt] ?? dt}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {DOC_TYPE_OPTIONS.map((dt) => (
+                    <option key={dt} value={dt}>
+                      {DOC_TYPE_LABELS[dt] ?? dt}
+                    </option>
+                  ))}
+                </select>
               </td>
               <td className="px-3 py-2 text-center">
                 {doc.ai_summary && doc.ai_tags ? (
