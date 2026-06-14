@@ -165,43 +165,45 @@ export default function DigestPage() {
 
   return (
     <div className="space-y-5">
-      {/* ─── Header ────────────────────────────────────────── */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-mono text-lg font-bold text-foreground">
-            MARKET INTELLIGENCE DIGEST
-          </h1>
-          <p className="font-mono text-xs text-muted-foreground">
-            Refreshed daily
-            {lastUpdated ? ` · Last updated: ${lastUpdated} ET` : ""}
-          </p>
-        </div>
-        <button
-          onClick={() => refresh.mutate()}
-          disabled={refresh.isPending}
-          className="inline-flex items-center gap-1.5 rounded border border-border bg-gda-panel px-2.5 py-1.5 font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
-          Refresh
-        </button>
-      </div>
-
-      {/* ─── Category tabs ─────────────────────────────────── */}
-      <div className="flex flex-wrap gap-1.5">
-        {CATEGORIES.map((cat) => (
+      {/* ─── Sticky Header ─────────────────────────────────── */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="font-mono text-lg font-bold text-foreground">
+              MARKET INTELLIGENCE DIGEST
+            </h1>
+            <p className="font-mono text-xs text-muted-foreground">
+              Refreshed daily
+              {lastUpdated ? ` · Last updated: ${lastUpdated} ET` : ""}
+            </p>
+          </div>
           <button
-            key={cat.key}
-            onClick={() => setActiveCategory(cat.key)}
-            className={cn(
-              "rounded px-2.5 py-1 font-mono text-xs transition-colors",
-              activeCategory === cat.key
-                ? "bg-gda-green/15 text-gda-green border border-gda-green/40"
-                : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30",
-            )}
+            onClick={() => refresh.mutate()}
+            disabled={refresh.isPending}
+            className="inline-flex items-center gap-1.5 rounded border border-border bg-gda-panel px-2.5 py-1.5 font-mono text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            {cat.label}
+            <RefreshCw size={12} className={refresh.isPending ? "animate-spin" : ""} />
+            Refresh
           </button>
-        ))}
+        </div>
+
+        {/* ─── Category tabs ─────────────────────────────────── */}
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => setActiveCategory(cat.key)}
+              className={cn(
+                "rounded px-2.5 py-1 font-mono text-xs transition-colors",
+                activeCategory === cat.key
+                  ? "bg-gda-green/15 text-gda-green border border-gda-green/40"
+                  : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30",
+              )}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ─── Main grid ─────────────────────────────────────── */}

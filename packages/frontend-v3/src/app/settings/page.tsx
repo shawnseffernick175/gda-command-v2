@@ -662,7 +662,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 sticky-page-header">
         <h1 className="font-mono text-lg font-bold text-foreground">SETTINGS</h1>
         <p className="text-sm text-muted-foreground">System configuration and integrations</p>
       </div>

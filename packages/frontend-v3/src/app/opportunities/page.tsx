@@ -306,109 +306,112 @@ function OpportunityList() {
 
   return (
     <div className="space-y-4">
-      {/* Page header */}
-      <h1 className="font-mono text-lg font-bold text-foreground">
-        Opportunities
-      </h1>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        {/* Page header */}
+        <h1 className="font-mono text-lg font-bold text-foreground">
+          Opportunities
+        </h1>
 
-      {/* Intelligence bar */}
-      {meta && (
-        <div className="flex flex-wrap gap-2">
-          <IntelChip
-            icon="#"
-            label={`${meta.total_count} Active`}
-            active={false}
-          />
-          <IntelChip
-            icon="!"
-            label={`${meta.due_this_week} Due This Week`}
-            active={dueFilter === "this_week"}
-            onClick={handleDueThisWeekClick}
-          />
-          <IntelChip
-            icon="?"
-            label={`${meta.unscored_count} Unscored`}
-            active={gradeFilter.includes("Unscored")}
-            onClick={handleUnscoredClick}
-          />
-          <IntelChip
-            icon="$"
-            label={`${formatMoney(meta.total_value)} Total Value`}
-            active={false}
-          />
-          <IntelChip
-            icon="A"
-            label={`${meta.grade_a_count} Grade A`}
-            active={gradeFilter.includes("A")}
-            onClick={handleGradeAClick}
-          />
-        </div>
-      )}
-
-      {/* Filter bar (column-level filters live in the table headers now) */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <input
-          type="text"
-          placeholder="Search title, agency, solicitation #…"
-          value={q}
-          onChange={handleSearchChange}
-          className="flex-grow min-w-[200px] rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
-        />
-        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={relevantOnly}
-            onChange={(e) => setRelevantOnly(e.target.checked)}
-            className="accent-gda-green h-3.5 w-3.5"
-          />
-          <span className="text-[11px] text-muted-foreground whitespace-nowrap">Relevant Only (IT/Consulting)</span>
-        </label>
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Clear
-          </button>
+        {/* Intelligence bar */}
+        {meta && (
+          <div className="flex flex-wrap gap-2">
+            <IntelChip
+              icon="#"
+              label={`${meta.total_count} Active`}
+              active={false}
+            />
+            <IntelChip
+              icon="!"
+              label={`${meta.due_this_week} Due This Week`}
+              active={dueFilter === "this_week"}
+              onClick={handleDueThisWeekClick}
+            />
+            <IntelChip
+              icon="?"
+              label={`${meta.unscored_count} Unscored`}
+              active={gradeFilter.includes("Unscored")}
+              onClick={handleUnscoredClick}
+            />
+            <IntelChip
+              icon="$"
+              label={`${formatMoney(meta.total_value)} Total Value`}
+              active={false}
+            />
+            <IntelChip
+              icon="A"
+              label={`${meta.grade_a_count} Grade A`}
+              active={gradeFilter.includes("A")}
+              onClick={handleGradeAClick}
+            />
+          </div>
         )}
-      </div>
 
-      {/* Stage tabs + group toggle */}
-      <div className="border-b border-border flex gap-0 overflow-x-auto items-center">
-        {STAGE_TABS.map((tab) => {
-          const count = getStageCount(tab.key);
-          const active = stageTab === tab.key;
-          return (
+        {/* Filter bar (column-level filters live in the table headers now) */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            type="text"
+            placeholder="Search title, agency, solicitation #…"
+            value={q}
+            onChange={handleSearchChange}
+            className="flex-grow min-w-[200px] rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+          />
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={relevantOnly}
+              onChange={(e) => setRelevantOnly(e.target.checked)}
+              className="accent-gda-green h-3.5 w-3.5"
+            />
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">Relevant Only (IT/Consulting)</span>
+          </label>
+          {hasActiveFilters && (
             <button
-              key={tab.key}
               type="button"
-              onClick={() => setStageTab(tab.key)}
+              onClick={handleClearFilters}
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Stage tabs + group toggle */}
+        <div className="border-b border-border flex gap-0 overflow-x-auto items-center">
+          {STAGE_TABS.map((tab) => {
+            const count = getStageCount(tab.key);
+            const active = stageTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setStageTab(tab.key)}
+                className={cn(
+                  "pb-2 px-3 text-xs font-mono whitespace-nowrap transition-colors",
+                  active
+                    ? "border-b-2 border-gda-green text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {tab.label} ({count})
+              </button>
+            );
+          })}
+          <div className="ml-auto pl-3">
+            <button
+              type="button"
+              onClick={() => setGroupBy(g => g === "none" ? "vehicle" : "none")}
               className={cn(
-                "pb-2 px-3 text-xs font-mono whitespace-nowrap transition-colors",
-                active
-                  ? "border-b-2 border-gda-green text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors",
+                groupBy === "vehicle"
+                  ? "border-gda-green text-gda-green bg-gda-green/10"
+                  : "border-border text-muted-foreground hover:border-gda-green/50",
               )}
             >
-              {tab.label} ({count})
+              <span>{groupBy === "vehicle" ? "\u229F" : "\u229E"}</span>
+              Group by Vehicle
             </button>
-          );
-        })}
-        <div className="ml-auto pl-3">
-          <button
-            type="button"
-            onClick={() => setGroupBy(g => g === "none" ? "vehicle" : "none")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors",
-              groupBy === "vehicle"
-                ? "border-gda-green text-gda-green bg-gda-green/10"
-                : "border-border text-muted-foreground hover:border-gda-green/50",
-            )}
-          >
-            <span>{groupBy === "vehicle" ? "\u229F" : "\u229E"}</span>
-            Group by Vehicle
-          </button>
+          </div>
         </div>
       </div>
 

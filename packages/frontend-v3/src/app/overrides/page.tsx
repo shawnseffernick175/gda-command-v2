@@ -54,25 +54,27 @@ export default function OverridesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-lg font-bold text-foreground">
-          Override Audit
-        </h1>
-        <div className="flex gap-2">
-          {RANGES.map((r) => (
-            <button
-              key={r.value}
-              onClick={() => setRange(r.value)}
-              className={cn(
-                "rounded px-3 py-1 text-xs font-medium transition-colors",
-                range === r.value
-                  ? "bg-gda-green text-white"
-                  : "border border-border bg-white text-muted-foreground hover:bg-gda-bg-base",
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 sticky-page-header">
+        <div className="flex items-center justify-between">
+          <h1 className="font-mono text-lg font-bold text-foreground">
+            Override Audit
+          </h1>
+          <div className="flex gap-2">
+            {RANGES.map((r) => (
+              <button
+                key={r.value}
+                onClick={() => setRange(r.value)}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-medium transition-colors",
+                  range === r.value
+                    ? "bg-gda-green text-white"
+                    : "border border-border bg-white text-muted-foreground hover:bg-gda-bg-base",
+                )}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

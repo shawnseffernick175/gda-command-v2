@@ -798,18 +798,20 @@ export default function PromptCreatorPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <h1 className="font-mono text-base font-bold text-foreground">Prompt Creator</h1>
-        {!isSpecialTab && (
-          <span className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green">
-            {prompts.length} prompts
-          </span>
-        )}
-      </div>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border sticky-page-header">
+        {/* Header */}
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <h1 className="font-mono text-base font-bold text-foreground">Prompt Creator</h1>
+          {!isSpecialTab && (
+            <span className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green">
+              {prompts.length} prompts
+            </span>
+          )}
+        </div>
 
-      {/* Tab row */}
-      <div className="flex items-center gap-1 border-b border-border px-4 py-2 overflow-x-auto">
+        {/* Tab row */}
+        <div className="flex items-center gap-1 border-b border-border px-4 py-2 overflow-x-auto">
         {SURFACE_TABS.map((tab) => (
           <button
             key={tab.value}
@@ -841,6 +843,7 @@ export default function PromptCreatorPage() {
             {tab.label}
           </button>
         ))}
+        </div>
       </div>
 
       {/* Main content */}

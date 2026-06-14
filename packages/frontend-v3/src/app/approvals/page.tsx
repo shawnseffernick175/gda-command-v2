@@ -47,19 +47,21 @@ export default function ApprovalsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-lg font-bold text-foreground">
-          Approvals
-        </h1>
-        <span className="text-xs text-muted-foreground">
-          {pending.length} pending
-        </span>
-      </div>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-3 sticky-page-header">
+        <div className="flex items-center justify-between">
+          <h1 className="font-mono text-lg font-bold text-foreground">
+            Approvals
+          </h1>
+          <span className="text-xs text-muted-foreground">
+            {pending.length} pending
+          </span>
+        </div>
 
-      <p className="text-sm text-muted-foreground">
-        Review match suggestions. Confirm merges real source links; reject
-        separates them. Both actions are audited.
-      </p>
+        <p className="text-sm text-muted-foreground">
+          Review match suggestions. Confirm merges real source links; reject
+          separates them. Both actions are audited.
+        </p>
+      </div>
 
       {selected.size > 0 && (
         <div className="flex items-center gap-2 rounded border border-border bg-gda-bg-base px-3 py-2">

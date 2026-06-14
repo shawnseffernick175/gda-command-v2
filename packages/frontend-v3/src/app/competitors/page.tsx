@@ -55,43 +55,45 @@ export default function CompetitorsPage() {
 
   return (
     <div className="space-y-6" ref={listRef}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-mono text-lg font-bold text-foreground">
-            Competitor Intelligence
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Aggregated from USAspending.gov federal contract awards
-          </p>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-6 sticky-page-header">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-mono text-lg font-bold text-foreground">
+              Competitor Intelligence
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Aggregated from USAspending.gov federal contract awards
+            </p>
+          </div>
+          {countData && (
+            <Badge variant="outline" className="font-mono text-xs">
+              {countData.count.toLocaleString()} companies
+            </Badge>
+          )}
         </div>
-        {countData && (
-          <Badge variant="outline" className="font-mono text-xs">
-            {countData.count.toLocaleString()} companies
-          </Badge>
-        )}
-      </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Search company name…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 w-64"
-        />
-        {q && (
-          <button
-            type="button"
-            onClick={() => { setQ(""); setDebouncedQ(""); }}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </button>
-        )}
-        <span className="ml-auto text-[11px] text-muted-foreground">
-          {items.length} results
-        </span>
+        {/* Search */}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Search company name…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 w-64"
+          />
+          {q && (
+            <button
+              type="button"
+              onClick={() => { setQ(""); setDebouncedQ(""); }}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+          <span className="ml-auto text-[11px] text-muted-foreground">
+            {items.length} results
+          </span>
+        </div>
       </div>
 
       {/* Table */}

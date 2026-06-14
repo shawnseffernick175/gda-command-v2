@@ -209,16 +209,18 @@ export default function PipelinePage() {
 
   return (
     <div className="space-y-4">
-      {/* ── Header row ────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-lg font-bold text-foreground">Pipeline</h1>
-        <button
-          type="button"
-          onClick={() => exportCsv(items)}
-          className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs font-mono text-foreground hover:bg-gda-bg-base transition-colors"
-        >
-          ↓ Export CSV
-        </button>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 sticky-page-header">
+        <div className="flex items-center justify-between">
+          <h1 className="font-mono text-lg font-bold text-foreground">Pipeline</h1>
+          <button
+            type="button"
+            onClick={() => exportCsv(items)}
+            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs font-mono text-foreground hover:bg-gda-bg-base transition-colors"
+          >
+            ↓ Export CSV
+          </button>
+        </div>
       </div>
 
       {/* ── Section 1: Intelligence Bar ───────────────────────────── */}

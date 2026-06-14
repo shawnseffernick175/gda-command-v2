@@ -698,125 +698,130 @@ export default function ContactsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Intelligence Bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant="outline" className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]">
-          {meta.total_count.toLocaleString()} Total Contacts
-        </Badge>
-        {meta.warm_no_touch > 0 && (
-          <Badge variant="outline" className="border-gda-red/30 text-gda-red font-mono text-[11px]">
-            {meta.warm_no_touch} Warm — No Recent Touch
-          </Badge>
-        )}
-        <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[11px]">
-          {meta.linked_to_pursuits} Linked to Active Pursuits
-        </Badge>
-        <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[11px]">
-          {meta.agency_count} Agencies
-        </Badge>
-        <button
-          onClick={() => setAddModalOpen(true)}
-          className="ml-auto rounded bg-gda-cyan px-3 py-1.5 text-xs font-medium text-black hover:bg-gda-cyan/80"
-        >
-          + Add Contact
-        </button>
-      </div>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+        <h1 className="font-mono text-lg font-bold text-foreground">Contacts</h1>
 
-      {/* View Toggle */}
-      <div className="flex items-center justify-between">
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            placeholder="Search name, email, agency\u2026"
-            value={searchInput}
-            onChange={handleSearchChange}
-            className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-60"
-          />
-          <select
-            value={activeCategory}
-            onChange={(e) => {
-              setActiveCategory(e.target.value as ContactCategory | "all");
-            }}
-            className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
-          >
-            <option value="all">All Categories</option>
-            <option value="government">Government</option>
-            <option value="teaming_partner">Teaming</option>
-            <option value="competitor">Competitor</option>
-            <option value="industry">Industry</option>
-            <option value="internal">Internal</option>
-          </select>
-          <select
-            value={activeTemp}
-            onChange={(e) => {
-              setActiveTemp(e.target.value as RelationshipTemp | "all");
-            }}
-            className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
-          >
-            <option value="all">Temperature</option>
-            <option value="hot">Hot</option>
-            <option value="warm">Warm</option>
-            <option value="cold">Cold</option>
-            <option value="unknown">Unknown</option>
-          </select>
-          <select
-            value={activeLinked}
-            onChange={(e) => {
-              setActiveLinked(e.target.value as "yes" | "no" | "");
-            }}
-            className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
-          >
-            <option value="">Linked</option>
-            <option value="yes">Linked to Pursuit</option>
-            <option value="no">No Pursuits</option>
-          </select>
-          <select
-            value={activeSource}
-            onChange={(e) => {
-              setActiveSource(e.target.value);
-            }}
-            className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
-          >
-            <option value="">Source</option>
-            <option value="GovTribe">GovTribe</option>
-            <option value="GovWin">GovWin</option>
-            <option value="sam.gov">SAM.gov</option>
-            <option value="Manual">Manual</option>
-            <option value="Imported">Imported</option>
-          </select>
-          {(activeCategory !== "all" || activeTemp !== "all" || activeLinked || activeSource || searchQuery) && (
-            <button
-              onClick={handleClearFilters}
-              className="rounded border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear
-            </button>
+        {/* Intelligence Bar */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="outline" className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]">
+            {meta.total_count.toLocaleString()} Total Contacts
+          </Badge>
+          {meta.warm_no_touch > 0 && (
+            <Badge variant="outline" className="border-gda-red/30 text-gda-red font-mono text-[11px]">
+              {meta.warm_no_touch} Warm — No Recent Touch
+            </Badge>
           )}
+          <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[11px]">
+            {meta.linked_to_pursuits} Linked to Active Pursuits
+          </Badge>
+          <Badge variant="outline" className="border-border text-muted-foreground font-mono text-[11px]">
+            {meta.agency_count} Agencies
+          </Badge>
+          <button
+            onClick={() => setAddModalOpen(true)}
+            className="ml-auto rounded bg-gda-cyan px-3 py-1.5 text-xs font-medium text-black hover:bg-gda-cyan/80"
+          >
+            + Add Contact
+          </button>
         </div>
 
-        {/* View toggle */}
-        <div className="flex gap-1">
-          <button
-            onClick={() => setViewMode("list")}
-            className={`rounded px-2 py-1 text-xs ${
-              viewMode === "list"
-                ? "bg-gda-cyan text-black"
-                : "border border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            &#8801; List
-          </button>
-          <button
-            onClick={() => setViewMode("agency")}
-            className={`rounded px-2 py-1 text-xs ${
-              viewMode === "agency"
-                ? "bg-gda-cyan text-black"
-                : "border border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            &#127970; By Agency
-          </button>
+        {/* View Toggle */}
+        <div className="flex items-center justify-between">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search name, email, agency\u2026"
+              value={searchInput}
+              onChange={handleSearchChange}
+              className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-60"
+            />
+            <select
+              value={activeCategory}
+              onChange={(e) => {
+                setActiveCategory(e.target.value as ContactCategory | "all");
+              }}
+              className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
+            >
+              <option value="all">All Categories</option>
+              <option value="government">Government</option>
+              <option value="teaming_partner">Teaming</option>
+              <option value="competitor">Competitor</option>
+              <option value="industry">Industry</option>
+              <option value="internal">Internal</option>
+            </select>
+            <select
+              value={activeTemp}
+              onChange={(e) => {
+                setActiveTemp(e.target.value as RelationshipTemp | "all");
+              }}
+              className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
+            >
+              <option value="all">Temperature</option>
+              <option value="hot">Hot</option>
+              <option value="warm">Warm</option>
+              <option value="cold">Cold</option>
+              <option value="unknown">Unknown</option>
+            </select>
+            <select
+              value={activeLinked}
+              onChange={(e) => {
+                setActiveLinked(e.target.value as "yes" | "no" | "");
+              }}
+              className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
+            >
+              <option value="">Linked</option>
+              <option value="yes">Linked to Pursuit</option>
+              <option value="no">No Pursuits</option>
+            </select>
+            <select
+              value={activeSource}
+              onChange={(e) => {
+                setActiveSource(e.target.value);
+              }}
+              className="rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground focus:outline-none"
+            >
+              <option value="">Source</option>
+              <option value="GovTribe">GovTribe</option>
+              <option value="GovWin">GovWin</option>
+              <option value="sam.gov">SAM.gov</option>
+              <option value="Manual">Manual</option>
+              <option value="Imported">Imported</option>
+            </select>
+            {(activeCategory !== "all" || activeTemp !== "all" || activeLinked || activeSource || searchQuery) && (
+              <button
+                onClick={handleClearFilters}
+                className="rounded border border-border px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* View toggle */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`rounded px-2 py-1 text-xs ${
+                viewMode === "list"
+                  ? "bg-gda-cyan text-black"
+                  : "border border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              &#8801; List
+            </button>
+            <button
+              onClick={() => setViewMode("agency")}
+              className={`rounded px-2 py-1 text-xs ${
+                viewMode === "agency"
+                  ? "bg-gda-cyan text-black"
+                  : "border border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              &#127970; By Agency
+            </button>
+          </div>
         </div>
       </div>
 

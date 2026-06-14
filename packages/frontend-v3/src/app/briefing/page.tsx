@@ -161,23 +161,25 @@ export default function BriefingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-mono text-lg font-bold text-foreground">
-            Daily Brief
-          </h1>
-          <p className="text-sm text-muted-foreground">{todayStr}</p>
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 sticky-page-header">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-mono text-lg font-bold text-foreground">
+              Daily Brief
+            </h1>
+            <p className="text-sm text-muted-foreground">{todayStr}</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={exporting}
+            className="gap-1.5"
+          >
+            <Download className="h-3 w-3" />
+            {exporting ? "Exporting…" : "Export PDF"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleExport}
-          disabled={exporting}
-          className="gap-1.5"
-        >
-          <Download className="h-3 w-3" />
-          {exporting ? "Exporting…" : "Export PDF"}
-        </Button>
       </div>
 
       {/* Headline */}
