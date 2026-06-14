@@ -166,7 +166,7 @@ export default function DigestPage() {
   return (
     <div className="space-y-5">
       {/* ─── Sticky Header ─────────────────────────────────── */}
-      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-4 sticky-page-header">
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="font-mono text-lg font-bold text-foreground">
