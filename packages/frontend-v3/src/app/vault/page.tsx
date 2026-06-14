@@ -25,7 +25,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { VaultDocument, RegulatoryCatalogEntry } from "@/lib/types";
@@ -471,7 +470,9 @@ function WorkProductTable({
                     className={`text-[11px] font-mono border rounded px-2 py-0.5 h-auto min-h-0 gap-1 ${docTypeBadgeClass(doc.doc_type)}`}
                     disabled={updateDocType.isPending && updateDocType.variables?.id === doc.id}
                   >
-                    <SelectValue placeholder="Select type" />
+                    <span className="pointer-events-none truncate">
+                      {DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type}
+                    </span>
                   </SelectTrigger>
                   <SelectContent align="start" alignItemWithTrigger={false}>
                     {DOC_TYPE_OPTIONS.map((dt) => (
