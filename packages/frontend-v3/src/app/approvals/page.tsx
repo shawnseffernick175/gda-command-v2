@@ -47,7 +47,7 @@ export default function ApprovalsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 -mx-6 px-6 -mt-6 pt-6 space-y-3 sticky-page-header">
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-3 sticky-page-header">
         <div className="flex items-center justify-between">
           <h1 className="font-mono text-lg font-bold text-foreground">
             Approvals
