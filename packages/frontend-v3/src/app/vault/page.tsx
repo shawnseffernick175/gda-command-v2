@@ -472,8 +472,7 @@ function WorkProductTable({
                       },
                     );
                   }}
-                  className={`text-[11px] font-mono border rounded px-2 py-0.5 cursor-pointer appearance-none bg-transparent pr-5 ${docTypeBadgeClass(doc.doc_type)}`}
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center' }}
+                  className={`text-[11px] font-mono border rounded px-2 py-0.5 cursor-pointer appearance-none bg-transparent pr-5 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22M6%209l6%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_4px_center] ${docTypeBadgeClass(doc.doc_type)}`}
                 >
                   {DOC_TYPE_OPTIONS.map((dt) => (
                     <option key={dt} value={dt}>
