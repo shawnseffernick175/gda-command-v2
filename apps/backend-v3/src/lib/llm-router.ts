@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type {
   Task,
+  ModelTier,
   RouteRequest,
   RouteResponse,
   RouteResponseOk,
@@ -39,10 +40,24 @@ const COST_TABLE: Record<string, { input: number; output: number }> = {
   'sonar-pro': { input: 0.000003, output: 0.000015 },
 };
 
+/** Model id to use when caller explicitly requests a tier. */
+const MODEL_TIER_MAP: Record<ModelTier, string> = {
+  sonnet: 'claude-sonnet-4-5',
+  opus: 'claude-opus-4-5',
+};
+
 function estimateCost(model: string, tokens: TokenUsage): number {
   const rates = COST_TABLE[model];
   if (!rates) return 0;
-  return tokens.input * rates.input + tokens.output * rates.output;
+  let inputCost = tokens.input * rates.input;
+  // Adjust for prompt caching: cache writes cost 25% more, reads cost 90% less
+  if (tokens.cache_creation_input_tokens) {
+    inputCost += tokens.cache_creation_input_tokens * rates.input * 0.25;
+  }
+  if (tokens.cache_read_input_tokens) {
+    inputCost -= tokens.cache_read_input_tokens * rates.input * 0.9;
+  }
+  return inputCost + tokens.output * rates.output;
 }
 
 /** Shared database pool reference — set via initRouter(). */
@@ -92,7 +107,12 @@ async function callProvider(
     const parsed = parseJsonResponse(result.text);
     return {
       output: parsed,
-      tokens: { input: result.tokens_input, output: result.tokens_output },
+      tokens: {
+        input: result.tokens_input,
+        output: result.tokens_output,
+        cache_creation_input_tokens: result.cache_creation_input_tokens,
+        cache_read_input_tokens: result.cache_read_input_tokens,
+      },
       model_used: result.model,
     };
   }
@@ -193,6 +213,9 @@ async function route<T extends Task>(
   }
 
   const entry = getRoutingEntry(task);
+  const resolvedModel = opts?.model_tier
+    ? MODEL_TIER_MAP[opts.model_tier]
+    : entry.model;
   const timeoutMs = opts?.timeout_ms ?? entry.timeout_ms;
   const deadline = startTime + timeoutMs;
   const disableRetry = opts?.disable_router_retry ?? false;
@@ -210,7 +233,7 @@ async function route<T extends Task>(
     }
 
     const result = await withRetry(
-      () => callProvider(task, entry.provider, entry.model, input, remaining),
+      () => callProvider(task, entry.provider, resolvedModel, input, remaining),
       { policy: DEFAULT_RETRY_POLICY, deadline, disabled: disableRetry },
     );
 
@@ -248,7 +271,7 @@ async function route<T extends Task>(
     };
   } catch (err: unknown) {
     const e = err as { message?: string; status?: number; __routerFallback?: boolean; __routerTimeout?: boolean; __routerNoRetry?: boolean };
-    primaryModelUsed = entry.model;
+    primaryModelUsed = resolvedModel;
 
     // Determine error kind
     let errorKind: RouterErrorKind = 'PROVIDER_ERROR';
@@ -270,7 +293,7 @@ async function route<T extends Task>(
       trace_id: traceId,
       task,
       provider: entry.provider,
-      model: entry.model,
+      model: resolvedModel,
       operator_id: opts?.operator_id ?? null,
       object_ref: opts?.object_ref ?? null,
       latency_ms: primaryLatency,

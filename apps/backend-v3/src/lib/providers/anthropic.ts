@@ -626,6 +626,8 @@ export interface AnthropicCallResult {
   tokens_input: number;
   tokens_output: number;
   model: string;
+  cache_creation_input_tokens: number;
+  cache_read_input_tokens: number;
 }
 
 /**
@@ -692,12 +694,25 @@ export async function callAnthropic(opts: {
     ? buildFinancialAnalyzePrompt(opts.input as FinancialAnalyzeInput)
     : JSON.stringify(opts.input);
 
+  // Prompt caching: use structured content blocks with cache_control
+  // for system prompts >= ~1024 tokens (Anthropic minimum cache size).
+  // Only financial_statement_extract qualifies (~2700+ tokens).
+  const CACHE_ELIGIBLE_TASKS: ReadonlySet<Task> = new Set([
+    'financial_statement_extract',
+  ] as const);
+
+  const useCache = CACHE_ELIGIBLE_TASKS.has(opts.task);
+  const systemParam: string | Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> =
+    useCache
+      ? [{ type: 'text' as const, text: systemPrompt, cache_control: { type: 'ephemeral' as const } }]
+      : systemPrompt;
+
   try {
     const response = await anthropic.messages.create(
       {
         model: opts.model,
         max_tokens: 4096,
-        system: systemPrompt,
+        system: systemParam,
         messages: [{ role: 'user', content: userContent }],
       },
       { timeout: opts.timeout_ms },
@@ -706,11 +721,21 @@ export async function callAnthropic(opts: {
     const textBlock = response.content.find((b) => b.type === 'text');
     const text = textBlock && 'text' in textBlock ? textBlock.text : '';
 
+    const cacheCreation = response.usage.cache_creation_input_tokens ?? 0;
+    const cacheRead = response.usage.cache_read_input_tokens ?? 0;
+    if (useCache && (cacheCreation > 0 || cacheRead > 0)) {
+      console.log(
+        `[llm-router] cache ${opts.task}: creation=${cacheCreation} read=${cacheRead}`,
+      );
+    }
+
     return {
       text,
       tokens_input: response.usage.input_tokens,
       tokens_output: response.usage.output_tokens,
       model: response.model,
+      cache_creation_input_tokens: cacheCreation,
+      cache_read_input_tokens: cacheRead,
     };
   } catch (err: unknown) {
     const e = err as { status?: number; message?: string; error?: { type?: string } };

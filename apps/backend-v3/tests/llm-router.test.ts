@@ -213,6 +213,28 @@ describe('PERPLEXITY_API_KEY optional at startup', () => {
   });
 });
 
+describe('Sonnet default — no Opus in routing table defaults', () => {
+  it('no routing table entry defaults to claude-opus', () => {
+    for (const entry of ROUTING_TABLE) {
+      expect(entry.model).not.toContain('opus');
+    }
+  });
+
+  it('capture_plan defaults to claude-sonnet-4-5', () => {
+    const entry = getRoutingEntry('capture_plan');
+    expect(entry.model).toBe('claude-sonnet-4-5');
+  });
+
+  it('every Anthropic task defaults to sonnet or haiku', () => {
+    const anthropicEntries = ROUTING_TABLE.filter((e) => e.provider === 'anthropic');
+    for (const entry of anthropicEntries) {
+      expect(
+        entry.model === 'claude-sonnet-4-5' || entry.model === 'claude-haiku-4-5',
+      ).toBe(true);
+    }
+  });
+});
+
 describe('Drift detector — no direct SDK imports outside providers/', () => {
   it('no direct import of openai or @anthropic-ai/sdk outside providers/', async () => {
     const { execSync } = await import('node:child_process');
