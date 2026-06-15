@@ -144,7 +144,11 @@ function resolveLink(row: { data_source: string; sam_notice_id: string | null; g
   if (!mapping) return null;
   const rawId = row[mapping.field];
   if (!rawId) return null;
-  return { source: mapping.source, source_native_id: rawId };
+  let nativeId = rawId;
+  if (row.data_source === 'govwin') {
+    nativeId = rawId.startsWith('govwin-') ? rawId.slice('govwin-'.length) : rawId;
+  }
+  return { source: mapping.source, source_native_id: nativeId };
 }
 
 main().catch((err) => {
