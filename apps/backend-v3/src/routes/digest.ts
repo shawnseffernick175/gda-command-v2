@@ -61,10 +61,10 @@ interface RegulatoryRow {
 interface UpcomingOppRow {
   id: string;
   title: string;
-  naics: string | null;
+  naics_code: string | null;
   agency: string | null;
   response_due_at: string | null;
-  source_uri: string | null;
+  source_url: string | null;
 }
 
 export async function digestRoutes(app: FastifyInstance): Promise<void> {
@@ -261,15 +261,23 @@ async function getRegulatoryTracker() {
 }
 
 async function getUpcomingSolicitations() {
+  // Bug 2a: Only show in-wheelhouse opportunities (NAICS allowlist gate)
+  // Bug 2b: 31-90 day timing window — CEO rule: <31d is too late to capture
+  // Also exclude opportunities in terminal pipeline stages (won/lost/no_bid/gov_cancelled)
   const { rows } = await pool.query<UpcomingOppRow>(
-    `SELECT id::text, title, naics, agency,
-            response_due_at::text, source_uri
-     FROM opportunities
-     WHERE naics = ANY($1)
-       AND response_due_at > NOW()
-       AND deleted_at IS NULL
-     ORDER BY response_due_at ASC
-     LIMIT 5`,
+    `SELECT o.id::text, o.title, o.naics AS naics_code, o.agency,
+            o.response_due_at::text, o.source_uri AS source_url
+     FROM opportunities o
+     WHERE o.naics = ANY($1)
+       AND o.response_due_at BETWEEN NOW() + INTERVAL '31 days' AND NOW() + INTERVAL '90 days'
+       AND o.deleted_at IS NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM pipeline_items pi
+         WHERE pi.opportunity_id = o.id
+           AND pi.stage IN ('won', 'lost', 'no_bid', 'gov_cancelled')
+       )
+     ORDER BY o.response_due_at ASC
+     LIMIT 10`,
     [ENVISION_NAICS],
   );
   return rows;

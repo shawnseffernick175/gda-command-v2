@@ -370,33 +370,22 @@ function RegulatoryTrackerPanel({ items }: { items: RegulatoryEntry[] }) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between gap-2"
+              className="min-w-0"
             >
-              <div className="min-w-0 flex-1">
-                {item.source_url ? (
-                  <a
-                    href={item.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
-                  >
-                    {item.title}
-                  </a>
-                ) : (
-                  <span className="font-mono text-[11px] text-foreground truncate block">
-                    {item.title}
-                  </span>
-                )}
-              </div>
-              <span className="font-mono text-[11px] text-muted-foreground whitespace-nowrap">
-                {item.effective_date
-                  ? new Date(item.effective_date).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : item.status ?? "—"}
-              </span>
+              {item.source_url ? (
+                <a
+                  href={item.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
+                >
+                  {item.title}
+                </a>
+              ) : (
+                <span className="font-mono text-[11px] text-foreground truncate block">
+                  {item.title}
+                </span>
+              )}
             </div>
           ))}
         </div>
