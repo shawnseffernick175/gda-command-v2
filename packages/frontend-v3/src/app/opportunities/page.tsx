@@ -14,6 +14,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
 import { SourceChip } from "@/components/shared/source-chip";
+import { ScoreTooltip } from "@/components/shared/score-tooltip";
 import { FieldStatusBadge } from "@/components/field-status-badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { useVaultDocuments } from "@/hooks/use-vault";
@@ -66,10 +67,10 @@ function getHeatColor(opp: OpportunitySummary): string | null {
   const daysLeft = getDaysLeft(opp);
   if (daysLeft !== null && (daysLeft <= 7 || daysLeft < 0)) return "border-l-gda-red";
   if (daysLeft !== null && daysLeft <= 30) return "border-l-gda-amber";
-  const grade = opp.pwin?.band === "forecast" ? "A" : opp.pwin?.band === "signal" ? "B" : null;
+  const isHot = opp.pwin && opp.pwin.score >= 70;
   const pipelineStage = opp.pipeline_stage;
-  if (grade === "A" && !pipelineStage) return "border-l-gda-cyan";
-  if (grade === "A" && pipelineStage) return "border-l-gda-green";
+  if (isHot && !pipelineStage) return "border-l-gda-cyan";
+  if (isHot && pipelineStage) return "border-l-gda-green";
   return null;
 }
 
@@ -156,7 +157,7 @@ function OpportunityList() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [agencyFilter, setAgencyFilter] = useState(searchParams.get("agency") ?? "");
-  const [gradeFilter, setGradeFilter] = useState<string[]>([]);
+  const [hotFilter, setHotFilter] = useState(false);
   const [setAsideFilter, setSetAsideFilter] = useState<string[]>([]);
   const [valueRange, setValueRange] = useState(0);
   const [dueFilter, setDueFilter] = useState("");
@@ -187,7 +188,7 @@ function OpportunityList() {
     return {
       q: debouncedQ || undefined,
       agency: agencyFilter || undefined,
-      grades: gradeFilter.length > 0 ? gradeFilter : undefined,
+      hot: hotFilter ? "1" : undefined,
       set_asides: setAsideFilter.length > 0 ? setAsideFilter : undefined,
       value_min: range?.min,
       value_max: range?.max,
@@ -199,7 +200,7 @@ function OpportunityList() {
       sort_dir: sortBy ? sortDir : undefined,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, sortBy, sortDir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, sortBy, sortDir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -236,7 +237,7 @@ function OpportunityList() {
   );
 
   const hasActiveFilters =
-    debouncedQ || agencyFilter || gradeFilter.length > 0 || setAsideFilter.length > 0 ||
+    debouncedQ || agencyFilter || hotFilter || setAsideFilter.length > 0 ||
     valueRange !== 0 || dueFilter || sourceFilter.length > 0;
 
   const handleClearFilters = useCallback(() => {
@@ -244,7 +245,7 @@ function OpportunityList() {
     setQ("");
     setDebouncedQ("");
     setAgencyFilter("");
-    setGradeFilter([]);
+    setHotFilter(false);
     setSetAsideFilter([]);
     setValueRange(0);
     setDueFilter("");
@@ -269,18 +270,8 @@ function OpportunityList() {
     setDueFilter((prev) => (prev === "this_week" ? "" : "this_week"));
   }, []);
 
-  const handleUnscoredClick = useCallback(() => {
-    setGradeFilter((prev) =>
-      prev.includes("Unscored")
-        ? prev.filter((g) => g !== "Unscored")
-        : [...prev, "Unscored"],
-    );
-  }, []);
-
-  const handleGradeAClick = useCallback(() => {
-    setGradeFilter((prev) =>
-      prev.includes("A") ? prev.filter((g) => g !== "A") : [...prev, "A"],
-    );
+  const handleHotClick = useCallback(() => {
+    setHotFilter((prev) => !prev);
   }, []);
 
   const applyAgencyFilter = useCallback((value: string) => {
@@ -330,19 +321,17 @@ function OpportunityList() {
             <IntelChip
               icon="?"
               label={`${meta.unscored_count} Unscored`}
-              active={gradeFilter.includes("Unscored")}
-              onClick={handleUnscoredClick}
+              active={false}
             />
             <IntelChip
               icon="$"
               label={`${formatMoney(meta.total_value)} Total Value`}
               active={false}
             />
-            <IntelChip
-              icon="A"
-              label={`${meta.grade_a_count} Grade A`}
-              active={gradeFilter.includes("A")}
-              onClick={handleGradeAClick}
+            <HotChip
+              count={meta.hot_count}
+              active={hotFilter}
+              onClick={handleHotClick}
             />
           </div>
         )}
@@ -513,6 +502,42 @@ function OpportunityList() {
         </>
       )}
     </div>
+  );
+}
+
+/* ── Hot (Pwin ≥ 70%) chip with tooltip ─────────────────────────── */
+
+function HotChip({
+  count,
+  active,
+  onClick,
+}: {
+  count: number;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <ScoreTooltip
+      label="Hot"
+      explanation="Hot = opportunities with Pwin (probability of win) ≥ 70%. Count reflects the current filter / tab."
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick}
+        className={cn(
+          "bg-gda-panel border rounded px-3 py-1.5 text-xs font-mono transition-colors",
+          active
+            ? "border-gda-green text-gda-green bg-gda-green/10"
+            : "border-border text-foreground",
+          onClick
+            ? "cursor-pointer hover:border-gda-green/40"
+            : "cursor-default",
+        )}
+      >
+        🔥 {count} Hot
+      </button>
+    </ScoreTooltip>
   );
 }
 

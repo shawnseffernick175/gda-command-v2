@@ -50,7 +50,6 @@ const FIELD_SOURCE_TABLES: Record<string, { table: string; fk: string }> = {
   agency: { table: 'opportunity_agency_sources', fk: 'opportunity_id' },
   naics: { table: 'opportunity_naics_sources', fk: 'opportunity_id' },
   set_aside: { table: 'opportunity_set_aside_sources', fk: 'opportunity_id' },
-  grade: { table: 'opportunity_grade_sources', fk: 'opportunity_id' },
   response_due_at: { table: 'opportunity_response_due_at_sources', fk: 'opportunity_id' },
   value_min: { table: 'opportunity_value_min_sources', fk: 'opportunity_id' },
   value_max: { table: 'opportunity_value_max_sources', fk: 'opportunity_id' },
@@ -142,8 +141,6 @@ function buildSummaryFromSources(
     naics_sources: sources.naics_sources ?? [],
     set_aside: row.set_aside,
     set_aside_sources: sources.set_aside_sources ?? [],
-    grade: row.grade,
-    grade_sources: sources.grade_sources ?? [],
     status: row.status,
     response_due_at: row.response_due_at,
     response_due_at_sources: sources.response_due_at_sources ?? [],
@@ -165,7 +162,7 @@ function buildSummaryFromSources(
 /**
  * Convert a cached pwin value (stored 0..1) into the list-display shape
  * { score: 0..100, band }. Returns null when no score is cached.
- * Band thresholds mirror the detail view grade mapping.
+ * Band thresholds mirror the pwin band mapping.
  */
 function attachPwin(raw: string | number | null | undefined): { score: number; band: string } | null {
   if (raw === null || raw === undefined) return null;
@@ -278,7 +275,6 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
     posted_at: row.posted_at,
     qualified_at: row.qualified_at,
     qualified_by: row.qualified_by,
-    grade_evidence: row.grade_evidence,
     analysis: enrichedAnalysis!,
     llm_analysis: llmAnalysis,
     llm_quality_flag: llmQualityFlag,
@@ -318,10 +314,6 @@ export async function listOpportunities(
     conditions.push(`naics ILIKE $${paramIdx++}`);
     params.push(`%${filters.naics}%`);
   }
-  if (filters.grade) {
-    conditions.push(`grade = $${paramIdx++}`);
-    params.push(filters.grade);
-  }
   if (filters.set_aside) {
     conditions.push(`set_aside ILIKE $${paramIdx++}`);
     params.push(`%${filters.set_aside}%`);
@@ -343,7 +335,7 @@ export async function listOpportunities(
     params.push(filters.max_value);
   }
   if (filters.hot === '1') {
-    conditions.push(`(grade = 'A')`);
+    conditions.push(`EXISTS(SELECT 1 FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id AND ac.pwin >= 0.70)`);
   }
 
   // C1: default NAICS filter — only show relevant IT/Consulting NAICS unless explicitly disabled
@@ -461,25 +453,6 @@ function buildFilterConditions(
     conditions.push(`o.naics ILIKE $${paramIdx++}`);
     params.push(`%${filters.naics}%`);
   }
-  if (filters.grade) {
-    conditions.push(`o.grade = $${paramIdx++}`);
-    params.push(filters.grade);
-  }
-  if (filters.grades && filters.grades.length > 0) {
-    const hasUnscored = filters.grades.includes('Unscored');
-    const letterGrades = filters.grades.filter((g) => g !== 'Unscored');
-    const parts: string[] = [];
-    if (letterGrades.length > 0) {
-      parts.push(`o.grade = ANY($${paramIdx++})`);
-      params.push(letterGrades);
-    }
-    if (hasUnscored) {
-      parts.push(`o.grade IS NULL`);
-    }
-    if (parts.length > 0) {
-      conditions.push(`(${parts.join(' OR ')})`);
-    }
-  }
   if (filters.set_aside) {
     conditions.push(`o.set_aside ILIKE $${paramIdx++}`);
     params.push(`%${filters.set_aside}%`);
@@ -547,7 +520,7 @@ function buildFilterConditions(
     params.push(filters.max_value);
   }
   if (filters.hot === '1') {
-    conditions.push(`(o.grade = 'A')`);
+    conditions.push(`EXISTS(SELECT 1 FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id AND ac.pwin >= 0.70)`);
   }
 
   // C1: default NAICS filter — only show relevant IT/Consulting NAICS unless explicitly disabled
@@ -615,9 +588,9 @@ export async function listOpportunitiesPaged(
     SELECT
       COUNT(*)::int AS total_count,
       COUNT(*) FILTER (WHERE o.response_due_at IS NOT NULL AND o.response_due_at >= NOW() AND o.response_due_at <= NOW() + INTERVAL '7 days')::int AS due_this_week,
-      COUNT(*) FILTER (WHERE o.grade IS NULL)::int AS unscored_count,
+      COUNT(*) FILTER (WHERE o.ai_analyzed_at IS NULL)::int AS unscored_count,
       COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)), 0)::bigint AS total_value,
-      COUNT(*) FILTER (WHERE o.grade = 'A')::int AS grade_a_count
+      COUNT(*) FILTER (WHERE (SELECT ac.pwin FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1) >= 0.70)::int AS hot_count
     FROM opportunities o ${where}
   `;
   const metaRes = await pool.query<{
@@ -625,7 +598,7 @@ export async function listOpportunitiesPaged(
     due_this_week: number;
     unscored_count: number;
     total_value: string;
-    grade_a_count: number;
+    hot_count: number;
   }>(metaSql, params);
   const metaRow = metaRes.rows[0];
   const total = metaRow?.total_count ?? 0;
@@ -694,7 +667,7 @@ export async function listOpportunitiesPaged(
     due_this_week: metaRow?.due_this_week ?? 0,
     unscored_count: metaRow?.unscored_count ?? 0,
     total_value: Number(metaRow?.total_value ?? 0),
-    grade_a_count: metaRow?.grade_a_count ?? 0,
+    hot_count: metaRow?.hot_count ?? 0,
     stage_counts: stageCounts,
   };
 

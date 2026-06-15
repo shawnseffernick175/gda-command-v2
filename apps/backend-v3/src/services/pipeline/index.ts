@@ -67,8 +67,6 @@ function rowToItem(row: PipelineRow): PipelineItem {
     opportunity_value_min_sources: row.opportunity_value_min_sources ?? [],
     opportunity_value_max: row.opportunity_value_max != null ? Number(row.opportunity_value_max) : null,
     opportunity_value_max_sources: row.opportunity_value_max_sources ?? [],
-    opportunity_grade: row.opportunity_grade,
-    opportunity_grade_sources: row.opportunity_grade_sources ?? [],
     capture_owner: row.capture_owner,
     capture_owner_sources: buildSourceRef(
       row.pipeline_source_kind,
@@ -120,7 +118,6 @@ const BASE_SELECT = `
     o.response_due_at AS opportunity_due_at,
     o.value_min       AS opportunity_value_min,
     o.value_max       AS opportunity_value_max,
-    o.grade           AS opportunity_grade,
     o.ai_analyzed_at  AS opportunity_ai_analyzed_at,
     o.analysis_version AS opportunity_analysis_version,
 
@@ -131,8 +128,6 @@ const BASE_SELECT = `
     ${SOURCE_SUBQUERY('opportunity_response_due_at_sources', 'opportunity_id')} AS opportunity_due_at_sources,
     ${SOURCE_SUBQUERY('opportunity_value_min_sources', 'opportunity_id')}     AS opportunity_value_min_sources,
     ${SOURCE_SUBQUERY('opportunity_value_max_sources', 'opportunity_id')}     AS opportunity_value_max_sources,
-    ${SOURCE_SUBQUERY('opportunity_grade_sources', 'opportunity_id')}         AS opportunity_grade_sources,
-
     ps.kind           AS pipeline_source_kind,
     ps.title          AS pipeline_source_title,
     ps.url            AS pipeline_source_url,

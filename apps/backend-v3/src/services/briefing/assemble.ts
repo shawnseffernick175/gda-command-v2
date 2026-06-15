@@ -84,21 +84,16 @@ async function fetchOpenOpportunities(): Promise<OpportunitySummary[]> {
     title: string;
     solicitation_number: string | null;
     response_due_at: string | null;
-    grade: string | null;
     pwin_score: number | null;
     days_until_deadline: number | null;
   }>(`
     SELECT id, title, solicitation_number, response_due_at,
-           (analysis->>'grade') as grade,
            (analysis->'pwin'->>'score')::int as pwin_score,
            EXTRACT(DAY FROM (response_due_at - NOW()))::int as days_until_deadline
     FROM opportunities
     WHERE deleted_at IS NULL
       AND status != 'pass'
-      AND (
-        (analysis->>'grade') = 'A' OR (analysis->>'grade') = 'B'
-        OR (analysis->'pwin'->>'band') IN ('forecast', 'signal')
-      )
+      AND (analysis->'pwin'->>'band') IN ('forecast', 'signal')
     ORDER BY response_due_at ASC NULLS LAST
     LIMIT 20
   `);
@@ -108,7 +103,7 @@ async function fetchOpenOpportunities(): Promise<OpportunitySummary[]> {
     title: r.title,
     solicitation_number: r.solicitation_number,
     response_deadline: r.response_due_at,
-    grade: (r.grade === 'A' || r.grade === 'B' ? r.grade : 'C') as 'A' | 'B' | 'C',
+    grade: ((r.pwin_score ?? 0) >= 65 ? 'A' : (r.pwin_score ?? 0) >= 45 ? 'B' : 'C') as 'A' | 'B' | 'C',
     pwin: r.pwin_score,
     days_until_deadline: r.days_until_deadline,
   }));
