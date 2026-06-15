@@ -167,7 +167,7 @@ function buildSummaryFromSources(
  * { score: 0..100, band }. Returns null when no score is cached.
  * Band thresholds mirror the detail view grade mapping.
  */
-function attachPwin(raw: string | number | null | undefined): { score: number; band: string } | null {
+export function attachPwin(raw: string | number | null | undefined): { score: number; band: string } | null {
   if (raw === null || raw === undefined) return null;
   const frac = typeof raw === 'string' ? Number(raw) : raw;
   if (!Number.isFinite(frac)) return null;
