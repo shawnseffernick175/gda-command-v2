@@ -14,7 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <TopBar />
         <IngestAlertBanner />
         <KpiHeader />
-        <main className="flex-1 overflow-y-auto px-6 pb-6">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-gda-bg-deep px-6 pb-6">{children}</main>
       </div>
     </div>
   );

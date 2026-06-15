@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useKpiHeader } from "@/hooks/use-kpi";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 
 type KpiMetricKey = "orders" | "sales" | "ebit" | "gross_margin" | "ros";
 
@@ -54,36 +58,8 @@ const KPI_ITEMS: KpiItem[] = [
   },
 ];
 
-function KpiPopover({ kpi, onClose }: { kpi: KpiItem; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose]);
-
-  return (
-    <div
-      ref={ref}
-      className="absolute bottom-full left-0 z-50 mb-2 bg-gda-panel border border-border rounded p-3 text-xs font-mono max-w-[220px] shadow-lg"
-    >
-      <p className="font-bold text-foreground uppercase">{kpi.label}</p>
-      <p className="mt-1 text-muted-foreground leading-relaxed">{kpi.definition}</p>
-      <p className="mt-2 text-muted-foreground">
-        Source: <span className="text-foreground">{kpi.source}</span>
-      </p>
-    </div>
-  );
-}
-
 export function KpiHeader() {
   const { data, isLoading, error } = useKpiHeader();
-  const [openPopover, setOpenPopover] = useState<string | null>(null);
 
   if (error) {
     return (
@@ -103,7 +79,7 @@ export function KpiHeader() {
         const delta = item?.delta;
 
         return (
-          <span key={kpi.key} className="relative inline-flex items-center gap-1">
+          <span key={kpi.key} className="inline-flex items-center gap-1">
             <div className="flex items-center gap-1.5 whitespace-nowrap">
               <span className="text-[11px] text-muted-foreground">
                 {kpi.label}
@@ -134,17 +110,26 @@ export function KpiHeader() {
                 <span className="text-[11px] text-muted-foreground">—</span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => setOpenPopover(openPopover === kpi.key ? null : kpi.key)}
-              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[11px] text-muted-foreground hover:bg-gda-panel cursor-pointer"
-              aria-label={`Info about ${kpi.label}`}
-            >
-              ?
-            </button>
-            {openPopover === kpi.key && (
-              <KpiPopover kpi={kpi} onClose={() => setOpenPopover(null)} />
-            )}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[11px] text-muted-foreground hover:bg-gda-panel cursor-pointer"
+                    aria-label={`Info about ${kpi.label}`}
+                  />
+                }
+              >
+                ?
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start" className="max-w-[220px]">
+                <p className="font-bold uppercase">{kpi.label}</p>
+                <p className="mt-1 leading-relaxed">{kpi.definition}</p>
+                <p className="mt-1 opacity-70">
+                  Source: {kpi.source}
+                </p>
+              </TooltipContent>
+            </Tooltip>
           </span>
         );
       })}
