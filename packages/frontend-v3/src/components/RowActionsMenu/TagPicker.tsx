@@ -72,7 +72,7 @@ export function TagPicker({
                 className="text-muted-foreground hover:text-foreground ml-0.5"
                 aria-label={`Remove tag ${tag}`}
               >
-                &times;
+                ×
               </button>
             </span>
           ))}

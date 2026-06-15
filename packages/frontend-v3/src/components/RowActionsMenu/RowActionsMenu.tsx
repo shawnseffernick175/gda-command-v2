@@ -146,7 +146,7 @@ export function RowActionsMenu({
           onClick={(e) => e.stopPropagation()}
           aria-label="Row actions"
         >
-          &#8942;
+          ⋮
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="bottom" sideOffset={4}>
           {sourceUri && (
