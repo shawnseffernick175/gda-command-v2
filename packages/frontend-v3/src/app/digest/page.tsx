@@ -82,8 +82,8 @@ function daysUntil(dateStr: string | null): string {
 function urgencyColor(dateStr: string | null): string {
   if (!dateStr) return "text-muted-foreground";
   const days = Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  if (days <= 3) return "text-gda-red";
-  if (days <= 14) return "text-gda-amber";
+  if (days <= 35) return "text-gda-red";
+  if (days <= 50) return "text-gda-amber";
   return "text-muted-foreground";
 }
 
