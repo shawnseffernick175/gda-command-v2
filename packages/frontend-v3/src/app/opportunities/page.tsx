@@ -99,16 +99,18 @@ function getDaysLeft(opp: OpportunitySummary): number | null {
 function formatDaysLeft(opp: OpportunitySummary): { text: string; className: string } {
   const days = getDaysLeft(opp);
   if (days === null) return { text: "—", className: "text-muted-foreground" };
+  const isForecasted = opp.date_confidence === "forecasted" || opp.date_confidence === "estimated";
+  if (isForecasted) {
+    const d = new Date(getEffectiveDueDate(opp)!);
+    const base = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return { text: `~${base}`, className: "text-muted-foreground/70" };
+  }
   if (days < 0) return { text: "PAST DUE", className: "text-gda-red font-mono font-bold italic" };
   if (days <= 7) return { text: `${days}d`, className: "text-gda-red font-mono font-bold" };
   if (days <= 30) return { text: `${days}d`, className: "text-gda-amber font-mono" };
   const d = new Date(getEffectiveDueDate(opp)!);
-  const isForecasted = opp.date_confidence === "forecasted" || opp.date_confidence === "estimated";
   const base = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return {
-    text: isForecasted ? `~${base}` : base,
-    className: isForecasted ? "text-muted-foreground/70" : "text-muted-foreground",
-  };
+  return { text: base, className: "text-muted-foreground" };
 }
 
 function isEstimatedValue(opp: OpportunitySummary): boolean {

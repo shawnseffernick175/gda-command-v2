@@ -51,8 +51,41 @@ export interface EnrichmentReport {
   govtribe_errors: number;
 }
 
+interface EnrichmentHit {
+  value: number | null;
+  dueDate: string | null;
+  sourceUrl: string;
+  sourceTitle: string;
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * R1: insert a sources row and link it to the opportunity via field junction table.
+ */
+async function writeSourceRef(
+  oppId: number,
+  kind: string,
+  sourceUrl: string,
+  sourceTitle: string,
+  junctionTable: string,
+): Promise<void> {
+  const { rows } = await pool.query<{ id: number }>(
+    `INSERT INTO sources (kind, url, title, confidence, meta)
+     VALUES ($1, $2, $3, 'medium', '{}')
+     RETURNING id`,
+    [kind, sourceUrl, sourceTitle],
+  );
+  const sourceId = rows[0]?.id;
+  if (!sourceId) return;
+  await pool.query(
+    `INSERT INTO ${junctionTable} (opportunity_id, source_id)
+     VALUES ($1, $2)
+     ON CONFLICT (opportunity_id, source_id) DO NOTHING`,
+    [oppId, sourceId],
+  );
 }
 
 /**
@@ -61,7 +94,7 @@ function delay(ms: number): Promise<void> {
 async function enrichFromGovWin(
   row: EnrichableRow,
   report: EnrichmentReport,
-): Promise<{ value: number | null; dueDate: string | null } | null> {
+): Promise<EnrichmentHit | null> {
   try {
     let hit: GovWinApiOpportunity | null = null;
 
@@ -78,7 +111,7 @@ async function enrichFromGovWin(
     const dueDate = hit.responseDueAt ?? null;
 
     if (!value && !dueDate) return null;
-    return { value, dueDate };
+    return { value, dueDate, sourceUrl: hit.sourceUri, sourceTitle: `GovWin ${hit.govwinId}` };
   } catch (err) {
     report.govwin_errors++;
     logger.warn(
@@ -92,7 +125,7 @@ async function enrichFromGovWin(
 async function enrichFromGovTribe(
   row: EnrichableRow,
   report: EnrichmentReport,
-): Promise<{ value: number | null; dueDate: string | null } | null> {
+): Promise<EnrichmentHit | null> {
   try {
     if (!row.solicitation_number && !row.title) return null;
 
@@ -152,7 +185,8 @@ async function enrichFromGovTribe(
     }
 
     if (!value && !dueDate) return null;
-    return { value, dueDate };
+    const sourceUrl = match.govtribe_url ?? match.source_url ?? `https://govtribe.com/opportunity/${match.govtribe_id}`;
+    return { value, dueDate, sourceUrl, sourceTitle: `GovTribe ${match.govtribe_id}` };
   } catch (err) {
     report.govtribe_errors++;
     logger.warn(
@@ -185,6 +219,7 @@ async function applyEnrichment(
          WHERE id = $2`,
         [govwinResult.value, row.id],
       );
+      await writeSourceRef(row.id, 'govwin', govwinResult.sourceUrl, govwinResult.sourceTitle, 'opportunity_value_max_sources');
       report.enriched_value_govwin++;
       valueEnriched = true;
     }
@@ -195,6 +230,7 @@ async function applyEnrichment(
          WHERE id = $2`,
         [govwinResult.dueDate, row.id],
       );
+      await writeSourceRef(row.id, 'govwin', govwinResult.sourceUrl, govwinResult.sourceTitle, 'opportunity_response_due_at_sources');
       report.enriched_date_govwin++;
       dateEnriched = true;
     }
@@ -214,6 +250,7 @@ async function applyEnrichment(
            WHERE id = $2`,
           [govtribeResult.value, row.id],
         );
+        await writeSourceRef(row.id, 'govtribe', govtribeResult.sourceUrl, govtribeResult.sourceTitle, 'opportunity_value_max_sources');
         report.enriched_value_govtribe++;
         valueEnriched = true;
       }
@@ -224,6 +261,7 @@ async function applyEnrichment(
            WHERE id = $2`,
           [govtribeResult.dueDate, row.id],
         );
+        await writeSourceRef(row.id, 'govtribe', govtribeResult.sourceUrl, govtribeResult.sourceTitle, 'opportunity_response_due_at_sources');
         report.enriched_date_govtribe++;
         dateEnriched = true;
       }
