@@ -84,3 +84,6 @@ v3_075_incumbent_indexes.sql
 v3_076_balance_sheet_actuals.sql
 v3_077_cost_detail_actuals.sql
 v3_078_indirect_expense_actuals.sql
+v3_079_vault_doc_type_expand.sql
+v3_080_capture_stage_history.sql
+v3_081_cleanup_phantom_pipeline_rows.sql
