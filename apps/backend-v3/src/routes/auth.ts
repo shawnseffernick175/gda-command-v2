@@ -332,7 +332,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     if (cookieValue) {
       const tokenHash = hashToken(cookieValue);
       const tokenRes = await pool.query(
-        `SELECT id, user_id FROM refresh_tokens WHERE token_hash = $1 AND revoked_at IS NULL`,
+        `SELECT rt.id, rt.user_id, u.email
+         FROM refresh_tokens rt
+         JOIN users u ON u.id = rt.user_id
+         WHERE rt.token_hash = $1 AND rt.revoked_at IS NULL`,
         [tokenHash],
       );
       if (tokenRes.rows.length > 0) {
@@ -341,11 +344,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`,
           [row.id],
         );
-
-        // Try to get email for audit from JWT if present, otherwise query
-        const userPayload = (req as FastifyRequest & { user?: JwtPayload }).user;
-        const email = userPayload?.email ?? 'unknown';
-        await recordAudit(row.user_id, email, 'logout', req);
+        await recordAudit(row.user_id, row.email ?? 'unknown', 'logout', req);
       }
     }
 

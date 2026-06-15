@@ -91,3 +91,4 @@ v3_082_is_idiq_column.sql
 v3_083_ceo_capture_table_ingest.sql
 v3_084_task_orders.sql
 v3_085_refresh_tokens.sql
+v3_086_auth_audit_refresh_events.sql
