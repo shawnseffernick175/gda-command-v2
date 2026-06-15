@@ -85,5 +85,7 @@ v3_076_balance_sheet_actuals.sql
 v3_077_cost_detail_actuals.sql
 v3_078_indirect_expense_actuals.sql
 v3_079_vault_doc_type_expand.sql
+v3_080_capture_stage_history.sql
 v3_080_is_idiq_column.sql
 v3_081_ceo_capture_table_ingest.sql
+v3_081_cleanup_phantom_pipeline_rows.sql

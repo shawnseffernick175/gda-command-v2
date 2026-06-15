@@ -462,10 +462,10 @@ function OpportunityList() {
             </div>
           ) : (
             <>
-              {/* Table. Header row stays pinned while the body scrolls. */}
-              <div className="rounded border border-border overflow-auto max-h-[calc(100vh-260px)]">
+              {/* Table — no inner scroll; the outer page scrolls */}
+              <div className="rounded border border-border overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-20">
+                  <thead>
                     <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                       <th className="w-[3px] p-0 bg-gda-bg-base" />
                       <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -1182,7 +1182,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
           {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
+          <DecisionBriefPanel llm={llm} oppId={id} canonicalPwin={opp.pwin?.score ?? null} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
 
           {/* Competitive Intelligence */}
           <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
@@ -1343,6 +1343,7 @@ const BID_BADGE_COLORS: Record<string, string> = {
 
 function DecisionBriefPanel({
   llm,
+  canonicalPwin,
   analyzing,
   onAnalyze,
   llmErrorKind,
@@ -1351,6 +1352,7 @@ function DecisionBriefPanel({
 }: {
   llm?: LlmAnalysis | null;
   oppId: string;
+  canonicalPwin?: number | null;
   analyzing: boolean;
   onAnalyze: () => void;
   llmErrorKind?: string | null;
@@ -1459,7 +1461,8 @@ function DecisionBriefPanel({
 
   const bidRec = llm.bid_recommendation ?? llm.shipley_bid_no_bid.overall;
   const bidColor = BID_BADGE_COLORS[bidRec] ?? "border-border text-muted-foreground";
-  const pwinScore = llm.win_probability;
+  // Use canonical pwin (single source of truth, #849) — same value shown on list
+  const pwinScore = canonicalPwin ?? llm.win_probability;
   const pwinColor = pwinScore >= 70 ? "text-gda-green" : pwinScore >= 40 ? "text-gda-amber" : "text-gda-red";
 
   return (
