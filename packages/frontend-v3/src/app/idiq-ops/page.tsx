@@ -1,16 +1,33 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import {
   useIdiqOpsFeed,
   useIdiqOpsScoreboard,
   useIdiqOpsKpis,
 } from "@/hooks/use-idiq-ops";
 import type { FeedFilters } from "@/hooks/use-idiq-ops";
-import { TaskOrderFeed } from "@/components/idiq-ops/TaskOrderFeed";
-import { FilterRail } from "@/components/idiq-ops/FilterRail";
-import { VehicleScoreboard } from "@/components/idiq-ops/VehicleScoreboard";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const TaskOrderFeed = dynamic(
+  () =>
+    import("@/components/idiq-ops/TaskOrderFeed").then((m) => m.TaskOrderFeed),
+  { ssr: false, loading: () => <FeedSkeleton /> },
+);
+
+const FilterRail = dynamic(
+  () => import("@/components/idiq-ops/FilterRail").then((m) => m.FilterRail),
+  { ssr: false },
+);
+
+const VehicleScoreboard = dynamic(
+  () =>
+    import("@/components/idiq-ops/VehicleScoreboard").then(
+      (m) => m.VehicleScoreboard,
+    ),
+  { ssr: false, loading: () => <ScoreboardSkeleton /> },
+);
 
 export default function IdiqOpsPage() {
   const [filters, setFilters] = useState<FeedFilters>({
@@ -30,17 +47,14 @@ export default function IdiqOpsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
         <h1 className="text-lg font-semibold text-foreground">
           IDIQ Operations
         </h1>
       </div>
 
-      {/* KPI strip */}
       <KpiStrip kpis={kpis} />
 
-      {/* Main layout: filter rail | feed table | vehicle scoreboard */}
       <div className="flex gap-4">
         <FilterRail
           filters={filters}
@@ -49,11 +63,7 @@ export default function IdiqOpsPage() {
         />
 
         {feedLoading ? (
-          <div className="flex-1 space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 bg-gda-panel" />
-            ))}
-          </div>
+          <FeedSkeleton />
         ) : (
           <TaskOrderFeed
             items={feedData?.items ?? []}
@@ -65,11 +75,7 @@ export default function IdiqOpsPage() {
         )}
 
         {scoreboardLoading ? (
-          <div className="w-[260px] shrink-0 space-y-2 border-l border-border pl-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-32 bg-gda-panel" />
-            ))}
-          </div>
+          <ScoreboardSkeleton />
         ) : (
           <VehicleScoreboard
             vehicles={scoreboard ?? []}
@@ -78,6 +84,28 @@ export default function IdiqOpsPage() {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── Skeletons ────────────────────────────────────────────────── */
+
+function FeedSkeleton() {
+  return (
+    <div className="flex-1 space-y-2">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <Skeleton key={i} className="h-8 bg-gda-panel" />
+      ))}
+    </div>
+  );
+}
+
+function ScoreboardSkeleton() {
+  return (
+    <div className="w-[260px] shrink-0 space-y-2 border-l border-border pl-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-32 bg-gda-panel" />
+      ))}
     </div>
   );
 }

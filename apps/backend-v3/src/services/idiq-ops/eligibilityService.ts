@@ -54,9 +54,8 @@ export async function computeEligibility(
   // Check set-aside eligibility
   if (setAside && setAside !== 'UR' && setAside !== 'Unrestricted') {
     const qualifies = vehicle.set_asides_held?.some(
-      (sa) => sa.toLowerCase() === setAside.toLowerCase() ||
-              ENVISION_SET_ASIDES.some((e) => e.toLowerCase() === setAside.toLowerCase()),
-    );
+      (sa) => sa.toLowerCase() === setAside.toLowerCase(),
+    ) || ENVISION_SET_ASIDES.some((e) => e.toLowerCase() === setAside.toLowerCase());
     if (!qualifies) {
       eligible = false;
       reasons.push(`Not eligible for ${setAside} set-aside`);
@@ -160,7 +159,7 @@ export function computeHeatTier(
 ): 'hot' | 'eligible' | 'watch' | 'not_eligible' {
   if (!eligible) return 'not_eligible';
   if (daysLeft != null && daysLeft <= 7 && wheelhouseScore >= 0.7) return 'hot';
-  if (eligible) return 'eligible';
+  if (wheelhouseScore >= 0.4) return 'eligible';
   return 'watch';
 }
 

@@ -55,7 +55,9 @@ export async function idiqOpsRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     if (closingWithinDays) {
-      conditions.push(`toa.response_due <= CURRENT_DATE + ${closingWithinDays}`);
+      paramIdx++;
+      conditions.push(`toa.response_due <= CURRENT_DATE + $${paramIdx}::int`);
+      params.push(closingWithinDays);
       conditions.push(`toa.response_due >= CURRENT_DATE`);
     }
 
@@ -196,67 +198,76 @@ export async function idiqOpsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/v3/idiq-ops/tos/:id/start-capture', async (req, reply) => {
     const { id } = req.params as { id: string };
 
-    // Get the TO
-    const toResult = await pool.query(
-      `SELECT id, title, vehicle_id FROM task_order_announcements WHERE id = $1`,
-      [id],
-    );
-    if (toResult.rows.length === 0) {
-      return reply.status(404).send({ success: false, error: 'TO not found' });
-    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    const to = toResult.rows[0];
+      // Get the TO
+      const toResult = await client.query(
+        `SELECT id, title, vehicle_id FROM task_order_announcements WHERE id = $1`,
+        [id],
+      );
+      if (toResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return reply.status(404).send({ success: false, error: 'TO not found' });
+      }
 
-    // Create a pipeline item first (captures require one)
-    const pipeResult = await pool.query(`
-      INSERT INTO pipeline_items (opportunity_id, stage, entered_at)
-      SELECT o.id, 'capture', NOW()
-      FROM opportunities o
-      WHERE o.title = $1
-      LIMIT 1
-      RETURNING id
-    `, [to.title]);
+      const to = toResult.rows[0];
 
-    let captureId: number;
-
-    if (pipeResult.rows.length > 0) {
-      // Create capture linked to pipeline item
-      const captureResult = await pool.query(`
-        INSERT INTO captures (pipeline_item_id, color_stage, source_id)
-        VALUES ($1, 'pink', 1)
-        RETURNING id
-      `, [pipeResult.rows[0].id]);
-      captureId = captureResult.rows[0].id;
-    } else {
-      // No matching opportunity — create a stub capture
-      // First ensure we have a pipeline item
-      const stubOpp = await pool.query(`
-        INSERT INTO opportunities (title, source_id, notice_id)
-        VALUES ($1, 1, $2)
-        RETURNING id
-      `, [to.title, `TO-${id}`]);
-
-      const stubPipe = await pool.query(`
+      // Create a pipeline item first (captures require one)
+      const pipeResult = await client.query(`
         INSERT INTO pipeline_items (opportunity_id, stage, entered_at)
-        VALUES ($1, 'capture', NOW())
+        SELECT o.id, 'capture', NOW()
+        FROM opportunities o
+        WHERE o.title = $1
+        LIMIT 1
         RETURNING id
-      `, [stubOpp.rows[0].id]);
+      `, [to.title]);
 
-      const captureResult = await pool.query(`
-        INSERT INTO captures (pipeline_item_id, color_stage, source_id)
-        VALUES ($1, 'pink', 1)
-        RETURNING id
-      `, [stubPipe.rows[0].id]);
-      captureId = captureResult.rows[0].id;
+      let captureId: number;
+
+      if (pipeResult.rows.length > 0) {
+        const captureResult = await client.query(`
+          INSERT INTO captures (pipeline_item_id, color_stage, source_id)
+          VALUES ($1, 'pink', 1)
+          RETURNING id
+        `, [pipeResult.rows[0].id]);
+        captureId = captureResult.rows[0].id;
+      } else {
+        const stubOpp = await client.query(`
+          INSERT INTO opportunities (title, source_id, notice_id)
+          VALUES ($1, 1, $2)
+          RETURNING id
+        `, [to.title, `TO-${id}`]);
+
+        const stubPipe = await client.query(`
+          INSERT INTO pipeline_items (opportunity_id, stage, entered_at)
+          VALUES ($1, 'capture', NOW())
+          RETURNING id
+        `, [stubOpp.rows[0].id]);
+
+        const captureResult = await client.query(`
+          INSERT INTO captures (pipeline_item_id, color_stage, source_id)
+          VALUES ($1, 'pink', 1)
+          RETURNING id
+        `, [stubPipe.rows[0].id]);
+        captureId = captureResult.rows[0].id;
+      }
+
+      // Link capture back to TO
+      await client.query(
+        `UPDATE task_order_announcements SET capture_id = $1 WHERE id = $2`,
+        [captureId, id],
+      );
+
+      await client.query('COMMIT');
+      return reply.send(successEnvelope({ capture_id: captureId, to_id: id }, req.requestId));
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
-
-    // Link capture back to TO
-    await pool.query(
-      `UPDATE task_order_announcements SET capture_id = $1 WHERE id = $2`,
-      [captureId, id],
-    );
-
-    return reply.send(successEnvelope({ capture_id: captureId, to_id: id }, req.requestId));
   });
 
   /**
