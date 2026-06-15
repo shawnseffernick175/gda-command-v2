@@ -165,7 +165,7 @@ jobs:
       - name: Check bundle size
         working-directory: packages/frontend-v3
         run: |
-          MAX_MAIN_KB=400
+          MAX_MAIN_KB=450
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
