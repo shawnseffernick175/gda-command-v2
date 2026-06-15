@@ -574,14 +574,33 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
   app.delete('/v3/workshop/uploads/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
 
-    const res = await pool.query<{ id: string }>(
-      'DELETE FROM document_uploads WHERE id = $1 RETURNING id',
+    const uploadRes = await pool.query<{ id: string; storage_path: string }>(
+      'SELECT id, storage_path FROM document_uploads WHERE id = $1',
       [id],
     );
-    if (res.rows.length === 0) {
+    if (uploadRes.rows.length === 0) {
       return reply.status(404).send(
         errorEnvelope('NOT_FOUND', 'Upload not found', req.requestId),
       );
+    }
+
+    const storagePath = uploadRes.rows[0].storage_path;
+
+    // Collect vault file paths from generated outputs before cascade-delete removes them
+    const vaultRes = await pool.query<{ file_path: string }>(
+      `SELECT vd.file_path FROM workshop_outputs wo
+       JOIN vault_documents vd ON vd.id = wo.vault_doc_id
+       WHERE wo.source_upload_id = $1 AND vd.file_path IS NOT NULL`,
+      [id],
+    );
+    const vaultPaths = vaultRes.rows.map((r) => r.file_path);
+
+    await pool.query('DELETE FROM document_uploads WHERE id = $1', [id]);
+
+    // Clean up physical files (best-effort)
+    const { unlink } = await import('node:fs/promises');
+    for (const fp of [storagePath, ...vaultPaths]) {
+      try { await unlink(fp); } catch { /* file may already be gone */ }
     }
 
     return reply.send(successEnvelope({ deleted: true }, req.requestId));
