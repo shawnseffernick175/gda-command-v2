@@ -120,6 +120,32 @@ function getLinkForItem(item: ActionItem): { href: string; label: string } | nul
   return null;
 }
 
+function FilterChips<T>({ items, active, onSelect }: {
+  items: readonly { label: string; value: T }[];
+  active: T;
+  onSelect: (v: T) => void;
+}) {
+  return (
+    <div className="flex gap-1">
+      {items.map((f) => (
+        <button
+          key={f.label}
+          type="button"
+          onClick={() => onSelect(f.value)}
+          className={cn(
+            "rounded px-2 py-0.5 text-caption transition-colors border",
+            active === f.value
+              ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
+              : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
+          )}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /* ── Page ────────────────────────────────────────────────────── */
 
 export default function ActionItemsPage() {
@@ -189,74 +215,18 @@ function ActionItemsContent() {
 
         {/* Filter chips row */}
         <div className="flex flex-wrap gap-4">
-          {/* Source filter */}
-          <div className="flex gap-1">
-            {SOURCE_FILTERS.map((f) => (
-              <button
-                key={f.label}
-                type="button"
-                onClick={() => setSourceFilter(f.value)}
-                className={cn(
-                  "rounded px-2 py-0.5 text-caption transition-colors border",
-                  sourceFilter === f.value
-                    ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
-                    : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
-                )}
-              >
-                {f.label}
-              </button>
+          <FilterChips items={SOURCE_FILTERS} active={sourceFilter} onSelect={setSourceFilter} />
+          <FilterChips items={SEVERITY_FILTERS} active={severityFilter} onSelect={setSeverityFilter} />
+          <select
+            value={ownerFilter ?? ""}
+            onChange={(e) => setOwnerFilter(e.target.value || undefined)}
+            className="rounded px-2 py-0.5 text-caption border border-[#D4D1CA] text-[#28251D] bg-white"
+          >
+            <option value="">All Owners</option>
+            {(users ?? []).map((u) => (
+              <option key={u.id} value={u.display_name}>{u.display_name}</option>
             ))}
-          </div>
-
-          {/* Severity filter */}
-          <div className="flex gap-1">
-            {SEVERITY_FILTERS.map((f) => (
-              <button
-                key={f.label}
-                type="button"
-                onClick={() => setSeverityFilter(f.value)}
-                className={cn(
-                  "rounded px-2 py-0.5 text-caption transition-colors border",
-                  severityFilter === f.value
-                    ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
-                    : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Owner filter */}
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => setOwnerFilter(undefined)}
-              className={cn(
-                "rounded px-2 py-0.5 text-caption transition-colors border",
-                !ownerFilter
-                  ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
-                  : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
-              )}
-            >
-              All Owners
-            </button>
-            {(users ?? []).slice(0, 5).map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => setOwnerFilter(u.display_name)}
-                className={cn(
-                  "rounded px-2 py-0.5 text-caption transition-colors border truncate max-w-[120px]",
-                  ownerFilter === u.display_name
-                    ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
-                    : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
-                )}
-              >
-                {u.display_name}
-              </button>
-            ))}
-          </div>
+          </select>
         </div>
       </div>
 
@@ -312,13 +282,11 @@ function ActionItemsContent() {
                   <ActionItemRow
                     key={item.id}
                     item={item}
-                    highlighted={String(item.id) === highlightId}
+                    highlighted={false}
                     onToggle={(id, status) =>
                       updateItem.mutate({ id, status })
                     }
-                    onAssign={(id, assignee_id) =>
-                      updateItem.mutate({ id, assignee_id })
-                    }
+
                   />
                 ))}
               </div>
@@ -342,21 +310,12 @@ function ActionItemRow({
   item,
   highlighted,
   onToggle,
-  onAssign,
 }: {
   item: ActionItem;
   highlighted: boolean;
   onToggle: (id: number, status: string) => void;
-  onAssign: (id: number, assignee_id: number | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const rowRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (highlighted && rowRef.current) {
-      rowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [highlighted]);
 
   const overdue = isOverdue(item);
   const priority = item.priority ?? "MEDIUM";
@@ -365,7 +324,6 @@ function ActionItemRow({
 
   return (
     <div
-      ref={rowRef}
       className={cn(
         "transition-colors",
         highlighted && "bg-[#01696F]/5 ring-1 ring-[#01696F]/30",
@@ -439,11 +397,9 @@ function ActionItemRow({
         </span>
 
         {/* Assignee */}
-        <AssigneePicker
-          currentAssigneeId={item.assignee_id}
-          currentAssigneeName={item.assignee?.name ?? null}
-          onAssign={(assigneeId) => onAssign(item.id, assigneeId)}
-        />
+        <span className="text-caption text-[#7A7974] shrink-0 w-[100px] truncate">
+          {item.assignee?.name ?? item.owner ?? "Unassigned"}
+        </span>
 
         {/* Status badge */}
         <Badge
@@ -463,65 +419,6 @@ function ActionItemRow({
 
       {expanded && (
         <DraftPanel itemId={item.id} drafts={item.drafts ?? []} />
-      )}
-    </div>
-  );
-}
-
-/* ── Assignee picker ─────────────────────────────────────────── */
-
-function AssigneePicker({
-  currentAssigneeId,
-  currentAssigneeName,
-  onAssign,
-}: {
-  currentAssigneeId: number | null;
-  currentAssigneeName: string | null;
-  onAssign: (id: number | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const { data: users } = useUsers();
-
-  return (
-    <div className="relative shrink-0 w-[100px]">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="text-caption text-[#7A7974] hover:text-[#28251D] transition-colors max-w-[100px] truncate"
-      >
-        {currentAssigneeName ?? "Unassigned"}
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded border border-[#D4D1CA] bg-white shadow-lg py-1">
-          <button
-            type="button"
-            onClick={() => {
-              onAssign(null);
-              setOpen(false);
-            }}
-            className="w-full text-left px-3 py-1.5 text-caption hover:bg-[#F7F6F2] transition-colors text-[#7A7974]"
-          >
-            Unassigned
-          </button>
-          {(users ?? []).map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => {
-                onAssign(u.id);
-                setOpen(false);
-              }}
-              className={cn(
-                "w-full text-left px-3 py-1.5 text-caption hover:bg-[#F7F6F2] transition-colors",
-                u.id === currentAssigneeId
-                  ? "text-[#01696F]"
-                  : "text-[#28251D]",
-              )}
-            >
-              {u.display_name}
-            </button>
-          ))}
-        </div>
       )}
     </div>
   );
