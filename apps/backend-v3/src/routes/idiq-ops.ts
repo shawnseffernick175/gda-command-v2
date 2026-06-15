@@ -214,45 +214,43 @@ export async function idiqOpsRoutes(fastify: FastifyInstance): Promise<void> {
 
       const to = toResult.rows[0];
 
-      // Create a pipeline item first (captures require one)
-      const pipeResult = await client.query(`
-        INSERT INTO pipeline_items (opportunity_id, stage, entered_at)
-        SELECT o.id, 'capture', NOW()
-        FROM opportunities o
-        WHERE o.title = $1
+      // Find matching opportunity or create one
+      const oppResult = await client.query(`
+        SELECT id, source_id FROM opportunities
+        WHERE title = $1
         LIMIT 1
-        RETURNING id
       `, [to.title]);
 
-      let captureId: number;
+      let oppId: number;
+      let sourceId: number;
 
-      if (pipeResult.rows.length > 0) {
-        const captureResult = await client.query(`
-          INSERT INTO captures (pipeline_item_id, color_stage, source_id)
-          VALUES ($1, 'pink', 1)
-          RETURNING id
-        `, [pipeResult.rows[0].id]);
-        captureId = captureResult.rows[0].id;
+      if (oppResult.rows.length > 0) {
+        oppId = oppResult.rows[0].id;
+        sourceId = oppResult.rows[0].source_id;
       } else {
         const stubOpp = await client.query(`
-          INSERT INTO opportunities (title, source_id, notice_id)
+          INSERT INTO opportunities (title, source_id, sam_notice_id)
           VALUES ($1, 1, $2)
           RETURNING id
         `, [to.title, `TO-${id}`]);
-
-        const stubPipe = await client.query(`
-          INSERT INTO pipeline_items (opportunity_id, stage, entered_at)
-          VALUES ($1, 'capture', NOW())
-          RETURNING id
-        `, [stubOpp.rows[0].id]);
-
-        const captureResult = await client.query(`
-          INSERT INTO captures (pipeline_item_id, color_stage, source_id)
-          VALUES ($1, 'pink', 1)
-          RETURNING id
-        `, [stubPipe.rows[0].id]);
-        captureId = captureResult.rows[0].id;
+        oppId = stubOpp.rows[0].id;
+        sourceId = 1;
       }
+
+      // Create a pipeline item (captures require one)
+      const pipeResult = await client.query(`
+        INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
+        VALUES ($1, 'admin', 'pursue', $2)
+        RETURNING id
+      `, [oppId, sourceId]);
+
+      // Create the capture
+      const captureResult = await client.query(`
+        INSERT INTO captures (pipeline_item_id, color_stage, source_id)
+        VALUES ($1, 'pink', $2)
+        RETURNING id
+      `, [pipeResult.rows[0].id, sourceId]);
+      const captureId = captureResult.rows[0].id;
 
       // Link capture back to TO
       await client.query(
