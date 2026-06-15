@@ -304,6 +304,24 @@ export function startCronScheduler(): void {
       `[cron] registered: ${cronLabel} (${job.schedule})`,
     );
   }
+
+  // Refresh token pruning — daily at 03:30 UTC
+  const refreshTokenPruneTask = cron.schedule('30 3 * * *', async () => {
+    try {
+      logger.info('[cron] refresh-token-prune starting');
+      const res = await pool.query(
+        `DELETE FROM refresh_tokens WHERE expires_at < NOW() - INTERVAL '7 days'`,
+      );
+      logger.info(
+        { deleted: res.rowCount },
+        '[cron] refresh-token-prune completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_refresh_token_prune_error');
+    }
+  });
+  tasks.push(refreshTokenPruneTask);
+  logger.info({ schedule: '30 3 * * *' }, '[cron] registered: refresh-token-prune (30 3 * * *)');
 }
 
 export function stopCronScheduler(): void {

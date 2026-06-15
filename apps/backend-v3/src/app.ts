@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyCors from '@fastify/cors';
+import fastifyCookie from '@fastify/cookie';
 import { config } from './config/index.js';
 import { logger } from './lib/logger.js';
 import { requestIdHook } from './middleware/requestId.js';
@@ -59,7 +60,8 @@ export async function buildApp() {
     trustProxy: true,
   });
 
-  await app.register(fastifyCors, { origin: true });
+  await app.register(fastifyCookie);
+  await app.register(fastifyCors, { origin: true, credentials: true });
 
   await app.register(fastifySwagger, {
     openapi: {
