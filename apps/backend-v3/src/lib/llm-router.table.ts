@@ -176,6 +176,20 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     timeout_ms: 30_000,
     fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
   },
+  {
+    task: 'workshop_teardown',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    timeout_ms: 90_000,
+    fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 30_000 },
+  },
+  {
+    task: 'workshop_generate',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    timeout_ms: 90_000,
+    fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 30_000 },
+  },
 ] as const;
 
 /** Lookup helper — O(1) via pre-built map. */

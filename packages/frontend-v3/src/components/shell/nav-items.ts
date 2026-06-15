@@ -17,6 +17,7 @@ import {
   Layers,
   GitCompare,
   Activity,
+  Hammer,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -39,6 +40,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Financial Bible", href: "/financials", icon: BookOpen },
   { label: "Action Items", href: "/action-items", icon: CheckSquare },
   { label: "Vault", href: "/vault", icon: Archive },
+  { label: "Workshop", href: "/workshop", icon: Hammer },
   { label: "Overrides", href: "/overrides", icon: GitCompare },
   { label: "Contacts", href: "/contacts", icon: Users },
   { label: "Competitors", href: "/competitors", icon: Shield },

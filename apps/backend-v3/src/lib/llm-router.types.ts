@@ -43,7 +43,9 @@ export type Task =
   | 'competitor_contact_discovery'
   | 'partner_contact_discovery'
   | 'financial_analyze'
-  | 'vault_vehicle_extract';
+  | 'vault_vehicle_extract'
+  | 'workshop_teardown'
+  | 'workshop_generate';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -232,6 +234,22 @@ export interface FinancialAnalyzeInput {
 export interface FinancialAnalyzeOutput {
   analysis: string;
   generated_at: string;
+}
+
+export interface WorkshopTeardownInput {
+  prompt: string;
+}
+
+export interface WorkshopTeardownOutput {
+  raw_text: string;
+}
+
+export interface WorkshopGenerateInput {
+  prompt: string;
+}
+
+export interface WorkshopGenerateOutput {
+  raw_text: string;
 }
 
 export interface BlackHatAnalysisInput {
@@ -838,6 +856,8 @@ export interface TaskInputMap {
   competitor_contact_discovery: CompetitorContactDiscoveryInput;
   partner_contact_discovery: PartnerContactDiscoveryInput;
   financial_analyze: FinancialAnalyzeInput;
+  workshop_teardown: WorkshopTeardownInput;
+  workshop_generate: WorkshopGenerateInput;
 }
 
 export interface TaskOutputMap {
@@ -865,6 +885,8 @@ export interface TaskOutputMap {
   competitor_contact_discovery: CompetitorContactDiscoveryOutput;
   partner_contact_discovery: PartnerContactDiscoveryOutput;
   financial_analyze: FinancialAnalyzeOutput;
+  workshop_teardown: WorkshopTeardownOutput;
+  workshop_generate: WorkshopGenerateOutput;
 }
 
 // ---------------------------------------------------------------------------

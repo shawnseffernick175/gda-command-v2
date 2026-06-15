@@ -35,6 +35,8 @@ import type {
   PartnerContactDiscoveryOutput,
   FinancialAnalyzeOutput,
   VaultVehicleExtractOutput,
+  WorkshopTeardownOutput,
+  WorkshopGenerateOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -399,6 +401,14 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       extraction_notes: 'Mock extraction — all fields populated from test document.',
       model_used: 'mock-model',
     } satisfies VaultVehicleExtractOutput,
+
+    workshop_teardown: {
+      raw_text: '{"title":"Mock Document","doc_type":"proposal","page_count":10,"structure":[],"key_claims":[],"key_numbers":[],"tables_extracted":[],"figures_extracted":[],"risks_or_gaps":[],"envision_relevance":{"wheelhouse_match":"medium","agencies_mentioned":[],"naics_mentioned":[],"vehicles_mentioned":[],"competitors_mentioned":[],"teammate_candidates":[],"threat_candidates":[]},"summary_3_sentence":"Mock teardown summary."}',
+    } satisfies WorkshopTeardownOutput,
+
+    workshop_generate: {
+      raw_text: 'Mock generated output content for workshop document.',
+    } satisfies WorkshopGenerateOutput,
   };
 
   return {
