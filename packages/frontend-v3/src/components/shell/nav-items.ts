@@ -45,6 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Contacts", href: "/contacts", icon: Users },
   { label: "Competitors", href: "/competitors", icon: Shield },
   { label: "Risks", href: "/risks", icon: AlertTriangle },
+  { label: "Prompts", href: "/prompts", icon: Terminal },
 ];
 
 export const SETTINGS_ITEM: NavItem = {
@@ -53,8 +54,3 @@ export const SETTINGS_ITEM: NavItem = {
   icon: Settings,
 };
 
-export const PROMPT_CREATOR_ITEM: NavItem = {
-  label: "Prompt Creator",
-  href: "/prompt-creator",
-  icon: Terminal,
-};
