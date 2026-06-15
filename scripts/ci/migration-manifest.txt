@@ -89,3 +89,4 @@ v3_080_capture_stage_history.sql
 v3_081_cleanup_phantom_pipeline_rows.sql
 v3_082_is_idiq_column.sql
 v3_083_ceo_capture_table_ingest.sql
+v3_084_task_orders.sql
