@@ -31,7 +31,9 @@ import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
 import { registerFasTracTier1Source } from '../ingest/fastrac/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
 import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
-import { generateActionItems } from '../jobs/generateActionItems.js';
+import { runCaptureStaleActionsJob } from '../jobs/captureStaleActionsJob.js';
+import { runCaptureDeadlineActionsJob } from '../jobs/captureDeadlineActionsJob.js';
+import { runRecompeteActionsJob } from '../jobs/recompeteActionsJob.js';
 import { runDigestRefresh } from './digest-refresh.js';
 import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
@@ -142,18 +144,44 @@ export function startCronScheduler(): void {
   tasks.push(pwinBatchScoreTask);
   logger.info({ schedule: '0 1 * * *' }, '[cron] registered: pwin.batch-score (0 1 * * *)');
 
-  // Action items auto-generation — every 6 hours
-  const actionItemsGenTask = cron.schedule('30 */6 * * *', async () => {
+  // Capture stale actions — daily at 06:00 UTC
+  const captureStaleTask = cron.schedule('0 6 * * *', async () => {
     try {
-      logger.info('[cron] action-items-gen starting');
-      await generateActionItems();
-      logger.info('[cron] action-items-gen completed');
+      logger.info('[cron] capture-stale-actions starting');
+      await runCaptureStaleActionsJob();
+      logger.info('[cron] capture-stale-actions completed');
     } catch (err) {
-      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_action_items_gen_error');
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_capture_stale_actions_error');
     }
   });
-  tasks.push(actionItemsGenTask);
-  logger.info({ schedule: '30 */6 * * *' }, '[cron] registered: action-items-gen (30 */6 * * *)');
+  tasks.push(captureStaleTask);
+  logger.info({ schedule: '0 6 * * *' }, '[cron] registered: capture-stale-actions (0 6 * * *)');
+
+  // Capture deadline actions — daily at 06:00 UTC
+  const captureDeadlineTask = cron.schedule('5 6 * * *', async () => {
+    try {
+      logger.info('[cron] capture-deadline-actions starting');
+      await runCaptureDeadlineActionsJob();
+      logger.info('[cron] capture-deadline-actions completed');
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_capture_deadline_actions_error');
+    }
+  });
+  tasks.push(captureDeadlineTask);
+  logger.info({ schedule: '5 6 * * *' }, '[cron] registered: capture-deadline-actions (5 6 * * *)');
+
+  // Recompete expiring actions — weekly Monday 06:00 UTC
+  const recompeteTask = cron.schedule('10 6 * * 1', async () => {
+    try {
+      logger.info('[cron] recompete-actions starting');
+      await runRecompeteActionsJob();
+      logger.info('[cron] recompete-actions completed');
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_recompete_actions_error');
+    }
+  });
+  tasks.push(recompeteTask);
+  logger.info({ schedule: '10 6 * * 1' }, '[cron] registered: recompete-actions (10 6 * * 1)');
 
   // Digest lead story refresh — daily at 11:00 UTC (6:00 AM ET)
   const digestRefreshTask = cron.schedule('0 11 * * *', async () => {

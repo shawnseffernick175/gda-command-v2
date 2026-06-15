@@ -6,6 +6,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { buildRegulatoryContext } from '../utils/regulatory-context.js';
+import { generateReviewKillItems } from '../jobs/reviewKillItemsJob.js';
 
 const STAGES = ['blue', 'pink', 'red', 'green', 'white'] as const;
 type WorkflowStage = (typeof STAGES)[number];
@@ -281,6 +282,13 @@ export async function captureWorkflowRoutes(app: FastifyInstance): Promise<void>
         } catch (err) {
           logger.warn({ err, captureId: id, stage }, 'Auto AI analysis failed on stage activation');
         }
+      }
+
+      // Generate review kill-item action items on stage completion
+      if (body?.status === 'complete' && res.rows[0].ai_analysis) {
+        generateReviewKillItems(Number(id), res.rows[0].id, stage).catch((err) => {
+          logger.warn({ err, captureId: id, stage }, 'Failed to generate review kill-items');
+        });
       }
 
       // Re-fetch with annotations

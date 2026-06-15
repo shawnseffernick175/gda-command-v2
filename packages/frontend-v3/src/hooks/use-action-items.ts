@@ -16,13 +16,25 @@ interface ActionItemsPagedResponse {
   };
 }
 
-export function useActionItems(params: { status?: string; due?: string; page?: number; sort_by?: string; sort_dir?: string } = {}) {
+export function useActionItems(params: {
+  status?: string;
+  due?: string;
+  doctrine_source?: string;
+  priority?: string;
+  owner?: string;
+  page?: number;
+  sort_by?: string;
+  sort_dir?: string;
+} = {}) {
   return useQuery({
     queryKey: ["action-items", params],
     queryFn: () =>
       apiGet<ActionItemsPagedResponse>("/v3/action-items", {
         status: params.status,
         due: params.due,
+        doctrine_source: params.doctrine_source,
+        priority: params.priority,
+        owner: params.owner,
         page: params.page,
         limit: 50,
         sort_by: params.sort_by,

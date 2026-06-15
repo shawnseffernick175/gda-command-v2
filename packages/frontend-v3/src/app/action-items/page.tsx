@@ -17,8 +17,15 @@ import { Pagination } from "@/components/shared/Pagination";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { cn } from "@/lib/utils";
-import type { ActionItem, ActionItemDraft, ActionItemPriority } from "@/lib/types";
+import type {
+  ActionItem,
+  ActionItemDraft,
+  ActionItemPriority,
+  DoctrineSource,
+} from "@/lib/types";
 import Link from "next/link";
+
+/* ── Constants ───────────────────────────────────────────────── */
 
 const STATUS_FILTERS = [
   { label: "All", value: undefined },
@@ -28,27 +35,46 @@ const STATUS_FILTERS = [
   { label: "Done", value: "done" },
 ] as const;
 
+const SOURCE_FILTERS: { label: string; value: DoctrineSource | undefined }[] = [
+  { label: "All Sources", value: undefined },
+  { label: "Review Kill-Items", value: "capture_review_killitem" },
+  { label: "Stale Captures", value: "capture_stale" },
+  { label: "Deadlines", value: "capture_deadline" },
+  { label: "Recompete", value: "recompete_expiring" },
+  { label: "Manual", value: "manual" },
+];
+
+const SEVERITY_FILTERS: { label: string; value: ActionItemPriority | undefined }[] = [
+  { label: "All Severity", value: undefined },
+  { label: "Critical", value: "CRITICAL" },
+  { label: "High", value: "HIGH" },
+  { label: "Medium", value: "MEDIUM" },
+  { label: "Low", value: "LOW" },
+];
+
 const DRAFT_KINDS = ["reply", "research", "milestone"] as const;
 
 const PRIORITY_COLORS: Record<ActionItemPriority, string> = {
-  CRITICAL: "bg-red-500/20 text-red-400 border-red-500/30",
-  HIGH: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  MEDIUM: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  LOW: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+  CRITICAL: "bg-[#A12C7B]/15 text-[#A12C7B] border-[#A12C7B]/30",
+  HIGH: "bg-orange-500/15 text-orange-600 border-orange-500/30",
+  MEDIUM: "bg-yellow-500/15 text-yellow-600 border-yellow-500/30",
+  LOW: "bg-[#7A7974]/15 text-[#7A7974] border-[#7A7974]/30",
 };
 
-const SOURCE_LABELS: Record<string, string> = {
-  opportunity: "Opportunity",
-  risk: "Risk",
-  award: "Award",
-  capture: "Capture",
+const DOCTRINE_SOURCE_LABELS: Record<DoctrineSource, string> = {
+  capture_review_killitem: "Review",
+  capture_stale: "Stale",
+  capture_deadline: "Deadline",
+  recompete_expiring: "Recompete",
+  manual: "Manual",
 };
 
-const SOURCE_ROUTES: Record<string, string> = {
-  opportunity: "/opportunities",
-  risk: "/risks",
-  award: "/awards",
-  capture: "/capture",
+const DOCTRINE_SOURCE_COLORS: Record<DoctrineSource, string> = {
+  capture_review_killitem: "bg-[#A12C7B]/10 text-[#A12C7B] border-[#A12C7B]/20",
+  capture_stale: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  capture_deadline: "bg-[#01696F]/10 text-[#01696F] border-[#01696F]/20",
+  recompete_expiring: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  manual: "bg-[#7A7974]/10 text-[#7A7974] border-[#7A7974]/20",
 };
 
 function formatDate(dateStr: string | null): string {
@@ -65,6 +91,37 @@ function isOverdue(item: ActionItem): boolean {
   return new Date(item.due_date) < new Date();
 }
 
+function getLinkForItem(item: ActionItem): { href: string; label: string } | null {
+  const ds = item.doctrine_source;
+  if (
+    ds === "capture_review_killitem" ||
+    ds === "capture_stale" ||
+    ds === "capture_deadline"
+  ) {
+    const captureId = item.capture_id ?? item.linked_record_id;
+    if (captureId) {
+      return { href: `/capture?id=${captureId}`, label: "Capture" };
+    }
+  }
+  if (ds === "recompete_expiring") {
+    const awardId = item.award_id ?? item.linked_record_id;
+    if (awardId) {
+      return { href: `/awards?id=${awardId}`, label: "Award" };
+    }
+  }
+  if (item.linked_record_type && item.linked_record_id) {
+    const routes: Record<string, string> = {
+      capture: "/capture",
+      award: "/awards",
+    };
+    const route = routes[item.linked_record_type] ?? "/";
+    return { href: `${route}?id=${item.linked_record_id}`, label: item.linked_record_type };
+  }
+  return null;
+}
+
+/* ── Page ────────────────────────────────────────────────────── */
+
 export default function ActionItemsPage() {
   return (
     <Suspense fallback={<div />}>
@@ -75,12 +132,15 @@ export default function ActionItemsPage() {
 
 function ActionItemsContent() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [sourceFilter, setSourceFilter] = useState<DoctrineSource | undefined>();
+  const [severityFilter, setSeverityFilter] = useState<ActionItemPriority | undefined>();
+  const [ownerFilter, setOwnerFilter] = useState<string | undefined>();
   const [page, setPage] = useState(1);
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
 
-  const filterKey = `${statusFilter ?? "__all__"}|${sortParams.sort_by ?? ""}|${sortParams.sort_dir ?? ""}`;
+  const filterKey = `${statusFilter ?? "_"}-${sourceFilter ?? "_"}-${severityFilter ?? "_"}-${ownerFilter ?? "_"}-${sortParams.sort_by ?? ""}-${sortParams.sort_dir ?? ""}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -89,6 +149,9 @@ function ActionItemsContent() {
 
   const { data, isLoading, error, refetch } = useActionItems({
     status: statusFilter,
+    doctrine_source: sourceFilter,
+    priority: severityFilter,
+    owner: ownerFilter,
     page,
     ...sortParams,
   });
@@ -96,14 +159,16 @@ function ActionItemsContent() {
   const items = data?.items ?? [];
   const totalPages = data?.pagination?.totalPages ?? 1;
   const updateItem = useUpdateActionItem();
+  const { data: users } = useUsers();
 
   return (
     <div className="space-y-4">
-      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
-        <h1 className="font-mono text-lg font-bold text-foreground">
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-3 sticky-page-header">
+        <h1 className="text-section font-semibold text-foreground">
           Action Items
         </h1>
 
+        {/* Status tabs */}
         <div className="flex gap-2">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -111,15 +176,87 @@ function ActionItemsContent() {
               type="button"
               onClick={() => setStatusFilter(f.value)}
               className={cn(
-                "rounded px-2.5 py-1 text-xs font-mono transition-colors",
+                "rounded px-2.5 py-1 text-caption transition-colors",
                 statusFilter === f.value
-                  ? "bg-gda-green/20 text-gda-green border border-gda-green/30"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-[#01696F]/15 text-[#01696F] border border-[#01696F]/30"
+                  : "text-[#7A7974] hover:text-[#28251D]",
               )}
             >
               {f.label}
             </button>
           ))}
+        </div>
+
+        {/* Filter chips row */}
+        <div className="flex flex-wrap gap-4">
+          {/* Source filter */}
+          <div className="flex gap-1">
+            {SOURCE_FILTERS.map((f) => (
+              <button
+                key={f.label}
+                type="button"
+                onClick={() => setSourceFilter(f.value)}
+                className={cn(
+                  "rounded px-2 py-0.5 text-caption transition-colors border",
+                  sourceFilter === f.value
+                    ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
+                    : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Severity filter */}
+          <div className="flex gap-1">
+            {SEVERITY_FILTERS.map((f) => (
+              <button
+                key={f.label}
+                type="button"
+                onClick={() => setSeverityFilter(f.value)}
+                className={cn(
+                  "rounded px-2 py-0.5 text-caption transition-colors border",
+                  severityFilter === f.value
+                    ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
+                    : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Owner filter */}
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setOwnerFilter(undefined)}
+              className={cn(
+                "rounded px-2 py-0.5 text-caption transition-colors border",
+                !ownerFilter
+                  ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
+                  : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
+              )}
+            >
+              All Owners
+            </button>
+            {(users ?? []).slice(0, 5).map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => setOwnerFilter(u.display_name)}
+                className={cn(
+                  "rounded px-2 py-0.5 text-caption transition-colors border truncate max-w-[120px]",
+                  ownerFilter === u.display_name
+                    ? "bg-[#01696F]/15 text-[#01696F] border-[#01696F]/30"
+                    : "text-[#7A7974] border-transparent hover:text-[#28251D] hover:border-[#D4D1CA]",
+                )}
+              >
+                {u.display_name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -139,7 +276,7 @@ function ActionItemsContent() {
       ) : items.length === 0 ? (
         <EmptyState
           title="No action items"
-          description="Action items are created from pursuits, captures, and reviews."
+          description="No action items. You're caught up — or no captures have stale activity, deadlines, or expiring recompetes."
         />
       ) : (
         <>
@@ -149,17 +286,28 @@ function ActionItemsContent() {
               <thead>
                 <tr className="bg-gda-bg-base text-muted-foreground">
                   <SortableHeader label="Priority" field="priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                  <SortableHeader label="Source" field="doctrine_source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
                   <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                  <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
                   <SortableHeader label="Due" field="due_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
-                  <SortableHeader label="Source" field="source_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                  <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
                 </tr>
               </thead>
             </table>
           </div>
           <Card className="border-border bg-gda-panel overflow-hidden rounded-t-none">
             <CardContent className="p-0">
-              <div className="divide-y divide-border">
+              {/* Table header */}
+              <div className="flex items-center gap-3 px-3 py-2 border-b border-[#D4D1CA] text-caption text-[#7A7974] uppercase tracking-[0.04em]">
+                <span className="w-4" />
+                <span className="w-[72px] shrink-0">Severity</span>
+                <span className="w-[72px] shrink-0">Source</span>
+                <span className="flex-1">Title</span>
+                <span className="w-[80px] shrink-0 text-right tabular-nums">Due</span>
+                <span className="w-[72px] shrink-0">Link</span>
+                <span className="w-[100px] shrink-0">Owner</span>
+                <span className="w-[72px] shrink-0">Status</span>
+              </div>
+              <div className="divide-y divide-[#D4D1CA]">
                 {items.map((item) => (
                   <ActionItemRow
                     key={item.id}
@@ -212,18 +360,18 @@ function ActionItemRow({
 
   const overdue = isOverdue(item);
   const priority = item.priority ?? "MEDIUM";
-  const sourceType = item.linked_record_type ?? item.source_type;
-  const sourceId = item.linked_record_id;
+  const doctrineSource = item.doctrine_source ?? "manual";
+  const link = getLinkForItem(item);
 
   return (
     <div
       ref={rowRef}
       className={cn(
         "transition-colors",
-        highlighted && "bg-gda-green/5 ring-1 ring-gda-green/30",
+        highlighted && "bg-[#01696F]/5 ring-1 ring-[#01696F]/30",
       )}
     >
-      <div className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-gda-bg-base transition-colors">
+      <div className="flex items-center gap-3 px-3 py-2 text-body hover:bg-[#F7F6F2] transition-colors">
         {/* Checkbox */}
         <button
           type="button"
@@ -233,17 +381,25 @@ function ActionItemRow({
           className={cn(
             "h-4 w-4 rounded border transition-colors shrink-0",
             item.status === "done"
-              ? "bg-gda-green border-gda-green"
-              : "border-border hover:border-gda-green",
+              ? "bg-[#01696F] border-[#01696F]"
+              : "border-[#D4D1CA] hover:border-[#01696F]",
           )}
         />
 
-        {/* Priority badge */}
+        {/* Severity badge */}
         <Badge
           variant="outline"
-          className={cn("text-[11px] font-mono shrink-0", PRIORITY_COLORS[priority])}
+          className={cn("text-[11px] shrink-0 w-[72px] justify-center", PRIORITY_COLORS[priority])}
         >
           {priority}
+        </Badge>
+
+        {/* Source type badge */}
+        <Badge
+          variant="outline"
+          className={cn("text-[11px] shrink-0 w-[72px] justify-center", DOCTRINE_SOURCE_COLORS[doctrineSource])}
+        >
+          {DOCTRINE_SOURCE_LABELS[doctrineSource]}
         </Badge>
 
         {/* Title */}
@@ -251,34 +407,36 @@ function ActionItemRow({
           type="button"
           onClick={() => setExpanded(!expanded)}
           className={cn(
-            "flex-1 text-left text-foreground hover:text-gda-green transition-colors truncate",
-            item.status === "done" && "line-through text-muted-foreground",
+            "flex-1 text-left text-[#28251D] hover:text-[#01696F] transition-colors truncate text-body",
+            item.status === "done" && "line-through text-[#7A7974]",
           )}
         >
           {item.title}
         </button>
 
         {/* Due date */}
-        {item.due_date && (
-          <span
-            className={cn(
-              "font-mono text-[11px] shrink-0",
-              overdue ? "text-red-400" : "text-muted-foreground",
-            )}
-          >
-            {formatDate(item.due_date)}
-          </span>
-        )}
+        <span
+          className={cn(
+            "text-caption shrink-0 w-[80px] text-right tabular-nums",
+            overdue ? "text-[#A12C7B] font-semibold" : "text-[#7A7974]",
+          )}
+        >
+          {item.due_date ? formatDate(item.due_date) : "—"}
+        </span>
 
-        {/* Source link chip */}
-        {sourceType && sourceId && (
-          <Link
-            href={`${SOURCE_ROUTES[sourceType] ?? "/"}?id=${sourceId}`}
-            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-mono bg-gda-cyan/10 text-gda-cyan border border-gda-cyan/20 hover:bg-gda-cyan/20 transition-colors"
-          >
-            {SOURCE_LABELS[sourceType] ?? sourceType} →
-          </Link>
-        )}
+        {/* Link to capture or award */}
+        <span className="w-[72px] shrink-0">
+          {link ? (
+            <Link
+              href={link.href}
+              className="rounded px-1.5 py-0.5 text-caption bg-[#01696F]/10 text-[#01696F] border border-[#01696F]/20 hover:bg-[#01696F]/20 transition-colors"
+            >
+              {link.label} →
+            </Link>
+          ) : (
+            <span className="text-caption text-[#7A7974]">—</span>
+          )}
+        </span>
 
         {/* Assignee */}
         <AssigneePicker
@@ -291,12 +449,12 @@ function ActionItemRow({
         <Badge
           variant="outline"
           className={cn(
-            "text-[11px] shrink-0",
+            "text-[11px] shrink-0 w-[72px] justify-center",
             overdue
-              ? "border-gda-red/30 text-gda-red"
+              ? "border-[#A12C7B]/30 text-[#A12C7B]"
               : item.status === "done"
-                ? "border-gda-green/30 text-gda-green"
-                : "border-border text-muted-foreground",
+                ? "border-[#01696F]/30 text-[#01696F]"
+                : "border-[#D4D1CA] text-[#7A7974]",
           )}
         >
           {overdue ? "overdue" : item.status}
@@ -325,23 +483,23 @@ function AssigneePicker({
   const { data: users } = useUsers();
 
   return (
-    <div className="relative shrink-0">
+    <div className="relative shrink-0 w-[100px]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="text-xs text-muted-foreground hover:text-foreground transition-colors max-w-[100px] truncate"
+        className="text-caption text-[#7A7974] hover:text-[#28251D] transition-colors max-w-[100px] truncate"
       >
         {currentAssigneeName ?? "Unassigned"}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-border bg-gda-panel shadow-lg py-1">
+        <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded border border-[#D4D1CA] bg-white shadow-lg py-1">
           <button
             type="button"
             onClick={() => {
               onAssign(null);
               setOpen(false);
             }}
-            className="w-full text-left px-3 py-1.5 text-xs hover:bg-gda-bg-base transition-colors text-muted-foreground"
+            className="w-full text-left px-3 py-1.5 text-caption hover:bg-[#F7F6F2] transition-colors text-[#7A7974]"
           >
             Unassigned
           </button>
@@ -354,10 +512,10 @@ function AssigneePicker({
                 setOpen(false);
               }}
               className={cn(
-                "w-full text-left px-3 py-1.5 text-xs hover:bg-gda-bg-base transition-colors",
+                "w-full text-left px-3 py-1.5 text-caption hover:bg-[#F7F6F2] transition-colors",
                 u.id === currentAssigneeId
-                  ? "text-gda-green"
-                  : "text-foreground",
+                  ? "text-[#01696F]"
+                  : "text-[#28251D]",
               )}
             >
               {u.display_name}
@@ -381,7 +539,7 @@ function DraftPanel({
   const createDraft = useCreateDraft();
 
   return (
-    <div className="ml-9 mr-2 mb-2 rounded bg-gda-bg-base p-2 space-y-2">
+    <div className="ml-9 mr-2 mb-2 rounded bg-[#F7F6F2] p-2 space-y-2">
       <div className="flex gap-1.5">
         {DRAFT_KINDS.map((kind) => (
           <button
@@ -389,7 +547,7 @@ function DraftPanel({
             type="button"
             disabled={createDraft.isPending}
             onClick={() => createDraft.mutate({ id: itemId, kind })}
-            className="text-xs font-mono px-2 py-0.5 rounded border border-border hover:border-gda-green transition-colors disabled:opacity-50"
+            className="text-caption px-2 py-0.5 rounded border border-[#D4D1CA] hover:border-[#01696F] transition-colors disabled:opacity-50"
           >
             {kind === "reply"
               ? "Reply Draft"
@@ -417,7 +575,7 @@ function DraftRow({ draft }: { draft: ActionItemDraft }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="rounded border border-border/50 px-2 py-1">
+    <div className="rounded border border-[#D4D1CA]/50 px-2 py-1">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -427,7 +585,7 @@ function DraftRow({ draft }: { draft: ActionItemDraft }) {
           {draft.kind}
         </Badge>
         <DraftStatusChip status={draft.status} />
-        <span className="text-xs text-muted-foreground line-clamp-2 flex-1">
+        <span className="text-caption text-[#7A7974] line-clamp-2 flex-1">
           {draft.status === "generating"
             ? "Generating…"
             : draft.content.slice(0, 120)}
@@ -435,7 +593,7 @@ function DraftRow({ draft }: { draft: ActionItemDraft }) {
       </button>
 
       {open && draft.status === "done" && (
-        <pre className="text-xs whitespace-pre-wrap bg-gda-bg-base rounded p-2 mt-1">
+        <pre className="text-caption whitespace-pre-wrap bg-[#F7F6F2] rounded p-2 mt-1">
           {draft.content}
         </pre>
       )}
@@ -450,14 +608,14 @@ function DraftStatusChip({
 }) {
   if (status === "generating") {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-amber-400">
-        <span className="h-3 w-3 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+      <span className="inline-flex items-center gap-1 text-[11px] text-[#B45309]">
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#B45309] border-t-transparent" />
         generating
       </span>
     );
   }
   if (status === "failed") {
-    return <span className="text-[11px] text-gda-red">failed</span>;
+    return <span className="text-[11px] text-[#A12C7B]">failed</span>;
   }
-  return <span className="text-[11px] text-gda-green">done</span>;
+  return <span className="text-[11px] text-[#01696F]">done</span>;
 }

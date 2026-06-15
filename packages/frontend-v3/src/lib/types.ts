@@ -378,6 +378,13 @@ export interface ActionItemDraft {
 
 export type ActionItemPriority = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
+export type DoctrineSource =
+  | "capture_review_killitem"
+  | "capture_stale"
+  | "capture_deadline"
+  | "recompete_expiring"
+  | "manual";
+
 export interface ActionItemAssignee {
   id: number;
   name: string;
@@ -390,10 +397,14 @@ export interface ActionItem {
   due_date: string | null;
   owner: string | null;
   priority: ActionItemPriority;
+  doctrine_source: DoctrineSource;
   source_type: string | null;
   is_auto: boolean;
   assignee_id: number | null;
   assignee: ActionItemAssignee | null;
+  capture_id: number | null;
+  award_id: number | null;
+  review_stage_id: number | null;
   linked_record_type: string | null;
   linked_record_id: string | null;
   status: "open" | "in_progress" | "done" | "overdue";
