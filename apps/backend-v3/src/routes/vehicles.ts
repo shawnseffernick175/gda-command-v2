@@ -53,7 +53,14 @@ export async function vehicleRoutes(fastify: FastifyInstance): Promise<void> {
       GROUP BY cv.id
       ORDER BY cv.agency, cv.name
     `);
-    return reply.send(successEnvelope(result.rows, req.requestId));
+    const vehicles = result.rows.map((r) => ({
+      ...r,
+      id: Number(r.id),
+      ceiling_value: r.ceiling_value !== null ? Number(r.ceiling_value) : null,
+      opportunity_count: Number(r.opportunity_count),
+      pipeline_count: Number(r.pipeline_count),
+    }));
+    return reply.send(successEnvelope(vehicles, req.requestId));
   });
 
   // GET /v3/vehicles/:vehicleId — single vehicle detail
@@ -91,7 +98,16 @@ export async function vehicleRoutes(fastify: FastifyInstance): Promise<void> {
       sourceDocs = docRes.rows;
     }
 
-    return reply.send(successEnvelope({ ...result.rows[0], source_docs: sourceDocs }, req.requestId));
+    const row = result.rows[0];
+    const vehicle = {
+      ...row,
+      id: Number(row.id),
+      ceiling_value: row.ceiling_value !== null ? Number(row.ceiling_value) : null,
+      opportunity_count: Number(row.opportunity_count),
+      pipeline_count: Number(row.pipeline_count),
+      source_docs: sourceDocs,
+    };
+    return reply.send(successEnvelope(vehicle, req.requestId));
   });
 
   // POST /v3/vehicles/ingest/:docId — extract vehicle from a single vault doc
