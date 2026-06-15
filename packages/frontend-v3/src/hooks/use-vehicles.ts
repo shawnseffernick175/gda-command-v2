@@ -48,6 +48,7 @@ export interface VehicleOpportunity {
   naics: string | null;
   value_min: number | null;
   value_max: number | null;
+  is_idiq?: boolean;
   response_due_at: string | null;
   posted_at: string | null;
   pipeline_stage: string | null;
