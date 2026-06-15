@@ -170,7 +170,7 @@ export default function FinancialsPage() {
 
       {/* Tab content */}
       <div className="min-h-[300px]">
-        {activeTab === "waterfall" && <ContractWaterfallTab fy={fy} />}
+        {activeTab === "waterfall" && <ContractWaterfallTab />}
         {activeTab === "execution" && <AopExecutionTab fy={fy} />}
         {activeTab === "capture" && <AopCaptureTab fy={fy} />}
         {activeTab === "p2" && <P2FinancialsTab />}
