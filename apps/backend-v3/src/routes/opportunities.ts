@@ -1033,6 +1033,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
+    const existing = await getOpportunityById(id);
+    if (!existing) {
+      return reply
+        .status(404)
+        .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+    }
+
     const user = (req as typeof req & { user?: { sub: string } }).user;
     const createdBy = (body?.created_by as string) ?? user?.sub ?? 'system';
 
