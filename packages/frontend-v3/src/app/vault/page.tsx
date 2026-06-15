@@ -113,7 +113,7 @@ function ExtractionStatusBadge({ status }: { status: string }) {
       return (
         <span
           title="Extraction failed"
-          className="inline-block rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold border border-gda-red/40 bg-gda-red/10 text-gda-red"
+          className="inline-block rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold border border-gda-red/40 bg-gda-red/10 text-gda-red"
         >
           FAILED
         </span>
@@ -122,7 +122,7 @@ function ExtractionStatusBadge({ status }: { status: string }) {
       return (
         <span
           title="File type not supported for extraction"
-          className="inline-block rounded px-1.5 py-0.5 text-[10px] font-mono border border-gda-amber/40 bg-gda-amber/10 text-gda-amber"
+          className="inline-block rounded px-1.5 py-0.5 text-[11px] font-mono border border-gda-amber/40 bg-gda-amber/10 text-gda-amber"
         >
           N/A
         </span>
