@@ -21,9 +21,16 @@ import {
 import { IngestPipelineSection } from "@/components/settings/ingest-pipeline";
 import { useMatchSuggestions } from "@/hooks/use-approvals";
 import dynamic from "next/dynamic";
+import {
+  useUserSettings,
+  useUpdateUserSettings,
+} from "@/hooks/use-user-settings";
 
 const MatchApprovals = dynamic(
   () => import("@/components/settings/MatchApprovals").then((m) => m.MatchApprovals),
+);
+const WheelhouseNaicsPanel = dynamic(
+  () => import("@/components/settings/wheelhouse-naics").then((m) => m.WheelhouseNaicsPanel),
 );
 
 /* ── Config key editor ──────────────────────────────────────────── */
@@ -564,6 +571,11 @@ export default function SettingsPage() {
         ) : (
           <SystemHealthSection sysHealth={sysHealth} />
         )}
+      </CollapseSection>
+
+      {/* ── Wheelhouse Filter ──────────────────────────────────── */}
+      <CollapseSection id="settings-wheelhouse" title="WHEELHOUSE FILTER (NAICS)" defaultOpen={false}>
+        <WheelhouseNaicsPanel />
       </CollapseSection>
 
       {/* ── Doctrine Configuration ─────────────────────────────── */}

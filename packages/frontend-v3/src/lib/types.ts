@@ -294,31 +294,52 @@ export interface AwardAnalysis {
   winner_classification: 'THREAT' | 'PARTNER' | 'IRRELEVANT';
   recommended_action: 'Pursue Re-Compete' | 'Monitor' | 'Pass' | 'Partner with Winner';
   so_what: string;
+  threat_level?: string;
+  envision_angle?: string;
 }
 
 export interface Award {
   id: string;
+  piid?: string;
   recipient_name: string | null;
   recipient_name_sources: AwardSourceRef[];
   agency: string | null;
   agency_sources: AwardSourceRef[];
+  contracting_office?: string | null;
   contract_type: string | null;
   contract_type_sources: AwardSourceRef[];
   awarded_amount: number | null;
   awarded_amount_sources: AwardSourceRef[];
+  total_value?: number | null;
   awarded_at: string | null;
   awarded_at_sources: AwardSourceRef[];
   fpds_url: string | null;
   data_source: string;
   is_recompete_candidate: boolean;
   period_of_performance_end: string | null;
+  days_to_pop_end?: number | null;
   set_aside: string | null;
   naics: string | null;
+  parent_award_id?: string | null;
   award_analysis: AwardAnalysis | null;
   award_analysis_run_at: string | null;
   incumbent_name: string | null;
   incumbent_name_sources: AwardSourceRef[];
   linked_opportunity_id: number | null;
+  priority_score?: number | null;
+  not_interested?: boolean;
+  not_interested_at?: string | null;
+  dismissal_reason?: string | null;
+  dismissal_note?: string | null;
+  vehicle_fit?: { short_name: string; name: string }[];
+}
+
+export interface AwardsKpis {
+  hot_recompetes: number;
+  wheelhouse_awards: number;
+  weak_incumbents: number;
+  in_my_vehicles: number;
+  already_pursuing: number;
 }
 
 export interface AwardsMeta {
@@ -333,6 +354,14 @@ export interface AwardsMeta {
 export interface AwardsPaginatedResponse {
   items: Award[];
   pagination: { limit: number; cursor: string | null; hasMore: boolean };
+}
+
+export interface WheelhouseNaics {
+  naics: string;
+  label: string | null;
+  reason: string | null;
+  active: boolean;
+  created_at: string;
 }
 
 /* ── Action Items ─────────────────────────────────────────────── */

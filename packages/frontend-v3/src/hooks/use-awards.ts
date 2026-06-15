@@ -1,29 +1,31 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api";
-import type { Award, AwardAnalysis, AwardsMeta, AwardsPaginatedResponse } from "@/lib/types";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
+import type {
+  Award,
+  AwardAnalysis,
+  AwardsKpis,
+  WheelhouseNaics,
+} from "@/lib/types";
 
-export interface UseAwardsParams {
-  agency?: string;
-  contract_type?: string;
-  awarded_after?: string;
+/* ── Tab type ──────────────────────────────────────────────────── */
+
+export type AwardsTab = "hot" | "90d" | "1yr" | "weak" | "vehicles" | "pursuing" | "all" | "excluded";
+
+/* ── Paged list ────────────────────────────────────────────────── */
+
+export interface UseAwardsPagedParams {
+  tab?: AwardsTab;
   limit?: number;
-  cursor?: string;
-}
-
-export function useAwards(params: UseAwardsParams = {}) {
-  return useQuery({
-    queryKey: ["awards", params],
-    queryFn: () =>
-      apiGet<AwardsPaginatedResponse>("/v3/awards", {
-        limit: params.limit ?? 100,
-        agency: params.agency || undefined,
-        contract_type: params.contract_type || undefined,
-        awarded_after: params.awarded_after || undefined,
-        cursor: params.cursor || undefined,
-      }),
-  });
+  page?: number;
+  search?: string;
+  incumbent?: string;
+  naics?: string;
+  value_min?: number;
+  value_max?: number;
+  sort_by?: string;
+  sort_dir?: string;
 }
 
 interface AwardsPagedResponse {
@@ -31,25 +33,6 @@ interface AwardsPagedResponse {
   total: number;
   page: number;
   totalPages: number;
-  meta?: AwardsMeta;
-}
-
-export interface UseAwardsPagedParams {
-  agency?: string;
-  contract_type?: string;
-  awarded_after?: string;
-  limit?: number;
-  page?: number;
-  recompete?: string;
-  has_incumbent?: boolean;
-  pursuing?: boolean;
-  incumbent?: string;
-  value_min?: number;
-  value_max?: number;
-  naics?: string;
-  search?: string;
-  sort_by?: string;
-  sort_dir?: string;
 }
 
 export function useAwardsPaged(params: UseAwardsPagedParams = {}) {
@@ -57,24 +40,31 @@ export function useAwardsPaged(params: UseAwardsPagedParams = {}) {
     queryKey: ["awards-paged", params],
     queryFn: () =>
       apiGet<AwardsPagedResponse>("/v3/awards", {
-        limit: params.limit ?? 100,
+        tab: params.tab ?? "hot",
+        limit: params.limit ?? 50,
         page: params.page ?? 1,
-        agency: params.agency || undefined,
-        contract_type: params.contract_type || undefined,
-        awarded_after: params.awarded_after || undefined,
-        recompete: params.recompete || undefined,
-        has_incumbent: params.has_incumbent ? "true" : undefined,
-        pursuing: params.pursuing ? "true" : undefined,
+        search: params.search || undefined,
         incumbent: params.incumbent || undefined,
+        naics: params.naics || undefined,
         value_min: params.value_min !== undefined ? String(params.value_min) : undefined,
         value_max: params.value_max !== undefined ? String(params.value_max) : undefined,
-        naics: params.naics || undefined,
-        search: params.search || undefined,
         sort_by: params.sort_by || undefined,
         sort_dir: params.sort_dir || undefined,
       }),
   });
 }
+
+/* ── KPIs ──────────────────────────────────────────────────────── */
+
+export function useAwardsKpis() {
+  return useQuery({
+    queryKey: ["awards", "kpis"],
+    queryFn: () => apiGet<AwardsKpis>("/v3/awards/kpis"),
+    staleTime: 30_000,
+  });
+}
+
+/* ── Count (nav badge) ─────────────────────────────────────────── */
 
 export function useAwardsCount() {
   return useQuery({
@@ -82,6 +72,18 @@ export function useAwardsCount() {
     queryFn: () => apiGet<{ count: number }>("/v3/awards/count"),
   });
 }
+
+/* ── Single detail ─────────────────────────────────────────────── */
+
+export function useAwardDetail(id: string | null) {
+  return useQuery({
+    queryKey: ["awards", "detail", id],
+    queryFn: () => apiGet<Award & { vehicle_fit: { short_name: string; name: string }[] }>(`/v3/awards/${id}`),
+    enabled: !!id,
+  });
+}
+
+/* ── Analyze ───────────────────────────────────────────────────── */
 
 export function useAwardAnalyze() {
   const queryClient = useQueryClient();
@@ -95,6 +97,8 @@ export function useAwardAnalyze() {
   });
 }
 
+/* ── Pursue ────────────────────────────────────────────────────── */
+
 export function useAwardPursue() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -103,6 +107,67 @@ export function useAwardPursue() {
         `/v3/awards/${awardId}/pursue`,
       ),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["awards-paged"] });
+      void queryClient.invalidateQueries({ queryKey: ["awards"] });
+    },
+  });
+}
+
+/* ── Dismiss (Not Interested) ──────────────────────────────────── */
+
+export function useAwardDismiss() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ awardId, reason, note }: { awardId: string; reason: string; note?: string }) =>
+      apiPost<{ dismissed: boolean }>(`/v3/awards/${awardId}/dismiss`, { reason, note }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["awards-paged"] });
+      void queryClient.invalidateQueries({ queryKey: ["awards"] });
+    },
+  });
+}
+
+export function useAwardUndismiss() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (awardId: string) =>
+      apiPost<{ undismissed: boolean }>(`/v3/awards/${awardId}/undismiss`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["awards-paged"] });
+      void queryClient.invalidateQueries({ queryKey: ["awards"] });
+    },
+  });
+}
+
+/* ── Wheelhouse NAICS ──────────────────────────────────────────── */
+
+export function useWheelhouseNaics() {
+  return useQuery({
+    queryKey: ["wheelhouse", "naics"],
+    queryFn: () => apiGet<{ items: WheelhouseNaics[] }>("/v3/wheelhouse/naics"),
+  });
+}
+
+export function useAddWheelhouseNaics() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { naics: string; label?: string; reason?: string }) =>
+      apiPost<{ added: boolean; naics: string }>("/v3/wheelhouse/naics", data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["wheelhouse"] });
+      void queryClient.invalidateQueries({ queryKey: ["awards-paged"] });
+      void queryClient.invalidateQueries({ queryKey: ["awards"] });
+    },
+  });
+}
+
+export function useRemoveWheelhouseNaics() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) =>
+      apiDelete(`/v3/wheelhouse/naics/${code}`) as Promise<void>,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["wheelhouse"] });
       void queryClient.invalidateQueries({ queryKey: ["awards-paged"] });
       void queryClient.invalidateQueries({ queryKey: ["awards"] });
     },
