@@ -40,6 +40,8 @@ const ALL_TASKS: readonly Task[] = [
   'partner_contact_discovery',
   'financial_analyze',
   'vault_vehicle_extract',
+  'workshop_teardown',
+  'workshop_generate',
 ] as const;
 
 describe('Routing Table', () => {

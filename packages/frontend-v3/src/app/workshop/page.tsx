@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, lazy, Suspense } from "react";
 import {
   useWorkshopUploads,
   useWorkshopUpload,
@@ -9,11 +9,23 @@ import {
   useReteardown,
   useDeleteWorkshopUpload,
 } from "@/hooks/use-workshop";
-import { UploadDropzone } from "@/components/workshop/UploadDropzone";
-import { ClassifyModal } from "@/components/workshop/ClassifyModal";
-import { TeardownView } from "@/components/workshop/TeardownView";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+
+const UploadDropzone = lazy(() =>
+  import("@/components/workshop/UploadDropzone").then((m) => ({
+    default: m.UploadDropzone,
+  })),
+);
+const ClassifyModal = lazy(() =>
+  import("@/components/workshop/ClassifyModal").then((m) => ({
+    default: m.ClassifyModal,
+  })),
+);
+const TeardownView = lazy(() =>
+  import("@/components/workshop/TeardownView").then((m) => ({
+    default: m.TeardownView,
+  })),
+);
 
 const TYPE_ICONS: Record<string, string> = {
   pdf: "PDF",
@@ -112,7 +124,9 @@ export default function WorkshopPage() {
         <h1 className="text-xl font-semibold text-foreground">Workshop</h1>
 
         {/* Upload */}
-        <UploadDropzone onFiles={handleFiles} disabled={upload.isPending} />
+        <Suspense fallback={null}>
+          <UploadDropzone onFiles={handleFiles} disabled={upload.isPending} />
+        </Suspense>
 
         {upload.isPending && (
           <p className="text-xs text-muted-foreground">Uploading...</p>
@@ -162,17 +176,17 @@ export default function WorkshopPage() {
                   </div>
                 </div>
                 {item.status === "analyzed" && (
-                  <Badge className="shrink-0 text-[11px] border-gda-green/30 text-gda-green bg-gda-green/10">
+                  <span className="shrink-0 rounded border border-gda-green/30 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-medium text-gda-green">
                     Analyzed
-                  </Badge>
+                  </span>
                 )}
                 {item.status === "analyzing" && (
                   <span className="shrink-0 h-3 w-3 animate-spin rounded-full border border-gda-green border-t-transparent" />
                 )}
                 {item.status === "failed" && (
-                  <Badge className="shrink-0 text-[11px] border-gda-red/30 text-gda-red bg-gda-red/10">
+                  <span className="shrink-0 rounded border border-gda-red/30 bg-gda-red/10 px-1.5 py-0.5 text-[11px] font-medium text-gda-red">
                     Failed
-                  </Badge>
+                  </span>
                 )}
               </button>
             );
@@ -223,11 +237,13 @@ export default function WorkshopPage() {
       {/* Right: Teardown view */}
       <div className="flex-1 min-w-0">
         {selectedUpload ? (
-          <TeardownView
-            upload={selectedUpload}
-            onReanalyze={() => reteardown.mutate(selectedUpload.id)}
-            isReanalyzing={reteardown.isPending}
-          />
+          <Suspense fallback={<div className="p-12 text-center text-sm text-muted-foreground">Loading...</div>}>
+            <TeardownView
+              upload={selectedUpload}
+              onReanalyze={() => reteardown.mutate(selectedUpload.id)}
+              isReanalyzing={reteardown.isPending}
+            />
+          </Suspense>
         ) : (
           <div className="flex h-full items-center justify-center rounded border border-dashed border-border p-12">
             <p className="text-sm text-muted-foreground">
@@ -239,12 +255,14 @@ export default function WorkshopPage() {
 
       {/* Classify Modal */}
       {classifyTarget && (
-        <ClassifyModal
-          filename={classifyTarget.filename}
-          onClassify={handleClassify}
-          onCancel={() => setClassifyTarget(null)}
-          isPending={classify.isPending}
-        />
+        <Suspense fallback={null}>
+          <ClassifyModal
+            filename={classifyTarget.filename}
+            onClassify={handleClassify}
+            onCancel={() => setClassifyTarget(null)}
+            isPending={classify.isPending}
+          />
+        </Suspense>
       )}
     </div>
   );
