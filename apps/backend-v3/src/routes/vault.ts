@@ -25,6 +25,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { logger } from '../lib/logger.js';
 import { ingestFinancialRows } from '../services/financials/ingest.js';
+import { extractVehicleFromVaultDoc } from '../services/vehicles/vault-extract.js';
 
 const UPLOAD_DIR = join(process.cwd(), 'data', 'vault');
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -682,6 +683,17 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
           logger.warn({ err, filename }, 'Financial extraction/ingest failed - upload not affected');
         }
       }
+    }
+
+    // Vehicle extraction for contract-type docs (best-effort, non-blocking)
+    const looksVehicle =
+      /contract|vehicle|idiq|bpa|gwac|task.order|teaming/i.test(filename) ||
+      docTypeConfirmed === 'contract' ||
+      docTypeConfirmed === 'subcontract_teaming';
+    if (looksVehicle && extractedText.length > 0) {
+      void extractVehicleFromVaultDoc(docId).catch((err) => {
+        logger.warn({ err, docId, filename }, 'Vehicle extraction on upload failed — non-blocking');
+      });
     }
 
     // Smart ingest routing (async, non-blocking for response)

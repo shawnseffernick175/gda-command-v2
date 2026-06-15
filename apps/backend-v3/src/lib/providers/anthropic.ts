@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, FinancialAnalyzeInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, FinancialAnalyzeInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -438,6 +438,38 @@ Parse this document and extract all relevant intelligence. Return JSON:
 }`;
 }
 
+function buildVaultVehicleExtractPrompt(input: VaultVehicleExtractInput): string {
+  const text = input.extracted_text.slice(0, 8000);
+  return `Document type: ${input.doc_type}
+Filename: ${input.filename}
+Extracted text (first 8000 chars):
+${text}
+
+You are an expert government contract analyst for Envision Innovative Solutions (EIS), a defense contractor.
+Determine if this document describes a contract vehicle (IDIQ, BPA, GWAC, GSA Schedule, task order contract, etc.) held by or relevant to EIS.
+
+If it IS a contract vehicle document, extract all available fields. If a field cannot be found, return null.
+
+Return JSON exactly matching this schema:
+{
+  "is_contract_vehicle": true/false,
+  "vehicle_name": "string or null — name of the contract vehicle",
+  "contract_number": "string or null — e.g. GS-XXX-XXXX, W912XX-XX-X-XXXX, N00178-XX-X-XXXX",
+  "sponsor_agency": "string or null — issuing agency",
+  "prime_or_sub": "prime" | "sub" | null,
+  "prime_contractor": "string or null — if sub, who is the prime",
+  "ceiling_value": number or null (in dollars, no commas),
+  "period_of_performance_start": "YYYY-MM-DD or null",
+  "period_of_performance_end": "YYYY-MM-DD or null",
+  "expiration_date": "YYYY-MM-DD or null — end of PoP including option periods",
+  "naics_codes": ["XXXXXX", ...] (5-6 digit NAICS codes found),
+  "set_aside_type": "8(a)" | "SDVOSB" | "WOSB" | "HUBZone" | "small business" | "unrestricted" | null,
+  "extraction_confidence": "high" | "medium" | "low",
+  "extraction_notes": "1-2 sentences explaining what was found/missing",
+  "model_used": "{model}"
+}`;
+}
+
 function buildVaultSmartRoutePrompt(input: VaultSmartRouteInput): string {
   return `Document filename: ${input.filename}
 Document summary: ${input.ai_summary}
@@ -692,6 +724,8 @@ export async function callAnthropic(opts: {
     ? buildSieExtractPrompt(opts.input as SieExtractInput)
     : opts.task === 'financial_analyze'
     ? buildFinancialAnalyzePrompt(opts.input as FinancialAnalyzeInput)
+    : opts.task === 'vault_vehicle_extract'
+    ? buildVaultVehicleExtractPrompt(opts.input as VaultVehicleExtractInput)
     : JSON.stringify(opts.input);
 
   // Prompt caching: use structured content blocks with cache_control
