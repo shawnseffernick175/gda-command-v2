@@ -842,18 +842,17 @@ export async function updateOpportunity(
   }
 
   // $1 = IDIQ rule: if value_min or value_max is set to exactly 1, mark as IDIQ
+  // Both value fields must be nulled (consistent with createOpportunity + migration)
   if (input.value_min === 1 || input.value_max === 1) {
     setClauses.push(`is_idiq = $${paramIdx++}`);
     params.push(true);
-    // Null out the dollar values — $1 is not a real amount
-    if (input.value_min === 1) {
-      const idx = fields.findIndex(([k]) => k === 'value_min');
-      if (idx >= 0) params[idx] = null;
-    }
-    if (input.value_max === 1) {
-      const idx = fields.findIndex(([k]) => k === 'value_max');
-      if (idx >= 0) params[idx] = null;
-    }
+    // Null out BOTH dollar values — $1 is not a real amount
+    const vMinIdx = fields.findIndex(([k]) => k === 'value_min');
+    if (vMinIdx >= 0) { params[vMinIdx] = null; }
+    else { setClauses.push(`value_min = $${paramIdx++}`); params.push(null); }
+    const vMaxIdx = fields.findIndex(([k]) => k === 'value_max');
+    if (vMaxIdx >= 0) { params[vMaxIdx] = null; }
+    else { setClauses.push(`value_max = $${paramIdx++}`); params.push(null); }
   }
 
   // Re-map department + org hierarchy when agency changes
