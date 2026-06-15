@@ -79,7 +79,7 @@ const CAPTURE_SORT_COLS: ColumnSortConfig[] = [
   { field: "program", type: "string", accessor: (r) => r.title },
   { field: "stage", type: "enum", enumOrder: ["interest", "qualify", "pursue", "solicitation", "post_submittal", "won"], accessor: (r) => r.stage },
   { field: "value", type: "number", accessor: (r) => (r.value_max as number) ?? (r.value_min as number) ?? (r.value as number) ?? 0 },
-  { field: "pwin", type: "number", accessor: (r) => (r.pwin as Record<string, unknown>)?.score as number ?? null },
+  { field: "pwin", type: "number", accessor: (r) => (r.pwin as number) ?? null },
 ];
 
 function CaptureList() {
