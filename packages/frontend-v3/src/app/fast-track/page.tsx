@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useFastTrackList, useRunFastTrack } from "@/hooks/use-fast-track";
 import {
   useFTSignals,
@@ -12,8 +12,20 @@ import type { FTSignal, FTMatch, FTMatchAnalysis } from "@/hooks/use-fast-track-
 import { Badge } from "@/components/ui/badge";
 import { SourceChip } from "@/components/shared/source-chip";
 import { CollapseSection } from "@/components/shared/collapse-section";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
 import type { FastTrackAssessment } from "@/lib/types";
+
+const SIGNAL_SORT_COLS: ColumnSortConfig[] = [
+  { field: "source", type: "string", accessor: (r) => r.source_name },
+  { field: "title", type: "string" },
+  { field: "institution", type: "string", accessor: (r) => r.institution },
+  { field: "horizon", type: "string", accessor: (r) => r.maturity_horizon },
+  { field: "strength", type: "number", accessor: (r) => r.signal_strength },
+  { field: "urgency", type: "number", accessor: (r) => r.urgency_score },
+];
 
 // ────────────────────────────────────────────────────────────
 // Grade styling (triage form)
@@ -246,7 +258,13 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
 // ────────────────────────────────────────────────────────────
 // Signal table wrapper
 // ────────────────────────────────────────────────────────────
-function SignalTable({ signals, loading, showInstitution }: { signals: FTSignal[]; loading: boolean; showInstitution?: boolean }) {
+function SignalTable({ signals, loading, showInstitution, sortPrefix }: { signals: FTSignal[]; loading: boolean; showInstitution?: boolean; sortPrefix?: string }) {
+  const { sortBy, sortDir, handleSort } = useTableSort(sortPrefix);
+
+  const sorted = useMemo(() => {
+    if (!sortBy) return signals;
+    return sortData(signals as unknown as Record<string, unknown>[], sortBy, sortDir, SIGNAL_SORT_COLS) as unknown as FTSignal[];
+  }, [signals, sortBy, sortDir]);
   if (loading) {
     return (
       <div className="space-y-2">
@@ -268,19 +286,19 @@ function SignalTable({ signals, loading, showInstitution }: { signals: FTSignal[
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
-            <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Source</th>
-            <th className="px-3 py-2 text-left font-medium">Title / Mission Tags</th>
+            <SortableHeader label="Source" field="source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
+            <SortableHeader label="Title / Mission Tags" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             {showInstitution && (
-              <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Institution</th>
+              <SortableHeader label="Institution" field="institution" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
             )}
-            <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Horizon</th>
-            <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Strength</th>
-            <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Urgency</th>
-            <th className="px-3 py-2 text-left font-medium">Next Review Action</th>
+            <SortableHeader label="Horizon" field="horizon" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
+            <SortableHeader label="Strength" field="strength" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
+            <SortableHeader label="Urgency" field="urgency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="whitespace-nowrap" />
+            <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Next Review Action</th>
           </tr>
         </thead>
         <tbody>
-          {signals.map((s) => (
+          {sorted.map((s) => (
             <SignalRow key={s.id} s={s} showInstitution={showInstitution} />
           ))}
         </tbody>
@@ -654,6 +672,14 @@ type TriageResult = FastTrackAssessment & {
 // Page
 // ────────────────────────────────────────────────────────────
 export default function FastTrackPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <FastTrackContent />
+    </Suspense>
+  );
+}
+
+function FastTrackContent() {
   const [activeSide, setActiveSide] = useState<PipelineSide>("government");
   const { data: listData,    isLoading: listLoading    } = useFastTrackList();
   const { data: signalsData, isLoading: signalsLoading } = useFTSignals(activeSide);
@@ -731,7 +757,7 @@ export default function FastTrackPage() {
               : "Watches DARPA, DIU, AFWERX, NavalX Tech Bridges, Army Applications Lab, NSIN, SBIR/STTR, startups and niche commercial firms for maturing dual-use capabilities that align with Envision's mission areas."}
           </p>
         </div>
-        <SignalTable signals={techSignals} loading={signalsLoading} showInstitution={isIndustry} />
+        <SignalTable signals={techSignals} loading={signalsLoading} showInstitution={isIndustry} sortPrefix="tech" />
       </CollapseSection>
 
       {/* ── NEED SENSING: Requirements Pipeline ──────────────── */}
@@ -747,7 +773,7 @@ export default function FastTrackPage() {
               : "Tracks procurement forecasts, sources sought, RFIs, industry days, draft RFPs, CSOs, and post-RFI formal opportunities to surface demand signals before they become competed awards."}
           </p>
         </div>
-        <SignalTable signals={reqSignals} loading={signalsLoading} showInstitution={isIndustry} />
+        <SignalTable signals={reqSignals} loading={signalsLoading} showInstitution={isIndustry} sortPrefix="req" />
       </CollapseSection>
 
       {/* ── NEED SENSING: Matched Pairs ───────────────────────── */}

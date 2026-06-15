@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useOpportunitiesPaged } from "@/hooks/use-opportunities";
@@ -13,6 +13,9 @@ import { formatMoney } from "@/lib/format-money";
 import { apiGet } from "@/lib/api";
 import type { OpportunitySummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import {
   ACTIVE_STAGES,
   LABEL_TO_DB_KEY,
@@ -151,11 +154,29 @@ function usePipelineSummary() {
 
 /* ── Main page ─────────────────────────────────────────────────── */
 
+const PIPELINE_SORT_COLS: ColumnSortConfig[] = [
+  { field: "title", type: "string" },
+  { field: "stage", type: "enum", enumOrder: [...ACTIVE_STAGES, "Won"], accessor: (r) => stageKeyToLabel(r.pipeline_stage as string) },
+  { field: "value", type: "number", accessor: (r) => (r.value_max as number) ?? (r.value_min as number) ?? (r.value as number) ?? 0 },
+  { field: "weighted", type: "number", accessor: (r) => { const v = (r.value_max as number) ?? (r.value_min as number) ?? (r.value as number) ?? 0; const p = (r.pwin as Record<string, unknown>)?.score as number ?? 0; return Math.round(v * (p / 100)); } },
+  { field: "pwin", type: "number", accessor: (r) => (r.pwin as Record<string, unknown>)?.score as number ?? null },
+  { field: "due", type: "date", accessor: (r) => (r.response_due_at as string) ?? (r.due_date as string) ?? null },
+];
+
 export default function PipelinePage() {
+  return (
+    <Suspense fallback={<div />}>
+      <PipelineContent />
+    </Suspense>
+  );
+}
+
+function PipelineContent() {
   const [search, setSearch] = useState("");
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [moversOpen, setMoversOpen] = useState(true);
   const [page, setPage] = useState(1);
+  const { sortBy, sortDir, handleSort } = useTableSort();
 
   const { data: summary, isLoading: summaryLoading } = usePipelineSummary();
 
@@ -172,8 +193,11 @@ export default function PipelinePage() {
 
   const items = useMemo(() => {
     const raw = listData?.items ?? [];
+    if (sortBy) {
+      return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, PIPELINE_SORT_COLS) as unknown as typeof raw;
+    }
     return [...raw].sort((a, b) => (b.pwin?.score ?? 0) - (a.pwin?.score ?? 0));
-  }, [listData]);
+  }, [listData, sortBy, sortDir]);
 
   // Reset to first page when the active filter changes. Adjust state during
   // render (React's supported pattern) rather than in an effect.
@@ -388,13 +412,13 @@ export default function PipelinePage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium">Title</th>
-                <th className="px-3 py-2 text-left font-medium w-[90px]">Stage</th>
-                <th className="px-3 py-2 text-left font-medium w-[100px]">Value</th>
-                <th className="px-3 py-2 text-left font-medium w-[100px]">Weighted</th>
-                <th className="px-3 py-2 text-left font-medium w-[80px]">Pwin</th>
-                <th className="px-3 py-2 text-left font-medium w-[70px]">Due</th>
-                <th className="px-3 py-2 text-left font-medium w-[40px]">→</th>
+                <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="90px" />
+                <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                <SortableHeader label="Weighted" field="weighted" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                <SortableHeader label="Due" field="due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="70px" />
+                <th className="px-3 py-2 text-left font-medium w-[40px] bg-gda-bg-base">→</th>
               </tr>
             </thead>
             <tbody>
