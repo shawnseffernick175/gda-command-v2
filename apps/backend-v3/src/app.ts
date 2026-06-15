@@ -36,7 +36,6 @@ import { agentRoutes } from './routes/agent.js';
 import { auditRoutes } from './routes/audit.js';
 import { reportRoutes } from './routes/reports.js';
 import { llmCostRollupRoutes } from './routes/llm-cost-rollup.js';
-import { briefingRoutes } from './routes/briefing.js';
 import { contactsRoutes } from './routes/contacts.js';
 import { competitorsRoutes } from './routes/competitors.js';
 import { adminUsersRoutes } from './routes/admin-users.js';
@@ -164,7 +163,6 @@ export async function buildApp() {
   await app.register(auditRoutes);
   await app.register(reportRoutes);
   await app.register(llmCostRollupRoutes);
-  await app.register(briefingRoutes);
   await app.register(contactsRoutes);
   await app.register(competitorsRoutes);
   await app.register(risksRoutes);
