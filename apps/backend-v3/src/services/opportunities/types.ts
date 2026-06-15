@@ -26,6 +26,7 @@ export interface OpportunityRow {
   description: string | null;
   tags: string[];
   data_source: string;
+  is_idiq: boolean;
   analysis: AnalysisBlock | null;
   analysis_version: string | null;
   ai_analyzed_at: string | null;
@@ -106,6 +107,7 @@ export interface OpportunitySummary {
   value_max: number | null;
   value_max_sources: SourceRef[];
   teaming_flags: TeamingFlag[];
+  is_idiq: boolean;
   ai_analyzed_at: string | null;
   analysis_version: string | null;
   source_uri: string | null;
@@ -157,6 +159,7 @@ export interface OpportunityCreateInput {
   posted_at?: string;
   value_min?: number;
   value_max?: number;
+  is_idiq?: boolean;
 }
 
 export interface OpportunityUpdateInput {
@@ -196,6 +199,8 @@ export interface ListFilters {
   sources?: string[];
   stage?: string;
   relevantOnly?: boolean;
+  /** Filter by IDIQ status: 'only' = IDIQs only, 'exclude' = hide IDIQs */
+  idiq?: 'only' | 'exclude';
   limit?: number;
   cursor?: string;
   page?: number;
@@ -231,6 +236,7 @@ export interface OpportunityMeta {
   unscored_count: number;
   total_value: number;
   hot_count: number;
+  idiq_count: number;
   stage_counts: Record<string, number>;
 }
 

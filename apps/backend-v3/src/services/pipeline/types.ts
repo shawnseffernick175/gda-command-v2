@@ -34,8 +34,12 @@ export interface PipelineItem {
   win_prob_pct_sources: SourceRef[];
   win_prob_evidence: string | null;
   win_prob_evidence_sources: SourceRef[];
+  stage: string;
   milestones: Milestone[];
   teaming_partners: string[];
+  pwin_score: number | null;
+  pwin_band: string | null;
+  solicitation_number: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +51,8 @@ export interface PipelineListFilters {
   opportunity_set_aside?: string;
   due_after?: string;
   due_before?: string;
+  stage?: string;
+  q?: string;
   limit: number;
   cursor?: string;
 }
@@ -108,4 +114,8 @@ export interface PipelineRow {
   pipeline_source_url: string | null;
   pipeline_source_retrieved_at: string | null;
   teaming_partners: string[] | null;
+  stage: string;
+  pwin_score: string | null;
+  pwin_band: string | null;
+  solicitation_number: string | null;
 }

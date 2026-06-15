@@ -87,17 +87,32 @@ export async function overrideRoutes(app: FastifyInstance): Promise<void> {
         );
 
         // Upsert pipeline_items
+        let pipelineItemId: number | null = pipelineRow?.id ?? null;
         if (pipelineRow) {
           await client.query(
             `UPDATE pipeline_items SET stage = $1, updated_at = NOW() WHERE id = $2`,
             [newStage, pipelineRow.id],
           );
         } else {
-          await client.query(
+          const newPi = await client.query<{ id: number }>(
             `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-             VALUES ($1, 'admin', $2, $3)`,
+             VALUES ($1, 'admin', $2, $3) RETURNING id`,
             [id, newStage, opp.source_id],
           );
+          pipelineItemId = newPi.rows[0]?.id ?? null;
+        }
+
+        // Log stage transition to capture_stage_history
+        try {
+          await client.query('SAVEPOINT csh_insert');
+          await client.query(
+            `INSERT INTO capture_stage_history
+             (pipeline_item_id, opportunity_id, from_stage, to_stage, moved_by_user, reason)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [pipelineItemId, id, currentStage, newStage, 'user', reason ?? null],
+          );
+        } catch {
+          await client.query('ROLLBACK TO SAVEPOINT csh_insert');
         }
 
         await client.query('COMMIT');

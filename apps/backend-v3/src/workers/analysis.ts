@@ -44,6 +44,7 @@ import type { OpportunityRow as PwinOpportunityRow } from '../services/pwin/feat
 import { llmRouter } from '../lib/llm-router.js';
 import { getPwinWeights } from '../services/pwin/pwin-weights.js';
 import { assembleDailyBriefing } from '../services/briefing/assemble.js';
+import { resolveUnifiedLink } from '../services/opportunities/unified-mirror.js';
 
 const { Pool } = pg;
 
@@ -510,6 +511,25 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
 
     const now = analysis.generated_at as string;
 
+    // ── Canonical Pwin: single source of truth (issue #849) ────────────────
+    // Priority: LLM win_probability > deterministic scorer.
+    // The LLM assessment incorporates Shipley dimensions, competitive landscape,
+    // and bid recommendation — producing a more accurate signal. The deterministic
+    // scorer only evaluates surface-level fit signals (NAICS, agency, set-aside).
+    const deterministicPwin: number =
+      typeof analysis.pwin === 'object' && analysis.pwin !== null
+        ? ((analysis.pwin as { score?: number | null }).score ?? 0) / 100
+        : (analysis.pwin as number) ?? 0;
+
+    const llmAnalysisResult = analysis.llm_analysis as { win_probability?: number } | null;
+    const llmPwin: number | null =
+      llmAnalysisResult && typeof llmAnalysisResult.win_probability === 'number'
+        ? llmAnalysisResult.win_probability / 100
+        : null;
+
+    // Canonical pwin stored as 0-1 fraction; LLM preferred when available.
+    const canonicalPwin: number = llmPwin ?? deterministicPwin;
+
     // Write to opportunity_analysis_cache
     try {
       await pool.query(
@@ -529,9 +549,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
           entityId,
           config.analysisVersion,
           now,
-          typeof analysis.pwin === 'object' && analysis.pwin !== null
-            ? ((analysis.pwin as { score?: number | null }).score ?? 0) / 100
-            : analysis.pwin,
+          canonicalPwin,
           analysis.incumbent,
           JSON.stringify(analysis.competitors),
           JSON.stringify(analysis.blackhat),
@@ -541,6 +559,29 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       );
     } catch (err) {
       logger.warn({ err, entityId }, 'Failed to write to analysis cache table — continuing with inline analysis');
+    }
+
+    // Propagate canonical pwin to unified_opportunities (single source of truth, #849)
+    try {
+      const canonicalPwin100 = Math.round(canonicalPwin * 100);
+      const link = resolveUnifiedLink({
+        data_source: row.data_source as string,
+        sam_notice_id: row.sam_notice_id as string | null,
+        govtribe_id: row.govtribe_id as string | null,
+        external_id: row.external_id as string | null,
+      });
+      if (link) {
+        await pool.query(
+          `UPDATE unified_opportunities uo
+             SET pwin = $1, updated_at = NOW()
+             FROM unified_opportunity_links l
+            WHERE l.internal_id = uo.internal_id
+              AND l.source = $2 AND l.source_native_id = $3`,
+          [canonicalPwin100, link.source, link.source_native_id],
+        );
+      }
+    } catch (err) {
+      logger.warn({ err, entityId }, 'Failed to propagate pwin to unified_opportunities — non-critical');
     }
 
     // Standing rule: auto-Pass when pwin band === 'pass' OR auto-No-Bid

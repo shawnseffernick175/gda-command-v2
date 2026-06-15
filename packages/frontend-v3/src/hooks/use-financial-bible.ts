@@ -21,12 +21,28 @@ export function useIngestionStatus() {
   });
 }
 
-export function useContractWaterfall(fy: string) {
+export function useContractWaterfall(params?: {
+  from?: string;
+  to?: string;
+  parent_vehicle_id?: number;
+  status?: string;
+  prime_or_sub?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.from) searchParams.set("from", params.from);
+  if (params?.to) searchParams.set("to", params.to);
+  if (params?.parent_vehicle_id)
+    searchParams.set("parent_vehicle_id", String(params.parent_vehicle_id));
+  if (params?.status) searchParams.set("status", params.status);
+  if (params?.prime_or_sub)
+    searchParams.set("prime_or_sub", params.prime_or_sub);
+
+  const qs = searchParams.toString();
   return useQuery({
-    queryKey: ["financials", "contract-waterfall", fy],
+    queryKey: ["financials", "contract-waterfall", qs],
     queryFn: () =>
       apiGet<ContractWaterfallData>(
-        `/v3/financials/contract-waterfall?fy=${encodeURIComponent(fy)}`,
+        `/v3/financials/contract-waterfall${qs ? `?${qs}` : ""}`,
       ),
     retry: false,
   });

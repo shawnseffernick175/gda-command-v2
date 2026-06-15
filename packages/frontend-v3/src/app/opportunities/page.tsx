@@ -41,6 +41,8 @@ import type {
   OpportunitySummary,
 } from "@/lib/types";
 
+const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
+
 export default function OpportunitiesPage() {
   return (
     <Suspense fallback={<Skeleton className="h-8 w-64 bg-gda-panel" />}>
@@ -163,6 +165,7 @@ function OpportunityList() {
   const [dueFilter, setDueFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
   const [relevantOnly, setRelevantOnly] = useState(true);
+  const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(undefined);
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const [page, setPage] = useState(1);
@@ -196,11 +199,12 @@ function OpportunityList() {
       sources: sourceFilter.length > 0 ? sourceFilter : undefined,
       stage: stageTab !== "all" ? stageTab : undefined,
       relevant_only: relevantOnly,
+      idiq: idiqFilter,
       sort_by: sortBy ?? undefined,
       sort_dir: sortBy ? sortDir : undefined,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, sortBy, sortDir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, idiqFilter, sortBy, sortDir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -238,7 +242,7 @@ function OpportunityList() {
 
   const hasActiveFilters =
     debouncedQ || agencyFilter || hotFilter || setAsideFilter.length > 0 ||
-    valueRange !== 0 || dueFilter || sourceFilter.length > 0;
+    valueRange !== 0 || dueFilter || sourceFilter.length > 0 || idiqFilter !== undefined;
 
   const handleClearFilters = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -250,6 +254,7 @@ function OpportunityList() {
     setValueRange(0);
     setDueFilter("");
     setSourceFilter([]);
+    setIdiqFilter(undefined);
     // Strip ?agency from the URL so a remount does not re-apply a stale filter
     if (searchParams.get("agency")) {
       router.replace("/opportunities");
@@ -333,6 +338,14 @@ function OpportunityList() {
               active={hotFilter}
               onClick={handleHotClick}
             />
+            {meta.idiq_count > 0 && (
+              <IntelChip
+                icon="I"
+                label={`${meta.idiq_count} IDIQ`}
+                active={idiqFilter === 'only'}
+                onClick={() => setIdiqFilter((prev) => prev === 'only' ? undefined : 'only')}
+              />
+            )}
           </div>
         )}
 
@@ -438,10 +451,10 @@ function OpportunityList() {
             </div>
           ) : (
             <>
-              {/* Table. Header row stays pinned while the body scrolls. */}
-              <div className="rounded border border-border overflow-auto max-h-[calc(100vh-260px)]">
+              {/* Table — no inner scroll; the outer page scrolls */}
+              <div className="rounded border border-border overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-20">
+                  <thead>
                     <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                       <th className="w-[3px] p-0 bg-gda-bg-base" />
                       <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -808,7 +821,9 @@ function VehicleOpportunityRow({
         </div>
       </div>
       <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground shrink-0">
-        {(opp.value_max || opp.value_min) ? (
+        {opp.is_idiq ? (
+          <span className={IDIQ_BADGE_CLS}>IDIQ</span>
+        ) : (opp.value_max || opp.value_min) ? (
           <span>{formatMoney(opp.value_max ?? opp.value_min)}</span>
         ) : (
           <FieldStatusBadge reason="no_source_data" />
@@ -920,7 +935,9 @@ function OpportunityRow({
         })()}
       </td>
       <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
-        {formatMoney(getEffectiveValue(opp))}
+        {opp.is_idiq ? (
+          <span className={IDIQ_BADGE_CLS}>IDIQ</span>
+        ) : formatMoney(getEffectiveValue(opp))}
       </td>
       <td className="px-3 py-1.5 text-left">
         {score != null ? (
@@ -1190,7 +1207,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
           {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
+          <DecisionBriefPanel llm={llm} oppId={id} canonicalPwin={opp.pwin?.score ?? null} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
 
           {/* Competitive Intelligence */}
           <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
@@ -1216,7 +1233,12 @@ function OpportunityDetail({ id }: { id: string }) {
               <MetaRow label="Agency" value={opp.agency_name ?? opp.agency ?? "---"} />
               {opp.office && <MetaRow label="Office" value={opp.office} />}
               {opp.contracting_office && <MetaRow label="Contracting" value={opp.contracting_office} />}
-              {opp.value_max || opp.value_min || opp.value ? (
+              {opp.is_idiq ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Value</span>
+                  <span className={IDIQ_BADGE_CLS}>IDIQ (ceiling TBD)</span>
+                </div>
+              ) : opp.value_max || opp.value_min || opp.value ? (
                 <MetaRow label="Value" value={formatMoney(opp.value_max ?? opp.value_min ?? opp.value ?? null)} mono />
               ) : (
                 <div className="flex items-center justify-between">
@@ -1346,6 +1368,7 @@ const BID_BADGE_COLORS: Record<string, string> = {
 
 function DecisionBriefPanel({
   llm,
+  canonicalPwin,
   analyzing,
   onAnalyze,
   llmErrorKind,
@@ -1354,6 +1377,7 @@ function DecisionBriefPanel({
 }: {
   llm?: LlmAnalysis | null;
   oppId: string;
+  canonicalPwin?: number | null;
   analyzing: boolean;
   onAnalyze: () => void;
   llmErrorKind?: string | null;
@@ -1462,7 +1486,8 @@ function DecisionBriefPanel({
 
   const bidRec = llm.bid_recommendation ?? llm.shipley_bid_no_bid.overall;
   const bidColor = BID_BADGE_COLORS[bidRec] ?? "border-border text-muted-foreground";
-  const pwinScore = llm.win_probability;
+  // Use canonical pwin (single source of truth, #849) — same value shown on list
+  const pwinScore = canonicalPwin ?? llm.win_probability;
   const pwinColor = pwinScore >= 70 ? "text-gda-green" : pwinScore >= 40 ? "text-gda-amber" : "text-gda-red";
 
   return (

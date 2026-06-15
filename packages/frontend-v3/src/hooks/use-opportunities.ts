@@ -19,6 +19,7 @@ export interface OpportunityMeta {
   unscored_count: number;
   total_value: number;
   hot_count: number;
+  idiq_count: number;
   stage_counts: Record<string, number>;
 }
 
@@ -78,6 +79,7 @@ export interface UseOpportunitiesPagedParams {
   sources?: string[];
   stage?: string;
   relevant_only?: boolean;
+  idiq?: 'only' | 'exclude';
   sort_by?: string;
   sort_dir?: "asc" | "desc";
 }
@@ -104,6 +106,7 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         "source[]": params.sources,
         stage: params.stage,
         relevant_only: params.relevant_only === false ? "false" : undefined,
+        idiq: params.idiq,
         sort_by: params.sort_by,
         sort_dir: params.sort_dir,
       }),
