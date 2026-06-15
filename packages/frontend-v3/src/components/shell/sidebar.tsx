@@ -68,12 +68,22 @@ export function Sidebar() {
         </Link>
 
         <Link
-          href="/settings#sentinel"
-          className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+          href={PROMPT_CREATOR_ITEM.href}
+          className={cn(
+            "flex items-center gap-2.5 rounded px-3 py-1.5 text-[13px] transition-colors",
+            pathname.startsWith("/prompt-creator")
+              ? "border-l-2 border-gda-green bg-gda-panel text-gda-green"
+              : "text-muted-foreground hover:bg-gda-panel hover:text-foreground",
+          )}
         >
+          <PROMPT_CREATOR_ITEM.icon size={15} />
+          <span>{PROMPT_CREATOR_ITEM.label}</span>
+        </Link>
+
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground">
           <span className={cn("h-2 w-2 rounded-full", sentinelColor)} />
           <span>Sentinel {sentinel?.overall ?? "..."}</span>
-        </Link>
+        </div>
       </div>
     </aside>
   );
