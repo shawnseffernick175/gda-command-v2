@@ -14,6 +14,7 @@ import {
   useDeleteVaultDocument,
   useUpdateVaultDocType,
   useRegulatoryCatalog,
+  useReExtractVaultDocument,
 } from "@/hooks/use-vault";
 import { Pagination } from "@/components/shared/Pagination";
 import { PendingState } from "@/components/shared/pending-state";
@@ -97,6 +98,41 @@ function docTypeBadgeClass(dt: string): string {
       return "border-gda-green/30 text-gda-green bg-gda-green/10";
     default:
       return "border-border text-muted-foreground";
+  }
+}
+
+function ExtractionStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case "success":
+      return (
+        <span title="Extraction successful" className="text-gda-green text-xs">
+          &#x2713;
+        </span>
+      );
+    case "failed":
+      return (
+        <span
+          title="Extraction failed"
+          className="inline-block rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold border border-gda-red/40 bg-gda-red/10 text-gda-red"
+        >
+          FAILED
+        </span>
+      );
+    case "unsupported":
+      return (
+        <span
+          title="File type not supported for extraction"
+          className="inline-block rounded px-1.5 py-0.5 text-[10px] font-mono border border-gda-amber/40 bg-gda-amber/10 text-gda-amber"
+        >
+          N/A
+        </span>
+      );
+    default:
+      return (
+        <span title="Extraction pending" className="text-muted-foreground text-xs">
+          &#x231b;
+        </span>
+      );
   }
 }
 
@@ -399,6 +435,7 @@ function WorkProductTable({
   onLink: (id: number) => void;
 }) {
   const updateDocType = useUpdateVaultDocType();
+  const reExtract = useReExtractVaultDocument();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -437,6 +474,7 @@ function WorkProductTable({
           <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
             <th className="px-3 py-2 text-left font-medium">Filename</th>
             <th className="px-3 py-2 text-left font-medium">Type</th>
+            <th className="px-3 py-2 text-center font-medium" title="Extraction status">Extract</th>
             <th className="px-3 py-2 text-center font-medium" title="AI ingestion status">AI</th>
             <th className="px-3 py-2 text-left font-medium">Linked To</th>
             <th className="px-3 py-2 text-left font-medium">Regulatory Refs</th>
@@ -484,6 +522,9 @@ function WorkProductTable({
                 </select>
               </td>
               <td className="px-3 py-2 text-center">
+                <ExtractionStatusBadge status={doc.extraction_status} />
+              </td>
+              <td className="px-3 py-2 text-center">
                 {doc.ai_summary && doc.ai_tags ? (
                   <span
                     title={`AI ingested \u00b7 ${(doc.ai_tags as string[]).length} tags`}
@@ -526,6 +567,17 @@ function WorkProductTable({
                   >
                     Link
                   </button>
+                  {doc.extraction_status !== 'success' && (
+                    <button
+                      onClick={() => reExtract.mutate(doc.id, {
+                        onError: () => setErrorMsg("Re-extraction failed. Try again."),
+                      })}
+                      disabled={reExtract.isPending}
+                      className="text-[11px] text-gda-amber hover:text-gda-amber/80 font-mono"
+                    >
+                      {reExtract.isPending && reExtract.variables === doc.id ? "Extracting\u2026" : "Re-extract"}
+                    </button>
+                  )}
                   {!doc.is_system_doc && (
                     <button
                       onClick={() => onDelete(doc)}
