@@ -38,8 +38,12 @@ export interface OpportunitySummary {
   value?: number | null;
   value_min?: number | null;
   value_max?: number | null;
+  value_source?: string | null;
+  value_confidence?: string | null;
   due_date?: string | null;
   response_due_at?: string | null;
+  date_source?: string | null;
+  date_confidence?: string | null;
   set_aside: string | null;
   eligibility?: SetAsideEligibility | null;
   hot?: boolean;

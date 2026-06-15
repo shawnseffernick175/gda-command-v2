@@ -103,10 +103,26 @@ function formatDaysLeft(opp: OpportunitySummary): { text: string; className: str
   if (days <= 7) return { text: `${days}d`, className: "text-gda-red font-mono font-bold" };
   if (days <= 30) return { text: `${days}d`, className: "text-gda-amber font-mono" };
   const d = new Date(getEffectiveDueDate(opp)!);
+  const isForecasted = opp.date_confidence === "forecasted" || opp.date_confidence === "estimated";
+  const base = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   return {
-    text: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    className: "text-muted-foreground",
+    text: isForecasted ? `~${base}` : base,
+    className: isForecasted ? "text-muted-foreground/70" : "text-muted-foreground",
   };
+}
+
+function isEstimatedValue(opp: OpportunitySummary): boolean {
+  return opp.value_source === "govwin_estimate" || opp.value_source === "govtribe_estimate";
+}
+
+function formatValueWithSource(opp: OpportunitySummary): { text: string; className: string } {
+  const val = getEffectiveValue(opp);
+  if (val == null) return { text: "—", className: "text-muted-foreground" };
+  const money = formatMoney(val);
+  if (isEstimatedValue(opp)) {
+    return { text: `~${money} est.`, className: "text-muted-foreground/70 tabular-nums" };
+  }
+  return { text: money, className: "text-foreground tabular-nums" };
 }
 
 /* ── Stage badge colors (from shared canonical model) ───────────── */
@@ -449,7 +465,7 @@ function OpportunityList() {
                       <th className="w-[3px] p-0 bg-gda-bg-base" />
                       <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                       <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
-                      <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                      <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" infoTooltip={<HeaderInfoTooltip text="Value pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin and GovTribe estimates (shown with ~ and in muted color). Empty means no source had data." />} />
                       <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
                       <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="150px" />
                       <SortableHeader
@@ -465,7 +481,7 @@ function OpportunityList() {
                           onToggle: (v) => toggleArrayFilter(setSetAsideFilter, v),
                         }}
                       />
-                      <SortableHeader label="Due" field="due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                      <SortableHeader label="Due" field="due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Due date pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin and GovTribe forecasts (shown with ~ and in muted color). Empty means no source had data." />} />
                       <th className="px-3 py-2 text-left font-medium w-[60px] bg-gda-bg-base">Actions</th>
                     </tr>
                   </thead>
@@ -574,6 +590,32 @@ function IntelChip({
     >
       {icon} {label}
     </button>
+  );
+}
+
+/* ── Header info tooltip (? popover) ─────────────────────────────── */
+
+function HeaderInfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <button
+        type="button"
+        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border text-[11px] text-muted-foreground hover:bg-gda-panel"
+        aria-label="Column info"
+      >
+        ?
+      </button>
+      {show && (
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded border border-border bg-gda-bg-raised p-2.5 text-xs text-muted-foreground shadow-lg normal-case font-normal">
+          {text}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -815,10 +857,13 @@ function OpportunityRow({
           );
         })()}
       </td>
-      <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
+      <td className="px-3 py-1.5 text-left font-mono text-xs tabular-nums">
         {opp.is_idiq ? (
           <span className={IDIQ_BADGE_CLS}>IDIQ</span>
-        ) : formatMoney(getEffectiveValue(opp))}
+        ) : (() => {
+          const fv = formatValueWithSource(opp);
+          return <span className={fv.className}>{fv.text}</span>;
+        })()}
       </td>
       <td className="px-3 py-1.5 text-left">
         {score != null ? (
