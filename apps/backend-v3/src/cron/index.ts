@@ -38,6 +38,7 @@ import { discoverPartnerContacts } from '../services/contacts/partner-discovery.
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
 import { runAutoPassDeadline } from './auto-pass-deadline.js';
+import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
@@ -80,6 +81,7 @@ const JOBS: CronJob[] = [
   ...(grantsGovEnabled
     ? [{ sourceKey: 'grants.gov', schedule: '0 11 * * *', label: 'Grants.gov open opportunities (daily 07:00 ET)' }]
     : []),
+  { sourceKey: 'fastrac-army', schedule: '0 9 * * *', label: 'FasTrac Tier 1 Army installation & unit signals (daily 05:00 ET)' },
 ];
 
 export function startCronScheduler(): void {
@@ -96,6 +98,7 @@ export function startCronScheduler(): void {
     registerGovWinSource();
   }
   registerGrantsGovSource();
+  registerFastracArmySource();
 
   const registeredSources = getRegisteredSources();
   const registeredAdapters = listAdapters();
@@ -302,6 +305,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'nih' ? 'nih.weekly'
       : job.sourceKey === 'arxiv' ? 'arxiv.weekly'
       : job.sourceKey === 'grants.gov' ? 'grants.daily'
+      : job.sourceKey === 'fastrac-army' ? 'fastrac-army.daily'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
