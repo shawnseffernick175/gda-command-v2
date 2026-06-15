@@ -144,7 +144,7 @@ const UPSERT_SQL = `
     $11, $12, $13,
     $14, $15
   )
-  ON CONFLICT DO NOTHING
+  ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO NOTHING
 `;
 
 /**
@@ -164,13 +164,6 @@ async function insertSignal(params: {
   installation: string;
   unit: string | null;
 }): Promise<boolean> {
-  // Pre-check for existing source_url to avoid inserting duplicates
-  const exists = await pool.query(
-    'SELECT 1 FROM fast_track_signals WHERE source_url = $1 LIMIT 1',
-    [params.sourceUrl],
-  );
-  if (exists.rows.length > 0) return false;
-
   const result = await pool.query(UPSERT_SQL, [
     'requirement',                // pipeline — installation signals are needs/requirements
     params.source,                // source
