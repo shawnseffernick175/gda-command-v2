@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "@/lib/toast";
+import { useToast } from "@/components/ui/toast";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -43,6 +43,7 @@ export function RowActionsMenu({
   const [showAssign, setShowAssign] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showNote, setShowNote] = useState(false);
+  const { toast } = useToast();
 
   const updateStage = useUpdateStage();
   const assignOwner = useAssignOwner();
@@ -61,9 +62,9 @@ export function RowActionsMenu({
     updateStage.mutate(
       { id: opportunityId, stage: "qualify" },
       {
-        onSuccess: () => toast.success("Moved to Qualify"),
+        onSuccess: () => toast("Moved to Qualify", "success"),
         onError: (err) =>
-          toast.error(`Failed to move to pipeline: ${err.message}`),
+          toast(`Failed to move to pipeline: ${err.message}`, "error"),
       },
     );
   }
@@ -73,9 +74,9 @@ export function RowActionsMenu({
     updateStage.mutate(
       { id: opportunityId, stage: dbKey },
       {
-        onSuccess: () => toast.success(`Stage moved to ${stage}`),
+        onSuccess: () => toast(`Stage moved to ${stage}`, "success"),
         onError: (err) =>
-          toast.error(`Failed to move stage: ${err.message}`),
+          toast(`Failed to move stage: ${err.message}`, "error"),
       },
     );
   }
@@ -85,11 +86,11 @@ export function RowActionsMenu({
       { id: opportunityId, ownerId: userId },
       {
         onSuccess: () => {
-          toast.success(`Assigned to ${displayName}`);
+          toast(`Assigned to ${displayName}`, "success");
           setShowAssign(false);
         },
         onError: (err) =>
-          toast.error(`Failed to assign: ${err.message}`),
+          toast(`Failed to assign: ${err.message}`, "error"),
       },
     );
   }
@@ -99,11 +100,11 @@ export function RowActionsMenu({
       { id: opportunityId, tags },
       {
         onSuccess: () => {
-          toast.success("Tags updated");
+          toast("Tags updated", "success");
           setShowTags(false);
         },
         onError: (err) =>
-          toast.error(`Failed to update tags: ${err.message}`),
+          toast(`Failed to update tags: ${err.message}`, "error"),
       },
     );
   }
@@ -113,11 +114,11 @@ export function RowActionsMenu({
       { id: opportunityId, body },
       {
         onSuccess: () => {
-          toast.success("Note added");
+          toast("Note added", "success");
           setShowNote(false);
         },
         onError: (err) =>
-          toast.error(`Failed to add note: ${err.message}`),
+          toast(`Failed to add note: ${err.message}`, "error"),
       },
     );
   }
@@ -127,11 +128,11 @@ export function RowActionsMenu({
       { id: opportunityId },
       {
         onSuccess: () => {
-          toast.success("Opportunity marked as Passed");
+          toast("Opportunity marked as Passed", "success");
           setShowPassConfirm(false);
         },
         onError: (err) => {
-          toast.error(`Failed to pass: ${err.message}`);
+          toast(`Failed to pass: ${err.message}`, "error");
           setShowPassConfirm(false);
         },
       },

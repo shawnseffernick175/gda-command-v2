@@ -31,6 +31,7 @@ import {
   qualifyOpportunity,
   rowToDetail,
   rowToSummary,
+  attachPwin,
   type OpportunityRow,
   type OpportunityCreateInput,
   type OpportunityUpdateInput,
@@ -545,6 +546,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     const relevantOnlyRaw = query.relevant_only as string | undefined;
     const relevantOnly = relevantOnlyRaw === 'false' ? false : true;
 
+    const idiqRaw = query.idiq as string | undefined;
+    const idiq: 'only' | 'exclude' | undefined =
+      idiqRaw === 'only' || idiqRaw === 'exclude' ? idiqRaw : undefined;
+
     const filters: ListFilters = {
       q: query.q as string | undefined,
       status: query.status as string | undefined,
@@ -564,6 +569,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       sources: parseArray(query['source[]'] ?? query.sources),
       stage: query.stage as string | undefined,
       relevantOnly,
+      idiq,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor as string | undefined,
       page: query.page ? Number(query.page) : undefined,
@@ -589,6 +595,15 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     return res.rows[0]?.stage ?? 'interest';
   }
 
+  // Fetch canonical pwin from opportunity_analysis_cache (single source of truth, #849)
+  async function getCachedPwin(oppId: string): Promise<{ score: number; band: string } | null> {
+    const res = await pool.query<{ pwin: string | number | null }>(
+      `SELECT pwin FROM opportunity_analysis_cache WHERE opportunity_id = $1 ORDER BY generated_at DESC LIMIT 1`,
+      [oppId],
+    );
+    return attachPwin(res.rows[0]?.pwin ?? null);
+  }
+
   // GET /v3/opportunities/:id — detail with 10s synchronous block (Addendum A.3)
   app.get<{ Params: { id: string } }>('/v3/opportunities/:id', async (req, reply) => {
     const id = await resolveOpportunityId(pool, req.params.id);
@@ -609,8 +624,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     if (isCacheFresh(row)) {
       analysisCacheHits.inc();
       const detail = await rowToDetail(row);
-      const pipelineStage = await getPipelineStage(id);
-      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
+      const [pipelineStage, pwin] = await Promise.all([getPipelineStage(id), getCachedPwin(id)]);
+      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage, pwin }, req.requestId));
     }
 
     // Pre-assessment gate: the cheap, deterministic ingest-time relevance filter
@@ -629,8 +644,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     if (skipFullAnalysis) {
       analysisCacheHits.inc();
       const detail = await rowToDetail(row);
-      const pipelineStage = await getPipelineStage(id);
-      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
+      const [pipelineStage, pwin] = await Promise.all([getPipelineStage(id), getCachedPwin(id)]);
+      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage, pwin }, req.requestId));
     }
 
     // Enqueue user-detail-priority analysis (ANALYSIS_PRIORITY.USER_DETAIL = 100)
@@ -656,8 +671,8 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       });
 
       const detail = await rowToDetail(fresh);
-      const pipelineStage = await getPipelineStage(id);
-      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage }, req.requestId));
+      const [pipelineStage, pwin] = await Promise.all([getPipelineStage(id), getCachedPwin(id)]);
+      return reply.status(200).send(successEnvelope({ ...detail, pipeline_stage: pipelineStage, pwin }, req.requestId));
     }
 
     analysisTimeoutCount.inc();

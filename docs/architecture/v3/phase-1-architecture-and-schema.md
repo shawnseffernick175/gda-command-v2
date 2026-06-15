@@ -250,6 +250,7 @@ CREATE TABLE opportunities (
   analysis_version    TEXT,                    -- analysis model version for cache invalidation
   ai_analyzed_at      TIMESTAMPTZ,             -- when analysis last ran
   is_teaming_required BOOLEAN       NOT NULL DEFAULT FALSE,
+  is_idiq             BOOLEAN       NOT NULL DEFAULT FALSE,  -- $1=IDIQ rule: ceiling unknown, exclude from $ totals
   qualified_at        TIMESTAMPTZ,             -- when opp was qualified (F-207)
   qualified_by        TEXT,                    -- who qualified it (user display name)
   source_id           BIGINT        NOT NULL REFERENCES sources(id),
