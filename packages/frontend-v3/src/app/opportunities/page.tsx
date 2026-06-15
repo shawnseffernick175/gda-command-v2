@@ -15,6 +15,7 @@ import { useVehicles, useVehicleOpportunities, type VehicleSummary, type Vehicle
 import { useAskAi } from "@/hooks/use-llm";
 import { SourceChip } from "@/components/shared/source-chip";
 import { ScoreTooltip } from "@/components/shared/score-tooltip";
+import { Flame } from "lucide-react";
 import { FieldStatusBadge } from "@/components/field-status-badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { useVaultDocuments } from "@/hooks/use-vault";
@@ -535,7 +536,7 @@ function HotChip({
             : "cursor-default",
         )}
       >
-        🔥 {count} Hot
+        <Flame className="inline-block h-3.5 w-3.5 -mt-0.5" /> {count} Hot
       </button>
     </ScoreTooltip>
   );
