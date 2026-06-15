@@ -15,6 +15,7 @@ import {
   useUploadRfp,
 } from "@/hooks/use-capture-workflow";
 import { apiPost } from "@/lib/api";
+import { stageKeyToLabel } from "@/lib/stages";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -129,26 +130,26 @@ function CaptureList() {
             <tbody>
               {pipeline.items.map((item) => (
                 <tr
-                  key={item.internal_id}
+                  key={item.opportunity_id}
                   className="border-b border-border hover:bg-gda-panel/50 transition-colors"
                 >
                   <td className="px-3 py-2">
                     <Link
-                      href={`/capture?opp=${item.internal_id}`}
+                      href={`/capture?opp=${item.opportunity_id}`}
                       className="text-foreground hover:text-gda-green"
                     >
-                      {item.title}
+                      {item.opportunity_title}
                     </Link>
                   </td>
                   <td className="px-3 py-2">
-                    <StageDropdown value={item.stage} />
+                    <StageDropdown value={stageKeyToLabel(item.stage)} />
                   </td>
                   <td className="px-3 py-2 text-left font-mono text-xs tabular-nums">
-                    {formatMoney(item.value)}
+                    {formatMoney(item.opportunity_value_max ?? item.opportunity_value_min ?? 0)}
                   </td>
                   <td className="px-3 py-2 text-left">
-                    {item.pwin != null ? (
-                      <ScoreDisplay score={item.pwin} className="text-sm" />
+                    {item.pwin_score != null ? (
+                      <ScoreDisplay score={item.pwin_score} className="text-sm" />
                     ) : (
                       <span className="text-xs text-muted-foreground" title="No capture plan — unforecastable">
                         —
@@ -156,7 +157,7 @@ function CaptureList() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {item.next_milestone ?? "—"}
+                    —
                   </td>
                 </tr>
               ))}
@@ -223,8 +224,8 @@ function CreateCaptureModal({
           >
             <option value="">— Select —</option>
             {pipeline?.items?.map((item) => (
-              <option key={item.internal_id} value={item.internal_id}>
-                {item.title}
+              <option key={item.opportunity_id} value={item.opportunity_id}>
+                {item.opportunity_title}
               </option>
             ))}
           </select>
