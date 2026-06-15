@@ -229,6 +229,10 @@ CREATE TABLE opportunities (
   incumbent           TEXT,
   incumbent_confidence TEXT CHECK (incumbent_confidence IN ('high', 'medium', 'low')),
   incumbent_source    TEXT,
+  value_source        TEXT,                    -- provenance: sam, govwin_estimate, govtribe_estimate, manual
+  value_confidence    TEXT CHECK (value_confidence IN ('confirmed', 'estimated', 'forecasted')),
+  date_source         TEXT,                    -- provenance for response_due_at
+  date_confidence     TEXT CHECK (date_confidence IN ('confirmed', 'estimated', 'forecasted')),
   description         TEXT,
   tags                TEXT[]        NOT NULL DEFAULT '{}',
   data_source         TEXT          NOT NULL DEFAULT 'manual',  -- ingest origin: 'sam', 'govtribe', 'govwin', 'dibbs', 'neco', 'manual'
