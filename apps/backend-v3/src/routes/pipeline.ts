@@ -137,7 +137,11 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
       FROM pipeline_items pi
       INNER JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
       WHERE pi.stage = 'won'
-        AND pi.updated_at >= date_trunc('year', CURRENT_DATE)
+        AND pi.updated_at >= CASE
+          WHEN EXTRACT(MONTH FROM CURRENT_DATE) >= 10
+            THEN date_trunc('year', CURRENT_DATE) + INTERVAL '9 months'
+            ELSE date_trunc('year', CURRENT_DATE) - INTERVAL '3 months'
+          END
     `;
     const wonYtdRes = await pool.query<{ won_ytd: string }>(wonYtdSql);
     const wonYtd = Number(wonYtdRes.rows[0]?.won_ytd ?? 0);
