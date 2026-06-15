@@ -23,6 +23,8 @@ import {
   useUserSettings,
   useUpdateUserSettings,
 } from "@/hooks/use-user-settings";
+import { useMatchSuggestions } from "@/hooks/use-approvals";
+import { MatchApprovals } from "@/components/settings/MatchApprovals";
 
 /* ── Config key editor ──────────────────────────────────────────── */
 function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
@@ -653,6 +655,22 @@ function NotificationsPanel() {
   );
 }
 
+/* ── Data Quality Section ──────────────────────────────────────── */
+function DataQualitySection() {
+  const { data } = useMatchSuggestions({ limit: 100 });
+  const pendingCount = (data?.items ?? []).filter((s) => s.status === "pending").length;
+
+  return (
+    <CollapseSection
+      id="settings-data-quality"
+      title={pendingCount > 0 ? `DATA QUALITY (${pendingCount})` : "DATA QUALITY"}
+      defaultOpen={false}
+    >
+      <MatchApprovals />
+    </CollapseSection>
+  );
+}
+
 /* ── Main Settings Page ─────────────────────────────────────────── */
 export default function SettingsPage() {
   const { isLoading: sentinelLoading } = useSentinel();
@@ -740,6 +758,9 @@ export default function SettingsPage() {
           </div>
         </div>
       </CollapseSection>
+
+      {/* ── Data Quality ───────────────────────────────────────── */}
+      <DataQualitySection />
 
       {/* ── User Management ────────────────────────────────────── */}
       <CollapseSection id="settings-users" title="USER MANAGEMENT" defaultOpen={false}>
