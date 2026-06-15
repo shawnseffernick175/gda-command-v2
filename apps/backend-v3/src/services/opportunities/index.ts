@@ -155,6 +155,7 @@ function buildSummaryFromSources(
     ai_analyzed_at: row.ai_analyzed_at,
     analysis_version: row.analysis_version,
     source_uri: row.source_uri ?? null,
+    tags: row.tags ?? [],
     deadline_warning: computeDeadlineWarning(row, hasPipelineStage),
     created_at: row.created_at,
     updated_at: row.updated_at,

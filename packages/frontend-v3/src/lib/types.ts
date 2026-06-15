@@ -57,6 +57,7 @@ export interface OpportunitySummary {
   deadline_warning?: boolean;
   grade?: string | null;
   source_uri?: string | null;
+  tags?: string[];
   ai_analyzed_at?: string | null;
 }
 
