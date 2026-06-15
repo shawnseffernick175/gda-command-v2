@@ -15,6 +15,7 @@ import {
   useUploadRfp,
 } from "@/hooks/use-capture-workflow";
 import { apiPost } from "@/lib/api";
+import { stageKeyToLabel } from "@/lib/stages";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -141,7 +142,7 @@ function CaptureList() {
                     </Link>
                   </td>
                   <td className="px-3 py-2">
-                    <StageDropdown value={item.stage} />
+                    <StageDropdown value={stageKeyToLabel(item.stage)} />
                   </td>
                   <td className="px-3 py-2 text-left font-mono text-xs tabular-nums">
                     {formatMoney(item.opportunity_value_max ?? item.opportunity_value_min ?? 0)}

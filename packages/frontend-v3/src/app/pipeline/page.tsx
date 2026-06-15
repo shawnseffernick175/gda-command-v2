@@ -52,7 +52,6 @@ const STAGE_ARROW_COLORS: Record<string, string> = {
   Pursue: "bg-gda-cyan/20 text-gda-cyan",
   Solicitation: "bg-gda-cyan/20 text-gda-cyan",
   Submission: "bg-gda-cyan/20 text-gda-cyan",
-  "Post-Submittal": "bg-gda-cyan/20 text-gda-cyan",
   Won: "bg-gda-green/20 text-gda-green",
 };
 
@@ -65,53 +64,32 @@ function pipelineStageLabel(dbKey: string): string {
 
 /* ── Urgency helpers ───────────────────────────────────────────── */
 
-function getDaysLeft(dueAt: string | null): number | null {
-  if (!dueAt) return null;
-  const due = new Date(dueAt);
-  const now = new Date();
-  return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-}
-
 function formatDaysLeft(dueAt: string | null): { text: string; className: string } {
-  const days = getDaysLeft(dueAt);
-  if (days === null) return { text: "—", className: "text-muted-foreground" };
+  if (!dueAt) return { text: "—", className: "text-muted-foreground" };
+  const days = Math.ceil((new Date(dueAt).getTime() - Date.now()) / 864e5);
   if (days < 0) return { text: "PAST DUE", className: "text-gda-red font-mono font-bold italic" };
   if (days <= 7) return { text: `${days}d`, className: "text-gda-red font-mono font-bold" };
   if (days <= 30) return { text: `${days}d`, className: "text-gda-amber font-mono" };
-  const d = new Date(dueAt!);
   return {
-    text: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    text: new Date(dueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     className: "text-muted-foreground",
   };
 }
 
 /* ── CSV Export ─────────────────────────────────────────────────── */
 
+const Q = (s: string | null) => `"${(s ?? "").replace(/"/g, '""')}"`;  
 function exportCsv(items: PipelineListItem[]) {
-  const header = ["Title", "Agency", "Stage", "Value", "Weighted Value", "Pwin Score", "Due Date", "Solicitation Number"];
-  const rows = items.map((item) => {
-    const value = item.opportunity_value_max ?? item.opportunity_value_min ?? 0;
-    const pwinScore = item.pwin_score ?? 0;
-    const weighted = Math.round(value * (pwinScore / 100));
-    const dueDate = item.opportunity_due_at ?? "";
-    return [
-      `"${(item.opportunity_title ?? "").replace(/"/g, '""')}"`,
-      `"${(item.opportunity_agency ?? "").replace(/"/g, '""')}"`,
-      `"${pipelineStageLabel(item.stage)}"`,
-      String(value),
-      String(weighted),
-      String(pwinScore),
-      dueDate,
-      `"${(item.solicitation_number ?? "").replace(/"/g, '""')}"`,
-    ].join(",");
+  const h = "Title,Agency,Stage,Value,Weighted,Pwin,Due,Sol#";
+  const rows = items.map((it) => {
+    const v = it.opportunity_value_max ?? it.opportunity_value_min ?? 0;
+    const p = it.pwin_score ?? 0;
+    return [Q(it.opportunity_title), Q(it.opportunity_agency), Q(pipelineStageLabel(it.stage)),
+      v, Math.round(v * p / 100), p, it.opportunity_due_at ?? "", Q(it.solicitation_number)].join(",");
   });
-  const csv = [header.join(","), ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([[h, ...rows].join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `pipeline-export-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
+  Object.assign(document.createElement("a"), { href: url, download: `pipeline-${new Date().toISOString().slice(0, 10)}.csv` }).click();
   URL.revokeObjectURL(url);
 }
 
@@ -382,7 +360,7 @@ export default function PipelinePage() {
           </table>
           {items.length === 0 && (
             <div className="py-8 text-center text-sm text-muted-foreground">
-              No pipeline items match the current filters.
+              No items match filters.
             </div>
           )}
           {items.length > 0 && (

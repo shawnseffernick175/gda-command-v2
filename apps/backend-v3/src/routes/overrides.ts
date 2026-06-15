@@ -212,6 +212,7 @@ export async function overrideRoutes(app: FastifyInstance): Promise<void> {
 
         // Log stage transition to capture_stage_history
         try {
+          await client.query('SAVEPOINT csh_insert');
           await client.query(
             `INSERT INTO capture_stage_history
              (pipeline_item_id, opportunity_id, from_stage, to_stage, moved_by_user, reason)
@@ -219,7 +220,7 @@ export async function overrideRoutes(app: FastifyInstance): Promise<void> {
             [pipelineItemId, id, currentStage, newStage, 'user', reason ?? null],
           );
         } catch {
-          // Table may not exist yet if migration hasn't run; non-fatal
+          await client.query('ROLLBACK TO SAVEPOINT csh_insert');
         }
 
         await client.query('COMMIT');
