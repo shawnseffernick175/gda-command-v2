@@ -469,39 +469,133 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
-  // GET /v3/financials/contract-waterfall?fy=FY26
+  // GET /v3/financials/contract-waterfall?from=YYYY-MM-DD&to=YYYY-MM-DD&parent_vehicle_id=&status=
+  // Returns task orders (NOT IDIQs) for the Gantt waterfall view.
   app.get('/v3/financials/contract-waterfall', async (req, reply) => {
+    const q = req.query as Record<string, string>;
+    const today = new Date().toISOString().slice(0, 10);
+    const fromDate = q.from || null;
+    const toDate = q.to || null;
+    const parentVehicleId = q.parent_vehicle_id ? Number(q.parent_vehicle_id) : null;
+    const statusFilter = q.status || null;
+    const primeOrSub = q.prime_or_sub || null;
+
+    let whereClause = 'WHERE 1=1';
+    const params: (string | number)[] = [];
+    let paramIdx = 0;
+
+    if (fromDate) {
+      paramIdx++;
+      whereClause += ` AND (t.pop_end >= $${paramIdx} OR t.pop_end IS NULL)`;
+      params.push(fromDate);
+    }
+    if (toDate) {
+      paramIdx++;
+      whereClause += ` AND (t.pop_start <= $${paramIdx} OR t.pop_start IS NULL)`;
+      params.push(toDate);
+    }
+    if (parentVehicleId) {
+      paramIdx++;
+      whereClause += ` AND t.parent_vehicle_id = $${paramIdx}`;
+      params.push(parentVehicleId);
+    }
+    if (statusFilter) {
+      paramIdx++;
+      whereClause += ` AND t.status = $${paramIdx}`;
+      params.push(statusFilter);
+    }
+    if (primeOrSub) {
+      paramIdx++;
+      whereClause += ` AND t.prime_or_sub = $${paramIdx}`;
+      params.push(primeOrSub);
+    }
+
     const { rows } = await pool.query(
-      `SELECT id, name, short_name, contract_number, vehicle_type,
-              agency, naics_primary, expiration_date,
-              ceiling_value, is_active, notes
-       FROM contract_vehicles
-       ORDER BY is_active DESC, name`,
+      `SELECT t.id, t.to_name, t.to_number,
+              t.parent_vehicle_id, t.parent_vehicle_short_name,
+              t.prime_or_sub, t.customer_agency, t.contracting_office,
+              t.pop_start, t.pop_end, t.base_pop_end,
+              t.option_periods, t.total_ceiling, t.funded_to_date,
+              t.status, t.cpars_status, t.notes,
+              cv.short_name AS cv_short_name
+       FROM task_orders t
+       LEFT JOIN contract_vehicles cv ON cv.id = t.parent_vehicle_id
+       ${whereClause}
+       ORDER BY t.parent_vehicle_short_name NULLS LAST, t.pop_end NULLS LAST, t.to_name`,
+      params,
     );
 
-    const contracts = rows.map((r) => ({
-      id: Number(r.id),
-      name: r.name as string,
-      short_name: r.short_name as string,
-      contract_number: r.contract_number as string | null,
-      vehicle_type: r.vehicle_type as string,
-      agency: r.agency as string | null,
-      naics_primary: r.naics_primary as string | null,
-      expiration_date: r.expiration_date as string | null,
-      ceiling_value: r.ceiling_value !== null ? Number(r.ceiling_value) : null,
-      is_active: Boolean(r.is_active),
-      notes: r.notes as string | null,
-    }));
+    // Assign colors per parent IDIQ for grouping
+    const vehicleColors: Record<string, string> = {
+      'RS3': '#01696F',
+      'TRAYSYS': '#2D6A4F',
+      'Seaport NxG': '#1B4332',
+      'GSA MAS': '#3D405B',
+      'OASIS SB Pool 1': '#5F0F40',
+      'OASIS SB Pool 3': '#6A4C93',
+      'eFAST': '#264653',
+      'EAGLE': '#2A9D8F',
+      'TSS-E': '#E76F51',
+      'CIO-SP3 SB': '#F4A261',
+      'CIO-SP3 8(a)': '#E9C46A',
+    };
 
-    const { rows: [metaRow] } = await pool.query(
-      `SELECT MAX(updated_at) AS last_refresh FROM contract_vehicles`,
+    const taskOrders = rows.map((r) => {
+      const popEnd = r.pop_end ? new Date(r.pop_end as string) : null;
+      const todayDate = new Date(today);
+      const daysUntilExpiration = popEnd
+        ? Math.ceil((popEnd.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      const parentShort = (r.parent_vehicle_short_name as string | null) ?? (r.cv_short_name as string | null);
+
+      return {
+        id: Number(r.id),
+        to_name: r.to_name as string,
+        to_number: r.to_number as string,
+        parent_vehicle_id: r.parent_vehicle_id ? Number(r.parent_vehicle_id) : null,
+        parent_vehicle_short_name: parentShort,
+        parent_color: parentShort ? (vehicleColors[parentShort] ?? '#7A7974') : '#7A7974',
+        prime_or_sub: r.prime_or_sub as string,
+        customer_agency: r.customer_agency as string | null,
+        contracting_office: r.contracting_office as string | null,
+        pop_start: r.pop_start ? (r.pop_start as string) : null,
+        pop_end: r.pop_end ? (r.pop_end as string) : null,
+        base_pop_end: r.base_pop_end ? (r.base_pop_end as string) : null,
+        option_periods: r.option_periods ?? null,
+        ceiling: r.total_ceiling !== null ? Number(r.total_ceiling) : null,
+        funded_to_date: r.funded_to_date !== null ? Number(r.funded_to_date) : null,
+        status: r.status as string,
+        cpars_status: r.cpars_status as string | null,
+        days_until_expiration: daysUntilExpiration,
+        is_expiring_soon: daysUntilExpiration !== null && daysUntilExpiration > 0 && daysUntilExpiration <= 365,
+        notes: r.notes as string | null,
+      };
+    });
+
+    // Compute range metadata
+    const allStarts = taskOrders.filter((t) => t.pop_start).map((t) => t.pop_start as string);
+    const allEnds = taskOrders.filter((t) => t.pop_end).map((t) => t.pop_end as string);
+    const earliestPop = allStarts.length > 0 ? allStarts.sort()[0] : null;
+    const latestPop = allEnds.length > 0 ? allEnds.sort().reverse()[0] : null;
+
+    // Fetch available parent vehicles for filters
+    const { rows: vehicleRows } = await pool.query(
+      `SELECT DISTINCT cv.id, cv.short_name
+       FROM contract_vehicles cv
+       INNER JOIN task_orders t ON t.parent_vehicle_id = cv.id
+       ORDER BY cv.short_name`,
     );
 
     return reply.send(successEnvelope({
-      contracts,
+      task_orders: taskOrders,
+      today,
+      earliest_pop: earliestPop,
+      latest_pop: latestPop,
+      available_vehicles: vehicleRows.map((v) => ({ id: Number(v.id), short_name: v.short_name as string })),
       meta: {
-        sources: [{ table: 'contract_vehicles', row_count: contracts.length }],
-        last_refresh: (metaRow?.last_refresh as string) ?? new Date().toISOString(),
+        sources: [{ table: 'task_orders', row_count: taskOrders.length }],
+        last_refresh: new Date().toISOString(),
         period: null,
       },
     }, req.requestId));

@@ -43,6 +43,7 @@ export interface OpportunitySummary {
   set_aside: string | null;
   eligibility?: SetAsideEligibility | null;
   hot?: boolean;
+  is_idiq?: boolean;
   created_at: string;
   updated_at: string;
   pwin?: PwinScore | null;
@@ -802,8 +803,42 @@ export interface ContractVehicleRow {
   notes: string | null;
 }
 
+export interface OptionPeriod {
+  name: string;
+  start: string;
+  end: string;
+  exercised: boolean;
+}
+
+export interface TaskOrderRow {
+  id: number;
+  to_name: string;
+  to_number: string;
+  parent_vehicle_id: number | null;
+  parent_vehicle_short_name: string | null;
+  parent_color: string;
+  prime_or_sub: string;
+  customer_agency: string | null;
+  contracting_office: string | null;
+  pop_start: string | null;
+  pop_end: string | null;
+  base_pop_end: string | null;
+  option_periods: OptionPeriod[] | null;
+  ceiling: number | null;
+  funded_to_date: number | null;
+  status: string;
+  cpars_status: string | null;
+  days_until_expiration: number | null;
+  is_expiring_soon: boolean;
+  notes: string | null;
+}
+
 export interface ContractWaterfallData {
-  contracts: ContractVehicleRow[];
+  task_orders: TaskOrderRow[];
+  today: string;
+  earliest_pop: string | null;
+  latest_pop: string | null;
+  available_vehicles: { id: number; short_name: string }[];
   meta: FinancialMeta;
 }
 
