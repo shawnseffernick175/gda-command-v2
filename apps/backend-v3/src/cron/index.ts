@@ -38,6 +38,7 @@ import { discoverCompetitorContacts } from '../services/contacts/competitor-disc
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
+import { pollAllDueSources } from '../services/idiq-ops/taskOrderIngestService.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
@@ -263,6 +264,21 @@ export function startCronScheduler(): void {
   });
   tasks.push(incumbentEnrichTask);
   logger.info({ schedule: '0 6 * * *' }, '[cron] registered: incumbent-enrichment (0 6 * * *)');
+
+  // IDIQ Ops — poll vehicle TO sources every hour
+  const idiqOpsPollTask = cron.schedule('5 * * * *', async () => {
+    try {
+      const result = await pollAllDueSources();
+      logger.info(
+        { ingested: result.totalIngested, errors: result.totalErrors },
+        '[cron] idiq-ops TO poll completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_idiq_ops_poll_error');
+    }
+  });
+  tasks.push(idiqOpsPollTask);
+  logger.info({ schedule: '5 * * * *' }, '[cron] registered: idiq-ops-poll (5 * * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {

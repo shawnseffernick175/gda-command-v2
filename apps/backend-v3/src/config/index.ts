@@ -57,4 +57,6 @@ export const config = {
   agentServiceToken: env('AGENT_SERVICE_TOKEN', ''),
 
   fpdsApiBaseUrl: env('FPDS_API_BASE_URL', 'https://www.fpds.gov/ezsearch/fpdsportal'),
+
+  samApiKey: env('SAM_API_KEY', ''),
 } as const;
