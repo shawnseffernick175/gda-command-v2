@@ -35,11 +35,11 @@ afterAll(async () => {
   if (pool) await pool.end();
 }, 30_000);
 
-describe('POST /v3/fast-track', () => {
+describe('POST /v3/fastrac', () => {
   it('should return 401 without auth', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       payload: validInput,
     });
     expect(res.statusCode).toBe(401);
@@ -48,7 +48,7 @@ describe('POST /v3/fast-track', () => {
   it('should return 400 VALIDATION_ERROR for missing title', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
       payload: { ...validInput, title: '' },
     });
@@ -61,7 +61,7 @@ describe('POST /v3/fast-track', () => {
   it('should return 400 for malformed NAICS code', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
       payload: { ...validInput, naics_codes: ['12345'] },
     });
@@ -73,7 +73,7 @@ describe('POST /v3/fast-track', () => {
   it('should return 400 for oversize description', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
       payload: { ...validInput, description: 'x'.repeat(50001) },
     });
@@ -86,7 +86,7 @@ describe('POST /v3/fast-track', () => {
     const codes = Array.from({ length: 11 }, (_, i) => String(100000 + i));
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
       payload: { ...validInput, naics_codes: codes },
     });
@@ -96,7 +96,7 @@ describe('POST /v3/fast-track', () => {
   it('should return 503 ANALYSIS_TIMEOUT when worker never writes', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
       payload: validInput,
     });
@@ -145,7 +145,7 @@ describe('POST /v3/fast-track', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
       payload: validInput,
     });
@@ -175,7 +175,7 @@ describe('POST /v3/fast-track', () => {
   it('should return cache hit on second call with identical input', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
       payload: validInput,
     });
@@ -185,7 +185,7 @@ describe('POST /v3/fast-track', () => {
   });
 });
 
-describe('GET /v3/fast-track/:id', () => {
+describe('GET /v3/fastrac/:id', () => {
   it('should return 200 for existing assessment', async () => {
     const rows = await pool.query<{ id: string }>('SELECT id FROM fast_track_assessments LIMIT 1');
     const id = rows.rows[0]?.id;
@@ -193,7 +193,7 @@ describe('GET /v3/fast-track/:id', () => {
 
     const res = await app.inject({
       method: 'GET',
-      url: `/v3/fast-track/${id}`,
+      url: `/v3/fastrac/${id}`,
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
@@ -207,7 +207,7 @@ describe('GET /v3/fast-track/:id', () => {
   it('should return 404 for non-existent id', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/v3/fast-track/999999',
+      url: '/v3/fastrac/999999',
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(404);
@@ -216,11 +216,11 @@ describe('GET /v3/fast-track/:id', () => {
   });
 });
 
-describe('GET /v3/fast-track (list)', () => {
+describe('GET /v3/fastrac (list)', () => {
   it('should return paginated list', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
@@ -234,7 +234,7 @@ describe('GET /v3/fast-track (list)', () => {
     const futureDate = new Date(Date.now() + 86400000).toISOString();
     const res = await app.inject({
       method: 'GET',
-      url: `/v3/fast-track?since=${futureDate}`,
+      url: `/v3/fastrac?since=${futureDate}`,
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
@@ -245,7 +245,7 @@ describe('GET /v3/fast-track (list)', () => {
   it('should respect limit parameter', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/v3/fast-track?limit=1',
+      url: '/v3/fastrac?limit=1',
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
