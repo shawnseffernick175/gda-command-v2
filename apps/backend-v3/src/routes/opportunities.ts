@@ -545,6 +545,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     const relevantOnlyRaw = query.relevant_only as string | undefined;
     const relevantOnly = relevantOnlyRaw === 'false' ? false : true;
 
+    const idiqRaw = query.idiq as string | undefined;
+    const idiq: 'only' | 'exclude' | undefined =
+      idiqRaw === 'only' || idiqRaw === 'exclude' ? idiqRaw : undefined;
+
     const filters: ListFilters = {
       q: query.q as string | undefined,
       status: query.status as string | undefined,
@@ -564,6 +568,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       sources: parseArray(query['source[]'] ?? query.sources),
       stage: query.stage as string | undefined,
       relevantOnly,
+      idiq,
       limit: query.limit ? Number(query.limit) : undefined,
       cursor: query.cursor as string | undefined,
       page: query.page ? Number(query.page) : undefined,

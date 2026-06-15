@@ -43,6 +43,7 @@ export interface OpportunitySummary {
   set_aside: string | null;
   eligibility?: SetAsideEligibility | null;
   hot?: boolean;
+  is_idiq?: boolean;
   created_at: string;
   updated_at: string;
   pwin?: PwinScore | null;

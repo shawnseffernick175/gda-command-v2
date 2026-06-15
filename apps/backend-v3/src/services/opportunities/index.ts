@@ -152,6 +152,7 @@ function buildSummaryFromSources(
     value_max: row.value_max !== null ? Number(row.value_max) : null,
     value_max_sources: sources.value_max_sources ?? [],
     teaming_flags: teamingFlags,
+    is_idiq: row.is_idiq ?? false,
     ai_analyzed_at: row.ai_analyzed_at,
     analysis_version: row.analysis_version,
     source_uri: row.source_uri ?? null,
@@ -560,6 +561,11 @@ function buildFilterConditions(
     conditions.push(`o.data_source = ANY($${paramIdx++})`);
     params.push(filters.sources);
   }
+  if (filters.idiq === 'only') {
+    conditions.push(`o.is_idiq = TRUE`);
+  } else if (filters.idiq === 'exclude') {
+    conditions.push(`o.is_idiq = FALSE`);
+  }
   // Passed view: auto-passed opps (in-NAICS but past due / too little lead time)
   // get their own 'Passed' tab. In every other view (all, active, specific
   // stages, default), exclude auto_pass so passed opps drop out of the working
@@ -616,8 +622,9 @@ export async function listOpportunitiesPaged(
       COUNT(*)::int AS total_count,
       COUNT(*) FILTER (WHERE o.response_due_at IS NOT NULL AND o.response_due_at >= NOW() AND o.response_due_at <= NOW() + INTERVAL '7 days')::int AS due_this_week,
       COUNT(*) FILTER (WHERE o.grade IS NULL)::int AS unscored_count,
-      COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)), 0)::bigint AS total_value,
-      COUNT(*) FILTER (WHERE o.grade = 'A')::int AS grade_a_count
+      COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)) FILTER (WHERE o.is_idiq = FALSE), 0)::bigint AS total_value,
+      COUNT(*) FILTER (WHERE o.grade = 'A')::int AS grade_a_count,
+      COUNT(*) FILTER (WHERE o.is_idiq = TRUE)::int AS idiq_count
     FROM opportunities o ${where}
   `;
   const metaRes = await pool.query<{
@@ -626,6 +633,7 @@ export async function listOpportunitiesPaged(
     unscored_count: number;
     total_value: string;
     grade_a_count: number;
+    idiq_count: number;
   }>(metaSql, params);
   const metaRow = metaRes.rows[0];
   const total = metaRow?.total_count ?? 0;
@@ -695,6 +703,7 @@ export async function listOpportunitiesPaged(
     unscored_count: metaRow?.unscored_count ?? 0,
     total_value: Number(metaRow?.total_value ?? 0),
     grade_a_count: metaRow?.grade_a_count ?? 0,
+    idiq_count: metaRow?.idiq_count ?? 0,
     stage_counts: stageCounts,
   };
 
@@ -723,13 +732,20 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
     sub_agency: input.sub_agency,
   });
 
+  // $1 = IDIQ rule: if value is exactly $1, flag as IDIQ and null out values
+  const isIdiq = input.is_idiq === true
+    || input.value_min === 1
+    || input.value_max === 1;
+  const effectiveValueMin = isIdiq ? null : (input.value_min ?? null);
+  const effectiveValueMax = isIdiq ? null : (input.value_max ?? null);
+
   const res = await pool.query<OpportunityRow>(
     `INSERT INTO opportunities (
       title, agency, sub_agency, sam_notice_id, naics, description,
       set_aside, response_due_at, posted_at, value_min, value_max,
-      data_source, source_id, status, department,
+      data_source, source_id, status, is_idiq, department,
       department_name, agency_name, office, contracting_office, org_path
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery', $14, $15, $16, $17, $18, $19)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery', $14, $15, $16, $17, $18, $19, $20)
     RETURNING *`,
     [
       input.title,
@@ -741,10 +757,11 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
       input.set_aside ?? null,
       input.response_due_at ?? null,
       input.posted_at ?? null,
-      input.value_min ?? null,
-      input.value_max ?? null,
+      effectiveValueMin,
+      effectiveValueMax,
       input.source,
       sourceId,
+      isIdiq,
       department,
       parsed.department_name,
       parsed.agency_name,
@@ -821,6 +838,21 @@ export async function updateOpportunity(
     }
     if (ANALYSIS_AFFECTING_FIELDS.has(key)) {
       analysisAffected = true;
+    }
+  }
+
+  // $1 = IDIQ rule: if value_min or value_max is set to exactly 1, mark as IDIQ
+  if (input.value_min === 1 || input.value_max === 1) {
+    setClauses.push(`is_idiq = $${paramIdx++}`);
+    params.push(true);
+    // Null out the dollar values — $1 is not a real amount
+    if (input.value_min === 1) {
+      const idx = fields.findIndex(([k]) => k === 'value_min');
+      if (idx >= 0) params[idx] = null;
+    }
+    if (input.value_max === 1) {
+      const idx = fields.findIndex(([k]) => k === 'value_max');
+      if (idx >= 0) params[idx] = null;
     }
   }
 

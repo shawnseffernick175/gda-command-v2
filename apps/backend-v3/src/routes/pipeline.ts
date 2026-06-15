@@ -69,12 +69,12 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/pipeline/summary — intelligence-bar aggregates + funnel + movers
   app.get('/v3/pipeline/summary', async (req, reply) => {
-    // Stage counts + values (exclude lost)
+    // Stage counts + values (exclude lost; IDIQ rows excluded from $ sums)
     const stagesSql = `
       SELECT
         pi.stage,
         COUNT(DISTINCT pi.opportunity_id)::int AS count,
-        COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)), 0)::bigint AS value
+        COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)) FILTER (WHERE o.is_idiq = FALSE), 0)::bigint AS value
       FROM pipeline_items pi
       INNER JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
       WHERE pi.stage != 'lost'
@@ -98,6 +98,7 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
 
     // Weighted pipeline value: sum of (value × pwin/100) for non-lost
     // pwin is stored in analysis JSONB as either {pwin: {score: N}} or {pwin: N}
+    // IDIQ rows are excluded — they have no meaningful dollar value for weighting.
     const weightedSql = `
       SELECT COALESCE(SUM(
         COALESCE(o.value_max, o.value_min, 0) *
@@ -112,7 +113,7 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
       ), 0)::bigint AS weighted
       FROM pipeline_items pi
       INNER JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
-      WHERE pi.stage != 'lost'
+      WHERE pi.stage != 'lost' AND o.is_idiq = FALSE
     `;
     const weightedRes = await pool.query<{ weighted: string }>(weightedSql);
     const weightedPipelineValue = Number(weightedRes.rows[0]?.weighted ?? 0);

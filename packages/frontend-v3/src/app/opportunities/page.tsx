@@ -162,6 +162,7 @@ function OpportunityList() {
   const [dueFilter, setDueFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
   const [relevantOnly, setRelevantOnly] = useState(true);
+  const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(undefined);
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const [page, setPage] = useState(1);
@@ -195,11 +196,12 @@ function OpportunityList() {
       sources: sourceFilter.length > 0 ? sourceFilter : undefined,
       stage: stageTab !== "all" ? stageTab : undefined,
       relevant_only: relevantOnly,
+      idiq: idiqFilter,
       sort_by: sortBy ?? undefined,
       sort_dir: sortBy ? sortDir : undefined,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, sortBy, sortDir]);
+  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, idiqFilter, sortBy, sortDir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -237,7 +239,7 @@ function OpportunityList() {
 
   const hasActiveFilters =
     debouncedQ || agencyFilter || gradeFilter.length > 0 || setAsideFilter.length > 0 ||
-    valueRange !== 0 || dueFilter || sourceFilter.length > 0;
+    valueRange !== 0 || dueFilter || sourceFilter.length > 0 || idiqFilter !== undefined;
 
   const handleClearFilters = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -249,6 +251,7 @@ function OpportunityList() {
     setValueRange(0);
     setDueFilter("");
     setSourceFilter([]);
+    setIdiqFilter(undefined);
     // Strip ?agency from the URL so a remount does not re-apply a stale filter
     if (searchParams.get("agency")) {
       router.replace("/opportunities");
@@ -344,6 +347,14 @@ function OpportunityList() {
               active={gradeFilter.includes("A")}
               onClick={handleGradeAClick}
             />
+            {meta.idiq_count > 0 && (
+              <IntelChip
+                icon="I"
+                label={`${meta.idiq_count} IDIQ`}
+                active={idiqFilter === 'only'}
+                onClick={() => setIdiqFilter((prev) => prev === 'only' ? undefined : 'only')}
+              />
+            )}
           </div>
         )}
 
@@ -783,7 +794,9 @@ function VehicleOpportunityRow({
         </div>
       </div>
       <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground shrink-0">
-        {(opp.value_max || opp.value_min) ? (
+        {opp.is_idiq ? (
+          <span className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green">IDIQ</span>
+        ) : (opp.value_max || opp.value_min) ? (
           <span>{formatMoney(opp.value_max ?? opp.value_min)}</span>
         ) : (
           <FieldStatusBadge reason="no_source_data" />
@@ -895,7 +908,9 @@ function OpportunityRow({
         })()}
       </td>
       <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
-        {formatMoney(getEffectiveValue(opp))}
+        {opp.is_idiq ? (
+          <span className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green">IDIQ</span>
+        ) : formatMoney(getEffectiveValue(opp))}
       </td>
       <td className="px-3 py-1.5 text-left">
         {score != null ? (
@@ -1191,7 +1206,12 @@ function OpportunityDetail({ id }: { id: string }) {
               <MetaRow label="Agency" value={opp.agency_name ?? opp.agency ?? "---"} />
               {opp.office && <MetaRow label="Office" value={opp.office} />}
               {opp.contracting_office && <MetaRow label="Contracting" value={opp.contracting_office} />}
-              {opp.value_max || opp.value_min || opp.value ? (
+              {opp.is_idiq ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Value</span>
+                  <span className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green">IDIQ (ceiling TBD)</span>
+                </div>
+              ) : opp.value_max || opp.value_min || opp.value ? (
                 <MetaRow label="Value" value={formatMoney(opp.value_max ?? opp.value_min ?? opp.value ?? null)} mono />
               ) : (
                 <div className="flex items-center justify-between">
