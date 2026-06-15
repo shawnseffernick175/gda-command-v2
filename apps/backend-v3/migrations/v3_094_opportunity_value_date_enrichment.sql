@@ -1,4 +1,4 @@
--- v3_079: Add value/date source and confidence columns for GovWin/GovTribe enrichment fallback.
+-- v3_094: Add value/date source and confidence columns for GovWin/GovTribe enrichment fallback.
 
 ALTER TABLE opportunities
   ADD COLUMN IF NOT EXISTS value_source TEXT,
