@@ -8,6 +8,7 @@ import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
+import { ScoreExplain } from "@/components/shared/score-explainers";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatMoney } from "@/lib/format-money";
 import { apiGet } from "@/lib/api";
@@ -237,10 +238,17 @@ export default function PipelinePage() {
             sub="Total Pipeline"
             onClick={() => setActiveStage(null)}
           />
-          <IntelChip
-            label={formatMoney(summary.weighted_pipeline_value)}
-            sub="Weighted"
-          />
+          <span className="inline-flex items-center gap-1">
+            <IntelChip
+              label={formatMoney(summary.weighted_pipeline_value)}
+              sub="Weighted"
+            />
+            <ScoreExplain
+              score={formatMoney(summary.weighted_pipeline_value)}
+              label="Pipeline Value (Weighted)"
+              scoreType="pipeline_value"
+            />
+          </span>
           <IntelChip
             label={String(summary.active_pursuits)}
             sub="Active Pursuits"
@@ -507,6 +515,12 @@ function PipelineRow({ opp }: { opp: OpportunitySummary }) {
           <div className="flex items-center gap-1">
             <ScoreDisplay score={pwin.score} className="text-xs" />
             <BandBadge band={pwin.band} />
+            <ScoreExplain
+              score={pwin.score}
+              label="Pwin"
+              scoreType="pwin"
+              inputs={{ top_drivers: pwin.top_drivers ?? [] }}
+            />
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">—</span>

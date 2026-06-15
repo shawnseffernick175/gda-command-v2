@@ -16,6 +16,7 @@ import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
 import { ErrorState } from "@/components/shared/error-state";
+import { ScoreExplain } from "@/components/shared/score-explainers";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import type { ActionItemPriority, Band } from "@/lib/types";
@@ -118,6 +119,13 @@ export default function LaunchpadPage() {
               label="Pipeline Value"
               value={formatMoney(pipelineValue)}
               color="text-gda-green"
+              scoreExplain={
+                <ScoreExplain
+                  score={formatMoney(pipelineValue)}
+                  label="Pipeline Value"
+                  scoreType="pipeline_value"
+                />
+              }
             />
           </Link>
         </div>
@@ -202,14 +210,30 @@ function TopProgramsTable({
                 </td>
                 <td className="px-4 py-2">
                   {opp.pwin != null ? (
-                    <ScoreDisplay score={opp.pwin} className="text-sm" />
+                    <span className="inline-flex items-center gap-1">
+                      <ScoreDisplay score={opp.pwin} className="text-sm" />
+                      <ScoreExplain
+                        score={opp.pwin}
+                        label="Pwin"
+                        scoreType="pwin"
+                        inputs={{ top_drivers: [] }}
+                      />
+                    </span>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </td>
                 <td className="px-4 py-2">
                   {VALID_BANDS.has(opp.band) ? (
-                    <BandBadge band={opp.band as Band} />
+                    <span className="inline-flex items-center gap-1">
+                      <BandBadge band={opp.band as Band} />
+                      <ScoreExplain
+                        score={opp.band}
+                        label="Pwin Band"
+                        scoreType="pwin_band"
+                        inputs={{ pwin_score: opp.pwin }}
+                      />
+                    </span>
                   ) : (
                     <Badge variant="outline" className="text-[11px] font-mono">
                       {STAGE_LABELS[opp.band] ?? opp.band}
@@ -480,15 +504,20 @@ function StatCard({
   label,
   value,
   color,
+  scoreExplain,
 }: {
   label: string;
   value: number | string;
   color: string;
+  scoreExplain?: React.ReactNode;
 }) {
   return (
     <Card className="border-border bg-gda-panel cursor-pointer hover:border-gda-green/40 transition-colors">
       <CardContent className="py-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <div className="flex items-center gap-1">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          {scoreExplain}
+        </div>
         <p className={`font-mono text-2xl font-bold tabular-nums ${color}`}>
           {value}
         </p>
