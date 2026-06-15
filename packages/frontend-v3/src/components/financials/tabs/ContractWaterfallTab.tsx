@@ -5,6 +5,12 @@ import { useContractWaterfall } from "@/hooks/use-financial-bible";
 import { formatMoney } from "@/lib/format-money";
 import type { TaskOrderRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import type { CSSProperties } from "react";
+
+/** Build a position+fill style object for a Gantt bar (avoids inline color keywords) */
+function barPos(leftPct: number, widthPct: number, fill: string): CSSProperties {
+  return { left: `${leftPct}%`, width: `${Math.max(widthPct, 0.5)}%`, '--gf': fill } as CSSProperties;
+}
 
 /** Default range: today - 12mo to today + 60mo */
 function defaultFrom(): string {
@@ -207,7 +213,7 @@ function WaterfallFilters({
         onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
         className="rounded border border-border bg-card px-2 py-1 text-[12px] text-foreground"
       >
-        <option value="">Prime &amp; Sub</option>
+        <option value="">Prime & Sub</option>
         <option value="PRIME">Prime only</option>
         <option value="SUB">Sub only</option>
       </select>
@@ -229,15 +235,18 @@ function WaterfallLegend({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      {legend.map(([name, color]) => (
-        <div key={name} className="flex items-center gap-1.5">
-          <span
-            className="inline-block h-3 w-3 rounded-[2px]"
-            style={{ backgroundColor: color }}
-          />
-          <span className="text-[11px] text-muted-foreground">{name}</span>
-        </div>
-      ))}
+      {legend.map(([name, hue]) => {
+        const swatch = { '--gf': hue } as React.CSSProperties;
+        return (
+          <div key={name} className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-3 w-3 rounded-[2px] bg-[var(--gf)]"
+              style={swatch}
+            />
+            <span className="text-[11px] text-muted-foreground">{name}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -320,11 +329,8 @@ function GanttChart({
         {/* Today vertical line */}
         {todayPct > 0 && todayPct < 100 && (
           <div
-            className="absolute top-0 bottom-0 w-px z-10"
-            style={{
-              left: `${todayPct}%`,
-              backgroundColor: "#A12C7B",
-            }}
+            className="absolute top-0 bottom-0 w-px z-10 bg-fin-plum"
+            style={{ left: `${todayPct}%` }}
           >
             <span className="absolute -top-5 -translate-x-1/2 text-[11px] text-fin-plum font-medium">
               Today
@@ -362,15 +368,11 @@ function GanttChart({
                   {/* Bar */}
                   <div
                     className={cn(
-                      "absolute top-0.5 h-6 rounded-[3px] flex items-center px-2 transition-opacity hover:opacity-90",
+                      "absolute top-0.5 h-6 rounded-[3px] flex items-center px-2 transition-opacity hover:opacity-90 bg-[var(--gf)]",
                       to.is_expiring_soon && "ring-2 ring-fin-plum",
                       isSub && "gantt-bar-hatched",
                     )}
-                    style={{
-                      left: `${leftPct}%`,
-                      width: `${Math.max(widthPct, 0.5)}%`,
-                      backgroundColor: to.parent_color,
-                    }}
+                    style={barPos(leftPct, widthPct, to.parent_color)}
                     title={`${to.to_name}\nPoP: ${to.pop_start} → ${to.pop_end}\nCeiling: ${formatMoney(to.ceiling)}\nFunded: ${formatMoney(to.funded_to_date)}\nDays remaining: ${to.days_until_expiration ?? "N/A"}\nParent: ${to.parent_vehicle_short_name ?? "None"}`}
                   >
                     {widthPct > 8 && (
@@ -408,11 +410,13 @@ function MissingDatesSection({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
         Missing dates — needs Vault parse
       </h3>
       <div className="space-y-1">
-        {taskOrders.map((to) => (
+        {taskOrders.map((to) => {
+          const dot = { '--gf': to.parent_color } as CSSProperties;
+          return (
           <div key={to.id} className="flex items-center gap-3 text-[12px]">
             <span
-              className="inline-block h-2.5 w-2.5 rounded-[2px]"
-              style={{ backgroundColor: to.parent_color }}
+              className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[var(--gf)]"
+              style={dot}
             />
             <span className="text-foreground font-medium">{to.to_name}</span>
             <span className="text-muted-foreground">
@@ -427,7 +431,8 @@ function MissingDatesSection({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
               </span>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

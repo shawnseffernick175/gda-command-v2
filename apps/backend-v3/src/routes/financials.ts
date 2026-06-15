@@ -568,7 +568,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         status: r.status as string,
         cpars_status: r.cpars_status as string | null,
         days_until_expiration: daysUntilExpiration,
-        is_expiring_soon: daysUntilExpiration !== null && daysUntilExpiration <= 365,
+        is_expiring_soon: daysUntilExpiration !== null && daysUntilExpiration > 0 && daysUntilExpiration <= 365,
         notes: r.notes as string | null,
       };
     });
