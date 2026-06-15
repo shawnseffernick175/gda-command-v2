@@ -61,7 +61,7 @@ export function ScoreExplain({
 
               <div>
                 <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
-                  How it&rsquo;s calculated
+                  {"How it\u2019s calculated"}
                 </p>
                 <div className="mt-0.5 text-foreground leading-relaxed">
                   {explainer.renderFormula(inputs)}

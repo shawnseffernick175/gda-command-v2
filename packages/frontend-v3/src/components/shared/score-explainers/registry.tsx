@@ -87,8 +87,8 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
     renderFormula: () => (
       <ul className="space-y-0.5">
         <Bullet>Forecast: Pwin ≥ 67</Bullet>
-        <Bullet>Signal: Pwin ≥ 45 and &lt; 67</Bullet>
-        <Bullet>Discovery: Pwin &lt; 45</Bullet>
+        <Bullet>Signal: Pwin ≥ 45 and {"<"} 67</Bullet>
+        <Bullet>Discovery: Pwin {"<"} 45</Bullet>
         <Bullet>Pass: response due within 30 days or past due</Bullet>
       </ul>
     ),
@@ -171,7 +171,7 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
     renderFormula: () => (
       <p>
         Scored 0.0–1.0 by comparing tech horizon (0–6 mo, 6–12 mo, 12–24 mo) against the
-        requirement&rsquo;s procurement window. Higher when windows overlap.
+        {"requirement\u2019s procurement window. Higher when windows overlap."}
       </p>
     ),
   },
@@ -182,7 +182,7 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
       "Whether the opportunity is in Envision's wheelhouse — NAICS allowlist plus title/keyword filter.",
     renderFormula: () => (
       <ul className="space-y-0.5">
-        <Bullet>Check NAICS against Envision&rsquo;s 18-code allowlist</Bullet>
+        <Bullet>{"Check NAICS against Envision\u2019s 18-code allowlist"}</Bullet>
         <Bullet>Title/keyword filter for commodity exclusion</Bullet>
         <Bullet>Result: on-profile or off-profile with reason code</Bullet>
       </ul>
@@ -223,7 +223,7 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
         <Bullet>Strong fit: ≥ 30/40</Bullet>
         <Bullet>Moderate fit: 18–29/40</Bullet>
         <Bullet>Weak fit: 6–17/40</Bullet>
-        <Bullet>No fit: &lt; 6/40</Bullet>
+        <Bullet>No fit: {"<"} 6/40</Bullet>
         <Bullet>6 exclusion rules — any triggered = hard fail</Bullet>
       </ul>
     ),
