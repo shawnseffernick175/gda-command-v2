@@ -19,12 +19,12 @@ import { cn } from "@/lib/utils";
 import type { FastTrackAssessment } from "@/lib/types";
 
 const SIGNAL_SORT_COLS: ColumnSortConfig[] = [
-  { field: "source", type: "string", accessor: (r) => r.source_name },
+  { field: "source", type: "string" },
   { field: "title", type: "string" },
-  { field: "institution", type: "string", accessor: (r) => r.institution },
-  { field: "horizon", type: "string", accessor: (r) => r.maturity_horizon },
+  { field: "institution", type: "string", accessor: (r) => r.institution_name },
+  { field: "horizon", type: "string" },
   { field: "strength", type: "number", accessor: (r) => r.signal_strength },
-  { field: "urgency", type: "number", accessor: (r) => r.urgency_score },
+  { field: "urgency", type: "enum", enumOrder: ["critical", "high", "medium", "low"], accessor: (r) => r.urgency },
 ];
 
 // ────────────────────────────────────────────────────────────
