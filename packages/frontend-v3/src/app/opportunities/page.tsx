@@ -40,6 +40,8 @@ import type {
   OpportunitySummary,
 } from "@/lib/types";
 
+const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
+
 export default function OpportunitiesPage() {
   return (
     <Suspense fallback={<Skeleton className="h-8 w-64 bg-gda-panel" />}>
@@ -795,7 +797,7 @@ function VehicleOpportunityRow({
       </div>
       <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground shrink-0">
         {opp.is_idiq ? (
-          <span className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green">IDIQ</span>
+          <span className={IDIQ_BADGE_CLS}>IDIQ</span>
         ) : (opp.value_max || opp.value_min) ? (
           <span>{formatMoney(opp.value_max ?? opp.value_min)}</span>
         ) : (
@@ -909,7 +911,7 @@ function OpportunityRow({
       </td>
       <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
         {opp.is_idiq ? (
-          <span className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green">IDIQ</span>
+          <span className={IDIQ_BADGE_CLS}>IDIQ</span>
         ) : formatMoney(getEffectiveValue(opp))}
       </td>
       <td className="px-3 py-1.5 text-left">
@@ -1209,7 +1211,7 @@ function OpportunityDetail({ id }: { id: string }) {
               {opp.is_idiq ? (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Value</span>
-                  <span className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green">IDIQ (ceiling TBD)</span>
+                  <span className={IDIQ_BADGE_CLS}>IDIQ (ceiling TBD)</span>
                 </div>
               ) : opp.value_max || opp.value_min || opp.value ? (
                 <MetaRow label="Value" value={formatMoney(opp.value_max ?? opp.value_min ?? opp.value ?? null)} mono />

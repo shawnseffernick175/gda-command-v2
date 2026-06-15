@@ -1,4 +1,4 @@
--- v3_079: Add is_idiq boolean to opportunities table
+-- v3_080: Add is_idiq boolean to opportunities table
 -- Implements the CEO $1 = IDIQ rule: when contract value is $1, the opportunity
 -- is an IDIQ with unknown ceiling. The $1 placeholder must not roll into totals.
 -- Also adds is_idiq to pipeline_items for explicit tracking.
