@@ -24,7 +24,11 @@ import {
   useUpdateUserSettings,
 } from "@/hooks/use-user-settings";
 import { useMatchSuggestions } from "@/hooks/use-approvals";
-import { MatchApprovals } from "@/components/settings/MatchApprovals";
+import dynamic from "next/dynamic";
+
+const MatchApprovals = dynamic(
+  () => import("@/components/settings/MatchApprovals").then((m) => m.MatchApprovals),
+);
 
 /* ── Config key editor ──────────────────────────────────────────── */
 function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
@@ -665,6 +669,7 @@ function DataQualitySection() {
       id="settings-data-quality"
       title={pendingCount > 0 ? `DATA QUALITY (${pendingCount})` : "DATA QUALITY"}
       defaultOpen={false}
+      count={pendingCount > 0 ? pendingCount : undefined}
     >
       <MatchApprovals />
     </CollapseSection>
