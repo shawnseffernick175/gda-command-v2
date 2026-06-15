@@ -650,7 +650,7 @@ function ContactsContent() {
     [searchQuery, activeCategory, activeTemp, activeLinked, activeSource],
   );
 
-  const filterKey = JSON.stringify(filterParams);
+  const filterKey = JSON.stringify({ ...filterParams, ...sortParams });
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);

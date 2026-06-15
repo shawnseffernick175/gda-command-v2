@@ -80,7 +80,7 @@ function ActionItemsContent() {
   const highlightId = searchParams.get("highlight");
   const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
 
-  const filterKey = statusFilter ?? "__all__";
+  const filterKey = `${statusFilter ?? "__all__"}|${sortParams.sort_by ?? ""}|${sortParams.sort_dir ?? ""}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
