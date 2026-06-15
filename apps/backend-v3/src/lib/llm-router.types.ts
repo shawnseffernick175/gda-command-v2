@@ -888,6 +888,8 @@ export interface RouteRequest<T extends Task> {
   opts?: RouteRequestOpts;
 }
 
+export type ModelTier = 'sonnet' | 'opus';
+
 export interface RouteRequestOpts {
   timeout_ms?: number;
   mock?: boolean;
@@ -899,6 +901,12 @@ export interface RouteRequestOpts {
    * retry semantics. Default: false (router retry enabled).
    */
   disable_router_retry?: boolean;
+  /**
+   * Explicitly request a model tier. When set to 'opus', the router
+   * escalates to claude-opus-4-5 instead of the routing-table default.
+   * Default: undefined (use routing-table model, which is Sonnet).
+   */
+  model_tier?: ModelTier;
 }
 
 export interface RouteResponseOk<T extends Task> {
@@ -934,6 +942,8 @@ export type RouteResponse<T extends Task> = RouteResponseOk<T> | RouteResponseEr
 export interface TokenUsage {
   input: number;
   output: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
 }
 
 export type QualityFlag = 'full' | 'degraded';
