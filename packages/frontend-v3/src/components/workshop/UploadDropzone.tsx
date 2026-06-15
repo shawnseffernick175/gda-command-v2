@@ -8,7 +8,6 @@ const ALLOWED_EXTENSIONS = [
   ".docx",
   ".xlsx",
   ".pdf",
-  ".msg",
   ".txt",
   ".md",
 ];

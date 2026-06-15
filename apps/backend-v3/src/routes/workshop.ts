@@ -14,7 +14,7 @@
 import type { FastifyInstance } from 'fastify';
 import fastifyMultipart from '@fastify/multipart';
 import { createWriteStream, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
@@ -25,7 +25,7 @@ const UPLOAD_DIR = join(process.cwd(), 'data', 'workshop');
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 const ALLOWED_EXTENSIONS = new Set([
-  'pptx', 'docx', 'xlsx', 'pdf', 'msg', 'txt', 'md',
+  'pptx', 'docx', 'xlsx', 'pdf', 'txt', 'md',
 ]);
 
 const CLASSIFICATIONS = [
@@ -275,8 +275,8 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
     );
     const total = countRes.rows[0]?.total ?? 0;
 
-    const dataRes = await pool.query<DocumentUploadRow>(
-      `SELECT id, filename, storage_path, mime_type, size_bytes,
+    const dataRes = await pool.query<Omit<DocumentUploadRow, 'storage_path'>>(
+      `SELECT id, filename, mime_type, size_bytes,
               uploaded_by, uploaded_at, classification,
               teardown_analysis, teardown_run_at, teardown_model, status
        FROM document_uploads
@@ -297,8 +297,8 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/workshop/uploads/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
 
-    const res = await pool.query<DocumentUploadRow>(
-      `SELECT id, filename, storage_path, mime_type, size_bytes,
+    const res = await pool.query<Omit<DocumentUploadRow, 'storage_path'>>(
+      `SELECT id, filename, mime_type, size_bytes,
               uploaded_by, uploaded_at, classification,
               teardown_analysis, teardown_run_at, teardown_model, status
        FROM document_uploads WHERE id = $1`,
@@ -313,9 +313,9 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
 
     const upload = res.rows[0];
 
-    const outputsRes = await pool.query<WorkshopOutputRow>(
+    const outputsRes = await pool.query<Omit<WorkshopOutputRow, 'config'>>(
       `SELECT id, source_upload_id, output_type, output_format,
-              vault_doc_id, generated_at, generated_by, config, rendered_text
+              vault_doc_id, generated_at, generated_by, rendered_text
        FROM workshop_outputs WHERE source_upload_id = $1
        ORDER BY generated_at DESC`,
       [id],
@@ -334,7 +334,8 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
     for await (const part of parts) {
       if (part.type !== 'file') continue;
 
-      const filename = part.filename;
+      const rawFilename = part.filename;
+      const filename = basename(rawFilename);
       const ext = filename.toLowerCase().split('.').pop() ?? '';
       if (!ALLOWED_EXTENSIONS.has(ext)) {
         return reply.status(400).send(
@@ -348,6 +349,11 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
 
       const fileId = crypto.randomUUID();
       const storagePath = join(UPLOAD_DIR, `${fileId}_${filename}`);
+      if (!resolve(storagePath).startsWith(resolve(UPLOAD_DIR))) {
+        return reply.status(400).send(
+          errorEnvelope('VALIDATION_ERROR', 'Invalid filename', req.requestId),
+        );
+      }
       const ws = createWriteStream(storagePath);
       await pipeline(part.file, ws);
 
@@ -358,7 +364,7 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
       const res = await pool.query<DocumentUploadRow>(
         `INSERT INTO document_uploads (filename, storage_path, mime_type, size_bytes, status)
          VALUES ($1, $2, $3, $4, 'uploaded')
-         RETURNING *`,
+         RETURNING id, filename, mime_type, size_bytes, uploaded_by, uploaded_at, classification, status`,
         [filename, storagePath, part.mimetype, size],
       );
 
@@ -536,7 +542,8 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
     let vaultDocId: number | null = null;
     if (outputFormat !== 'txt') {
       try {
-        const vaultFilename = `workshop_${outputType}_${upload.filename.replace(/\.[^.]+$/, '')}.${outputFormat}`;
+        const safeName = basename(upload.filename).replace(/\.[^.]+$/, '');
+        const vaultFilename = `workshop_${outputType}_${safeName}.${outputFormat}`;
         const vaultPath = join(process.cwd(), 'data', 'vault', `${crypto.randomUUID()}_${vaultFilename}`);
 
         await generateFile(outputFormat, renderedText, vaultPath);
