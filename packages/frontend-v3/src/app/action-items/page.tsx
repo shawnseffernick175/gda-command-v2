@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import {
   useActionItems,
   useUpdateActionItem,
@@ -162,8 +161,6 @@ function ActionItemsContent() {
   const [severityFilter, setSeverityFilter] = useState<ActionItemPriority | undefined>();
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>();
   const [page, setPage] = useState(1);
-  const searchParams = useSearchParams();
-  const highlightId = searchParams.get("highlight");
   const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
 
   const filterKey = `${statusFilter ?? "_"}-${sourceFilter ?? "_"}-${severityFilter ?? "_"}-${ownerFilter ?? "_"}-${sortParams.sort_by ?? ""}-${sortParams.sort_dir ?? ""}`;
