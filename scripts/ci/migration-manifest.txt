@@ -86,7 +86,6 @@ v3_077_cost_detail_actuals.sql
 v3_078_indirect_expense_actuals.sql
 v3_079_vault_doc_type_expand.sql
 v3_080_capture_stage_history.sql
-v3_093_idiq_ops.sql
 v3_081_cleanup_phantom_pipeline_rows.sql
 v3_082_is_idiq_column.sql
 v3_083_ceo_capture_table_ingest.sql
@@ -99,5 +98,7 @@ v3_089_vault_vehicle_extraction.sql
 v3_090_regulatory_tracker_urls.sql
 v3_091_fastrac_bidirectional_evidence.sql
 v3_092_fastrac_installation_unit.sql
-v3_093_opportunity_notes_owner.sql
-v3_094_opportunity_value_date_enrichment.sql
+v3_093_idiq_ops.sql
+v3_094_opportunity_notes_owner.sql
+v3_095_opportunity_value_date_enrichment.sql
+v3_096_fastrac_signal_columns.sql

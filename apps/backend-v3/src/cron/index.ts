@@ -28,6 +28,7 @@ import { registerArxivSource } from '../ingest/arxiv/index.js';
 import { registerGovTribeSource } from '../ingest/govtribe/index.js';
 import { registerGovWinSource } from '../ingest/govwin/index.js';
 import { registerGrantsGovSource } from '../ingest/grants_gov/index.js';
+import { registerFasTracTier1Source } from '../ingest/fastrac/index.js';
 import { trainIfReady } from '../services/pwin/index.js';
 import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
@@ -48,6 +49,7 @@ const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
 const grantsGovEnabled = process.env.ENABLE_GRANTS_GOV_INGEST !== 'false';
 const fastracArmyEnabled = process.env.ENABLE_FASTRAC_ARMY_INGEST !== 'false';
+const fasTracEnabled = process.env.ENABLE_FASTRAC_INGEST !== 'false';
 
 const tasks: ScheduledTask[] = [];
 
@@ -87,6 +89,9 @@ const JOBS: CronJob[] = [
   ...(fastracArmyEnabled
     ? [{ sourceKey: 'fastrac-army', schedule: '0 9 * * *', label: 'FasTrac Tier 1 Army installation & unit signals (daily 05:00 ET)' }]
     : []),
+  ...(fasTracEnabled
+    ? [{ sourceKey: 'fastrac.tier1', schedule: '0 9 * * *', label: 'FasTrac Tier 1 innovation org signals (daily 05:00 ET)' }]
+    : []),
 ];
 
 export function startCronScheduler(): void {
@@ -105,6 +110,9 @@ export function startCronScheduler(): void {
   registerGrantsGovSource();
   if (fastracArmyEnabled) {
     registerFastracArmySource();
+  }
+  if (fasTracEnabled) {
+    registerFasTracTier1Source();
   }
 
   const registeredSources = getRegisteredSources();
