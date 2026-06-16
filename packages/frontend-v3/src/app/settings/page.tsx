@@ -21,10 +21,6 @@ import {
 import { IngestPipelineSection } from "@/components/settings/ingest-pipeline";
 import { useMatchSuggestions } from "@/hooks/use-approvals";
 import dynamic from "next/dynamic";
-import {
-  useUserSettings,
-  useUpdateUserSettings,
-} from "@/hooks/use-user-settings";
 
 const MatchApprovals = dynamic(
   () => import("@/components/settings/MatchApprovals").then((m) => m.MatchApprovals),
