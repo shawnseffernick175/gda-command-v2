@@ -1,6 +1,8 @@
 # GDA Command v2 — Master Document
 
-**Last Updated:** May 13, 2026
+**Last Updated:** Architecture as of May 13, 2026.  
+**Current operational status:** See [`docs/STATUS.md`](./STATUS.md) (regenerated each milestone).  
+**Latest snapshot:** 2026-06-16 — 29 PRs merged, queue empty.
 **Production:** https://gda.csr-llc.tech
 **Repository:** https://github.com/shawnseffernick175/gda-command-v2
 **n8n:** https://n8n.csr-llc.tech
