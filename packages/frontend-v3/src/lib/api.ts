@@ -46,22 +46,27 @@ export class ApiError extends Error {
   }
 }
 
+/* ── Redirect helper (works in both App Router and plain contexts) ── */
+
+function redirectToLogin(): void {
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+}
+
 /* ── Core fetch wrapper ───────────────────────────────────────── */
 
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
-  if (!accessToken) return false;
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
     try {
       const res = await fetch(`${API_BASE}/v3/auth/refresh`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
       if (!res.ok) return false;
       const envelope = (await res.json()) as SuccessEnvelope<{ token: string }>;
@@ -79,6 +84,16 @@ async function tryRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
+/**
+ * Attempt to restore the session from the httpOnly refresh cookie.
+ * Called once on app boot (before any other API call).
+ * Returns the new access token on success, null if no valid session.
+ */
+export async function bootRefresh(): Promise<string | null> {
+  const ok = await tryRefresh();
+  return ok ? accessToken : null;
+}
+
 async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -93,11 +108,16 @@ async function apiFetch<T>(
 
   let res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
-  if (res.status === 401 && accessToken) {
+  if (res.status === 401) {
     const refreshed = await tryRefresh();
     if (refreshed) {
       headers["Authorization"] = `Bearer ${accessToken}`;
       res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    } else {
+      // No valid session — redirect silently, do not throw into TanStack Query
+      accessToken = null;
+      redirectToLogin();
+      throw new ApiError("UNAUTHORIZED", "Session expired", 401);
     }
   }
 
@@ -281,10 +301,18 @@ export async function login(
   email: string,
   password: string,
 ): Promise<LoginResponse> {
-  const data = await apiPost<LoginResponse>("/v3/auth/login", {
-    email,
-    password,
+  const res = await fetch(`${API_BASE}/v3/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
   });
+  const envelope = (await res.json()) as Envelope<LoginResponse>;
+  if (!envelope.success) {
+    const err = envelope as ErrorEnvelope;
+    throw new ApiError(err.error.code, err.error.message, res.status, err.error.detail);
+  }
+  const data = (envelope as SuccessEnvelope<LoginResponse>).data;
   accessToken = data.token;
   return data;
 }
@@ -295,7 +323,14 @@ export async function me(): Promise<AuthUser> {
 
 export async function logout(): Promise<void> {
   try {
-    await apiPost<void>("/v3/auth/logout");
+    await fetch(`${API_BASE}/v3/auth/logout`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      credentials: "include",
+    });
   } finally {
     accessToken = null;
   }
