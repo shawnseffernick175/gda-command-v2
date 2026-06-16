@@ -19,6 +19,7 @@ import {
   Activity,
   Hammer,
   Wand2,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -54,6 +55,10 @@ export const SETTINGS_ITEM: NavItem = {
   href: "/settings",
   icon: Settings,
 };
+
+export const SETTINGS_SUB_ITEMS: NavItem[] = [
+  { label: "Scoring & Doctrine", href: "/settings/scoring-doctrine", icon: SlidersHorizontal },
+];
 
 export const PROMPT_CREATOR_ITEM: NavItem = {
   label: "Prompt Creator",
