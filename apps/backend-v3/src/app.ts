@@ -45,6 +45,7 @@ import { financialsRoutes } from './routes/financials.js';
 import { captureWorkflowRoutes } from './routes/capture-workflow.js';
 import { vaultRoutes } from './routes/vault.js';
 import { fasTracSignalRoutes } from './routes/fastrac-signals.js';
+import { fastracBidirectionalRoutes } from './routes/fastrac-bidirectional.js';
 import { promptLibraryRoutes } from './routes/prompt-library.js';
 import { digestRoutes } from './routes/digest.js';
 import { ingestStatusRoutes } from './routes/ingest-status.js';
@@ -141,6 +142,7 @@ export async function buildApp() {
   await app.register(launchpadRoutes);
   await app.register(fasTracRoutes);
   await app.register(fasTracSignalRoutes);
+  await app.register(fastracBidirectionalRoutes);
   await app.register(sourceRoutes);
   await app.register(partnerRoutes);
   await app.register(actionItemRoutes);

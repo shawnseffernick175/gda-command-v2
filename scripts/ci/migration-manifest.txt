@@ -96,3 +96,4 @@ v3_087_drop_grade_columns.sql
 v3_088_vault_extraction_status.sql
 v3_089_vault_vehicle_extraction.sql
 v3_090_regulatory_tracker_urls.sql
+v3_091_fastrac_bidirectional_evidence.sql
