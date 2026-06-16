@@ -46,7 +46,7 @@ function ChipListEditor({
             <button
               type="button"
               onClick={() => removeItem(item)}
-              className="text-muted-foreground hover:text-gda-red text-[10px]"
+              className="text-muted-foreground hover:text-gda-red text-[11px]"
             >
               x
             </button>

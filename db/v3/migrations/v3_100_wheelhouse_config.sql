@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS wheelhouse_config (
   dollar_max BIGINT NOT NULL DEFAULT 500000000,
   setasides_pursued TEXT[] NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_by UUID REFERENCES users(id)
+  updated_by BIGINT REFERENCES users(id)
 );
 
 INSERT INTO wheelhouse_config (id, naics_allowlist, agency_allowlist, setasides_pursued)
@@ -22,7 +22,7 @@ VALUES (1,
 
 -- 2. Pwin scoring config audit columns
 ALTER TABLE pwin_scoring_config
-  ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS updated_by BIGINT REFERENCES users(id),
   ADD COLUMN IF NOT EXISTS previous_weights JSONB;
 
 COMMIT;
