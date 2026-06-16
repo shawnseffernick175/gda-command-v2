@@ -32,7 +32,6 @@ import { trainIfReady } from '../services/pwin/index.js';
 import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
 import { runDigestRefresh } from './digest-refresh.js';
-import { runDailyBriefingCron } from './daily-briefing.js';
 import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
@@ -107,19 +106,6 @@ export function startCronScheduler(): void {
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
   }
-
-  // Daily briefing auto-delivery — 6:00 AM ET (11:00 UTC) on weekdays
-  const briefingDeliveryTask = cron.schedule('0 11 * * 1-5', async () => {
-    try {
-      logger.info('[cron] briefing.delivery starting');
-      await runDailyBriefingCron();
-      logger.info('[cron] briefing.delivery completed');
-    } catch (err) {
-      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_briefing_delivery_error');
-    }
-  });
-  tasks.push(briefingDeliveryTask);
-  logger.info({ schedule: '0 11 * * 1-5' }, '[cron] registered: briefing.delivery (0 11 * * 1-5)');
 
   // PWin batch scoring — daily at 01:00 UTC (before retrain at 02:00 and action-items at 06:30)
   const pwinBatchScoreTask = cron.schedule('0 1 * * *', async () => {
