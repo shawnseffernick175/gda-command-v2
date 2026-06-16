@@ -5,6 +5,13 @@ export type ActionItemStatus = 'open' | 'in_progress' | 'done';
 
 export type ActionItemPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
+export type DoctrineSource =
+  | 'capture_review_killitem'
+  | 'capture_stale'
+  | 'capture_deadline'
+  | 'recompete_expiring'
+  | 'manual';
+
 export interface ActionItemRow {
   id: string;
   title: string;
@@ -16,8 +23,12 @@ export interface ActionItemRow {
   source: string;
   source_id: string | null;
   source_type: string | null;
+  doctrine_source: DoctrineSource;
   is_auto: boolean;
   assignee_id: number | null;
+  capture_id: number | null;
+  award_id: number | null;
+  review_stage_id: number | null;
   linked_record_type: string | null;
   linked_record_id: string | null;
   completed_at: string | null;
@@ -54,6 +65,8 @@ export interface ActionItemListFilters {
   status?: string;
   owner?: string;
   source?: string;
+  doctrine_source?: string;
+  priority?: string;
   linked_record_type?: string;
   limit: number;
   cursor?: string;
@@ -119,9 +132,13 @@ export function toApiShape(row: ActionItemRow, drafts: object[] = [], assignee?:
     due_date_sources: row.due_date ? [sourceRef] : [],
     source: row.source,
     source_type: row.source_type,
+    doctrine_source: row.doctrine_source ?? 'manual',
     is_auto: row.is_auto ?? false,
     assignee_id: row.assignee_id,
     assignee: assignee ?? null,
+    capture_id: row.capture_id ?? null,
+    award_id: row.award_id ?? null,
+    review_stage_id: row.review_stage_id ?? null,
     linked_record_type: row.linked_record_type ?? row.source_type,
     linked_record_id: row.linked_record_id ?? row.source_id,
     drafts,
@@ -285,6 +302,14 @@ export async function listActionItems(
   if (filters.linked_record_type) {
     conditions.push(`linked_record_type = $${idx++}`);
     vals.push(filters.linked_record_type);
+  }
+  if (filters.doctrine_source) {
+    conditions.push(`doctrine_source = $${idx++}`);
+    vals.push(filters.doctrine_source);
+  }
+  if (filters.priority) {
+    conditions.push(`priority = $${idx++}`);
+    vals.push(filters.priority);
   }
 
   // --- Offset/page mode (mirrors Opportunities) ---

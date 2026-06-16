@@ -31,6 +31,8 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
       status?: string;
       owner?: string;
       source?: string;
+      doctrine_source?: string;
+      priority?: string;
       linked_record_type?: string;
       limit?: string;
       cursor?: string;
@@ -41,6 +43,8 @@ export async function actionItemRoutes(app: FastifyInstance): Promise<void> {
       status: req.query.status,
       owner: req.query.owner,
       source: req.query.source,
+      doctrine_source: req.query.doctrine_source,
+      priority: req.query.priority,
       linked_record_type: req.query.linked_record_type,
       limit: req.query.limit ? parseInt(req.query.limit, 10) : 50,
       cursor: req.query.cursor,

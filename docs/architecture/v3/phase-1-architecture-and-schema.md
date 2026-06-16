@@ -462,6 +462,13 @@ CREATE TABLE action_items (
   source_id       BIGINT        REFERENCES sources(id),  -- nullable after v3_062 (v3 uses linked_record_id)
   created_by      BIGINT        REFERENCES users(id),
   completed_at    TIMESTAMPTZ,
+  doctrine_source TEXT          DEFAULT 'manual'
+                                CHECK (doctrine_source IN (
+                                  'capture_review_killitem', 'capture_stale',
+                                  'capture_deadline', 'recompete_expiring', 'manual')),
+  capture_id      BIGINT        REFERENCES captures(id) ON DELETE CASCADE,
+  award_id        BIGINT        REFERENCES awards(id) ON DELETE CASCADE,
+  review_stage_id INTEGER       REFERENCES capture_color_stages(id) ON DELETE CASCADE,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
@@ -471,6 +478,10 @@ CREATE INDEX idx_actions_owner       ON action_items (owner_email);
 CREATE INDEX idx_actions_due         ON action_items (due_date) WHERE status != 'done';
 CREATE INDEX idx_actions_opp         ON action_items (opportunity_id) WHERE opportunity_id IS NOT NULL;
 CREATE INDEX idx_actions_source      ON action_items (source_id);
+CREATE INDEX idx_action_items_capture_id ON action_items (capture_id) WHERE capture_id IS NOT NULL;
+CREATE INDEX idx_action_items_award_id ON action_items (award_id) WHERE award_id IS NOT NULL;
+CREATE INDEX idx_action_items_review_stage_id ON action_items (review_stage_id) WHERE review_stage_id IS NOT NULL;
+CREATE INDEX idx_action_items_doctrine_source ON action_items (doctrine_source) WHERE status IN ('open', 'in_progress');
 ```
 
 | Column | Purpose |
