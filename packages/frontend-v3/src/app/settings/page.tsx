@@ -25,6 +25,9 @@ import dynamic from "next/dynamic";
 const MatchApprovals = dynamic(
   () => import("@/components/settings/MatchApprovals").then((m) => m.MatchApprovals),
 );
+const WheelhouseNaicsPanel = dynamic(
+  () => import("@/components/settings/wheelhouse-naics").then((m) => m.WheelhouseNaicsPanel),
+);
 
 /* ── Config key editor ──────────────────────────────────────────── */
 function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
@@ -564,6 +567,11 @@ export default function SettingsPage() {
         ) : (
           <SystemHealthSection sysHealth={sysHealth} />
         )}
+      </CollapseSection>
+
+      {/* ── Wheelhouse Filter ──────────────────────────────────── */}
+      <CollapseSection id="settings-wheelhouse" title="WHEELHOUSE FILTER (NAICS)" defaultOpen={false}>
+        <WheelhouseNaicsPanel />
       </CollapseSection>
 
       {/* ── Doctrine Configuration ─────────────────────────────── */}
