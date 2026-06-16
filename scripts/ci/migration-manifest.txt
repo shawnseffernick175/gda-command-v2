@@ -102,3 +102,4 @@ v3_093_idiq_ops.sql
 v3_094_opportunity_notes_owner.sql
 v3_095_opportunity_value_date_enrichment.sql
 v3_096_fastrac_signal_columns.sql
+v3_097_workshop.sql

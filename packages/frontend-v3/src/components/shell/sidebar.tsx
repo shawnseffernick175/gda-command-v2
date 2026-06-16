@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, SETTINGS_ITEM } from "./nav-items";
+import { NAV_ITEMS, SETTINGS_ITEM, PROMPT_CREATOR_ITEM } from "./nav-items";
 import { useSentinel } from "@/hooks/use-sentinel";
 
 export function Sidebar() {

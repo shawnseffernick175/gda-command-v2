@@ -52,6 +52,7 @@ import { ingestStatusRoutes } from './routes/ingest-status.js';
 import { vehicleRoutes } from './routes/vehicles.js';
 import { idiqOpsRoutes } from './routes/idiq-ops.js';
 import { overrideRoutes } from './routes/overrides.js';
+import { workshopRoutes } from './routes/workshop.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -180,6 +181,7 @@ export async function buildApp() {
   await app.register(vehicleRoutes);
   await app.register(idiqOpsRoutes);
   await app.register(overrideRoutes);
+  await app.register(workshopRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

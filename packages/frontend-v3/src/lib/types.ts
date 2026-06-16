@@ -932,3 +932,85 @@ export interface AiAnalyzeResponse {
 }
 
 
+/* ── Workshop (#873) ──────────────────────────────────────────── */
+
+export interface TeardownStructureEntry {
+  section_name: string;
+  page_start: number;
+  page_end: number;
+  summary: string;
+}
+
+export interface TeardownKeyNumber {
+  value: string;
+  context: string;
+  page: number;
+}
+
+export interface TeardownTable {
+  caption: string;
+  csv: string;
+}
+
+export interface TeardownFigure {
+  caption: string;
+  page: number;
+}
+
+export interface TeardownEnvisionRelevance {
+  wheelhouse_match: "high" | "medium" | "low" | "none";
+  agencies_mentioned: string[];
+  naics_mentioned: string[];
+  vehicles_mentioned: string[];
+  competitors_mentioned: string[];
+  teammate_candidates: string[];
+  threat_candidates: string[];
+}
+
+export interface TeardownAnalysis {
+  title: string;
+  doc_type: string;
+  page_count: number;
+  structure: TeardownStructureEntry[];
+  key_claims: string[];
+  key_numbers: TeardownKeyNumber[];
+  tables_extracted: TeardownTable[];
+  figures_extracted: TeardownFigure[];
+  risks_or_gaps: string[];
+  envision_relevance: TeardownEnvisionRelevance;
+  summary_3_sentence: string;
+}
+
+export interface WorkshopOutput {
+  id: string;
+  source_upload_id: string;
+  output_type: string;
+  output_format: string;
+  vault_doc_id: number | null;
+  generated_at: string;
+  generated_by: string | null;
+  config: Record<string, unknown> | null;
+  rendered_text: string | null;
+}
+
+export interface DocumentUpload {
+  id: string;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  uploaded_by: string | null;
+  uploaded_at: string;
+  classification: string | null;
+  teardown_analysis: TeardownAnalysis | null;
+  teardown_run_at: string | null;
+  teardown_model: string | null;
+  status: "uploaded" | "analyzing" | "analyzed" | "failed";
+  outputs?: WorkshopOutput[];
+}
+
+export interface WorkshopListResponse {
+  items: DocumentUpload[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
