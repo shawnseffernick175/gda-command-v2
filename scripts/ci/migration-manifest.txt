@@ -94,4 +94,5 @@ v3_085_refresh_tokens.sql
 v3_086_auth_audit_refresh_events.sql
 v3_087_drop_grade_columns.sql
 v3_088_vault_extraction_status.sql
-v3_089_opportunity_notes_owner.sql
+v3_089_vault_vehicle_extraction.sql
+v3_090_opportunity_notes_owner.sql

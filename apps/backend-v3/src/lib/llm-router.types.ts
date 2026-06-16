@@ -42,7 +42,8 @@ export type Task =
   | 'digest_lead'
   | 'competitor_contact_discovery'
   | 'partner_contact_discovery'
-  | 'financial_analyze';
+  | 'financial_analyze'
+  | 'vault_vehicle_extract';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -391,6 +392,30 @@ export interface VaultSmartRouteOutput {
   regulatory_citation: string | null;
   routing_rationale: string;
   confidence: string;
+}
+
+export interface VaultVehicleExtractInput {
+  filename: string;
+  extracted_text: string;
+  doc_type: string;
+}
+
+export interface VaultVehicleExtractOutput {
+  is_contract_vehicle: boolean;
+  vehicle_name: string | null;
+  contract_number: string | null;
+  sponsor_agency: string | null;
+  prime_or_sub: 'prime' | 'sub' | null;
+  prime_contractor: string | null;
+  ceiling_value: number | null;
+  period_of_performance_start: string | null;
+  period_of_performance_end: string | null;
+  expiration_date: string | null;
+  naics_codes: string[];
+  set_aside_type: string | null;
+  extraction_confidence: 'high' | 'medium' | 'low';
+  extraction_notes: string;
+  model_used: string;
 }
 
 export interface FinancialStatementExtractInput {
@@ -804,6 +829,7 @@ export interface TaskInputMap {
   match_analysis: MatchAnalysisInput;
   vault_document_parse: VaultDocumentParseInput;
   vault_smart_route: VaultSmartRouteInput;
+  vault_vehicle_extract: VaultVehicleExtractInput;
   financial_statement_extract: FinancialStatementExtractInput;
   balance_sheet_extract: BalanceSheetExtractInput;
   cost_detail_extract: CostDetailExtractInput;
@@ -830,6 +856,7 @@ export interface TaskOutputMap {
   match_analysis: MatchAnalysisOutput;
   vault_document_parse: VaultDocumentParseOutput;
   vault_smart_route: VaultSmartRouteOutput;
+  vault_vehicle_extract: VaultVehicleExtractOutput;
   financial_statement_extract: FinancialStatementExtractOutput;
   balance_sheet_extract: BalanceSheetExtractOutput;
   cost_detail_extract: CostDetailExtractOutput;
