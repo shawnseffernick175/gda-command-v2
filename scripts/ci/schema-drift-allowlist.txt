@@ -32,6 +32,9 @@ analysis_jobs
 # pg_extension is a system catalog table, not in public schema
 pg_extension
 
+# wheelhouse_config is a singleton config table created by v3_100 (Shipley pipeline coverage)
+wheelhouse_config
+
 # migration helper CTEs / subquery aliases used in migration scripts
 scored_opps
 soak_events
