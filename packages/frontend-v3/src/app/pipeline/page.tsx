@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
+import { ScoreExplain } from "@/components/shared/score-explainers";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
@@ -210,10 +211,17 @@ function PipelineContent() {
             sub="Total Pipeline"
             onClick={() => setActiveBucket(null)}
           />
-          <IntelChip
-            label={formatMoney(summary.weighted_pipeline_value)}
-            sub="Weighted Pipeline"
-          />
+          <span className="inline-flex items-center gap-1">
+            <IntelChip
+              label={formatMoney(summary.weighted_pipeline_value)}
+              sub="Weighted Pipeline"
+            />
+            <ScoreExplain
+              score={formatMoney(summary.weighted_pipeline_value)}
+              label="Pipeline Value (Weighted)"
+              scoreType="pipeline_value"
+            />
+          </span>
           <IntelChip
             label={String(summary.active_pursuits)}
             sub="Active Pursuits"
@@ -487,6 +495,12 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
                 {item.pwin_band}
               </span>
             )}
+            <ScoreExplain
+              score={pwinScore}
+              label="Pwin"
+              scoreType="pwin"
+              inputs={{ top_drivers: [] }}
+            />
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">—</span>

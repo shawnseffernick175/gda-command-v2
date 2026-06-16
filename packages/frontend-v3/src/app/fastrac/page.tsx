@@ -12,6 +12,7 @@ import type { FTSignal, FTMatch, FTMatchAnalysis, FasTracTab } from "@/hooks/use
 import { Badge } from "@/components/ui/badge";
 import { SourceChip } from "@/components/shared/source-chip";
 import { CollapseSection } from "@/components/shared/collapse-section";
+import { ScoreExplain } from "@/components/shared/score-explainers";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
@@ -45,20 +46,28 @@ function gradeStyle(grade: string): string {
 // ────────────────────────────────────────────────────────────
 // Signal strength dot array (1–5 filled)
 // ────────────────────────────────────────────────────────────
-function SignalStrength({ value }: { value: number }) {
+function SignalStrength({ value, source }: { value: number; source?: string }) {
   return (
-    <div className="flex items-center gap-0.5" title={`Signal strength: ${value}/5`}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <span
-          key={i}
-          className={cn(
-            "inline-block h-2 w-2 rounded-full border",
-            i < value
-              ? "bg-gda-green border-gda-green"
-              : "bg-transparent border-border"
-          )}
-        />
-      ))}
+    <div className="flex items-center gap-1" title={`Signal strength: ${value}/5`}>
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <span
+            key={i}
+            className={cn(
+              "inline-block h-2 w-2 rounded-full border",
+              i < value
+                ? "bg-gda-green border-gda-green"
+                : "bg-transparent border-border"
+            )}
+          />
+        ))}
+      </div>
+      <ScoreExplain
+        score={`${value}/5`}
+        label="Signal Strength"
+        scoreType="signal_strength"
+        inputs={{ source }}
+      />
     </div>
   );
 }
@@ -73,11 +82,19 @@ const URGENCY_STYLES: Record<string, string> = {
   low:      "bg-muted/30 border-border text-muted-foreground",
 };
 
-function UrgencyBadge({ urgency }: { urgency: string | null }) {
+function UrgencyBadge({ urgency, horizon }: { urgency: string | null; horizon?: string }) {
   if (!urgency) return null;
   return (
-    <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase", URGENCY_STYLES[urgency] ?? URGENCY_STYLES.low)}>
-      {urgency}
+    <span className="inline-flex items-center gap-1">
+      <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono uppercase", URGENCY_STYLES[urgency] ?? URGENCY_STYLES.low)}>
+        {urgency}
+      </span>
+      <ScoreExplain
+        score={urgency}
+        label="Urgency"
+        scoreType="urgency"
+        inputs={{ horizon }}
+      />
     </span>
   );
 }
@@ -193,11 +210,11 @@ function SignalRow({ s, showInstitution }: { s: FTSignal; showInstitution?: bool
         </td>
         {/* Signal strength */}
         <td className="px-3 py-2 text-left align-top">
-          <SignalStrength value={s.signal_strength} />
+          <SignalStrength value={s.signal_strength} source={s.source} />
         </td>
         {/* Urgency */}
         <td className="px-3 py-2 text-left align-top">
-          <UrgencyBadge urgency={s.urgency} />
+          <UrgencyBadge urgency={s.urgency} horizon={s.horizon} />
         </td>
         {/* Next action */}
         <td className="px-3 py-2 text-left align-top max-w-[240px]">
@@ -310,12 +327,21 @@ function SignalTable({ signals, loading, showInstitution, sortPrefix }: { signal
 // ────────────────────────────────────────────────────────────
 // Score bar
 // ────────────────────────────────────────────────────────────
-function ScoreBar({ label, value }: { label: string; value: number }) {
+function ScoreBar({ label, value, scoreType }: { label: string; value: number; scoreType?: "mission_fit" | "technical_fit" | "timing_fit" | "fastrac_match" }) {
   const pct = Math.round(value * 100);
   return (
     <div className="space-y-0.5">
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{label}</span>
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {scoreType && (
+            <ScoreExplain
+              score={`${pct}%`}
+              label={label}
+              scoreType={scoreType}
+            />
+          )}
+        </span>
         <span className="font-mono text-foreground">{pct}%</span>
       </div>
       <div className="h-1.5 rounded-full bg-gda-bg-base overflow-hidden">
@@ -546,7 +572,15 @@ function MatchCard({ m }: { m: FTMatch }) {
             )}>
               {overallPct}
             </span>
-            <span className="text-[11px] text-muted-foreground mt-0.5">match</span>
+            <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground mt-0.5">
+              match
+              <ScoreExplain
+                score={overallPct}
+                label="Match Score"
+                scoreType="fastrac_match"
+                inputs={{ mission_fit: missionFit, technical_fit: techFit, timing }}
+              />
+            </span>
           </div>
           <div className="flex-1 min-w-0 text-right">
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Requirement Signal</p>
@@ -561,9 +595,9 @@ function MatchCard({ m }: { m: FTMatch }) {
 
         {/* Scores */}
         <div className="space-y-1.5">
-          <ScoreBar label="Mission Fit"   value={missionFit} />
-          <ScoreBar label="Technical Fit" value={techFit} />
-          <ScoreBar label="Timing"        value={timing} />
+          <ScoreBar label="Mission Fit"   value={missionFit} scoreType="mission_fit" />
+          <ScoreBar label="Technical Fit" value={techFit} scoreType="technical_fit" />
+          <ScoreBar label="Timing"        value={timing} scoreType="timing_fit" />
         </div>
 
         {/* Vehicle + path */}
