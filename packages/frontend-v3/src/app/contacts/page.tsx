@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { Suspense, useState, useMemo, useCallback, useRef } from "react";
 import {
   useContacts,
   useContactsCount,
@@ -17,6 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { Pagination } from "@/components/shared/Pagination";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
 import type {
   GovTriContact,
   ContactCategory,
@@ -614,6 +616,14 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
 /* ── Main Page ────────────────────────────────────────────────── */
 
 export default function ContactsPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <ContactsContent />
+    </Suspense>
+  );
+}
+
+function ContactsContent() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -625,6 +635,7 @@ export default function ContactsPage() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "agency">("list");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
 
   const deleteMutation = useDeleteContact();
 
@@ -639,14 +650,14 @@ export default function ContactsPage() {
     [searchQuery, activeCategory, activeTemp, activeLinked, activeSource],
   );
 
-  const filterKey = JSON.stringify(filterParams);
+  const filterKey = JSON.stringify({ ...filterParams, ...sortParams });
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
     setPage(1);
   }
 
-  const { data, isLoading, error, refetch } = useContacts({ ...filterParams, page });
+  const { data, isLoading, error, refetch } = useContacts({ ...filterParams, page, ...sortParams });
   const { data: countData } = useContactsCount(activeCategory);
 
   const meta: ContactsMeta = data?.meta ?? {
@@ -846,14 +857,14 @@ export default function ContactsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                  <th className="w-[30px] px-2 py-2 text-left font-medium" />
-                  <th className="w-[160px] px-3 py-2 text-left font-medium">Name</th>
-                  <th className="w-[140px] px-3 py-2 text-left font-medium">Title / Role</th>
-                  <th className="w-[140px] px-3 py-2 text-left font-medium">Agency</th>
-                  <th className="w-[120px] px-3 py-2 text-left font-medium">Contact</th>
-                  <th className="px-3 py-2 text-left font-medium">Linked To</th>
-                  <th className="w-[80px] px-3 py-2 text-left font-medium">Last Touch</th>
-                  <th className="w-[60px] px-3 py-2 text-left font-medium">Actions</th>
+                  <th className="w-[30px] px-2 py-2 text-left font-medium bg-gda-bg-base" />
+                  <SortableHeader label="Name" field="name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="160px" />
+                  <SortableHeader label="Title / Role" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
+                  <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
+                  <SortableHeader label="Contact" field="email" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="120px" />
+                  <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Linked To</th>
+                  <SortableHeader label="Last Touch" field="last_contacted_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                  <th className="w-[60px] px-3 py-2 text-left font-medium bg-gda-bg-base">Actions</th>
                 </tr>
               </thead>
               <tbody>
