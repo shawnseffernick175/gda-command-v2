@@ -18,6 +18,7 @@ import {
   type PipelineListItem,
   type PipelineStageStats,
 } from "@/hooks/use-pipeline";
+import { PipelineCoverageCard } from "./PipelineCoverageCard";
 
 const PAGE_SIZE = 50;
 
@@ -196,6 +197,9 @@ function PipelineContent() {
           </button>
         </div>
       </div>
+
+      {/* ── Section 0: Shipley Pipeline Coverage Card ─────────── */}
+      <PipelineCoverageCard />
 
       {/* ── Section 1: Pipeline KPI Strip ─────────────────────────── */}
       {summaryLoading ? (
