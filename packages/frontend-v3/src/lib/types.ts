@@ -698,6 +698,8 @@ export interface VaultAuditEntry {
   created_at: string;
 }
 
+export type VaultExtractionStatus = 'pending' | 'success' | 'failed' | 'unsupported';
+
 export interface VaultDocument {
   id: number;
   filename: string;
@@ -707,6 +709,7 @@ export interface VaultDocument {
   file_size_bytes: number | null;
   file_path: string | null;
   extracted_text: string | null;
+  extraction_status: VaultExtractionStatus;
   ai_summary: string | null;
   ai_tags: string[] | null;
   ai_entities: VaultEntity[] | null;

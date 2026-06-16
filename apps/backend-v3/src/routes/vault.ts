@@ -51,6 +51,7 @@ interface VaultDocumentRow {
   file_size_bytes: string | null;
   file_path: string | null;
   extracted_text: string | null;
+  extraction_status: string;
   ai_summary: string | null;
   ai_tags: string[] | null;
   ai_entities: { name: string; type: string; value: string }[] | null;
@@ -149,6 +150,55 @@ async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<str
     return blocks.join('\n\n').slice(0, MAX);
   }
 
+  if (ext === 'msg') {
+    const mod = await import('@kenjiuno/msgreader');
+    const MsgReader = mod.default as unknown as new (buf: ArrayBuffer | DataView) => { getFileData(): Record<string, unknown>; getAttachment(att: unknown): { fileName?: string; content?: Uint8Array } };
+    const arrayBuf = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+    const msg = new MsgReader(arrayBuf);
+    const fileData = msg.getFileData() as {
+      senderName?: string;
+      senderEmail?: string;
+      recipients?: { name?: string; email?: string; recipType?: string }[];
+      subject?: string;
+      messageDeliveryTime?: string;
+      creationTime?: string;
+      body?: string;
+      attachments?: { fileName?: string; contentLength?: number }[];
+    };
+
+    const parts: string[] = [];
+    if (fileData.senderName || fileData.senderEmail) {
+      parts.push(`FROM: ${fileData.senderName ?? ''} <${fileData.senderEmail ?? ''}>`);
+    }
+    const recipients = fileData.recipients ?? [];
+    const toList = recipients.filter((r) => !r.recipType || r.recipType === 'to');
+    const ccList = recipients.filter((r) => r.recipType === 'cc');
+    if (toList.length > 0) {
+      parts.push(`TO: ${toList.map((r) => r.name || r.email || '').join(', ')}`);
+    }
+    if (ccList.length > 0) {
+      parts.push(`CC: ${ccList.map((r) => r.name || r.email || '').join(', ')}`);
+    }
+    if (fileData.subject) parts.push(`SUBJECT: ${fileData.subject}`);
+    if (fileData.messageDeliveryTime || fileData.creationTime) {
+      parts.push(`DATE: ${fileData.messageDeliveryTime ?? fileData.creationTime ?? ''}`);
+    }
+    const attachments = fileData.attachments ?? [];
+    if (attachments.length > 0) {
+      const attList = attachments.map((a) => {
+        const name = a.fileName ?? 'unnamed';
+        const size = a.contentLength ? `(${Math.round(a.contentLength / 1024)} KB)` : '';
+        return `${name} ${size}`.trim();
+      });
+      parts.push(`ATTACHMENTS: [${attList.join(', ')}]`);
+    }
+    parts.push('');
+    parts.push('--- BODY ---');
+    parts.push(fileData.body ?? '');
+
+    return parts.join('\n');
+  }
+
   if (ext === 'zip') {
     const AdmZip = (await import('adm-zip')).default;
     const zip = new AdmZip(buf);
@@ -173,6 +223,18 @@ async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<str
   }
 
   return '';
+}
+
+type ExtractionStatus = 'pending' | 'success' | 'failed' | 'unsupported';
+
+const SUPPORTED_EXTENSIONS = new Set(['pdf', 'docx', 'txt', 'csv', 'xlsx', 'zip', 'msg']);
+
+function determineExtractionStatus(filename: string, extractedText: string, fileSizeBytes: number): ExtractionStatus {
+  const ext = filename.toLowerCase().split('.').pop() ?? '';
+  if (!SUPPORTED_EXTENSIONS.has(ext)) return 'unsupported';
+  if (fileSizeBytes === 0) return 'failed';
+  if (extractedText.trim().length > 0) return 'success';
+  return 'failed';
 }
 
 async function insertAudit(
@@ -358,7 +420,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     const dataSql = `
       SELECT d.id, d.filename, d.doc_type, d.doc_category, d.is_system_doc,
         d.file_size_bytes, d.file_path, d.ai_summary, d.ai_tags, d.ai_entities,
-        d.regulatory_citation, d.effective_date, d.applicable_naics,
+        d.extraction_status, d.regulatory_citation, d.effective_date, d.applicable_naics,
         d.linked_opportunity_id, d.linked_capture_id, d.linked_award_id,
         d.uploaded_by, d.uploaded_at, d.updated_at, d.deleted_at,
         o.title AS opp_title,
@@ -622,12 +684,13 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const regCitations = extractRegCitations(extractedText);
+    const extractionStatus = determineExtractionStatus(filename, extractedText, fileSizeBytes);
 
     const insertRes = await pool.query<{ id: number }>(
       `INSERT INTO vault_documents
         (filename, doc_type, doc_category, file_size_bytes, file_path, extracted_text,
-         ai_summary, ai_tags, ai_entities, regulatory_citation, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ai_summary, ai_tags, ai_entities, regulatory_citation, uploaded_by, extraction_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id`,
       [
         filename,
@@ -641,6 +704,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
         aiEntities ? JSON.stringify(aiEntities) : null,
         regCitations.length > 0 ? regCitations[0] : null,
         'admin',
+        extractionStatus,
       ],
     );
 
@@ -855,6 +919,117 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     );
     return reply.send(
       successEnvelope(res.rows, req.requestId),
+    );
+  });
+
+  // POST /v3/vault/:id/re-extract — re-run text extraction on a document
+  app.post('/v3/vault/:id/re-extract', async (req, reply) => {
+    const { id } = req.params as { id: string };
+
+    const docRes = await pool.query<{ id: number; filename: string; file_path: string | null; file_size_bytes: string | null }>(
+      `SELECT id, filename, file_path, file_size_bytes FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+
+    if (!docRes.rows[0]) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Document not found', req.requestId),
+      );
+    }
+
+    const doc = docRes.rows[0];
+    const filePath = doc.file_path ? join(process.cwd(), 'data', doc.file_path) : null;
+
+    if (!filePath) {
+      await pool.query(
+        `UPDATE vault_documents SET extraction_status = 'failed', updated_at = NOW() WHERE id = $1`,
+        [id],
+      );
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'No file path stored for this document', req.requestId),
+      );
+    }
+
+    let buf: Buffer;
+    try {
+      const { readFileSync } = await import('node:fs');
+      buf = readFileSync(filePath);
+    } catch {
+      await pool.query(
+        `UPDATE vault_documents SET extraction_status = 'failed', updated_at = NOW() WHERE id = $1`,
+        [id],
+      );
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'File not found on disk — cannot re-extract', req.requestId),
+      );
+    }
+
+    const fileSizeBytes = buf.length;
+
+    let extractedText = '';
+    try {
+      extractedText = await extractTextFromBuffer(buf, doc.filename);
+    } catch (err) {
+      logger.warn({ err, filename: doc.filename }, 'Re-extraction failed');
+    }
+
+    const extractionStatus = determineExtractionStatus(doc.filename, extractedText, fileSizeBytes);
+
+    // Run AI parse if extraction succeeded
+    let aiSummary: string | null = null;
+    let aiTags: string[] | null = null;
+    let aiEntities: { name: string; type: string; value: string }[] | null = null;
+
+    if (extractedText.length > 0) {
+      try {
+        const llmResult = await llmRouter.route({
+          task: 'vault_document_parse',
+          input: {
+            doc_type: 'other',
+            filename: doc.filename,
+            extracted_text: extractedText,
+          },
+        });
+
+        if (llmResult.ok && llmResult.output) {
+          aiSummary = llmResult.output.summary;
+          aiTags = llmResult.output.tags;
+          aiEntities = llmResult.output.entities;
+        }
+      } catch (err) {
+        logger.warn({ err, filename: doc.filename }, 'AI parse failed during re-extraction');
+      }
+    }
+
+    await pool.query(
+      `UPDATE vault_documents
+       SET extracted_text = $1, extraction_status = $2, ai_summary = $3, ai_tags = $4, ai_entities = $5,
+           file_size_bytes = $6, updated_at = NOW()
+       WHERE id = $7`,
+      [
+        extractedText || null,
+        extractionStatus,
+        aiSummary,
+        aiTags ? JSON.stringify(aiTags) : null,
+        aiEntities ? JSON.stringify(aiEntities) : null,
+        fileSizeBytes,
+        id,
+      ],
+    );
+
+    await insertAudit(Number(id), 're_extracted', 'admin', `Status: ${extractionStatus}, text length: ${extractedText.length}`);
+
+    const updated = await pool.query<VaultDocumentRow>(
+      `SELECT d.*, o.title AS opp_title,
+        (SELECT o2.title FROM captures c JOIN pipeline_items pi ON pi.id = c.pipeline_item_id JOIN opportunities o2 ON o2.id = pi.opportunity_id WHERE c.id = d.linked_capture_id LIMIT 1) AS capture_title
+       FROM vault_documents d
+       LEFT JOIN opportunities o ON o.id = d.linked_opportunity_id
+       WHERE d.id = $1`,
+      [id],
+    );
+
+    return reply.send(
+      successEnvelope(updated.rows[0], req.requestId),
     );
   });
 

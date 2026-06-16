@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { ScoreExplain } from "@/components/shared/score-explainers";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { SortableHeader } from "@/components/shared/SortableHeader";
@@ -820,7 +821,15 @@ function OpportunityRow({
       </td>
       <td className="px-3 py-1.5 text-left">
         {score != null ? (
-          <span className={cn("font-mono text-xs tabular-nums", pwinClass)}>{score}%</span>
+          <span className="inline-flex items-center gap-1">
+            <span className={cn("font-mono text-xs tabular-nums", pwinClass)}>{score}%</span>
+            <ScoreExplain
+              score={score}
+              label="Pwin"
+              scoreType="pwin"
+              inputs={{ top_drivers: opp.pwin?.top_drivers ?? [] }}
+            />
+          </span>
         ) : (
           <FieldStatusBadge reason={opp.ai_analyzed_at == null ? "pending_analysis" : "no_source_data"} />
         )}
@@ -1133,11 +1142,25 @@ function OpportunityDetail({ id }: { id: string }) {
               <MetaRow label="Source" value={opp.source ?? "---"} />
               {/* Doctrine Fit — demoted to one line */}
               {(doctrine || doctrineScore != null) && (
-                <MetaRow
-                  label="Doctrine Fit"
-                  value={doctrine ? `${doctrine.label} ${Math.round((doctrine.score / 100) * 40)}/40` : `${doctrineScore}/40`}
-                  className={doctrine ? FIT_COLORS[doctrine.label] : "text-gda-cyan"}
-                />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Doctrine Fit</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className={cn("font-mono text-foreground", doctrine ? FIT_COLORS[doctrine.label] : "text-gda-cyan")}>
+                      {doctrine ? `${doctrine.label} ${Math.round((doctrine.score / 100) * 40)}/40` : `${doctrineScore}/40`}
+                    </span>
+                    <ScoreExplain
+                      score={doctrine ? Math.round((doctrine.score / 100) * 40) : (doctrineScore ?? null)}
+                      label="Doctrine Score"
+                      scoreType="doctrine_score"
+                      inputs={{
+                        alignment_total: doctrine ? Math.round((doctrine.score / 100) * 40) : doctrineScore,
+                        label: doctrine?.label,
+                        matchedPrinciples: doctrine?.matchedPrinciples,
+                        rationale: doctrine?.rationale,
+                      }}
+                    />
+                  </span>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1295,9 +1318,17 @@ function DecisionBriefPanel({
               <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">
                 Pre-Assessment
               </p>
-              <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", preColor)}>
-                {preLabel}
-              </Badge>
+              <span className="inline-flex items-center gap-1">
+                <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", preColor)}>
+                  {preLabel}
+                </Badge>
+                <ScoreExplain
+                  score={preLabel}
+                  label="Relevance"
+                  scoreType="relevance"
+                  inputs={{ status: relevanceStatus, reason: relevanceReason }}
+                />
+              </span>
             </div>
             {relevanceReason && (
               <p className="text-xs text-muted-foreground leading-relaxed font-mono">
@@ -1394,7 +1425,15 @@ function DecisionBriefPanel({
 
         {/* Win Probability */}
         <div>
-          <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Win Probability</p>
+          <div className="flex items-center gap-1 mb-1">
+            <p className="text-[11px] font-mono text-muted-foreground uppercase">Win Probability</p>
+            <ScoreExplain
+              score={pwinScore}
+              label="Pwin"
+              scoreType="pwin"
+              inputs={{ top_drivers: [] }}
+            />
+          </div>
           <div className="flex items-baseline gap-2">
             <span className={cn("font-mono text-4xl font-bold", pwinColor)}>
               {pwinScore}%
