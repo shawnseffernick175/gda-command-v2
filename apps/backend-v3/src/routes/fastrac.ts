@@ -1,10 +1,10 @@
 /**
- * Fast Track routes — F-227.
+ * FasTrac routes (formerly Fast Track) — F-227.
  *
  * Endpoints:
- *   POST   /v3/fast-track         — triage: cache check → enqueue → sync wait → 200 or 503
- *   GET    /v3/fast-track/:id     — fetch single assessment by id
- *   GET    /v3/fast-track         — list recent assessments (cursor pagination)
+ *   POST   /v3/fastrac         — triage: cache check → enqueue → sync wait → 200 or 503
+ *   GET    /v3/fastrac/:id     — fetch single assessment by id
+ *   GET    /v3/fastrac         — list recent assessments (cursor pagination)
  */
 
 import { createHash } from 'node:crypto';
@@ -71,9 +71,9 @@ function rowToResponse(row: FastTrackRow, cacheHit: boolean) {
 
 const NAICS_RE = /^\d{6}$/;
 
-export async function fastTrackRoutes(app: FastifyInstance): Promise<void> {
-  // POST /v3/fast-track — triage with cache + sync wait
-  app.post('/v3/fast-track', async (req, reply) => {
+export async function fasTracRoutes(app: FastifyInstance): Promise<void> {
+  // POST /v3/fastrac — triage with cache + sync wait
+  app.post('/v3/fastrac', async (req, reply) => {
     const body = req.body as Record<string, unknown> | undefined;
 
     // Validation
@@ -207,8 +207,8 @@ export async function fastTrackRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  // GET /v3/fast-track/:id — single assessment by primary key
-  app.get<{ Params: { id: string } }>('/v3/fast-track/:id', async (req, reply) => {
+  // GET /v3/fastrac/:id — single assessment by primary key
+  app.get<{ Params: { id: string } }>('/v3/fastrac/:id', async (req, reply) => {
     const { id } = req.params;
 
     const result = await pool.query<FastTrackRow>(
@@ -227,8 +227,8 @@ export async function fastTrackRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  // GET /v3/fast-track — list recent assessments
-  app.get('/v3/fast-track', async (req, reply) => {
+  // GET /v3/fastrac — list recent assessments
+  app.get('/v3/fastrac', async (req, reply) => {
     const query = req.query as Record<string, string | undefined>;
 
     const limit = Math.min(Math.max(Number(query.limit) || 25, 1), 100);

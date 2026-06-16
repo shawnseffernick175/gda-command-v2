@@ -29,7 +29,7 @@ const SURFACE_TABS = [
   { label: "Opportunities", value: "opportunities" },
   { label: "Risks", value: "risks" },
   { label: "Capture", value: "capture" },
-  { label: "Fast Track", value: "fast_track" },
+  { label: "FasTrac", value: "fast_track" },
   { label: "Briefing", value: "briefing" },
   { label: "Competitors", value: "competitors" },
 ];
@@ -46,7 +46,7 @@ const SURFACE_OPTIONS = [
   { label: "Opportunities", value: "opportunities" },
   { label: "Risks", value: "risks" },
   { label: "Competitors", value: "competitors" },
-  { label: "Fast Track", value: "fast_track" },
+  { label: "FasTrac", value: "fast_track" },
   { label: "Doctrine", value: "doctrine" },
   { label: "Color Teams", value: "color_teams" },
   { label: "Build", value: "build" },

@@ -2,12 +2,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api";
 import type { FastTrackAssessment } from "@/lib/types";
 
-interface FastTrackListResponse {
+interface FasTracListResponse {
   items: (FastTrackAssessment & { title?: string })[];
   next_cursor: string | null;
 }
 
-interface FastTrackInput {
+interface FasTracInput {
   title: string;
   description: string;
   naics_codes: string[];
@@ -15,18 +15,18 @@ interface FastTrackInput {
   place_of_performance: string | null;
 }
 
-export function useFastTrackList() {
+export function useFasTracList() {
   return useQuery({
-    queryKey: ["fast-track", "list"],
-    queryFn: () => apiGet<FastTrackListResponse>("/v3/fast-track", { limit: "25" }),
+    queryKey: ["fastrac", "list"],
+    queryFn: () => apiGet<FasTracListResponse>("/v3/fastrac", { limit: "25" }),
   });
 }
 
-export function useRunFastTrack() {
+export function useRunFasTrac() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: FastTrackInput) =>
-      apiPost<FastTrackAssessment>("/v3/fast-track", input),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["fast-track"] }),
+    mutationFn: (input: FasTracInput) =>
+      apiPost<FastTrackAssessment>("/v3/fastrac", input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["fastrac"] }),
   });
 }

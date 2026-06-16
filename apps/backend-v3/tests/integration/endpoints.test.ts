@@ -231,9 +231,9 @@ describe('GET /v3/action-items/:id (with drafts hydrated)', () => {
 });
 
 // ─── Fast Track ──────────────────────────────────────────────────────
-describe('GET /v3/fast-track', () => {
+describe('GET /v3/fastrac', () => {
   it('returns 200 with items', async () => {
-    const res = await app.inject({ method: 'GET', url: '/v3/fast-track', headers: authHeader() });
+    const res = await app.inject({ method: 'GET', url: '/v3/fastrac', headers: authHeader() });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body) as { success: boolean; data: { items: unknown[] } };
     expect(body.success).toBe(true);
@@ -241,11 +241,11 @@ describe('GET /v3/fast-track', () => {
   });
 });
 
-describe('POST /v3/fast-track (assess)', () => {
+describe('POST /v3/fastrac (assess)', () => {
   it('returns 200 or 503 (sync-wait timeout without worker)', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/v3/fast-track',
+      url: '/v3/fastrac',
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({
         title: 'Test Fast Track Assessment',

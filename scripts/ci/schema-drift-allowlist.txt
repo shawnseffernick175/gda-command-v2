@@ -36,6 +36,7 @@ pg_extension
 scored_opps
 soak_events
 soak_metrics
+stage_totals
 
 # False positive from LLM prompt template literals (snake_case English terms)
 gross_margin
