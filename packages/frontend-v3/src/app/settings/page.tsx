@@ -19,10 +19,12 @@ import {
   useDeactivateAdminUser,
 } from "@/hooks/use-admin-users";
 import { IngestPipelineSection } from "@/components/settings/ingest-pipeline";
-import {
-  useUserSettings,
-  useUpdateUserSettings,
-} from "@/hooks/use-user-settings";
+import { useMatchSuggestions } from "@/hooks/use-approvals";
+import dynamic from "next/dynamic";
+
+const MatchApprovals = dynamic(
+  () => import("@/components/settings/MatchApprovals").then((m) => m.MatchApprovals),
+);
 
 /* ── Config key editor ──────────────────────────────────────────── */
 function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
@@ -518,138 +520,21 @@ function timeAgo(date: Date): string {
   return `${days}d ago`;
 }
 
-/* ── Notifications Panel ───────────────────────────────────────── */
-function NotificationsPanel() {
-  const { data: settings, isLoading } = useUserSettings();
-  const updateSettings = useUpdateUserSettings();
-  const [emailDraft, setEmailDraft] = useState("");
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [saved, setSaved] = useState(false);
 
-  const autoDelivery = settings?.briefing_auto_delivery ?? false;
-  const deliveryEmail = settings?.briefing_delivery_email ?? "";
-
-  function handleToggle() {
-    const next = !autoDelivery;
-    updateSettings.mutate(
-      { briefing_auto_delivery: next },
-      { onSuccess: () => { setSaved(true); setTimeout(() => setSaved(false), 2000); } },
-    );
-  }
-
-  function handleSaveEmail() {
-    const trimmed = emailDraft.trim();
-    if (!trimmed) return;
-    updateSettings.mutate(
-      { briefing_delivery_email: trimmed },
-      {
-        onSuccess: () => {
-          setEditingEmail(false);
-          setSaved(true);
-          setTimeout(() => setSaved(false), 2000);
-        },
-      },
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        <div className="h-8 animate-pulse rounded bg-gda-bg-base" />
-        <div className="h-8 animate-pulse rounded bg-gda-bg-base" />
-      </div>
-    );
-  }
+/* ── Data Quality Section ──────────────────────────────────────── */
+function DataQualitySection() {
+  const { data } = useMatchSuggestions({ limit: 100 });
+  const pendingCount = (data?.items ?? []).filter((s) => s.status === "pending").length;
 
   return (
-    <div className="space-y-4">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-        Daily Brief Auto-Delivery
-      </p>
-
-      <div className="rounded border border-border bg-gda-bg-base px-4 py-3 space-y-3">
-        {/* Toggle row */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-foreground">
-              Scheduled delivery
-            </p>
-            <p className="text-[11px] text-muted-foreground">
-              Generate and email the daily brief at 6:00 AM ET on weekdays
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleToggle}
-            disabled={updateSettings.isPending}
-            className={cn(
-              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-gda-green/50 disabled:opacity-50",
-              autoDelivery ? "bg-gda-green" : "bg-muted",
-            )}
-            role="switch"
-            aria-checked={autoDelivery}
-          >
-            <span
-              className={cn(
-                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform",
-                autoDelivery ? "translate-x-4" : "translate-x-0",
-              )}
-            />
-          </button>
-        </div>
-
-        {/* Email row */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] text-muted-foreground">Email:</span>
-          {editingEmail ? (
-            <>
-              <input
-                type="email"
-                value={emailDraft}
-                onChange={(e) => setEmailDraft(e.target.value)}
-                className="flex-1 min-w-[200px] rounded border border-border bg-gda-panel px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
-                placeholder="you@example.com"
-              />
-              <button
-                type="button"
-                onClick={handleSaveEmail}
-                disabled={updateSettings.isPending}
-                className="rounded border border-gda-green bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingEmail(false)}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="text-xs text-foreground font-mono">
-                {deliveryEmail || "Not set"}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailDraft(deliveryEmail);
-                  setEditingEmail(true);
-                }}
-                className="text-[11px] text-muted-foreground hover:text-foreground"
-              >
-                Edit
-              </button>
-            </>
-          )}
-        </div>
-
-        {saved && (
-          <p className="text-[11px] text-gda-green">Settings saved.</p>
-        )}
-      </div>
-    </div>
+    <CollapseSection
+      id="settings-data-quality"
+      title={pendingCount > 0 ? `DATA QUALITY (${pendingCount})` : "DATA QUALITY"}
+      defaultOpen={false}
+      count={pendingCount > 0 ? pendingCount : undefined}
+    >
+      <MatchApprovals />
+    </CollapseSection>
   );
 }
 
@@ -741,15 +626,14 @@ export default function SettingsPage() {
         </div>
       </CollapseSection>
 
+      {/* ── Data Quality ───────────────────────────────────────── */}
+      <DataQualitySection />
+
       {/* ── User Management ────────────────────────────────────── */}
       <CollapseSection id="settings-users" title="USER MANAGEMENT" defaultOpen={false}>
         <UserManagementPanel />
       </CollapseSection>
 
-      {/* ── Notifications ─────────────────────────────────────── */}
-      <CollapseSection id="settings-notifications" title="NOTIFICATIONS" defaultOpen={false}>
-        <NotificationsPanel />
-      </CollapseSection>
     </div>
   );
 }

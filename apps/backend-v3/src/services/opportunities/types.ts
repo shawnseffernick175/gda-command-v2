@@ -14,8 +14,6 @@ export interface OpportunityRow {
   solicitation_number: string | null;
   sam_notice_id: string | null;
   status: string;
-  grade: string | null;
-  grade_evidence: string | null;
   value_min: number | null;
   value_max: number | null;
   naics: string | null;
@@ -28,6 +26,7 @@ export interface OpportunityRow {
   description: string | null;
   tags: string[];
   data_source: string;
+  is_idiq: boolean;
   analysis: AnalysisBlock | null;
   analysis_version: string | null;
   ai_analyzed_at: string | null;
@@ -100,8 +99,6 @@ export interface OpportunitySummary {
   naics_sources: SourceRef[];
   set_aside: string | null;
   set_aside_sources: SourceRef[];
-  grade: string | null;
-  grade_sources: SourceRef[];
   status: string;
   response_due_at: string | null;
   response_due_at_sources: SourceRef[];
@@ -110,6 +107,7 @@ export interface OpportunitySummary {
   value_max: number | null;
   value_max_sources: SourceRef[];
   teaming_flags: TeamingFlag[];
+  is_idiq: boolean;
   ai_analyzed_at: string | null;
   analysis_version: string | null;
   source_uri: string | null;
@@ -136,7 +134,6 @@ export interface OpportunityDetail extends OpportunitySummary {
   posted_at: string | null;
   qualified_at: string | null;
   qualified_by: string | null;
-  grade_evidence: string | null;
   analysis: AnalysisBlock;
   llm_analysis?: unknown;
   llm_quality_flag?: string | null;
@@ -162,6 +159,7 @@ export interface OpportunityCreateInput {
   posted_at?: string;
   value_min?: number;
   value_max?: number;
+  is_idiq?: boolean;
 }
 
 export interface OpportunityUpdateInput {
@@ -190,8 +188,6 @@ export interface ListFilters {
   agency?: string;
   department?: string;
   naics?: string;
-  grade?: string;
-  grades?: string[];
   due_before?: string;
   due_after?: string;
   due?: string;
@@ -203,6 +199,8 @@ export interface ListFilters {
   sources?: string[];
   stage?: string;
   relevantOnly?: boolean;
+  /** Filter by IDIQ status: 'only' = IDIQs only, 'exclude' = hide IDIQs */
+  idiq?: 'only' | 'exclude';
   limit?: number;
   cursor?: string;
   page?: number;
@@ -237,7 +235,8 @@ export interface OpportunityMeta {
   due_this_week: number;
   unscored_count: number;
   total_value: number;
-  grade_a_count: number;
+  hot_count: number;
+  idiq_count: number;
   stage_counts: Record<string, number>;
 }
 

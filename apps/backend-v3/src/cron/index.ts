@@ -32,19 +32,21 @@ import { trainIfReady } from '../services/pwin/index.js';
 import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
 import { runDigestRefresh } from './digest-refresh.js';
-import { runDailyBriefingCron } from './daily-briefing.js';
 import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
 import { pollAllDueSources } from '../services/idiq-ops/taskOrderIngestService.js';
+import { runAutoPassDeadline } from './auto-pass-deadline.js';
+import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
 const grantsGovEnabled = process.env.ENABLE_GRANTS_GOV_INGEST !== 'false';
+const fastracArmyEnabled = process.env.ENABLE_FASTRAC_ARMY_INGEST !== 'false';
 
 const tasks: ScheduledTask[] = [];
 
@@ -81,6 +83,9 @@ const JOBS: CronJob[] = [
   ...(grantsGovEnabled
     ? [{ sourceKey: 'grants.gov', schedule: '0 11 * * *', label: 'Grants.gov open opportunities (daily 07:00 ET)' }]
     : []),
+  ...(fastracArmyEnabled
+    ? [{ sourceKey: 'fastrac-army', schedule: '0 9 * * *', label: 'FasTrac Tier 1 Army installation & unit signals (daily 05:00 ET)' }]
+    : []),
 ];
 
 export function startCronScheduler(): void {
@@ -97,6 +102,9 @@ export function startCronScheduler(): void {
     registerGovWinSource();
   }
   registerGrantsGovSource();
+  if (fastracArmyEnabled) {
+    registerFastracArmySource();
+  }
 
   const registeredSources = getRegisteredSources();
   const registeredAdapters = listAdapters();
@@ -108,19 +116,9 @@ export function startCronScheduler(): void {
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
   }
-
-  // Daily briefing auto-delivery — 6:00 AM ET (11:00 UTC) on weekdays
-  const briefingDeliveryTask = cron.schedule('0 11 * * 1-5', async () => {
-    try {
-      logger.info('[cron] briefing.delivery starting');
-      await runDailyBriefingCron();
-      logger.info('[cron] briefing.delivery completed');
-    } catch (err) {
-      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_briefing_delivery_error');
-    }
-  });
-  tasks.push(briefingDeliveryTask);
-  logger.info({ schedule: '0 11 * * 1-5' }, '[cron] registered: briefing.delivery (0 11 * * 1-5)');
+  if (!fastracArmyEnabled) {
+    logger.info({ flag: 'ENABLE_FASTRAC_ARMY_INGEST' }, '[cron] fastrac-army.daily skipped — gated behind env flag (default on)');
+  }
 
   // PWin batch scoring — daily at 01:00 UTC (before retrain at 02:00 and action-items at 06:30)
   const pwinBatchScoreTask = cron.schedule('0 1 * * *', async () => {
@@ -279,6 +277,22 @@ export function startCronScheduler(): void {
   });
   tasks.push(idiqOpsPollTask);
   logger.info({ schedule: '5 * * * *' }, '[cron] registered: idiq-ops-poll (5 * * * *)');
+  // Auto-pass deadline — daily at 07:00 UTC (03:00 ET, after incumbent enrichment)
+  // CEO rule: opportunities with <30 days to deadline and no active capture are auto-passed
+  const autoPassDeadlineTask = cron.schedule('0 7 * * *', async () => {
+    try {
+      logger.info('[cron] auto-pass-deadline starting');
+      const result = await runAutoPassDeadline();
+      logger.info(
+        { scanned: result.scanned, passed: result.passed, skipped_active: result.skipped_active_capture, skipped_terminal: result.skipped_already_terminal },
+        '[cron] auto-pass-deadline completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_auto_pass_deadline_error');
+    }
+  });
+  tasks.push(autoPassDeadlineTask);
+  logger.info({ schedule: '0 7 * * *' }, '[cron] registered: auto-pass-deadline (0 7 * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {
@@ -314,12 +328,31 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'nih' ? 'nih.weekly'
       : job.sourceKey === 'arxiv' ? 'arxiv.weekly'
       : job.sourceKey === 'grants.gov' ? 'grants.daily'
+      : job.sourceKey === 'fastrac-army' ? 'fastrac-army.daily'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
       `[cron] registered: ${cronLabel} (${job.schedule})`,
     );
   }
+
+  // Refresh token pruning — daily at 03:30 UTC
+  const refreshTokenPruneTask = cron.schedule('30 3 * * *', async () => {
+    try {
+      logger.info('[cron] refresh-token-prune starting');
+      const res = await pool.query(
+        `DELETE FROM refresh_tokens WHERE expires_at < NOW() - INTERVAL '7 days'`,
+      );
+      logger.info(
+        { deleted: res.rowCount },
+        '[cron] refresh-token-prune completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_refresh_token_prune_error');
+    }
+  });
+  tasks.push(refreshTokenPruneTask);
+  logger.info({ schedule: '30 3 * * *' }, '[cron] registered: refresh-token-prune (30 3 * * *)');
 }
 
 export function stopCronScheduler(): void {

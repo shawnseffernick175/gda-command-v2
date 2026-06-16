@@ -30,13 +30,6 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
   },
   {
-    task: 'daily_briefing',
-    provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
-    timeout_ms: 90_000,
-    fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
-  },
-  {
     task: 'sentinel_summary',
     provider: 'anthropic',
     model: 'claude-haiku-4-5',
@@ -174,6 +167,13 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     provider: 'anthropic',
     model: 'claude-sonnet-4-5',
     timeout_ms: 60_000,
+    fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
+  },
+  {
+    task: 'vault_vehicle_extract',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    timeout_ms: 30_000,
     fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 500 },
   },
 ] as const;

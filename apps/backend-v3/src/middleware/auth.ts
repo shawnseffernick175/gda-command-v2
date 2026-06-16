@@ -22,6 +22,8 @@ const PUBLIC_PATHS = new Set([
   '/v3/docs/',
   '/v3/soak-metrics',
   '/v3/auth/login',
+  '/v3/auth/refresh',
+  '/v3/auth/logout',
   '/v3/ingest/health',
 ]);
 

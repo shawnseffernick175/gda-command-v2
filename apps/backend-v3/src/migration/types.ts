@@ -103,8 +103,6 @@ export interface V3Opportunity {
   solicitation_number: string | null;
   sam_notice_id: string | null;
   status: string;
-  grade: string | null;
-  grade_evidence: string | null;
   value_min: number | null;
   value_max: number | null;
   naics: string | null;

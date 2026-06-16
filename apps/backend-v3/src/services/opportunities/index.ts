@@ -50,7 +50,6 @@ const FIELD_SOURCE_TABLES: Record<string, { table: string; fk: string }> = {
   agency: { table: 'opportunity_agency_sources', fk: 'opportunity_id' },
   naics: { table: 'opportunity_naics_sources', fk: 'opportunity_id' },
   set_aside: { table: 'opportunity_set_aside_sources', fk: 'opportunity_id' },
-  grade: { table: 'opportunity_grade_sources', fk: 'opportunity_id' },
   response_due_at: { table: 'opportunity_response_due_at_sources', fk: 'opportunity_id' },
   value_min: { table: 'opportunity_value_min_sources', fk: 'opportunity_id' },
   value_max: { table: 'opportunity_value_max_sources', fk: 'opportunity_id' },
@@ -142,8 +141,6 @@ function buildSummaryFromSources(
     naics_sources: sources.naics_sources ?? [],
     set_aside: row.set_aside,
     set_aside_sources: sources.set_aside_sources ?? [],
-    grade: row.grade,
-    grade_sources: sources.grade_sources ?? [],
     status: row.status,
     response_due_at: row.response_due_at,
     response_due_at_sources: sources.response_due_at_sources ?? [],
@@ -152,6 +149,7 @@ function buildSummaryFromSources(
     value_max: row.value_max !== null ? Number(row.value_max) : null,
     value_max_sources: sources.value_max_sources ?? [],
     teaming_flags: teamingFlags,
+    is_idiq: row.is_idiq ?? false,
     ai_analyzed_at: row.ai_analyzed_at,
     analysis_version: row.analysis_version,
     source_uri: row.source_uri ?? null,
@@ -165,9 +163,9 @@ function buildSummaryFromSources(
 /**
  * Convert a cached pwin value (stored 0..1) into the list-display shape
  * { score: 0..100, band }. Returns null when no score is cached.
- * Band thresholds mirror the detail view grade mapping.
+ * Band thresholds mirror the pwin band mapping.
  */
-function attachPwin(raw: string | number | null | undefined): { score: number; band: string } | null {
+export function attachPwin(raw: string | number | null | undefined): { score: number; band: string } | null {
   if (raw === null || raw === undefined) return null;
   const frac = typeof raw === 'string' ? Number(raw) : raw;
   if (!Number.isFinite(frac)) return null;
@@ -278,7 +276,6 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
     posted_at: row.posted_at,
     qualified_at: row.qualified_at,
     qualified_by: row.qualified_by,
-    grade_evidence: row.grade_evidence,
     analysis: enrichedAnalysis!,
     llm_analysis: llmAnalysis,
     llm_quality_flag: llmQualityFlag,
@@ -318,10 +315,6 @@ export async function listOpportunities(
     conditions.push(`naics ILIKE $${paramIdx++}`);
     params.push(`%${filters.naics}%`);
   }
-  if (filters.grade) {
-    conditions.push(`grade = $${paramIdx++}`);
-    params.push(filters.grade);
-  }
   if (filters.set_aside) {
     conditions.push(`set_aside ILIKE $${paramIdx++}`);
     params.push(`%${filters.set_aside}%`);
@@ -343,7 +336,7 @@ export async function listOpportunities(
     params.push(filters.max_value);
   }
   if (filters.hot === '1') {
-    conditions.push(`(grade = 'A')`);
+    conditions.push(`EXISTS(SELECT 1 FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id AND ac.pwin >= 0.70)`);
   }
 
   // C1: default NAICS filter — only show relevant IT/Consulting NAICS unless explicitly disabled
@@ -461,25 +454,6 @@ function buildFilterConditions(
     conditions.push(`o.naics ILIKE $${paramIdx++}`);
     params.push(`%${filters.naics}%`);
   }
-  if (filters.grade) {
-    conditions.push(`o.grade = $${paramIdx++}`);
-    params.push(filters.grade);
-  }
-  if (filters.grades && filters.grades.length > 0) {
-    const hasUnscored = filters.grades.includes('Unscored');
-    const letterGrades = filters.grades.filter((g) => g !== 'Unscored');
-    const parts: string[] = [];
-    if (letterGrades.length > 0) {
-      parts.push(`o.grade = ANY($${paramIdx++})`);
-      params.push(letterGrades);
-    }
-    if (hasUnscored) {
-      parts.push(`o.grade IS NULL`);
-    }
-    if (parts.length > 0) {
-      conditions.push(`(${parts.join(' OR ')})`);
-    }
-  }
   if (filters.set_aside) {
     conditions.push(`o.set_aside ILIKE $${paramIdx++}`);
     params.push(`%${filters.set_aside}%`);
@@ -547,7 +521,7 @@ function buildFilterConditions(
     params.push(filters.max_value);
   }
   if (filters.hot === '1') {
-    conditions.push(`(o.grade = 'A')`);
+    conditions.push(`EXISTS(SELECT 1 FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id AND ac.pwin >= 0.70)`);
   }
 
   // C1: default NAICS filter — only show relevant IT/Consulting NAICS unless explicitly disabled
@@ -559,6 +533,11 @@ function buildFilterConditions(
   if (filters.sources && filters.sources.length > 0) {
     conditions.push(`o.data_source = ANY($${paramIdx++})`);
     params.push(filters.sources);
+  }
+  if (filters.idiq === 'only') {
+    conditions.push(`o.is_idiq = TRUE`);
+  } else if (filters.idiq === 'exclude') {
+    conditions.push(`o.is_idiq = FALSE`);
   }
   // Passed view: auto-passed opps (in-NAICS but past due / too little lead time)
   // get their own 'Passed' tab. In every other view (all, active, specific
@@ -615,9 +594,10 @@ export async function listOpportunitiesPaged(
     SELECT
       COUNT(*)::int AS total_count,
       COUNT(*) FILTER (WHERE o.response_due_at IS NOT NULL AND o.response_due_at >= NOW() AND o.response_due_at <= NOW() + INTERVAL '7 days')::int AS due_this_week,
-      COUNT(*) FILTER (WHERE o.grade IS NULL)::int AS unscored_count,
-      COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)), 0)::bigint AS total_value,
-      COUNT(*) FILTER (WHERE o.grade = 'A')::int AS grade_a_count
+      COUNT(*) FILTER (WHERE o.ai_analyzed_at IS NULL)::int AS unscored_count,
+      COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)) FILTER (WHERE o.is_idiq = FALSE), 0)::bigint AS total_value,
+      COUNT(*) FILTER (WHERE (SELECT ac.pwin FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1) >= 0.70)::int AS hot_count,
+      COUNT(*) FILTER (WHERE o.is_idiq = TRUE)::int AS idiq_count
     FROM opportunities o ${where}
   `;
   const metaRes = await pool.query<{
@@ -625,7 +605,8 @@ export async function listOpportunitiesPaged(
     due_this_week: number;
     unscored_count: number;
     total_value: string;
-    grade_a_count: number;
+    hot_count: number;
+    idiq_count: number;
   }>(metaSql, params);
   const metaRow = metaRes.rows[0];
   const total = metaRow?.total_count ?? 0;
@@ -694,7 +675,8 @@ export async function listOpportunitiesPaged(
     due_this_week: metaRow?.due_this_week ?? 0,
     unscored_count: metaRow?.unscored_count ?? 0,
     total_value: Number(metaRow?.total_value ?? 0),
-    grade_a_count: metaRow?.grade_a_count ?? 0,
+    hot_count: metaRow?.hot_count ?? 0,
+    idiq_count: metaRow?.idiq_count ?? 0,
     stage_counts: stageCounts,
   };
 
@@ -723,13 +705,20 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
     sub_agency: input.sub_agency,
   });
 
+  // $1 = IDIQ rule: if value is exactly $1, flag as IDIQ and null out values
+  const isIdiq = input.is_idiq === true
+    || input.value_min === 1
+    || input.value_max === 1;
+  const effectiveValueMin = isIdiq ? null : (input.value_min ?? null);
+  const effectiveValueMax = isIdiq ? null : (input.value_max ?? null);
+
   const res = await pool.query<OpportunityRow>(
     `INSERT INTO opportunities (
       title, agency, sub_agency, sam_notice_id, naics, description,
       set_aside, response_due_at, posted_at, value_min, value_max,
-      data_source, source_id, status, department,
+      data_source, source_id, status, is_idiq, department,
       department_name, agency_name, office, contracting_office, org_path
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery', $14, $15, $16, $17, $18, $19)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'discovery', $14, $15, $16, $17, $18, $19, $20)
     RETURNING *`,
     [
       input.title,
@@ -741,10 +730,11 @@ export async function createOpportunity(input: OpportunityCreateInput): Promise<
       input.set_aside ?? null,
       input.response_due_at ?? null,
       input.posted_at ?? null,
-      input.value_min ?? null,
-      input.value_max ?? null,
+      effectiveValueMin,
+      effectiveValueMax,
       input.source,
       sourceId,
+      isIdiq,
       department,
       parsed.department_name,
       parsed.agency_name,
@@ -822,6 +812,20 @@ export async function updateOpportunity(
     if (ANALYSIS_AFFECTING_FIELDS.has(key)) {
       analysisAffected = true;
     }
+  }
+
+  // $1 = IDIQ rule: if value_min or value_max is set to exactly 1, mark as IDIQ
+  // Both value fields must be nulled (consistent with createOpportunity + migration)
+  if (input.value_min === 1 || input.value_max === 1) {
+    setClauses.push(`is_idiq = $${paramIdx++}`);
+    params.push(true);
+    // Null out BOTH dollar values — $1 is not a real amount
+    const vMinIdx = fields.findIndex(([k]) => k === 'value_min');
+    if (vMinIdx >= 0) { params[vMinIdx] = null; }
+    else { setClauses.push(`value_min = $${paramIdx++}`); params.push(null); }
+    const vMaxIdx = fields.findIndex(([k]) => k === 'value_max');
+    if (vMaxIdx >= 0) { params[vMaxIdx] = null; }
+    else { setClauses.push(`value_max = $${paramIdx++}`); params.push(null); }
   }
 
   // Re-map department + org hierarchy when agency changes

@@ -14,7 +14,6 @@ import type {
   FastTrackTriageOutput,
   OpportunityAnalysisOutput,
   CapturePlanOutput,
-  DailyBriefingOutput,
   SentinelSummaryOutput,
   DoctrineScoreOutput,
   SemanticEmbedOutput,
@@ -35,6 +34,7 @@ import type {
   CompetitorContactDiscoveryOutput,
   PartnerContactDiscoveryOutput,
   FinancialAnalyzeOutput,
+  VaultVehicleExtractOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -137,14 +137,6 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       model_used: 'mock-model',
       is_partial: false,
     } satisfies CapturePlanOutput,
-
-    daily_briefing: {
-      headline: 'Mock daily briefing',
-      priority_actions: [],
-      risk_flags: [],
-      market_intel_summary: 'Mock intel summary',
-      cert_expiration_warnings: [],
-    } satisfies DailyBriefingOutput,
 
     sentinel_summary: {
       severity: 'info',
@@ -389,6 +381,24 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       analysis: 'Mock CFO analysis: Envision financial performance is on plan for the current period.',
       generated_at: new Date().toISOString(),
     } satisfies FinancialAnalyzeOutput,
+
+    vault_vehicle_extract: {
+      is_contract_vehicle: true,
+      vehicle_name: 'Army RS3',
+      contract_number: 'W15P7T-19-D-0094',
+      sponsor_agency: 'Army',
+      prime_or_sub: 'prime',
+      prime_contractor: null,
+      ceiling_value: 37500000000,
+      period_of_performance_start: '2019-10-01',
+      period_of_performance_end: '2029-09-30',
+      expiration_date: '2029-09-30',
+      naics_codes: ['541715'],
+      set_aside_type: 'small business',
+      extraction_confidence: 'high',
+      extraction_notes: 'Mock extraction — all fields populated from test document.',
+      model_used: 'mock-model',
+    } satisfies VaultVehicleExtractOutput,
   };
 
   return {

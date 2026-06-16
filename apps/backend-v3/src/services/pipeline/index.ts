@@ -1,4 +1,5 @@
 import { pool } from '../../lib/db.js';
+import { normalizePipelineStage } from '../../lib/pipeline-stage.js';
 import type {
   PipelineItem,
   PipelineRow,
@@ -67,8 +68,6 @@ function rowToItem(row: PipelineRow): PipelineItem {
     opportunity_value_min_sources: row.opportunity_value_min_sources ?? [],
     opportunity_value_max: row.opportunity_value_max != null ? Number(row.opportunity_value_max) : null,
     opportunity_value_max_sources: row.opportunity_value_max_sources ?? [],
-    opportunity_grade: row.opportunity_grade,
-    opportunity_grade_sources: row.opportunity_grade_sources ?? [],
     capture_owner: row.capture_owner,
     capture_owner_sources: buildSourceRef(
       row.pipeline_source_kind,
@@ -90,8 +89,12 @@ function rowToItem(row: PipelineRow): PipelineItem {
       row.pipeline_source_url,
       row.pipeline_source_retrieved_at,
     ),
+    stage: row.stage,
     milestones: parseMilestones(row.milestone_90day),
     teaming_partners: row.teaming_partners ?? [],
+    pwin_score: row.pwin_score != null ? Number(row.pwin_score) : null,
+    pwin_band: row.pwin_band,
+    solicitation_number: row.solicitation_number,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -120,9 +123,26 @@ const BASE_SELECT = `
     o.response_due_at AS opportunity_due_at,
     o.value_min       AS opportunity_value_min,
     o.value_max       AS opportunity_value_max,
-    o.grade           AS opportunity_grade,
     o.ai_analyzed_at  AS opportunity_ai_analyzed_at,
     o.analysis_version AS opportunity_analysis_version,
+    o.solicitation_number AS solicitation_number,
+
+    pi.stage,
+
+    (SELECT ac.pwin FROM opportunity_analysis_cache ac
+     WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1
+    ) AS pwin_score,
+
+    (SELECT
+       CASE
+         WHEN ac.pwin >= 70 THEN 'high'
+         WHEN ac.pwin >= 40 THEN 'medium'
+         WHEN ac.pwin > 0  THEN 'low'
+         ELSE NULL
+       END
+     FROM opportunity_analysis_cache ac
+     WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1
+    ) AS pwin_band,
 
     ${SOURCE_SUBQUERY('opportunity_title_sources', 'opportunity_id')}         AS opportunity_title_sources,
     ${SOURCE_SUBQUERY('opportunity_agency_sources', 'opportunity_id')}        AS opportunity_agency_sources,
@@ -131,8 +151,6 @@ const BASE_SELECT = `
     ${SOURCE_SUBQUERY('opportunity_response_due_at_sources', 'opportunity_id')} AS opportunity_due_at_sources,
     ${SOURCE_SUBQUERY('opportunity_value_min_sources', 'opportunity_id')}     AS opportunity_value_min_sources,
     ${SOURCE_SUBQUERY('opportunity_value_max_sources', 'opportunity_id')}     AS opportunity_value_max_sources,
-    ${SOURCE_SUBQUERY('opportunity_grade_sources', 'opportunity_id')}         AS opportunity_grade_sources,
-
     ps.kind           AS pipeline_source_kind,
     ps.title          AS pipeline_source_title,
     ps.url            AS pipeline_source_url,
@@ -187,6 +205,17 @@ export async function listPipelineItems(
     paramIdx++;
     conditions.push(`o.response_due_at <= $${paramIdx}`);
     params.push(filters.due_before);
+  }
+  if (filters.stage) {
+    const normalized = normalizePipelineStage(filters.stage) ?? filters.stage;
+    paramIdx++;
+    conditions.push(`pi.stage = $${paramIdx}`);
+    params.push(normalized);
+  }
+  if (filters.q) {
+    paramIdx++;
+    conditions.push(`(o.title ILIKE $${paramIdx} OR o.agency ILIKE $${paramIdx} OR o.solicitation_number ILIKE $${paramIdx})`);
+    params.push(`%${filters.q}%`);
   }
 
   if (filters.cursor) {

@@ -19,7 +19,6 @@ const ALL_TASKS: readonly Task[] = [
   'fast_track_triage',
   'opportunity_analysis',
   'capture_plan',
-  'daily_briefing',
   'sentinel_summary',
   'doctrine_score',
   'semantic_embed',
@@ -40,6 +39,7 @@ const ALL_TASKS: readonly Task[] = [
   'competitor_contact_discovery',
   'partner_contact_discovery',
   'financial_analyze',
+  'vault_vehicle_extract',
 ] as const;
 
 describe('Routing Table', () => {

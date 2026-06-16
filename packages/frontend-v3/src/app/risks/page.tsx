@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, useMemo } from "react";
 import { useRisks, useCreateRisk, useUpdateRisk, useDeleteRisk, useGenerateRisks } from "@/hooks/use-risks";
 import { useOpportunities } from "@/hooks/use-opportunities";
 import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { RiskDetailPanel } from "@/components/RiskDetailPanel";
 import { PwinWeightsPanel } from "@/components/pwin-weights-panel";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
 import type { Risk } from "@/lib/types";
 
@@ -111,6 +114,18 @@ function AiRiskGeneration() {
   );
 }
 
+const RISK_SORT_COLS: ColumnSortConfig[] = [
+  { field: "title", type: "string" },
+  { field: "risk_type", type: "enum", enumOrder: ["negative", "positive"] },
+  { field: "category", type: "string" },
+  { field: "likelihood", type: "number" },
+  { field: "impact", type: "number" },
+  { field: "score", type: "number", accessor: (r) => ((r.likelihood as number) ?? 3) * ((r.impact as number) ?? 3) },
+  { field: "status", type: "enum", enumOrder: ["open", "mitigated", "accepted", "closed"] },
+  { field: "owner", type: "string" },
+  { field: "opportunity_title", type: "string" },
+];
+
 function RisksRegisterContent() {
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterCategory, setFilterCategory] = useState<string>("");
@@ -119,6 +134,7 @@ function RisksRegisterContent() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
+  const { sortBy, sortDir, handleSort } = useTableSort();
 
   const { data, isLoading } = useRisks({
     status: filterStatus || undefined,
@@ -128,7 +144,11 @@ function RisksRegisterContent() {
   const updateRisk = useUpdateRisk();
   const deleteRisk = useDeleteRisk();
 
-  const items: Risk[] = data?.items ?? [];
+  const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
+  const items = useMemo(() => {
+    if (!sortBy) return rawItems;
+    return sortData(rawItems as unknown as Record<string, unknown>[], sortBy, sortDir, RISK_SORT_COLS) as unknown as Risk[];
+  }, [rawItems, sortBy, sortDir]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -465,16 +485,16 @@ function RisksRegisterContent() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Risk</th>
-              <th className="px-3 py-2 text-left font-medium">Type</th>
-              <th className="px-3 py-2 text-left font-medium">Category</th>
-              <th className="px-3 py-2 text-left font-medium">L</th>
-              <th className="px-3 py-2 text-left font-medium">I</th>
-              <th className="px-3 py-2 text-left font-medium">Score</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-              <th className="px-3 py-2 text-left font-medium">Owner</th>
-              <th className="px-3 py-2 text-left font-medium">Opportunity</th>
-              <th className="px-3 py-2 text-left font-medium">Actions</th>
+              <SortableHeader label="Risk" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Type" field="risk_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Category" field="category" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="L" field="likelihood" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="I" field="impact" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Score" field="score" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Owner" field="owner" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Opportunity" field="opportunity_title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -584,6 +604,14 @@ function RisksRegisterContent() {
 }
 
 export default function RisksPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <RisksPageInner />
+    </Suspense>
+  );
+}
+
+function RisksPageInner() {
   const [activeTab, setActiveTab] = useState<"register" | "pwin">("register");
 
   return (

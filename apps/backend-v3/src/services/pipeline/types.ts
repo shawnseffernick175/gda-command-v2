@@ -28,16 +28,18 @@ export interface PipelineItem {
   opportunity_value_min_sources: SourceRef[];
   opportunity_value_max: number | null;
   opportunity_value_max_sources: SourceRef[];
-  opportunity_grade: string | null;
-  opportunity_grade_sources: SourceRef[];
   capture_owner: string;
   capture_owner_sources: SourceRef[];
   win_prob_pct: number | null;
   win_prob_pct_sources: SourceRef[];
   win_prob_evidence: string | null;
   win_prob_evidence_sources: SourceRef[];
+  stage: string;
   milestones: Milestone[];
   teaming_partners: string[];
+  pwin_score: number | null;
+  pwin_band: string | null;
+  solicitation_number: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,6 +51,8 @@ export interface PipelineListFilters {
   opportunity_set_aside?: string;
   due_after?: string;
   due_before?: string;
+  stage?: string;
+  q?: string;
   limit: number;
   cursor?: string;
 }
@@ -96,7 +100,6 @@ export interface PipelineRow {
   opportunity_due_at: string | null;
   opportunity_value_min: string | null;
   opportunity_value_max: string | null;
-  opportunity_grade: string | null;
   opportunity_ai_analyzed_at: string | null;
   opportunity_analysis_version: string | null;
   opportunity_title_sources: SourceRef[] | null;
@@ -106,10 +109,13 @@ export interface PipelineRow {
   opportunity_due_at_sources: SourceRef[] | null;
   opportunity_value_min_sources: SourceRef[] | null;
   opportunity_value_max_sources: SourceRef[] | null;
-  opportunity_grade_sources: SourceRef[] | null;
   pipeline_source_kind: string | null;
   pipeline_source_title: string | null;
   pipeline_source_url: string | null;
   pipeline_source_retrieved_at: string | null;
   teaming_partners: string[] | null;
+  stage: string;
+  pwin_score: string | null;
+  pwin_band: string | null;
+  solicitation_number: string | null;
 }

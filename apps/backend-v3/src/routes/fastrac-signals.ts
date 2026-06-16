@@ -1,11 +1,11 @@
 /**
- * Fast Track — Need Sensing routes
+ * FasTrac — Need Sensing routes (formerly Fast Track)
  *
  * Endpoints:
- *   GET  /v3/fast-track/signals              — all signals, filterable by pipeline, urgency, mission, side
- *   GET  /v3/fast-track/signals/matches      — matched signal pairs with scores
- *   GET  /v3/fast-track/matches/:id/analysis — cached match analysis
- *   POST /v3/fast-track/matches/:id/analyze  — run AI match analysis
+ *   GET  /v3/fastrac/signals              — all signals, filterable by pipeline, urgency, mission, tab
+ *   GET  /v3/fastrac/signals/matches      — matched signal pairs with scores
+ *   GET  /v3/fastrac/matches/:id/analysis — cached match analysis
+ *   POST /v3/fastrac/matches/:id/analyze  — run AI match analysis
  */
 
 import type { FastifyInstance } from 'fastify';
@@ -34,6 +34,8 @@ interface SignalRow {
   institution_type: string | null;
   institution_name: string | null;
   doi: string | null;
+  installation: string | null;
+  unit: string | null;
 }
 
 interface MatchRow {
@@ -70,14 +72,46 @@ interface MatchAnalysisRow {
   generated_at: string;
 }
 
-export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void> {
-  // ── GET /v3/fast-track/signals ──────────────────────────────────────────
-  app.get('/v3/fast-track/signals', async (req, reply) => {
+// Institution type sets for tab-based filtering
+const ACADEMIA_TYPES = ['academia', 'ffrdc', 'innovation_factory', 'uarc'];
+const INDUSTRY_TYPES = ['startup', 'corporate_r_d', 'prime', 'commercial'];
+const GOVERNMENT_TYPES = ['agency', 'command', 'base', 'unit'];
+
+function buildTabCondition(tab: string, idx: number): { clause: string; params: unknown[]; nextIdx: number } {
+  switch (tab) {
+    case 'academia':
+      return {
+        clause: `institution_type = ANY($${idx})`,
+        params: [ACADEMIA_TYPES],
+        nextIdx: idx + 1,
+      };
+    case 'industry':
+      return {
+        clause: `(institution_type = ANY($${idx}) OR (pipeline_side = 'industry' AND (institution_type IS NULL OR institution_type NOT IN (SELECT unnest($${idx + 1}::text[])))))`,
+        params: [INDUSTRY_TYPES, ACADEMIA_TYPES],
+        nextIdx: idx + 2,
+      };
+    case 'government':
+      return {
+        clause: `(institution_type = ANY($${idx}) OR (pipeline_side = 'government' AND (institution_type IS NULL OR institution_type NOT IN (SELECT unnest($${idx + 1}::text[])))))`,
+        params: [GOVERNMENT_TYPES, ACADEMIA_TYPES],
+        nextIdx: idx + 2,
+      };
+    default:
+      return { clause: '', params: [], nextIdx: idx };
+  }
+}
+
+export async function fasTracSignalRoutes(app: FastifyInstance): Promise<void> {
+  // ── GET /v3/fastrac/signals ──────────────────────────────────────────
+  app.get('/v3/fastrac/signals', async (req, reply) => {
     const qs = req.query as Record<string, string>;
     const pipeline = qs.pipeline ?? null;       // 'tech' | 'requirement'
     const urgency  = qs.urgency  ?? null;
     const mission  = qs.mission  ?? null;       // partial match against mission_tags
-    const side     = qs.side     ?? null;       // 'government' | 'industry'
+    const tab      = qs.tab      ?? null;       // 'government' | 'industry' | 'academia'
+    const side     = qs.side     ?? null;       // legacy compat
+    const installationFilter = qs.installation ?? null;
     const limit    = Math.min(parseInt(qs.limit ?? '100', 10), 200);
 
     try {
@@ -97,9 +131,20 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
         conditions.push(`mission_tags && $${idx++}`);
         params.push([mission]);
       }
-      if (side) {
+      if (tab) {
+        const tabFilter = buildTabCondition(tab, idx);
+        if (tabFilter.clause) {
+          conditions.push(tabFilter.clause);
+          params.push(...tabFilter.params);
+          idx = tabFilter.nextIdx;
+        }
+      } else if (side) {
         conditions.push(`pipeline_side = $${idx++}`);
         params.push(side);
+      }
+      if (installationFilter) {
+        conditions.push(`installation = $${idx++}`);
+        params.push(installationFilter);
       }
 
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -109,7 +154,8 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
           mission_tags, problem_tags, maturity, urgency, horizon,
           signal_strength, transition_tags, source_url,
           published_at, ingested_at, next_review_at, next_review_action,
-          pipeline_side, institution_type, institution_name, doi
+          pipeline_side, institution_type, institution_name, doi,
+          installation, unit
         FROM fast_track_signals
         ${where}
         ORDER BY signal_strength DESC, ingested_at DESC
@@ -128,17 +174,32 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
         total: rows.length,
       }, req.requestId));
     } catch (err) {
-      app.log.error(err, 'fast-track signals list failed');
+      app.log.error(err, 'fastrac signals list failed');
       return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to fetch signals', req.requestId));
     }
   });
 
-  // ── GET /v3/fast-track/signals/matches ─────────────────────────────────
-  app.get('/v3/fast-track/signals/matches', async (req, reply) => {
+  // ── GET /v3/fastrac/signals/matches ─────────────────────────────────
+  app.get('/v3/fastrac/signals/matches', async (req, reply) => {
     const qs = req.query as Record<string, string>;
     const limit = Math.min(parseInt(qs.limit ?? '50', 10), 100);
+    const tab   = qs.tab ?? null;
 
     try {
+      let tabWhere = '';
+      const params: unknown[] = [limit];
+
+      if (tab === 'academia') {
+        tabWhere = `WHERE (t.institution_type = ANY($2) OR r.institution_type = ANY($2))`;
+        params.push(ACADEMIA_TYPES);
+      } else if (tab === 'industry') {
+        tabWhere = `WHERE (t.institution_type = ANY($2) OR r.institution_type = ANY($2) OR (t.pipeline_side = 'industry' AND (t.institution_type IS NULL OR t.institution_type NOT IN (SELECT unnest($3::text[])))) OR (r.pipeline_side = 'industry' AND (r.institution_type IS NULL OR r.institution_type NOT IN (SELECT unnest($3::text[])))))`;
+        params.push(INDUSTRY_TYPES, ACADEMIA_TYPES);
+      } else if (tab === 'government') {
+        tabWhere = `WHERE (t.institution_type = ANY($2) OR r.institution_type = ANY($2) OR (t.pipeline_side = 'government' AND (t.institution_type IS NULL OR t.institution_type NOT IN (SELECT unnest($3::text[])))) OR (r.pipeline_side = 'government' AND (r.institution_type IS NULL OR r.institution_type NOT IN (SELECT unnest($3::text[])))))`;
+        params.push(GOVERNMENT_TYPES, ACADEMIA_TYPES);
+      }
+
       const { rows } = await pool.query<MatchRow>(`
         SELECT
           m.id,
@@ -162,19 +223,20 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
         FROM fast_track_matches m
         JOIN fast_track_signals t ON t.id = m.tech_signal_id
         JOIN fast_track_signals r ON r.id = m.req_signal_id
+        ${tabWhere}
         ORDER BY m.mission_fit_score DESC, m.technical_fit_score DESC
         LIMIT $1
-      `, [limit]);
+      `, params);
 
       return reply.send(successEnvelope({ matches: rows, total: rows.length }, req.requestId));
     } catch (err) {
-      app.log.error(err, 'fast-track matches list failed');
+      app.log.error(err, 'fastrac matches list failed');
       return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to fetch matches', req.requestId));
     }
   });
 
-  // ── GET /v3/fast-track/matches/:id/analysis ────────────────────────────
-  app.get('/v3/fast-track/matches/:id/analysis', async (req, reply) => {
+  // ── GET /v3/fastrac/matches/:id/analysis ────────────────────────────
+  app.get('/v3/fastrac/matches/:id/analysis', async (req, reply) => {
     const matchId = parseInt((req.params as { id: string }).id, 10);
     if (isNaN(matchId)) {
       return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'Invalid match ID', req.requestId));
@@ -192,13 +254,13 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
 
       return reply.send(successEnvelope(rows[0], req.requestId));
     } catch (err) {
-      app.log.error(err, 'fast-track match analysis fetch failed');
+      app.log.error(err, 'fastrac match analysis fetch failed');
       return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to fetch match analysis', req.requestId));
     }
   });
 
-  // ── POST /v3/fast-track/matches/:id/analyze ────────────────────────────
-  app.post('/v3/fast-track/matches/:id/analyze', async (req, reply) => {
+  // ── POST /v3/fastrac/matches/:id/analyze ────────────────────────────
+  app.post('/v3/fastrac/matches/:id/analyze', async (req, reply) => {
     const matchId = parseInt((req.params as { id: string }).id, 10);
     if (isNaN(matchId)) {
       return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'Invalid match ID', req.requestId));
@@ -308,7 +370,7 @@ export async function fastTrackSignalRoutes(app: FastifyInstance): Promise<void>
         }, req.requestId),
       );
     } catch (err) {
-      app.log.error(err, 'fast-track match analysis failed');
+      app.log.error(err, 'fastrac match analysis failed');
       return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to run match analysis', req.requestId));
     }
   });

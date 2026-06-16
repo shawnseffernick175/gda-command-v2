@@ -204,7 +204,6 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
             department: opp.department,
             solicitation_number: opp.solicitation_number,
             status: opp.status,
-            grade: opp.grade,
             naics: opp.naics,
             psc: opp.psc,
             set_aside: opp.set_aside,

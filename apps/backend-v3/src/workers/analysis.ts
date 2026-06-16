@@ -43,7 +43,7 @@ import { scoreSingleOpportunityPwin } from '../services/pwin/batch-score.js';
 import type { OpportunityRow as PwinOpportunityRow } from '../services/pwin/feature-extraction.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { getPwinWeights } from '../services/pwin/pwin-weights.js';
-import { assembleDailyBriefing } from '../services/briefing/assemble.js';
+import { resolveUnifiedLink } from '../services/opportunities/unified-mirror.js';
 
 const { Pool } = pg;
 
@@ -64,13 +64,8 @@ let workerBossRef: PgBoss | null = null;
 // Set-aside list moved to constants/relevance.ts (PR-A4); re-exported here for pwin scoring.
 import { ENVISION_SET_ASIDES } from '../constants/relevance.js';
 
-function scoreToGrade(score: number): string {
-  if (score >= 80) return 'A';
-  if (score >= 65) return 'B';
-  if (score >= 50) return 'C';
-  if (score >= 35) return 'D';
-  return 'F';
-}
+// scoreToGrade removed — letter grades (A/B/C/D/F) eliminated in favour of
+// continuous Pwin percentage.  Hot threshold (≥ 70%) is evaluated at read time.
 
 // ────────────────────────────────────────────────────────────────────────────
 // Incumbent extraction — reads from the enriched columns populated by
@@ -515,6 +510,25 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
 
     const now = analysis.generated_at as string;
 
+    // ── Canonical Pwin: single source of truth (issue #849) ────────────────
+    // Priority: LLM win_probability > deterministic scorer.
+    // The LLM assessment incorporates Shipley dimensions, competitive landscape,
+    // and bid recommendation — producing a more accurate signal. The deterministic
+    // scorer only evaluates surface-level fit signals (NAICS, agency, set-aside).
+    const deterministicPwin: number =
+      typeof analysis.pwin === 'object' && analysis.pwin !== null
+        ? ((analysis.pwin as { score?: number | null }).score ?? 0) / 100
+        : (analysis.pwin as number) ?? 0;
+
+    const llmAnalysisResult = analysis.llm_analysis as { win_probability?: number } | null;
+    const llmPwin: number | null =
+      llmAnalysisResult && typeof llmAnalysisResult.win_probability === 'number'
+        ? llmAnalysisResult.win_probability / 100
+        : null;
+
+    // Canonical pwin stored as 0-1 fraction; LLM preferred when available.
+    const canonicalPwin: number = llmPwin ?? deterministicPwin;
+
     // Write to opportunity_analysis_cache
     try {
       await pool.query(
@@ -534,9 +548,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
           entityId,
           config.analysisVersion,
           now,
-          typeof analysis.pwin === 'object' && analysis.pwin !== null
-            ? ((analysis.pwin as { score?: number | null }).score ?? 0) / 100
-            : analysis.pwin,
+          canonicalPwin,
           analysis.incumbent,
           JSON.stringify(analysis.competitors),
           JSON.stringify(analysis.blackhat),
@@ -548,58 +560,43 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       logger.warn({ err, entityId }, 'Failed to write to analysis cache table — continuing with inline analysis');
     }
 
+    // Propagate canonical pwin to unified_opportunities (single source of truth, #849)
+    try {
+      const canonicalPwin100 = Math.round(canonicalPwin * 100);
+      const link = resolveUnifiedLink({
+        data_source: row.data_source as string,
+        sam_notice_id: row.sam_notice_id as string | null,
+        govtribe_id: row.govtribe_id as string | null,
+        external_id: row.external_id as string | null,
+      });
+      if (link) {
+        await pool.query(
+          `UPDATE unified_opportunities uo
+             SET pwin = $1, updated_at = NOW()
+             FROM unified_opportunity_links l
+            WHERE l.internal_id = uo.internal_id
+              AND l.source = $2 AND l.source_native_id = $3`,
+          [canonicalPwin100, link.source, link.source_native_id],
+        );
+      }
+    } catch (err) {
+      logger.warn({ err, entityId }, 'Failed to propagate pwin to unified_opportunities — non-critical');
+    }
+
     // Standing rule: auto-Pass when pwin band === 'pass' OR auto-No-Bid
     const pwinResult = analysis.pwin as { score?: number | null; band?: string } | null;
     const isAutoPass = isAutoNoBid || (typeof pwinResult === 'object' && pwinResult !== null && pwinResult.band === 'pass');
 
-    const pwinScore = typeof pwinResult === 'object' && pwinResult !== null
-      ? (pwinResult.score ?? 0)
-      : 0;
-    const grade = isAutoPass ? 'F' : scoreToGrade(pwinScore);
-    const gradeEvidence = JSON.stringify({
-      pwin_score: pwinScore,
-      auto_pass: isAutoPass,
-      auto_no_bid: isAutoNoBid,
-      auto_no_bid_days: autoNoBidDays,
-      auto_pass_reason: isAutoNoBid
-        ? `Auto-No-Bid: ${autoNoBidDays} days to response deadline (<${AUTO_NO_BID_DAYS_THRESHOLD}-day threshold). Insufficient time to compete.`
-        : isAutoPass ? 'response_due_at < 30 days — insufficient lead time' : null,
-      naics_match: row.naics as string | null,
-      set_aside_fit: row.set_aside as string | null,
-      agency: row.agency as string | null,
-    });
-
-    // Write analysis + grade to opportunities table (inline JSONB for fast reads)
+    // Write analysis to opportunities table (inline JSONB for fast reads)
     await pool.query(
       `UPDATE opportunities
        SET analysis = $1,
            analysis_version = $2,
            ai_analyzed_at = $3,
-           grade = $4,
-           grade_evidence = $5,
            updated_at = updated_at
-       WHERE id = $6 AND deleted_at IS NULL`,
-      [JSON.stringify(analysis), config.analysisVersion, now, grade, gradeEvidence, entityId],
+       WHERE id = $4 AND deleted_at IS NULL`,
+      [JSON.stringify(analysis), config.analysisVersion, now, entityId],
     );
-
-    // Write grade source citation
-    try {
-      const sourceRes = await pool.query<{ source_id: string }>(
-        `SELECT source_id FROM opportunities WHERE id = $1`,
-        [entityId],
-      );
-      const sourceId = sourceRes.rows[0]?.source_id;
-      if (sourceId) {
-        await pool.query(
-          `INSERT INTO opportunity_grade_sources (opportunity_id, source_id)
-           VALUES ($1, $2)
-           ON CONFLICT (opportunity_id, source_id) DO NOTHING`,
-          [entityId, sourceId],
-        );
-      }
-    } catch (err) {
-      logger.warn({ err, entityId }, 'Failed to write grade source — non-critical');
-    }
 
     // Standing rule: auto-No-Bid opportunities are moved into the No Bid tab so they
     // leave the active list automatically. We create a no_bid pipeline card ONLY when
@@ -634,7 +631,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       }
     }
 
-    logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin, grade }, 'Opportunity analysis written');
+    logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin }, 'Opportunity analysis written');
 
     // Re-analyze any captures linked to this opportunity
     try {
@@ -881,49 +878,6 @@ async function schedulePeriodicRefreshCron(boss: PgBoss): Promise<void> {
   });
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Daily briefing cron (F-460b) — 10:00 UTC = 6:00 AM ET
-// ────────────────────────────────────────────────────────────────────────────
-
-async function scheduleDailyBriefingCron(boss: PgBoss): Promise<void> {
-  await boss.schedule(QUEUE_NAMES.DAILY_BRIEFING, '0 10 * * *', {}, {
-    retryLimit: 1,
-  });
-  await boss.work<Record<string, unknown>>(QUEUE_NAMES.DAILY_BRIEFING, { batchSize: 1 }, async () => {
-    const todayET = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-    logger.info({ date: todayET }, 'Running daily briefing generation');
-    const { output, model_used, quality_flag, trace_id } = await assembleDailyBriefing(todayET);
-    await pool.query(
-      `INSERT INTO daily_briefing_cache
-         (briefing_date, headline, priority_actions, risk_flags,
-          market_intel_summary, cert_expiration_warnings,
-          model_used, quality_flag, trace_id, generated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-       ON CONFLICT (briefing_date) DO UPDATE SET
-         headline = EXCLUDED.headline,
-         priority_actions = EXCLUDED.priority_actions,
-         risk_flags = EXCLUDED.risk_flags,
-         market_intel_summary = EXCLUDED.market_intel_summary,
-         cert_expiration_warnings = EXCLUDED.cert_expiration_warnings,
-         model_used = EXCLUDED.model_used,
-         quality_flag = EXCLUDED.quality_flag,
-         trace_id = EXCLUDED.trace_id,
-         generated_at = NOW()`,
-      [
-        todayET,
-        output.headline,
-        JSON.stringify(output.priority_actions),
-        JSON.stringify(output.risk_flags),
-        output.market_intel_summary,
-        JSON.stringify(output.cert_expiration_warnings),
-        model_used,
-        quality_flag,
-        trace_id,
-      ],
-    );
-    logger.info({ date: todayET, headline: output.headline }, 'Daily briefing generated');
-  });
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Worker start
@@ -994,7 +948,6 @@ export async function startWorker(): Promise<PgBoss> {
   // Schedule cron jobs for pre-warm sweeps
   await scheduleModelVersionBumpCron(boss);
   await schedulePeriodicRefreshCron(boss);
-  await scheduleDailyBriefingCron(boss);
 
   return boss;
 }

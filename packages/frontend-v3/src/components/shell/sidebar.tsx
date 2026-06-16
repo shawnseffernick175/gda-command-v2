@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, SETTINGS_ITEM, PROMPT_CREATOR_ITEM } from "./nav-items";
+import { NAV_ITEMS, SETTINGS_ITEM } from "./nav-items";
 import { useSentinel } from "@/hooks/use-sentinel";
 
 export function Sidebar() {
@@ -80,13 +80,10 @@ export function Sidebar() {
           <span>{PROMPT_CREATOR_ITEM.label}</span>
         </Link>
 
-        <Link
-          href="/settings#sentinel"
-          className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground"
-        >
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-muted-foreground">
           <span className={cn("h-2 w-2 rounded-full", sentinelColor)} />
           <span>Sentinel {sentinel?.overall ?? "..."}</span>
-        </Link>
+        </div>
       </div>
     </aside>
   );

@@ -18,7 +18,8 @@ export interface OpportunityMeta {
   due_this_week: number;
   unscored_count: number;
   total_value: number;
-  grade_a_count: number;
+  hot_count: number;
+  idiq_count: number;
   stage_counts: Record<string, number>;
 }
 
@@ -38,7 +39,6 @@ interface UseOpportunitiesParams {
   agency?: string;
   department?: string;
   naics?: string;
-  grade?: string;
   due_before?: string;
   due_after?: string;
 }
@@ -55,7 +55,6 @@ export function useOpportunities(params: UseOpportunitiesParams = {}) {
         agency: params.agency,
         department: params.department,
         naics: params.naics,
-        grade: params.grade,
         due_before: params.due_before,
         due_after: params.due_after,
       }),
@@ -70,8 +69,7 @@ export interface UseOpportunitiesPagedParams {
   agency?: string;
   department?: string;
   naics?: string;
-  grade?: string;
-  grades?: string[];
+  hot?: string;
   due_before?: string;
   due_after?: string;
   due?: string;
@@ -81,6 +79,7 @@ export interface UseOpportunitiesPagedParams {
   sources?: string[];
   stage?: string;
   relevant_only?: boolean;
+  idiq?: 'only' | 'exclude';
   sort_by?: string;
   sort_dir?: "asc" | "desc";
 }
@@ -97,8 +96,7 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         agency: params.agency,
         department: params.department,
         naics: params.naics,
-        grade: params.grade,
-        "grade[]": params.grades,
+        hot: params.hot,
         due_before: params.due_before,
         due_after: params.due_after,
         due: params.due,
@@ -108,6 +106,7 @@ export function useOpportunitiesPaged(params: UseOpportunitiesPagedParams = {}) 
         "source[]": params.sources,
         stage: params.stage,
         relevant_only: params.relevant_only === false ? "false" : undefined,
+        idiq: params.idiq,
         sort_by: params.sort_by,
         sort_dir: params.sort_dir,
       }),
@@ -132,8 +131,7 @@ export function useOpportunitiesInfinite(params: Omit<UseOpportunitiesPagedParam
         agency: params.agency,
         department: params.department,
         naics: params.naics,
-        grade: params.grade,
-        "grade[]": params.grades,
+        hot: params.hot,
         due_before: params.due_before,
         due_after: params.due_after,
         due: params.due,

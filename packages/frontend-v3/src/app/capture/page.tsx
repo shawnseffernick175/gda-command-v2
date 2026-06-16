@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback, useRef } from "react";
+import { Suspense, useState, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import {
   useUploadRfp,
 } from "@/hooks/use-capture-workflow";
 import { apiPost } from "@/lib/api";
+import { stageKeyToLabel } from "@/lib/stages";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,9 @@ import { CollapseSection } from "@/components/shared/collapse-section";
 import { AskAiPanel } from "@/components/shared/ask-ai-panel";
 import { useVaultDocuments } from "@/hooks/use-vault";
 import { formatMoney } from "@/lib/format-money";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import type {
   CaptureColorStage,
   CaptureStageAnnotation,
@@ -72,10 +76,24 @@ function CaptureContent() {
   return <CaptureList />;
 }
 
+const CAPTURE_SORT_COLS: ColumnSortConfig[] = [
+  { field: "program", type: "string", accessor: (r) => r.title },
+  { field: "stage", type: "enum", enumOrder: ["interest", "qualify", "pursue", "solicitation", "post_submittal", "won"], accessor: (r) => r.stage },
+  { field: "value", type: "number", accessor: (r) => (r.value_max as number) ?? (r.value_min as number) ?? (r.value as number) ?? 0 },
+  { field: "pwin", type: "number", accessor: (r) => (r.pwin as number) ?? null },
+];
+
 function CaptureList() {
   const { data: pipeline, isLoading } = usePipeline({ stage: "Pursue" });
   const [showModal, setShowModal] = useState(false);
   const [modalEntryPoint, setModalEntryPoint] = useState<"full_pipeline" | "white_only">("full_pipeline");
+  const { sortBy, sortDir, handleSort } = useTableSort();
+
+  const sorted = useMemo(() => {
+    const raw = pipeline?.items ?? [];
+    if (!sortBy) return raw;
+    return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, CAPTURE_SORT_COLS) as unknown as typeof raw;
+  }, [pipeline, sortBy, sortDir]);
 
   return (
     <div className="space-y-6">
@@ -119,36 +137,36 @@ function CaptureList() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium">Program</th>
-                <th className="px-3 py-2 text-left font-medium">Stage</th>
-                <th className="px-3 py-2 text-left font-medium">Value</th>
-                <th className="px-3 py-2 text-left font-medium">pwin</th>
-                <th className="px-3 py-2 text-left font-medium">Next Milestone</th>
+                <SortableHeader label="Program" field="program" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Next Milestone</th>
               </tr>
             </thead>
             <tbody>
-              {pipeline.items.map((item) => (
+              {sorted.map((item) => (
                 <tr
-                  key={item.internal_id}
+                  key={item.opportunity_id}
                   className="border-b border-border hover:bg-gda-panel/50 transition-colors"
                 >
                   <td className="px-3 py-2">
                     <Link
-                      href={`/capture?opp=${item.internal_id}`}
+                      href={`/capture?opp=${item.opportunity_id}`}
                       className="text-foreground hover:text-gda-green"
                     >
-                      {item.title}
+                      {item.opportunity_title}
                     </Link>
                   </td>
                   <td className="px-3 py-2">
-                    <StageDropdown value={item.stage} />
+                    <StageDropdown value={stageKeyToLabel(item.stage)} />
                   </td>
                   <td className="px-3 py-2 text-left font-mono text-xs tabular-nums">
-                    {formatMoney(item.value)}
+                    {formatMoney(item.opportunity_value_max ?? item.opportunity_value_min ?? 0)}
                   </td>
                   <td className="px-3 py-2 text-left">
-                    {item.pwin != null ? (
-                      <ScoreDisplay score={item.pwin} className="text-sm" />
+                    {item.pwin_score != null ? (
+                      <ScoreDisplay score={item.pwin_score} className="text-sm" />
                     ) : (
                       <span className="text-xs text-muted-foreground" title="No capture plan — unforecastable">
                         —
@@ -156,7 +174,7 @@ function CaptureList() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {item.next_milestone ?? "—"}
+                    —
                   </td>
                 </tr>
               ))}
@@ -223,8 +241,8 @@ function CreateCaptureModal({
           >
             <option value="">— Select —</option>
             {pipeline?.items?.map((item) => (
-              <option key={item.internal_id} value={item.internal_id}>
-                {item.title}
+              <option key={item.opportunity_id} value={item.opportunity_id}>
+                {item.opportunity_title}
               </option>
             ))}
           </select>

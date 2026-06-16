@@ -18,7 +18,7 @@ export interface LifecycleFunnel {
   stages: FunnelStageCount[];
   total: number;
   qualified_count: number;
-  grade_distribution: Array<{ grade: string; count: number }>;
+  hot_count: number;
   conversions: ConversionRate[];
 }
 
@@ -85,25 +85,13 @@ export async function buildFunnelReport(
   );
   const qualified_count = Number(qualRes.rows[0]?.cnt ?? 0);
 
-  // 3. Grade distribution
-  const gradeRes = await pool.query<{ grade: string | null; cnt: string }>(
-    `SELECT grade, count(*) AS cnt FROM opportunities WHERE deleted_at IS NULL GROUP BY grade`,
+  // 3. Hot count (Pwin >= 70%)
+  const hotRes = await pool.query<{ cnt: string }>(
+    `SELECT count(*) AS cnt FROM opportunities o
+     WHERE o.deleted_at IS NULL
+       AND EXISTS(SELECT 1 FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id AND ac.pwin >= 0.70)`,
   );
-  const gradeMap = new Map<string, number>();
-  let ungradedCount = 0;
-  for (const r of gradeRes.rows) {
-    if (r.grade === null) {
-      ungradedCount = Number(r.cnt);
-    } else {
-      gradeMap.set(r.grade, Number(r.cnt));
-    }
-  }
-  const grade_distribution = [
-    { grade: 'A', count: gradeMap.get('A') ?? 0 },
-    { grade: 'B', count: gradeMap.get('B') ?? 0 },
-    { grade: 'C', count: gradeMap.get('C') ?? 0 },
-    { grade: 'ungraded', count: ungradedCount },
-  ];
+  const hot_count = Number(hotRes.rows[0]?.cnt ?? 0);
 
   // 4. Conversions (snapshot adjacent-stage ratios)
   const conversions: ConversionRate[] = [];
@@ -167,7 +155,7 @@ export async function buildFunnelReport(
 
   return {
     generated_at: new Date().toISOString(),
-    lifecycle: { stages, total, qualified_count, grade_distribution, conversions },
+    lifecycle: { stages, total, qualified_count, hot_count, conversions },
     signal_funnel,
     decisions: {
       window_days: windowDays,

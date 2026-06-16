@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPatch, apiDelete, getToken } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, getToken } from "@/lib/api";
 import type {
   VaultDocument,
   VaultPaginatedResponse,
@@ -200,5 +200,17 @@ export function useRegulatoryCatalog(params: { category?: string } = {}) {
       apiGet<RegulatoryCatalogEntry[]>("/v3/vault/regulatory/catalog", {
         category: params.category || undefined,
       }),
+  });
+}
+
+export function useReExtractVaultDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiPost<VaultDocument>(`/v3/vault/${id}/re-extract`, {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["vault"] });
+    },
   });
 }

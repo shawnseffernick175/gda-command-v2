@@ -43,6 +43,7 @@ export interface OpportunitySummary {
   set_aside: string | null;
   eligibility?: SetAsideEligibility | null;
   hot?: boolean;
+  is_idiq?: boolean;
   created_at: string;
   updated_at: string;
   pwin?: PwinScore | null;
@@ -55,7 +56,6 @@ export interface OpportunitySummary {
   pipeline_stage?: string | null;
   days_in_stage?: number | null;
   deadline_warning?: boolean;
-  grade?: string | null;
   source_uri?: string | null;
   ai_analyzed_at?: string | null;
 }
@@ -175,7 +175,7 @@ export interface BulkDecisionItem {
   action: "confirm" | "reject";
 }
 
-/* ── Fast Track ───────────────────────────────────────────────── */
+/* ── FasTrac (formerly Fast Track) ────────────────────────────── */
 
 export interface FastTrackSignal {
   id: string;
@@ -186,7 +186,6 @@ export interface FastTrackSignal {
   gov_match?: string;
   match_strength?: string;
   your_angle?: string;
-  grade?: string;
   status: string;
   created_at: string;
 }
@@ -699,6 +698,8 @@ export interface VaultAuditEntry {
   created_at: string;
 }
 
+export type VaultExtractionStatus = 'pending' | 'success' | 'failed' | 'unsupported';
+
 export interface VaultDocument {
   id: number;
   filename: string;
@@ -708,6 +709,7 @@ export interface VaultDocument {
   file_size_bytes: number | null;
   file_path: string | null;
   extracted_text: string | null;
+  extraction_status: VaultExtractionStatus;
   ai_summary: string | null;
   ai_tags: string[] | null;
   ai_entities: VaultEntity[] | null;
@@ -802,8 +804,42 @@ export interface ContractVehicleRow {
   notes: string | null;
 }
 
+export interface OptionPeriod {
+  name: string;
+  start: string;
+  end: string;
+  exercised: boolean;
+}
+
+export interface TaskOrderRow {
+  id: number;
+  to_name: string;
+  to_number: string;
+  parent_vehicle_id: number | null;
+  parent_vehicle_short_name: string | null;
+  parent_color: string;
+  prime_or_sub: string;
+  customer_agency: string | null;
+  contracting_office: string | null;
+  pop_start: string | null;
+  pop_end: string | null;
+  base_pop_end: string | null;
+  option_periods: OptionPeriod[] | null;
+  ceiling: number | null;
+  funded_to_date: number | null;
+  status: string;
+  cpars_status: string | null;
+  days_until_expiration: number | null;
+  is_expiring_soon: boolean;
+  notes: string | null;
+}
+
 export interface ContractWaterfallData {
-  contracts: ContractVehicleRow[];
+  task_orders: TaskOrderRow[];
+  today: string;
+  earliest_pop: string | null;
+  latest_pop: string | null;
+  available_vehicles: { id: number; short_name: string }[];
   meta: FinancialMeta;
 }
 
@@ -890,22 +926,4 @@ export interface AiAnalyzeResponse {
   generated_at: string;
 }
 
-/* ── Daily Briefing (F-460b) ──────────────────────────────────── */
 
-export interface BriefingAction {
-  action: string;
-  urgency: "immediate" | "today" | "this_week";
-  related_entity: string | null;
-}
-
-export interface DailyBriefing {
-  headline: string;
-  priority_actions: BriefingAction[];
-  risk_flags: string[];
-  market_intel_summary: string;
-  cert_expiration_warnings: string[];
-  model_used: string | null;
-  quality_flag: string | null;
-  generated_at: string;
-  briefing_date: string;
-}

@@ -16,7 +16,7 @@ interface ActionItemsPagedResponse {
   };
 }
 
-export function useActionItems(params: { status?: string; due?: string; page?: number } = {}) {
+export function useActionItems(params: { status?: string; due?: string; page?: number; sort_by?: string; sort_dir?: string } = {}) {
   return useQuery({
     queryKey: ["action-items", params],
     queryFn: () =>
@@ -25,6 +25,8 @@ export function useActionItems(params: { status?: string; due?: string; page?: n
         due: params.due,
         page: params.page,
         limit: 50,
+        sort_by: params.sort_by,
+        sort_dir: params.sort_dir,
       }),
     refetchInterval: (query) => {
       const items = query.state.data?.items ?? [];
