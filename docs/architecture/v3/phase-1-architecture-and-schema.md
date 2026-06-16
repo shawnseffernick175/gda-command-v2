@@ -332,6 +332,7 @@ CREATE TABLE pipeline_items (
                                     'qualifying', 'pursuit', 'proposal', 'submitted',
                                     'evaluation', 'won', 'lost'
                                   )),
+  pwin_override     NUMERIC       CHECK (pwin_override IS NULL OR (pwin_override >= 0 AND pwin_override <= 1)),
   source_id         BIGINT        NOT NULL REFERENCES sources(id),
   created_by        BIGINT        REFERENCES users(id),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -352,6 +353,7 @@ CREATE INDEX idx_pipeline_source     ON pipeline_items (source_id);
 | `win_prob_evidence` | Text rationale — "Data First" doctrine requires evidence, not optimism |
 | `milestone_90day` | Current 90-day execution milestone per "Relentless Execution" doctrine |
 | `stage` | Shipley-aligned pipeline stage with CHECK constraint |
+| `pwin_override` | Per-pursuit Pwin override (0–1, nullable). Overrides default stage Pwin in Shipley coverage calculations |
 | `source_id` | **R1 FK** — every pipeline item must cite its source |
 
 **Why this choice:** Legacy `pipeline_items` (migration 129) had `ou_tag` column — removed per scope correction. Stage values align with the Shipley process lifecycle used by Envision. The 90-day milestone field enforces Doctrine Principle 5.
