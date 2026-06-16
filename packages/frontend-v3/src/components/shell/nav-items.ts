@@ -60,4 +60,3 @@ export const PROMPT_CREATOR_ITEM: NavItem = {
   href: "/prompt-creator",
   icon: Wand2,
 };
-
