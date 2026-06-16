@@ -17,7 +17,7 @@ import { sourceRoutes } from './routes/sources.js';
 import { partnerRoutes } from './routes/partners.js';
 import { actionItemRoutes } from './routes/action-items.js';
 import { soakRoutes } from './routes/soak.js';
-import { fastTrackRoutes } from './routes/fast-track.js';
+import { fasTracRoutes } from './routes/fastrac.js';
 import { regulatoryRoutes } from './routes/regulatory.js';
 import { authRoutes } from './routes/auth.js';
 import { systemHealthRoutes } from './routes/health.js';
@@ -44,7 +44,7 @@ import { risksRoutes } from './routes/risks.js';
 import { financialsRoutes } from './routes/financials.js';
 import { captureWorkflowRoutes } from './routes/capture-workflow.js';
 import { vaultRoutes } from './routes/vault.js';
-import { fastTrackSignalRoutes } from './routes/fast-track-signals.js';
+import { fasTracSignalRoutes } from './routes/fastrac-signals.js';
 import { promptLibraryRoutes } from './routes/prompt-library.js';
 import { digestRoutes } from './routes/digest.js';
 import { ingestStatusRoutes } from './routes/ingest-status.js';
@@ -59,8 +59,8 @@ export async function buildApp() {
     trustProxy: true,
   });
 
-  await app.register(fastifyCookie);
   await app.register(fastifyCors, { origin: true, credentials: true });
+  await app.register(fastifyCookie);
 
   await app.register(fastifySwagger, {
     openapi: {
@@ -139,8 +139,8 @@ export async function buildApp() {
   await app.register(captureRoutes);
   await app.register(pipelineRoutes);
   await app.register(launchpadRoutes);
-  await app.register(fastTrackRoutes);
-  await app.register(fastTrackSignalRoutes);
+  await app.register(fasTracRoutes);
+  await app.register(fasTracSignalRoutes);
   await app.register(sourceRoutes);
   await app.register(partnerRoutes);
   await app.register(actionItemRoutes);

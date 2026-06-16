@@ -28,8 +28,6 @@ export interface PipelineItem {
   opportunity_value_min_sources: SourceRef[];
   opportunity_value_max: number | null;
   opportunity_value_max_sources: SourceRef[];
-  opportunity_grade: string | null;
-  opportunity_grade_sources: SourceRef[];
   capture_owner: string;
   capture_owner_sources: SourceRef[];
   win_prob_pct: number | null;
@@ -102,7 +100,6 @@ export interface PipelineRow {
   opportunity_due_at: string | null;
   opportunity_value_min: string | null;
   opportunity_value_max: string | null;
-  opportunity_grade: string | null;
   opportunity_ai_analyzed_at: string | null;
   opportunity_analysis_version: string | null;
   opportunity_title_sources: SourceRef[] | null;
@@ -112,7 +109,6 @@ export interface PipelineRow {
   opportunity_due_at_sources: SourceRef[] | null;
   opportunity_value_min_sources: SourceRef[] | null;
   opportunity_value_max_sources: SourceRef[] | null;
-  opportunity_grade_sources: SourceRef[] | null;
   pipeline_source_kind: string | null;
   pipeline_source_title: string | null;
   pipeline_source_url: string | null;

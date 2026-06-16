@@ -184,8 +184,6 @@ export function transformOpportunities(
       solicitation_number: row.solicitation_number?.trim() ?? null,
       sam_notice_id: row.notice_id?.trim() ?? null,
       status: row.status?.trim() ?? 'discovery',
-      grade: null,
-      grade_evidence: null,
       value_min: coerceNumber(row.value_min ?? row.value),
       value_max: coerceNumber(row.value_max),
       naics: row.naics?.trim() ?? null,
