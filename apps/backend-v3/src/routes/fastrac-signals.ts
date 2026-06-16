@@ -34,6 +34,8 @@ interface SignalRow {
   institution_type: string | null;
   institution_name: string | null;
   doi: string | null;
+  installation: string | null;
+  unit: string | null;
 }
 
 interface MatchRow {
@@ -109,6 +111,7 @@ export async function fasTracSignalRoutes(app: FastifyInstance): Promise<void> {
     const mission  = qs.mission  ?? null;       // partial match against mission_tags
     const tab      = qs.tab      ?? null;       // 'government' | 'industry' | 'academia'
     const side     = qs.side     ?? null;       // legacy compat
+    const installationFilter = qs.installation ?? null;
     const limit    = Math.min(parseInt(qs.limit ?? '100', 10), 200);
 
     try {
@@ -139,6 +142,10 @@ export async function fasTracSignalRoutes(app: FastifyInstance): Promise<void> {
         conditions.push(`pipeline_side = $${idx++}`);
         params.push(side);
       }
+      if (installationFilter) {
+        conditions.push(`installation = $${idx++}`);
+        params.push(installationFilter);
+      }
 
       const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       const sql = `
@@ -147,7 +154,8 @@ export async function fasTracSignalRoutes(app: FastifyInstance): Promise<void> {
           mission_tags, problem_tags, maturity, urgency, horizon,
           signal_strength, transition_tags, source_url,
           published_at, ingested_at, next_review_at, next_review_action,
-          pipeline_side, institution_type, institution_name, doi
+          pipeline_side, institution_type, institution_name, doi,
+          installation, unit
         FROM fast_track_signals
         ${where}
         ORDER BY signal_strength DESC, ingested_at DESC

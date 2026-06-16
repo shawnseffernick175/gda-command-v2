@@ -38,12 +38,14 @@ import { discoverPartnerContacts } from '../services/contacts/partner-discovery.
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
 import { runAutoPassDeadline } from './auto-pass-deadline.js';
+import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
 const govtribeEnabled = process.env.ENABLE_GOVTRIBE_INGEST !== 'false';
 const govwinEnabled = process.env.GOVWIN_CONNECTOR_V1 === 'true';
 const grantsGovEnabled = process.env.ENABLE_GRANTS_GOV_INGEST !== 'false';
+const fastracArmyEnabled = process.env.ENABLE_FASTRAC_ARMY_INGEST !== 'false';
 
 const tasks: ScheduledTask[] = [];
 
@@ -80,6 +82,9 @@ const JOBS: CronJob[] = [
   ...(grantsGovEnabled
     ? [{ sourceKey: 'grants.gov', schedule: '0 11 * * *', label: 'Grants.gov open opportunities (daily 07:00 ET)' }]
     : []),
+  ...(fastracArmyEnabled
+    ? [{ sourceKey: 'fastrac-army', schedule: '0 9 * * *', label: 'FasTrac Tier 1 Army installation & unit signals (daily 05:00 ET)' }]
+    : []),
 ];
 
 export function startCronScheduler(): void {
@@ -96,6 +101,9 @@ export function startCronScheduler(): void {
     registerGovWinSource();
   }
   registerGrantsGovSource();
+  if (fastracArmyEnabled) {
+    registerFastracArmySource();
+  }
 
   const registeredSources = getRegisteredSources();
   const registeredAdapters = listAdapters();
@@ -106,6 +114,9 @@ export function startCronScheduler(): void {
   }
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
+  }
+  if (!fastracArmyEnabled) {
+    logger.info({ flag: 'ENABLE_FASTRAC_ARMY_INGEST' }, '[cron] fastrac-army.daily skipped — gated behind env flag (default on)');
   }
 
   // PWin batch scoring — daily at 01:00 UTC (before retrain at 02:00 and action-items at 06:30)
@@ -302,6 +313,7 @@ export function startCronScheduler(): void {
       : job.sourceKey === 'nih' ? 'nih.weekly'
       : job.sourceKey === 'arxiv' ? 'arxiv.weekly'
       : job.sourceKey === 'grants.gov' ? 'grants.daily'
+      : job.sourceKey === 'fastrac-army' ? 'fastrac-army.daily'
       : job.sourceKey;
     logger.info(
       { sourceKey: job.sourceKey, schedule: job.schedule, label: job.label },
