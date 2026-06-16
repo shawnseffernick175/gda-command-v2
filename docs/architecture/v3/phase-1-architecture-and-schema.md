@@ -254,6 +254,7 @@ CREATE TABLE opportunities (
   qualified_at        TIMESTAMPTZ,             -- when opp was qualified (F-207)
   qualified_by        TEXT,                    -- who qualified it (user display name)
   source_id           BIGINT        NOT NULL REFERENCES sources(id),
+  owner_id            BIGINT        REFERENCES users(id),  -- assigned capture owner
   created_by          BIGINT        REFERENCES users(id),
   created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
@@ -296,6 +297,20 @@ CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted
 **Indexes:** All partial on `deleted_at IS NULL` — queries never scan deleted rows. Agency, NAICS, set-aside, grade support the Ops Tracker filter bar. `response_due_at DESC` powers deadline sorting.
 
 **Why this choice:** Phase 0 found three competing opportunity tables (`sam_opportunities` 20,062 rows, `gda_opportunity_tracker` 1,924 rows, `opportunities` 658 rows). V3 consolidates to one. The legacy `text` PK and missing dedup key (`sam_notice_id`) caused FK type conflicts and duplicate records. The `BIGSERIAL` PK with `sam_notice_id` UNIQUE constraint eliminates both. The `analysis` JSONB + `analysis_version` supports R2 cache invalidation without a separate table.
+
+### 2.3b `opportunity_notes` — Free-form notes on opportunities
+
+```sql
+CREATE TABLE opportunity_notes (
+  id              BIGSERIAL     PRIMARY KEY,
+  opportunity_id  BIGINT        NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  body            TEXT          NOT NULL,
+  created_by      TEXT          NOT NULL DEFAULT 'system',
+  created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_opp_notes_opp ON opportunity_notes (opportunity_id);
+```
 
 ### 2.4 `pipeline_items` — Qualified opportunities in active capture
 

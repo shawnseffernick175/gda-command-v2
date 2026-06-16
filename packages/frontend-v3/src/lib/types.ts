@@ -57,6 +57,7 @@ export interface OpportunitySummary {
   days_in_stage?: number | null;
   deadline_warning?: boolean;
   source_uri?: string | null;
+  tags?: string[];
   ai_analyzed_at?: string | null;
 }
 

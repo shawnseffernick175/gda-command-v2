@@ -153,6 +153,7 @@ function buildSummaryFromSources(
     ai_analyzed_at: row.ai_analyzed_at,
     analysis_version: row.analysis_version,
     source_uri: row.source_uri ?? null,
+    tags: row.tags ?? [],
     deadline_warning: computeDeadlineWarning(row, hasPipelineStage),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -345,13 +346,13 @@ export async function listOpportunities(
     params.push(ENVISION_NAICS);
   }
 
-  // Passed view: auto-passed opps get their own 'Passed' tab; excluded from
-  // every other view so they drop out of the working list. (Mirror of the
-  // paged builder.)
+  // Passed view: auto-passed AND manually-passed opps get their own 'Passed'
+  // tab; excluded from every other view so they drop out of the working list.
+  // (Mirror of the paged builder.)
   if (filters.stage === 'passed') {
-    conditions.push(`relevance_status = 'auto_pass'`);
+    conditions.push(`relevance_status IN ('auto_pass', 'manual_pass')`);
   } else {
-    conditions.push(`(relevance_status IS DISTINCT FROM 'auto_pass')`);
+    conditions.push(`(relevance_status IS NULL OR relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
   }
 
   // Stage filter (pipeline_items-based). Uses o.id since the main query aliases opportunities as o.
@@ -539,14 +540,13 @@ function buildFilterConditions(
   } else if (filters.idiq === 'exclude') {
     conditions.push(`o.is_idiq = FALSE`);
   }
-  // Passed view: auto-passed opps (in-NAICS but past due / too little lead time)
-  // get their own 'Passed' tab. In every other view (all, active, specific
-  // stages, default), exclude auto_pass so passed opps drop out of the working
-  // list. relevance_status is stamped at ingest by evaluateRelevance.
+  // Passed view: auto-passed AND manually-passed opps get their own 'Passed'
+  // tab. In every other view (all, active, specific stages, default), exclude
+  // both so passed opps drop out of the working list.
   if (filters.stage === 'passed') {
-    conditions.push(`o.relevance_status = 'auto_pass'`);
+    conditions.push(`o.relevance_status IN ('auto_pass', 'manual_pass')`);
   } else {
-    conditions.push(`(o.relevance_status IS DISTINCT FROM 'auto_pass')`);
+    conditions.push(`(o.relevance_status IS NULL OR o.relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
   }
   if (filters.stage === 'active') {
     // Active = has an active-stage pipeline row OR has no pipeline row (defaults to interest)

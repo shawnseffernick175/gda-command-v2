@@ -33,6 +33,9 @@ export interface OpportunityRow {
   qualified_at: string | null;
   qualified_by: string | null;
   source_uri: string | null;
+  owner_id: string | null;
+  relevance_status: string | null;
+  relevance_reason: string | null;
   source_id: string;
   created_at: string;
   updated_at: string;
@@ -111,6 +114,7 @@ export interface OpportunitySummary {
   ai_analyzed_at: string | null;
   analysis_version: string | null;
   source_uri: string | null;
+  tags: string[];
   deadline_warning: boolean;
   created_at: string;
   updated_at: string;
@@ -178,6 +182,8 @@ export interface OpportunityUpdateInput {
   incumbent?: string;
   tags?: string[];
   stage?: string;
+  owner_id?: number | null;
+  relevance_status?: string | null;
   /** Owner attribution used when a stage change must create a pipeline card. */
   capture_owner?: string;
 }

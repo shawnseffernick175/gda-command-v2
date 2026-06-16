@@ -759,7 +759,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       'title', 'naics', 'agency', 'sub_agency', 'description',
       'set_aside', 'response_due_at', 'value_min', 'value_max',
       'solicitation_number', 'sam_notice_id', 'psc', 'incumbent', 'tags',
-      'stage',
+      'stage', 'owner_id', 'relevance_status',
     ];
 
     for (const field of allowedFields) {
@@ -1000,5 +1000,66 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         actual_outcome: outcome,
       }, req.requestId),
     );
+  });
+
+  // ── Opportunity Notes CRUD ────────────────────────────────────────────────
+
+  // GET /v3/opportunities/:id/notes — list notes for an opportunity
+  app.get<{ Params: { id: string } }>('/v3/opportunities/:id/notes', async (req, reply) => {
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
+
+    const res = await pool.query(
+      `SELECT id, opportunity_id, body, created_by, created_at
+       FROM opportunity_notes
+       WHERE opportunity_id = $1
+       ORDER BY created_at DESC`,
+      [id],
+    );
+
+    return reply.status(200).send(successEnvelope(res.rows, req.requestId));
+  });
+
+  // POST /v3/opportunities/:id/notes — add a note
+  app.post<{ Params: { id: string } }>('/v3/opportunities/:id/notes', async (req, reply) => {
+    const id = await resolveOpportunityId(pool, req.params.id);
+    if (id === null) {
+      if (UUID_RE.test(req.params.id)) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'opportunity_not_found', req.requestId));
+      }
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'invalid_id_format', req.requestId));
+    }
+
+    const body = req.body as Record<string, unknown> | undefined;
+    const noteBody = body?.body as string | undefined;
+    if (!noteBody || noteBody.trim().length === 0) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'body is required and must be non-empty', req.requestId),
+      );
+    }
+
+    const existing = await getOpportunityById(id);
+    if (!existing) {
+      return reply
+        .status(404)
+        .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
+    }
+
+    const user = (req as typeof req & { user?: { sub: string } }).user;
+    const createdBy = (body?.created_by as string) ?? user?.sub ?? 'system';
+
+    const res = await pool.query(
+      `INSERT INTO opportunity_notes (opportunity_id, body, created_by)
+       VALUES ($1, $2, $3)
+       RETURNING id, opportunity_id, body, created_by, created_at`,
+      [id, noteBody.trim(), createdBy],
+    );
+
+    return reply.status(201).send(successEnvelope(res.rows[0], req.requestId));
   });
 }

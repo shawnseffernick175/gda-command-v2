@@ -25,6 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScoreExplain } from "@/components/shared/score-explainers";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import {
@@ -899,29 +900,11 @@ function OpportunityRow({
         <span className={cn("text-xs", daysLeft.className)}>{daysLeft.text}</span>
       </td>
       <td className="px-3 py-1.5">
-        {/* Decluttered: two left-aligned actions, always visible. */}
-        <div className="flex items-center justify-start gap-2">
-          <Link
-            href={`/opportunities?id=${opp.id}`}
-            className="text-[11px] font-mono text-muted-foreground hover:text-gda-green transition-colors"
-            title="View detail"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {"->"}
-          </Link>
-          {opp.source_uri && (
-            <a
-              href={opp.source_uri}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] font-mono text-gda-cyan hover:underline transition-colors"
-              title="View solicitation"
-              onClick={(e) => e.stopPropagation()}
-            >
-              src
-            </a>
-          )}
-        </div>
+        <RowActionsMenu
+          opportunityId={String(opp.id)}
+          sourceUri={opp.source_uri ?? null}
+          currentTags={opp.tags ?? []}
+        />
       </td>
     </tr>
   );
