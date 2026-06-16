@@ -12,7 +12,10 @@ export type ErrorCode =
   | 'INTERNAL_ERROR'
   | 'AGENT_UNAVAILABLE'
   | 'WEBHOOK_AUTH_FAILED'
-  | 'RATE_LIMITED';
+  | 'RATE_LIMITED'
+  | 'INVALID_REFRESH_TOKEN'
+  | 'REVOKED_REFRESH_TOKEN'
+  | 'EXPIRED_REFRESH_TOKEN';
 
 export interface Meta {
   generatedAt: string;
