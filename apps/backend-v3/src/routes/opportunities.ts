@@ -556,8 +556,6 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       agency: query.agency as string | undefined,
       department: query.department as string | undefined,
       naics: query.naics as string | undefined,
-      grade: query.grade as string | undefined,
-      grades: parseArray(query['grade[]'] ?? query.grades),
       due_before: query.due_before as string | undefined,
       due_after: query.due_after as string | undefined,
       due: query.due as string | undefined,
@@ -982,11 +980,9 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
 
     const analysis = existing.analysis as { pwin?: { score?: number } } | null;
     const predictedPwin = analysis?.pwin?.score ?? null;
-    const predictedGrade = existing.grade ?? null;
-
     await pool.query(
       `INSERT INTO pwin_outcomes (opportunity_id, predicted_pwin, predicted_grade, actual_outcome, feedback_source)
-       VALUES ($1, $2, $3, $4, 'manual')
+       VALUES ($1, $2, NULL, $3, 'manual')
        ON CONFLICT (opportunity_id)
        DO UPDATE SET
          predicted_pwin = EXCLUDED.predicted_pwin,
@@ -994,14 +990,13 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
          actual_outcome = EXCLUDED.actual_outcome,
          feedback_source = EXCLUDED.feedback_source,
          recorded_at = NOW()`,
-      [id, predictedPwin, predictedGrade, outcome],
+      [id, predictedPwin, outcome],
     );
 
     return reply.status(200).send(
       successEnvelope({
         opportunity_id: id,
         predicted_pwin: predictedPwin,
-        predicted_grade: predictedGrade,
         actual_outcome: outcome,
       }, req.requestId),
     );

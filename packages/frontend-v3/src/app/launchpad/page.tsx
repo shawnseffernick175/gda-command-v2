@@ -331,7 +331,7 @@ function RecentSignalsWidget() {
         <div className="flex items-center gap-2 pt-1 border-t border-border">
           <SourceChip label="Defense Market Intel" kind="real" />
           <span className="text-[11px] text-muted-foreground">
-            Sourced from Fast Track signals
+            Sourced from FasTrac signals
           </span>
         </div>
       </CardContent>

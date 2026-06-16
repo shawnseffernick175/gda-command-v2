@@ -64,13 +64,8 @@ let workerBossRef: PgBoss | null = null;
 // Set-aside list moved to constants/relevance.ts (PR-A4); re-exported here for pwin scoring.
 import { ENVISION_SET_ASIDES } from '../constants/relevance.js';
 
-function scoreToGrade(score: number): string {
-  if (score >= 80) return 'A';
-  if (score >= 65) return 'B';
-  if (score >= 50) return 'C';
-  if (score >= 35) return 'D';
-  return 'F';
-}
+// scoreToGrade removed — letter grades (A/B/C/D/F) eliminated in favour of
+// continuous Pwin percentage.  Hot threshold (≥ 70%) is evaluated at read time.
 
 // ────────────────────────────────────────────────────────────────────────────
 // Incumbent extraction — reads from the enriched columns populated by
@@ -592,54 +587,16 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
     const pwinResult = analysis.pwin as { score?: number | null; band?: string } | null;
     const isAutoPass = isAutoNoBid || (typeof pwinResult === 'object' && pwinResult !== null && pwinResult.band === 'pass');
 
-    const pwinScore = typeof pwinResult === 'object' && pwinResult !== null
-      ? (pwinResult.score ?? 0)
-      : 0;
-    const grade = isAutoPass ? 'F' : scoreToGrade(pwinScore);
-    const gradeEvidence = JSON.stringify({
-      pwin_score: pwinScore,
-      auto_pass: isAutoPass,
-      auto_no_bid: isAutoNoBid,
-      auto_no_bid_days: autoNoBidDays,
-      auto_pass_reason: isAutoNoBid
-        ? `Auto-No-Bid: ${autoNoBidDays} days to response deadline (<${AUTO_NO_BID_DAYS_THRESHOLD}-day threshold). Insufficient time to compete.`
-        : isAutoPass ? 'response_due_at < 30 days — insufficient lead time' : null,
-      naics_match: row.naics as string | null,
-      set_aside_fit: row.set_aside as string | null,
-      agency: row.agency as string | null,
-    });
-
-    // Write analysis + grade to opportunities table (inline JSONB for fast reads)
+    // Write analysis to opportunities table (inline JSONB for fast reads)
     await pool.query(
       `UPDATE opportunities
        SET analysis = $1,
            analysis_version = $2,
            ai_analyzed_at = $3,
-           grade = $4,
-           grade_evidence = $5,
            updated_at = updated_at
-       WHERE id = $6 AND deleted_at IS NULL`,
-      [JSON.stringify(analysis), config.analysisVersion, now, grade, gradeEvidence, entityId],
+       WHERE id = $4 AND deleted_at IS NULL`,
+      [JSON.stringify(analysis), config.analysisVersion, now, entityId],
     );
-
-    // Write grade source citation
-    try {
-      const sourceRes = await pool.query<{ source_id: string }>(
-        `SELECT source_id FROM opportunities WHERE id = $1`,
-        [entityId],
-      );
-      const sourceId = sourceRes.rows[0]?.source_id;
-      if (sourceId) {
-        await pool.query(
-          `INSERT INTO opportunity_grade_sources (opportunity_id, source_id)
-           VALUES ($1, $2)
-           ON CONFLICT (opportunity_id, source_id) DO NOTHING`,
-          [entityId, sourceId],
-        );
-      }
-    } catch (err) {
-      logger.warn({ err, entityId }, 'Failed to write grade source — non-critical');
-    }
 
     // Standing rule: auto-No-Bid opportunities are moved into the No Bid tab so they
     // leave the active list automatically. We create a no_bid pipeline card ONLY when
@@ -674,7 +631,7 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       }
     }
 
-    logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin, grade }, 'Opportunity analysis written');
+    logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin }, 'Opportunity analysis written');
 
     // Re-analyze any captures linked to this opportunity
     try {

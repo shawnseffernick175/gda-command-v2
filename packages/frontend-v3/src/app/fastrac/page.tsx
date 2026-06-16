@@ -1,14 +1,14 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
-import { useFastTrackList, useRunFastTrack } from "@/hooks/use-fast-track";
+import { useFasTracList, useRunFasTrac } from "@/hooks/use-fastrac";
 import {
   useFTSignals,
   useFTMatches,
   useFTMatchAnalysis,
   useRunFTMatchAnalysis,
-} from "@/hooks/use-fast-track-signals";
-import type { FTSignal, FTMatch, FTMatchAnalysis } from "@/hooks/use-fast-track-signals";
+} from "@/hooks/use-fastrac-signals";
+import type { FTSignal, FTMatch, FTMatchAnalysis, FasTracTab } from "@/hooks/use-fastrac-signals";
 import { Badge } from "@/components/ui/badge";
 import { SourceChip } from "@/components/shared/source-chip";
 import { CollapseSection } from "@/components/shared/collapse-section";
@@ -654,35 +654,31 @@ function MatchCard({ m }: { m: FTMatch }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Pipeline side tab switcher
+// Pipeline tab switcher (Government / Industry / Academia)
 // ────────────────────────────────────────────────────────────
-type PipelineSide = "government" | "industry";
+function TabSwitcher({ activeTab, onChange }: { activeTab: FasTracTab; onChange: (t: FasTracTab) => void }) {
+  const tabs: { key: FasTracTab; label: string; activeClass: string }[] = [
+    { key: "government", label: "Government", activeClass: "bg-gda-green/15 border-gda-green/40 text-gda-green" },
+    { key: "industry", label: "Industry", activeClass: "bg-gda-cyan/15 border-gda-cyan/40 text-gda-cyan" },
+    { key: "academia", label: "Academia", activeClass: "bg-amber-400/15 border-amber-400/40 text-amber-400" },
+  ];
 
-function SideTabSwitcher({ activeSide, onChange }: { activeSide: PipelineSide; onChange: (s: PipelineSide) => void }) {
   return (
     <div className="flex gap-1 mb-3">
-      <button
-        onClick={() => onChange("government")}
-        className={cn(
-          "rounded px-3 py-1 text-xs font-mono font-medium transition-colors border",
-          activeSide === "government"
-            ? "bg-gda-green/15 border-gda-green/40 text-gda-green"
-            : "bg-gda-bg-base border-border text-muted-foreground hover:text-foreground"
-        )}
-      >
-        Government
-      </button>
-      <button
-        onClick={() => onChange("industry")}
-        className={cn(
-          "rounded px-3 py-1 text-xs font-mono font-medium transition-colors border",
-          activeSide === "industry"
-            ? "bg-gda-cyan/15 border-gda-cyan/40 text-gda-cyan"
-            : "bg-gda-bg-base border-border text-muted-foreground hover:text-foreground"
-        )}
-      >
-        Industry
-      </button>
+      {tabs.map((t) => (
+        <button
+          key={t.key}
+          onClick={() => onChange(t.key)}
+          className={cn(
+            "rounded px-3 py-1 text-xs font-mono font-medium transition-colors border",
+            activeTab === t.key
+              ? t.activeClass
+              : "bg-gda-bg-base border-border text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {t.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -705,20 +701,20 @@ type TriageResult = FastTrackAssessment & {
 // ────────────────────────────────────────────────────────────
 // Page
 // ────────────────────────────────────────────────────────────
-export default function FastTrackPage() {
+export default function FasTracPage() {
   return (
     <Suspense fallback={<div />}>
-      <FastTrackContent />
+      <FasTracContent />
     </Suspense>
   );
 }
 
-function FastTrackContent() {
-  const [activeSide, setActiveSide] = useState<PipelineSide>("government");
-  const { data: listData,    isLoading: listLoading    } = useFastTrackList();
-  const { data: signalsData, isLoading: signalsLoading } = useFTSignals(activeSide);
-  const { data: matchesData, isLoading: matchesLoading } = useFTMatches();
-  const runTriage = useRunFastTrack();
+function FasTracContent() {
+  const [activeTab, setActiveTab] = useState<FasTracTab>("government");
+  const { data: listData,    isLoading: listLoading    } = useFasTracList();
+  const { data: signalsData, isLoading: signalsLoading } = useFTSignals(activeTab);
+  const { data: matchesData, isLoading: matchesLoading } = useFTMatches(activeTab);
+  const runTriage = useRunFasTrac();
 
   const [form, setForm]       = useState({ ...EMPTY_FORM });
   const [result, setResult]   = useState<TriageResult | null>(null);
@@ -729,7 +725,7 @@ function FastTrackContent() {
   const techSignals = signalsData?.tech ?? [];
   const reqSignals  = signalsData?.requirement ?? [];
   const matches     = matchesData?.matches ?? [];
-  const isIndustry  = activeSide === "industry";
+  const showInstitution = activeTab === "industry" || activeTab === "academia";
 
   async function handleTriage(e: React.FormEvent) {
     e.preventDefault();
@@ -768,14 +764,14 @@ function FastTrackContent() {
       {/* ── Sticky Page Header ──────────────────────────────── */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-6 sticky-page-header">
         <div>
-          <h1 className="font-mono text-lg font-bold text-foreground">Fast Track</h1>
+          <h1 className="font-mono text-lg font-bold text-foreground">FasTrac</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Need Sensing — monitor emerging technology & requirement signals, match them, and surface the right pursuit vehicle
           </p>
         </div>
 
-        {/* ── Pipeline Side Tabs ────────────────────────────────── */}
-        <SideTabSwitcher activeSide={activeSide} onChange={setActiveSide} />
+        {/* ── Pipeline Tabs ────────────────────────────────────── */}
+        <TabSwitcher activeTab={activeTab} onChange={setActiveTab} />
       </div>
 
       {/* ── NEED SENSING: Technology Pipeline ────────────────── */}
@@ -786,12 +782,14 @@ function FastTrackContent() {
       >
         <div className="mb-2">
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            {isIndustry
-              ? "Academic papers, FFRDC research outputs, innovation factory results, and startup dual-use capabilities that align with Envision's mission areas."
+            {activeTab === "academia"
+              ? "Academic papers, FFRDC research outputs, innovation factory results, and university research that align with Envision's mission areas."
+              : activeTab === "industry"
+              ? "Startup dual-use capabilities, corporate R&D announcements, and commercial tech that align with Envision's mission areas."
               : "Watches DARPA, DIU, AFWERX, NavalX Tech Bridges, Army Applications Lab, NSIN, SBIR/STTR, startups and niche commercial firms for maturing dual-use capabilities that align with Envision's mission areas."}
           </p>
         </div>
-        <SignalTable signals={techSignals} loading={signalsLoading} showInstitution={isIndustry} sortPrefix="tech" />
+        <SignalTable signals={techSignals} loading={signalsLoading} showInstitution={showInstitution} sortPrefix="tech" />
       </CollapseSection>
 
       {/* ── NEED SENSING: Requirements Pipeline ──────────────── */}
@@ -802,12 +800,14 @@ function FastTrackContent() {
       >
         <div className="mb-2">
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            {isIndustry
+            {activeTab === "academia"
               ? "FFRDC reports, university research outputs, and innovation factory assessments that surface emerging requirement patterns before formal procurements."
+              : activeTab === "industry"
+              ? "Corporate requirements, startup capability needs, and commercial dual-use demand signals."
               : "Tracks procurement forecasts, sources sought, RFIs, industry days, draft RFPs, CSOs, and post-RFI formal opportunities to surface demand signals before they become competed awards."}
           </p>
         </div>
-        <SignalTable signals={reqSignals} loading={signalsLoading} showInstitution={isIndustry} sortPrefix="req" />
+        <SignalTable signals={reqSignals} loading={signalsLoading} showInstitution={showInstitution} sortPrefix="req" />
       </CollapseSection>
 
       {/* ── NEED SENSING: Matched Pairs ───────────────────────── */}
@@ -911,7 +911,7 @@ function FastTrackContent() {
               disabled={triaging}
               className="rounded border border-gda-green bg-gda-green/10 px-4 py-1.5 text-xs font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
             >
-              {triaging ? "Triaging…" : "Run Fast Track"}
+              {triaging ? "Triaging…" : "Run FasTrac"}
             </button>
             {triaging && (
               <span className="text-[11px] text-muted-foreground animate-pulse">
