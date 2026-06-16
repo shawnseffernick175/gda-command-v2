@@ -175,7 +175,7 @@ export interface BulkDecisionItem {
   action: "confirm" | "reject";
 }
 
-/* ── Fast Track ───────────────────────────────────────────────── */
+/* ── FasTrac (formerly Fast Track) ────────────────────────────── */
 
 export interface FastTrackSignal {
   id: string;

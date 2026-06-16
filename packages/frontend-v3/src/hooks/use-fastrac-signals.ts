@@ -1,6 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api";
 
+export type FasTracTab = "government" | "industry" | "academia";
+
 export interface FTSignal {
   id: string;
   pipeline: "tech" | "requirement";
@@ -70,19 +72,20 @@ interface MatchesResponse {
   total: number;
 }
 
-export function useFTSignals(side?: "government" | "industry") {
+export function useFTSignals(tab?: FasTracTab) {
   return useQuery({
-    queryKey: ["ft-signals", side],
+    queryKey: ["ft-signals", tab],
     queryFn: () =>
-      apiGet<SignalsResponse>("/v3/fast-track/signals", side ? { side } : undefined),
+      apiGet<SignalsResponse>("/v3/fastrac/signals", tab ? { tab } : undefined),
     staleTime: 60_000,
   });
 }
 
-export function useFTMatches() {
+export function useFTMatches(tab?: FasTracTab) {
   return useQuery({
-    queryKey: ["ft-matches"],
-    queryFn: () => apiGet<MatchesResponse>("/v3/fast-track/signals/matches"),
+    queryKey: ["ft-matches", tab],
+    queryFn: () =>
+      apiGet<MatchesResponse>("/v3/fastrac/signals/matches", tab ? { tab } : undefined),
     staleTime: 60_000,
   });
 }
@@ -90,7 +93,7 @@ export function useFTMatches() {
 export function useFTMatchAnalysis(matchId: string | null) {
   return useQuery({
     queryKey: ["ft-match-analysis", matchId],
-    queryFn: () => apiGet<FTMatchAnalysis>(`/v3/fast-track/matches/${matchId}/analysis`),
+    queryFn: () => apiGet<FTMatchAnalysis>(`/v3/fastrac/matches/${matchId}/analysis`),
     enabled: !!matchId,
     staleTime: 120_000,
     retry: false,
@@ -100,6 +103,6 @@ export function useFTMatchAnalysis(matchId: string | null) {
 export function useRunFTMatchAnalysis() {
   return useMutation({
     mutationFn: async (matchId: string) =>
-      apiPost<FTMatchAnalysis>(`/v3/fast-track/matches/${matchId}/analyze`),
+      apiPost<FTMatchAnalysis>(`/v3/fastrac/matches/${matchId}/analyze`),
   });
 }
