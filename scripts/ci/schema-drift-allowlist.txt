@@ -52,3 +52,8 @@ bare-column:unified_opportunity_links:opportunity_id
 bare-column:compliance_items:evidence
 # backfill_incumbent.ts + incumbent-enrichment.ts: opportunities.place_of_performance_state → actual: place_of_performance
 bare-column:opportunities:place_of_performance_state
+
+# F-878: wheelhouse_config is a new table created by v3_100 migration; not yet in CI snapshot
+wheelhouse_config
+# F-878: scoring-doctrine.ts references canonical_stage column on opportunities
+bare-column:opportunities:canonical_stage
