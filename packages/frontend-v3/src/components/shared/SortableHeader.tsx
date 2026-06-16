@@ -30,6 +30,8 @@ export interface SortableHeaderProps {
     selected: string[];
     onToggle: (value: string) => void;
   };
+  /** Optional info tooltip rendered after sort/filter controls. */
+  infoTooltip?: React.ReactNode;
 }
 
 export function SortableHeader({
@@ -42,6 +44,7 @@ export function SortableHeader({
   align = "left",
   className,
   filter,
+  infoTooltip,
 }: SortableHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const ref = useRef<HTMLTableCellElement>(null);
@@ -117,6 +120,7 @@ export function SortableHeader({
             {filterCount > 0 ? filterCount : "\u25BE"}
           </button>
         )}
+        {infoTooltip}
       </div>
 
       {filter && menuOpen && (

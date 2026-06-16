@@ -25,6 +25,10 @@ export interface OpportunityRow {
   incumbent: string | null;
   description: string | null;
   tags: string[];
+  value_source: string | null;
+  value_confidence: string | null;
+  date_source: string | null;
+  date_confidence: string | null;
   data_source: string;
   is_idiq: boolean;
   analysis: AnalysisBlock | null;
@@ -109,6 +113,10 @@ export interface OpportunitySummary {
   value_min_sources: SourceRef[];
   value_max: number | null;
   value_max_sources: SourceRef[];
+  value_source: string | null;
+  value_confidence: string | null;
+  date_source: string | null;
+  date_confidence: string | null;
   teaming_flags: TeamingFlag[];
   is_idiq: boolean;
   ai_analyzed_at: string | null;

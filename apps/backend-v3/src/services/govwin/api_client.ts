@@ -207,6 +207,54 @@ export async function fetchOpportunityByIdApi(
 }
 
 /**
+ * Search for an opportunity by solicitation number.
+ * Returns the first match or null.
+ */
+export async function searchBySolicitationNumber(
+  solNumber: string,
+): Promise<GovWinApiOpportunity | null> {
+  try {
+    const data = await apiGet<GovWinSearchResult>(
+      `/opportunities?solicitationNumber=${encodeURIComponent(solNumber)}&max=5`,
+    );
+    const rawItems = data.opportunities ?? data.results ?? data.data ?? [];
+    if (rawItems.length === 0) return null;
+    return mapRawToOpp(rawItems[0]!);
+  } catch (err) {
+    logger.warn(
+      { solNumber, error: err instanceof Error ? err.message : String(err) },
+      'govwin_api_search_sol_error',
+    );
+    return null;
+  }
+}
+
+/**
+ * Search for an opportunity by title + agency fuzzy match.
+ * Returns the first match or null.
+ */
+export async function searchByTitleAgency(
+  title: string,
+  agency: string | null,
+): Promise<GovWinApiOpportunity | null> {
+  try {
+    const q = agency ? `${title} ${agency}` : title;
+    const data = await apiGet<GovWinSearchResult>(
+      `/opportunities?q=${encodeURIComponent(q.slice(0, 200))}&max=5`,
+    );
+    const rawItems = data.opportunities ?? data.results ?? data.data ?? [];
+    if (rawItems.length === 0) return null;
+    return mapRawToOpp(rawItems[0]!);
+  } catch (err) {
+    logger.warn(
+      { title, agency, error: err instanceof Error ? err.message : String(err) },
+      'govwin_api_search_title_error',
+    );
+    return null;
+  }
+}
+
+/**
  * Log remaining daily quota for observability.
  */
 export function logQuotaStatus(): void {
