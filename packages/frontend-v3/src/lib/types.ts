@@ -56,7 +56,6 @@ export interface OpportunitySummary {
   pipeline_stage?: string | null;
   days_in_stage?: number | null;
   deadline_warning?: boolean;
-  grade?: string | null;
   source_uri?: string | null;
   ai_analyzed_at?: string | null;
 }
@@ -187,7 +186,6 @@ export interface FastTrackSignal {
   gov_match?: string;
   match_strength?: string;
   your_angle?: string;
-  grade?: string;
   status: string;
   created_at: string;
 }

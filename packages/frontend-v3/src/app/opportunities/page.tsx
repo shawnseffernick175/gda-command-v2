@@ -14,6 +14,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
 import { SourceChip } from "@/components/shared/source-chip";
+import { ScoreTooltip } from "@/components/shared/score-tooltip";
 import { FieldStatusBadge } from "@/components/field-status-badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { useVaultDocuments } from "@/hooks/use-vault";
@@ -70,10 +71,10 @@ function getHeatColor(opp: OpportunitySummary): string | null {
   const daysLeft = getDaysLeft(opp);
   if (daysLeft !== null && (daysLeft <= 7 || daysLeft < 0)) return "border-l-gda-red";
   if (daysLeft !== null && daysLeft <= 30) return "border-l-gda-amber";
-  const grade = opp.pwin?.band === "forecast" ? "A" : opp.pwin?.band === "signal" ? "B" : null;
+  const isHot = opp.pwin && opp.pwin.score >= 70;
   const pipelineStage = opp.pipeline_stage;
-  if (grade === "A" && !pipelineStage) return "border-l-gda-cyan";
-  if (grade === "A" && pipelineStage) return "border-l-gda-green";
+  if (isHot && !pipelineStage) return "border-l-gda-cyan";
+  if (isHot && pipelineStage) return "border-l-gda-green";
   return null;
 }
 
@@ -160,7 +161,7 @@ function OpportunityList() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [agencyFilter, setAgencyFilter] = useState(searchParams.get("agency") ?? "");
-  const [gradeFilter, setGradeFilter] = useState<string[]>([]);
+  const [hotFilter, setHotFilter] = useState(false);
   const [setAsideFilter, setSetAsideFilter] = useState<string[]>([]);
   const [valueRange, setValueRange] = useState(0);
   const [dueFilter, setDueFilter] = useState("");
@@ -178,7 +179,7 @@ function OpportunityList() {
     return {
       q: debouncedQ || undefined,
       agency: agencyFilter || undefined,
-      grades: gradeFilter.length > 0 ? gradeFilter : undefined,
+      hot: hotFilter ? "1" : undefined,
       set_asides: setAsideFilter.length > 0 ? setAsideFilter : undefined,
       value_min: range?.min,
       value_max: range?.max,
@@ -191,7 +192,7 @@ function OpportunityList() {
       sort_dir: sortParams.sort_dir,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, idiqFilter, sortParams.sort_by, sortParams.sort_dir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, idiqFilter, sortParams.sort_by, sortParams.sort_dir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -228,7 +229,7 @@ function OpportunityList() {
   );
 
   const hasActiveFilters =
-    debouncedQ || agencyFilter || gradeFilter.length > 0 || setAsideFilter.length > 0 ||
+    debouncedQ || agencyFilter || hotFilter || setAsideFilter.length > 0 ||
     valueRange !== 0 || dueFilter || sourceFilter.length > 0 || idiqFilter !== undefined;
 
   const handleClearFilters = useCallback(() => {
@@ -236,7 +237,7 @@ function OpportunityList() {
     setQ("");
     setDebouncedQ("");
     setAgencyFilter("");
-    setGradeFilter([]);
+    setHotFilter(false);
     setSetAsideFilter([]);
     setValueRange(0);
     setDueFilter("");
@@ -262,18 +263,8 @@ function OpportunityList() {
     setDueFilter((prev) => (prev === "this_week" ? "" : "this_week"));
   }, []);
 
-  const handleUnscoredClick = useCallback(() => {
-    setGradeFilter((prev) =>
-      prev.includes("Unscored")
-        ? prev.filter((g) => g !== "Unscored")
-        : [...prev, "Unscored"],
-    );
-  }, []);
-
-  const handleGradeAClick = useCallback(() => {
-    setGradeFilter((prev) =>
-      prev.includes("A") ? prev.filter((g) => g !== "A") : [...prev, "A"],
-    );
+  const handleHotClick = useCallback(() => {
+    setHotFilter((prev) => !prev);
   }, []);
 
   const applyAgencyFilter = useCallback((value: string) => {
@@ -323,19 +314,17 @@ function OpportunityList() {
             <IntelChip
               icon="?"
               label={`${meta.unscored_count} Unscored`}
-              active={gradeFilter.includes("Unscored")}
-              onClick={handleUnscoredClick}
+              active={false}
             />
             <IntelChip
               icon="$"
               label={`${formatMoney(meta.total_value)} Total Value`}
               active={false}
             />
-            <IntelChip
-              icon="A"
-              label={`${meta.grade_a_count} Grade A`}
-              active={gradeFilter.includes("A")}
-              onClick={handleGradeAClick}
+            <HotChip
+              count={meta.hot_count}
+              active={hotFilter}
+              onClick={handleHotClick}
             />
             {meta.idiq_count > 0 && (
               <IntelChip
@@ -514,6 +503,42 @@ function OpportunityList() {
         </>
       )}
     </div>
+  );
+}
+
+/* ── Hot (Pwin ≥ 70%) chip with tooltip ─────────────────────────── */
+
+function HotChip({
+  count,
+  active,
+  onClick,
+}: {
+  count: number;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <ScoreTooltip
+      label="Hot"
+      explanation="Hot = opportunities with Pwin (probability of win) ≥ 70%. Count reflects the current filter / tab."
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!onClick}
+        className={cn(
+          "bg-gda-panel border rounded px-3 py-1.5 text-xs font-mono transition-colors",
+          active
+            ? "border-gda-green text-gda-green bg-gda-green/10"
+            : "border-border text-foreground",
+          onClick
+            ? "cursor-pointer hover:border-gda-green/40"
+            : "cursor-default",
+        )}
+      >
+        <svg className="inline-block h-3.5 w-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg> {count} Hot
+      </button>
+    </ScoreTooltip>
   );
 }
 

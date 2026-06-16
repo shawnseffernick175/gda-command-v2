@@ -65,8 +65,6 @@ async function ensureMigrationTables(client: pg.PoolClient): Promise<void> {
       solicitation_number TEXT,
       sam_notice_id TEXT,
       status TEXT NOT NULL DEFAULT 'discovery',
-      grade TEXT,
-      grade_evidence TEXT,
       value_min NUMERIC,
       value_max NUMERIC,
       naics TEXT,
@@ -174,15 +172,15 @@ export async function loadOpportunities(
     await client.query(
       `INSERT INTO v3_opportunities (
         id, title, agency, sub_agency, solicitation_number, sam_notice_id,
-        status, grade, grade_evidence, value_min, value_max, naics, psc,
+        status, value_min, value_max, naics, psc,
         set_aside, place_of_performance, response_due_at, posted_at,
         incumbent, description, tags, data_source, analysis,
         analysis_version, ai_analyzed_at, qualified_at, qualified_by,
         source_id, legacy_id, created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-        $27, $28, $29, $30
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+        $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
+        $25, $26, $27, $28
       )
       ON CONFLICT (legacy_id) WHERE legacy_id IS NOT NULL
       DO UPDATE SET
@@ -216,7 +214,7 @@ export async function loadOpportunities(
         END`,
       [
         r.id, r.title, r.agency, r.sub_agency, r.solicitation_number,
-        r.sam_notice_id, r.status, r.grade, r.grade_evidence, r.value_min,
+        r.sam_notice_id, r.status, r.value_min,
         r.value_max, r.naics, r.psc, r.set_aside, r.place_of_performance,
         r.response_due_at, r.posted_at, r.incumbent, r.description, r.tags,
         r.data_source, r.analysis ? JSON.stringify(r.analysis) : null,

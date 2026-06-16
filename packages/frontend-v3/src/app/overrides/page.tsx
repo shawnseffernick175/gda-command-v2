@@ -26,7 +26,6 @@ const RANGES: { label: string; value: Range }[] = [
   { label: "All time", value: "all" },
 ];
 
-const GRADES = ["A", "B", "C", "D", "F"];
 const STAGES = [
   "interest",
   "qualify",
@@ -74,8 +73,8 @@ function OverridesContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- data.recent is the relevant dep
   }, [data?.recent, sortBy, sortDir]);
 
-  const mostCommonDisagreement = data?.grade_pivot?.[0]
-    ? `${data.grade_pivot[0].ai_value}\u2192${data.grade_pivot[0].human_value}: ${data.grade_pivot[0].count} times`
+  const mostCommonDisagreement = data?.stage_pivot?.[0]
+    ? `${data.stage_pivot[0].ai_value}\u2192${data.stage_pivot[0].human_value}: ${data.stage_pivot[0].count} times`
     : "\u2014";
 
   return (
@@ -136,20 +135,6 @@ function OverridesContent() {
             <Card>
               <CardHeader className="pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground">
-                  Grade Agreement Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <span className="text-2xl font-bold tabular-nums">
-                  {data.agreement_rate.grade_pct === 0
-                    ? "\u2014"
-                    : `${data.agreement_rate.grade_pct}%`}
-                </span>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-1">
-                <CardTitle className="text-xs font-medium text-muted-foreground">
                   Stage Agreement Rate
                 </CardTitle>
               </CardHeader>
@@ -173,25 +158,6 @@ function OverridesContent() {
             </Card>
           </div>
 
-          {/* Grade Pivot Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">
-                Grade Override Matrix
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Rows = AI grade, Columns = Human override
-              </p>
-            </CardHeader>
-            <CardContent>
-              <PivotTable
-                rowLabels={GRADES}
-                colLabels={GRADES}
-                data={data.grade_pivot}
-              />
-            </CardContent>
-          </Card>
-
           {/* Stage Pivot Table */}
           <Card>
             <CardHeader>
@@ -211,80 +177,6 @@ function OverridesContent() {
             </CardContent>
           </Card>
 
-          {/* Top NAICS Disagreements */}
-          {data.top_disagreement_naics.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">
-                  Top 10 NAICS — AI Disagreements
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {data.top_disagreement_naics.map((row) => (
-                    <div
-                      key={row.naics}
-                      className="flex items-center gap-3"
-                    >
-                      <span className="w-20 text-xs font-medium tabular-nums">
-                        {row.naics}
-                      </span>
-                      <div className="flex-1">
-                        <div
-                          className="h-5 rounded bg-gda-green/20"
-                          style={{
-                            width: `${Math.min(100, (row.count / (data.top_disagreement_naics[0]?.count || 1)) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="w-8 text-right text-xs tabular-nums">
-                        {row.count}
-                      </span>
-                      <span className="w-16 text-right text-xs text-muted-foreground">
-                        {row.most_common}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Top Agency Disagreements */}
-          {data.top_disagreement_agency.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">
-                  Top 10 Agencies — AI Disagreements
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {data.top_disagreement_agency.map((row) => (
-                    <div
-                      key={row.agency}
-                      className="flex items-center gap-3"
-                    >
-                      <span className="w-48 truncate text-xs font-medium">
-                        {row.agency}
-                      </span>
-                      <div className="flex-1">
-                        <div
-                          className="h-5 rounded bg-gda-green/20"
-                          style={{
-                            width: `${Math.min(100, (row.count / (data.top_disagreement_agency[0]?.count || 1)) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="w-8 text-right text-xs tabular-nums">
-                        {row.count}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Recent Overrides Feed */}
           <Card>
@@ -297,7 +189,7 @@ function OverridesContent() {
               {data.recent.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No overrides recorded yet. Overrides appear here when you
-                  change an opportunity{"\u2019"}s grade or pipeline stage from
+                  change an opportunity{"\u2019"}s pipeline stage from
                   the system-suggested value.
                 </p>
               ) : (
@@ -332,7 +224,7 @@ function OverridesContent() {
                           <td className="py-2 pr-4 capitalize">
                             {row.field_name === "pipeline_stage"
                               ? "Stage"
-                              : "Grade"}
+                              : row.field_name}
                           </td>
                           <td className="py-2 pr-4 font-medium">
                             AI: {row.ai_value ?? "none"} → You:{" "}

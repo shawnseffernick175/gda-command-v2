@@ -59,8 +59,8 @@ export async function buildApp() {
     trustProxy: true,
   });
 
-  await app.register(fastifyCookie);
   await app.register(fastifyCors, { origin: true, credentials: true });
+  await app.register(fastifyCookie);
 
   await app.register(fastifySwagger, {
     openapi: {
