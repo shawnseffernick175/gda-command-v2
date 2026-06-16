@@ -63,7 +63,7 @@ async function fetchEntityContext(entityKind: string, entityId: string): Promise
   if (entityKind === 'opportunity') {
     const res = await pool.query(
       `SELECT title, description, agency, naics, set_aside, value_min, value_max,
-              analysis, status, grade
+              analysis, status
        FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
       [entityId]
     );
