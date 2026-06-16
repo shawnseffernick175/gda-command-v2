@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useCompetitorsPaged, useCompetitorsCount, useBlackHatAnalysis } from "@/hooks/use-competitors";
 import { Pagination } from "@/components/shared/Pagination";
@@ -8,9 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
 import CompetitorDetailPanel, { SizeBadge } from "@/components/CompetitorDetailPanel";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
 import type { Competitor } from "@/lib/types";
 
 export default function CompetitorsPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <CompetitorsContent />
+    </Suspense>
+  );
+}
+
+function CompetitorsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -47,7 +57,9 @@ export default function CompetitorsPage() {
 
   const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
 
-  const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, limit: 50, page: currentPage });
+  const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
+
+  const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, limit: 50, page: currentPage, ...sortParams });
   const { data: countData } = useCompetitorsCount();
 
   const items = data?.items ?? [];
@@ -101,13 +113,13 @@ export default function CompetitorsPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Company</th>
-              <th className="px-3 py-2 text-left font-medium">Wins</th>
-              <th className="px-3 py-2 text-left font-medium">Total Obligated</th>
-              <th className="px-3 py-2 text-left font-medium">Largest Award</th>
-              <th className="px-3 py-2 text-left font-medium">Last Win</th>
-              <th className="px-3 py-2 text-left font-medium">Agencies</th>
-              <th className="px-3 py-2 text-left font-medium">NAICS</th>
+              <SortableHeader label="Company" field="name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Wins" field="win_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Total Obligated" field="total_obligated" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Largest Award" field="largest_award" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Last Win" field="last_win" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Agencies" field="agency_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="NAICS" field="naics_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>

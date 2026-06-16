@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { randomBytes, createHash } from 'node:crypto';
 import { config } from '../config/index.js';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
@@ -8,11 +9,27 @@ import type { JwtPayload } from '../middleware/auth.js';
 
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
-const TOKEN_TTL = '12h';
+const ACCESS_TOKEN_TTL = '15m';
+const REFRESH_TOKEN_DAYS = 30;
+const REFRESH_TOKEN_SECONDS = REFRESH_TOKEN_DAYS * 24 * 60 * 60;
 
 interface LoginBody {
   email: string;
   password: string;
+}
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function refreshCookieOptions(secure: boolean) {
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict' as const,
+    path: '/v3/auth',
+    maxAge: REFRESH_TOKEN_SECONDS,
+  };
 }
 
 async function recordAudit(
@@ -31,7 +48,35 @@ async function recordAudit(
   );
 }
 
+async function issueRefreshToken(
+  userId: number,
+  req: FastifyRequest,
+): Promise<string> {
+  const plaintext = randomBytes(32).toString('base64url');
+  const tokenHash = hashToken(plaintext);
+  const userAgent = req.headers['user-agent'] || null;
+  const ip = req.ip || null;
+
+  await pool.query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip)
+     VALUES ($1, $2, NOW() + INTERVAL '${REFRESH_TOKEN_DAYS} days', $3, $4::inet)`,
+    [userId, tokenHash, userAgent, ip],
+  );
+
+  return plaintext;
+}
+
+async function revokeTokenFamily(userId: number): Promise<void> {
+  await pool.query(
+    `UPDATE refresh_tokens SET revoked_at = NOW()
+     WHERE user_id = $1 AND revoked_at IS NULL`,
+    [userId],
+  );
+}
+
 export async function authRoutes(app: FastifyInstance): Promise<void> {
+  const isSecure = config.nodeEnv === 'production';
+
   app.post('/v3/auth/login', async (req: FastifyRequest, reply: FastifyReply) => {
     const { email, password } = req.body as LoginBody;
 
@@ -66,7 +111,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
-    // Check lockout
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
       const retryAfter = Math.ceil(
         (new Date(user.locked_until).getTime() - Date.now()) / 1000,
@@ -81,7 +125,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // Verify password
     if (!user.password_hash) {
       await recordAudit(user.id, normalizedEmail, 'login_failure', req);
       return reply.status(401).send(
@@ -137,8 +180,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     const token = jwt.sign(payload, config.jwtSecret, {
       algorithm: config.jwtAlgorithm,
-      expiresIn: TOKEN_TTL,
+      expiresIn: ACCESS_TOKEN_TTL,
     });
+
+    const refreshToken = await issueRefreshToken(user.id, req);
+
+    void reply.setCookie('gda_refresh', refreshToken, refreshCookieOptions(isSecure));
 
     await recordAudit(user.id, normalizedEmail, 'login_success', req);
 
@@ -190,51 +237,118 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/v3/auth/refresh', async (req: FastifyRequest, reply: FastifyReply) => {
-    const userPayload = (req as FastifyRequest & { user: JwtPayload }).user;
-    if (!userPayload) {
+    const cookieValue = (req.cookies as Record<string, string | undefined>)?.gda_refresh;
+
+    if (!cookieValue) {
       return reply.status(401).send(
-        errorEnvelope('UNAUTHORIZED', 'Missing or invalid authorization', req.requestId),
+        errorEnvelope('INVALID_REFRESH_TOKEN', 'No refresh token provided', req.requestId),
       );
     }
 
-    const newPayload: JwtPayload = {
-      sub: userPayload.sub,
-      email: userPayload.email,
-      role: userPayload.role,
-    };
+    const tokenHash = hashToken(cookieValue);
 
-    const token = jwt.sign(newPayload, config.jwtSecret, {
-      algorithm: config.jwtAlgorithm,
-      expiresIn: TOKEN_TTL,
-    });
-
-    await recordAudit(
-      Number(userPayload.sub) || null,
-      userPayload.email || 'unknown',
-      'token_refresh',
-      req,
+    const tokenRes = await pool.query(
+      `SELECT rt.id, rt.user_id, rt.revoked_at, rt.expires_at,
+              u.email, u.role, u.is_active
+       FROM refresh_tokens rt
+       JOIN users u ON u.id = rt.user_id
+       WHERE rt.token_hash = $1`,
+      [tokenHash],
     );
 
+    if (tokenRes.rows.length === 0) {
+      void reply.clearCookie('gda_refresh', { path: '/v3/auth' });
+      return reply.status(401).send(
+        errorEnvelope('INVALID_REFRESH_TOKEN', 'Invalid refresh token', req.requestId),
+      );
+    }
+
+    const row = tokenRes.rows[0];
+
+    // Revoked token reuse → compromise detected, revoke entire family
+    if (row.revoked_at) {
+      await revokeTokenFamily(row.user_id);
+      void reply.clearCookie('gda_refresh', { path: '/v3/auth' });
+      await recordAudit(row.user_id, row.email ?? 'unknown', 'refresh_revoked_reuse', req);
+      return reply.status(401).send(
+        errorEnvelope('REVOKED_REFRESH_TOKEN', 'Refresh token has been revoked', req.requestId),
+      );
+    }
+
+    if (new Date(row.expires_at) < new Date()) {
+      void reply.clearCookie('gda_refresh', { path: '/v3/auth' });
+      return reply.status(401).send(
+        errorEnvelope('EXPIRED_REFRESH_TOKEN', 'Refresh token has expired', req.requestId),
+      );
+    }
+
+    if (!row.is_active) {
+      void reply.clearCookie('gda_refresh', { path: '/v3/auth' });
+      return reply.status(401).send(
+        errorEnvelope('UNAUTHORIZED', 'Account is disabled', req.requestId),
+      );
+    }
+
+    // Rotate: issue new refresh token, revoke old one
+    const newRefreshToken = await issueRefreshToken(row.user_id, req);
+
+    // Get the new token's id for replaced_by_id tracking
+    const newTokenHash = hashToken(newRefreshToken);
+    const newTokenRes = await pool.query(
+      `SELECT id FROM refresh_tokens WHERE token_hash = $1`,
+      [newTokenHash],
+    );
+    const newTokenId = newTokenRes.rows[0]?.id ?? null;
+
+    await pool.query(
+      `UPDATE refresh_tokens SET revoked_at = NOW(), replaced_by_id = $1 WHERE id = $2`,
+      [newTokenId, row.id],
+    );
+
+    // Issue new access token
+    const jwtPayload: JwtPayload = {
+      sub: String(row.user_id),
+      email: row.email,
+      role: row.role,
+    };
+
+    const accessToken = jwt.sign(jwtPayload, config.jwtSecret, {
+      algorithm: config.jwtAlgorithm,
+      expiresIn: ACCESS_TOKEN_TTL,
+    });
+
+    void reply.setCookie('gda_refresh', newRefreshToken, refreshCookieOptions(isSecure));
+
+    await recordAudit(row.user_id, row.email ?? 'unknown', 'refresh', req);
+
     return reply.status(200).send(
-      successEnvelope({ token }, req.requestId),
+      successEnvelope({ token: accessToken }, req.requestId),
     );
   });
 
   app.post('/v3/auth/logout', async (req: FastifyRequest, reply: FastifyReply) => {
-    const userPayload = (req as FastifyRequest & { user: JwtPayload }).user;
-    if (!userPayload) {
-      return reply.status(401).send(
-        errorEnvelope('UNAUTHORIZED', 'Missing or invalid authorization', req.requestId),
+    const cookieValue = (req.cookies as Record<string, string | undefined>)?.gda_refresh;
+
+    if (cookieValue) {
+      const tokenHash = hashToken(cookieValue);
+      const tokenRes = await pool.query(
+        `SELECT rt.id, rt.user_id, u.email
+         FROM refresh_tokens rt
+         JOIN users u ON u.id = rt.user_id
+         WHERE rt.token_hash = $1 AND rt.revoked_at IS NULL`,
+        [tokenHash],
       );
+      if (tokenRes.rows.length > 0) {
+        const row = tokenRes.rows[0];
+        await pool.query(
+          `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`,
+          [row.id],
+        );
+        await recordAudit(row.user_id, row.email ?? 'unknown', 'logout', req);
+      }
     }
 
-    await recordAudit(
-      Number(userPayload.sub) || null,
-      userPayload.email || 'unknown',
-      'logout',
-      req,
-    );
-
+    void reply.clearCookie('gda_refresh', { path: '/v3/auth' });
     return reply.status(204).send();
   });
 }

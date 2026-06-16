@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { Suspense, useState, useRef, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -23,6 +23,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
 import {
   STAGE_TABS as CANONICAL_STAGE_TABS,
   STAGE_ACTIONS as CANONICAL_STAGE_ACTIONS,
@@ -168,22 +170,8 @@ function OpportunityList() {
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const [page, setPage] = useState(1);
-  // Column sort state. null sortBy = default recency order.
-  const [sortBy, setSortBy] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Click a column to sort. Same column toggles direction; new column starts desc.
-  const handleSort = useCallback((field: string) => {
-    setSortBy((prevField) => {
-      if (prevField === field) {
-        setSortDir((d) => (d === "desc" ? "asc" : "desc"));
-        return field;
-      }
-      setSortDir("desc");
-      return field;
-    });
-  }, []);
 
   const filterParams = useMemo(() => {
     const range = VALUE_RANGES[valueRange];
@@ -199,11 +187,11 @@ function OpportunityList() {
       stage: stageTab !== "all" ? stageTab : undefined,
       relevant_only: relevantOnly,
       idiq: idiqFilter,
-      sort_by: sortBy ?? undefined,
-      sort_dir: sortBy ? sortDir : undefined,
+      sort_by: sortParams.sort_by,
+      sort_dir: sortParams.sort_dir,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, idiqFilter, sortBy, sortDir]);
+  }, [debouncedQ, agencyFilter, gradeFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, idiqFilter, sortParams.sort_by, sortParams.sort_dir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -562,116 +550,7 @@ function IntelChip({
   );
 }
 
-/* ── Sortable / filterable table header ─────────────────────────── */
-
-function SortableHeader({
-  label,
-  field,
-  sortBy,
-  sortDir,
-  onSort,
-  width,
-  align = "left",
-  filter,
-}: {
-  label: string;
-  field?: string;
-  sortBy: string | null;
-  sortDir: "asc" | "desc";
-  onSort: (field: string) => void;
-  width?: string;
-  align?: "left" | "right";
-  filter?: {
-    options: readonly string[];
-    selected: string[];
-    onToggle: (value: string) => void;
-  };
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const ref = useRef<HTMLTableCellElement>(null);
-  const active = field != null && sortBy === field;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
-
-  // ASCII carets only (no unicode glyphs, to satisfy the forbidden-token check).
-  const caret = active ? (sortDir === "asc" ? "^" : "v") : "";
-  const filterCount = filter?.selected.length ?? 0;
-
-  return (
-    <th
-      ref={ref}
-      className={cn(
-        "relative px-3 py-2 font-medium",
-        align === "right" ? "text-right" : "text-left",
-      )}
-      style={width ? { width } : undefined}
-    >
-      <div className={cn("flex items-center gap-1", align === "right" && "justify-end")}>
-        {field ? (
-          <button
-            type="button"
-            onClick={() => onSort(field)}
-            className={cn(
-              "flex items-center gap-1 transition-colors hover:text-foreground",
-              active ? "text-gda-green" : "text-muted-foreground",
-            )}
-            title={`Sort by ${label}`}
-          >
-            <span>{label}</span>
-            {caret && <span className="font-mono text-[11px]">{caret}</span>}
-          </button>
-        ) : (
-          <span className="text-muted-foreground">{label}</span>
-        )}
-        {filter && (
-          <button
-            type="button"
-            onClick={() => setMenuOpen((o) => !o)}
-            className={cn(
-              "flex items-center font-mono text-[10px] transition-colors hover:text-foreground",
-              filterCount > 0 ? "text-gda-green" : "text-muted-foreground/60",
-            )}
-            title={`Filter ${label}`}
-          >
-            <span>{"\u25BE"}</span>
-            {filterCount > 0 && (
-              <span className="ml-0.5 rounded-full bg-gda-green/20 px-1 text-gda-green">
-                {filterCount}
-              </span>
-            )}
-          </button>
-        )}
-      </div>
-      {filter && menuOpen && (
-        <div className="absolute top-full left-0 mt-1 z-50 rounded border border-border bg-gda-panel shadow-lg py-1 min-w-[150px] font-normal normal-case">
-          {filter.options.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => filter.onToggle(opt)}
-              className={cn(
-                "w-full text-left px-3 py-1 text-xs hover:bg-gda-green/10 transition-colors flex items-center gap-2",
-                filter.selected.includes(opt) ? "text-gda-green" : "text-foreground",
-              )}
-            >
-              <span className="w-3">{filter.selected.includes(opt) ? "x" : ""}</span>
-              {opt}
-            </button>
-          ))}
-        </div>
-      )}
-    </th>
-  );
-}
+/* Inline SortableHeader removed — using shared component from @/components/shared/SortableHeader */
 
 /* ── Vehicle grouped view ───────────────────────────────────────── */
 

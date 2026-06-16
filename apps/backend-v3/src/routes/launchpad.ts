@@ -52,32 +52,8 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
       .send(successEnvelope(result, req.requestId));
   });
 
-  // ── GET /v3/launchpad/signals — live market intel from daily briefing + fast track ──
+  // ── GET /v3/launchpad/signals — live Fast Track signals ──
   app.get('/v3/launchpad/signals', async (req, reply) => {
-    const todayET = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-
-    // Try today's briefing first, fall back to most recent
-    let briefingRow: { briefing_date: string; market_intel_summary: string; generated_at: string } | null = null;
-    const todayRes = await pool.query<{ briefing_date: string; market_intel_summary: string; generated_at: string }>(
-      `SELECT briefing_date, market_intel_summary, generated_at::text
-       FROM daily_briefing_cache
-       WHERE briefing_date = $1`,
-      [todayET],
-    );
-    if (todayRes.rows.length > 0) {
-      briefingRow = todayRes.rows[0]!;
-    } else {
-      const fallbackRes = await pool.query<{ briefing_date: string; market_intel_summary: string; generated_at: string }>(
-        `SELECT briefing_date, market_intel_summary, generated_at::text
-         FROM daily_briefing_cache
-         ORDER BY briefing_date DESC
-         LIMIT 1`,
-      );
-      if (fallbackRes.rows.length > 0) {
-        briefingRow = fallbackRes.rows[0]!;
-      }
-    }
-
     // 3 most recent fast_track_signals
     const ftRes = await pool.query<{
       id: string;
@@ -95,8 +71,8 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
     );
 
     const payload = {
-      briefing_date: briefingRow?.briefing_date ?? null,
-      market_intel: briefingRow?.market_intel_summary ?? null,
+      briefing_date: null,
+      market_intel: null,
       ft_signals: ftRes.rows.map((r) => ({
         id: r.id,
         title: r.title,
@@ -106,7 +82,7 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
         urgency: r.urgency,
         created_at: r.ingested_at,
       })),
-      generated_at: briefingRow?.generated_at ?? new Date().toISOString(),
+      generated_at: new Date().toISOString(),
     };
 
     return reply.status(200).send(successEnvelope(payload, req.requestId));

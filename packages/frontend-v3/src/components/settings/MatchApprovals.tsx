@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
 import {
   useMatchSuggestions,
@@ -12,7 +12,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import type { MatchSuggestion, BulkDecisionItem } from "@/lib/types";
+
+const APPROVAL_SORT_COLS: ColumnSortConfig[] = [
+  { field: "confidence", type: "number" },
+  { field: "reason", type: "string" },
+  { field: "created_at", type: "date" },
+  { field: "status", type: "enum", enumOrder: ["pending", "confirmed", "rejected"] },
+];
 
 function SuggestionCard({
   suggestion: s,
@@ -88,14 +98,27 @@ function SuggestionCard({
 }
 
 export function MatchApprovals() {
+  return (
+    <Suspense fallback={<div />}>
+      <MatchApprovalsContent />
+    </Suspense>
+  );
+}
+
+function MatchApprovalsContent() {
   const { user } = useAuth();
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const { data, isLoading, error, refetch } = useMatchSuggestions({ limit: 100 });
   const decide = useDecideMatch();
   const bulkDecide = useBulkDecide();
+  const { sortBy, sortDir, handleSort } = useTableSort();
 
-  const items = data?.items ?? [];
-  const pending = items.filter((s) => s.status === "pending");
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const pending = useMemo(() => {
+    const p = items.filter((s) => s.status === "pending");
+    if (!sortBy) return p;
+    return sortData(p as unknown as Record<string, unknown>[], sortBy, sortDir, APPROVAL_SORT_COLS) as unknown as MatchSuggestion[];
+  }, [items, sortBy, sortDir]);
 
   function toggleSelect(linkId: number) {
     setSelected((prev) => {
@@ -177,6 +200,12 @@ export function MatchApprovals() {
         </Card>
       ) : (
         <div className="space-y-2">
+          <table className="w-full"><thead><tr>
+            <SortableHeader label="Confidence" field="confidence" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Reason" field="reason" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Created" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+          </tr></thead></table>
           {pending.map((s) => (
             <SuggestionCard
               key={s.link_id}

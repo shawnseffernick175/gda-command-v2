@@ -19,6 +19,9 @@ import {
 import { Pagination } from "@/components/shared/Pagination";
 import { PendingState } from "@/components/shared/pending-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -421,6 +424,12 @@ const DOC_TYPE_OPTIONS = [...VAULT_BUCKETS]
     return (DOC_TYPE_LABELS[a] ?? a).localeCompare(DOC_TYPE_LABELS[b] ?? b);
   });
 
+const VAULT_SORT_COLS: ColumnSortConfig[] = [
+  { field: "filename", type: "string" },
+  { field: "doc_type", type: "string" },
+  { field: "uploaded_at", type: "date" },
+];
+
 function WorkProductTable({
   items,
   isLoading,
@@ -437,6 +446,12 @@ function WorkProductTable({
   const updateDocType = useUpdateVaultDocType();
   const reExtract = useReExtractVaultDocument();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { sortBy, sortDir, handleSort } = useTableSort("vault");
+
+  const sorted = useMemo(() => {
+    if (!sortBy) return items;
+    return sortData(items as unknown as Record<string, unknown>[], sortBy, sortDir, VAULT_SORT_COLS) as unknown as VaultDocument[];
+  }, [items, sortBy, sortDir]);
 
   useEffect(() => {
     if (!errorMsg) return;
@@ -472,18 +487,18 @@ function WorkProductTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-            <th className="px-3 py-2 text-left font-medium">Filename</th>
-            <th className="px-3 py-2 text-left font-medium">Type</th>
-            <th className="px-3 py-2 text-center font-medium" title="Extraction status">Extract</th>
-            <th className="px-3 py-2 text-center font-medium" title="AI ingestion status">AI</th>
-            <th className="px-3 py-2 text-left font-medium">Linked To</th>
-            <th className="px-3 py-2 text-left font-medium">Regulatory Refs</th>
-            <th className="px-3 py-2 text-left font-medium">Uploaded</th>
-            <th className="px-3 py-2 text-left font-medium">Actions</th>
+            <SortableHeader label="Filename" field="filename" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortableHeader label="Type" field="doc_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <th className="px-3 py-2 text-center font-medium bg-gda-bg-base" title="Extraction status">Extract</th>
+            <th className="px-3 py-2 text-center font-medium bg-gda-bg-base" title="AI ingestion status">AI</th>
+            <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Linked To</th>
+            <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Regulatory Refs</th>
+            <SortableHeader label="Uploaded" field="uploaded_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((doc) => (
+          {sorted.map((doc) => (
             <tr
               key={doc.id}
               className="border-b border-border hover:bg-gda-panel/50 transition-colors group"

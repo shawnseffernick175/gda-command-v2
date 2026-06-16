@@ -41,7 +41,7 @@ describe('JWT auth middleware', () => {
     expect(body.error.code).toBe('UNAUTHORIZED');
   });
 
-  it('returns 401 for expired JWT', async () => {
+  it('returns 401 for expired JWT on protected endpoints', async () => {
     const token = jwt.sign(
       { sub: 'user-1', email: 'test@gda.local' },
       'test-jwt-secret',
@@ -56,6 +56,25 @@ describe('JWT auth middleware', () => {
     const body = JSON.parse(res.body) as { success: boolean; error: { code: string; message: string } };
     expect(body.error.code).toBe('UNAUTHORIZED');
     expect(body.error.message).toBe('Token expired');
+  });
+
+  it('/v3/auth/refresh is public (no Bearer required)', async () => {
+    // Without a cookie, should return 401 INVALID_REFRESH_TOKEN (not generic UNAUTHORIZED)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v3/auth/refresh',
+    });
+    expect(res.statusCode).toBe(401);
+    const body = JSON.parse(res.body) as { success: boolean; error: { code: string } };
+    expect(body.error.code).toBe('INVALID_REFRESH_TOKEN');
+  });
+
+  it('/v3/auth/logout is public (no Bearer required)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v3/auth/logout',
+    });
+    expect(res.statusCode).toBe(204);
   });
 
   it('returns 401 for invalid JWT secret', async () => {

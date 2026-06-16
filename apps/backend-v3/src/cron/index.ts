@@ -32,7 +32,6 @@ import { trainIfReady } from '../services/pwin/index.js';
 import { batchScoreOpportunities } from '../services/pwin/batch-score.js';
 import { generateActionItems } from '../jobs/generateActionItems.js';
 import { runDigestRefresh } from './digest-refresh.js';
-import { runDailyBriefingCron } from './daily-briefing.js';
 import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
@@ -107,19 +106,6 @@ export function startCronScheduler(): void {
   if (!govwinEnabled) {
     logger.info({ flag: 'GOVWIN_CONNECTOR_V1' }, '[cron] govwin.6h skipped — gated behind feature flag');
   }
-
-  // Daily briefing auto-delivery — 6:00 AM ET (11:00 UTC) on weekdays
-  const briefingDeliveryTask = cron.schedule('0 11 * * 1-5', async () => {
-    try {
-      logger.info('[cron] briefing.delivery starting');
-      await runDailyBriefingCron();
-      logger.info('[cron] briefing.delivery completed');
-    } catch (err) {
-      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_briefing_delivery_error');
-    }
-  });
-  tasks.push(briefingDeliveryTask);
-  logger.info({ schedule: '0 11 * * 1-5' }, '[cron] registered: briefing.delivery (0 11 * * 1-5)');
 
   // PWin batch scoring — daily at 01:00 UTC (before retrain at 02:00 and action-items at 06:30)
   const pwinBatchScoreTask = cron.schedule('0 1 * * *', async () => {
@@ -304,6 +290,24 @@ export function startCronScheduler(): void {
       `[cron] registered: ${cronLabel} (${job.schedule})`,
     );
   }
+
+  // Refresh token pruning — daily at 03:30 UTC
+  const refreshTokenPruneTask = cron.schedule('30 3 * * *', async () => {
+    try {
+      logger.info('[cron] refresh-token-prune starting');
+      const res = await pool.query(
+        `DELETE FROM refresh_tokens WHERE expires_at < NOW() - INTERVAL '7 days'`,
+      );
+      logger.info(
+        { deleted: res.rowCount },
+        '[cron] refresh-token-prune completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_refresh_token_prune_error');
+    }
+  });
+  tasks.push(refreshTokenPruneTask);
+  logger.info({ schedule: '30 3 * * *' }, '[cron] registered: refresh-token-prune (30 3 * * *)');
 }
 
 export function stopCronScheduler(): void {
