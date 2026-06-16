@@ -37,6 +37,7 @@ import { discoverCompetitorContacts } from '../services/contacts/competitor-disc
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
+import { pollAllDueSources } from '../services/idiq-ops/taskOrderIngestService.js';
 import { runAutoPassDeadline } from './auto-pass-deadline.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { pool } from '../lib/db.js';
@@ -262,6 +263,20 @@ export function startCronScheduler(): void {
   tasks.push(incumbentEnrichTask);
   logger.info({ schedule: '0 6 * * *' }, '[cron] registered: incumbent-enrichment (0 6 * * *)');
 
+  // IDIQ Ops — poll vehicle TO sources every hour
+  const idiqOpsPollTask = cron.schedule('5 * * * *', async () => {
+    try {
+      const result = await pollAllDueSources();
+      logger.info(
+        { ingested: result.totalIngested, errors: result.totalErrors },
+        '[cron] idiq-ops TO poll completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_idiq_ops_poll_error');
+    }
+  });
+  tasks.push(idiqOpsPollTask);
+  logger.info({ schedule: '5 * * * *' }, '[cron] registered: idiq-ops-poll (5 * * * *)');
   // Auto-pass deadline — daily at 07:00 UTC (03:00 ET, after incumbent enrichment)
   // CEO rule: opportunities with <30 days to deadline and no active capture are auto-passed
   const autoPassDeadlineTask = cron.schedule('0 7 * * *', async () => {

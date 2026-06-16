@@ -16,6 +16,7 @@ import {
   Radio,
   Layers,
   GitCompare,
+  Activity,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -31,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "FasTrac", href: "/fastrac", icon: Zap },
   { label: "Opportunities", href: "/opportunities", icon: Search },
   { label: "Vehicles", href: "/vehicles", icon: Layers },
+  { label: "IDIQ Ops", href: "/idiq-ops", icon: Activity },
   { label: "Capture", href: "/capture", icon: Target },
   { label: "Pipeline", href: "/pipeline", icon: BarChart3 },
   { label: "Awards & Intel", href: "/awards", icon: Trophy },
