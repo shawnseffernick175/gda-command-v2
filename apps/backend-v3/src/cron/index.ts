@@ -37,6 +37,7 @@ import { discoverCompetitorContacts } from '../services/contacts/competitor-disc
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
+import { runAutoPassDeadline } from './auto-pass-deadline.js';
 import { pool } from '../lib/db.js';
 
 const sbirEnabled = process.env.ENABLE_SBIR_INGEST === 'true';
@@ -249,6 +250,23 @@ export function startCronScheduler(): void {
   });
   tasks.push(incumbentEnrichTask);
   logger.info({ schedule: '0 6 * * *' }, '[cron] registered: incumbent-enrichment (0 6 * * *)');
+
+  // Auto-pass deadline — daily at 07:00 UTC (03:00 ET, after incumbent enrichment)
+  // CEO rule: opportunities with <30 days to deadline and no active capture are auto-passed
+  const autoPassDeadlineTask = cron.schedule('0 7 * * *', async () => {
+    try {
+      logger.info('[cron] auto-pass-deadline starting');
+      const result = await runAutoPassDeadline();
+      logger.info(
+        { scanned: result.scanned, passed: result.passed, skipped_active: result.skipped_active_capture, skipped_terminal: result.skipped_already_terminal },
+        '[cron] auto-pass-deadline completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_auto_pass_deadline_error');
+    }
+  });
+  tasks.push(autoPassDeadlineTask);
+  logger.info({ schedule: '0 7 * * *' }, '[cron] registered: auto-pass-deadline (0 7 * * *)');
 
   for (const job of JOBS) {
     if (!registeredSources.includes(job.sourceKey)) {
