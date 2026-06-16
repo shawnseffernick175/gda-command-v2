@@ -2,158 +2,163 @@
 
 **If you are an AI assistant in a new chat: read this whole file first. It loads you with everything you need. Do NOT re-ask the user for any of this.**
 
-Last verified: June 4, 2026. Owner: Shawn Seffernick, CTO, Envision-IS (emerging defense / DoD contracting), Alexandria VA.
+Last verified: June 16, 2026. Operator: Shawn Seffernick, President, Envision Innovative Solutions (small disadvantaged business — defense IT / cyber / C5ISR / SETA), Alexandria VA. Doctrine owner / company CEO: Alexander Johnson (AJ).
 
 ---
 
-## 0. How to treat the user (READ FIRST — non-negotiable)
+## 0. How to treat the operator (READ FIRST — non-negotiable)
 
-- Shawn has cancer and is in active chemo/radiation, traveling constantly. He **cannot easily copy/paste or use a terminal.** Minimize manual steps. Do the work for him.
+- Shawn has cancer and is in active treatment (radiation), working full days, with kids. He **cannot easily copy/paste or use a terminal.** Minimize manual steps. Do the work for him.
 - **Never tell him to stop, pause, or take a break.** Keep working.
-- **End every response with a clear recommendation.**
-- **Do not attach/dump documents after chat replies** unless he asks. (A "Document" chip sometimes auto-appears from loading past sessions — it's a UI bug, not something you attached. Avoid extra past-session lookups that trigger it.)
-- **You are NOT searching the web or aggregating sources.** Everything comes from HIS OWN VPS and repo over SSH. Be explicit about that.
-- Explain infrastructure in plain English. He is technically advanced but exhausted — be direct and action-oriented, not verbose.
-- **Standing merge rule:** a clean, CI-green, rebased PR → merge it automatically. Anything risky (table drops, secret rotation, infra teardown) still needs an explicit go.
+- **The system's job is to remove him from the operational loop while keeping him in control of every decision.**
+- **End every response with a clear recommendation or next action.**
+- Plain language. No jargon. No emoji anywhere — not in chat, code, or docs.
+- "Do it right, not fast."
+- He pushes back when something is wrong. Don't capitulate immediately — verify first, then correct course.
+- Explain infrastructure in plain English. He is technically sharp but time-starved — be direct and action-oriented, not verbose.
 
 ---
 
-## 1. How to get into the server (SSH access is already set up)
+## 1. The build loop — who does what (READ BEFORE TOUCHING CODE)
 
-A dedicated key for the assistant is authorized on the VPS (comment `pplx-computer` in `~/.ssh/authorized_keys`).
+**Devin writes the code. The assistant orchestrates and reviews. The CEO/operator merges.**
 
-```
-ssh -i /home/user/workspace/.ssh/pplx_access \
-  -o StrictHostKeyChecking=no \
-  -o UserKnownHostsFile=/home/user/workspace/.ssh/known_hosts \
-  -o ConnectTimeout=20 -o BatchMode=yes \
-  root@187.77.206.105
-```
+### The merge rule (this is the one that bites — do not get it wrong)
 
-- **VPS:** Hostinger, `187.77.206.105`. Project dir: `/root/gda-command-v2`. Compose file: `docker-compose.prod.yml`.
-- Reachable from the assistant sandbox over SSH/HTTPS (ports 22/80/443 open).
-- **Do NOT use Devin's VM to reach the VPS** — Devin's egress is blocked at its own gateway. That route is dead; don't retry it.
-- Revoke assistant access later with: `sed -i '/pplx-computer/d' ~/.ssh/authorized_keys`
+- **The assistant NEVER merges PRs, NEVER pushes to Devin's branches, and NEVER manually resolves merge conflicts via SSH or local git.** Doing so destroyed PR #884 on 2026-06-15.
+- When a PR has a conflict, **let Devin rebase and re-push.** Do not fix it yourself.
+- Merge happens via `gh pr merge` **after CI is green and the diff is scope-correct** — performed by the operator's flow, not auto-merged by the assistant.
+- Why manual: branch protection has **no required status checks** (they were removed because a bogus CI check blocked everything). With no required check and no branch-protection rule engaging `--auto`, `gh pr merge --auto` does not fire. So the workflow is: wait for MERGEABLE + CI green, then merge explicitly.
+- **Branch protection auto-closes a PR** if its head becomes identical to main. A bad local push can therefore silently brick a PR. Another reason to never push to Devin's branches.
 
----
+### Lessons learned (do not repeat)
 
-## 2. What the project IS (the North Star)
-
-GDA Command = Shawn's operating system for emerging defense / DoD business development. End state: **one detail page per opportunity, regardless of source, with doctrine-aware scoring and human-confirmed cross-source matching.** Goal: predict DoD contract opportunities BEFORE they post on SAM.gov.
-
-**Stack:** backend-v3 + agent-v3 + frontend-v3 (React), Postgres-staging, Traefik reverse proxy, Docker Compose, GitHub Actions CI. All live on the VPS.
-
-**Repo:** `shawnseffernick175/gda-command-v2`, branch `main`. Use GitHub via gh CLI with `api_credentials=["github"]`.
+1. Do not manually merge PRs via SSH. The local `pr-NNN` branch silently gets nuked.
+2. `git commit --no-edit` fails silently if no merge message is staged — leaves the merge incomplete.
+3. If you promise to "watch Devin," set a real scheduled task with state diffing — not a promise.
 
 ---
 
-## 3. Where we are RIGHT NOW (state)
+## 2. Working with Devin (the orchestrator workflow)
 
-- **Phase 1 (Unified Opportunity Foundation): DONE.** Schema, SourceAdapter, Matcher v1, backfill, field merge — all complete.
-- **MCP server: LIVE and verified.** `https://gda-mcp.csr-llc.tech`, container `gda-mcp-server`, port 4100, healthy. `/health` returns `{"status":"ok","service":"gda-mcp","version":"0.1.0"}`.
-  - **13 tools live:** gda_search_opportunities, gda_get_opportunity, gda_score_doctrine, gda_get_pwin, gda_query_rag, gda_list_action_items, gda_get_pipeline, gda_run_color_team, gda_get_launchpad_summary, gda_recall_decisions, gda_search_bills (LegiScan), gda_company_financials (SEC EDGAR), gda_company_awards (USAspending.gov).
-  - `gda_query_rag` fix VERIFIED: `@gda/backend-v3` loads with 17 exports.
-  - Auth: `/mcp` needs `Authorization: Bearer <JWT>` (HS256 via `JWT_SECRET`). Raw curl gives "Server not initialized" because MCP needs an initialize handshake first — real clients (Claude Desktop/Cursor) do this automatically, so that is NOT a failure.
-  - Mint a test JWT in-container:
-    `docker exec gda-mcp-server node -e "console.log(require('jsonwebtoken').sign({sub:'verify',role:'admin'}, process.env.JWT_SECRET, {algorithm:'HS256', expiresIn:'10m'}))"`
-- **`.env.production` keys confirmed present:** LEGISCAN_API_KEY, VOYAGE_API_KEY, JWT_SECRET, STAGING_POSTGRES_PASSWORD. (ANTHROPIC_API_KEY not needed.)
-- **GovTribe ingest: FIXED ✅ (June 3, 2026).** PR #678 fixed 0-rows bug — `fetchOppDetailBatches` only handled `{ results: [] }` shape; GovTribe MCP returns `{ data: [] }`, `{ rows: [] }`, and bare arrays too. Added `extractResultsArray<T>()` helper in `apps/backend-v3/src/ingest/govtribe/job.ts`. Verified: run_id=57 → 349 rows inserted.
-- **GovWin ingest: FIXED ✅ (June 3, 2026).** GovWin uses OAuth2 **password grant** (NOT client_credentials). Working token endpoint: `https://services.govwin.com/neo-ws/oauth/token`. Three bugs fixed across PRs #679 and #680:
-  1. `oauth2_auth.ts` — switched to `grant_type=password` + username + password + `scope=read`; fixed column names `tgt_hash`/`last_refresh_at` (not `token_hash`/`authenticated_at`).
-  2. `api_client.ts` — sort param `updatedDate` (not `updated_at`), pagination `max` (not `per_page`), added `oppSelectionDateFrom=-30D`.
-  - Credentials: `sseffernick@pd-sys.net` / `AUR_nka3arb_vbn0pzv`, client_id `DJTCSO5JOVG94UIQIV9KQ9NMLELV01HIAEBIHB83E0VQ4`, secret in `.env`. Verified: run_id=61 → 50 rows inserted.
-- **F-215 D4 Real LLM Router: DONE ✅ (June 4, 2026).** PR #682 merged (squash, commit `9814e6c`). Real Anthropic + OpenAI providers implemented. Routing table: 8 tasks, 1 entry each (CI-enforced). Retry/fallback/wall-clock per D4 spec. `llm_calls` table created (migration `v3_033_llm_calls.sql`). `GET /v3/llm-cost-rollup` live. PERPLEXITY_API_KEY optional at startup. SDK drift detector in CI. Mock mode (MOCK_LLM=1) for zero real API calls in CI. Backend rebuilt and running healthy. **AI panels (OODA Inspector, Ask AI, Competitive Intel) are now unblocked** — wire them in F-453 or next frontend ticket.
-- **F-460 Frontend Rewire: DONE ✅ (June 4, 2026).** PR #681 merged (squash, commit `add6dcc`). Frontend rebuilt and redeployed to VPS. All routes 200. Pipeline → `/v3/opportunities` (band filter, score sort, top_drivers chips). OpportunityDetail → REAL tier only (Doctrine panel 0–40, Timeline, Capture Pwin). Approvals → `/v3/match-suggestions`. Launchpad → lifecycle funnel from `/v3/reports/funnel`. Honesty gate enforced — heuristic panels hidden with "coming soon".
-- **nginx SPA routing fix: DONE ✅ (June 4, 2026).** Commit `06d28ea` — added `try_files $uri $uri.html` so Next.js static export `/page.html` paths route correctly without 403.
-- **Devin API: FIXED ✅ (June 3, 2026).** New API key saved to vault (`api.devin.ai`, bearer). Duplicate entries cleaned.
+### How Devin is triggered
 
----
+Devin sessions are started by **labeling a GitHub issue `devin-ready`**. The workflow `.github/workflows/devin-fprompt-trigger.yml` fires on the `labeled` event, builds a prompt from the issue body (which must contain the spec or an `!fprompt` reference), calls the Devin API, and comments the session link back on the issue.
 
-## 4. What's NEXT (the build order)
+- To **re-trigger** a session on an issue that already has the label: remove the label, wait a few seconds, re-add it.
+- The Devin API call uses `"idempotent": true`, so re-triggering the same issue resumes/dedupes rather than spawning a duplicate.
 
-- **Phase 2 — Unified API (✅ COMPLETE):** ✅ F-410 unified detail (`GET /v3/opportunities/unified/:internal_id`) · ✅ F-411 stage filter (`GET /v3/opportunities/unified?stage=`) · ✅ F-412 suggestion queue (`GET/POST /v3/match-suggestions`) · ✅ F-413 field override + audit (`PUT /v3/opportunities/:internal_id/field-override`). All live on backend-v3.
-- **Phase 3 — Unified UI (IN PROGRESS):** ✅ F-420 unified detail page (route `/unified/:internal_id`, PR #637, live) → ✅ F-420a connect-the-data (per-field source URLs in F-410 + unified analyze endpoint, clickable SourceLinks + auto-analysis for R1/R2, PR #639, live) → ✅ F-421 tab structure (say-something surfaces) — tabbed unified list at `/unified`, stage-group filters, R1 source links on every value, PR #641, live → ✅ F-422 suggestion review UI (Review Matches tab, human-in-the-loop confirm/reject queue, PR #643, live) → **F-423 decommission old per-source detail routes = NEXT** (Devin blocked at 403 — queue this when Devin comes back online).
-- **Phase 4 — Fast Track adapters:** F-430 NSF, F-431 SBIR, F-432 SAM Sources Sought/Pre-Sol, F-433 DoD RSS, F-434 NIH RePORTER, F-435 arXiv+USAspending, F-436 signal scoring, F-437 doctrine badge.
-- **Phase 5 — Hardening + analytics:** F-440 LOW-confidence matcher, F-441 conversion funnel, F-442 audit log, F-443 bulk review.
+### Talking to Devin directly (REST API)
 
-**The single canonical roadmap lives at `docs/canonical/north_star_roadmap_v3.md`.** That file has the full master task list with done/todo status. Read it after this one.
+Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call (bearer key injected automatically). Base: `https://api.devin.ai/v1`.
+
+- **Check status:** `curl -s https://api.devin.ai/v1/session/<session_id>` → read `status_enum` (`working` | `blocked` | `finished` | `suspended` | `expired`), `pull_request`, and the `messages[]` thread.
+- **Send a follow-up / unblock:** `POST https://api.devin.ai/v1/session/<session_id>/message` with `{"message":"..."}`.
+- **Important:** Devin's own VM **cannot reach the VPS** (egress blocked at its gateway). Never ask Devin to SSH or deploy. Devin writes code + opens PRs; the assistant handles VPS/deploy.
+
+### What every Devin spec must include
+
+1. **Repo + base branch:** `shawnseffernick175/gda-command-v2`, `main`.
+2. **Exact files/routes to touch** and an explicit **OUT OF SCOPE** list.
+3. **Definition of done:** typecheck, lint, tests, build, and all GitHub CI green. Open one PR per issue. **Do not self-merge.**
+4. **House rules:** R1 (every user-facing value carries a clickable source ref), R2 (no forbidden status tokens / no "Run Analysis" buttons — analysis is automatic on open), 6-color palette only (Pink/Red/Black/Blue/White/Green — **NO gold**, no raw hex, no gradients, no box-shadow, no JetBrains Mono, no emoji), clean PR off `main`.
+5. **A report-back request:** branch, PR number, key decisions, files changed/deleted, CI status.
 
 ---
 
-## 5. Shawn's only recurring manual step
+## 3. The project — North Star
 
-DNS for new subdomains. `gda-mcp.csr-llc.tech` is already done. If a new subdomain is stood up, he adds a Hostinger DNS A record → `187.77.206.105`. Everything else is on autopilot.
+GDA Command = the operating system for running Envision's government-contracting (govcon) business — capture, pipeline, competitive intel, opportunity management, and platform health. End state: **one detail page per opportunity regardless of source, with doctrine-aware scoring and human-confirmed cross-source matching**, and the tooling to run capture reviews on every active pursuit.
 
----
+**Repo:** `shawnseffernick175/gda-command-v2`, branch `main`. Use GitHub via the `gh` CLI with `api_credentials=["github"]`.
 
-## 6. Credentials available to the assistant
+**Production:** https://gda.csr-llc.tech
 
-Custom credentials (use `api_credentials=["custom-cred:<host>"]`):
-- Devin API — `api.devin.ai` (bearer). Drives the orchestrator workflow (see Section 8). NOTE: Devin's own VM can't reach the VPS, so don't ask Devin to SSH/deploy to the VPS — the assistant does VPS/deploy steps; Devin does code+PR.
-- Voyage embeddings — `api.voyageai.com`
-- LegiScan — `api.legiscan.com`
+### Repo layout (canonical — confirm against `CLAUDE.md`)
 
-Connected services: GitHub, Google Calendar, Google Drive, Finance.
-
----
-
-## 8. Working with Devin (the orchestrator workflow)
-
-**Shawn is cut out of this loop entirely.** The assistant is the ORCHESTRATOR. Devin writes the code. Shawn only gets involved for risky changes (table drops, secret rotation, infra teardown).
-
-### The loop
-
-1. Assistant writes spec → creates a **Session** (`POST /v1/sessions`)
-2. Devin works → assistant monitors, sends follow-up messages to unblock
-3. Devin opens a PR
-4. CI completes → assistant reviews the diff
-5. **All CI green + diff is scope-correct → assistant merges automatically.** No Shawn approval needed.
-6. Assistant deploys to VPS, verifies live, updates roadmap.
-
-**No approval step. If it's green and clean, merge it.**
-
-### How to talk to Devin (REST API, confirmed working)
-
-Auth: `api_credentials=["custom-cred:api.devin.ai"]` on the `bash`/`curl` call
-(bearer key injected automatically). Base: `https://api.devin.ai/v1`.
-
-- **Always create a Session. Never use Review.**
-- **Create a session:**
-  ```
-  curl -s -X POST https://api.devin.ai/v1/sessions \
-    -H "Content-Type: application/json" \
-    --data @payload.json
-  ```
-  `payload.json` = `{"prompt":"<full spec>","idempotent":true,"tags":["fNNN"],"title":"..."}`.
-  Returns `{session_id, url, is_new_session}`.
-- **Check status:** `curl -s https://api.devin.ai/v1/session/<session_id>`
-  → read `status_enum` (`working` | `blocked` | `finished`), `pull_request.url`.
-- **Send a follow-up:** `POST https://api.devin.ai/v1/session/<session_id>/message`
-  with `{"message":"..."}` — use to unblock or correct.
-- **List sessions:** `curl -s "https://api.devin.ai/v1/sessions?limit=N"`.
-
-### What every Devin spec MUST include
-
-1. **Repo + base branch** — `shawnseffernick175/gda-command-v2`, `main` (+ current HEAD).
-2. **Exact files/routes to touch** and explicit **OUT OF SCOPE** list.
-3. **Definition of done** — exact check commands from `packages/frontend-v3` using DIRECT binaries (NOT npx):
-   `node ../../node_modules/typescript/bin/tsc --noEmit`,
-   `node ../../node_modules/eslint/bin/eslint.js . --max-warnings 0`,
-   `node ../../node_modules/vitest/vitest.mjs run` (+ `--config vitest.contract.config.ts`),
-   `npm run build`, and all GitHub CI checks green.
-4. **Constraints (house rules):** R1 (every user-facing value carries a clickable SourceRef/SourceLink); R2 forbidden-token scan (no `running`/`pending`/`not_yet_analyzed`/`analysis_status`/`"stale":bool`/`analysis:null`); color lock (6 tokens only, NO gold, no raw hex/box-shadow/gradients/emoji/JetBrains Mono); no nested-heredoc file edits; clean PR off `main`, stage only changed paths.
-5. **A report-back request:** branch, PR number, key decisions, files deleted, CI status.
+- **Backend (the only backend):** `apps/backend-v3/` — Node/Express, V3 API surface under `/v3/...`. There is no `packages/backend/`.
+- **Frontend:** `packages/frontend-v3/` — React.
+- **Other apps:** `apps/gda-agent-v3/`, `apps/gda-mcp-server/`.
+- **The only compose file is `docker-compose.prod.yml`.** No root Dockerfile, no `docker-compose.yml`, no n8n in the critical path — all ingestion is backend-cron driven.
 
 ---
 
-## 7. Key canonical docs in `docs/canonical/`
+## 4. Doctrine (binding rules — enforced in code, data, and UI; they do not drift)
 
-- `north_star_roadmap_v3.md` — the roadmap + master task list (read after this)
-- `unified_opportunity_architecture_v1.md` — full F-400 design
-- `v3_completion_plan_v4_1.md` — V3 tactical completion plan
-- `product_rules.md` — product/UI rules (6-color palette: Pink, Red, Black, Blue, White, Green — NO gold)
-- `aesthetics_canonical_v1.md`, `doctrine_to_doors_map.md`, `fast_track_sources_v1.md`, `gda_company_profile_v1.md`
+1. **`$1 = IDIQ`.** Any opportunity valued at exactly $1 is an IDIQ placeholder. NULL the dollar, exclude from rollups, display the literal text "IDIQ". Never sum.
+2. **IDIQs do NOT appear in Contract Waterfall.** Only Task Orders against IDIQs. The waterfall is a Gantt of executable revenue, not vehicle ceilings.
+3. **Capture reviews are first-class.** The tool exists to run capture reviews on every active pursuit, every cycle.
+4. **Pipeline = CEO-approved pursuits only.** The SAM.gov / GovTribe firehose is intake noise, not Pipeline. The 12 pursuits the CEO seeded are the truth.
+5. **Sentinel Health is a static status indicator.** No link, no click, no expand. It only confirms the platform is alive.
+6. **Prompt Creator has no JSON exports and no sidebar metadata.** Strip dev clutter.
+7. **No letter grades (A/B/C/D/F).** Hot KPI tile = Pwin ≥ 70%. Pwin must match between list and detail views.
+8. **One source of truth.** If the same data appears in two places, it must be identical.
+
+The full doctrinal source lives in `docs/canonical/` (see Section 8). If the screen disagrees with those docs, the docs win.
 
 ---
 
-**Bottom line for a new chat:** SSH in (Section 1), read `north_star_roadmap_v3.md`, pick up at the next open ticket. Current state as of June 4, 2026: **F-470 COMPLETE.** Grants.gov ingest live — 500 rows on first run, daily 07:00 ET cron, `grants_gov` kind in sources table (v3_037 migration applied). Prior: **F-460b COMPLETE.** Daily Commander Briefing live. `daily_briefing_cache` table (v3_036 migration applied). Cron fires at 06:00 ET daily (`0 10 * * *` UTC). `GET /v3/briefing/today` + `POST /v3/briefing/generate` endpoints live. `/briefing` page in sidebar — headline card, priority actions with urgency chips, risk flags, market intel, cert warnings, Regenerate button. LLM router `daily_briefing` task: claude-sonnet-4-5, 90s timeout, explicit JSON schema in system prompt. First briefing generated and verified 200. Prior: F-453 COMPLETE — AI Analysis card live on OpportunityDetail (Shipley win probability, competitor landscape, source chips). Pwin weights tunable at `/settings/pwin`. GovTribe ✅. GovWin ✅. Devin API ✅. When sending to Devin: write spec (Section 8), hand off via `POST /v1/sessions` (Session, not Review), monitor, QA, merge when CI green. Assistant does VPS/deploy. Devin writes code. End with a recommendation. Don't make Shawn do anything.
+## 5. Where we are RIGHT NOW (state as of 2026-06-16)
+
+- **The doctrine rebuild shipped today.** 29 PRs merged 2026-06-16. Full list and operational snapshot in **`docs/STATUS.md`** (regenerated on every milestone — read it for the live picture).
+- **Open PRs: 0.** Latest commit on `main`: `cdb9523` (STATUS pointer) on top of the 29-PR train.
+- **Current top-nav tabs:** Launchpad, Pipeline (12 CEO pursuits), Ops Tracker, Contract Waterfall (Task Orders, IDIQs excluded), IDIQ Operations, Workshop, Awards & Intel, Action Items, FasTrac, Vehicles, Vault, Prompt Creator, Settings → Data Quality (Approvals moved here).
+- **In flight with Devin (re-triggered 2026-06-16):**
+  - **#878 — Scoring & Doctrine config page.** CEO-editable Pwin weights + doctrine rules on one Settings page. Was bricked as PR #884 during a manual SSH merge on 2026-06-15; rebuilt fresh. Spec in issue #878.
+  - **#887 — Shipley Pipeline Coverage Card.** Coverage multiples vs AOP (Total Qualified 5×, Active Capture 3×, Bid & Proposal 1.5–2×, Pwin-Weighted ≥1×). AOP targets FY26 $44.8M / FY27 $50.2M / FY28 $56.2M. Spec in issue #887.
+- **Watcher active:** an hourly scheduled task polls both Devin sessions and GitHub, auto-nudges an idle session once, and notifies the operator on a real change (new PR, CI green, Devin question/blocker). It never merges.
+- **Backlog:** ~36 open issues. Inventory in `docs_refresh/issues_open.json` when present.
+
+---
+
+## 6. Infrastructure
+
+### Auto-deploy (works)
+
+- `.github/workflows/deploy-prod.yml` watches `main`, pulls + rebuilds + restarts containers on the VPS.
+- Typical lag: ~5 minutes from merge to live. Deploy SSH key is a GitHub Actions secret.
+
+### VPS (Hostinger)
+
+- Host: `187.77.206.105`. Project dir: `/root/gda-command-v2`. Compose: `docker-compose.prod.yml`.
+- Containers: `gda-frontend-v3`, `gda-backend-v3`, `gda-postgres-staging` (DB `gda_command_staging`).
+- SSH from the assistant sandbox: `ssh -i ~/.ssh/gda_deploy -o StrictHostKeyChecking=no root@187.77.206.105`.
+- Ports 22/80/443 open. The assistant does VPS/deploy steps — Devin cannot reach the VPS.
+
+### Branch protection on `main`
+
+- `allow_auto_merge = true`, `allow_squash_merge = true`.
+- **No required status checks** (intentionally removed — a bogus CI gate was blocking everything).
+- Because nothing engages `--auto`, merge is explicit after MERGEABLE + CI green. See Section 1.
+
+---
+
+## 7. Credentials available to the assistant
+
+Custom credentials (`api_credentials=["custom-cred:<host>"]`):
+- **Devin API** — `api.devin.ai` (bearer). Drives the orchestrator workflow (Section 2).
+- **Voyage embeddings** — `api.voyageai.com`.
+- **LegiScan** — `api.legiscan.com`.
+
+Connected services: GitHub (`gh` CLI, `api_credentials=["github"]`), Google Calendar, Google Drive, Finance.
+
+---
+
+## 8. Key canonical docs (`docs/canonical/`)
+
+Read order for a fresh chat: **this file → `docs/STATUS.md` (live state) → `CLAUDE.md` (paths + house rules) → the canonical authority docs below.**
+
+- `gda_company_profile_v1.md` — company identity, the 3 OUs, FY26–FY28 financials, doctrine.
+- `doctrine_to_doors_map.md` — the 13-door rebuild map; each door anchored to a doctrine principle.
+- `tool_ownership_model_v1.md` — why the tool is Envision-primary and partners are intel.
+- `partner_intel_spec_v1.md` — Partner Intel door spec.
+- `aesthetics_canonical_v1.md` — visual + UX standards (6-color palette, NO gold).
+- `product_rules.md` — cross-cutting product rules (R1/R2).
+- `north_star_roadmap_v3.md` — V3 roadmap + master task list.
+- `unified_opportunity_architecture_v1.md` — unified opportunity / matching design.
+
+**Ownership note:** Doctrine authority and company ownership sit with CEO Alexander Johnson (AJ). The tool is Envision-operated (OU-I), Shawn's workspace. Riverstone (OU-II) and PD Systems (OU-III) are tracked as teaming partners via Partner Intel, not co-equal tenants.
+
+---
+
+**Bottom line for a new chat:** read this file, then `docs/STATUS.md` for the live state, then pick up the next open item. Devin is triggered by the `devin-ready` label; talk to it via the API to unblock. The assistant orchestrates, reviews, and deploys — **the operator merges. Never self-merge, never push to Devin's branches, never resolve conflicts by hand.** End every response with a recommendation. Don't make Shawn do anything he doesn't have to.
