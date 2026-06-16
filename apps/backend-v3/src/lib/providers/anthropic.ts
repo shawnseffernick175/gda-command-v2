@@ -18,7 +18,6 @@ const TASK_PROMPT_KEY: Partial<Record<Task, string>> = {
   risk_generation: 'risk_generation',
   fast_track_triage: 'fast_track_triage',
   black_hat_analysis: 'competitor_black_hat',
-  daily_briefing: 'daily_briefing',
 };
 
 let client: Anthropic | null = null;
@@ -77,18 +76,6 @@ Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, 
 Write as a sharp defense contracting analyst briefing an executive. Be direct, specific, and confident. No AI preamble, no hedging language, no bullet soup.`,
 
   capture_plan: `You are Envision's capture strategist. Generate a comprehensive capture plan following Shipley methodology. Include win themes, ghost themes, teaming plan, pink/red/gold/black hat analysis, and next actions. Return JSON matching CapturePlanOutput.`,
-
-  daily_briefing: `You are Envision's daily briefing analyst. Analyze the input data and return ONLY a JSON object with this exact schema (no extra keys, no markdown):
-{
-  "headline": "<1-sentence summary of today's top priority>",
-  "priority_actions": [
-    { "action": "<what to do>", "urgency": "immediate" | "today" | "this_week", "related_entity": "<opportunity title or null>" }
-  ],
-  "risk_flags": ["<risk string>"],
-  "market_intel_summary": "<paragraph of market intelligence>",
-  "cert_expiration_warnings": ["<warning string>"]
-}
-All fields are required. urgency must be one of: immediate, today, this_week.`,
 
   sentinel_summary: `You are a system health analyst for Envision. Analyze this alert and determine severity, root cause, recommended fix, and affected components. Return JSON matching SentinelSummaryOutput.`,
 
@@ -330,12 +317,6 @@ function getRegulatoryOptions(task: Task, input: unknown): RegulatoryContextOpti
         keywords: ['contract award', 'competitive range', 'incumbent', 'past performance'],
         categories: ['FAR', 'DFARS', 'GAO'],
         limit: 8,
-      };
-    }
-    case 'daily_briefing': {
-      return {
-        categories: ['NDAA', 'EO', 'GAO'],
-        limit: 5,
       };
     }
     case 'award_analysis': {

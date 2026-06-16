@@ -23,7 +23,6 @@ export type Task =
   | 'fast_track_triage'
   | 'opportunity_analysis'
   | 'capture_plan'
-  | 'daily_briefing'
   | 'sentinel_summary'
   | 'doctrine_score'
   | 'semantic_embed'
@@ -90,16 +89,6 @@ export interface CapturePlanInput {
   sources: SourceRef[];
 }
 
-export interface DailyBriefingInput {
-  date: string;
-  open_opportunities: OpportunitySummary[];
-  captures_with_gaps: CaptureSummary[];
-  action_items_due: ActionItemSummary[];
-  sentinel_status: SentinelStatusSummary;
-  pending_recommendations: AgentRecommendation[];
-  pipeline_at_risk: PipelineMilestoneItem[];
-  expiring_certs: ExpiringCert[];
-}
 
 export interface OpportunitySummary {
   opportunity_id: string;
@@ -760,19 +749,6 @@ export interface SourceChip {
   retrieved_at: string;
 }
 
-export interface DailyBriefingOutput {
-  headline: string;
-  priority_actions: BriefingAction[];
-  risk_flags: string[];
-  market_intel_summary: string;
-  cert_expiration_warnings: string[];
-}
-
-export interface BriefingAction {
-  action: string;
-  urgency: 'immediate' | 'today' | 'this_week';
-  related_entity: string | null;
-}
 
 export interface SentinelSummaryOutput {
   severity: 'info' | 'warning' | 'critical';
@@ -841,7 +817,6 @@ export interface TaskInputMap {
   fast_track_triage: FastTrackTriageInput;
   opportunity_analysis: OpportunityAnalysisInput;
   capture_plan: CapturePlanInput;
-  daily_briefing: DailyBriefingInput;
   sentinel_summary: SentinelSummaryInput;
   doctrine_score: DoctrineScoreInput;
   semantic_embed: SemanticEmbedInput;
@@ -869,7 +844,6 @@ export interface TaskOutputMap {
   fast_track_triage: FastTrackTriageOutput;
   opportunity_analysis: OpportunityAnalysisOutput;
   capture_plan: CapturePlanOutput;
-  daily_briefing: DailyBriefingOutput;
   sentinel_summary: SentinelSummaryOutput;
   doctrine_score: DoctrineScoreOutput;
   semantic_embed: SemanticEmbedOutput;

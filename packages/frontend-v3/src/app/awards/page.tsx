@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { Suspense, useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useAwardsPaged, useAwardsCount, useAwardAnalyze, useAwardPursue } from "@/hooks/use-awards";
 import { Pagination } from "@/components/shared/Pagination";
@@ -9,9 +9,48 @@ import { Badge } from "@/components/ui/badge";
 import { SourceChip } from "@/components/shared/source-chip";
 import { PendingState } from "@/components/shared/pending-state";
 import { ErrorState } from "@/components/shared/error-state";
+import { useTableSort } from "@/hooks/use-table-sort";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import type { Award, AwardAnalysis, AwardsMeta } from "@/lib/types";
+
+/* ── Sort header for div-based column headers ─────────────────── */
+
+function SortHeaderSpan({
+  label,
+  field,
+  sortBy,
+  sortDir,
+  onSort,
+  className,
+}: {
+  label: string;
+  field: string;
+  sortBy: string | null;
+  sortDir: "asc" | "desc";
+  onSort: (field: string) => void;
+  className?: string;
+}) {
+  const active = sortBy === field;
+  const indicator = active ? (sortDir === "asc" ? "\u25B2" : "\u25BC") : "";
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(field)}
+      className={cn(
+        "transition-colors hover:text-foreground text-left",
+        active ? "text-gda-green" : "",
+        className,
+      )}
+      title={`Sort by ${label}`}
+    >
+      {label}
+      {indicator && (
+        <span className="ml-0.5 text-[11px] leading-none">{indicator}</span>
+      )}
+    </button>
+  );
+}
 
 /* ── Tab definitions ──────────────────────────────────────────── */
 
@@ -77,6 +116,14 @@ function formatExpiresColumn(award: Award): { text: string; className: string } 
 /* ── Main page ────────────────────────────────────────────────── */
 
 export default function AwardsPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <AwardsContent />
+    </Suspense>
+  );
+}
+
+function AwardsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -97,6 +144,7 @@ export default function AwardsPage() {
   const incumbentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const naicsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
 
   // Map tab to query params
   const tabQueryParams = useMemo(() => {
@@ -121,6 +169,7 @@ export default function AwardsPage() {
     pursuing: tabQueryParams.pursuing as boolean | undefined,
     limit: 50,
     page: currentPage,
+    ...sortParams,
   });
   const { data: countData } = useAwardsCount();
 
@@ -318,10 +367,10 @@ export default function AwardsPage() {
           {/* Column header */}
           <div className="flex items-center gap-2 px-3 py-1 text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
             <span className="w-[3px]" />
-            <span className="flex-1 min-w-0">Title + Incumbent</span>
-            <span className="w-[130px] shrink-0">Agency</span>
-            <span className="w-[100px] shrink-0 text-left">Value</span>
-            <span className="w-[90px] shrink-0 text-left">Expires</span>
+            <SortHeaderSpan label="Title + Incumbent" field="recipient_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="flex-1 min-w-0" />
+            <SortHeaderSpan label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[130px] shrink-0" />
+            <SortHeaderSpan label="Value" field="awarded_amount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[100px] shrink-0 text-left" />
+            <SortHeaderSpan label="Expires" field="period_of_performance_end" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[90px] shrink-0 text-left" />
             <span className="w-[90px] shrink-0 text-left">Status</span>
             <span className="w-[80px] shrink-0 text-left">Actions</span>
           </div>
