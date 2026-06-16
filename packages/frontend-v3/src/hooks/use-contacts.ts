@@ -19,6 +19,8 @@ export interface UseContactsParams {
   limit?: number;
   cursor?: number;
   page?: number;
+  sort_by?: string;
+  sort_dir?: string;
 }
 
 interface ContactsResponse {
@@ -41,6 +43,8 @@ export function useContacts(params: UseContactsParams = {}) {
         limit: params.page ? 50 : (params.limit ?? 100),
         cursor: params.page ? undefined : (params.cursor || undefined),
         page: params.page || undefined,
+        sort_by: params.sort_by || undefined,
+        sort_dir: params.sort_dir || undefined,
       }),
   });
 }

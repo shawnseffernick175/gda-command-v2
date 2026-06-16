@@ -33,6 +33,8 @@ interface UseCompetitorsPagedParams {
   naics?: string;
   limit?: number;
   page?: number;
+  sort_by?: string;
+  sort_dir?: string;
 }
 
 export function useCompetitorsPaged(params: UseCompetitorsPagedParams = {}) {
@@ -44,6 +46,8 @@ export function useCompetitorsPaged(params: UseCompetitorsPagedParams = {}) {
         naics: params.naics,
         limit: params.limit ?? 100,
         page: params.page ?? 1,
+        sort_by: params.sort_by,
+        sort_dir: params.sort_dir,
       }),
   });
 }

@@ -19,7 +19,6 @@ const ALL_TASKS: readonly Task[] = [
   'fast_track_triage',
   'opportunity_analysis',
   'capture_plan',
-  'daily_briefing',
   'sentinel_summary',
   'doctrine_score',
   'semantic_embed',

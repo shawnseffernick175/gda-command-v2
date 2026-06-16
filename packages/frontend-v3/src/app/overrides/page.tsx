@@ -1,11 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, useMemo } from "react";
 import { useOverrideSummary } from "@/hooks/use-overrides";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+
+const OVERRIDE_SORT_COLS: ColumnSortConfig[] = [
+  { field: "created_at", type: "date" },
+  { field: "opportunity_title", type: "string" },
+  { field: "field_name", type: "string" },
+  { field: "human_value", type: "string" },
+  { field: "reason", type: "string" },
+];
 
 type Range = "7d" | "30d" | "all";
 
@@ -43,8 +54,24 @@ function emDash(val: number): string {
 }
 
 export default function OverridesPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <OverridesContent />
+    </Suspense>
+  );
+}
+
+function OverridesContent() {
   const [range, setRange] = useState<Range>("30d");
   const { data, isLoading } = useOverrideSummary(range);
+  const { sortBy, sortDir, handleSort } = useTableSort();
+
+  const sortedRecent = useMemo(() => {
+    if (!data?.recent) return [];
+    if (!sortBy) return data.recent;
+    return sortData(data.recent as unknown as Record<string, unknown>[], sortBy, sortDir, OVERRIDE_SORT_COLS) as unknown as typeof data.recent;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- data.recent is the relevant dep
+  }, [data?.recent, sortBy, sortDir]);
 
   const mostCommonDisagreement = data?.stage_pivot?.[0]
     ? `${data.stage_pivot[0].ai_value}\u2192${data.stage_pivot[0].human_value}: ${data.stage_pivot[0].count} times`
@@ -170,15 +197,15 @@ export default function OverridesPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border text-left uppercase tracking-wider text-muted-foreground">
-                        <th className="pb-2 pr-4">Date</th>
-                        <th className="pb-2 pr-4">Opportunity</th>
-                        <th className="pb-2 pr-4">Field</th>
-                        <th className="pb-2 pr-4">Override</th>
-                        <th className="pb-2">Reason</th>
+                        <SortableHeader label="Date" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="pb-2 pr-4" />
+                        <SortableHeader label="Opportunity" field="opportunity_title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="pb-2 pr-4" />
+                        <SortableHeader label="Field" field="field_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="pb-2 pr-4" />
+                        <SortableHeader label="Override" field="human_value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="pb-2 pr-4" />
+                        <SortableHeader label="Reason" field="reason" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="pb-2" />
                       </tr>
                     </thead>
                     <tbody>
-                      {data.recent.map((row) => (
+                      {sortedRecent.map((row) => (
                         <tr
                           key={row.id}
                           className="border-b border-border last:border-0"
