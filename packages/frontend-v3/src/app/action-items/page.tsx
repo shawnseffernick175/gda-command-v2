@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   useActionItems,
@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/Pagination";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
 import { cn } from "@/lib/utils";
 import type { ActionItem, ActionItemDraft, ActionItemPriority } from "@/lib/types";
 import Link from "next/link";
@@ -64,12 +66,21 @@ function isOverdue(item: ActionItem): boolean {
 }
 
 export default function ActionItemsPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <ActionItemsContent />
+    </Suspense>
+  );
+}
+
+function ActionItemsContent() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [page, setPage] = useState(1);
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
+  const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
 
-  const filterKey = statusFilter ?? "__all__";
+  const filterKey = `${statusFilter ?? "__all__"}|${sortParams.sort_by ?? ""}|${sortParams.sort_dir ?? ""}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
@@ -79,6 +90,7 @@ export default function ActionItemsPage() {
   const { data, isLoading, error, refetch } = useActionItems({
     status: statusFilter,
     page,
+    ...sortParams,
   });
 
   const items = data?.items ?? [];
@@ -131,7 +143,21 @@ export default function ActionItemsPage() {
         />
       ) : (
         <>
-          <Card className="border-border bg-gda-panel overflow-hidden">
+          {/* Sort header row */}
+          <div className="rounded-t border border-b-0 border-border overflow-hidden">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="bg-gda-bg-base text-muted-foreground">
+                  <SortableHeader label="Priority" field="priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                  <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                  <SortableHeader label="Due" field="due_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                  <SortableHeader label="Source" field="source_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                </tr>
+              </thead>
+            </table>
+          </div>
+          <Card className="border-border bg-gda-panel overflow-hidden rounded-t-none">
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {items.map((item) => (

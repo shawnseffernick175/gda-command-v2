@@ -187,7 +187,7 @@ describe('extractWhereIdents', () => {
   });
 
   it('does not emit __str__ placeholder as an identifier', () => {
-    const result = extractWhereIdents("settings->>'briefing_auto_delivery' = 'true'");
+    const result = extractWhereIdents("settings->>'theme_preference' = 'dark'");
     expect(result).not.toContain('__str__');
   });
 

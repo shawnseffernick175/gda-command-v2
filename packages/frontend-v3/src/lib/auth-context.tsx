@@ -12,7 +12,7 @@ import {
   login as apiLogin,
   logout as apiLogout,
   me as apiMe,
-  getToken,
+  bootRefresh,
   setToken,
   type AuthUser,
 } from "@/lib/api";
@@ -28,7 +28,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 type AuthState = { user: AuthUser | null; loading: boolean };
 
-let authState: AuthState = { user: null, loading: !!getToken() };
+let authState: AuthState = { user: null, loading: true };
 const listeners = new Set<() => void>();
 
 function notifyListeners() {
@@ -53,13 +53,15 @@ let initPromise: Promise<void> | null = null;
 
 function initAuth(): Promise<void> {
   if (initPromise) return initPromise;
-  if (!getToken()) {
-    setAuthState({ user: null, loading: false });
-    initPromise = Promise.resolve();
-    return initPromise;
-  }
-  initPromise = apiMe()
-    .then((u) => setAuthState({ user: u, loading: false }))
+  initPromise = bootRefresh()
+    .then(async (token) => {
+      if (token) {
+        const u = await apiMe();
+        setAuthState({ user: u, loading: false });
+      } else {
+        setAuthState({ user: null, loading: false });
+      }
+    })
     .catch(() => {
       setToken(null);
       setAuthState({ user: null, loading: false });
@@ -67,7 +69,7 @@ function initAuth(): Promise<void> {
   return initPromise;
 }
 
-// kick off immediately on module load if token exists
+// kick off immediately on module load
 void initAuth();
 
 export function AuthProvider({ children }: { children: ReactNode }) {

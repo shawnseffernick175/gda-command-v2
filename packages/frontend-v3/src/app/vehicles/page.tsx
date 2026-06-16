@@ -1,12 +1,40 @@
 "use client";
 
+import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const VEHICLE_SORT_COLS: ColumnSortConfig[] = [
+  { field: "vehicle", type: "string", accessor: (r) => r.short_name },
+  { field: "type", type: "string", accessor: (r) => r.vehicle_type },
+  { field: "agency", type: "string" },
+  { field: "contract_number", type: "string" },
+  { field: "open_opps", type: "number", accessor: (r) => r.opportunity_count },
+  { field: "pipeline", type: "number", accessor: (r) => r.pipeline_count },
+];
 
 export default function VehiclesPage() {
+  return (
+    <Suspense fallback={<div />}>
+      <VehiclesContent />
+    </Suspense>
+  );
+}
+
+function VehiclesContent() {
   const { data: vehicles, isLoading, error, refetch } = useVehicles();
+  const { sortBy, sortDir, handleSort } = useTableSort();
+
+  const sorted = useMemo(() => {
+    if (!vehicles) return [];
+    if (!sortBy) return vehicles;
+    return sortData(vehicles as unknown as Record<string, unknown>[], sortBy, sortDir, VEHICLE_SORT_COLS) as unknown as typeof vehicles;
+  }, [vehicles, sortBy, sortDir]);
 
   return (
     <div className="space-y-4">
@@ -34,17 +62,17 @@ export default function VehiclesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium">Vehicle</th>
-                <th className="px-3 py-2 text-left font-medium w-[80px]">Type</th>
-                <th className="px-3 py-2 text-left font-medium w-[100px]">Agency</th>
-                <th className="px-3 py-2 text-left font-medium w-[160px]">Contract #</th>
-                <th className="px-3 py-2 text-left font-medium w-[120px]">Open Opps</th>
-                <th className="px-3 py-2 text-left font-medium w-[100px]">Pipeline</th>
+                <SortableHeader label="Vehicle" field="vehicle" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Type" field="type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
+                <SortableHeader label="Contract #" field="contract_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="160px" />
+                <SortableHeader label="Open Opps" field="open_opps" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="120px" />
+                <SortableHeader label="Pipeline" field="pipeline" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
               </tr>
             </thead>
             <tbody>
-              {vehicles && vehicles.length > 0 ? (
-                vehicles.map((v) => (
+              {sorted && sorted.length > 0 ? (
+                sorted.map((v) => (
                   <tr
                     key={v.id}
                     className="border-b border-border hover:bg-gda-panel/50 transition-colors"

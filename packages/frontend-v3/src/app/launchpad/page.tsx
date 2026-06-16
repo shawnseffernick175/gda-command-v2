@@ -8,7 +8,6 @@ import {
   useTopPrograms,
 } from "@/hooks/use-launchpad";
 import { useActionItems, useTopActionItems } from "@/hooks/use-action-items";
-import { useGenerateBriefing } from "@/hooks/use-briefing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -264,7 +263,6 @@ function TopProgramsTable({
 
 function RecentSignalsWidget() {
   const { data: signals, isLoading } = useLaunchpadSignals();
-  const generateBriefing = useGenerateBriefing();
 
   if (isLoading) {
     return (
@@ -276,105 +274,64 @@ function RecentSignalsWidget() {
     );
   }
 
-  const hasBriefing = signals?.market_intel != null;
-
   return (
     <Card className="border-border bg-gda-panel">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="font-mono text-sm text-muted-foreground">
           Recent Signals
         </CardTitle>
-        <div className="flex items-center gap-2">
-          {signals?.briefing_date && (
-            <Badge variant="outline" className="text-[11px] font-mono">
-              {new Date(signals.briefing_date + "T00:00:00").toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </Badge>
-          )}
-          {!hasBriefing && (
-            <button
-              type="button"
-              onClick={() => generateBriefing.mutate()}
-              disabled={generateBriefing.isPending}
-              className="rounded border border-border bg-gda-bg-base px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-gda-panel transition-colors disabled:opacity-50"
-            >
-              {generateBriefing.isPending ? "Generating…" : "Generate"}
-            </button>
-          )}
-        </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {hasBriefing ? (
-          <>
-            <div className="text-xs text-foreground leading-relaxed whitespace-pre-line">
-              {signals.market_intel}
-            </div>
-            {signals.ft_signals && signals.ft_signals.length > 0 && (
-              <div className="space-y-1 border-t border-border pt-2">
-                {signals.ft_signals.map((sig) => (
-                  <div
-                    key={sig.id}
-                    className="flex items-center gap-2 rounded p-1.5 text-xs hover:bg-gda-bg-base transition-colors"
+        {signals?.ft_signals && signals.ft_signals.length > 0 ? (
+          <div className="space-y-1">
+            {signals.ft_signals.map((sig) => (
+              <div
+                key={sig.id}
+                className="flex items-center gap-2 rounded p-1.5 text-xs hover:bg-gda-bg-base transition-colors"
+              >
+                <Badge
+                  variant="outline"
+                  className="text-[11px] font-mono shrink-0 border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan"
+                >
+                  {sig.source}
+                </Badge>
+                {sig.source_url ? (
+                  <a
+                    href={sig.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 truncate text-foreground hover:text-gda-green transition-colors"
                   >
-                    <Badge
-                      variant="outline"
-                      className="text-[11px] font-mono shrink-0 border-gda-cyan/30 bg-gda-cyan/10 text-gda-cyan"
-                    >
-                      {sig.source}
-                    </Badge>
-                    {sig.source_url ? (
-                      <a
-                        href={sig.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 truncate text-foreground hover:text-gda-green transition-colors"
-                      >
-                        {sig.title}
-                      </a>
-                    ) : (
-                      <span className="flex-1 truncate text-foreground">
-                        {sig.title}
-                      </span>
+                    {sig.title}
+                  </a>
+                ) : (
+                  <span className="flex-1 truncate text-foreground">
+                    {sig.title}
+                  </span>
+                )}
+                {sig.urgency && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[11px] font-mono shrink-0",
+                      URGENCY_COLORS[sig.urgency] ?? URGENCY_COLORS.low,
                     )}
-                    {sig.urgency && (
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-[11px] font-mono shrink-0",
-                          URGENCY_COLORS[sig.urgency] ?? URGENCY_COLORS.low,
-                        )}
-                      >
-                        {sig.urgency}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                  >
+                    {sig.urgency}
+                  </Badge>
+                )}
               </div>
-            )}
-          </>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              No daily briefing generated yet.
-            </p>
-            <button
-              type="button"
-              onClick={() => generateBriefing.mutate()}
-              disabled={generateBriefing.isPending}
-              className="rounded border border-gda-green/30 bg-gda-green/10 px-3 py-1.5 text-xs text-gda-green hover:bg-gda-green/20 transition-colors disabled:opacity-50"
-            >
-              {generateBriefing.isPending
-                ? "Generating…"
-                : "Generate Today's Briefing"}
-            </button>
+            ))}
           </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No signals available.
+          </p>
         )}
         <div className="flex items-center gap-2 pt-1 border-t border-border">
           <SourceChip label="Defense Market Intel" kind="real" />
           <span className="text-[11px] text-muted-foreground">
-            Sourced from daily briefing + Fast Track signals
+            Sourced from Fast Track signals
           </span>
         </div>
       </CardContent>

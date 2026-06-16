@@ -48,6 +48,8 @@ export interface UseAwardsPagedParams {
   value_max?: number;
   naics?: string;
   search?: string;
+  sort_by?: string;
+  sort_dir?: string;
 }
 
 export function useAwardsPaged(params: UseAwardsPagedParams = {}) {
@@ -68,6 +70,8 @@ export function useAwardsPaged(params: UseAwardsPagedParams = {}) {
         value_max: params.value_max !== undefined ? String(params.value_max) : undefined,
         naics: params.naics || undefined,
         search: params.search || undefined,
+        sort_by: params.sort_by || undefined,
+        sort_dir: params.sort_dir || undefined,
       }),
   });
 }

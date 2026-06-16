@@ -14,7 +14,6 @@ import type {
   FastTrackTriageOutput,
   OpportunityAnalysisOutput,
   CapturePlanOutput,
-  DailyBriefingOutput,
   SentinelSummaryOutput,
   DoctrineScoreOutput,
   SemanticEmbedOutput,
@@ -137,14 +136,6 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       model_used: 'mock-model',
       is_partial: false,
     } satisfies CapturePlanOutput,
-
-    daily_briefing: {
-      headline: 'Mock daily briefing',
-      priority_actions: [],
-      risk_flags: [],
-      market_intel_summary: 'Mock intel summary',
-      cert_expiration_warnings: [],
-    } satisfies DailyBriefingOutput,
 
     sentinel_summary: {
       severity: 'info',
