@@ -128,7 +128,7 @@ function CoverageRow({
       >
         <td className="px-4 py-2 text-left font-mono text-xs text-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[11px] text-muted-foreground">
               {isExpanded ? "▾" : "▸"}
             </span>
             {layer.label}
@@ -186,7 +186,7 @@ function DrilldownTable({ pursuits }: { pursuits: CoveragePursuit[] }) {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+        <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
           <th className="px-4 py-1.5 text-left font-medium">Pursuit</th>
           <th className="px-4 py-1.5 text-right font-medium">Value</th>
           <th className="px-4 py-1.5 text-left font-medium">Stage</th>
@@ -208,7 +208,7 @@ function DrilldownTable({ pursuits }: { pursuits: CoveragePursuit[] }) {
                 {p.title}
               </Link>
               {p.agency && (
-                <span className="text-[10px] text-muted-foreground truncate block max-w-[280px]">
+                <span className="text-[11px] text-muted-foreground truncate block max-w-[280px]">
                   {p.agency}
                 </span>
               )}
