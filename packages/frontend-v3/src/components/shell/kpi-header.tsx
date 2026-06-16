@@ -4,19 +4,15 @@ import Link from "next/link";
 import { useKpiHeader } from "@/hooks/use-kpi";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
+import { ScoreExplain } from "@/components/shared/score-explainers";
+import type { ScoreType } from "@/components/shared/score-explainers";
 
 type KpiMetricKey = "orders" | "sales" | "ebit" | "gross_margin" | "ros";
 
 interface KpiItem {
   label: string;
   key: KpiMetricKey;
-  definition: string;
-  source: string;
+  scoreType: ScoreType;
   format: (v: number) => string;
 }
 
@@ -24,36 +20,31 @@ const KPI_ITEMS: KpiItem[] = [
   {
     label: "Orders",
     key: "orders",
-    definition: "Total contract value of awards received in the reporting period.",
-    source: "USAspending.gov + captures",
+    scoreType: "orders",
     format: formatMoney,
   },
   {
     label: "Sales",
     key: "sales",
-    definition: "Revenue recognized from active contracts.",
-    source: "Financial planning system",
+    scoreType: "sales",
     format: formatMoney,
   },
   {
     label: "EBIT",
     key: "ebit",
-    definition: "Earnings before interest and taxes.",
-    source: "Derived: Sales − direct costs − overhead",
+    scoreType: "ebit",
     format: formatMoney,
   },
   {
     label: "Gross Margin",
     key: "gross_margin",
-    definition: "(Sales − COGS) / Sales × 100",
-    source: "Financial planning system",
+    scoreType: "gross_margin",
     format: (v) => `${v.toFixed(1)}%`,
   },
   {
     label: "ROS",
     key: "ros",
-    definition: "Return on Sales = Net Income / Sales × 100",
-    source: "Derived from financial inputs",
+    scoreType: "ros",
     format: (v) => `${v.toFixed(1)}%`,
   },
 ];
@@ -110,26 +101,12 @@ export function KpiHeader() {
                 <span className="text-[11px] text-muted-foreground">—</span>
               )}
             </div>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-border text-[11px] text-muted-foreground hover:bg-gda-panel cursor-pointer"
-                    aria-label={`Info about ${kpi.label}`}
-                  />
-                }
-              >
-                ?
-              </TooltipTrigger>
-              <TooltipContent side="bottom" align="start" className="max-w-[220px]">
-                <p className="font-bold uppercase">{kpi.label}</p>
-                <p className="mt-1 leading-relaxed">{kpi.definition}</p>
-                <p className="mt-1 opacity-70">
-                  Source: {kpi.source}
-                </p>
-              </TooltipContent>
-            </Tooltip>
+            <ScoreExplain
+              score={value != null ? kpi.format(value) : null}
+              label={kpi.label}
+              scoreType={kpi.scoreType}
+              inputs={{ delta }}
+            />
           </span>
         );
       })}
