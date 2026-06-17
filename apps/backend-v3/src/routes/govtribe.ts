@@ -279,6 +279,7 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
       naics?: string[];
       posted_within?: string;
       max_results?: number;
+      caller?: string;
     };
 
     const query = body.query ?? '';
@@ -310,11 +311,15 @@ export async function govtribeRoutes(app: FastifyInstance): Promise<void> {
 
     const cacheId = `agent_search_${Buffer.from(JSON.stringify({ query, agency: body.agency, naics: body.naics, posted_within: body.posted_within, max_results: maxResults })).toString('base64').slice(0, 64)}`;
 
+    const caller = body.caller ?? undefined;
+
     try {
       const result = await mcpCallTool(
         'Search_Federal_Contract_Opportunities',
         mcpArgs,
         cacheId,
+        false,
+        caller,
       );
 
       return reply.send(

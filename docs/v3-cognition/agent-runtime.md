@@ -24,7 +24,7 @@ Browser ──JWT──▶ backend-v3:4000/v3/agent/* ──service-token──�
 | `GET` | `/v3/agent/trace/:run_id` | Retrieve full trace for a completed run |
 | `POST` | `/v3/agent/cancel/:run_id` | Cancel an in-progress run |
 
-## Tool Registry (11 tools)
+## Tool Registry (12 tools)
 
 | # | Tool | Description | Credit burn |
 |---|------|-------------|-------------|
@@ -39,12 +39,13 @@ Browser ──JWT──▶ backend-v3:4000/v3/agent/* ──service-token──�
 | 9 | `file_read` | Read a document from the GDA Command file store | None (local) |
 | 10 | `pwin_score` | Get probability-of-win score for an opportunity (F-302 model) | LLM call |
 | 11 | `govwin_search` | Search GovWin IQ for government contract intelligence | GovWin API credit |
+| 12 | `govtribe_search` | Search GovTribe for federal contract opportunities (MCP-backed, credit-budgeted) | GovTribe MCP credit (3 per 10 results) |
 
 ### Credit-burn annotations
 
 - **Free/Local**: `sam_search`, `usaspending_search`, `federal_register_search`, `db_query`, `rag_search`, `decision_memory_lookup`, `file_read` — zero external cost.
 - **LLM**: `doctrine_check`, `pwin_score` — consume LLM tokens (OpenAI/Anthropic). Cost tracked via `AGENT_HOURLY_COST_LIMIT_USD` (default $5/hr).
-- **API credits**: `web_search` (Perplexity/Tavily per-query), `govwin_search` (GovWin IQ API).
+- **API credits**: `web_search` (Perplexity/Tavily per-query), `govwin_search` (GovWin IQ API), `govtribe_search` (GovTribe MCP — 3 credits per 10 results, 150/cycle cap, 1200/month cap).
 
 ## Tool Schemas
 
@@ -127,6 +128,15 @@ Input:  { query, agency? }
 Output: { results: [{ title, agency, status, source_url }], warning? }
 ```
 
+### govtribe_search
+
+```
+Input:  { query, agency?, naics?, posted_within?(e.g. '7d','30d'), max_results(1-100, default 25) }
+Output: { results: [{ title, agency?, posted_at?, response_due_at?, notice_id, govtribe_url, estimated_value?, set_aside? }], decision?, credits_used, from_cache, warning? }
+```
+
+**Credit accounting:** Calls backend `POST /v3/govtribe/search` (not GovTribe directly). Backend enforces cycle cap (150/cycle) and monthly cap (1200/month) via `govtribe_credit_ledger`. Ledger entries include `caller='agent-v3'` for attribution. If caps are hit, returns `decision='skipped_cycle_cap'` or `'skipped_halted'` with cached data (if available).
+
 ## Configuration (Environment Variables)
 
 | Variable | Service | Description |
@@ -144,6 +154,7 @@ Output: { results: [{ title, agency, status, source_url }], warning? }
 | `AGENT_MAX_STEPS` | agent-v3 | Max agent steps per run (default: 12) |
 | `AGENT_WALL_TIMEOUT_S` | agent-v3 | Wall-clock timeout per run in seconds (default: 30) |
 | `AGENT_HOURLY_COST_LIMIT_USD` | agent-v3 | Hourly cost limit in USD (default: $5) |
+| `BACKEND_V3_URL` | agent-v3 | Internal URL to backend-v3 (default: `http://gda-backend-v3:4000`). Used by `govtribe_search` tool. |
 
 ## Docker Compose
 
