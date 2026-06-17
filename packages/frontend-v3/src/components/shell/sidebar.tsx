@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, SETTINGS_ITEM, SETTINGS_SUB_ITEMS, PROMPT_CREATOR_ITEM } from "./nav-items";
 import { useSentinel } from "@/hooks/use-sentinel";
+import { useRegulatoryCount } from "@/hooks/use-regulatory";
 
 export function Sidebar() {
   const pathname = usePathname();
   const { data: sentinel } = useSentinel();
+  const { data: regCount } = useRegulatoryCount();
 
   const sentinelColor =
     sentinel?.overall === "healthy"
@@ -47,7 +49,12 @@ export function Sidebar() {
               )}
             >
               <Icon size={15} />
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.href === "/regulatory" && regCount?.count != null && (
+                <span className="ml-auto rounded-full bg-gda-panel px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
+                  {regCount.count}
+                </span>
+              )}
             </Link>
           );
         })}
