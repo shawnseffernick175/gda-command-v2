@@ -1,4 +1,32 @@
 services:
+  traefik-v3:
+    image: traefik:v3.6.8
+    container_name: gda-traefik-v3
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=gda-command-v2_edge"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=shawn.seffernick175@gmail.com"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - gda-letsencrypt:/letsencrypt
+    networks:
+      - edge
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
   postgres-staging:
     image: pgvector/pgvector:pg16
     container_name: gda-postgres-staging
@@ -23,7 +51,7 @@ services:
           cpus: "0.5"
     networks:
       - gda
-      - traefik
+      - edge
 
   backend-v3:
     build:
@@ -78,13 +106,14 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gda-v3.rule=Host(`gda-v3.csr-llc.tech`)"
+      - "traefik.http.routers.gda-v3.entrypoints=websecure"
       - "traefik.http.routers.gda-v3.tls=true"
       - "traefik.http.routers.gda-v3.tls.certresolver=mytlschallenge"
       - "traefik.http.services.gda-v3.loadbalancer.server.port=4000"
-      - "traefik.docker.network=n8n_default"
+      - "traefik.docker.network=gda-command-v2_edge"
     networks:
       - gda
-      - traefik
+      - edge
 
   gda-agent-v3:
     build:
@@ -149,13 +178,14 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gda-v3-ui.rule=Host(`gda.csr-llc.tech`) || Host(`app.csr-llc.tech`) || Host(`gda-v3-ui.csr-llc.tech`)"
+      - "traefik.http.routers.gda-v3-ui.entrypoints=websecure"
       - "traefik.http.routers.gda-v3-ui.tls=true"
       - "traefik.http.routers.gda-v3-ui.tls.certresolver=mytlschallenge"
       - "traefik.http.services.gda-v3-ui.loadbalancer.server.port=80"
-      - "traefik.docker.network=n8n_default"
+      - "traefik.docker.network=gda-command-v2_edge"
     networks:
       - gda
-      - traefik
+      - edge
 
   gda-mcp-server:
     build:
@@ -188,18 +218,19 @@ services:
       - "traefik.http.routers.gda-mcp.tls=true"
       - "traefik.http.routers.gda-mcp.tls.certresolver=mytlschallenge"
       - "traefik.http.services.gda-mcp.loadbalancer.server.port=4100"
-      - "traefik.docker.network=n8n_default"
+      - "traefik.docker.network=gda-command-v2_edge"
     networks:
       - gda
-      - traefik
+      - edge
 
 networks:
   gda:
     driver: bridge
-  traefik:
-    external: true
-    name: n8n_default
+  edge:
+    driver: bridge
+    name: gda-command-v2_edge
 
 volumes:
   pgdata-staging:
   vaultdata:
+  gda-letsencrypt:
