@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, SETTINGS_ITEM, PROMPT_CREATOR_ITEM } from "./nav-items";
+import { NAV_ITEMS, SETTINGS_ITEM, SETTINGS_SUB_ITEMS, PROMPT_CREATOR_ITEM } from "./nav-items";
 import { useSentinel } from "@/hooks/use-sentinel";
 
 export function Sidebar() {
@@ -66,6 +66,26 @@ export function Sidebar() {
           <SETTINGS_ITEM.icon size={15} />
           <span>{SETTINGS_ITEM.label}</span>
         </Link>
+
+        {pathname.startsWith("/settings") && SETTINGS_SUB_ITEMS.map((sub) => {
+          const subActive = pathname === sub.href || pathname.startsWith(sub.href + "/");
+          const SubIcon = sub.icon;
+          return (
+            <Link
+              key={sub.href}
+              href={sub.href}
+              className={cn(
+                "flex items-center gap-2 rounded px-3 py-1 pl-8 text-[12px] transition-colors",
+                subActive
+                  ? "text-gda-green"
+                  : "text-muted-foreground hover:bg-gda-panel hover:text-foreground",
+              )}
+            >
+              <SubIcon size={13} />
+              <span>{sub.label}</span>
+            </Link>
+          );
+        })}
 
         <Link
           href={PROMPT_CREATOR_ITEM.href}
