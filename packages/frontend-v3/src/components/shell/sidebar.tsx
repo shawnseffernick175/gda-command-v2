@@ -51,7 +51,7 @@ export function Sidebar() {
               <Icon size={15} />
               <span className="flex-1">{item.label}</span>
               {item.href === "/regulatory" && regCount?.count != null && (
-                <span className="ml-auto rounded-full bg-gda-panel px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
+                <span className="ml-auto rounded-full bg-gda-panel px-1.5 py-0.5 font-mono text-[11px] leading-none text-muted-foreground">
                   {regCount.count}
                 </span>
               )}
