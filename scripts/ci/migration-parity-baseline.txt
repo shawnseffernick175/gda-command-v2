@@ -13,7 +13,6 @@ v3_023_color_team_reviews.sql
 v3_024_backfill_schema_migrations.sql
 v3_028_field_override_audit.sql
 v3_061_pipeline_stage_add_no_bid.sql
-v3_087_drop_grade_columns.sql
 v3_093_opportunity_notes_owner.sql
 v3_094_opportunity_notes_owner.sql
 v3_094_opportunity_value_date_enrichment.sql

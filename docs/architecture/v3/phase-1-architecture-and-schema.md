@@ -216,8 +216,6 @@ CREATE TABLE opportunities (
                                       'discovery', 'tracking', 'qualifying',
                                       'qualified', 'no_bid', 'closed', 'awarded'
                                     )),
-  grade               TEXT          CHECK (grade IN ('A', 'B', 'C')),
-  grade_evidence      TEXT,                    -- human-readable rationale for the grade
   value_min           NUMERIC,                 -- estimated floor ($)
   value_max           NUMERIC,                 -- estimated ceiling ($)
   naics               TEXT,                    -- primary NAICS code
@@ -270,7 +268,6 @@ CREATE INDEX idx_opps_agency         ON opportunities (agency) WHERE deleted_at 
 CREATE INDEX idx_opps_naics          ON opportunities (naics) WHERE deleted_at IS NULL;
 CREATE INDEX idx_opps_set_aside      ON opportunities (set_aside) WHERE deleted_at IS NULL;
 CREATE INDEX idx_opps_response_due   ON opportunities (response_due_at DESC) WHERE deleted_at IS NULL;
-CREATE INDEX idx_opps_grade          ON opportunities (grade) WHERE deleted_at IS NULL;
 CREATE INDEX idx_opps_sam_notice     ON opportunities (sam_notice_id) WHERE sam_notice_id IS NOT NULL;
 CREATE INDEX idx_opps_agency_subtype ON opportunities (agency_subtype) WHERE agency_subtype IS NOT NULL;
 CREATE INDEX idx_opportunities_department_name ON opportunities (department_name);
@@ -288,7 +285,6 @@ CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted
 | `id` | `BIGSERIAL` PK — fixes legacy text PK that caused FK type mismatches |
 | `sam_notice_id` | Unique SAM.gov notice ID for deduplication (legacy had no dedup key) |
 | `status` | Lifecycle stage with CHECK constraint (legacy had free-text, no constraint) |
-| `grade` / `grade_evidence` | A/B/C evidence-based qualification per Doctrine "Data First" |
 | `value_min` / `value_max` | Range estimate replacing legacy single `value_estimated` |
 | `analysis` | JSONB: R2 cached auto-analysis (pwin, incumbent, competitors, wargame, timeline) |
 | `analysis_version` | Model version string for cache invalidation when analysis logic changes |
@@ -298,7 +294,7 @@ CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted
 | `source_id` | **R1 FK** — every opportunity must cite its source. DB-enforced NOT NULL. |
 | `deleted_at` | Soft delete (partial indexes exclude deleted rows from all queries) |
 
-**Indexes:** All partial on `deleted_at IS NULL` — queries never scan deleted rows. Agency, NAICS, set-aside, grade support the Ops Tracker filter bar. `response_due_at DESC` powers deadline sorting.
+**Indexes:** All partial on `deleted_at IS NULL` — queries never scan deleted rows. Agency, NAICS, and set-aside support the Ops Tracker filter bar. `response_due_at DESC` powers deadline sorting. (The A/B/C letter-grade system was removed in v3_087 — Pwin, a continuous percentage, is now the sole fit metric.)
 
 **Why this choice:** Phase 0 found three competing opportunity tables (`sam_opportunities` 20,062 rows, `gda_opportunity_tracker` 1,924 rows, `opportunities` 658 rows). V3 consolidates to one. The legacy `text` PK and missing dedup key (`sam_notice_id`) caused FK type conflicts and duplicate records. The `BIGSERIAL` PK with `sam_notice_id` UNIQUE constraint eliminates both. The `analysis` JSONB + `analysis_version` supports R2 cache invalidation without a separate table.
 
