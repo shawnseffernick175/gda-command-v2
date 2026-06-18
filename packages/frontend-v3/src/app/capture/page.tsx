@@ -149,7 +149,6 @@ function CaptureList() {
                 <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                 <SortableHeader label="pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                 <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Reviews</th>
-                <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Next Milestone</th>
               </tr>
             </thead>
             <tbody>
@@ -183,9 +182,6 @@ function CaptureList() {
                   </td>
                   <td className="px-3 py-2">
                     <CaptureReviewDots opportunityId={item.opportunity_id} />
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    —
                   </td>
                 </tr>
               ))}

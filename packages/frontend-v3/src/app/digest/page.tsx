@@ -262,7 +262,11 @@ function LeadStoryPanel({ lead }: { lead: DigestLeadStory }) {
       <div className="flex items-center gap-3 pt-1">
         {lead.related_opportunity_ids.length > 0 && (
           <a
-            href={`/opportunities?ids=${lead.related_opportunity_ids.join(",")}`}
+            href={
+              lead.related_opportunity_ids.length === 1
+                ? `/opportunities?id=${lead.related_opportunity_ids[0]}`
+                : `/opportunities`
+            }
             className="font-mono text-[11px] text-gda-cyan hover:underline"
           >
             → View {lead.related_opportunity_ids.length} related{" "}

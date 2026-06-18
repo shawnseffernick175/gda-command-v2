@@ -99,7 +99,9 @@ function getLinkForItem(item: ActionItem): { href: string; label: string } | nul
   ) {
     const captureId = item.capture_id ?? item.linked_record_id;
     if (captureId) {
-      return { href: `/capture?id=${captureId}`, label: "Capture" };
+      // Capture detail reads the `opp` query param (passed straight to
+      // GET /v3/captures/:id, which resolves a capture id).
+      return { href: `/capture?opp=${captureId}`, label: "Capture" };
     }
   }
   if (ds === "recompete_expiring") {
@@ -109,12 +111,17 @@ function getLinkForItem(item: ActionItem): { href: string; label: string } | nul
     }
   }
   if (item.linked_record_type && item.linked_record_id) {
-    const routes: Record<string, string> = {
-      capture: "/capture",
-      award: "/awards",
+    // Each surface reads a different detail query param: Capture uses `opp`,
+    // others use `id`.
+    const routes: Record<string, { path: string; param: string }> = {
+      capture: { path: "/capture", param: "opp" },
+      award: { path: "/awards", param: "id" },
     };
-    const route = routes[item.linked_record_type] ?? "/";
-    return { href: `${route}?id=${item.linked_record_id}`, label: item.linked_record_type };
+    const route = routes[item.linked_record_type] ?? { path: "/", param: "id" };
+    return {
+      href: `${route.path}?${route.param}=${item.linked_record_id}`,
+      label: item.linked_record_type,
+    };
   }
   return null;
 }

@@ -279,9 +279,10 @@ export default function VehiclesPage() {
                       </td>
                       <td className="px-3 py-2">
                         <Link
-                          href="/opportunities?groupBy=vehicle"
+                          href="/opportunities"
                           className="text-xs font-mono text-gda-green hover:underline"
                           onClick={(e) => e.stopPropagation()}
+                          title="View opportunities"
                         >
                           {v.opportunity_count}
                         </Link>
