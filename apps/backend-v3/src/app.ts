@@ -55,6 +55,7 @@ import { overrideRoutes } from './routes/overrides.js';
 import { workshopRoutes } from './routes/workshop.js';
 import { scoringDoctrineRoutes } from './routes/scoring-doctrine.js';
 import { pipelineCoverageRoutes } from './routes/pipeline-coverage.js';
+import { captureReviewRoutes } from './routes/capture-reviews.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -186,6 +187,7 @@ export async function buildApp() {
   await app.register(workshopRoutes);
   await app.register(scoringDoctrineRoutes);
   await app.register(pipelineCoverageRoutes);
+  await app.register(captureReviewRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

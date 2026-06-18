@@ -285,6 +285,135 @@ export interface CaptureColorStage {
   updated_at: string;
 }
 
+/* ── Capture Review Engine (F-868) ────────────────────────────── */
+
+export type ReviewColor = "pink" | "red" | "black" | "blue" | "white" | "green";
+export type ReviewStatus = "scheduled" | "in_progress" | "complete" | "cancelled";
+export type ColorRating = "Blue" | "Green" | "Yellow" | "Red" | "Pink";
+export type ReviewerRole = "lead" | "technical" | "mgmt" | "past_perf" | "pricing" | "compliance";
+
+export interface CapturePlan {
+  id: number;
+  capture_id: number;
+  customer_relationship_score: number | null;
+  customer_relationship_notes: string | null;
+  customer_budget_confirmed: boolean;
+  customer_funded_date: string | null;
+  solution_fit_score: number | null;
+  solution_differentiators: string | null;
+  solution_risks: string | null;
+  competitive_position_score: number | null;
+  known_competitors: Array<{ name: string; threat_level: string; win_themes: string }>;
+  ghosting_strategy: string | null;
+  ptw_estimate: number | null;
+  pricing_posture: "aggressive" | "balanced" | "premium" | null;
+  margin_target: number | null;
+  cpars_references: unknown[];
+  team_required_pp_categories: unknown[];
+  prime_or_sub: "PRIME" | "SUB" | null;
+  teammates: Array<{ company: string; role: string; scope_pct: number; status: string }>;
+  computed_pwin: number | null;
+  pwin_last_computed_at: string | null;
+  is_forecastable: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CaptureMilestone {
+  id: number;
+  capture_id: number;
+  milestone_name: string;
+  due_date: string;
+  status: "pending" | "in_progress" | "complete" | "slipped";
+  owner_contact: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ColorReview {
+  id: number;
+  capture_id: number;
+  proposal_vault_doc_id: number | null;
+  rfp_vault_doc_id: number | null;
+  color: ReviewColor;
+  scheduled_date: string | null;
+  completed_date: string | null;
+  status: ReviewStatus;
+  rubric: string;
+  overall_color_rating: ColorRating | null;
+  overall_score: number | null;
+  pwin_impact: number | null;
+  report_vault_doc_id: number | null;
+  total_sections?: number;
+  scored_sections?: number;
+  reviewers?: ColorReviewReviewer[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ColorReviewReviewer {
+  id: number;
+  review_id?: number;
+  reviewer_name?: string;
+  name?: string;
+  reviewer_email?: string;
+  role: ReviewerRole | null;
+  submitted_at: string | null;
+}
+
+export interface ColorReviewSection {
+  id: number;
+  review_id: number;
+  section_name: string;
+  section_m_criterion: string | null;
+  section_l_requirement: string | null;
+  rfp_text_excerpt: string | null;
+  proposal_text_excerpt: string | null;
+  weight_pct: number | null;
+  display_order: number;
+}
+
+export interface ColorReviewScore {
+  id: number;
+  section_id: number;
+  reviewer_id: number;
+  score: number | null;
+  color_rating: ColorRating | null;
+  strengths: string | null;
+  weaknesses: string | null;
+  recommendations: string | null;
+  submitted_at: string | null;
+}
+
+export interface ColorReviewCompliance {
+  id: number;
+  review_id: number;
+  shall_statement: string;
+  rfp_reference: string | null;
+  proposal_addressed_in: string | null;
+  is_compliant: boolean | null;
+  notes: string | null;
+}
+
+export interface ReviewDetail extends ColorReview {
+  sections: ColorReviewSection[];
+  reviewers: ColorReviewReviewer[];
+  scores: ColorReviewScore[];
+  compliance: ColorReviewCompliance[];
+}
+
+export interface MyOpenReview {
+  review_id: number;
+  color: ReviewColor;
+  status: ReviewStatus;
+  scheduled_date: string | null;
+  capture_id: number;
+  capture_name: string | null;
+  total_sections: number;
+  scored_sections: number;
+}
+
 /* ── Awards ───────────────────────────────────────────────────── */
 
 export interface AwardSourceRef {

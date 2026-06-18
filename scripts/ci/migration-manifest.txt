@@ -105,3 +105,6 @@ v3_096_fastrac_signal_columns.sql
 v3_097_workshop.sql
 v3_098_awards_intel_rebuild.sql
 v3_099_action_items_doctrine_sources.sql
+v3_100_wheelhouse_config.sql
+v3_101_pipeline_coverage_shipley.sql
+v3_102_capture_review_engine.sql
