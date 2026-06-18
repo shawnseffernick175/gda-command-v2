@@ -86,6 +86,6 @@ docker compose -f docker-compose.prod.yml rm -f backend-v3
 
 ## Notes
 
-- backend-v3 listens on port 4000 internally; Traefik terminates TLS on `gda-v3.csr-llc.tech`.
+- backend-v3 listens on port 4000 internally; Traefik terminates TLS on `gda.csr-llc.tech`.
 - Connects to `postgres-staging` (the migrated DB with 15,742 opps from F-212), NOT `postgres` (V2).
-- The `traefik` network is the external `n8n_default` network, same as other services.
+- **Reverse proxy (current, 2026-06-18):** V3 runs its own dedicated `traefik-v3` service (`gda-traefik-v3`, image `traefik:v3.6.8`) on a V3-owned bridge network named `edge` (external name `gda-command-v2_edge`). The old V2/n8n stack and its `n8n_default` network have been removed — V3 no longer shares a proxy or network with n8n. The ACME cert resolver is `mytlschallenge` (matches the copied `acme.json` certs; `gda.csr-llc.tech` is a SAN on the `app.csr-llc.tech` cert). Services attached to `edge`: `traefik-v3`, `postgres-staging`, `backend-v3`, `gda-agent-v3`, `frontend-v3`, `gda-mcp-server`. The internal `gda` network carries service-to-service DB traffic.
