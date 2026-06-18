@@ -20,6 +20,14 @@ jobs:
       - run: npm run build -w packages/shared
       - run: npm run build
 
+  migration-drift-guardrail:
+    name: Migration Drift Guardrail
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check db/v3 is the single migration source of truth
+        run: bash scripts/check-migration-parity.sh
+
   test:
     name: Test
     runs-on: ubuntu-latest
