@@ -545,11 +545,11 @@ function WorkProductTable({
                     title={`AI ingested \u00b7 ${(doc.ai_tags as string[]).length} tags`}
                     className="text-gda-green"
                   >
-                    ✓
+                    {"\u2713"}
                   </span>
                 ) : (
                   <span title="AI pending" className="text-muted-foreground">
-                    ⌛
+                    {"\u231b"}
                   </span>
                 )}
               </td>
@@ -854,14 +854,14 @@ function DocumentReaderDrawer({
                       title={`AI ingested \u00b7 ${(doc.ai_tags as string[]).length} tags`}
                       className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-gda-green/30 bg-gda-green/10 text-gda-green"
                     >
-                      AI ✓
+                      AI {"\u2713"}
                     </span>
                   ) : (
                     <span
                       title="AI pending"
                       className="inline-block rounded px-2 py-0.5 text-[11px] font-mono border border-border text-muted-foreground"
                     >
-                      AI ⌛
+                      AI {"\u231b"}
                     </span>
                   )}
                 </div>
