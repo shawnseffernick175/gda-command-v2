@@ -108,7 +108,7 @@ export function WorkshopContent() {
     <div className="mx-auto flex max-w-7xl gap-6 px-8 py-6">
       {/* Left: Document Library */}
       <div className="w-80 shrink-0 space-y-4">
-        <h1 className="text-xl font-semibold text-foreground">Workshop</h1>
+        <h1 className="font-mono text-lg font-bold text-foreground">Workshop</h1>
 
         {/* Upload */}
         <UploadDropzone onFiles={handleFiles} disabled={upload.isPending} />
@@ -209,6 +209,13 @@ export function WorkshopContent() {
             type="button"
             className="w-full rounded border border-gda-red/30 px-3 py-1.5 text-[12px] text-gda-red transition-colors hover:bg-gda-red/10"
             onClick={() => {
+              if (
+                !confirm(
+                  `Delete ${selectedUpload?.filename ?? "this document"}? This cannot be undone.`,
+                )
+              ) {
+                return;
+              }
               deleteUpload.mutate(selectedId, {
                 onSuccess: () => setSelectedId(null),
               });

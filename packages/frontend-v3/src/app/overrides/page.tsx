@@ -8,7 +8,13 @@ import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
+import { DB_KEY_TO_LABEL } from "@/lib/stages";
 import Link from "next/link";
+
+function stageLabel(key: string | null | undefined): string {
+  if (!key) return "none";
+  return (DB_KEY_TO_LABEL as Record<string, string>)[key] ?? key;
+}
 
 const OVERRIDE_SORT_COLS: ColumnSortConfig[] = [
   { field: "created_at", type: "date" },
@@ -74,7 +80,7 @@ function OverridesContent() {
   }, [data?.recent, sortBy, sortDir]);
 
   const mostCommonDisagreement = data?.stage_pivot?.[0]
-    ? `${data.stage_pivot[0].ai_value}\u2192${data.stage_pivot[0].human_value}: ${data.stage_pivot[0].count} times`
+    ? `${stageLabel(data.stage_pivot[0].ai_value)} → ${stageLabel(data.stage_pivot[0].human_value)}: ${data.stage_pivot[0].count} times`
     : "\u2014";
 
   return (
@@ -94,7 +100,7 @@ function OverridesContent() {
                   "rounded px-3 py-1 text-xs font-medium transition-colors",
                   range === r.value
                     ? "bg-gda-green text-white"
-                    : "border border-border bg-white text-muted-foreground hover:bg-gda-bg-base",
+                    : "border border-border bg-gda-panel text-muted-foreground hover:bg-gda-bg-base",
                 )}
               >
                 {r.label}
@@ -105,15 +111,15 @@ function OverridesContent() {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid gap-4 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-24 rounded" />
           ))}
         </div>
       ) : data ? (
         <>
           {/* KPI Strip */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -165,7 +171,7 @@ function OverridesContent() {
                 Stage Override Matrix
               </CardTitle>
               <p className="text-xs text-muted-foreground">
-                Rows = Previous stage, Columns = Human override
+                Rows = System suggested, Columns = Your override
               </p>
             </CardHeader>
             <CardContent>
@@ -227,8 +233,8 @@ function OverridesContent() {
                               : row.field_name}
                           </td>
                           <td className="py-2 pr-4 font-medium">
-                            AI: {row.ai_value ?? "none"} → You:{" "}
-                            {row.human_value}
+                            AI: {stageLabel(row.ai_value)} → You:{" "}
+                            {stageLabel(row.human_value)}
                           </td>
                           <td className="max-w-[200px] truncate py-2 text-muted-foreground">
                             {row.reason || "\u2014"}
@@ -277,7 +283,7 @@ function PivotTable({
                 key={col}
                 className="pb-1 text-center uppercase tracking-wider text-muted-foreground"
               >
-                {col}
+                {stageLabel(col)}
               </th>
             ))}
           </tr>
@@ -285,7 +291,7 @@ function PivotTable({
         <tbody>
           {rowLabels.map((row) => (
             <tr key={row} className="border-b border-border last:border-0">
-              <td className="py-1 pr-2 font-medium">{row}</td>
+              <td className="py-1 pr-2 font-medium">{stageLabel(row)}</td>
               {colLabels.map((col) => {
                 const count = lookup.get(`${row}|${col}`) ?? 0;
                 const isDiagonal = row === col;
@@ -296,15 +302,15 @@ function PivotTable({
                     key={col}
                     className={cn(
                       "py-1 text-center tabular-nums",
-                      isDiagonal && count > 0 && "bg-green-100",
+                      isDiagonal && count > 0 && "bg-gda-green/20 text-foreground",
                       !isDiagonal &&
                         count > 0 &&
                         intensity > 0.5 &&
-                        "bg-red-100",
+                        "bg-gda-red/20 text-foreground",
                       !isDiagonal &&
                         count > 0 &&
                         intensity <= 0.5 &&
-                        "bg-yellow-50",
+                        "bg-gda-amber/10 text-foreground",
                     )}
                   >
                     {count === 0 ? "\u2014" : count}
