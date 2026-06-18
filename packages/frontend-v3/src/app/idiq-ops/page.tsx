@@ -138,7 +138,7 @@ function KpiStrip({ kpis }: KpiStripProps) {
   ];
 
   return (
-    <div className="flex items-center gap-6 rounded border border-border bg-white px-4 py-2">
+    <div className="flex items-center gap-6 rounded border border-border bg-gda-panel px-4 py-2">
       {items.map((kpi) => (
         <div key={kpi.label} className="flex items-center gap-1.5">
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">

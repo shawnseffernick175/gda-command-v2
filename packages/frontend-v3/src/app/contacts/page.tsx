@@ -255,7 +255,7 @@ function LinkOpportunityModal({
         </div>
         <input
           type="text"
-          placeholder="Search opportunities or captures\u2026"
+          placeholder="Search opportunities or captures…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="mb-3 w-full rounded border border-border bg-gda-bg-base px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
@@ -385,7 +385,7 @@ function ContactExpandRow({
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
                 onBlur={handleSaveNotes}
-                placeholder="Notes\u2026"
+                placeholder="Notes…"
                 className="w-full rounded border border-border bg-gda-bg-base px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-gda-cyan/50"
               />
             </div>
@@ -552,7 +552,7 @@ function ByAgencyView({
                           {c.email}
                         </a>
                       ) : (
-                        <span className="text-muted-foreground">\u2014</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-2 py-2 text-xs">
@@ -585,7 +585,7 @@ function LinkedChips({ contact }: { contact: GovTriContact }) {
   const opps = contact.linked_opportunities ?? [];
   const caps = contact.linked_captures ?? [];
   if (opps.length === 0 && caps.length === 0) {
-    return <span className="text-muted-foreground">\u2014</span>;
+    return <span className="text-muted-foreground">—</span>;
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -743,7 +743,7 @@ function ContactsContent() {
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="text"
-              placeholder="Search name, email, agency\u2026"
+              placeholder="Search name, email, agency…"
               value={searchInput}
               onChange={handleSearchChange}
               className="rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-cyan/50 w-60"
@@ -929,7 +929,7 @@ function ContactsContent() {
                             ) : c.phone ? (
                               <span className="text-muted-foreground">{c.phone}</span>
                             ) : (
-                              <span className="text-muted-foreground">\u2014</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
                           {/* Linked To */}

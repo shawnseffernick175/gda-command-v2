@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { BandBadge } from "@/components/band-badge";
 import { ScoreDisplay } from "@/components/score-display";
 import { SourceChip } from "@/components/shared/source-chip";
+import { sourceLabelFromUrl } from "@/lib/source-label";
 import { ErrorState } from "@/components/shared/error-state";
 import { ScoreExplain } from "@/components/shared/score-explainers";
 import { formatMoney } from "@/lib/format-money";
@@ -115,13 +116,13 @@ export default function LaunchpadPage() {
           </Link>
           <Link href="/opportunities">
             <StatCard
-              label="Pipeline Value"
+              label="Top-5 Pipeline Value"
               value={formatMoney(pipelineValue)}
               color="text-gda-green"
               scoreExplain={
                 <ScoreExplain
                   score={formatMoney(pipelineValue)}
-                  label="Pipeline Value"
+                  label="Top-5 Pipeline Value"
                   scoreType="pipeline_value"
                 />
               }
@@ -241,7 +242,11 @@ function TopProgramsTable({
                 </td>
                 <td className="px-4 py-2">
                   {opp.source_url ? (
-                    <SourceChip label="SAM.gov" url={opp.source_url} kind="real" />
+                    <SourceChip
+                      label={sourceLabelFromUrl(opp.source_url, "SAM.gov")}
+                      url={opp.source_url}
+                      kind="real"
+                    />
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
                   )}

@@ -128,7 +128,7 @@ export default function VehiclesPage() {
           </h1>
           <button
             type="button"
-            className="h-8 rounded border border-border bg-white px-4 text-[13px] font-medium text-ink transition-colors hover:bg-gda-bg-base"
+            className="h-8 rounded border border-border bg-gda-panel px-4 text-[13px] font-medium text-foreground transition-colors hover:bg-gda-bg-base"
             onClick={() => reingest.mutate(true)}
             disabled={reingest.isPending}
           >
@@ -308,7 +308,7 @@ export default function VehiclesPage() {
           {selectedId && (
             <Suspense
               fallback={
-                <div className="w-[380px] shrink-0 rounded border border-border bg-white p-4 space-y-3">
+                <div className="w-[380px] shrink-0 rounded border border-border bg-gda-panel p-4 space-y-3">
                   <Skeleton className="h-6 w-48 bg-gda-panel" />
                   <Skeleton className="h-4 w-32 bg-gda-panel" />
                   <Skeleton className="h-20 bg-gda-panel" />

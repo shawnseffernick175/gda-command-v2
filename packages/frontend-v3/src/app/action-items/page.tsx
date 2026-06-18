@@ -13,8 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Pagination } from "@/components/shared/Pagination";
-import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
+import type { SortDirection } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
 import type {
   ActionItem,
@@ -23,6 +23,43 @@ import type {
   DoctrineSource,
 } from "@/lib/types";
 import Link from "next/link";
+
+/** Inline sortable header label for the flex-based Action Items header row. */
+function SortSpan({
+  label,
+  field,
+  sortBy,
+  sortDir,
+  onSort,
+  className,
+}: {
+  label: string;
+  field: string;
+  sortBy: string | null;
+  sortDir: SortDirection;
+  onSort: (field: string) => void;
+  className?: string;
+}) {
+  const active = sortBy === field;
+  const indicator = active ? (sortDir === "asc" ? "\u25B2" : "\u25BC") : "";
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(field)}
+      title={`Sort by ${label}`}
+      className={cn(
+        "flex items-center gap-1 uppercase tracking-[0.04em] transition-colors hover:text-foreground",
+        active ? "text-gda-green" : "text-muted-foreground",
+        className,
+      )}
+    >
+      <span className="truncate">{label}</span>
+      {indicator && (
+        <span className="font-mono text-[11px] leading-none">{indicator}</span>
+      )}
+    </button>
+  );
+}
 
 /* ── Constants ───────────────────────────────────────────────── */
 
@@ -254,34 +291,20 @@ function ActionItemsContent() {
         />
       ) : (
         <>
-          {/* Sort header row */}
-          <div className="rounded-t border border-b-0 border-border overflow-hidden">
-            <table className="w-full text-[11px]">
-              <thead>
-                <tr className="bg-gda-bg-base text-muted-foreground">
-                  <SortableHeader label="Priority" field="priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
-                  <SortableHeader label="Source" field="doctrine_source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
-                  <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                  <SortableHeader label="Due" field="due_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" />
-                  <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
-                </tr>
-              </thead>
-            </table>
-          </div>
-          <Card className="border-border bg-gda-panel overflow-hidden rounded-t-none">
+          <Card className="border-border bg-gda-panel overflow-hidden">
             <CardContent className="p-0">
-              {/* Table header */}
-              <div className="flex items-center gap-3 px-3 py-2 border-b border-[#D4D1CA] text-caption text-[#7A7974] uppercase tracking-[0.04em]">
+              {/* Single sortable header row (aligned to ActionItemRow) */}
+              <div className="flex items-center gap-3 px-3 py-2 border-b border-border text-caption text-muted-foreground uppercase tracking-[0.04em]">
                 <span className="w-4" />
-                <span className="w-[72px] shrink-0">Severity</span>
-                <span className="w-[72px] shrink-0">Source</span>
-                <span className="flex-1">Title</span>
-                <span className="w-[80px] shrink-0 text-right tabular-nums">Due</span>
+                <SortSpan label="Severity" field="priority" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[72px] shrink-0" />
+                <SortSpan label="Source" field="doctrine_source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[72px] shrink-0" />
+                <SortSpan label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="flex-1" />
+                <SortSpan label="Due" field="due_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[80px] shrink-0 justify-end text-right tabular-nums" />
                 <span className="w-[72px] shrink-0">Link</span>
                 <span className="w-[100px] shrink-0">Owner</span>
-                <span className="w-[72px] shrink-0">Status</span>
+                <SortSpan label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[72px] shrink-0" />
               </div>
-              <div className="divide-y divide-[#D4D1CA]">
+              <div className="divide-y divide-border">
                 {items.map((item) => (
                   <ActionItemRow
                     key={item.id}
