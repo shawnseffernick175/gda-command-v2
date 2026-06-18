@@ -30,6 +30,11 @@ import { formatMoney } from "@/lib/format-money";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+import { ReviewColorDots } from "@/components/capture/ReviewColorDots";
+import { MyOpenReviews } from "@/components/capture/MyOpenReviews";
+import { CapturePlanDrawer } from "@/components/capture/CapturePlanDrawer";
+import { ScoringWorkspace } from "@/components/capture/ScoringWorkspace";
+import { useCaptureReviews } from "@/hooks/use-capture-reviews";
 import type {
   CaptureColorStage,
   CaptureStageAnnotation,
@@ -87,6 +92,8 @@ function CaptureList() {
   const { data: pipeline, isLoading } = usePipeline({ stage: "Pursue" });
   const [showModal, setShowModal] = useState(false);
   const [modalEntryPoint, setModalEntryPoint] = useState<"full_pipeline" | "white_only">("full_pipeline");
+  const [drawerCapture, setDrawerCapture] = useState<{ id: number; title: string; stage: string; value: number | null } | null>(null);
+  const [scoringReviewId, setScoringReviewId] = useState<number | null>(null);
   const { sortBy, sortDir, handleSort } = useTableSort();
 
   const sorted = useMemo(() => {
@@ -141,6 +148,7 @@ function CaptureList() {
                 <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                 <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                 <SortableHeader label="pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Reviews</th>
                 <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Next Milestone</th>
               </tr>
             </thead>
@@ -173,6 +181,9 @@ function CaptureList() {
                       </span>
                     )}
                   </td>
+                  <td className="px-3 py-2">
+                    <CaptureReviewDots opportunityId={item.opportunity_id} />
+                  </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
                     —
                   </td>
@@ -188,14 +199,40 @@ function CaptureList() {
         />
       )}
 
+      {/* My Open Reviews panel */}
+      <MyOpenReviews onResumeReview={(id) => setScoringReviewId(id)} />
+
       {showModal && (
         <CreateCaptureModal
           entryPoint={modalEntryPoint}
           onClose={() => setShowModal(false)}
         />
       )}
+
+      {drawerCapture && (
+        <CapturePlanDrawer
+          capture={{ ...drawerCapture, opportunity_id: String(drawerCapture.id), pwin: null } as import("@/lib/types").CaptureDetail}
+          onClose={() => setDrawerCapture(null)}
+          onOpenScoringWorkspace={(id) => setScoringReviewId(id)}
+        />
+      )}
+
+      {scoringReviewId && (
+        <ScoringWorkspace
+          reviewId={scoringReviewId}
+          onClose={() => setScoringReviewId(null)}
+        />
+      )}
     </div>
   );
+}
+
+function CaptureReviewDots({ opportunityId }: { opportunityId?: string }) {
+  const { data: capture } = useCapture(opportunityId ?? "");
+  const captureId = capture?.id;
+  const { data } = useCaptureReviews(captureId);
+  if (!captureId || !data?.items) return <span className="text-[11px] text-muted-foreground">—</span>;
+  return <ReviewColorDots reviews={data.items} />;
 }
 
 function CreateCaptureModal({
