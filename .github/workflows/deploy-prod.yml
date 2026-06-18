@@ -95,6 +95,11 @@ jobs:
           SSH_USER: ${{ secrets.PROD_SSH_USER }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: |
+          # pipefail is REQUIRED: without it, `ssh ... | tee` returns tee's exit
+          # code (0) and masks a failed/rolled-back deploy, falsely reporting
+          # success. This was the propagation bug behind the June 2026 drift
+          # incident (deploy printed DEPLOY_FAILED but the job stayed green).
+          set -o pipefail
           scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
             scripts/deploy-prod.sh "${SSH_USER}@${SSH_HOST}:/tmp/deploy-prod.sh"
           ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
