@@ -85,28 +85,36 @@ export function ReviewsTab({ captureId, reviews, onOpenScoringWorkspace }: Revie
   );
 }
 
-function ReviewDot({ color, status }: { color: ReviewColor; status: string }) {
-  const colorMap: Record<ReviewColor, string> = {
-    pink: "#ec4899",
-    red: "#ef4444",
-    black: "#374151",
-    blue: "#3b82f6",
-    white: "#9ca3af",
-    green: "#22c55e",
-  };
+const DOT_COMPLETE_CLS: Record<ReviewColor, string> = {
+  pink: "bg-pink-500 border-pink-500",
+  red: "bg-red-500 border-red-500",
+  black: "bg-gray-700 border-gray-700",
+  blue: "bg-blue-500 border-blue-500",
+  white: "bg-gray-400 border-gray-400",
+  green: "bg-green-500 border-green-500",
+};
 
-  const fill = status === "complete" ? colorMap[color] : "transparent";
-  const border = status === "none" ? "#4b5563" : colorMap[color];
+const DOT_SCHEDULED_CLS: Record<ReviewColor, string> = {
+  pink: "border-pink-500 bg-transparent",
+  red: "border-red-500 bg-transparent",
+  black: "border-gray-700 bg-transparent",
+  blue: "border-blue-500 bg-transparent",
+  white: "border-gray-400 bg-transparent",
+  green: "border-green-500 bg-transparent",
+};
+
+function ReviewDot({ color, status }: { color: ReviewColor; status: string }) {
+  let cls: string;
+  if (status === "complete") {
+    cls = DOT_COMPLETE_CLS[color];
+  } else if (status === "none") {
+    cls = "border-gray-500 bg-transparent opacity-40";
+  } else {
+    cls = DOT_SCHEDULED_CLS[color];
+  }
 
   return (
-    <div
-      className="mx-auto h-4 w-4 rounded-full"
-      style={{
-        backgroundColor: fill,
-        border: `2px solid ${border}`,
-        opacity: status === "none" ? 0.4 : 1,
-      }}
-    />
+    <div className={`mx-auto h-4 w-4 rounded-full border-2 ${cls}`} />
   );
 }
 
