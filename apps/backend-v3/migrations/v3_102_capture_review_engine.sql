@@ -1,4 +1,4 @@
--- v3_100: Capture Review Engine — 6-color Shipley reviews + capture plans + milestones
+-- v3_102: Capture Review Engine — 6-color Shipley reviews + capture plans + milestones
 -- F-868: CEO directive — "Capture page is THE place for every color review"
 -- Adds: capture_plans, capture_milestones, color_reviews, color_review_reviewers,
 --       color_review_sections, color_review_scores, color_review_compliance
