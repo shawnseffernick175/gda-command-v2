@@ -1,4 +1,4 @@
--- v3_079_action_items_doctrine_sources.sql
+-- v3_099_action_items_doctrine_sources.sql
 -- Issue #872: Action Items — show only CEO's actual work, not SAM firehose
 --
 -- 1. Adds doctrine_source discriminator (replaces the generic source_type text)

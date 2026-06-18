@@ -23,10 +23,37 @@
 #
 # RATCHET DESIGN
 # --------------
-# The 42 historically-divergent files are recorded in
+# The historically-divergent files are recorded in
 # scripts/ci/migration-parity-baseline.txt. This guard does NOT force a risky
 # mass-renumber of that history. Instead it RATCHETS: it allows the baselined
 # divergences but FAILS on any NEW divergence introduced by a PR.
+#
+# BASELINE HISTORY
+# ----------------
+#   - Originally 42 entries (June 2026 drift-incident remediation).
+#   - Shrunk to 20 entries: 21 db/v3-only files that apply cleanly from scratch
+#     AND leave the design-doc schema drift-free (verified against a node-postgres
+#     replica of db/v3/migrate.ts on PG/pgvector, then re-checked with the real
+#     scripts/v3-schema-diff.ts detector) were COPIED into db/v3 identically,
+#     resolving them; the v3_099 comment-only header divergence was normalized
+#     to the canonical filename.
+#   - The remaining 20 are GENUINELY UNSAFE to merge and MUST stay baselined:
+#       * 12 renumbered-twin files (v3_017..v3_023) — a logical migration exists
+#         under a DIFFERENT sequence number in db/v3, so copying double-creates.
+#       * v3_024_backfill_schema_migrations.sql — INSERTs into v3_schema_migrations,
+#         dup-keys on a fresh-DB run.
+#       * v3_028_field_override_audit.sql — FK REFERENCES unified_opportunities,
+#         which intentionally does not persist in a db/v3 from-scratch run.
+#       * v3_061_pipeline_stage_add_no_bid.sql — its CHECK constraint is violated
+#         by seed rows present in the db/v3 from-scratch chain.
+#       * v3_087_drop_grade_columns.sql — DROPs opportunities.grade /
+#         grade_evidence + idx_opps_grade, which the architecture design doc
+#         still defines; copying it makes the drift detector fail.
+#       * 4 renumbered pairs: v3_093/094 opportunity_notes_owner and
+#         v3_094/095 opportunity_value_date_enrichment.
+#   - The baseline file is read with `sort -u` and is NOT comment-stripped, so it
+#     MUST contain ONLY bare filenames. Keep all documentation in this header.
+#   - Follow-up tracking: GitHub issue #898.
 #
 # When you add a migration:
 #   - add an IDENTICAL .sql file to BOTH apps/backend-v3/migrations/
