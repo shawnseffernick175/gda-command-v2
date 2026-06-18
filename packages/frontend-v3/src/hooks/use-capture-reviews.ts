@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiPatch } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDownload } from "@/lib/api";
 import type {
   CapturePlan,
   CaptureMilestone,
@@ -84,6 +84,13 @@ export function useScheduleReview(captureId: number | string | undefined) {
       scheduled_date?: string;
       rubric?: string;
       reviewers?: Array<{ name: string; email?: string; role?: string }>;
+      /**
+       * When true, in addition to seeding this color's sections the review also
+       * seeds a labeled back-review block for every prior color in doctrine
+       * order (black → blue → pink → green → red → white). Lets a team start a
+       * review at any color while still confirming earlier gates were met.
+       */
+      cumulative?: boolean;
     }) => apiPost<ColorReview>(`/v3/captures/${captureId}/reviews`, data),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["capture-reviews", captureId] });
@@ -147,6 +154,23 @@ export function useAiSuggestScore(reviewId: number | string | undefined) {
         weaknesses: string;
         recommendations: string;
       }>(`/v3/reviews/${reviewId}/ai-suggest`, data),
+  });
+}
+
+/**
+ * Download a completed review's outbrief as a Word (.docx) or PDF document.
+ * Streams raw file bytes from GET /v3/reviews/:id/outbrief and triggers a
+ * browser "Save As". Returns a mutation so callers get isPending / isError.
+ */
+export function useDownloadOutbrief(reviewId: number | string | undefined) {
+  return useMutation({
+    mutationFn: (format: "docx" | "pdf") => {
+      const ext = format === "pdf" ? "pdf" : "docx";
+      return apiDownload(
+        `/v3/reviews/${reviewId}/outbrief?format=${format}`,
+        `outbrief-review-${reviewId}.${ext}`,
+      );
+    },
   });
 }
 

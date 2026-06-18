@@ -280,6 +280,81 @@ export async function apiDelete(path: string): Promise<void> {
   await apiFetch<void>(path, { method: "DELETE" });
 }
 
+/* ── Binary download helper ───────────────────────────────────── */
+
+/**
+ * Download a binary file (e.g. a generated Word/PDF document) from a /v3/*
+ * endpoint and trigger a browser "Save As". Unlike apiGet/apiPost, this does
+ * NOT expect the JSON success envelope — the endpoint streams raw file bytes.
+ * Handles the same Bearer auth + one-shot refresh-on-401 flow as apiFetch, and
+ * derives the filename from the Content-Disposition header when present.
+ *
+ * Kept here so this file remains the only networking layer in the frontend.
+ */
+export async function apiDownload(
+  path: string,
+  fallbackFilename: string,
+): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const buildHeaders = (): Record<string, string> => {
+    const h: Record<string, string> = {};
+    if (accessToken) h["Authorization"] = `Bearer ${accessToken}`;
+    return h;
+  };
+
+  let res = await fetch(`${API_BASE}${path}`, { method: "GET", headers: buildHeaders() });
+
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      res = await fetch(`${API_BASE}${path}`, { method: "GET", headers: buildHeaders() });
+    } else {
+      accessToken = null;
+      redirectToLogin();
+      throw new ApiError("UNAUTHORIZED", "Session expired", 401);
+    }
+  }
+
+  if (!res.ok) {
+    // Error responses still use the JSON envelope — surface a clean message.
+    let message = `Download failed (${res.status})`;
+    let code = "UPSTREAM_ERROR";
+    try {
+      const envelope = (await res.json()) as ErrorEnvelope;
+      if (envelope && envelope.success === false) {
+        code = envelope.error.code;
+        message = envelope.error.message;
+      }
+    } catch {
+      /* non-JSON body — keep the generic message */
+    }
+    throw new ApiError(code, message, res.status);
+  }
+
+  // Derive filename from Content-Disposition: attachment; filename="..."
+  let filename = fallbackFilename;
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  if (match && match[1]) {
+    try {
+      filename = decodeURIComponent(match[1]);
+    } catch {
+      filename = match[1];
+    }
+  }
+
+  const blob = await res.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(objectUrl);
+}
+
 /* ── Auth helpers ─────────────────────────────────────────────── */
 
 export interface AuthUser {

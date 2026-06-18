@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useScheduleReview } from "@/hooks/use-capture-reviews";
+import { useScheduleReview, useDownloadOutbrief } from "@/hooks/use-capture-reviews";
 import type { ColorReview, ReviewColor } from "@/lib/types";
 
+// Status-strip order (left-to-right) kept as-is for visual continuity.
 const ALL_COLORS: ReviewColor[] = ["pink", "red", "black", "blue", "white", "green"];
+
+// Canonical doctrine order (black → blue → pink → green → red → white).
+// Used in the Schedule picker so "review everything up to this color"
+// (cumulative) reads in the order reviews actually happen.
+const DOCTRINE_ORDER: ReviewColor[] = ["black", "blue", "pink", "green", "red", "white"];
 
 const COLOR_LABELS: Record<ReviewColor, string> = {
   pink: "Pink Team",
@@ -14,6 +20,13 @@ const COLOR_LABELS: Record<ReviewColor, string> = {
   white: "White Team",
   green: "Green (Pricing)",
 };
+
+// Prior colors in doctrine order, used to explain what a cumulative
+// back-review will additionally cover.
+function priorColors(color: ReviewColor): ReviewColor[] {
+  const idx = DOCTRINE_ORDER.indexOf(color);
+  return idx > 0 ? DOCTRINE_ORDER.slice(0, idx) : [];
+}
 
 interface ReviewsTabProps {
   captureId: number | string;
@@ -175,14 +188,44 @@ function ReviewCard({ review, onResume }: { review: ColorReview; onResume: () =>
           </button>
         )}
         {review.status === "complete" && (
-          <button
-            type="button"
-            className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-gda-panel"
-          >
-            View Report
-          </button>
+          <OutbriefDownload reviewId={review.id} />
         )}
       </div>
+    </div>
+  );
+}
+
+function OutbriefDownload({ reviewId }: { reviewId: number }) {
+  const download = useDownloadOutbrief(reviewId);
+  const pending = download.isPending;
+  const pendingFormat = (download.variables as "docx" | "pdf" | undefined) ?? null;
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[11px] text-muted-foreground">Outbrief:</span>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => download.mutate("docx")}
+        className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-gda-panel disabled:opacity-50"
+        title="Download the outbrief as a Word document"
+      >
+        {pending && pendingFormat === "docx" ? "Preparing…" : "Word"}
+      </button>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => download.mutate("pdf")}
+        className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-gda-panel disabled:opacity-50"
+        title="Download the outbrief as a PDF"
+      >
+        {pending && pendingFormat === "pdf" ? "Preparing…" : "PDF"}
+      </button>
+      {download.isError && (
+        <span className="text-[11px] text-gda-red">
+          {(download.error as Error).message}
+        </span>
+      )}
     </div>
   );
 }
@@ -197,9 +240,14 @@ function ScheduleReviewModal({
   const [color, setColor] = useState<ReviewColor>("pink");
   const [scheduledDate, setScheduledDate] = useState("");
   const [reviewerName, setReviewerName] = useState("");
+  const [cumulative, setCumulative] = useState(false);
   const reviewerRole = "lead";
 
   const schedule = useScheduleReview(captureId);
+
+  const earlier = priorColors(color);
+  const canBeCumulative = earlier.length > 0;
+  const earlierLabels = earlier.map((c) => COLOR_LABELS[c]).join(", ");
 
   function handleSchedule() {
     schedule.mutate(
@@ -209,6 +257,7 @@ function ScheduleReviewModal({
         reviewers: reviewerName
           ? [{ name: reviewerName, role: reviewerRole }]
           : undefined,
+        cumulative: canBeCumulative ? cumulative : undefined,
       },
       { onSuccess: () => onClose() }
     );
@@ -226,10 +275,31 @@ function ScheduleReviewModal({
             onChange={(e) => setColor(e.target.value as ReviewColor)}
             className="mt-0.5 w-full rounded border border-border bg-gda-panel px-2 py-1.5 text-xs text-foreground"
           >
-            {ALL_COLORS.map((c) => (
+            {DOCTRINE_ORDER.map((c) => (
               <option key={c} value={c}>{COLOR_LABELS[c]}</option>
             ))}
           </select>
+        </div>
+
+        {/* Cumulative back-review */}
+        <div className="rounded border border-border bg-gda-panel/50 p-2.5">
+          <label className={`flex items-start gap-2 ${canBeCumulative ? "cursor-pointer" : "opacity-50 cursor-not-allowed"}`}>
+            <input
+              type="checkbox"
+              checked={canBeCumulative && cumulative}
+              disabled={!canBeCumulative}
+              onChange={(e) => setCumulative(e.target.checked)}
+              className="mt-0.5 accent-gda-green"
+            />
+            <span className="text-xs text-foreground">
+              Also back-review earlier stages
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                {canBeCumulative
+                  ? `Adds a labeled section to confirm ${earlierLabels} ${earlier.length === 1 ? "was" : "were"} done right before this ${COLOR_LABELS[color]} review. Use when you're starting mid-stream and want to catch anything missed earlier.`
+                  : "Black Hat is the first stage, so there is nothing earlier to back-review."}
+              </span>
+            </span>
+          </label>
         </div>
 
         <div>
