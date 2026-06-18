@@ -12,6 +12,8 @@ export function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showResetHelp, setShowResetHelp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -67,12 +69,22 @@ export function LoginScreen() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-muted-foreground">
-                Password
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-muted-foreground">
+                  Password
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -90,6 +102,21 @@ export function LoginScreen() {
             >
               {loading ? "Signing in…" : "Sign in"}
             </Button>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setShowResetHelp((v) => !v)}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Forgot password?
+              </button>
+              {showResetHelp && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Passwords are managed by your administrator. Contact your GDA
+                  Command admin to have your password reset.
+                </p>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
