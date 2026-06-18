@@ -1,9 +1,21 @@
 # GDA Command v2 — Operational Status
 
-**Last Updated:** 2026-06-16 (auto-generated, end of day)
+**Last Updated:** 2026-06-18
 **Production:** https://gda.csr-llc.tech
 **Repository:** https://github.com/shawnseffernick175/gda-command-v2
-**Latest commit on main:** `188d96c7` (Awards & Intel rebuild #881) followed by Action Items doctrine #880
+**Latest commit on main (live in prod):** `74986e1` (migration-parity baseline 42→19 + grade-removal doc fix, PR #897)
+**Schema version in prod:** `v3_102_capture_review_engine`
+
+---
+
+## 0. Session Reconciliation — 2026-06-18
+
+Decisions made and verified live in production this session (docs updated to match):
+
+1. **V3 severed from V2/n8n stack.** Added dedicated `traefik-v3` service (`gda-traefik-v3`, `traefik:v3.6.8`) on a V3-owned `edge` network (`gda-command-v2_edge`); killed the old n8n stack and its `n8n_default` network. Cert resolver `mytlschallenge` (gda.csr-llc.tech is a SAN on the app.csr-llc.tech cert). gda / app / gda-mcp all return HTTP 200 with valid SSL. (See `docs/deploy/v3-backend.md`, `docs/GDA-COMMAND-MASTER-DOC.md`.)
+2. **IDIQ doctrine reaffirmed in code.** Funded Task Orders belong in the Contract Waterfall; parent IDIQ vehicles do not. Waterfall pulls from `task_orders`; the 3 IDIQs (Tradewind, CBM+, GSA Marketplace) sit in the `pipeline_items` board, not the Waterfall.
+3. **Letter grades fully retired (migration `v3_087`).** `grade`/`grade_evidence` columns, `idx_opps_grade`, and `opportunity_grade_sources` are gone in prod. **Pwin (continuous %) is the sole fit metric**; "Hot" = Pwin ≥ 70%. Architecture + API-contract docs updated to remove all grade references.
+4. **Migration-folder parity reconciled (PR #897).** apps↔db/v3 parity baseline shrunk 42→19; 23 safe divergences resolved. Remaining 19 renumbered-history divergences tracked in issue #898.
 
 ---
 

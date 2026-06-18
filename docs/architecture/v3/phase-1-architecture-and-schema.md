@@ -58,6 +58,8 @@
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+> **AS-BUILT UPDATE (2026-06-18) — cutover complete, V3 severed from V2/n8n.** The sections below describe the original Phase 1 *plan* (a side-by-side cutover sharing one Traefik via `GDA_BACKEND_VERSION`). That plan is now superseded. In production today: V3 runs a **dedicated `traefik-v3` service** (`gda-traefik-v3`, `traefik:v3.6.8`) on a **V3-owned `edge` bridge network** (external name `gda-command-v2_edge`). The old V2/n8n stack and the `n8n_default` network have been **removed entirely** — there is no shared proxy, no shared network, and no `GDA_BACKEND_VERSION` routing switch anymore. ACME cert resolver is `mytlschallenge` (matches the copied `acme.json`; `gda.csr-llc.tech` is a SAN on the `app.csr-llc.tech` cert). Live services on `edge`: `traefik-v3`, `postgres-staging`, `backend-v3`, `gda-agent-v3`, `frontend-v3`, `gda-mcp-server`. The DB is `gda-postgres-staging` (pgvector pg16), not a separate `gda-postgres-v3` container. The "n8n never touches V3 DB" rule below is now moot — n8n is gone. See `docs/deploy/v3-backend.md` for the current topology. The original plan is retained below for historical context.
+
 ### Key architectural rules
 
 | Rule | Detail |

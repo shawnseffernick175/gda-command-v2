@@ -248,20 +248,21 @@ siblings are returned on every field.
 | `status` | string | Filter by status (`discovery`, `qualified`, `pipeline`, `lost`, `won`) |
 | `agency` | string | Case-insensitive substring match on agency |
 | `naics` | string | Case-insensitive substring match on NAICS code |
-| `grade` | string | Filter by grade (`A`, `B`, `C`) |
 | `due_before` | ISO date | Opportunities due before this date |
 | `due_after` | ISO date | Opportunities due after this date |
 | `set_aside` | string | Filter by set-aside type |
-| `hot` | `1` | Grade A or win prob ≥ 70% |
+| `hot` | `1` | Pwin ≥ 70% (the only "hot" definition; letter grades removed) |
 | `limit` | integer | Page size (default 50, max 200) |
 | `cursor` | string | Pagination cursor |
 
 **V2 compatibility:** V2 uses `page`/`per_page` and includes `naics`,
 `agency`, `set_aside`, `min_value`, `max_value`, `due_before`, `due_after`,
-`grade`, `qualified`, `hot` filters. V3 preserves all filter names and adds
+`qualified`, `hot` filters. V3 preserves the surviving filter names and adds
 `status`. The `ou_tag` and `qualified` params are removed (Envision-only scope;
-use `status=qualified` instead). V3 adds `min_value` and `max_value` to the
-OpenAPI spec for parity.
+use `status=qualified` instead). The `grade` filter was removed when the
+A/B/C/D/F letter-grade system was retired (migration `v3_087`); **Pwin
+(continuous %) is now the sole fit metric** and `hot=1` means Pwin ≥ 70%. V3
+adds `min_value` and `max_value` to the OpenAPI spec for parity.
 
 #### `GET /api/v3/opportunities/:id`
 

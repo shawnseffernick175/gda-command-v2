@@ -114,10 +114,11 @@ Express Backend (Node.js, port 3001)
 
 ### Infrastructure
 - **VPS:** Hostinger (see internal runbook for access details)
-- **Docker:** Multi-container (frontend + backend + postgres), docker-compose.prod.yml
-- **SSL:** Traefik reverse proxy with Let's Encrypt
-- **Domain:** gda.csr-llc.tech (app), n8n.csr-llc.tech (automation)
-- **Database:** PostgreSQL 16 with pgvector extension for semantic search
+- **Docker:** Multi-container (`docker-compose.prod.yml`) — live services: `traefik-v3`, `postgres-staging`, `backend-v3`, `gda-agent-v3`, `frontend-v3`, `gda-mcp-server`.
+- **SSL:** Dedicated `traefik-v3` reverse proxy (`traefik:v3.6.8`) with Let's Encrypt, cert resolver `mytlschallenge`, on a V3-owned `edge` network (`gda-command-v2_edge`).
+- **Domain:** gda.csr-llc.tech / app.csr-llc.tech (app), gda-mcp.csr-llc.tech (MCP server).
+- **Database:** PostgreSQL 16 with pgvector extension for semantic search (`gda-postgres-staging`).
+- **n8n RETIRED (2026-06-18):** The old V2/n8n automation stack and its `n8n_default` network have been removed. V3 no longer shares a proxy or network with n8n, and n8n.csr-llc.tech is no longer part of this platform. The architecture diagram above is V2-era and retained for historical context; the n8n and port-3001 boxes no longer reflect production.
 
 ### AI Models
 | Model | Role | Used For |
