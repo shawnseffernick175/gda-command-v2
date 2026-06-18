@@ -168,8 +168,3 @@ CREATE TABLE IF NOT EXISTS color_review_compliance (
 
 CREATE INDEX IF NOT EXISTS idx_color_review_compliance_review ON color_review_compliance(review_id);
 
--- ═══════════════════════════════════════════════════════════════════
--- 8. Add contract_revenue_value to captures for Pwin calc
--- ═══════════════════════════════════════════════════════════════════
-ALTER TABLE captures
-  ADD COLUMN IF NOT EXISTS contract_revenue_value NUMERIC;

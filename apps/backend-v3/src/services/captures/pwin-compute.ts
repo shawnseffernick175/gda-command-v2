@@ -62,18 +62,20 @@ export async function computePwin(captureId: number): Promise<number | null> {
     base -= 0.10;
   }
 
-  // Get contract revenue value for PTW check
-  const captureRes = await pool.query<{ contract_revenue_value: number | null }>(
-    'SELECT contract_revenue_value FROM captures WHERE id = $1',
+  // Get estimated value from pipeline chain for PTW check
+  const valRes = await pool.query<{ estimated_value: number | null }>(
+    `SELECT pi.estimated_value FROM captures c
+     JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
+     WHERE c.id = $1`,
     [captureId]
   );
-  const captureRow = captureRes.rows[0];
+  const estimatedValue = valRes.rows[0]?.estimated_value;
 
   if (
     plan.ptw_estimate !== null &&
-    captureRow?.contract_revenue_value !== null &&
-    captureRow?.contract_revenue_value !== undefined &&
-    plan.ptw_estimate < captureRow.contract_revenue_value * 0.85
+    estimatedValue !== null &&
+    estimatedValue !== undefined &&
+    plan.ptw_estimate < estimatedValue * 0.85
   ) {
     base -= 0.05;
   }
