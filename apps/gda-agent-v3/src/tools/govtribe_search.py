@@ -61,7 +61,11 @@ def _normalize_opportunity(raw: dict) -> GovtribeOpportunity | None:
 
 async def govtribe_search(inp: GovtribeSearchInput) -> GovtribeSearchOutput:
     """Search GovTribe for federal contract opportunities via MCP."""
-    payload: dict = {"query": inp.query, "max_results": inp.max_results}
+    payload: dict = {
+        "query": inp.query,
+        "max_results": inp.max_results,
+        "caller": "agent-v3",
+    }
     if inp.agency:
         payload["agency"] = inp.agency
     if inp.naics:

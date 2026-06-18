@@ -186,12 +186,13 @@ async function logCreditUsage(
   decision: BudgetDecision,
   responseStatus?: number,
   errorText?: string,
+  caller?: string,
 ): Promise<void> {
   await pool.query(
     `INSERT INTO govtribe_credit_ledger
-       (endpoint, cost_credits, decision, response_status, error_text)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [toolName, costCredits, decision, responseStatus ?? null, errorText ?? null],
+       (endpoint, cost_credits, decision, response_status, error_text, caller)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [toolName, costCredits, decision, responseStatus ?? null, errorText ?? null, caller ?? null],
   );
 
   if (decision === 'called') {
@@ -339,12 +340,14 @@ function countResultRows(data: unknown): number {
  * @param args - Tool arguments (JSON-serializable object)
  * @param cacheId - Cache key entity_id (e.g. 'saved_search_gda-opps-core')
  * @param critical - If true, allowed even at >95% budget (on-demand detail)
+ * @param caller - Identifies the calling service for credit attribution (e.g. 'agent-v3')
  */
 export async function mcpCallTool<T = unknown>(
   toolName: string,
   args: Record<string, unknown>,
   cacheId: string,
   critical = false,
+  caller?: string,
 ): Promise<McpToolCallResult<T>> {
   const budgetStatus = await getCreditBudgetStatus();
   // Pre-estimate cost using per_page arg (or 10 default) for budget checks;
@@ -358,7 +361,7 @@ export async function mcpCallTool<T = unknown>(
       { source: 'govtribe', cycleUsed: cycleCreditsUsed, cycleCap: CYCLE_CREDIT_CAP },
       'govtribe_mcp_cycle_cap_exceeded',
     );
-    await logCreditUsage(toolName, estimatedCost, 'skipped_cycle_cap');
+    await logCreditUsage(toolName, estimatedCost, 'skipped_cycle_cap', undefined, undefined, caller);
     const cached = await getCachedResponse(toolName, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -388,7 +391,7 @@ export async function mcpCallTool<T = unknown>(
 
   // Hard stop: no credits left (even critical calls stop here)
   if (dailyStatus.remainingCredits <= 0) {
-    await logCreditUsage(toolName, estimatedCost, 'skipped_halted');
+    await logCreditUsage(toolName, estimatedCost, 'skipped_halted', undefined, undefined, caller);
     const cached = await getCachedResponse(toolName, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -401,7 +404,7 @@ export async function mcpCallTool<T = unknown>(
 
   // Daily pace gate: today's allowance exhausted (non-critical only)
   if (dailyStatus.todayAvailable < estimatedCost && !critical) {
-    await logCreditUsage(toolName, estimatedCost, 'skipped_halted');
+    await logCreditUsage(toolName, estimatedCost, 'skipped_halted', undefined, undefined, caller);
     const cached = await getCachedResponse(toolName, cacheId);
     return {
       data: (cached as T) ?? null,
@@ -466,7 +469,7 @@ export async function mcpCallTool<T = unknown>(
       const actualRows = countResultRows(data);
       const actualCost = getToolCreditCost(toolName, actualRows);
 
-      await logCreditUsage(toolName, actualCost, 'called', 200);
+      await logCreditUsage(toolName, actualCost, 'called', 200, undefined, caller);
       await setCachedResponse(toolName, cacheId, data);
       cycleCreditsUsed += actualCost;
 
@@ -485,7 +488,7 @@ export async function mcpCallTool<T = unknown>(
       ) {
         // Auth errors — don't retry
         const errorText = err.message;
-        await logCreditUsage(toolName, 0, 'skipped_halted', undefined, errorText);
+        await logCreditUsage(toolName, 0, 'skipped_halted', undefined, errorText, caller);
         logger.error({ source: 'govtribe', tool: toolName, error: errorText }, 'govtribe_mcp_auth_error');
         throw err;
       }
@@ -495,7 +498,7 @@ export async function mcpCallTool<T = unknown>(
 
   // All retries exhausted — log and fall back to cache
   const errorText = lastError?.message ?? 'max retries exhausted';
-  await logCreditUsage(toolName, 0, 'skipped_halted', undefined, errorText);
+  await logCreditUsage(toolName, 0, 'skipped_halted', undefined, errorText, caller);
   logger.error({ source: 'govtribe', tool: toolName, error: errorText }, 'govtribe_mcp_fetch_error');
 
   const cached = await getCachedResponse(toolName, cacheId);
