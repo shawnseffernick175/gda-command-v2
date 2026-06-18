@@ -8,6 +8,9 @@ on:
       - 'apps/backend-v3/src/lib/migrate.ts'
       - 'scripts/ci/check-migration-manifest.sh'
       - 'scripts/ci/migration-manifest.txt'
+      - 'scripts/ci/check-migration-folder-parity.sh'
+      - 'scripts/ci/migration-parity-baseline.txt'
+      - 'db/v3/**'
   pull_request:
     branches: [main]
     paths:
@@ -15,6 +18,8 @@ on:
       - 'apps/backend-v3/src/lib/migrate.ts'
       - 'scripts/ci/check-migration-manifest.sh'
       - 'scripts/ci/migration-manifest.txt'
+      - 'scripts/ci/check-migration-folder-parity.sh'
+      - 'scripts/ci/migration-parity-baseline.txt'
       - 'db/v3/**'
 
 permissions:
@@ -43,6 +48,9 @@ jobs:
 
       - name: Guard against migration-directory drift
         run: bash scripts/ci/check-migration-manifest.sh
+
+      - name: Guard against migration-folder parity drift (apps vs db/v3)
+        run: bash scripts/ci/check-migration-folder-parity.sh
 
       - uses: actions/setup-node@v5
         with:

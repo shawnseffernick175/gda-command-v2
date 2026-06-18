@@ -296,6 +296,28 @@ if [ "$HEALTH_PASS" != "true" ]; then
   exit 1
 fi
 
+# ---------- Guard: running schema-head must match committed migration head ----------
+# Root-cause guard (June 2026 drift incident): a deploy can report "success"
+# while the running container image is STALE — its baked-in migrations (and code)
+# lag behind main. /v3/ready reports the schema_version the running backend last
+# applied. Assert it equals the highest committed migration filename. If not, the
+# image did not actually pick up the new migrations: fail loud and roll back.
+echo "--- verifying running schema-head matches committed migration head ---"
+EXPECTED_HEAD=$(find db/v3/migrations/ -maxdepth 1 -name 'v3_[0-9][0-9][0-9]_*.sql' -printf '%f\n' \
+  | sed 's/\.sql$//' | sort -V | tail -1)
+READY_BODY=$(docker exec "$BACKEND_CONTAINER" wget -qO- "http://127.0.0.1:4000/v3/ready" 2>/dev/null || echo '{}')
+RUNNING_HEAD=$(echo "$READY_BODY" | grep -o '"schema_version":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "unknown")
+echo "expected_schema_head=${EXPECTED_HEAD}"
+echo "running_schema_head=${RUNNING_HEAD}"
+if [ -z "$EXPECTED_HEAD" ]; then
+  echo "WARNING: could not determine expected migration head — skipping schema-head guard"
+elif [ "$RUNNING_HEAD" != "$EXPECTED_HEAD" ]; then
+  echo "DEPLOY_FAILED running schema head (${RUNNING_HEAD}) != committed head (${EXPECTED_HEAD}) — image is STALE or migrations did not apply"
+  rollback "schema-head mismatch (stale image)"
+  exit 1
+fi
+echo "schema-head verified: running backend is at committed migration head"
+
 # ---------- F-315c: Prune old SHA-tagged images (keep last 5) ----------
 echo "--- pruning old SHA-tagged images ---"
 for SVC in backend-v3 frontend-v3; do
