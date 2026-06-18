@@ -21,6 +21,8 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { computePwin, colorRatingToPwinImpact, computeOverallRating } from '../services/captures/pwin-compute.js';
+import { doctrineFor, priorColors } from '../services/captures/color-review-doctrine.js';
+import { buildOutbriefDocx, buildOutbriefPdf, type OutbriefData } from '../services/captures/outbrief.js';
 
 export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
 
@@ -219,6 +221,7 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
       scheduled_date?: string;
       rubric?: string;
       reviewers?: Array<{ name: string; email?: string; role?: string }>;
+      cumulative?: boolean;
     };
   }>('/v3/captures/:id/reviews', async (req, reply) => {
     const captureId = parseInt(req.params.id, 10);
@@ -226,16 +229,17 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'Invalid capture ID', req.requestId));
     }
 
-    const { color, proposal_vault_doc_id, rfp_vault_doc_id, scheduled_date, rubric, reviewers } = req.body;
+    const { color, proposal_vault_doc_id, rfp_vault_doc_id, scheduled_date, rubric, reviewers, cumulative } = req.body;
     const validColors = ['pink', 'red', 'black', 'blue', 'white', 'green'];
     if (!color || !validColors.includes(color)) {
       return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', `color must be one of: ${validColors.join(', ')}`, req.requestId));
     }
+    const isCumulative = cumulative === true;
 
     const res = await pool.query(
-      `INSERT INTO color_reviews (capture_id, color, proposal_vault_doc_id, rfp_vault_doc_id, scheduled_date, rubric, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'scheduled') RETURNING *`,
-      [captureId, color, proposal_vault_doc_id ?? null, rfp_vault_doc_id ?? null, scheduled_date ?? null, rubric ?? 'shipley_5']
+      `INSERT INTO color_reviews (capture_id, color, proposal_vault_doc_id, rfp_vault_doc_id, scheduled_date, rubric, status, is_cumulative)
+       VALUES ($1, $2, $3, $4, $5, $6, 'scheduled', $7) RETURNING *`,
+      [captureId, color, proposal_vault_doc_id ?? null, rfp_vault_doc_id ?? null, scheduled_date ?? null, rubric ?? 'shipley_5', isCumulative]
     );
 
     const review = res.rows[0];
@@ -248,6 +252,34 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
            VALUES ($1, $2, $3, $4)`,
           [review.id, r.name, r.email ?? null, r.role ?? null]
         );
+      }
+    }
+
+    // Seed doctrine sections. Always seed the primary color's focus-appropriate
+    // sections. When cumulative, ALSO seed a clearly-labeled back-review block for
+    // every prior color (in doctrine order) so nothing earlier reviews should have
+    // caught is skipped. Primary sections come first (display_order 0..n), then the
+    // prior-color back-review sections after, grouped in doctrine order.
+    const primary = doctrineFor(color);
+    if (primary) {
+      let order = 0;
+      for (const sectionName of primary.seeded_sections) {
+        await pool.query(
+          `INSERT INTO color_review_sections (review_id, section_name, display_order)
+           VALUES ($1, $2, $3)`,
+          [review.id, sectionName, order++]
+        );
+      }
+      if (isCumulative) {
+        for (const prior of priorColors(color)) {
+          for (const sectionName of prior.seeded_sections) {
+            await pool.query(
+              `INSERT INTO color_review_sections (review_id, section_name, display_order)
+               VALUES ($1, $2, $3)`,
+              [review.id, `[Back-review: ${prior.label}] ${sectionName}`, order++]
+            );
+          }
+        }
       }
     }
 
@@ -572,7 +604,7 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Review not found', req.requestId));
     }
 
-    const review = reviewRes.rows[0] as { rfp_vault_doc_id: number | null };
+    const review = reviewRes.rows[0] as { rfp_vault_doc_id: number | null; color: string };
 
     if (!review.rfp_vault_doc_id) {
       return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'No RFP document linked to this review', req.requestId));
@@ -588,15 +620,28 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'RFP document has no extracted text', req.requestId));
     }
 
-    // Placeholder: in production this would call the LLM to extract Section L/M
-    // For now, create placeholder sections
-    const placeholderSections = [
-      { name: 'Technical Approach', criterion: 'M.1 Technical Approach', weight: 35 },
-      { name: 'Management Approach', criterion: 'M.2 Management Approach', weight: 25 },
-      { name: 'Past Performance', criterion: 'M.3 Past Performance', weight: 20 },
-      { name: 'Staffing Plan', criterion: 'M.4 Staffing/Key Personnel', weight: 15 },
-      { name: 'Small Business', criterion: 'M.5 Small Business Participation', weight: 5 },
-    ];
+    // Section seeding is doctrine-aware. Red and White reviews are legitimately
+    // Section L/M oriented (eval-panel grading and final compliance), so they keep
+    // the Section M factor placeholders. All other colors seed their focus-appropriate
+    // doctrine sections so the review reflects that phase's actual job.
+    const sectionMColors = ['red', 'white'];
+    let placeholderSections: Array<{ name: string; criterion: string | null; weight: number | null }>;
+    if (sectionMColors.includes(review.color)) {
+      placeholderSections = [
+        { name: 'Technical Approach', criterion: 'M.1 Technical Approach', weight: 35 },
+        { name: 'Management Approach', criterion: 'M.2 Management Approach', weight: 25 },
+        { name: 'Past Performance', criterion: 'M.3 Past Performance', weight: 20 },
+        { name: 'Staffing Plan', criterion: 'M.4 Staffing/Key Personnel', weight: 15 },
+        { name: 'Small Business', criterion: 'M.5 Small Business Participation', weight: 5 },
+      ];
+    } else {
+      const doctrine = doctrineFor(review.color);
+      placeholderSections = (doctrine?.seeded_sections ?? []).map((name) => ({
+        name,
+        criterion: null,
+        weight: null,
+      }));
+    }
 
     for (let i = 0; i < placeholderSections.length; i++) {
       const s = placeholderSections[i];
@@ -608,7 +653,8 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
-    // Add sample compliance items
+    // Add sample Section L "shall" compliance items (still useful across colors as
+    // the framework-compliance backbone; pink/red especially rely on these).
     const complianceItems = [
       { shall: 'Contractor shall provide qualified key personnel', ref: 'L.5.2.1' },
       { shall: 'Contractor shall demonstrate relevant past performance', ref: 'L.5.3.1' },
@@ -628,4 +674,86 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
       compliance_items_created: complianceItems.length,
     }, req.requestId));
   });
+
+  // ── Outbrief export (Word / PDF) ──────────────────────────────────────
+
+  app.get<{ Params: { id: string }; Querystring: { format?: string } }>(
+    '/v3/reviews/:id/outbrief',
+    async (req, reply) => {
+      const reviewId = parseInt(req.params.id, 10);
+      if (isNaN(reviewId)) {
+        return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'Invalid review ID', req.requestId));
+      }
+
+      const format = (req.query.format ?? 'docx').toLowerCase();
+      if (format !== 'docx' && format !== 'pdf') {
+        return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', "format must be 'docx' or 'pdf'", req.requestId));
+      }
+
+      const reviewRes = await pool.query('SELECT * FROM color_reviews WHERE id = $1', [reviewId]);
+      if (reviewRes.rows.length === 0) {
+        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Review not found', req.requestId));
+      }
+      const review = reviewRes.rows[0];
+
+      // Resolve a human-readable capture/opportunity title (same join as /v3/reviews/mine).
+      const titleRes = await pool.query(
+        `SELECT o.title AS capture_name
+         FROM color_reviews cr
+         JOIN captures c ON c.id = cr.capture_id
+         LEFT JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
+         LEFT JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
+         WHERE cr.id = $1`,
+        [reviewId]
+      );
+      const captureTitle =
+        (titleRes.rows[0] as { capture_name: string | null } | undefined)?.capture_name ??
+        `Capture #${review.capture_id}`;
+
+      const sectionsRes = await pool.query(
+        'SELECT * FROM color_review_sections WHERE review_id = $1 ORDER BY display_order ASC',
+        [reviewId]
+      );
+      const reviewersRes = await pool.query(
+        'SELECT * FROM color_review_reviewers WHERE review_id = $1 ORDER BY id ASC',
+        [reviewId]
+      );
+      const scoresRes = await pool.query(
+        `SELECT crs.* FROM color_review_scores crs
+         JOIN color_review_sections s ON s.id = crs.section_id
+         WHERE s.review_id = $1`,
+        [reviewId]
+      );
+      const complianceRes = await pool.query(
+        'SELECT * FROM color_review_compliance WHERE review_id = $1 ORDER BY id ASC',
+        [reviewId]
+      );
+
+      const data: OutbriefData = {
+        review,
+        captureTitle,
+        reviewers: reviewersRes.rows,
+        sections: sectionsRes.rows,
+        scores: scoresRes.rows,
+        compliance: complianceRes.rows,
+      };
+
+      let buffer: Buffer;
+      let contentType: string;
+      if (format === 'pdf') {
+        buffer = await buildOutbriefPdf(data);
+        contentType = 'application/pdf';
+      } else {
+        buffer = await buildOutbriefDocx(data);
+        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      }
+
+      const filename = `outbrief-${review.color}-review-${reviewId}.${format}`;
+      reply
+        .header('Content-Type', contentType)
+        .header('Content-Disposition', `attachment; filename="${filename}"`)
+        .header('Content-Length', buffer.length);
+      return reply.send(buffer);
+    }
+  );
 }
