@@ -2,10 +2,17 @@
 
 export type Band = "forecast" | "signal" | "discovery" | "pass";
 
+export interface RuleContribution {
+  name: string;
+  value: number;
+  description: string;
+}
+
 export interface PwinScore {
   score: number;
   band: Band;
-  top_drivers: string[];
+  top_drivers?: string[];
+  feature_weights?: RuleContribution[];
   days_to_due: number | null;
   model_version: string;
   scored_at: string;
