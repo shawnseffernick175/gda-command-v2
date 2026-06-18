@@ -2,24 +2,34 @@
 
 import { useIngestionStatus } from "@/hooks/use-financial-bible";
 
+const MONTH_ABBR: Record<string, string> = {
+  jan: "JAN",
+  feb: "FEB",
+  mar: "MAR",
+  apr: "APR",
+  may: "MAY",
+  jun: "JUN",
+  jul: "JUL",
+  aug: "AUG",
+  sep: "SEP",
+  oct: "OCT",
+  nov: "NOV",
+  dec: "DEC",
+};
+
+// Derive a "MON-YY" label from any "FY<yy> <Mon>" / "CY<yy> <Mon>" period
+// string, reading the year from the data rather than assuming a fixed FY.
 function formatPeriodLabel(period: string | null): string {
   if (!period) return "N/A";
-  const parts = period.replace("FY26 ", "").trim();
-  const monthMap: Record<string, string> = {
-    Jan: "JAN-26",
-    Feb: "FEB-26",
-    Mar: "MAR-26",
-    Apr: "APR-26",
-    May: "MAY-26",
-    Jun: "JUN-26",
-    Jul: "JUL-26",
-    Aug: "AUG-26",
-    Sep: "SEP-26",
-    Oct: "OCT-26",
-    Nov: "NOV-26",
-    Dec: "DEC-26",
-  };
-  return monthMap[parts] ?? period;
+  const yearMatch = period.match(/(?:FY|CY)\s*(\d{2,4})/i);
+  const year = yearMatch ? yearMatch[1].slice(-2) : null;
+  const monthMatch = period.match(/\b([A-Za-z]{3,})\b/g);
+  // Find the first token that maps to a month abbreviation.
+  const month = monthMatch
+    ?.map((t) => MONTH_ABBR[t.slice(0, 3).toLowerCase()])
+    .find(Boolean);
+  if (month && year) return `${month}-${year}`;
+  return period;
 }
 
 function formatRefreshTime(ts: string | null): string {

@@ -103,7 +103,11 @@ function CompetitorsContent() {
             </button>
           )}
           <span className="ml-auto text-[11px] text-muted-foreground">
-            {items.length} results
+            {debouncedQ
+              ? `${items.length} on this page`
+              : countData
+                ? `${countData.count.toLocaleString()} total`
+                : `${items.length} on this page`}
           </span>
         </div>
       </div>
@@ -213,7 +217,7 @@ function CompetitorsContent() {
         title="Black Hat Analysis"
         defaultOpen={false}
       >
-        <BlackHatSection competitors={items} />
+        <BlackHatSection />
       </CollapseSection>
 
       {selectedCompetitor && (
@@ -226,14 +230,19 @@ function CompetitorsContent() {
   );
 }
 
-function BlackHatSection({ competitors }: { competitors: { name: string; win_count: number }[] }) {
+function BlackHatSection() {
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
   const blackHat = useBlackHatAnalysis(selectedCompetitor);
 
-  const top20 = competitors
-    .slice()
-    .sort((a, b) => b.win_count - a.win_count)
-    .slice(0, 20);
+  // Source the picker from the top competitors by win count across the whole
+  // dataset, not just whoever happens to be on the current page.
+  const { data: topData } = useCompetitorsPaged({
+    limit: 20,
+    page: 1,
+    sort_by: "win_count",
+    sort_dir: "desc",
+  });
+  const top20 = topData?.items ?? [];
 
   return (
     <div className="space-y-4">

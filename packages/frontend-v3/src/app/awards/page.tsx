@@ -498,8 +498,12 @@ function AwardCard({
         </p>
       )}
       {!soWhat && !analysis && (
-        <p className="text-xs text-muted-foreground italic">
-          Analysis pending
+        <p className="flex items-center gap-2 text-xs text-muted-foreground italic">
+          <span
+            className="inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-gda-cyan"
+            aria-hidden="true"
+          />
+          Analyzing… (runs automatically; check back shortly)
         </p>
       )}
 

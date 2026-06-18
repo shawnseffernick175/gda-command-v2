@@ -8,6 +8,7 @@ import { AopExecutionTab } from "@/components/financials/tabs/AopExecutionTab";
 import { AopCaptureTab } from "@/components/financials/tabs/AopCaptureTab";
 import { P2FinancialsTab } from "@/components/financials/tabs/P2FinancialsTab";
 import { DefinitionsTab } from "@/components/financials/tabs/DefinitionsTab";
+import { BalanceSheetCard } from "@/components/financials/BalanceSheetCard";
 import {
   useAiAnalyze,
   useP2Financials,
@@ -19,6 +20,7 @@ type Tab =
   | "execution"
   | "capture"
   | "p2"
+  | "balance-sheet"
   | "definitions";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -26,8 +28,14 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "execution", label: "AOP Execution" },
   { id: "capture", label: "AOP Capture" },
   { id: "p2", label: "Monthly Financials" },
+  { id: "balance-sheet", label: "Balance Sheet" },
   { id: "definitions", label: "Definitions" },
 ];
+
+// Only these tabs actually consume the FY/CY + year selection; the others
+// ignore it, so we disable the year controls when they're active rather than
+// letting the control imply it does something it doesn't.
+const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set(["execution", "capture"]);
 
 type CalendarMode = "FY" | "CY";
 
@@ -43,6 +51,8 @@ function tabTitle(tab: Tab): string {
       return "AOP Capture";
     case "p2":
       return "Monthly Financials";
+    case "balance-sheet":
+      return "Balance Sheet";
     case "definitions":
       return "Definitions";
   }
@@ -58,6 +68,7 @@ export default function FinancialsPage() {
   const p2Data = useP2Financials();
 
   const fy = `${calendarMode}${selectedYear}`;
+  const yearControlsActive = YEAR_AWARE_TABS.has(activeTab);
 
   const handleAiAnalyze = useCallback(() => {
     const kpi = p2Data.data?.kpi;
@@ -119,17 +130,29 @@ export default function FinancialsPage() {
           </div>
 
           {/* Right: FY/CY toggle + year buttons */}
-          <div className="flex items-center gap-2">
+          <div
+            className={cn(
+              "flex items-center gap-2",
+              !yearControlsActive && "opacity-40",
+            )}
+            title={
+              yearControlsActive
+                ? undefined
+                : "Year selection applies only to AOP Execution and AOP Capture"
+            }
+          >
             <div className="flex rounded border border-border">
               {(["FY", "CY"] as CalendarMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
+                  disabled={!yearControlsActive}
                   className={cn(
                     "px-2 py-1 text-[12px] font-medium transition-colors",
                     calendarMode === mode
                       ? "bg-card text-foreground"
                       : "text-muted-foreground hover:text-foreground",
+                    !yearControlsActive && "cursor-not-allowed",
                   )}
                   onClick={() => setCalendarMode(mode)}
                 >
@@ -142,11 +165,13 @@ export default function FinancialsPage() {
                 <button
                   key={yr}
                   type="button"
+                  disabled={!yearControlsActive}
                   className={cn(
                     "rounded px-2 py-1 text-[12px] font-medium transition-colors",
                     selectedYear === yr
                       ? "bg-card text-foreground border border-border"
                       : "text-muted-foreground hover:text-foreground",
+                    !yearControlsActive && "cursor-not-allowed",
                   )}
                   onClick={() => setSelectedYear(yr)}
                 >
@@ -160,7 +185,8 @@ export default function FinancialsPage() {
         {/* Page title + subtitle */}
         <div>
           <h1 className="text-lg font-semibold text-foreground">
-            {tabTitle(activeTab)} {"\u2014"} {fy}
+            {tabTitle(activeTab)}
+            {yearControlsActive ? ` \u2014 ${fy}` : ""}
           </h1>
           <p className="text-[12px] text-muted-foreground">
             Envision Innovative Solutions (OU3) {"\u2014"} 7% YoY Growth Target
@@ -174,6 +200,7 @@ export default function FinancialsPage() {
         {activeTab === "execution" && <AopExecutionTab fy={fy} />}
         {activeTab === "capture" && <AopCaptureTab fy={fy} />}
         {activeTab === "p2" && <P2FinancialsTab />}
+        {activeTab === "balance-sheet" && <BalanceSheetCard />}
         {activeTab === "definitions" && <DefinitionsTab />}
       </div>
 
