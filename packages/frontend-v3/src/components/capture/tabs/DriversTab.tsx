@@ -93,7 +93,7 @@ export function DriversTab({ captureId, plan }: DriversTabProps) {
             </select>
           </div>
           <div>
-            <span className="text-[11px] text-muted-foreground">Margin target (%)</span>
+            <span className="text-[11px] text-muted-foreground">Margin target (decimal, e.g. 0.08 = 8%)</span>
             <input
               type="number"
               step="0.01"

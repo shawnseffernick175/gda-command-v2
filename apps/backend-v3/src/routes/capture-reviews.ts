@@ -88,7 +88,7 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
         captureId,
         b.customer_relationship_score ?? null,
         b.customer_relationship_notes ?? null,
-        b.customer_budget_confirmed ?? false,
+        b.customer_budget_confirmed ?? null,
         b.customer_funded_date ?? null,
         b.solution_fit_score ?? null,
         b.solution_differentiators ?? null,
@@ -166,9 +166,11 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
     const params: unknown[] = [];
     let idx = 1;
 
-    for (const [key, val] of Object.entries(req.body)) {
+    const allowedFields = ['milestone_name', 'due_date', 'status', 'owner_contact', 'notes'];
+    for (const field of allowedFields) {
+      const val = (req.body as Record<string, unknown>)[field];
       if (val !== undefined) {
-        sets.push(`${key} = $${idx++}`);
+        sets.push(`${field} = $${idx++}`);
         params.push(val);
       }
     }
@@ -261,7 +263,7 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
     const res = await pool.query(
       `SELECT cr.*,
               (SELECT COUNT(*) FROM color_review_sections WHERE review_id = cr.id) AS total_sections,
-              (SELECT COUNT(*) FROM color_review_scores crs
+              (SELECT COUNT(DISTINCT crs.section_id) FROM color_review_scores crs
                JOIN color_review_sections s ON s.id = crs.section_id
                WHERE s.review_id = cr.id) AS scored_sections,
               (SELECT json_agg(json_build_object('id', crr.id, 'name', crr.reviewer_name, 'role', crr.role, 'submitted_at', crr.submitted_at))
@@ -381,9 +383,11 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
     const params: unknown[] = [];
     let idx = 1;
 
-    for (const [key, val] of Object.entries(req.body)) {
+    const allowedFields = ['is_compliant', 'proposal_addressed_in', 'notes'];
+    for (const field of allowedFields) {
+      const val = (req.body as Record<string, unknown>)[field];
       if (val !== undefined) {
-        sets.push(`${key} = $${idx++}`);
+        sets.push(`${field} = $${idx++}`);
         params.push(val);
       }
     }
@@ -494,7 +498,7 @@ export async function captureReviewRoutes(app: FastifyInstance): Promise<void> {
               c.pipeline_item_id,
               o.title AS capture_name,
               (SELECT COUNT(*) FROM color_review_sections WHERE review_id = cr.id) AS total_sections,
-              (SELECT COUNT(*) FROM color_review_scores crs
+              (SELECT COUNT(DISTINCT crs.section_id) FROM color_review_scores crs
                JOIN color_review_sections s ON s.id = crs.section_id
                WHERE s.review_id = cr.id) AS scored_sections
        FROM color_reviews cr
