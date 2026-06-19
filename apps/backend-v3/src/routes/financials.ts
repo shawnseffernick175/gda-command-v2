@@ -422,6 +422,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
             SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL
             UNION
             SELECT source_doc_id FROM indirect_expense_actuals WHERE source_doc_id IS NOT NULL
+            UNION
+            SELECT source_doc_id FROM financial_actuals WHERE source_doc_id IS NOT NULL
           ) AS all_docs
          ) AS docs_ingested,
          (SELECT COUNT(*) FROM vault_documents
@@ -442,7 +444,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       `SELECT GREATEST(
          (SELECT MAX(created_at) FROM balance_sheet_actuals),
          (SELECT MAX(created_at) FROM cost_detail_actuals),
-         (SELECT MAX(created_at) FROM indirect_expense_actuals)
+         (SELECT MAX(created_at) FROM indirect_expense_actuals),
+         (SELECT MAX(vd.uploaded_at) FROM financial_actuals fa
+            JOIN vault_documents vd ON vd.id = fa.source_doc_id
+          WHERE fa.source_doc_id IS NOT NULL)
        ) AS last_refresh`,
     );
 
@@ -456,6 +461,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
            SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL
            UNION
            SELECT source_doc_id FROM indirect_expense_actuals WHERE source_doc_id IS NOT NULL
+           UNION
+           SELECT source_doc_id FROM financial_actuals WHERE source_doc_id IS NOT NULL
          )
        ORDER BY vd.filename`,
     );
@@ -753,6 +760,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
            SELECT source_doc_id FROM cost_detail_actuals WHERE source_doc_id IS NOT NULL
            UNION
            SELECT source_doc_id FROM balance_sheet_actuals WHERE source_doc_id IS NOT NULL
+           UNION
+           SELECT source_doc_id FROM financial_actuals WHERE source_doc_id IS NOT NULL
          )
        ORDER BY vd.filename`,
     );
