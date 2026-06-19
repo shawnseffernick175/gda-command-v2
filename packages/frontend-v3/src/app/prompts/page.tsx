@@ -19,6 +19,13 @@ import {
   type DoctrinePrinciple,
 } from "@/hooks/use-doctrine";
 import { COLOR_TEAM_CONFIGS, colorBadgeClasses } from "@/lib/color-team-configs";
+import {
+  promptStatus,
+  promptStatusLabel,
+  promptStatusTooltip,
+  promptStatusClasses,
+} from "@/lib/prompt-status";
+import { FRAMEWORKS, getFramework } from "@/lib/prompt-frameworks";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 
@@ -38,6 +45,7 @@ const SPECIAL_TABS = [
   { label: "Doctrine", value: "__doctrine" },
   { label: "Color Teams", value: "__color_teams" },
   { label: "Build", value: "__build" },
+  { label: "Frameworks", value: "__frameworks" },
 ];
 
 const SURFACE_OPTIONS = [
@@ -219,6 +227,20 @@ function EditorPanel({
             <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono", surfaceBadgeColor(prompt.surface))}>
               {prompt.surface}
             </span>
+            {(() => {
+              const status = promptStatus(prompt.prompt_key);
+              return (
+                <span
+                  title={promptStatusTooltip(status)}
+                  className={cn(
+                    "rounded border px-1.5 py-0.5 text-[11px] font-mono",
+                    promptStatusClasses(status),
+                  )}
+                >
+                  {promptStatusLabel(status)}
+                </span>
+              );
+            })()}
           </div>
           <button
             type="button"
@@ -232,10 +254,29 @@ function EditorPanel({
           <p className="text-xs text-muted-foreground">{prompt.description}</p>
         )}
 
+        {promptStatus(prompt.prompt_key) === "live" ? (
+          <div className="rounded border border-gda-green/30 bg-gda-green/5 px-3 py-2 text-[11px] text-muted-foreground">
+            <span className="font-mono text-gda-green">How to use this:</span>{" "}
+            Type your instructions in plain English in the{" "}
+            <span className="text-foreground">System Prompt</span> box below —
+            no code or JSON needed — then hit{" "}
+            <span className="text-foreground">Save</span>. The AI uses your new
+            wording the next time this task runs. The required output format is
+            handled automatically, so you can rewrite the instructions freely.
+          </div>
+        ) : (
+          <div className="rounded border border-border bg-gda-panel px-3 py-2 text-[11px] text-muted-foreground">
+            This prompt is stored but not currently read by any AI task, so
+            editing it will not change AI behavior yet. The live prompts are the
+            ones marked{" "}
+            <span className="font-mono text-gda-green">Live</span>.
+          </div>
+        )}
+
         {/* System Prompt — always visible */}
         <div className="space-y-1.5">
           <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-            Prompt Body
+            System Prompt {"\u2014"} plain English, no JSON needed
           </label>
           <textarea
             value={systemPrompt}
@@ -810,6 +851,213 @@ function BuildPanel({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) 
 
 /* ── Main Page ────────────────────────────────────────────────── */
 
+function FrameworkBuilder({ onNavigateToPrompt }: { onNavigateToPrompt: (key: string) => void }) {
+  const [frameworkId, setFrameworkId] = useState(FRAMEWORKS[0].id);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [name, setName] = useState("");
+  const [surface, setSurface] = useState("general");
+  const [copied, setCopied] = useState(false);
+  const [savedKey, setSavedKey] = useState<string | null>(null);
+
+  const createPrompt = useCreatePrompt();
+  const { toast } = useToast();
+
+  const framework = getFramework(frameworkId) ?? FRAMEWORKS[0];
+  const assembled = framework.assemble(values);
+  const hasContent = assembled.trim().length > 0;
+
+  const handlePickFramework = useCallback((id: string) => {
+    setFrameworkId(id);
+    setValues({});
+    setSavedKey(null);
+    setCopied(false);
+  }, []);
+
+  const handleCopy = useCallback(() => {
+    if (!hasContent) return;
+    void navigator.clipboard.writeText(assembled).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [assembled, hasContent]);
+
+  const handleSave = useCallback(() => {
+    if (!hasContent) return;
+    const displayName = name.trim() || `${framework.acronym} prompt`;
+    const slug = displayName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+    createPrompt.mutate(
+      {
+        prompt_key: slug,
+        display_name: displayName,
+        surface,
+        system_prompt: assembled,
+      },
+      {
+        onSuccess: (saved) => {
+          toast("Prompt saved to library", "success");
+          setSavedKey(saved.prompt_key);
+        },
+        onError: (err) => {
+          toast(
+            err instanceof Error ? err.message : "Failed to save prompt",
+            "error",
+          );
+        },
+      },
+    );
+  }, [createPrompt, hasContent, name, framework.acronym, surface, assembled, toast]);
+
+  return (
+    <div className="flex-1 overflow-y-auto p-6 max-w-3xl mx-auto space-y-6">
+      <div>
+        <h2 className="font-mono text-base font-bold text-foreground">Framework Builder</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          Pick a proven prompt structure, answer a few questions, and it
+          assembles a clean prompt you can copy or save to your library.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+          Framework
+        </label>
+        <select
+          value={frameworkId}
+          onChange={(e) => handlePickFramework(e.target.value)}
+          className="w-full font-mono text-xs bg-gda-bg-base border border-border rounded px-2.5 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+        >
+          {FRAMEWORKS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.acronym} {"\u2014"} {f.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-[11px] text-muted-foreground italic">{framework.tagline}</p>
+      </div>
+
+      <div className="space-y-4">
+        {framework.fields.map((field) => (
+          <div key={field.key} className="space-y-1.5">
+            <label className="flex items-center gap-2 font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              <span className="rounded border border-gda-cyan/30 bg-gda-cyan/10 px-1.5 py-0.5 text-gda-cyan">
+                {field.letter}
+              </span>
+              {field.label}
+            </label>
+            {field.multiline ? (
+              <textarea
+                value={values[field.key] ?? ""}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                }
+                placeholder={field.placeholder}
+                rows={3}
+                className="w-full font-mono text-xs bg-gda-bg-base border border-border px-2.5 py-2 rounded resize-y text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+              />
+            ) : (
+              <input
+                type="text"
+                value={values[field.key] ?? ""}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                }
+                placeholder={field.placeholder}
+                className="w-full font-mono text-xs bg-gda-bg-base border border-border px-2.5 py-1.5 rounded text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-4">
+        <div className="flex items-center justify-between">
+          <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+            Your Prompt
+          </label>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!hasContent}
+            className="rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-xs font-mono font-medium text-gda-green hover:bg-gda-green/20 disabled:opacity-50 transition-colors"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+        <pre className="whitespace-pre-wrap font-mono text-xs rounded border border-border p-4 text-foreground bg-gda-bg-base min-h-[80px] max-h-[400px] overflow-y-auto">
+          {hasContent ? (
+            assembled
+          ) : (
+            <span className="text-muted-foreground/50">
+              Fill in the fields above to assemble your prompt{"\u2026"}
+            </span>
+          )}
+        </pre>
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              Name (optional)
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Capture summary prompt"
+              className="w-full font-mono text-xs bg-gda-bg-base border border-border px-2.5 py-1.5 rounded text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="font-mono text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              Surface
+            </label>
+            <select
+              value={surface}
+              onChange={(e) => setSurface(e.target.value)}
+              className="w-full font-mono text-xs bg-gda-bg-base border border-border rounded px-2 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
+            >
+              {SURFACE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!hasContent || createPrompt.isPending}
+          className="rounded border border-border px-3 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel disabled:opacity-50 transition-colors"
+        >
+          {createPrompt.isPending ? "Saving\u2026" : "Save to Library"}
+        </button>
+        <p className="text-[11px] text-muted-foreground">
+          Saved prompts appear in the All tab. Note: prompts saved here are
+          stored for reuse but are not wired to a live AI task.
+        </p>
+      </div>
+
+      {savedKey && (
+        <div className="rounded border border-gda-green/30 bg-gda-green/5 p-3 text-xs font-mono text-gda-green">
+          Saved to Library.{" "}
+          <button
+            type="button"
+            onClick={() => onNavigateToPrompt(savedKey)}
+            className="underline hover:text-gda-green/80"
+          >
+            View {'"'}{savedKey}{'"'} in All tab
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PromptsPage() {
   const [activeTab, setActiveTab] = useState("");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -886,6 +1134,8 @@ export default function PromptsPage() {
         <ColorTeamsPanel />
       ) : activeTab === "__build" ? (
         <BuildPanel onNavigateToPrompt={handleNavigateToPrompt} />
+      ) : activeTab === "__frameworks" ? (
+        <FrameworkBuilder onNavigateToPrompt={handleNavigateToPrompt} />
       ) : (
         <div className="flex flex-1 overflow-hidden">
           {/* Prompt list (left 35%) */}
@@ -920,6 +1170,20 @@ export default function PromptsPage() {
                   <span className={cn("rounded border px-1.5 py-0.5 text-[11px] font-mono", surfaceBadgeColor(p.surface))}>
                     {p.surface}
                   </span>
+                  {(() => {
+                    const status = promptStatus(p.prompt_key);
+                    return (
+                      <span
+                        title={promptStatusTooltip(status)}
+                        className={cn(
+                          "rounded border px-1.5 py-0.5 text-[11px] font-mono",
+                          promptStatusClasses(status),
+                        )}
+                      >
+                        {promptStatusLabel(status)}
+                      </span>
+                    );
+                  })()}
                   {!p.is_active && (
                     <span className="rounded border border-gda-red/30 bg-gda-red/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-red">
                       inactive

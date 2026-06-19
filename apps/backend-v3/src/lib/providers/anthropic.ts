@@ -12,12 +12,34 @@ import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
 import { ENVISION_NAICS_PROMPT_SUMMARY, ENVISION_COMPANY_CONTEXT } from '../../constants/envision-naics.js';
 
-/** Map from task to prompt_library key for read-through lookup. */
+/**
+ * Map from task to prompt_library key for read-through lookup.
+ *
+ * Any task listed here reads its system prompt from the editable
+ * prompt_library table first (falling back to the hard-coded SYSTEM_PROMPTS
+ * default if the row is missing or inactive). Editing these in the Prompts tab
+ * retunes live AI behavior without a redeploy.
+ *
+ * Deliberately EXCLUDED (system-locked): the strict JSON extractors
+ * (balance_sheet_extract, financial_statement_extract, cost_detail_extract,
+ * sie_extract, vault_document_parse, vault_vehicle_extract). Their prompts
+ * carry parsing-critical schema directives; exposing them for free-text edits
+ * risks corrupting ingestion. doctrine_score is managed via the Doctrine tab.
+ */
 const TASK_PROMPT_KEY: Partial<Record<Task, string>> = {
+  // Originally wired
   opportunity_analysis: 'opportunity_analysis',
   risk_generation: 'risk_generation',
   fast_track_triage: 'fast_track_triage',
   black_hat_analysis: 'competitor_black_hat',
+  // Newly wired judgment/analysis tasks
+  award_analysis: 'award_analysis',
+  capture_plan: 'capture_plan',
+  competitor_analysis: 'competitor_analysis',
+  match_analysis: 'match_analysis',
+  sentinel_summary: 'sentinel_summary',
+  digest_lead: 'digest_lead',
+  contact_enrich: 'contact_enrich',
 };
 
 let client: Anthropic | null = null;
@@ -660,13 +682,14 @@ export async function callAnthropic(opts: {
   const stored = promptKey ? await getStoredPrompt(promptKey) : null;
   let systemPrompt = stored?.system_prompt ?? SYSTEM_PROMPTS[opts.task] ?? 'Return valid JSON matching the requested output schema.';
 
-  // For opportunity_analysis, ensure the stored prompt includes the JSON schema.
-  // If the operator set a custom prompt without a schema, augment it with the
-  // hardcoded schema block so Claude always returns parseable JSON.
-  if (opts.task === 'opportunity_analysis' && stored?.system_prompt) {
+  // Safety net for operator-editable prompts: if a stored prompt was edited in
+  // a way that dropped its JSON directive, re-append the hardcoded default so
+  // Claude always returns parseable JSON. Applies to every wired task that has
+  // a hardcoded fallback (not just opportunity_analysis).
+  if (stored?.system_prompt && SYSTEM_PROMPTS[opts.task]) {
     const hasJsonDirective = /return\s+(only\s+)?.*json/i.test(stored.system_prompt);
-    if (!hasJsonDirective && SYSTEM_PROMPTS['opportunity_analysis']) {
-      systemPrompt += '\n\n' + SYSTEM_PROMPTS['opportunity_analysis'];
+    if (!hasJsonDirective) {
+      systemPrompt += '\n\n' + SYSTEM_PROMPTS[opts.task];
     }
   }
 
