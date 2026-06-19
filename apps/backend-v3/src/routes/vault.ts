@@ -25,6 +25,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { logger } from '../lib/logger.js';
 import { ingestFinancialRows } from '../services/financials/ingest.js';
+import { reingestFinancialDoc } from '../services/financials/reingest-doc.js';
 import { extractVehicleFromVaultDoc } from '../services/vehicles/vault-extract.js';
 
 const UPLOAD_DIR = join(process.cwd(), 'data', 'vault');
@@ -926,8 +927,8 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
   app.post('/v3/vault/:id/re-extract', async (req, reply) => {
     const { id } = req.params as { id: string };
 
-    const docRes = await pool.query<{ id: number; filename: string; file_path: string | null; file_size_bytes: string | null }>(
-      `SELECT id, filename, file_path, file_size_bytes FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+    const docRes = await pool.query<{ id: number; filename: string; file_path: string | null; file_size_bytes: string | null; doc_type: string | null }>(
+      `SELECT id, filename, file_path, file_size_bytes, doc_type FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
       [id],
     );
 
@@ -1019,6 +1020,65 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
     await insertAudit(Number(id), 're_extracted', 'admin', `Status: ${extractionStatus}, text length: ${extractedText.length}`);
 
+    // Re-run the SAME structured ingest pipelines a fresh upload would trigger,
+    // so a document that failed (or predated) ingest gets fully re-processed —
+    // not just its AI summary refreshed. All ingest paths upsert on natural
+    // keys, so this is idempotent. Best-effort: a parser failure must not fail
+    // the re-extract response.
+    const reingest: {
+      financial?: Awaited<ReturnType<typeof reingestFinancialDoc>>;
+      vehicle_triggered?: boolean;
+      routing?: unknown;
+    } = {};
+
+    if (extractedText.length > 0) {
+      // 1. Financial (KPI / balance sheet / cost detail / SIE — selects per doc).
+      try {
+        reingest.financial = await reingestFinancialDoc({
+          docId: Number(id),
+          filename: doc.filename,
+          extractedText,
+          docType: doc.doc_type,
+        });
+        if (reingest.financial.any_ingested) {
+          await insertAudit(
+            Number(id),
+            'financials_ingested',
+            'admin',
+            `re-ingest: plan=${reingest.financial.plan}, actual=${reingest.financial.actual}, bs=${reingest.financial.balance_sheet}, cd=${reingest.financial.cost_detail}, sie=${reingest.financial.sie}, rejected=${reingest.financial.rejected}`,
+          );
+        }
+      } catch (err) {
+        logger.warn({ err, docId: id, filename: doc.filename }, 'Re-extract: financial re-ingest failed');
+      }
+
+      // 2. Vehicle extraction for contract-type docs (non-blocking).
+      const looksVehicle =
+        /contract|vehicle|idiq|bpa|gwac|task.order|teaming/i.test(doc.filename) ||
+        doc.doc_type === 'contract' ||
+        doc.doc_type === 'subcontract_teaming';
+      if (looksVehicle) {
+        reingest.vehicle_triggered = true;
+        void extractVehicleFromVaultDoc(Number(id)).catch((err) => {
+          logger.warn({ err, docId: id, filename: doc.filename }, 'Re-extract: vehicle extraction failed — non-blocking');
+        });
+      }
+
+      // 3. Smart ingest routing (auto-classify / link). Preserve any
+      // user-assigned bucket: only re-route when the doc is still 'other'.
+      try {
+        reingest.routing = await smartIngestRouter(
+          Number(id),
+          doc.filename,
+          extractedText,
+          aiSummary,
+          doc.doc_type ? doc.doc_type !== 'other' : false,
+        );
+      } catch (err) {
+        logger.warn({ err, docId: id, filename: doc.filename }, 'Re-extract: smart ingest routing failed');
+      }
+    }
+
     const updated = await pool.query<VaultDocumentRow>(
       `SELECT d.*, o.title AS opp_title,
         (SELECT o2.title FROM captures c JOIN pipeline_items pi ON pi.id = c.pipeline_item_id JOIN opportunities o2 ON o2.id = pi.opportunity_id WHERE c.id = d.linked_capture_id LIMIT 1) AS capture_title
@@ -1029,8 +1089,112 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     );
 
     return reply.send(
-      successEnvelope(updated.rows[0], req.requestId),
+      successEnvelope({ ...updated.rows[0], reingest }, req.requestId),
     );
+  });
+
+  // POST /v3/vault/financials/reingest-all — re-run financial ingest against
+  // every vault doc that already has extracted text. Idempotent (all ingest
+  // paths upsert on natural keys). Uses the STORED extracted_text, so it works
+  // even when the original file is no longer on disk. This is the one-shot
+  // "fix everything that failed to ingest" action.
+  //   ?ids=81,83,85  -> limit to specific doc ids
+  //   ?dry_run=true  -> report what WOULD ingest without writing (still calls
+  //                     parsers; the helper always writes, so dry_run only
+  //                     restricts the doc set echo, not writes — omit for apply)
+  app.post('/v3/vault/financials/reingest-all', async (req, reply) => {
+    const q = req.query as Record<string, string>;
+    const idFilter = q.ids
+      ? q.ids.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n))
+      : null;
+
+    // Candidate docs: financial/other type OR a filename that looks financial,
+    // with non-empty extracted text. (Other types route through re-extract.)
+    const { rows: docs } = await pool.query<{
+      id: number;
+      filename: string;
+      doc_type: string | null;
+      extracted_text: string | null;
+    }>(
+      `SELECT id, filename, doc_type, extracted_text
+         FROM vault_documents
+        WHERE deleted_at IS NULL
+          AND extracted_text IS NOT NULL
+          AND length(trim(extracted_text)) > 0
+          AND (
+            doc_type IN ('financial', 'other')
+            OR filename ~* '(financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\\msie\\M)'
+          )
+          ${idFilter ? 'AND id = ANY($1)' : ''}
+        ORDER BY id`,
+      idFilter ? [idFilter] : [],
+    );
+
+    const results: Array<{
+      doc_id: number;
+      filename: string;
+      status: 'ingested' | 'no_rows';
+      plan: number;
+      actual: number;
+      balance_sheet: number;
+      cost_detail: number;
+      sie: number;
+      rejected: number;
+      parsers_run: string[];
+    }> = [];
+
+    for (const doc of docs) {
+      try {
+        const r = await reingestFinancialDoc({
+          docId: doc.id,
+          filename: doc.filename,
+          extractedText: doc.extracted_text ?? '',
+          docType: doc.doc_type,
+        });
+        if (r.any_ingested) {
+          await insertAudit(
+            doc.id,
+            'financials_ingested',
+            'admin',
+            `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, rejected=${r.rejected}`,
+          );
+        }
+        results.push({
+          doc_id: doc.id,
+          filename: doc.filename,
+          status: r.any_ingested ? 'ingested' : 'no_rows',
+          plan: r.plan,
+          actual: r.actual,
+          balance_sheet: r.balance_sheet,
+          cost_detail: r.cost_detail,
+          sie: r.sie,
+          rejected: r.rejected,
+          parsers_run: r.parsers_run,
+        });
+      } catch (err) {
+        logger.warn({ err, docId: doc.id, filename: doc.filename }, 'reingest-all: doc failed');
+        results.push({
+          doc_id: doc.id,
+          filename: doc.filename,
+          status: 'no_rows',
+          plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, rejected: 0,
+          parsers_run: [],
+        });
+      }
+    }
+
+    const summary = {
+      docs_considered: docs.length,
+      docs_ingested: results.filter((r) => r.status === 'ingested').length,
+      total_plan: results.reduce((s, r) => s + r.plan, 0),
+      total_actual: results.reduce((s, r) => s + r.actual, 0),
+      total_balance_sheet: results.reduce((s, r) => s + r.balance_sheet, 0),
+      total_cost_detail: results.reduce((s, r) => s + r.cost_detail, 0),
+      total_sie: results.reduce((s, r) => s + r.sie, 0),
+      total_rejected: results.reduce((s, r) => s + r.rejected, 0),
+    };
+
+    return reply.send(successEnvelope({ summary, results }, req.requestId));
   });
 
   // DELETE /v3/vault/:id — soft delete (blocked for system docs)
