@@ -649,7 +649,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
     // Monthly revenue: AOP plan (financial_plan) vs actuals (financial_actuals income_statement).
     // Ordered Jan..Dec so the frontend can lay months out left-to-right.
-    const monthOrder = `CASE period
+    const monthOrder = `CASE p.period
       WHEN 'FY${fiscalYear % 100} Jan' THEN 1 WHEN 'FY${fiscalYear % 100} Feb' THEN 2
       WHEN 'FY${fiscalYear % 100} Mar' THEN 3 WHEN 'FY${fiscalYear % 100} Apr' THEN 4
       WHEN 'FY${fiscalYear % 100} May' THEN 5 WHEN 'FY${fiscalYear % 100} Jun' THEN 6
