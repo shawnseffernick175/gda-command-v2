@@ -91,7 +91,7 @@ async function main(): Promise<void> {
 
       if (finResult.ok && finResult.output.is_financial && finResult.output.rows.length > 0) {
         if (isApply) {
-          const counts = await ingestFinancialRows(finResult.output.rows);
+          const counts = await ingestFinancialRows(finResult.output.rows, doc.id);
           result.plan = counts.plan;
           result.actual = counts.actual;
           result.rejected = counts.rejected;

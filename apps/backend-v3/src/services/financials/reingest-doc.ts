@@ -81,7 +81,7 @@ export async function reingestFinancialDoc(params: {
       });
       result.parsers_run.push('financial_statement_extract');
       if (finResult.ok && finResult.output.is_financial && finResult.output.rows.length > 0) {
-        const counts = await ingestFinancialRows(finResult.output.rows);
+        const counts = await ingestFinancialRows(finResult.output.rows, docId);
         result.plan = counts.plan;
         result.actual = counts.actual;
         result.rejected = counts.rejected;

@@ -31,6 +31,51 @@ import { extractVehicleFromVaultDoc } from '../services/vehicles/vault-extract.j
 const UPLOAD_DIR = join(process.cwd(), 'data', 'vault');
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
+// ---------------------------------------------------------------------------
+// Async financial reingest job tracking. Heavy ledgers (SIE / GL Detail) take
+// longer than the gateway's synchronous request timeout, so reingest-all can
+// run in the background and report progress via reingest-status. In-memory and
+// single-process by design: only one backfill runs at a time and it is an
+// idempotent admin action, so losing the record on restart is harmless.
+// ---------------------------------------------------------------------------
+interface ReingestDocResult {
+  doc_id: number;
+  filename: string;
+  status: 'ingested' | 'no_rows' | 'error';
+  plan: number;
+  actual: number;
+  balance_sheet: number;
+  cost_detail: number;
+  sie: number;
+  rejected: number;
+  parsers_run: string[];
+  error?: string;
+}
+interface ReingestJob {
+  id: string;
+  state: 'running' | 'done' | 'error';
+  total: number;
+  processed: number;
+  results: ReingestDocResult[];
+  started_at: string;
+  finished_at: string | null;
+  error?: string;
+}
+const reingestJobs = new Map<string, ReingestJob>();
+function summarizeJob(job: ReingestJob): Record<string, number> {
+  return {
+    docs_considered: job.total,
+    docs_ingested: job.results.filter((r) => r.status === 'ingested').length,
+    docs_errored: job.results.filter((r) => r.status === 'error').length,
+    total_plan: job.results.reduce((s, r) => s + r.plan, 0),
+    total_actual: job.results.reduce((s, r) => s + r.actual, 0),
+    total_balance_sheet: job.results.reduce((s, r) => s + r.balance_sheet, 0),
+    total_cost_detail: job.results.reduce((s, r) => s + r.cost_detail, 0),
+    total_sie: job.results.reduce((s, r) => s + r.sie, 0),
+    total_rejected: job.results.reduce((s, r) => s + r.rejected, 0),
+  };
+}
+
 export const VAULT_BUCKETS = [
   'bid_protest', 'capability_statement', 'certificate', 'color_review',
   'contract', 'correspondence', 'financial', 'market_research',
@@ -736,7 +781,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
           });
 
           if (finResult.ok && finResult.output.is_financial && finResult.output.rows.length > 0) {
-            const counts = await ingestFinancialRows(finResult.output.rows);
+            const counts = await ingestFinancialRows(finResult.output.rows, docId);
             await insertAudit(
               docId,
               'financials_ingested',
@@ -1102,11 +1147,16 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
   //   ?dry_run=true  -> report what WOULD ingest without writing (still calls
   //                     parsers; the helper always writes, so dry_run only
   //                     restricts the doc set echo, not writes — omit for apply)
+  //   ?async=true    -> kick off in the background, return 202 immediately, and
+  //                     poll GET /v3/vault/financials/reingest-status. Required
+  //                     for heavy ledgers (SIE / GL Detail) whose parsers exceed
+  //                     the gateway's synchronous request timeout.
   app.post('/v3/vault/financials/reingest-all', async (req, reply) => {
     const q = req.query as Record<string, string>;
     const idFilter = q.ids
       ? q.ids.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n))
       : null;
+    const runAsync = q.async === 'true' || q.async === '1';
 
     // Candidate docs: financial/other type OR a filename that looks financial,
     // with non-empty extracted text. (Other types route through re-extract.)
@@ -1130,71 +1180,121 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       idFilter ? [idFilter] : [],
     );
 
-    const results: Array<{
-      doc_id: number;
-      filename: string;
-      status: 'ingested' | 'no_rows';
-      plan: number;
-      actual: number;
-      balance_sheet: number;
-      cost_detail: number;
-      sie: number;
-      rejected: number;
-      parsers_run: string[];
-    }> = [];
-
-    for (const doc of docs) {
-      try {
-        const r = await reingestFinancialDoc({
-          docId: doc.id,
-          filename: doc.filename,
-          extractedText: doc.extracted_text ?? '',
-          docType: doc.doc_type,
-        });
-        if (r.any_ingested) {
-          await insertAudit(
-            doc.id,
-            'financials_ingested',
-            'admin',
-            `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, rejected=${r.rejected}`,
-          );
+    async function runReingest(job: ReingestJob): Promise<void> {
+      for (const doc of docs) {
+        try {
+          const r = await reingestFinancialDoc({
+            docId: doc.id,
+            filename: doc.filename,
+            extractedText: doc.extracted_text ?? '',
+            docType: doc.doc_type,
+          });
+          if (r.any_ingested) {
+            await insertAudit(
+              doc.id,
+              'financials_ingested',
+              'admin',
+              `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, rejected=${r.rejected}`,
+            );
+          }
+          job.results.push({
+            doc_id: doc.id,
+            filename: doc.filename,
+            status: r.any_ingested ? 'ingested' : 'no_rows',
+            plan: r.plan,
+            actual: r.actual,
+            balance_sheet: r.balance_sheet,
+            cost_detail: r.cost_detail,
+            sie: r.sie,
+            rejected: r.rejected,
+            parsers_run: r.parsers_run,
+          });
+        } catch (err) {
+          logger.warn({ err, docId: doc.id, filename: doc.filename }, 'reingest-all: doc failed');
+          job.results.push({
+            doc_id: doc.id,
+            filename: doc.filename,
+            status: 'error',
+            plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, rejected: 0,
+            parsers_run: [],
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
-        results.push({
-          doc_id: doc.id,
-          filename: doc.filename,
-          status: r.any_ingested ? 'ingested' : 'no_rows',
-          plan: r.plan,
-          actual: r.actual,
-          balance_sheet: r.balance_sheet,
-          cost_detail: r.cost_detail,
-          sie: r.sie,
-          rejected: r.rejected,
-          parsers_run: r.parsers_run,
-        });
-      } catch (err) {
-        logger.warn({ err, docId: doc.id, filename: doc.filename }, 'reingest-all: doc failed');
-        results.push({
-          doc_id: doc.id,
-          filename: doc.filename,
-          status: 'no_rows',
-          plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, rejected: 0,
-          parsers_run: [],
-        });
+        job.processed += 1;
       }
     }
 
-    const summary = {
-      docs_considered: docs.length,
-      docs_ingested: results.filter((r) => r.status === 'ingested').length,
-      total_plan: results.reduce((s, r) => s + r.plan, 0),
-      total_actual: results.reduce((s, r) => s + r.actual, 0),
-      total_balance_sheet: results.reduce((s, r) => s + r.balance_sheet, 0),
-      total_cost_detail: results.reduce((s, r) => s + r.cost_detail, 0),
-      total_sie: results.reduce((s, r) => s + r.sie, 0),
-      total_rejected: results.reduce((s, r) => s + r.rejected, 0),
-    };
+    if (runAsync) {
+      // Fire-and-forget: register a job, return 202 immediately, run in the
+      // background. Survives the gateway timeout for heavy ledgers.
+      const job: ReingestJob = {
+        id: `reingest_${Date.now()}`,
+        state: 'running',
+        total: docs.length,
+        processed: 0,
+        results: [],
+        started_at: new Date().toISOString(),
+        finished_at: null,
+      };
+      reingestJobs.set('latest', job);
+      // Intentionally not awaited.
+      void runReingest(job)
+        .then(() => {
+          job.state = 'done';
+          job.finished_at = new Date().toISOString();
+        })
+        .catch((err) => {
+          job.state = 'error';
+          job.finished_at = new Date().toISOString();
+          job.error = err instanceof Error ? err.message : String(err);
+          logger.error({ err }, 'reingest-all async job failed');
+        });
 
-    return reply.send(successEnvelope({ summary, results }, req.requestId));
+      return reply.status(202).send(successEnvelope({
+        accepted: true,
+        job_id: job.id,
+        docs_considered: docs.length,
+        poll: '/v3/vault/financials/reingest-status',
+      }, req.requestId));
+    }
+
+    // Synchronous path (small doc sets / specific ids).
+    const job: ReingestJob = {
+      id: `reingest_${Date.now()}`,
+      state: 'running',
+      total: docs.length,
+      processed: 0,
+      results: [],
+      started_at: new Date().toISOString(),
+      finished_at: null,
+    };
+    await runReingest(job);
+    job.state = 'done';
+    job.finished_at = new Date().toISOString();
+    reingestJobs.set('latest', job);
+
+    return reply.send(successEnvelope({ summary: summarizeJob(job), results: job.results }, req.requestId));
+  });
+
+  // GET /v3/vault/financials/reingest-status — progress of the most recent
+  // (sync or async) reingest-all run. Lets a client kick off a heavy async
+  // backfill and poll until done without holding an HTTP connection open.
+  app.get('/v3/vault/financials/reingest-status', async (req, reply) => {
+    const job = reingestJobs.get('latest');
+    if (!job) {
+      return reply.send(successEnvelope({ state: 'idle', job: null }, req.requestId));
+    }
+    return reply.send(successEnvelope({
+      state: job.state,
+      job_id: job.id,
+      total: job.total,
+      processed: job.processed,
+      started_at: job.started_at,
+      finished_at: job.finished_at,
+      error: job.error ?? null,
+      summary: summarizeJob(job),
+      results: job.results,
+    }, req.requestId));
   });
 
   // DELETE /v3/vault/:id — soft delete (blocked for system docs)

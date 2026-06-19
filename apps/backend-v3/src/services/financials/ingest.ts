@@ -204,6 +204,7 @@ async function upsertRow(
   table: 'financial_plan' | 'financial_actuals',
   columnMap: Record<string, keyof FinancialRow>,
   row: FinancialRow,
+  sourceDocId?: number | null,
 ): Promise<boolean> {
   const cols: string[] = ['source', 'period', 'fiscal_year', 'quarter'];
   const params: unknown[] = [resolveSource(row), row.period, row.fiscal_year, row.quarter];
@@ -214,6 +215,13 @@ async function upsertRow(
       cols.push(dbCol);
       params.push(value);
     }
+  }
+
+  // Only financial_actuals carries source_doc_id (the vault doc that produced
+  // this actual row). Plan rows have no single source document.
+  if (table === 'financial_actuals' && sourceDocId !== null && sourceDocId !== undefined) {
+    cols.push('source_doc_id');
+    params.push(sourceDocId);
   }
 
   const keyCols = new Set(['source', 'period', 'fiscal_year', 'quarter']);
@@ -332,6 +340,7 @@ async function recomputeQuarterTotals(
 
 export async function ingestFinancialRows(
   rows: FinancialStatementExtractOutput['rows'],
+  sourceDocId?: number | null,
 ): Promise<{ plan: number; actual: number; rejected: number }> {
   let plan = 0;
   let actual = 0;
@@ -374,7 +383,7 @@ export async function ingestFinancialRows(
           await upsertRow('financial_plan', PLAN_COLUMNS, row);
           plan += 1;
         } else if (row.kind === 'actual') {
-          await upsertRow('financial_actuals', ACTUAL_COLUMNS, row);
+          await upsertRow('financial_actuals', ACTUAL_COLUMNS, row, sourceDocId);
           actual += 1;
         } else {
           continue;
