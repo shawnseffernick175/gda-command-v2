@@ -647,8 +647,97 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       [fiscalYear],
     );
 
+    // Monthly revenue: AOP plan (financial_plan) vs actuals (financial_actuals income_statement).
+    // Ordered Jan..Dec so the frontend can lay months out left-to-right.
+    const monthOrder = `CASE period
+      WHEN 'FY${fiscalYear % 100} Jan' THEN 1 WHEN 'FY${fiscalYear % 100} Feb' THEN 2
+      WHEN 'FY${fiscalYear % 100} Mar' THEN 3 WHEN 'FY${fiscalYear % 100} Apr' THEN 4
+      WHEN 'FY${fiscalYear % 100} May' THEN 5 WHEN 'FY${fiscalYear % 100} Jun' THEN 6
+      WHEN 'FY${fiscalYear % 100} Jul' THEN 7 WHEN 'FY${fiscalYear % 100} Aug' THEN 8
+      WHEN 'FY${fiscalYear % 100} Sep' THEN 9 WHEN 'FY${fiscalYear % 100} Oct' THEN 10
+      WHEN 'FY${fiscalYear % 100} Nov' THEN 11 WHEN 'FY${fiscalYear % 100} Dec' THEN 12
+      ELSE 99 END`;
+    const { rows: planActualRows } = await pool.query(
+      `SELECT p.period AS period,
+              p.plan_orders AS plan_orders, a.actual_orders AS actual_orders,
+              p.plan_sales AS plan_sales, a.actual_sales AS actual_sales,
+              p.plan_ebit AS plan_ebit, a.actual_ebit AS actual_ebit,
+              p.plan_gross_margin AS plan_gross_margin, a.actual_gross_margin AS actual_gross_margin,
+              p.plan_ros AS plan_ros, a.actual_ros AS actual_ros
+       FROM financial_plan p
+       LEFT JOIN financial_actuals a
+         ON a.period = p.period AND a.source = 'income_statement'
+       WHERE p.source = 'aop_seed' AND p.fiscal_year = $1 AND p.period NOT LIKE '%Q%'
+       ORDER BY ${monthOrder}`,
+      [fiscalYear],
+    );
+
+    // Build one Plan/Actual/Variance metric block per line.
+    // kind: 'currency' lines roll up by sum; 'percent' lines roll up by average.
+    const metricDefs: Array<{
+      key: string;
+      label: string;
+      kind: 'currency' | 'percent';
+      favorable: 'higher' | 'lower';
+      planCol: string;
+      actualCol: string;
+    }> = [
+      { key: 'orders', label: 'Orders', kind: 'currency', favorable: 'higher', planCol: 'plan_orders', actualCol: 'actual_orders' },
+      { key: 'sales', label: 'Sales', kind: 'currency', favorable: 'higher', planCol: 'plan_sales', actualCol: 'actual_sales' },
+      { key: 'ebit', label: 'EBIT', kind: 'currency', favorable: 'higher', planCol: 'plan_ebit', actualCol: 'actual_ebit' },
+      { key: 'gross_margin', label: 'Gross Margin %', kind: 'percent', favorable: 'higher', planCol: 'plan_gross_margin', actualCol: 'actual_gross_margin' },
+      { key: 'ros', label: 'ROS %', kind: 'percent', favorable: 'higher', planCol: 'plan_ros', actualCol: 'actual_ros' },
+    ];
+
+    const metrics = metricDefs.map((def) => {
+      const months = planActualRows.map((r) => {
+        const planRaw = r[def.planCol];
+        const actualRaw = r[def.actualCol];
+        const plan = planRaw !== null && planRaw !== undefined ? Number(planRaw) : 0;
+        const actual = actualRaw !== null && actualRaw !== undefined ? Number(actualRaw) : null;
+        return {
+          period: r.period as string,
+          plan,
+          actual,
+          variance: actual !== null ? actual - plan : null,
+        };
+      });
+      const monthsWithActual = months.filter((m) => m.actual !== null);
+      let planTotal: number;
+      let actualTotal: number | null;
+      if (def.kind === 'percent') {
+        // Average across months; actual averaged only over months that have data.
+        planTotal = months.length
+          ? months.reduce((s, m) => s + m.plan, 0) / months.length
+          : 0;
+        actualTotal = monthsWithActual.length
+          ? monthsWithActual.reduce((s, m) => s + (m.actual ?? 0), 0) / monthsWithActual.length
+          : null;
+      } else {
+        planTotal = months.reduce((s, m) => s + m.plan, 0);
+        actualTotal = monthsWithActual.length
+          ? monthsWithActual.reduce((s, m) => s + (m.actual ?? 0), 0)
+          : null;
+      }
+      return {
+        key: def.key,
+        label: def.label,
+        kind: def.kind,
+        favorable: def.favorable,
+        months,
+        plan_total: planTotal,
+        actual_total: actualTotal,
+        variance_total: actualTotal !== null ? actualTotal - planTotal : null,
+      };
+    });
+
+    // Keep `revenue` for backward-compatibility (the Sales block).
+    const revenue = metrics.find((m) => m.key === 'sales') ?? null;
+
     return reply.send(successEnvelope({
       items,
+      metrics,
+      revenue,
       periods: periodRows.map((r) => r.period as string),
       meta: {
         sources: srcDocs.map((d) => ({

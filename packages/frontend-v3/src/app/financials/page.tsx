@@ -189,7 +189,7 @@ export default function FinancialsPage() {
             {yearControlsActive ? ` \u2014 ${fy}` : ""}
           </h1>
           <p className="text-[12px] text-muted-foreground">
-            Envision Innovative Solutions (OU3) {"\u2014"} 7% YoY Growth Target
+            Envision Innovative Solutions (OU3) {"\u2014"} 6% YoY Growth Target
           </p>
         </div>
       </div>

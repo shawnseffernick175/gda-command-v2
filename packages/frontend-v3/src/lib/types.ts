@@ -1033,8 +1033,31 @@ export interface AopExecutionItem {
   variance: number;
 }
 
+export interface AopMetricMonth {
+  period: string;
+  plan: number;
+  actual: number | null;
+  variance: number | null;
+}
+
+export interface AopMetric {
+  key: string;
+  label: string;
+  kind: "currency" | "percent";
+  favorable: "higher" | "lower";
+  months: AopMetricMonth[];
+  plan_total: number;
+  actual_total: number | null;
+  variance_total: number | null;
+}
+
+// Back-compat alias for the Sales metric block.
+export type AopRevenue = AopMetric;
+
 export interface AopExecutionData {
   items: AopExecutionItem[];
+  metrics?: AopMetric[];
+  revenue?: AopMetric | null;
   periods: string[];
   meta: FinancialMeta;
 }
