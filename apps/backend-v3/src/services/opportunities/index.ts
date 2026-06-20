@@ -65,6 +65,25 @@ const ANALYSIS_SOURCE_TABLES: Record<string, { table: string; fk: string }> = {
   timeline: { table: 'opportunity_analysis_timeline_sources', fk: 'opportunity_analysis_id' },
 };
 
+/**
+ * Latest cached pwin per opportunity, computed in a single pass.
+ *
+ * The list endpoint previously read pwin via a per-row correlated subquery
+ * (`SELECT ... ORDER BY generated_at DESC LIMIT 1`) in the meta hot_count
+ * aggregate, the data SELECT, and the pwin ORDER BY. On the relevance-filtered
+ * working set (~17K rows) that fans out into tens of thousands of random index
+ * probes, which is multiple seconds on a cold cache and was the dominant cost
+ * behind the Opportunities list timing out. Scanning the cache once with
+ * DISTINCT ON and hash-joining touches ~60x fewer buffers. The alias is
+ * referenced by the meta query, the data query, and buildOrderByClause('pwin').
+ */
+const LATEST_PWIN_JOIN = `
+  LEFT JOIN (
+    SELECT DISTINCT ON (opportunity_id) opportunity_id, pwin
+      FROM opportunity_analysis_cache
+     ORDER BY opportunity_id, generated_at DESC
+  ) latest_pwin ON latest_pwin.opportunity_id = o.id`;
+
 async function resolveOpportunitySources(oppId: string): Promise<Record<string, SourceRef[]>> {
   const result: Record<string, SourceRef[]> = {};
   for (const [field, { table, fk }] of Object.entries(FIELD_SOURCE_TABLES)) {
@@ -191,8 +210,8 @@ function buildOrderByClause(
 ): string {
   const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
   const nulls = 'NULLS LAST';
-  const pwinExpr =
-    `(SELECT ac.pwin FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1)`;
+  // Resolved via LATEST_PWIN_JOIN on the data query, not a correlated subquery.
+  const pwinExpr = `latest_pwin.pwin`;
   const stageExpr =
     `COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest')`;
   switch (sortBy) {
@@ -600,9 +619,9 @@ export async function listOpportunitiesPaged(
       COUNT(*) FILTER (WHERE o.response_due_at IS NOT NULL AND o.response_due_at >= NOW() AND o.response_due_at <= NOW() + INTERVAL '7 days')::int AS due_this_week,
       COUNT(*) FILTER (WHERE o.ai_analyzed_at IS NULL)::int AS unscored_count,
       COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)) FILTER (WHERE o.is_idiq = FALSE), 0)::bigint AS total_value,
-      COUNT(*) FILTER (WHERE (SELECT ac.pwin FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1) >= 0.70)::int AS hot_count,
+      COUNT(*) FILTER (WHERE latest_pwin.pwin >= 0.70)::int AS hot_count,
       COUNT(*) FILTER (WHERE o.is_idiq = TRUE)::int AS idiq_count
-    FROM opportunities o ${where}
+    FROM opportunities o ${LATEST_PWIN_JOIN} ${where}
   `;
   const metaRes = await pool.query<{
     total_count: number;
@@ -650,8 +669,8 @@ export async function listOpportunitiesPaged(
     SELECT o.*,
       (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage,
       COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage,
-      (SELECT ac.pwin FROM opportunity_analysis_cache ac WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1) AS pwin_score
-    FROM opportunities o ${where}
+      latest_pwin.pwin AS pwin_score
+    FROM opportunities o ${LATEST_PWIN_JOIN} ${where}
     ${orderBy}
     LIMIT $${dataParamIdx} OFFSET $${dataParamIdx + 1}
   `;
