@@ -1058,11 +1058,36 @@ export interface AopExecutionData {
   items: AopExecutionItem[];
   metrics?: AopMetric[];
   revenue?: AopMetric | null;
-  // Provenance of the displayed AOP plan. 'aop_seed' = assistant-seeded
-  // benchmark, not an owner-approved board AOP. null = no plan rows.
+  // Provenance of the displayed AOP plan. 'user_aop' = real owner-entered plan
+  // (annual targets divided flat across 12 months). 'aop_seed' = legacy fake
+  // benchmark (should no longer occur). null = no plan entered yet.
   plan_source?: string | null;
   periods: string[];
   meta: FinancialMeta;
+}
+
+// AOP Plan input: the owner's annual board-approved plan for a fiscal year.
+export interface AopPlanValues {
+  plan_orders: number;
+  plan_sales: number;
+  plan_ebit: number;
+  plan_gross_margin: number;
+  plan_ros: number;
+}
+
+export interface AopPlanData {
+  fiscal_year: number;
+  fy: string;
+  has_plan: boolean;
+  plan: AopPlanValues | null;
+}
+
+export interface AopPlanSaveResponse {
+  fiscal_year: number;
+  fy: string;
+  months_written: number;
+  plan: AopPlanValues;
+  monthly: AopPlanValues;
 }
 
 export interface AopCaptureItem {
