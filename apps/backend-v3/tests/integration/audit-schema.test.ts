@@ -47,8 +47,6 @@ const TABLE_NAMES = new Set([
 // Each entry is "table.column". The audit still logs these as warnings but does
 // not fail CI — new drift (not in this set) WILL fail the build.
 const KNOWN_DRIFT = new Set([
-  // pipeline_items.capture_kickoff_at — route code references it but no migration adds it
-  'pipeline_items.capture_kickoff_at',
   // soak_events / soak_metrics — code references but no migration creates these tables (F-233)
   'soak_events.kind', 'soak_events.url', 'soak_events.status',
   'soak_events.duration_ms', 'soak_events.message',

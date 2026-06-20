@@ -141,17 +141,16 @@ describe('GET /v3/captures', () => {
 });
 
 describe('POST /v3/captures', () => {
-  it('returns 500 — schema drift: route SELECTs pipeline_items.capture_kickoff_at which does not exist', async () => {
-    // Known drift: captures route references pipeline_items.capture_kickoff_at
-    // which is not in v3_001. The SELECT succeeds (undefined column) but the
-    // subsequent UPDATE SET capture_kickoff_at fails.
+  it('returns 201 and creates a capture from a pipeline item', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/v3/captures',
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ pipeline_item_id: ids.pipelineItemId }),
     });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body) as { data: { pipeline_item_id: string } };
+    expect(body.data.pipeline_item_id).toBe(String(ids.pipelineItemId));
   });
 });
 

@@ -31,7 +31,6 @@ interface PipelineItemRow {
   id: string;
   opportunity_id: string;
   capture_owner: string;
-  capture_kickoff_at: string | null;
   source_id: string;
 }
 
@@ -126,12 +125,14 @@ function buildFriendlyResponse(
     ? (plan.discriminators as unknown[]).filter((d): d is string => typeof d === 'string')
     : null;
 
+  const cachePwin = cache?.pwin != null ? Number(cache.pwin) : null;
+
   return {
     id: Number(captureRow.id),
     opportunity_id: String(detail.opportunity_id),
     title: detail.title,
     stage: pipelineStageToLabel(detail.stage),
-    pwin: cache?.pwin ?? detail.pwin ?? null,
+    pwin: cachePwin ?? detail.pwin ?? null,
     value: detail.value_max ?? detail.value_min ?? null,
     win_strategy: winStrategy,
     discriminators,
@@ -324,11 +325,11 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     let captureRow: CaptureRow | null = null;
     let opportunityId: string | null = null;
 
-    captureRow = await resolveCaptureForOpportunity(id);
-    if (captureRow) {
-      opportunityId = id;
-    } else if (/^\d+$/.test(id)) {
-      // Not an opportunity in capture — try the param as a raw captures.id.
+    // Try the param as a raw captures.id first so direct capture links resolve
+    // to the exact requested row. Capture and opportunity ids share a numeric
+    // space, so resolving by opportunity first could return a different capture
+    // when the ids collide.
+    if (/^\d+$/.test(id)) {
       const byId = await pool.query<CaptureRow>('SELECT * FROM captures WHERE id = $1', [id]);
       captureRow = byId.rows[0] ?? null;
       if (captureRow) {
@@ -338,6 +339,13 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
         );
         opportunityId = piRes.rows[0]?.opportunity_id ?? null;
       }
+    }
+
+    // Not a known capture — treat the param as an opportunity_id and
+    // materialize the backing capture row from its pipeline_item.
+    if (!captureRow) {
+      captureRow = await resolveCaptureForOpportunity(id);
+      if (captureRow) opportunityId = id;
     }
 
     if (!captureRow || !opportunityId) {
@@ -411,7 +419,7 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const piRes = await pool.query<PipelineItemRow>(
-      'SELECT id, opportunity_id, capture_owner, capture_kickoff_at, source_id FROM pipeline_items WHERE id = $1',
+      'SELECT id, opportunity_id, capture_owner, source_id FROM pipeline_items WHERE id = $1',
       [pipelineItemId]
     );
     const pi = piRes.rows[0];
@@ -440,13 +448,6 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     );
 
     const captureId = insertRes.rows[0]!.id;
-
-    if (!pi.capture_kickoff_at) {
-      await pool.query(
-        'UPDATE pipeline_items SET capture_kickoff_at = $1 WHERE id = $2',
-        [now, pipelineItemId]
-      );
-    }
 
     await enqueueCaptureAnalysis(String(captureId), 'pre-warm');
 

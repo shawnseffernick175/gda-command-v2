@@ -317,9 +317,8 @@ describe('Integration: capture re-analysis on opportunity update', () => {
 });
 
 describe('Integration: pre-warm enqueue behavior', () => {
-  // Schema drift: POST /v3/captures route UPDATEs pipeline_items.capture_kickoff_at
-  // which does not exist in v3_001.
-  it('POST /v3/captures returns 500 — schema drift: capture_kickoff_at missing', async () => {
+  // POST /v3/captures creates a capture row from a pipeline item and returns 201.
+  it('POST /v3/captures returns 201 and creates the capture', async () => {
     const oppId = await insertTestOpportunity('Cap_PreWarm Create');
     const piId = await insertTestPipelineItem(oppId);
 
@@ -329,7 +328,10 @@ describe('Integration: pre-warm enqueue behavior', () => {
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ pipeline_item_id: piId }),
     });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body) as { data: { id: string; pipeline_item_id: string } };
+    expect(body.data.pipeline_item_id).toBe(String(piId));
+    expect(body.data.id).toBeTruthy();
   });
 
   it('PATCH of pricing_notes does NOT enqueue analysis', async () => {
