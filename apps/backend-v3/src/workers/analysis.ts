@@ -583,10 +583,6 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       logger.warn({ err, entityId }, 'Failed to propagate pwin to unified_opportunities — non-critical');
     }
 
-    // Standing rule: auto-Pass when pwin band === 'pass' OR auto-No-Bid
-    const pwinResult = analysis.pwin as { score?: number | null; band?: string } | null;
-    const isAutoPass = isAutoNoBid || (typeof pwinResult === 'object' && pwinResult !== null && pwinResult.band === 'pass');
-
     // Write analysis to opportunities table (inline JSONB for fast reads)
     await pool.query(
       `UPDATE opportunities
@@ -598,37 +594,16 @@ async function handleOpportunityAnalysis(jobs: PgBoss.Job<AnalysisJobData>[]): P
       [JSON.stringify(analysis), config.analysisVersion, now, entityId],
     );
 
-    // Standing rule: auto-No-Bid opportunities are moved into the No Bid tab so they
-    // leave the active list automatically. We create a no_bid pipeline card ONLY when
-    // no card exists yet; we NEVER overwrite an existing card, so an owner's explicit
-    // decision (or an active pursuit) is always preserved.
+    // Owner rule (binding): AI does ASSESSMENT ONLY — it NEVER inserts into the
+    // pipeline. Nothing enters the pipeline unless the user personally promotes
+    // it from the Ops Tracker. We therefore only LOG the auto-No-Bid signal here;
+    // the intake assessment flow records it as a 'pass' on the opportunity's
+    // assessment_status. No pipeline_item is ever created or mutated.
     if (isAutoNoBid) {
-      try {
-        const existingCard = await pool.query<{ id: string; stage: string; source_id: string }>(
-          `SELECT id, stage FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
-          [entityId],
-        );
-        if (existingCard.rows.length === 0) {
-          const srcRes = await pool.query<{ source_id: string }>(
-            `SELECT source_id FROM opportunities WHERE id = $1`,
-            [entityId],
-          );
-          const srcId = srcRes.rows[0]?.source_id ?? null;
-          await pool.query(
-            `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-             VALUES ($1, $2, $3, $4)`,
-            [entityId, 'system', 'no_bid', srcId],
-          );
-          logger.info({ entityId, daysTodue: autoNoBidDays }, 'Auto-No-Bid: created no_bid pipeline card');
-        } else {
-          logger.info(
-            { entityId, existingStage: existingCard.rows[0].stage },
-            'Auto-No-Bid: pipeline card already exists, leaving stage untouched',
-          );
-        }
-      } catch (err) {
-        logger.warn({ err, entityId }, 'Auto-No-Bid: failed to write no_bid pipeline card - non-critical');
-      }
+      logger.info(
+        { entityId, daysTodue: autoNoBidDays },
+        'Auto-No-Bid signal: deadline < threshold (assessment-only; no pipeline card created)',
+      );
     }
 
     logger.info({ entityId, version: config.analysisVersion, pwin: analysis.pwin }, 'Opportunity analysis written');
