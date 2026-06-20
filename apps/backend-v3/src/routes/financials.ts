@@ -1,8 +1,20 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
+
+// Live, user-specific financials read from the DB on every request. They must
+// never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
+// otherwise the UI shows a stale/empty body even after the data lands. Mark
+// these responses no-store and strip any validator that could trigger a 304.
+function noStore(reply: FastifyReply): void {
+  reply.header('Cache-Control', 'no-store, no-cache, must-revalidate');
+  reply.header('Pragma', 'no-cache');
+  reply.header('Expires', '0');
+  reply.removeHeader('ETag');
+  reply.removeHeader('Last-Modified');
+}
 
 export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/kpi/header
@@ -170,6 +182,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/financials/balance-sheet
   // Returns balance sheet actuals, latest period first, plus trend data.
   app.get('/v3/financials/balance-sheet', async (req, reply) => {
+    noStore(reply);
     const { rows } = await pool.query(
       `SELECT period, fiscal_year, quarter, source,
               cash, accounts_receivable,
@@ -610,6 +623,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/financials/aop-execution?fy=FY26
   app.get('/v3/financials/aop-execution', async (req, reply) => {
+    noStore(reply);
     const fy = (req.query as Record<string, string>).fy ?? 'FY26';
     const fiscalYear = parseInt(fy.replace(/\D/g, ''), 10) || 2026;
 
@@ -658,7 +672,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       WHEN 'FY${fiscalYear % 100} Nov' THEN 11 WHEN 'FY${fiscalYear % 100} Dec' THEN 12
       ELSE 99 END`;
     const { rows: planActualRows } = await pool.query(
-      `SELECT p.period AS period,
+      `SELECT p.period AS period, p.source AS plan_source,
               p.plan_orders AS plan_orders, a.actual_orders AS actual_orders,
               p.plan_sales AS plan_sales, a.actual_sales AS actual_sales,
               p.plan_ebit AS plan_ebit, a.actual_ebit AS actual_ebit,
@@ -734,10 +748,19 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     // Keep `revenue` for backward-compatibility (the Sales block).
     const revenue = metrics.find((m) => m.key === 'sales') ?? null;
 
+    // Surface the provenance of the displayed AOP plan. The monthly plan rows are
+    // pulled from financial_plan WHERE source = 'aop_seed', so when any plan row
+    // is present the plan shown is assistant-seeded benchmark data, not an
+    // owner-approved board AOP. The UI uses this to flag the numbers.
+    const planSource = planActualRows.length > 0
+      ? (planActualRows[0].plan_source as string)
+      : null;
+
     return reply.send(successEnvelope({
       items,
       metrics,
       revenue,
+      plan_source: planSource,
       periods: periodRows.map((r) => r.period as string),
       meta: {
         sources: srcDocs.map((d) => ({
@@ -759,6 +782,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/financials/aop-capture?fy=FY26
   app.get('/v3/financials/aop-capture', async (req, reply) => {
+    noStore(reply);
     const captureStages = ['interest', 'qualify', 'pursue', 'proposal', 'post_submittal'];
 
     const { rows } = await pool.query(
@@ -797,6 +821,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /v3/financials/p2?period=MAR-26
   app.get('/v3/financials/p2', async (req, reply) => {
+    noStore(reply);
     // KPI tiles from financial_actuals (latest quarter)
     const { rows: kpiRows } = await pool.query(
       `SELECT period, fiscal_year, quarter,

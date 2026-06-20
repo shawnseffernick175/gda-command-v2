@@ -56,6 +56,10 @@ export function useAopExecution(fy: string) {
         `/v3/financials/aop-execution?fy=${encodeURIComponent(fy)}`,
       ),
     retry: false,
+    // Live data: always refetch on mount / fy change, never serve a stale
+    // (possibly empty) cached body.
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -67,6 +71,8 @@ export function useAopCapture(fy: string) {
         `/v3/financials/aop-capture?fy=${encodeURIComponent(fy)}`,
       ),
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -75,6 +81,8 @@ export function useP2Financials() {
     queryKey: ["financials", "p2"],
     queryFn: () => apiGet<P2FinancialsData>("/v3/financials/p2"),
     retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
