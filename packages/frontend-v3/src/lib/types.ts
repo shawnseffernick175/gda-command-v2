@@ -1058,6 +1058,9 @@ export interface AopExecutionData {
   items: AopExecutionItem[];
   metrics?: AopMetric[];
   revenue?: AopMetric | null;
+  // Provenance of the displayed AOP plan. 'aop_seed' = assistant-seeded
+  // benchmark, not an owner-approved board AOP. null = no plan rows.
+  plan_source?: string | null;
   periods: string[];
   meta: FinancialMeta;
 }

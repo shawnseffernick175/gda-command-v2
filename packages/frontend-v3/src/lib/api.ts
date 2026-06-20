@@ -241,7 +241,9 @@ export async function apiGet<T>(
     const qs = sp.toString();
     if (qs) url += `?${qs}`;
   }
-  return apiFetch<T>(url, { method: "GET" });
+  // Live data: bypass the browser HTTP cache so a stale 200/304 can never mask
+  // freshly-computed server data (e.g. the Financial Bible AOP tabs).
+  return apiFetch<T>(url, { method: "GET", cache: "no-store" });
 }
 
 export async function apiPost<T>(

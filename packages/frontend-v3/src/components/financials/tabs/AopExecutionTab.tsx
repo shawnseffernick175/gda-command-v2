@@ -26,6 +26,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
   const metrics = data?.metrics ?? (data?.revenue ? [data.revenue] : []);
   const hasMetrics = metrics.length > 0 && metrics.some((m) => m.months.length > 0);
   const hasCostItems = !!data && data.items.length > 0;
+  const isSeededPlan = data?.plan_source === "aop_seed";
 
   if (!data || (!hasCostItems && !hasMetrics)) {
     return (
@@ -97,6 +98,12 @@ export function AopExecutionTab({ fy }: { fy: string }) {
           <h2 className="text-sm font-semibold text-foreground">
             AOP Plan vs Actual {"\u2014"} {fy}
           </h2>
+          {isSeededPlan && (
+            <div className="rounded border border-gda-amber/40 bg-gda-amber/10 px-4 py-3 text-[13px] text-gda-amber">
+              Seeded benchmark {"\u2014"} not owner-approved. Replace with
+              board-approved AOP.
+            </div>
+          )}
           {metrics.map((metric) => (
             <div key={metric.key} className="space-y-2">
               <div className="flex items-baseline justify-between">
