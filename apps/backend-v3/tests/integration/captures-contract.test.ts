@@ -197,9 +197,8 @@ describe('Contract: GET /v3/captures/:id', () => {
 });
 
 describe('Contract: POST /v3/captures', () => {
-  // Schema drift: POST route references pipeline_items.capture_kickoff_at
-  // which does not exist in v3_001. The UPDATE SET capture_kickoff_at fails.
-  it('returns 500 — schema drift: route UPDATEs pipeline_items.capture_kickoff_at (missing from v3_001)', async () => {
+  // POST /v3/captures creates a capture row from a pipeline item and returns 201.
+  it('returns 201 and creates a capture from a pipeline item', async () => {
     const oppId = await insertTestOpportunity('Cap_Create Opp');
     const piId = await insertTestPipelineItem(oppId);
 
@@ -209,7 +208,9 @@ describe('Contract: POST /v3/captures', () => {
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ pipeline_item_id: piId }),
     });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body) as { data: { id: string; pipeline_item_id: string } };
+    expect(body.data.pipeline_item_id).toBe(String(piId));
   });
 
   it('returns 400 for missing pipeline_item_id', async () => {

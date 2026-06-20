@@ -123,9 +123,9 @@ beforeEach(async () => {
 });
 
 describe('Integration: capture detail with fresh cache', () => {
-  // Schema drift: GET /v3/captures/:id SELECTs pipeline_items.capture_kickoff_at
-  // which does not exist in v3_001. The query fails before cache logic runs.
-  it('returns 500 — schema drift: route SELECTs pipeline_items.capture_kickoff_at (missing from v3_001)', async () => {
+  // GET /v3/captures/:id resolves a real captures.id and returns the friendly
+  // CaptureDetail shape derived from the backing pipeline_item + opportunity.
+  it('returns 200 with friendly CaptureDetail shape and cached pwin', async () => {
     const oppId = await insertTestOpportunity('Cap_Fresh Capture');
     const piId = await insertTestPipelineItem(oppId);
     const capId = await insertTestCapture(piId);
@@ -136,30 +136,48 @@ describe('Integration: capture detail with fresh cache', () => {
       url: `/v3/captures/${capId}`,
       headers: authHeader(),
     });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as { data: Record<string, unknown> };
+    expect(body.data.id).toBe(Number(capId));
+    expect(body.data.opportunity_id).toBe(oppId);
+    expect(body.data.title).toBe('Cap_Fresh Capture');
+    expect(body.data.pwin).toBe(0.65);
   });
 });
 
-describe('Integration: capture detail pre-warm completes within timeout', () => {
-  // Schema drift: same capture_kickoff_at drift as above.
-  it('returns 500 — schema drift: capture_kickoff_at missing from v3_001', async () => {
+describe('Integration: capture detail resolves by opportunity_id', () => {
+  // The Capture list links by opportunity_id. Opening the detail materializes
+  // the backing capture row when none exists yet, and returns 200.
+  it('returns 200 and lazily creates the backing capture for an opportunity', async () => {
     const oppId = await insertTestOpportunity('Cap_PreWarm Capture');
-    const piId = await insertTestPipelineItem(oppId);
-    await insertTestCapture(piId);
+    await insertTestPipelineItem(oppId);
 
     const res = await app.inject({
       method: 'GET',
       url: `/v3/captures/${oppId}`,
       headers: authHeader(),
     });
-    expect(res.statusCode).toBeOneOf([404, 500]);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as { data: Record<string, unknown> };
+    expect(body.data.opportunity_id).toBe(oppId);
+    expect(typeof body.data.id).toBe('number');
+    expect(body.data.title).toBe('Cap_PreWarm Capture');
+
+    // A captures row now exists for the opportunity's pipeline_item.
+    const check = await pool.query<{ n: string }>(
+      `SELECT COUNT(*)::text AS n FROM captures c
+         JOIN pipeline_items pi ON c.pipeline_item_id = pi.id
+        WHERE pi.opportunity_id = $1`,
+      [oppId],
+    );
+    expect(Number(check.rows[0]!.n)).toBeGreaterThanOrEqual(1);
   });
 });
 
-describe('Integration: capture detail ANALYSIS_TIMEOUT', () => {
-  // Schema drift: GET /v3/captures/:id fails before reaching timeout logic
-  // because it SELECTs pipeline_items.capture_kickoff_at (not in v3_001).
-  it('returns 500 — schema drift: capture_kickoff_at blocks timeout path', async () => {
+describe('Integration: capture detail without cache', () => {
+  // No fresh analysis cache: the endpoint still returns 200 with a null pwin
+  // (analysis is enqueued in the background; the door never blocks/500s).
+  it('returns 200 with null pwin when no cache is present', async () => {
     process.env['ANALYSIS_TIMEOUT_MS'] = '500';
     process.env['ANALYSIS_POLL_INTERVAL_MS'] = '50';
 
@@ -172,7 +190,9 @@ describe('Integration: capture detail ANALYSIS_TIMEOUT', () => {
       url: `/v3/captures/${capId}`,
       headers: authHeader(),
     });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as { data: Record<string, unknown> };
+    expect(body.data.pwin).toBeNull();
   });
 });
 
@@ -297,9 +317,8 @@ describe('Integration: capture re-analysis on opportunity update', () => {
 });
 
 describe('Integration: pre-warm enqueue behavior', () => {
-  // Schema drift: POST /v3/captures route UPDATEs pipeline_items.capture_kickoff_at
-  // which does not exist in v3_001.
-  it('POST /v3/captures returns 500 — schema drift: capture_kickoff_at missing', async () => {
+  // POST /v3/captures creates a capture row from a pipeline item and returns 201.
+  it('POST /v3/captures returns 201 and creates the capture', async () => {
     const oppId = await insertTestOpportunity('Cap_PreWarm Create');
     const piId = await insertTestPipelineItem(oppId);
 
@@ -309,7 +328,10 @@ describe('Integration: pre-warm enqueue behavior', () => {
       headers: { ...authHeader(), 'content-type': 'application/json' },
       payload: JSON.stringify({ pipeline_item_id: piId }),
     });
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body) as { data: { id: string; pipeline_item_id: string } };
+    expect(body.data.pipeline_item_id).toBe(String(piId));
+    expect(body.data.id).toBeTruthy();
   });
 
   it('PATCH of pricing_notes does NOT enqueue analysis', async () => {

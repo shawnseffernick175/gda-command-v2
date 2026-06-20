@@ -51,7 +51,6 @@ const TABLE_NAMES = new Set([
 // Pre-existing schema drift (code references columns/tables not yet in migrations).
 // Logged as warnings, not failures. New drift (not in this set) exits non-zero.
 const KNOWN_DRIFT = new Set([
-  'pipeline_items.capture_kickoff_at',
   'soak_events.kind', 'soak_events.url', 'soak_events.status',
   'soak_events.duration_ms', 'soak_events.message',
   'soak_metrics.kind', 'soak_metrics.p95_ms',

@@ -29,6 +29,9 @@ function CompetitorsContent() {
 
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [naics, setNaics] = useState("");
+  const [appliedNaics, setAppliedNaics] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +62,7 @@ function CompetitorsContent() {
 
   const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
 
-  const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, limit: 50, page: currentPage, ...sortParams });
+  const { data, isLoading } = useCompetitorsPaged({ q: debouncedQ || undefined, naics: appliedNaics || undefined, limit: 50, page: currentPage, ...sortParams });
   const { data: countData } = useCompetitorsCount();
 
   const items = data?.items ?? [];
@@ -102,14 +105,64 @@ function CompetitorsContent() {
               Clear
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            className={`rounded border px-3 py-1.5 text-xs transition-colors ${
+              showFilters || appliedNaics
+                ? "border-gda-green/50 bg-gda-green/15 text-gda-green"
+                : "border-border bg-gda-panel text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Filter{appliedNaics ? " (1)" : ""}
+          </button>
           <span className="ml-auto text-[11px] text-muted-foreground">
-            {debouncedQ
+            {debouncedQ || appliedNaics
               ? `${items.length} on this page`
               : countData
                 ? `${countData.count.toLocaleString()} total`
                 : `${items.length} on this page`}
           </span>
         </div>
+
+        {showFilters && (
+          <div className="flex items-end gap-3 rounded border border-border bg-gda-panel px-3 py-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                NAICS code
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 5415"
+                value={naics}
+                onChange={(e) => setNaics(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setAppliedNaics(naics.trim());
+                    setPage(1);
+                  }
+                }}
+                className="rounded border border-border bg-gda-bg-base px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50 w-40"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => { setAppliedNaics(naics.trim()); setPage(1); }}
+              className="rounded bg-gda-green/20 px-3 py-1 text-xs font-medium text-gda-green hover:bg-gda-green/30"
+            >
+              Apply
+            </button>
+            {appliedNaics && (
+              <button
+                type="button"
+                onClick={() => { setNaics(""); setAppliedNaics(""); setPage(1); }}
+                className="text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
