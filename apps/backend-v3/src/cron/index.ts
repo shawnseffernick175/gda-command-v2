@@ -42,6 +42,7 @@ import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
 import { runIncumbentEnrichment } from '../workers/incumbent-enrichment.js';
 import { pollAllDueSources } from '../services/idiq-ops/taskOrderIngestService.js';
 import { runAutoPassDeadline } from './auto-pass-deadline.js';
+import { runIntakeAssessment } from '../services/assessment/index.js';
 import { registerFastracArmySource } from '../ingest/fastrac-army/index.js';
 import { runValueDateEnrichment } from '../services/enrichment/value-date.js';
 import { pool } from '../lib/db.js';
@@ -143,6 +144,24 @@ export function startCronScheduler(): void {
   });
   tasks.push(pwinBatchScoreTask);
   logger.info({ schedule: '0 1 * * *' }, '[cron] registered: pwin.batch-score (0 1 * * *)');
+
+  // Intake assessment — daily at 01:30 UTC (after pwin batch-score at 01:00).
+  // ASSESSMENT ONLY: sorts intake opportunities into pass / ops_tracker.
+  // Never inserts into the pipeline (owner rule — only the user promotes).
+  const intakeAssessmentTask = cron.schedule('30 1 * * *', async () => {
+    try {
+      logger.info('[cron] intake-assessment starting');
+      const result = await runIntakeAssessment();
+      logger.info(
+        { scanned: result.scanned, passed: result.passed, ops_tracker: result.ops_tracker, by_reason: result.by_reason },
+        '[cron] intake-assessment completed',
+      );
+    } catch (err) {
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'cron_intake_assessment_error');
+    }
+  });
+  tasks.push(intakeAssessmentTask);
+  logger.info({ schedule: '30 1 * * *' }, '[cron] registered: intake-assessment (30 1 * * *)');
 
   // Capture stale actions — daily at 06:00 UTC
   const captureStaleTask = cron.schedule('0 6 * * *', async () => {

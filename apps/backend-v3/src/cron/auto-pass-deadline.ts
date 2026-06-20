@@ -37,9 +37,8 @@ export async function runAutoPassDeadline(): Promise<AutoPassResult> {
     id: string;
     title: string;
     response_due_at: string;
-    source_id: string;
   }>(
-    `SELECT id::text, title, response_due_at::text, source_id::text
+    `SELECT id::text, title, response_due_at::text
      FROM opportunities
      WHERE naics = ANY($1)
        AND response_due_at IS NOT NULL
@@ -89,28 +88,28 @@ export async function runAutoPassDeadline(): Promise<AutoPassResult> {
       continue;
     }
 
-    // Auto-pass: insert a no_bid pipeline item with capture_owner = 'system'
-    // (mirrors the pattern in analysis.ts for auto-no-bid)
+    // Owner rule (binding): NOTHING enters the pipeline unless the user puts
+    // it there. This job NEVER creates a pipeline_item. If no card exists, the
+    // opportunity is left untouched — deadline assessment is handled by the
+    // intake assessment flow (relevance/assessment status), not the pipeline.
     if (pipelineRows.length === 0) {
-      await pool.query(
-        `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-         VALUES ($1, 'system', 'no_bid', $2)`,
-        [opp.id, opp.source_id],
-      );
-    } else {
-      // Update existing pipeline item stage to no_bid
-      await pool.query(
-        `UPDATE pipeline_items SET stage = 'no_bid', capture_owner = 'system', updated_at = NOW()
-         WHERE opportunity_id = $1
-           AND id = (SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1)`,
-        [opp.id],
-      );
+      result.skipped_already_terminal++;
+      continue;
     }
+
+    // Update the EXISTING user-owned pipeline item's stage to no_bid.
+    // Preserve capture_owner — never overwrite it with 'system'.
+    await pool.query(
+      `UPDATE pipeline_items SET stage = 'no_bid', updated_at = NOW()
+       WHERE opportunity_id = $1
+         AND id = (SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1)`,
+      [opp.id],
+    );
 
     result.passed++;
     logger.info(
       { opportunityId: opp.id, title: opp.title, response_due_at: opp.response_due_at },
-      '[auto-pass-deadline] opportunity auto-passed (too late to capture)',
+      '[auto-pass-deadline] existing pipeline item moved to no_bid (too late to capture; owner preserved)',
     );
   }
 

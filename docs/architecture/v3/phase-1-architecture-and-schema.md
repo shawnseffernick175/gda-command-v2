@@ -250,6 +250,11 @@ CREATE TABLE opportunities (
   govtribe_id         TEXT,                    -- GovTribe entity ID for dedup + detail proxy
   relevance_status    TEXT,                    -- ingest-time relevance gate: relevant/off_profile/unknown_naics/auto_pass
   relevance_reason    TEXT,                    -- human-readable explanation of relevance_status
+  assessment_status   TEXT          NOT NULL DEFAULT 'intake'
+                                    CHECK (assessment_status IN ('intake', 'pass', 'ops_tracker')),  -- v3_105 intake funnel: AI assessment only, user-only promotion
+  assessment_reason   TEXT,                    -- v3_105: why an opp was passed / moved to ops_tracker
+  assessment_score    NUMERIC,                 -- v3_105: AI pWin/fit (0-100) for ops_tracker ranking; NULL when passed/unassessed
+  assessed_at         TIMESTAMPTZ,             -- v3_105: when the assessment job last stamped this opp
   analysis            JSONB,                   -- R2: cached auto-analysis result
   analysis_version    TEXT,                    -- analysis model version for cache invalidation
   ai_analyzed_at      TIMESTAMPTZ,             -- when analysis last ran
@@ -280,6 +285,8 @@ CREATE INDEX idx_opps_govtribe_id   ON opportunities (govtribe_id) WHERE govtrib
 CREATE INDEX idx_opps_source_uri    ON opportunities (source_uri) WHERE source_uri IS NOT NULL;
 CREATE INDEX idx_opps_source         ON opportunities (source_id);
 CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_opps_assessment_status   ON opportunities (assessment_status) WHERE deleted_at IS NULL;
+CREATE INDEX idx_opps_assessment_ops_rank ON opportunities (assessment_score DESC) WHERE deleted_at IS NULL AND assessment_status = 'ops_tracker';
 ```
 
 | Column | Purpose |
@@ -294,6 +301,10 @@ CREATE INDEX idx_opps_deleted        ON opportunities (deleted_at) WHERE deleted
 | `qualified_at` | When the opportunity was qualified (set by POST /v3/opportunities/:id/qualify) |
 | `qualified_by` | Who qualified it (user display name from JWT claims) |
 | `source_id` | **R1 FK** — every opportunity must cite its source. DB-enforced NOT NULL. |
+| `assessment_status` | v3_105 intake funnel state: `intake` (default), `pass` (AI auto-declined), `ops_tracker` (survived, awaiting user promotion). AI assesses only; pipeline entry is user-driven. |
+| `assessment_reason` | Human-readable reason stamped by the assessment job (e.g. `pass: out_of_naics`) |
+| `assessment_score` | AI pWin/fit (0–100) for Ops Tracker ranking; NULL when passed or unassessed |
+| `assessed_at` | When the assessment job last evaluated this opportunity |
 | `deleted_at` | Soft delete (partial indexes exclude deleted rows from all queries) |
 
 **Indexes:** All partial on `deleted_at IS NULL` — queries never scan deleted rows. Agency, NAICS, and set-aside support the Ops Tracker filter bar. `response_due_at DESC` powers deadline sorting. (The A/B/C letter-grade system was removed in v3_087 — Pwin, a continuous percentage, is now the sole fit metric.)
