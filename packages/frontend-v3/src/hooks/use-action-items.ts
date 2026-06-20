@@ -109,9 +109,12 @@ export function useTopActionItems(limit: number = 5) {
 export function useUsers() {
   return useQuery({
     queryKey: ["users"],
-    queryFn: () =>
-      apiGet<{ id: number; display_name: string; email: string }[]>(
-        "/v3/admin/users",
-      ),
+    queryFn: async () => {
+      const res = await apiGet<{
+        items: { id: number; display_name: string; email: string }[];
+        total: number;
+      }>("/v3/admin/users");
+      return res.items;
+    },
   });
 }

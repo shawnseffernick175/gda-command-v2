@@ -3,7 +3,7 @@ import { config } from '../config/index.js';
 import { pool } from '../lib/db.js';
 import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../lib/queue.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
-import { analysisCacheHits, analysisTimeoutCount } from '../lib/metrics.js';
+import { analysisCacheHits } from '../lib/metrics.js';
 import { logger } from '../lib/logger.js';
 import {
   type ColorReviewStage,
@@ -35,9 +35,20 @@ interface PipelineItemRow {
   source_id: string;
 }
 
-interface OpportunityMinimal {
+/**
+ * Friendly capture-detail shape consumed by the frontend (CaptureDetail type).
+ * Derived from the backing pipeline_item + opportunity + analysis cache —
+ * never fabricated. `id` is always a real captures.id so the capture
+ * sub-resources (/plan, /milestones, /reviews, /stages) resolve correctly.
+ */
+interface CaptureDetailRow {
+  opportunity_id: string;
   title: string;
   agency: string | null;
+  value_min: number | null;
+  value_max: number | null;
+  stage: string;
+  pwin: number | null;
 }
 
 interface CacheRow {
@@ -74,57 +85,102 @@ function isCacheFresh(cache: CacheRow | null, captureUpdatedAt: string): boolean
   return new Date(cache.generated_at) >= new Date(captureUpdatedAt);
 }
 
-async function waitForAnalysis(
-  captureId: string,
-  captureUpdatedAt: string,
-  timeoutMs: number,
-  pollMs: number
-): Promise<CacheRow | null> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const res = await pool.query<CacheRow>(
-      'SELECT pwin, version, generated_at FROM capture_analysis_cache WHERE capture_id = $1 AND version = $2',
-      [captureId, config.analysisVersion]
-    );
-    const row = res.rows[0];
-    if (row && isCacheFresh(row, captureUpdatedAt)) return row;
-    await new Promise((resolve) => setTimeout(resolve, pollMs));
-  }
-  return null;
+function pipelineStageToLabel(stage: string): string {
+  const map: Record<string, string> = {
+    interest: 'Interest',
+    qualify: 'Qualify',
+    pursue: 'Pursue',
+    solicitation: 'Solicitation',
+    post_submittal: 'Post-Submittal',
+    won: 'Won',
+    lost: 'Lost',
+    no_bid: 'No Bid',
+    gov_cancelled: 'Government Cancelled',
+  };
+  return map[stage] ?? stage;
 }
 
-function buildDetailResponse(
-  row: CaptureRow,
-  opp: OpportunityMinimal | null,
-  captureOwner: string | null,
-  complianceItems: ComplianceItemRow[],
+/**
+ * Build the frontend CaptureDetail payload from real data: the backing capture
+ * row provides the id and capture_plan; the pipeline_item + opportunity provide
+ * title/agency/value/stage; the analysis cache provides pwin and compliance.
+ */
+function buildFriendlyResponse(
+  captureRow: CaptureRow,
+  detail: CaptureDetailRow,
   cache: CacheRow | null,
+  complianceItems: ComplianceItemRow[],
 ): Record<string, unknown> {
+  const addressed = complianceItems.filter((c) => c.status === 'addressed' || c.status === 'waived').length;
+  const compliancePct = complianceItems.length > 0
+    ? Math.round((addressed / complianceItems.length) * 100)
+    : null;
+
+  const plan = (captureRow.capture_plan ?? {}) as Record<string, unknown>;
+  const winStrategy = typeof plan.win_strategy === 'string'
+    ? plan.win_strategy
+    : typeof plan.solution_strategy === 'string'
+      ? plan.solution_strategy
+      : null;
+  const discriminators = Array.isArray(plan.discriminators)
+    ? (plan.discriminators as unknown[]).filter((d): d is string => typeof d === 'string')
+    : null;
+
   return {
-    id: row.id,
-    pipeline_item_id: row.pipeline_item_id,
-    pipeline_capture_owner: captureOwner,
-    opportunity_title: opp?.title ?? null,
-    opportunity_title_sources: [],
-    opportunity_agency: opp?.agency ?? null,
-    opportunity_agency_sources: [],
-    color_stage: row.color_stage,
-    capture_plan: row.capture_plan,
-    pricing_notes: row.pricing_notes,
-    compliance_status: row.compliance_status,
-    win_themes: row.win_themes ?? [],
-    ghost_team: row.ghost_team,
-    compliance_items: complianceItems,
-    pwin: cache?.pwin ?? null,
-    pwin_sources: cache?.pwin !== null && cache?.pwin !== undefined
-      ? [{ kind: 'internal', title: 'Envision Capture Analysis', url: `/v3/captures/${row.id}`, retrieved_at: cache.generated_at }]
-      : [],
-    source_url: `/v3/captures/${row.id}`,
-    ai_analyzed_at: cache?.generated_at ?? null,
-    analysis_version: cache?.version ?? null,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    id: Number(captureRow.id),
+    opportunity_id: String(detail.opportunity_id),
+    title: detail.title,
+    stage: pipelineStageToLabel(detail.stage),
+    pwin: cache?.pwin ?? detail.pwin ?? null,
+    value: detail.value_max ?? detail.value_min ?? null,
+    win_strategy: winStrategy,
+    discriminators,
+    color_review_status: captureRow.color_stage,
+    compliance_pct: compliancePct,
+    next_milestone: null,
+    capture_plan: captureRow.capture_plan ?? null,
+    rfp_filename: null,
+    rfp_uploaded_at: null,
   };
+}
+
+/**
+ * Resolve a backing capture row for an opportunity. The Capture list links by
+ * opportunity_id, but capture sub-resources require a real captures.id, so we
+ * materialize the capture row (derived from the opportunity's pipeline_item)
+ * the first time the detail is opened. Returns null if the opportunity has no
+ * pipeline_item (i.e. is not in capture yet).
+ */
+async function resolveCaptureForOpportunity(opportunityId: string): Promise<CaptureRow | null> {
+  // Numeric guard: opportunity ids are BIGINT. A non-numeric param can never
+  // match, and feeding it to a BIGINT column would raise a query error.
+  if (!/^\d+$/.test(opportunityId)) return null;
+
+  const piRes = await pool.query<{ id: string; source_id: string }>(
+    `SELECT id, source_id
+       FROM pipeline_items WHERE opportunity_id = $1
+       ORDER BY id DESC LIMIT 1`,
+    [opportunityId]
+  );
+  const pi = piRes.rows[0];
+  if (!pi) return null;
+
+  const existing = await pool.query<CaptureRow>(
+    'SELECT * FROM captures WHERE pipeline_item_id = $1 ORDER BY id LIMIT 1',
+    [pi.id]
+  );
+  if (existing.rows[0]) return existing.rows[0];
+
+  const now = new Date().toISOString();
+  const insertRes = await pool.query<CaptureRow>(
+    `INSERT INTO captures (pipeline_item_id, color_stage, source_id, created_by, created_at, updated_at)
+     VALUES ($1, 'pink', $2, NULL, $3, $3)
+     RETURNING *`,
+    [pi.id, pi.source_id, now]
+  );
+
+  await enqueueCaptureAnalysis(String(insertRes.rows[0]!.id), 'pre-warm');
+  return insertRes.rows[0]!;
 }
 
 async function enqueueCaptureAnalysis(captureId: string, trigger: AnalysisJobData['trigger']): Promise<void> {
@@ -253,73 +309,90 @@ export async function captureRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  // GET /v3/captures/:id — detail with R2 analysis (10s sync block)
+  // GET /v3/captures/:id — capture detail for the Capture door.
+  //
+  // The Capture list links by opportunity_id, and the frontend consumes the
+  // friendly CaptureDetail shape. We therefore resolve the param as an
+  // opportunity_id first (materializing the backing capture row from its
+  // pipeline_item when none exists yet), and fall back to treating the param as
+  // a raw captures.id so direct capture links keep working. Either way the
+  // response carries a real captures.id so capture sub-resources resolve.
   app.get<{ Params: { id: string } }>('/v3/captures/:id', async (req, reply) => {
     const { id } = req.params;
 
-    const res = await pool.query<CaptureRow>(
-      'SELECT * FROM captures WHERE id = $1',
-      [id]
-    );
+    // Resolve the capture row + its opportunity-derived detail.
+    let captureRow: CaptureRow | null = null;
+    let opportunityId: string | null = null;
 
-    const row = res.rows[0];
-    if (!row) {
+    captureRow = await resolveCaptureForOpportunity(id);
+    if (captureRow) {
+      opportunityId = id;
+    } else if (/^\d+$/.test(id)) {
+      // Not an opportunity in capture — try the param as a raw captures.id.
+      const byId = await pool.query<CaptureRow>('SELECT * FROM captures WHERE id = $1', [id]);
+      captureRow = byId.rows[0] ?? null;
+      if (captureRow) {
+        const piRes = await pool.query<{ opportunity_id: string }>(
+          'SELECT opportunity_id FROM pipeline_items WHERE id = $1',
+          [captureRow.pipeline_item_id]
+        );
+        opportunityId = piRes.rows[0]?.opportunity_id ?? null;
+      }
+    }
+
+    if (!captureRow || !opportunityId) {
       return reply.status(404).send(
         errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId)
       );
     }
 
-    const piRes = await pool.query<PipelineItemRow>(
-      'SELECT id, opportunity_id, capture_owner, capture_kickoff_at, source_id FROM pipeline_items WHERE id = $1',
-      [row.pipeline_item_id]
+    const detailRes = await pool.query<CaptureDetailRow>(
+      `SELECT
+         o.id::text       AS opportunity_id,
+         o.title          AS title,
+         o.agency         AS agency,
+         o.value_min      AS value_min,
+         o.value_max      AS value_max,
+         pi.stage         AS stage,
+         (SELECT ac.pwin FROM opportunity_analysis_cache ac
+            WHERE ac.opportunity_id = o.id ORDER BY ac.generated_at DESC LIMIT 1) AS pwin
+       FROM pipeline_items pi
+       JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
+       WHERE pi.id = $1`,
+      [captureRow.pipeline_item_id]
     );
-    const pi = piRes.rows[0] ?? null;
-
-    let opp: OpportunityMinimal | null = null;
-    if (pi?.opportunity_id) {
-      const oppRes = await pool.query<OpportunityMinimal>(
-        'SELECT title, agency FROM opportunities WHERE id = $1 AND deleted_at IS NULL',
-        [pi.opportunity_id]
+    const detail = detailRes.rows[0];
+    if (!detail) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId)
       );
-      opp = oppRes.rows[0] ?? null;
     }
+    detail.value_min = detail.value_min != null ? Number(detail.value_min) : null;
+    detail.value_max = detail.value_max != null ? Number(detail.value_max) : null;
+    detail.pwin = detail.pwin != null ? Number(detail.pwin) : null;
 
     const compItemsRes = await pool.query<ComplianceItemRow>(
       'SELECT id, requirement, section_ref, status, response_notes, assigned_to, source_id FROM compliance_items WHERE capture_id = $1 ORDER BY id',
-      [id]
+      [captureRow.id]
     );
     const complianceItems = compItemsRes.rows;
 
     const cacheRes = await pool.query<CacheRow>(
       'SELECT pwin, version, generated_at FROM capture_analysis_cache WHERE capture_id = $1 AND version = $2',
-      [id, config.analysisVersion]
+      [captureRow.id, config.analysisVersion]
     );
     const cache = cacheRes.rows[0] ?? null;
 
-    if (isCacheFresh(cache, row.updated_at)) {
+    if (cache && isCacheFresh(cache, captureRow.updated_at)) {
       analysisCacheHits.inc();
-      return reply.status(200).send(
-        successEnvelope(buildDetailResponse(row, opp, pi?.capture_owner ?? null, complianceItems, cache), req.requestId)
-      );
+    } else {
+      await enqueueCaptureAnalysis(String(captureRow.id), 'detail-endpoint');
     }
 
-    await enqueueCaptureAnalysis(id, 'detail-endpoint');
-
-    const fresh = await waitForAnalysis(id, row.updated_at, config.analysisTimeoutMs, config.analysisPollIntervalMs);
-    if (fresh) {
-      analysisCacheHits.inc();
-      return reply.status(200).send(
-        successEnvelope(buildDetailResponse(row, opp, pi?.capture_owner ?? null, complianceItems, fresh), req.requestId)
-      );
-    }
-
-    analysisTimeoutCount.inc();
-    return reply.status(503).send(
-      errorEnvelope(
-        'ANALYSIS_TIMEOUT',
-        'Analysis not ready, retry in a few seconds',
-        req.requestId,
-        'estimated_seconds=8'
+    return reply.status(200).send(
+      successEnvelope(
+        buildFriendlyResponse(captureRow, detail, cache, complianceItems),
+        req.requestId
       )
     );
   });
