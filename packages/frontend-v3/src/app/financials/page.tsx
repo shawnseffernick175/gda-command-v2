@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { StatusStrip } from "@/components/financials/StatusStrip";
 import { AiAnalyzeModal } from "@/components/financials/AiAnalyzeModal";
 import { ContractWaterfallTab } from "@/components/financials/tabs/ContractWaterfallTab";
+import { AopPlanTab } from "@/components/financials/tabs/AopPlanTab";
 import { AopExecutionTab } from "@/components/financials/tabs/AopExecutionTab";
 import { AopCaptureTab } from "@/components/financials/tabs/AopCaptureTab";
 import { P2FinancialsTab } from "@/components/financials/tabs/P2FinancialsTab";
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 type Tab =
   | "waterfall"
+  | "plan"
   | "execution"
   | "capture"
   | "p2"
@@ -25,6 +27,7 @@ type Tab =
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "waterfall", label: "Contract Waterfall" },
+  { id: "plan", label: "AOP Plan" },
   { id: "execution", label: "AOP Execution" },
   { id: "capture", label: "AOP Capture" },
   { id: "p2", label: "Monthly Financials" },
@@ -35,7 +38,7 @@ const TABS: { id: Tab; label: string }[] = [
 // Only these tabs actually consume the FY/CY + year selection; the others
 // ignore it, so we disable the year controls when they're active rather than
 // letting the control imply it does something it doesn't.
-const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set(["execution", "capture"]);
+const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set(["plan", "execution", "capture"]);
 
 type CalendarMode = "FY" | "CY";
 
@@ -45,6 +48,8 @@ function tabTitle(tab: Tab): string {
   switch (tab) {
     case "waterfall":
       return "Contract Waterfall";
+    case "plan":
+      return "AOP Plan";
     case "execution":
       return "AOP Execution";
     case "capture":
@@ -138,7 +143,7 @@ export default function FinancialsPage() {
             title={
               yearControlsActive
                 ? undefined
-                : "Year selection applies only to AOP Execution and AOP Capture"
+                : "Year selection applies only to AOP Plan, AOP Execution and AOP Capture"
             }
           >
             <div className="flex rounded border border-border">
@@ -197,6 +202,7 @@ export default function FinancialsPage() {
       {/* Tab content */}
       <div className="min-h-[300px]">
         {activeTab === "waterfall" && <ContractWaterfallTab />}
+        {activeTab === "plan" && <AopPlanTab fy={fy} />}
         {activeTab === "execution" && <AopExecutionTab fy={fy} />}
         {activeTab === "capture" && <AopCaptureTab fy={fy} />}
         {activeTab === "p2" && <P2FinancialsTab />}

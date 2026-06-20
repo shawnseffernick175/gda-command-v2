@@ -671,6 +671,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       WHEN 'FY${fiscalYear % 100} Sep' THEN 9 WHEN 'FY${fiscalYear % 100} Oct' THEN 10
       WHEN 'FY${fiscalYear % 100} Nov' THEN 11 WHEN 'FY${fiscalYear % 100} Dec' THEN 12
       ELSE 99 END`;
+    // Read the user's real, owner-entered AOP plan (source='user_aop',
+    // is_seed=false) — NOT the old fake 'aop_seed' benchmark rows. A FY with no
+    // user_aop plan simply yields no monthly plan rows here (honest empty state).
     const { rows: planActualRows } = await pool.query(
       `SELECT p.period AS period, p.source AS plan_source,
               p.plan_orders AS plan_orders, a.actual_orders AS actual_orders,
@@ -681,7 +684,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        FROM financial_plan p
        LEFT JOIN financial_actuals a
          ON a.period = p.period AND a.source = 'income_statement'
-       WHERE p.source = 'aop_seed' AND p.fiscal_year = $1 AND p.period NOT LIKE '%Q%'
+       WHERE p.source = 'user_aop' AND p.is_seed = false
+         AND p.fiscal_year = $1 AND p.period NOT LIKE '%Q%'
        ORDER BY ${monthOrder}`,
       [fiscalYear],
     );
@@ -749,9 +753,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const revenue = metrics.find((m) => m.key === 'sales') ?? null;
 
     // Surface the provenance of the displayed AOP plan. The monthly plan rows are
-    // pulled from financial_plan WHERE source = 'aop_seed', so when any plan row
-    // is present the plan shown is assistant-seeded benchmark data, not an
-    // owner-approved board AOP. The UI uses this to flag the numbers.
+    // now pulled from financial_plan WHERE source = 'user_aop' — real, owner-entered
+    // numbers (annual targets divided flat across 12 months). 'user_aop' is real
+    // data, not a seeded benchmark; the UI no longer flags it. null = no plan yet.
     const planSource = planActualRows.length > 0
       ? (planActualRows[0].plan_source as string)
       : null;
@@ -777,6 +781,188 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
           : null,
         period: `FY${fiscalYear % 100}`,
       },
+    }, req.requestId));
+  });
+
+  // ─── AOP Plan input (user-entered annual plan + flat 1/12 division) ──────
+  //
+  // The owner enters ONE annual number per metric for a fiscal year. We then do
+  // arithmetic on the owner's own numbers (NOT seeded/benchmark data):
+  //   • dollar targets (orders, sales, EBIT) are divided FLAT — annual / 12 per month
+  //   • percentages (gross_margin, ros) are applied UNCHANGED to every month
+  // and write 12 monthly rows (source='user_aop', is_seed=false) into financial_plan.
+
+  // The 12 fiscal-year months in order, with their calendar quarter (ceil(m/3)).
+  const AOP_MONTHS: ReadonlyArray<{ mon: string; quarter: number }> = [
+    { mon: 'Jan', quarter: 1 }, { mon: 'Feb', quarter: 1 }, { mon: 'Mar', quarter: 1 },
+    { mon: 'Apr', quarter: 2 }, { mon: 'May', quarter: 2 }, { mon: 'Jun', quarter: 2 },
+    { mon: 'Jul', quarter: 3 }, { mon: 'Aug', quarter: 3 }, { mon: 'Sep', quarter: 3 },
+    { mon: 'Oct', quarter: 4 }, { mon: 'Nov', quarter: 4 }, { mon: 'Dec', quarter: 4 },
+  ];
+
+  // GET /v3/financials/aop-plan?fy=FY26
+  // Returns the owner's annual AOP plan for a fiscal year (reconstructed from the
+  // stored monthly rows), or nulls when none has been entered yet.
+  app.get('/v3/financials/aop-plan', async (req, reply) => {
+    noStore(reply);
+    const fy = (req.query as Record<string, string>).fy ?? 'FY26';
+    const fiscalYear = parseInt(fy.replace(/\D/g, ''), 10) || 2026;
+
+    const { rows } = await pool.query(
+      `SELECT
+         SUM(plan_orders) AS plan_orders,
+         SUM(plan_sales)  AS plan_sales,
+         SUM(plan_ebit)   AS plan_ebit,
+         AVG(plan_gross_margin) AS plan_gross_margin,
+         AVG(plan_ros)    AS plan_ros,
+         COUNT(*) AS month_count
+       FROM financial_plan
+       WHERE source = 'user_aop' AND is_seed = false
+         AND fiscal_year = $1 AND period NOT LIKE '%Q%'`,
+      [fiscalYear],
+    );
+
+    const r = rows[0];
+    const hasPlan = r && Number(r.month_count) > 0;
+
+    return reply.send(successEnvelope({
+      fiscal_year: fiscalYear,
+      fy: `FY${fiscalYear % 100}`,
+      has_plan: Boolean(hasPlan),
+      plan: hasPlan
+        ? {
+            plan_orders: Number(r.plan_orders),
+            plan_sales: Number(r.plan_sales),
+            plan_ebit: Number(r.plan_ebit),
+            plan_gross_margin: Number(r.plan_gross_margin),
+            plan_ros: Number(r.plan_ros),
+          }
+        : null,
+    }, req.requestId));
+  });
+
+  // POST /v3/financials/aop-plan
+  // Body: { fy: 'FY26', plan_orders, plan_sales, plan_ebit, plan_gross_margin, plan_ros }
+  // Saves the owner's annual plan: deletes ALL existing financial_plan rows for the
+  // FY (old aop_seed AND any prior user_aop) and inserts 12 fresh monthly rows, all
+  // in one transaction. Dollars are flat 1/12; percentages are repeated per month.
+  app.post('/v3/financials/aop-plan', async (req, reply) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+
+    const fyRaw = typeof body.fy === 'string' ? body.fy : '';
+    const fiscalYear = parseInt(fyRaw.replace(/\D/g, ''), 10);
+    if (!fiscalYear || fiscalYear < 2000 || fiscalYear > 2100) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'A valid fiscal year (e.g. "FY26") is required', req.requestId));
+    }
+
+    // Each metric must be a finite number. Percentages must be 0..100.
+    const num = (v: unknown): number | null =>
+      typeof v === 'number' && Number.isFinite(v)
+        ? v
+        : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))
+          ? Number(v)
+          : null;
+
+    const planOrders = num(body.plan_orders);
+    const planSales = num(body.plan_sales);
+    const planEbit = num(body.plan_ebit);
+    const planGm = num(body.plan_gross_margin);
+    const planRos = num(body.plan_ros);
+
+    const missing: string[] = [];
+    if (planOrders === null) missing.push('plan_orders');
+    if (planSales === null) missing.push('plan_sales');
+    if (planEbit === null) missing.push('plan_ebit');
+    if (planGm === null) missing.push('plan_gross_margin');
+    if (planRos === null) missing.push('plan_ros');
+    if (missing.length > 0) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', `Missing or invalid numeric value(s): ${missing.join(', ')}`, req.requestId));
+    }
+    if ((planGm as number) < 0 || (planGm as number) > 100 || (planRos as number) < 0 || (planRos as number) > 100) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'Percentages (gross margin, ROS) must be between 0 and 100', req.requestId));
+    }
+
+    const fyShort = `FY${fiscalYear % 100}`;
+    // Flat 1/12 split of the annual dollar targets; percentages carry through.
+    const monthOrders = (planOrders as number) / 12;
+    const monthSales = (planSales as number) / 12;
+    const monthEbit = (planEbit as number) / 12;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Replace this FY's plan: drop old seed AND prior user_aop month/quarter rows.
+      await client.query(
+        `DELETE FROM financial_plan
+          WHERE fiscal_year = $1 AND source IN ('aop_seed', 'user_aop')`,
+        [fiscalYear],
+      );
+
+      for (const { mon, quarter } of AOP_MONTHS) {
+        await client.query(
+          `INSERT INTO financial_plan
+             (period, fiscal_year, quarter, plan_orders, plan_sales, plan_ebit,
+              plan_gross_margin, plan_ros, is_seed, source)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, 'user_aop')`,
+          [`${fyShort} ${mon}`, fiscalYear, quarter, monthOrders, monthSales, monthEbit, planGm, planRos],
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      req.log.error({ err }, 'aop-plan save failed');
+      return reply.status(500).send(errorEnvelope('INTERNAL_ERROR', 'Failed to save AOP plan', req.requestId));
+    } finally {
+      client.release();
+    }
+
+    return reply.send(successEnvelope({
+      fiscal_year: fiscalYear,
+      fy: fyShort,
+      months_written: AOP_MONTHS.length,
+      plan: {
+        plan_orders: planOrders,
+        plan_sales: planSales,
+        plan_ebit: planEbit,
+        plan_gross_margin: planGm,
+        plan_ros: planRos,
+      },
+      monthly: {
+        plan_orders: monthOrders,
+        plan_sales: monthSales,
+        plan_ebit: monthEbit,
+        plan_gross_margin: planGm,
+        plan_ros: planRos,
+      },
+    }, req.requestId));
+  });
+
+  // POST /v3/financials/aop-plan/clear-seed
+  // One-shot cleanup of the fake assistant-seeded rows (source='aop_seed') that
+  // were never owner-approved. Optional body { fy: 'FY26' } limits it to one FY;
+  // omit to clear all fiscal years. Never touches user_aop or other real rows.
+  app.post('/v3/financials/aop-plan/clear-seed', async (req, reply) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const fyRaw = typeof body.fy === 'string' ? body.fy : '';
+    const fiscalYear = fyRaw ? parseInt(fyRaw.replace(/\D/g, ''), 10) : null;
+
+    const params: number[] = [];
+    let where = "source = 'aop_seed'";
+    if (fiscalYear && !Number.isNaN(fiscalYear)) {
+      params.push(fiscalYear);
+      where += ` AND fiscal_year = $${params.length}`;
+    }
+
+    const { rowCount } = await pool.query(
+      `DELETE FROM financial_plan WHERE ${where}`,
+      params,
+    );
+
+    return reply.send(successEnvelope({
+      cleared: rowCount ?? 0,
+      fiscal_year: fiscalYear,
     }, req.requestId));
   });
 

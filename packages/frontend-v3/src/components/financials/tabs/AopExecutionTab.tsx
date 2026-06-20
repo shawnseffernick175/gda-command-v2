@@ -32,8 +32,10 @@ export function AopExecutionTab({ fy }: { fy: string }) {
     return (
       <div className="rounded border border-dashed border-border bg-card p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No AOP execution data for {fy}. Upload cost detail (TGT vs ACT)
-          financial documents via Vault to populate this tab.
+          No AOP execution data for {fy} yet. Enter your annual plan on the{" "}
+          <span className="font-medium text-foreground">AOP Plan</span> tab,
+          and/or upload cost detail (TGT vs ACT) financial documents via Vault,
+          to populate this tab.
         </p>
       </div>
     );
@@ -195,8 +197,9 @@ export function AopExecutionTab({ fy }: { fy: string }) {
           ))}
           <p className="text-[11px] text-muted-foreground italic">
             Actual above plan is favorable (green). Dollar lines (Orders, Sales,
-            EBIT) are AOP seed, flat monthly (annual {"\u00f7"} 12); percentage
-            lines (GM, ROS) are flat each month. Blank months await actuals.
+            EBIT) come from your annual AOP plan divided flat monthly (annual
+            {" \u00f7 "}12); percentage lines (GM, ROS) apply the same plan value
+            each month. Blank months await actuals.
           </p>
         </div>
       )}

@@ -1,12 +1,15 @@
 "use client";
 
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/lib/api";
 import type {
   IngestionStatus,
   ContractWaterfallData,
   AopExecutionData,
   AopCaptureData,
+  AopPlanData,
+  AopPlanValues,
+  AopPlanSaveResponse,
   P2FinancialsData,
   DefinitionsData,
   AiAnalyzeResponse,
@@ -73,6 +76,32 @@ export function useAopCapture(fy: string) {
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",
+  });
+}
+
+export function useAopPlan(fy: string) {
+  return useQuery({
+    queryKey: ["financials", "aop-plan", fy],
+    queryFn: () =>
+      apiGet<AopPlanData>(
+        `/v3/financials/aop-plan?fy=${encodeURIComponent(fy)}`,
+      ),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useSaveAopPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { fy: string } & AopPlanValues) =>
+      apiPost<AopPlanSaveResponse>("/v3/financials/aop-plan", payload),
+    onSuccess: () => {
+      // The saved plan now drives AOP Execution — refresh both views.
+      void qc.invalidateQueries({ queryKey: ["financials", "aop-plan"] });
+      void qc.invalidateQueries({ queryKey: ["financials", "aop-execution"] });
+    },
   });
 }
 
