@@ -10,7 +10,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace("/launchpad");
+      router.replace("/digest");
     }
   }, [user, router]);
 

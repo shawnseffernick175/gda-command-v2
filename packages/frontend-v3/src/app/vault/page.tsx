@@ -309,6 +309,11 @@ export default function VaultPage() {
             </div>
           )}
         </div>
+        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          Your central document library — proposals, work product, and reference
+          files tied to opportunities and captures. Browse and upload documents,
+          and pull up the source material behind your pursuits.
+        </p>
 
         {/* Tabs */}
         <div className="flex items-center gap-1 border-b border-border">

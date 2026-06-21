@@ -9,6 +9,7 @@ import { RiskDetailPanel } from "@/components/RiskDetailPanel";
 import { PwinWeightsPanel } from "@/components/pwin-weights-panel";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
+import { useColumnFilters } from "@/hooks/use-column-filters";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { cn } from "@/lib/utils";
 import type { Risk } from "@/lib/types";
@@ -135,6 +136,7 @@ function RisksRegisterContent() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedRisk, setSelectedRisk] = useState<Risk | null>(null);
   const { sortBy, sortDir, handleSort } = useTableSort();
+  const { filters, setFilter, applyFilters } = useColumnFilters();
 
   const { data, isLoading } = useRisks({
     status: filterStatus || undefined,
@@ -145,10 +147,14 @@ function RisksRegisterContent() {
   const deleteRisk = useDeleteRisk();
 
   const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
+  const filteredItems = useMemo(
+    () => applyFilters(rawItems),
+    [rawItems, applyFilters],
+  );
   const items = useMemo(() => {
-    if (!sortBy) return rawItems;
-    return sortData(rawItems as unknown as Record<string, unknown>[], sortBy, sortDir, RISK_SORT_COLS) as unknown as Risk[];
-  }, [rawItems, sortBy, sortDir]);
+    if (!sortBy) return filteredItems;
+    return sortData(filteredItems as unknown as Record<string, unknown>[], sortBy, sortDir, RISK_SORT_COLS) as unknown as Risk[];
+  }, [filteredItems, sortBy, sortDir]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -485,15 +491,15 @@ function RisksRegisterContent() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-              <SortableHeader label="Risk" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="Type" field="risk_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="Category" field="category" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Risk" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.title ?? "", onChange: (v) => setFilter("title", v) }} />
+              <SortableHeader label="Type" field="risk_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.risk_type ?? "", onChange: (v) => setFilter("risk_type", v) }} />
+              <SortableHeader label="Category" field="category" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.category ?? "", onChange: (v) => setFilter("category", v) }} />
               <SortableHeader label="L" field="likelihood" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="I" field="impact" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Score" field="score" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="Owner" field="owner" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="Opportunity" field="opportunity_title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.status ?? "", onChange: (v) => setFilter("status", v) }} />
+              <SortableHeader label="Owner" field="owner" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.owner ?? "", onChange: (v) => setFilter("owner", v) }} />
+              <SortableHeader label="Opportunity" field="opportunity_title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} textFilter={{ value: filters.opportunity_title ?? "", onChange: (v) => setFilter("opportunity_title", v) }} />
               <th className="px-3 py-2 text-left font-medium bg-gda-bg-base">Actions</th>
             </tr>
           </thead>
@@ -619,6 +625,12 @@ function RisksPageInner() {
       {/* Tab row */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
         <h1 className="font-mono text-lg font-bold text-foreground">Risks</h1>
+        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          The risk register for your pursuits — what could go wrong, how likely
+          it is, and how hard it would hit. Log and rate risks by likelihood and
+          impact, assign owners and mitigations, and keep an eye on the highest
+          exposure items.
+        </p>
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab("register")}

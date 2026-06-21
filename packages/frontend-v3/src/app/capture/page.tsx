@@ -105,10 +105,18 @@ function CaptureList() {
   return (
     <div className="space-y-6">
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-3 sticky-page-header">
-        <div className="flex items-center justify-between">
-          <h1 className="font-mono text-lg font-bold text-foreground">
-            Capture
-          </h1>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="font-mono text-lg font-bold text-foreground">
+              Capture
+            </h1>
+            <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+              The capture workspace where you build the case to win a specific
+              pursuit — color-team reviews, scoring, milestones, and drivers. Run
+              your capture process, track review status, and sharpen PWin before
+              you commit to bid.
+            </p>
+          </div>
           <div className="flex gap-2">
             <button
               type="button"

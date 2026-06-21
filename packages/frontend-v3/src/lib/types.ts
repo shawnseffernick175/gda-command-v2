@@ -120,33 +120,6 @@ export interface PaginatedResponse<T> {
   total?: number;
 }
 
-/* ── Launchpad ────────────────────────────────────────────────── */
-
-export interface LaunchpadSummary {
-  total_opportunities: number;
-  forecast_count: number;
-  signal_count: number;
-  discovery_count: number;
-  pass_count: number;
-  avg_pwin: number | null;
-  top_agencies: Array<{ agency: string; count: number }>;
-  recent_scores: Array<{
-    internal_id: string;
-    title: string;
-    score: number;
-    band: Band;
-  }>;
-}
-
-export interface LaunchpadFlags {
-  flags: Array<{
-    type: string;
-    message: string;
-    severity: "info" | "warning" | "critical";
-    opportunity_id?: string;
-  }>;
-}
-
 /* ── Funnel report ────────────────────────────────────────────── */
 
 export interface FunnelStage {

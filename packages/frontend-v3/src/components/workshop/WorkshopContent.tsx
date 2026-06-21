@@ -109,6 +109,11 @@ export function WorkshopContent() {
       {/* Left: Document Library */}
       <div className="w-80 shrink-0 space-y-4">
         <h1 className="font-mono text-lg font-bold text-foreground">Workshop</h1>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          A hands-on space to upload solicitation and reference documents, have
+          the system classify and tear them down, and generate analysis you can
+          feed back into your captures.
+        </p>
 
         {/* Upload */}
         <UploadDropzone onFiles={handleFiles} disabled={upload.isPending} />

@@ -51,6 +51,14 @@ export default function IdiqOpsPage() {
         <h1 className="text-lg font-semibold text-foreground">
           IDIQ Operations
         </h1>
+        <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          IDIQ (Indefinite Delivery / Indefinite Quantity) contracts are
+          umbrella vehicles the government uses to issue task orders over time.
+          This page tracks the task orders flowing through the IDIQ vehicles you
+          hold or can compete on — review the live task-order feed, filter by
+          vehicle and eligibility, and use the vehicle scoreboard to see where
+          you are best positioned to win work.
+        </p>
       </div>
 
       <KpiStrip kpis={kpis} />

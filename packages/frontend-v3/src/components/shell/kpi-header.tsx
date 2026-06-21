@@ -54,16 +54,14 @@ export function KpiHeader() {
 
   if (error) {
     return (
-      <div className="flex h-9 items-center border-b border-border bg-gda-bg-base px-4">
-        <span className="text-[11px] text-muted-foreground italic">
-          KPI header — pending Financial Bible integration
-        </span>
-      </div>
+      <span className="text-[11px] text-muted-foreground italic whitespace-nowrap">
+        KPI header — pending Financial Bible integration
+      </span>
     );
   }
 
   return (
-    <div className="flex h-9 items-center gap-6 border-b border-border bg-gda-bg-base px-4 overflow-x-auto">
+    <div className="flex items-center gap-6 overflow-x-auto">
       {KPI_ITEMS.map((kpi) => {
         const item = data?.[kpi.key];
         const value = item?.value;

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 export default function RootPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/launchpad");
+    router.replace("/digest");
   }, [router]);
   return null;
 }

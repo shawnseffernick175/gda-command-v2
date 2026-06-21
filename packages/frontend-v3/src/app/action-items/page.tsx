@@ -234,6 +234,11 @@ function ActionItemsContent() {
         <h1 className="text-section font-semibold text-foreground">
           Action Items
         </h1>
+        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          Your running to-do list of follow-ups generated from opportunities,
+          captures, and reviews. Filter by status, see what is due, and work
+          through the next steps that keep pursuits moving.
+        </p>
 
         {/* Status tabs */}
         <div className="flex gap-2">
