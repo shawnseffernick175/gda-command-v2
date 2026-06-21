@@ -73,6 +73,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   // Clean all opportunities and pipeline_items between tests
+  await testPool.query("SET LOCAL gda.allow_pipeline_delete = 'true'");
   await testPool.query('DELETE FROM pipeline_items');
   await testPool.query('DELETE FROM opportunities');
   // Clean logs dir

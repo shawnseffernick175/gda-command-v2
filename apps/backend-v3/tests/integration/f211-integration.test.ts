@@ -29,6 +29,7 @@ beforeEach(async () => {
   await pool.query("DELETE FROM action_items WHERE title LIKE 'F211 Test%'");
   await pool.query("DELETE FROM compliance_items WHERE requirement LIKE 'F211 Test%'");
   await pool.query("DELETE FROM captures WHERE pipeline_item_id IN (SELECT id FROM pipeline_items WHERE capture_owner = 'f211-test')");
+  await pool.query("SET LOCAL gda.allow_pipeline_delete = 'true'");
   await pool.query("DELETE FROM pipeline_items WHERE capture_owner = 'f211-test'");
   await pool.query("DELETE FROM launchpad_flags WHERE title LIKE 'F211 Test%'");
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'F211 Test%'");

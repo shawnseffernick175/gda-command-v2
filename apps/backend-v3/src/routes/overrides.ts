@@ -120,11 +120,11 @@ export async function overrideRoutes(app: FastifyInstance): Promise<void> {
         try {
           await client.query('SAVEPOINT audit_insert');
           await recordAuditLog(client, {
-            action: 'UPDATE',
+            action: pipelineRow ? 'UPDATE' : 'INSERT',
             table_name: 'pipeline_items',
             record_id: pipelineItemId,
-            old_values: { stage: currentStage },
-            new_values: { stage: newStage },
+            ...(pipelineRow ? { old_values: { stage: currentStage } } : {}),
+            new_values: { stage: newStage, ...(pipelineRow ? {} : { opportunity_id: id }) },
             actor: 'user',
             source: 'user',
           });

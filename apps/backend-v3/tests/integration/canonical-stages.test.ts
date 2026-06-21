@@ -55,6 +55,7 @@ afterAll(async () => {
 }, 30_000);
 
 beforeEach(async () => {
+  await pool.query("SET LOCAL gda.allow_pipeline_delete = 'true'");
   await pool.query("DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE title LIKE 'Test Canonical%')");
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test Canonical%'");
 });

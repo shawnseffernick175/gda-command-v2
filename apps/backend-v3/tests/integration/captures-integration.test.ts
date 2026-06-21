@@ -114,6 +114,7 @@ beforeEach(async () => {
       WHERE o.title LIKE 'Cap_%'
     )
   `);
+  await pool.query("SET LOCAL gda.allow_pipeline_delete = 'true'");
   await pool.query(`
     DELETE FROM pipeline_items WHERE opportunity_id IN (
       SELECT id FROM opportunities WHERE title LIKE 'Cap_%'

@@ -53,8 +53,8 @@ export async function runAutoPassDeadline(): Promise<AutoPassResult> {
 
   for (const opp of candidates) {
     // Check current pipeline stage
-    const { rows: pipelineRows } = await pool.query<{ stage: string }>(
-      `SELECT stage FROM pipeline_items
+    const { rows: pipelineRows } = await pool.query<{ id: string; stage: string }>(
+      `SELECT id::text, stage FROM pipeline_items
        WHERE opportunity_id = $1
        ORDER BY id DESC LIMIT 1`,
       [opp.id],
@@ -100,12 +100,7 @@ export async function runAutoPassDeadline(): Promise<AutoPassResult> {
 
     // Update the EXISTING user-owned pipeline item's stage to no_bid.
     // Preserve capture_owner — never overwrite it with 'system'.
-    const piId = pipelineRows[0] ? Number(
-      (await pool.query<{ id: string }>(
-        `SELECT id::text FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
-        [opp.id],
-      )).rows[0]?.id,
-    ) : null;
+    const piId = Number(pipelineRows[0].id);
 
     await pool.query(
       `UPDATE pipeline_items SET stage = 'no_bid', updated_at = NOW()
