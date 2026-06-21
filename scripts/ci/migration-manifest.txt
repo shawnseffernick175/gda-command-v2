@@ -111,3 +111,5 @@ v3_102_capture_review_engine.sql
 v3_103_color_reviews_is_cumulative.sql
 v3_104_financial_actuals_source_doc.sql
 v3_105_intake_assessment_status.sql
+v3_106_pipeline_items_delete_guard.sql
+v3_107_audit_log_source.sql

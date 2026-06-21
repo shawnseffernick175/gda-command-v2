@@ -60,3 +60,8 @@ bare-column:opportunities:place_of_performance_state
 wheelhouse_config
 # F-878: scoring-doctrine.ts references canonical_stage column on opportunities
 bare-column:opportunities:canonical_stage
+
+# F-600: audit_log.source column added by v3_107 (not in CI snapshot yet)
+audit_log.source
+# F-600: prevent_pipeline_item_delete trigger function created by v3_106
+prevent_pipeline_item_delete

@@ -16,6 +16,7 @@ import { logger } from '../../lib/logger.js';
 import { scoreSingleOpportunityPwin } from '../pwin/batch-score.js';
 import type { OpportunityRow } from '../pwin/feature-extraction.js';
 import { assessOpportunity, type AssessmentDecision } from './rules.js';
+import { recordAuditLog } from '../audit/audit-log.js';
 
 export interface AssessmentRunResult {
   scanned: number;
@@ -90,6 +91,19 @@ export async function assessAndPersist(row: IntakeRow): Promise<AssessmentDecisi
       WHERE id = $4 AND deleted_at IS NULL`,
     [decision.status, decision.reason, decision.score, row.id],
   );
+
+  // F-600: audit trail for assessment_status change (system-initiated)
+  recordAuditLog(pool, {
+    action: 'UPDATE',
+    table_name: 'opportunities',
+    record_id: Number(row.id),
+    old_values: { assessment_status: 'intake' },
+    new_values: { assessment_status: decision.status, assessment_reason: decision.reason },
+    actor: 'intake-assessment',
+    source: 'system',
+  }).catch((err) => {
+    logger.warn({ err, opportunityId: row.id }, 'F-600 audit_log write failed (non-critical)');
+  });
 
   return decision;
 }

@@ -695,10 +695,13 @@ CREATE INDEX idx_audit_created       ON audit_log (created_at DESC);
 | `table_name` / `record_id` | Which record was affected |
 | `old_values` / `new_values` | Full before/after state for audit trail |
 | `ip_address` / `user_agent` | Security audit — who connected from where |
+| `source` | `'system'` or `'user'` — distinguishes automated/cron writes from owner-initiated actions (added v3_107, F-600) |
 
 **Indexes:** `table_name + created_at` for "show all changes to opportunities in the last 24 hours." `table_name + record_id` for "show all changes to this specific opportunity."
 
 **Why this choice:** Legacy `audit_log` existed but had limited coverage. Legacy `record_version` (26 MB, 16,425 rows in prod) was a heavy versioning system with triggers. V3 replaces both with a simpler append-only log. Write-time capture in application code (not DB triggers) ensures consistent behavior and avoids the "duplicate trigger" bug from migration 043.
+
+**F-600 DELETE guard (v3_106):** A `BEFORE DELETE` trigger on `pipeline_items` raises an exception on any DELETE. All 12 pipeline items are owner-promoted decisions — terminal stages (no_bid, won, lost, gov_cancelled) are explicit owner verdicts, not junk. Bypass for tests only via `SET LOCAL gda.allow_pipeline_delete = 'true'`.
 
 ### 2.13 `schema_versions` — Single migration tracker
 
