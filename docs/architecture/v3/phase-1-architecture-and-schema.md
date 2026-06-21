@@ -679,6 +679,7 @@ CREATE TABLE audit_log (
   new_values      JSONB,                       -- new state (for INSERT/UPDATE)
   ip_address      INET,
   user_agent      TEXT,
+  source          TEXT,                        -- 'system' or 'user' (F-600)
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
