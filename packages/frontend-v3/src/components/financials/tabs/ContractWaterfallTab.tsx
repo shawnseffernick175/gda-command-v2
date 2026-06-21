@@ -194,11 +194,11 @@ function FundedSummaryStrip({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
     let activeCount = 0;
 
     for (const to of taskOrders) {
-      if (to.funded_to_date) {
+      if (to.funded_to_date != null && to.funded_to_date > 0) {
         totalFunded += to.funded_to_date;
         fundedCount++;
       }
-      if (to.ceiling) totalCeiling += to.ceiling;
+      if (to.ceiling != null) totalCeiling += to.ceiling;
       if (to.status === "active") activeCount++;
     }
 
@@ -220,7 +220,7 @@ function FundedSummaryStrip({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
       <KpiItem label="Total funded" value={formatMoney(stats.totalFunded)} />
       <KpiItem label="Total ceiling" value={formatMoney(stats.totalCeiling)} />
       {stats.burnPct !== null && (
-        <KpiItem label="Burn rate" value={`${stats.burnPct}%`} />
+        <KpiItem label="Funded %" value={`${stats.burnPct}%`} />
       )}
       <KpiItem label="Active TOs" value={String(stats.activeCount)} />
       <KpiItem label="Total TOs" value={String(stats.totalCount)} />
@@ -648,12 +648,12 @@ function MissingDatesSection({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
               <span className="text-muted-foreground italic">
                 {to.prime_or_sub}
               </span>
-              {to.funded_to_date && (
+              {to.funded_to_date != null && (
                 <span className="tabular-nums text-fin-teal font-medium">
                   {formatMoney(to.funded_to_date)} funded
                 </span>
               )}
-              {to.ceiling && (
+              {to.ceiling != null && (
                 <span className="tabular-nums text-muted-foreground">
                   {formatMoney(to.ceiling)} ceiling
                 </span>

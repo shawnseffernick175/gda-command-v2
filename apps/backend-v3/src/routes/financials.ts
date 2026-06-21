@@ -1374,11 +1374,15 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const ids: number[] = [];
+    let skipped = 0;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       for (const to of body.task_orders) {
-        if (!to.to_name || !to.to_number || !to.prime_or_sub) continue;
+        if (!to.to_name || !to.to_number || !to.prime_or_sub) {
+          skipped++;
+          continue;
+        }
 
         // Try to resolve parent vehicle by short_name
         let parentVehicleId: number | null = null;
@@ -1426,6 +1430,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.status(201).send(successEnvelope({
       inserted: ids.length,
+      skipped,
       ids,
     }, req.requestId));
   });
