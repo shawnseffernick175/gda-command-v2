@@ -1,18 +1,27 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useContractWaterfall } from "@/hooks/use-financial-bible";
+import { useState, useMemo, useRef, useCallback } from "react";
+import {
+  useContractWaterfall,
+  useCreateTaskOrder,
+} from "@/hooks/use-financial-bible";
 import { formatMoney } from "@/lib/format-money";
 import type { TaskOrderRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { CSSProperties } from "react";
 
-/** Build a position+fill style object for a Gantt bar (avoids inline color keywords) */
-function barPos(leftPct: number, widthPct: number, fill: string): CSSProperties {
-  return { left: `${leftPct}%`, width: `${Math.max(widthPct, 0.5)}%`, '--gf': fill } as CSSProperties;
+function barPos(
+  leftPct: number,
+  widthPct: number,
+  fill: string,
+): CSSProperties {
+  return {
+    left: `${leftPct}%`,
+    width: `${Math.max(widthPct, 0.5)}%`,
+    "--gf": fill,
+  } as CSSProperties;
 }
 
-/** Default range: today - 12mo to today + 60mo */
 function defaultFrom(): string {
   const d = new Date();
   d.setMonth(d.getMonth() - 12);
@@ -34,6 +43,7 @@ export function ContractWaterfallTab() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("");
   const [selectedTO, setSelectedTO] = useState<TaskOrderRow | null>(null);
+  const [addFormOpen, setAddFormOpen] = useState(false);
 
   const params = useMemo(
     () => ({
@@ -65,22 +75,19 @@ export function ContractWaterfallTab() {
 
   if (!data || data.task_orders.length === 0) {
     return (
-      <div className="rounded border border-dashed border-border bg-card p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No task orders on file yet. Add task orders by uploading award docs to
-          the Vault, or import from USAspending via the Recompete Tracker.
-        </p>
-      </div>
+      <WaterfallEmptyState
+        onAddTaskOrder={() => setAddFormOpen(true)}
+        addFormOpen={addFormOpen}
+        onCloseAddForm={() => setAddFormOpen(false)}
+      />
     );
   }
 
-  // Separate: TOs with dates vs without
   const withDates = data.task_orders.filter((t) => t.pop_start && t.pop_end);
   const missingDates = data.task_orders.filter(
     (t) => !t.pop_start || !t.pop_end,
   );
 
-  // Apply vehicle filter client-side (multi-select)
   const filtered =
     vehicleFilter.length > 0
       ? withDates.filter(
@@ -104,7 +111,10 @@ export function ContractWaterfallTab() {
         setFromDate={setFromDate}
         toDate={toDate}
         setToDate={setToDate}
+        onAddTaskOrder={() => setAddFormOpen(true)}
       />
+
+      <FundedSummaryStrip taskOrders={data.task_orders} />
 
       <WaterfallLegend taskOrders={data.task_orders} />
 
@@ -123,11 +133,115 @@ export function ContractWaterfallTab() {
       {selectedTO && (
         <TaskOrderDrawer to={selectedTO} onClose={() => setSelectedTO(null)} />
       )}
+
+      {addFormOpen && (
+        <AddTaskOrderDrawer onClose={() => setAddFormOpen(false)} />
+      )}
     </div>
   );
 }
 
-/* ─── Filters ─────────────────────────────────────── */
+/* ── Empty State ──────────────────────────────────── */
+
+function WaterfallEmptyState({
+  onAddTaskOrder,
+  addFormOpen,
+  onCloseAddForm,
+}: {
+  onAddTaskOrder: () => void;
+  addFormOpen: boolean;
+  onCloseAddForm: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded border border-dashed border-border bg-card p-12 text-center">
+        <p className="text-[15px] font-medium text-foreground">
+          No task orders on file
+        </p>
+        <p className="mt-2 max-w-lg mx-auto text-[12px] text-muted-foreground leading-relaxed">
+          The Contract Waterfall displays funded dollars flowing through awarded
+          Task Orders. Upload a contract document to the Vault, or add task
+          orders manually to populate this view.
+        </p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            className="rounded border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-gda-bg-deep"
+            onClick={onAddTaskOrder}
+          >
+            Add task order
+          </button>
+          <a
+            href="/vault"
+            className="rounded bg-fin-teal px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:opacity-90"
+          >
+            Upload to Vault
+          </a>
+        </div>
+      </div>
+      {addFormOpen && <AddTaskOrderDrawer onClose={onCloseAddForm} />}
+    </div>
+  );
+}
+
+/* ── Funded Summary Strip ─────────────────────────── */
+
+function FundedSummaryStrip({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
+  const stats = useMemo(() => {
+    let totalFunded = 0;
+    let totalCeiling = 0;
+    let fundedCount = 0;
+    let activeCount = 0;
+
+    for (const to of taskOrders) {
+      if (to.funded_to_date) {
+        totalFunded += to.funded_to_date;
+        fundedCount++;
+      }
+      if (to.ceiling) totalCeiling += to.ceiling;
+      if (to.status === "active") activeCount++;
+    }
+
+    return {
+      totalFunded,
+      totalCeiling,
+      fundedCount,
+      activeCount,
+      totalCount: taskOrders.length,
+      burnPct:
+        totalCeiling > 0
+          ? Math.round((totalFunded / totalCeiling) * 100)
+          : null,
+    };
+  }, [taskOrders]);
+
+  return (
+    <div className="flex flex-wrap items-center gap-6 rounded border border-border bg-card px-4 py-2">
+      <KpiItem label="Total funded" value={formatMoney(stats.totalFunded)} />
+      <KpiItem label="Total ceiling" value={formatMoney(stats.totalCeiling)} />
+      {stats.burnPct !== null && (
+        <KpiItem label="Burn rate" value={`${stats.burnPct}%`} />
+      )}
+      <KpiItem label="Active TOs" value={String(stats.activeCount)} />
+      <KpiItem label="Total TOs" value={String(stats.totalCount)} />
+    </div>
+  );
+}
+
+function KpiItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+        {label}
+      </span>
+      <span className="text-[13px] font-medium tabular-nums text-foreground">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/* ── Filters ──────────────────────────────────────── */
 
 function WaterfallFilters({
   availableVehicles,
@@ -141,6 +255,7 @@ function WaterfallFilters({
   setFromDate,
   toDate,
   setToDate,
+  onAddTaskOrder,
 }: {
   availableVehicles: { id: number; short_name: string }[];
   vehicleFilter: number[];
@@ -153,75 +268,186 @@ function WaterfallFilters({
   setFromDate: (v: string) => void;
   toDate: string;
   setToDate: (v: string) => void;
+  onAddTaskOrder: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Date range */}
-      <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-        From
-      </label>
-      <input
-        type="date"
-        value={fromDate}
-        onChange={(e) => setFromDate(e.target.value)}
-        className="rounded border border-border bg-card px-2 py-1 text-[12px] text-foreground"
-      />
-      <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-        To
-      </label>
-      <input
-        type="date"
-        value={toDate}
-        onChange={(e) => setToDate(e.target.value)}
-        className="rounded border border-border bg-card px-2 py-1 text-[12px] text-foreground"
-      />
+      <FilterGroup label="From">
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+        />
+      </FilterGroup>
+      <FilterGroup label="To">
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+        />
+      </FilterGroup>
 
-      {/* Parent IDIQ multi-select */}
-      <select
-        multiple
-        value={vehicleFilter.map(String)}
-        onChange={(e) =>
-          setVehicleFilter(
-            Array.from(e.target.selectedOptions, (o) => Number(o.value)),
-          )
-        }
-        className="rounded border border-border bg-card px-2 py-1 text-[12px] text-foreground max-h-[80px]"
-      >
-        {availableVehicles.map((v) => (
-          <option key={v.id} value={v.id}>
-            {v.short_name}
-          </option>
-        ))}
-      </select>
+      {/* Vehicle multi-select dropdown */}
+      {availableVehicles.length > 0 && (
+        <FilterGroup label="Vehicle">
+          <VehicleDropdown
+            vehicles={availableVehicles}
+            selected={vehicleFilter}
+            onChange={setVehicleFilter}
+          />
+        </FilterGroup>
+      )}
 
       {/* Status */}
-      <select
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-        className="rounded border border-border bg-card px-2 py-1 text-[12px] text-foreground"
-      >
-        <option value="">All statuses</option>
-        <option value="active">Active</option>
-        <option value="closeout">Closeout</option>
-        <option value="expired">Expired</option>
-        <option value="awarded_not_started">Awarded (not started)</option>
-      </select>
+      <FilterGroup label="Status">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+        >
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="closeout">Closeout</option>
+          <option value="expired">Expired</option>
+          <option value="awarded_not_started">Awarded (not started)</option>
+        </select>
+      </FilterGroup>
 
       {/* Prime vs Sub */}
-      <select
-        value={roleFilter}
-        onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
-        className="rounded border border-border bg-card px-2 py-1 text-[12px] text-foreground"
-      >
-        <option value="">Prime & Sub</option>
-        <option value="PRIME">Prime only</option>
-        <option value="SUB">Sub only</option>
-      </select>
+      <FilterGroup label="Role">
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+        >
+          <option value="">Prime & Sub</option>
+          <option value="PRIME">Prime only</option>
+          <option value="SUB">Sub only</option>
+        </select>
+      </FilterGroup>
+
+      <div className="ml-auto">
+        <button
+          type="button"
+          className="rounded border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-gda-bg-deep"
+          onClick={onAddTaskOrder}
+        >
+          + Add TO
+        </button>
+      </div>
     </div>
   );
 }
 
-/* ─── Legend ───────────────────────────────────────── */
+function FilterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/* ── Vehicle Multi-Select Dropdown ────────────────── */
+
+function VehicleDropdown({
+  vehicles,
+  selected,
+  onChange,
+}: {
+  vehicles: { id: number; short_name: string }[];
+  selected: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const handleToggle = useCallback(
+    (id: number) => {
+      if (selected.includes(id)) {
+        onChange(selected.filter((v) => v !== id));
+      } else {
+        onChange([...selected, id]);
+      }
+    },
+    [selected, onChange],
+  );
+
+  const label =
+    selected.length === 0
+      ? "All vehicles"
+      : selected.length === 1
+        ? vehicles.find((v) => v.id === selected[0])?.short_name ?? "1 selected"
+        : `${selected.length} selected`;
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        className="flex items-center gap-1 rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+        onClick={() => setOpen(!open)}
+        onBlur={(e) => {
+          if (!wrapperRef.current?.contains(e.relatedTarget as Node)) {
+            setOpen(false);
+          }
+        }}
+      >
+        <span>{label}</span>
+        <span className="text-muted-foreground text-[11px]">▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 z-30 mt-1 min-w-[180px] rounded border border-border bg-card shadow-md">
+          {selected.length > 0 && (
+            <button
+              type="button"
+              className="w-full border-b border-border px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-gda-bg-deep"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange([]);
+              }}
+            >
+              Clear all
+            </button>
+          )}
+          <div className="max-h-[200px] overflow-y-auto py-1">
+            {vehicles.map((v) => {
+              const checked = selected.includes(v.id);
+              return (
+                <label
+                  key={v.id}
+                  className="flex cursor-pointer items-center gap-2 px-3 py-1 text-[12px] text-foreground hover:bg-gda-bg-deep"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => handleToggle(v.id)}
+                    className="h-3 w-3 rounded border-border"
+                  />
+                  {v.short_name}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Legend ────────────────────────────────────────── */
 
 function WaterfallLegend({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
   const legend = useMemo(() => {
@@ -236,7 +462,7 @@ function WaterfallLegend({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
   return (
     <div className="flex flex-wrap items-center gap-4">
       {legend.map(([name, hue]) => {
-        const swatch = { '--gf': hue } as React.CSSProperties;
+        const swatch = { "--gf": hue } as React.CSSProperties;
         return (
           <div key={name} className="flex items-center gap-1.5">
             <span
@@ -251,7 +477,7 @@ function WaterfallLegend({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
   );
 }
 
-/* ─── Gantt Chart (CSS-grid) ──────────────────────── */
+/* ── Gantt Chart ──────────────────────────────────── */
 
 function GanttChart({
   taskOrders,
@@ -262,7 +488,6 @@ function GanttChart({
   today: string;
   onSelect: (to: TaskOrderRow) => void;
 }) {
-  // Compute timeline range
   const allStarts = taskOrders.map((t) => new Date(t.pop_start!).getTime());
   const allEnds = taskOrders.map((t) => new Date(t.pop_end!).getTime());
   const rangeStart = Math.min(...allStarts);
@@ -275,11 +500,10 @@ function GanttChart({
       ? ((todayMs - rangeStart) / (rangeEnd - rangeStart)) * 100
       : 0;
 
-  // Group by parent vehicle
   const groups = useMemo(() => {
     const map = new Map<string, TaskOrderRow[]>();
     for (const t of taskOrders) {
-      const groupKey = t.parent_vehicle_short_name ?? "Commercial / Non-IDIQ";
+      const groupKey = t.parent_vehicle_short_name ?? "Standalone / Non-IDIQ";
       const existing = map.get(groupKey) ?? [];
       existing.push(t);
       map.set(groupKey, existing);
@@ -287,7 +511,6 @@ function GanttChart({
     return Array.from(map.entries());
   }, [taskOrders]);
 
-  // Generate year markers
   const yearMarkers = useMemo(() => {
     const startYear = new Date(rangeStart).getFullYear();
     const endYear = new Date(rangeEnd).getFullYear();
@@ -326,7 +549,6 @@ function GanttChart({
 
       {/* Today line + gantt rows */}
       <div className="relative">
-        {/* Today vertical line */}
         {todayPct > 0 && todayPct < 100 && (
           <div
             className="absolute top-0 bottom-0 w-px z-10 bg-fin-plum"
@@ -340,14 +562,12 @@ function GanttChart({
 
         {groups.map(([groupName, tos]) => (
           <div key={groupName} className="mb-3">
-            {/* Section header */}
             <div className="flex items-center gap-2 py-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 ── {groupName} ──
               </span>
             </div>
 
-            {/* Rows */}
             {tos.map((to) => {
               const startMs = new Date(to.pop_start!).getTime();
               const endMs = new Date(to.pop_end!).getTime();
@@ -357,7 +577,12 @@ function GanttChart({
                 ((endMs - startMs) / (rangeEnd - rangeStart)) * 100;
 
               const isSub = to.prime_or_sub === "SUB";
-              const barLabel = `${to.to_name}${to.ceiling ? ` — ${formatMoney(to.ceiling)}` : ""}`;
+              const fundedLabel = to.funded_to_date
+                ? formatMoney(to.funded_to_date)
+                : to.ceiling
+                  ? formatMoney(to.ceiling)
+                  : "";
+              const barLabel = `${to.to_name}${fundedLabel ? ` — ${fundedLabel}` : ""}`;
 
               return (
                 <div
@@ -365,7 +590,6 @@ function GanttChart({
                   className="group relative h-7 my-1 cursor-pointer"
                   onClick={() => onSelect(to)}
                 >
-                  {/* Bar */}
                   <div
                     className={cn(
                       "absolute top-0.5 h-6 rounded-[3px] flex items-center px-2 transition-opacity hover:opacity-90 bg-[var(--gf)]",
@@ -382,7 +606,6 @@ function GanttChart({
                     )}
                   </div>
 
-                  {/* Inline label for narrow bars */}
                   {widthPct <= 8 && (
                     <span
                       className="absolute top-1 text-[11px] text-muted-foreground truncate max-w-[120px]"
@@ -401,7 +624,7 @@ function GanttChart({
   );
 }
 
-/* ─── Missing Dates Section ───────────────────────── */
+/* ── Missing Dates Section ────────────────────────── */
 
 function MissingDatesSection({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
   return (
@@ -411,26 +634,31 @@ function MissingDatesSection({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
       </h3>
       <div className="space-y-1">
         {taskOrders.map((to) => {
-          const dot = { '--gf': to.parent_color } as CSSProperties;
+          const dot = { "--gf": to.parent_color } as CSSProperties;
           return (
-          <div key={to.id} className="flex items-center gap-3 text-[12px]">
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[var(--gf)]"
-              style={dot}
-            />
-            <span className="text-foreground font-medium">{to.to_name}</span>
-            <span className="text-muted-foreground">
-              {to.parent_vehicle_short_name ?? "Non-IDIQ"}
-            </span>
-            <span className="text-muted-foreground italic">
-              {to.prime_or_sub}
-            </span>
-            {to.ceiling && (
-              <span className="tabular-nums text-muted-foreground">
-                {formatMoney(to.ceiling)}
+            <div key={to.id} className="flex items-center gap-3 text-[12px]">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[var(--gf)]"
+                style={dot}
+              />
+              <span className="text-foreground font-medium">{to.to_name}</span>
+              <span className="text-muted-foreground">
+                {to.parent_vehicle_short_name ?? "Non-IDIQ"}
               </span>
-            )}
-          </div>
+              <span className="text-muted-foreground italic">
+                {to.prime_or_sub}
+              </span>
+              {to.funded_to_date && (
+                <span className="tabular-nums text-fin-teal font-medium">
+                  {formatMoney(to.funded_to_date)} funded
+                </span>
+              )}
+              {to.ceiling && (
+                <span className="tabular-nums text-muted-foreground">
+                  {formatMoney(to.ceiling)} ceiling
+                </span>
+              )}
+            </div>
           );
         })}
       </div>
@@ -438,7 +666,7 @@ function MissingDatesSection({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
   );
 }
 
-/* ─── Task Order Detail Drawer ────────────────────── */
+/* ── Task Order Detail Drawer ─────────────────────── */
 
 function TaskOrderDrawer({
   to,
@@ -450,7 +678,6 @@ function TaskOrderDrawer({
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-[400px] max-w-full bg-card border-l border-border shadow-lg overflow-y-auto">
       <div className="p-6 space-y-4">
-        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-[15px] font-semibold text-foreground">
@@ -469,7 +696,6 @@ function TaskOrderDrawer({
           </button>
         </div>
 
-        {/* Status badge */}
         <div className="flex items-center gap-2">
           <StatusBadge status={to.status} isExpiringSoon={to.is_expiring_soon} />
           {to.prime_or_sub === "SUB" && (
@@ -479,7 +705,6 @@ function TaskOrderDrawer({
           )}
         </div>
 
-        {/* Details */}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[12px]">
           <dt className="text-muted-foreground">Parent IDIQ</dt>
           <dd className="text-foreground font-medium">
@@ -513,14 +738,14 @@ function TaskOrderDrawer({
               : "—"}
           </dd>
 
-          <dt className="text-muted-foreground">Ceiling</dt>
-          <dd className="text-foreground tabular-nums font-medium">
-            {formatMoney(to.ceiling)}
+          <dt className="text-muted-foreground">Funded to Date</dt>
+          <dd className="text-foreground tabular-nums font-medium text-fin-teal">
+            {formatMoney(to.funded_to_date)}
           </dd>
 
-          <dt className="text-muted-foreground">Funded to Date</dt>
+          <dt className="text-muted-foreground">Ceiling</dt>
           <dd className="text-foreground tabular-nums">
-            {formatMoney(to.funded_to_date)}
+            {formatMoney(to.ceiling)}
           </dd>
 
           <dt className="text-muted-foreground">CPARS Status</dt>
@@ -529,7 +754,6 @@ function TaskOrderDrawer({
           </dd>
         </dl>
 
-        {/* Notes */}
         {to.notes && (
           <div className="border-t border-border pt-3">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
@@ -543,7 +767,235 @@ function TaskOrderDrawer({
   );
 }
 
-/* ─── Status Badge ────────────────────────────────── */
+/* ── Add Task Order Drawer ────────────────────────── */
+
+function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
+  const createTO = useCreateTaskOrder();
+  const [form, setForm] = useState({
+    to_name: "",
+    to_number: "",
+    prime_or_sub: "PRIME" as "PRIME" | "SUB",
+    customer_agency: "",
+    contracting_office: "",
+    pop_start: "",
+    pop_end: "",
+    total_ceiling: "",
+    funded_to_date: "",
+    status: "active",
+    notes: "",
+  });
+
+  const handleSubmit = () => {
+    if (!form.to_name || !form.to_number) return;
+
+    createTO.mutate(
+      {
+        to_name: form.to_name,
+        to_number: form.to_number,
+        prime_or_sub: form.prime_or_sub,
+        customer_agency: form.customer_agency || null,
+        contracting_office: form.contracting_office || null,
+        pop_start: form.pop_start || null,
+        pop_end: form.pop_end || null,
+        total_ceiling: form.total_ceiling
+          ? Number(form.total_ceiling)
+          : null,
+        funded_to_date: form.funded_to_date
+          ? Number(form.funded_to_date)
+          : null,
+        status: form.status,
+        notes: form.notes || null,
+      },
+      {
+        onSuccess: () => onClose(),
+      },
+    );
+  };
+
+  const setField = (key: string, value: string) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  return (
+    <div className="fixed inset-y-0 right-0 z-50 w-[420px] max-w-full bg-card border-l border-border shadow-lg overflow-y-auto">
+      <div className="p-6 space-y-4">
+        <div className="flex items-start justify-between">
+          <h2 className="text-[15px] font-semibold text-foreground">
+            Add Task Order
+          </h2>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground text-[18px] leading-none"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <FormField
+            label="Task Order Name *"
+            value={form.to_name}
+            onChange={(v) => setField("to_name", v)}
+            placeholder="e.g. PEO IEW&S HQ SETA"
+          />
+          <FormField
+            label="Contract Number *"
+            value={form.to_number}
+            onChange={(v) => setField("to_number", v)}
+            placeholder="e.g. W56KGY22F0028"
+          />
+
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+                Role
+              </label>
+              <select
+                value={form.prime_or_sub}
+                onChange={(e) =>
+                  setField("prime_or_sub", e.target.value)
+                }
+                className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+              >
+                <option value="PRIME">Prime</option>
+                <option value="SUB">Sub</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+                Status
+              </label>
+              <select
+                value={form.status}
+                onChange={(e) => setField("status", e.target.value)}
+                className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+              >
+                <option value="active">Active</option>
+                <option value="awarded_not_started">Awarded (not started)</option>
+                <option value="closeout">Closeout</option>
+                <option value="expired">Expired</option>
+              </select>
+            </div>
+          </div>
+
+          <FormField
+            label="Customer Agency"
+            value={form.customer_agency}
+            onChange={(v) => setField("customer_agency", v)}
+            placeholder="e.g. U.S. Army DEVCOM"
+          />
+          <FormField
+            label="Contracting Office"
+            value={form.contracting_office}
+            onChange={(v) => setField("contracting_office", v)}
+            placeholder="e.g. ACC-APG"
+          />
+
+          <div className="flex gap-3">
+            <FormField
+              label="PoP Start"
+              value={form.pop_start}
+              onChange={(v) => setField("pop_start", v)}
+              type="date"
+            />
+            <FormField
+              label="PoP End"
+              value={form.pop_end}
+              onChange={(v) => setField("pop_end", v)}
+              type="date"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <FormField
+              label="Total Ceiling ($)"
+              value={form.total_ceiling}
+              onChange={(v) => setField("total_ceiling", v)}
+              type="number"
+              placeholder="0"
+            />
+            <FormField
+              label="Funded to Date ($)"
+              value={form.funded_to_date}
+              onChange={(v) => setField("funded_to_date", v)}
+              type="number"
+              placeholder="0"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+              Notes
+            </label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => setField("notes", e.target.value)}
+              rows={2}
+              className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground resize-none"
+              placeholder="Source reference, context..."
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2 border-t border-border">
+          <button
+            type="button"
+            className="rounded bg-fin-teal px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50"
+            onClick={handleSubmit}
+            disabled={!form.to_name || !form.to_number || createTO.isPending}
+          >
+            {createTO.isPending ? "Saving…" : "Save task order"}
+          </button>
+          <button
+            type="button"
+            className="rounded border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-gda-bg-deep"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          {createTO.isError && (
+            <span className="text-[11px] text-fin-plum">
+              Failed to save. Try again.
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Form helpers ─────────────────────────────────── */
+
+function FormField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex-1">
+      <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+      />
+    </div>
+  );
+}
+
+/* ── Status Badge ─────────────────────────────────── */
 
 function StatusBadge({
   status,

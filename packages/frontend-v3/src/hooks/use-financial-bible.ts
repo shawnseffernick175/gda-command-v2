@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import type {
   IngestionStatus,
   ContractWaterfallData,
@@ -121,6 +121,69 @@ export function useDefinitions() {
     queryFn: () => apiGet<DefinitionsData>("/v3/financials/definitions"),
     retry: false,
     staleTime: Infinity,
+  });
+}
+
+export function useCreateTaskOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      to_name: string;
+      to_number: string;
+      parent_vehicle_id?: number | null;
+      prime_or_sub: "PRIME" | "SUB";
+      customer_agency?: string | null;
+      contracting_office?: string | null;
+      pop_start?: string | null;
+      pop_end?: string | null;
+      total_ceiling?: number | null;
+      funded_to_date?: number | null;
+      status?: string;
+      notes?: string | null;
+    }) => apiPost<{ id: number }>("/v3/financials/task-orders", payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["financials", "contract-waterfall"] });
+    },
+  });
+}
+
+export function useBulkCreateTaskOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      task_orders: Array<{
+        to_name: string;
+        to_number: string;
+        parent_vehicle_short_name?: string | null;
+        prime_or_sub: "PRIME" | "SUB";
+        customer_agency?: string | null;
+        contracting_office?: string | null;
+        pop_start?: string | null;
+        pop_end?: string | null;
+        total_ceiling?: number | null;
+        funded_to_date?: number | null;
+        status?: string;
+        notes?: string | null;
+      }>;
+    }) =>
+      apiPost<{ inserted: number; ids: number[] }>(
+        "/v3/financials/task-orders/bulk",
+        payload,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["financials", "contract-waterfall"] });
+    },
+  });
+}
+
+export function useDeleteTaskOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiDelete(`/v3/financials/task-orders/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["financials", "contract-waterfall"] });
+    },
   });
 }
 
