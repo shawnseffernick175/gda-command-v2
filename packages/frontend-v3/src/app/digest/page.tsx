@@ -17,23 +17,19 @@ import {
   FileText,
   Scale,
   ScrollText,
-  DollarSign,
-  Radio,
 } from "lucide-react";
 
 // ────────────────────────────────────────────────────────────
 // Category filter tabs
 // ────────────────────────────────────────────────────────────
 
-type Category = "all" | "solicitation" | "gao_decision" | "regulation" | "budget" | "agency_intel";
+type Category = "all" | "solicitation" | "gao_decision" | "regulation";
 
 const CATEGORIES: { key: Category; label: string }[] = [
   { key: "all", label: "All" },
   { key: "solicitation", label: "Solicitations" },
   { key: "regulation", label: "Regulations" },
   { key: "gao_decision", label: "GAO Decisions" },
-  { key: "budget", label: "Budget" },
-  { key: "agency_intel", label: "Agency Intel" },
 ];
 
 // ────────────────────────────────────────────────────────────
@@ -47,8 +43,6 @@ const SIGNAL_CONFIG: Record<
   solicitation: { icon: FileText, label: "SOLICITATION", color: "text-gda-cyan" },
   gao_decision: { icon: Scale, label: "GAO DECISION", color: "text-gda-amber" },
   regulation: { icon: ScrollText, label: "REGULATION", color: "text-gda-green" },
-  budget: { icon: DollarSign, label: "BUDGET", color: "text-gda-amber" },
-  agency_intel: { icon: Radio, label: "AGENCY INTEL", color: "text-gda-cyan" },
 };
 
 // ────────────────────────────────────────────────────────────

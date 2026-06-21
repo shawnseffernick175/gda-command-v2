@@ -15,6 +15,8 @@ import {
   useUpdateVaultDocType,
   useRegulatoryCatalog,
   useReExtractVaultDocument,
+  useVaultUnresolvedCount,
+  useResolveAllVault,
 } from "@/hooks/use-vault";
 import { Pagination } from "@/components/shared/Pagination";
 import { PendingState } from "@/components/shared/pending-state";
@@ -196,7 +198,28 @@ export default function VaultPage() {
   });
   const { data: countData } = useVaultCount();
   const { data: bucketCounts } = useVaultCountsByBucket();
+  const { data: unresolvedData } = useVaultUnresolvedCount();
+  const resolveAll = useResolveAllVault();
   const deleteDoc = useDeleteVaultDocument();
+  const [resolveMsg, setResolveMsg] = useState<string | null>(null);
+
+  const unresolvedCount = unresolvedData?.count ?? 0;
+
+  const handleResolveAll = useCallback(() => {
+    if (resolveAll.isPending) return;
+    setResolveMsg(null);
+    resolveAll.mutate(undefined, {
+      onSuccess: (res) => {
+        const { docs_resolved, docs_still_unresolved } = res.summary;
+        setResolveMsg(
+          docs_still_unresolved > 0
+            ? `Resolved ${docs_resolved} · ${docs_still_unresolved} still need attention`
+            : `Resolved all ${docs_resolved} document${docs_resolved === 1 ? "" : "s"}`,
+        );
+      },
+      onError: () => setResolveMsg("Resolve failed. Try again."),
+    });
+  }, [resolveAll]);
 
   const totalCount = useMemo(() => {
     if (!bucketCounts) return countData?.count ?? 0;
@@ -259,12 +282,31 @@ export default function VaultPage() {
             )}
           </div>
           {activeTab === "work_product" && (
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
-            >
-              Upload Document
-            </button>
+            <div className="flex items-center gap-2">
+              {resolveMsg && (
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  {resolveMsg}
+                </span>
+              )}
+              {unresolvedCount > 0 && (
+                <button
+                  onClick={handleResolveAll}
+                  disabled={resolveAll.isPending}
+                  title="Re-run extraction + AI parse on every unresolved document"
+                  className="rounded border border-gda-amber/40 bg-gda-amber/10 px-4 py-1.5 text-xs font-mono text-gda-amber hover:bg-gda-amber/20 transition-colors disabled:opacity-50"
+                >
+                  {resolveAll.isPending
+                    ? "Resolving…"
+                    : `Resolve All (${unresolvedCount})`}
+                </button>
+              )}
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="rounded border border-gda-green/40 bg-gda-green/10 px-4 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
+              >
+                Upload Document
+              </button>
+            </div>
           )}
         </div>
 

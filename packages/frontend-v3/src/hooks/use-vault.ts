@@ -214,3 +214,36 @@ export function useReExtractVaultDocument() {
     },
   });
 }
+
+export function useVaultUnresolvedCount() {
+  return useQuery({
+    queryKey: ["vault", "unresolved-count"],
+    queryFn: () => apiGet<{ count: number }>("/v3/vault/unresolved-count"),
+  });
+}
+
+export interface VaultResolveAllResponse {
+  summary: {
+    docs_considered: number;
+    docs_resolved: number;
+    docs_still_unresolved: number;
+  };
+  results: Array<{
+    doc_id: number;
+    filename: string;
+    extraction_status: string;
+    resolved: boolean;
+    error?: string;
+  }>;
+}
+
+export function useResolveAllVault() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => apiPost<VaultResolveAllResponse>("/v3/vault/resolve-all", {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["vault"] });
+    },
+  });
+}
