@@ -221,8 +221,8 @@ export function PeriodDrillDrawer({
 
 const SOURCE_LABELS: Record<string, string> = {
   income_statement: "Income Statement",
-  l1_actual: "L1-ACTUAL",
-  l1_target: "L1-TARGET",
+  l1_actual: "Project Revenue",
+  l1_target: "Revenue Plan",
 };
 
 function MetricsRow({

@@ -25,20 +25,42 @@ type Tab =
   | "balance-sheet"
   | "definitions";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "waterfall", label: "Contract Waterfall" },
-  { id: "plan", label: "AOP Plan" },
-  { id: "execution", label: "AOP Execution" },
-  { id: "capture", label: "AOP Capture" },
-  { id: "p2", label: "Monthly Financials" },
-  { id: "balance-sheet", label: "Balance Sheet" },
-  { id: "definitions", label: "Definitions" },
+interface TabGroup {
+  label: string;
+  tabs: { id: Tab; label: string }[];
+}
+
+const TAB_GROUPS: TabGroup[] = [
+  {
+    label: "Statements",
+    tabs: [
+      { id: "p2", label: "Income Statement" },
+      { id: "balance-sheet", label: "Balance Sheet" },
+    ],
+  },
+  {
+    label: "Planning",
+    tabs: [
+      { id: "plan", label: "AOP Plan" },
+      { id: "execution", label: "AOP Execution" },
+      { id: "capture", label: "AOP Capture" },
+    ],
+  },
+  {
+    label: "Contracts",
+    tabs: [{ id: "waterfall", label: "Contract Waterfall" }],
+  },
+  {
+    label: "Reference",
+    tabs: [{ id: "definitions", label: "Definitions" }],
+  },
 ];
 
-// Only these tabs actually consume the FY/CY + year selection; the others
-// ignore it, so we disable the year controls when they're active rather than
-// letting the control imply it does something it doesn't.
-const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set(["plan", "execution", "capture"]);
+const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set([
+  "plan",
+  "execution",
+  "capture",
+]);
 
 type CalendarMode = "FY" | "CY";
 
@@ -55,7 +77,7 @@ function tabTitle(tab: Tab): string {
     case "capture":
       return "AOP Capture";
     case "p2":
-      return "Monthly Financials";
+      return "Income Statement";
     case "balance-sheet":
       return "Balance Sheet";
     case "definitions":
@@ -105,8 +127,8 @@ export default function FinancialsPage() {
 
         {/* Tab bar with AI Analyze + Year Selector */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Left: AI Analyze button + tabs */}
-          <div className="flex items-center gap-4">
+          {/* Left: AI Analyze button + grouped tabs */}
+          <div className="flex items-center gap-3">
             <button
               type="button"
               className="rounded px-3 py-1.5 text-[13px] font-medium text-white transition-colors bg-fin-navy hover:bg-fin-navy-hover"
@@ -115,21 +137,28 @@ export default function FinancialsPage() {
               AI Analyze
             </button>
 
-            <nav className="flex items-center gap-4">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={cn(
-                    "border-b-2 pb-1 text-[13px] font-medium transition-colors",
-                    activeTab === tab.id
-                      ? "border-gda-cyan text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
+            <nav className="flex items-center gap-1">
+              {TAB_GROUPS.map((group, gi) => (
+                <div key={group.label} className="flex items-center">
+                  {gi > 0 && (
+                    <span className="mx-2 h-4 w-px bg-border" />
                   )}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  {tab.label}
-                </button>
+                  {group.tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={cn(
+                        "border-b-2 px-2 pb-1 text-[13px] font-medium transition-colors",
+                        activeTab === tab.id
+                          ? "border-gda-cyan text-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => setActiveTab(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
               ))}
             </nav>
           </div>
@@ -194,13 +223,11 @@ export default function FinancialsPage() {
             {yearControlsActive ? ` \u2014 ${fy}` : ""}
           </h1>
           <p className="text-[12px] text-muted-foreground">
-            Envision Innovative Solutions (OU3) {"\u2014"} 6% YoY Growth Target
+            Envision Innovative Solutions {"\u2014"} Financial Bible
           </p>
           <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-            The Financial Bible \u2014 your single source of truth for plan, forecast,
-            and actuals. Move across the tabs to see the AOP plan, execution
-            against it, contract waterfall, and balance sheet, with every number
-            traceable to its source.
+            Single source of truth for plan, forecast, and actuals. Every number
+            traces to its source document.
           </p>
         </div>
       </div>

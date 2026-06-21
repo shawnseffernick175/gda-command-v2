@@ -5,6 +5,31 @@ import { Kpi } from "@/components/financials/primitives/Kpi";
 import { NumberCell } from "@/components/financials/primitives/NumberCell";
 import { SourceFooter } from "@/components/financials/SourceFooter";
 import { formatMoney } from "@/lib/format-money";
+import type { IncomeStatementLineItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+interface StatementRow {
+  label: string;
+  key: keyof IncomeStatementLineItem;
+  format: "money" | "percent";
+  isSummary?: boolean;
+  indent?: boolean;
+}
+
+const STATEMENT_ROWS: StatementRow[] = [
+  { label: "Revenue", key: "revenue", format: "money", isSummary: true },
+  { label: "Direct Costs (COGS)", key: "direct_costs", format: "money", indent: true },
+  { label: "Gross Profit", key: "gross_profit", format: "money", isSummary: true },
+  { label: "Gross Margin %", key: "gross_margin_pct", format: "percent", indent: true },
+  { label: "Operating Expenses", key: "operating_expenses", format: "money", indent: true },
+  { label: "EBIT (Operating Income)", key: "ebit", format: "money", isSummary: true },
+  { label: "Return on Sales %", key: "ros_pct", format: "percent", indent: true },
+  { label: "New Orders (Bookings)", key: "new_orders", format: "money" },
+];
+
+function shortPeriod(period: string): string {
+  return period.replace(/^FY\d{2}\s+/, "");
+}
 
 export function P2FinancialsTab() {
   const { data, isLoading, error } = useP2Financials();
@@ -38,6 +63,9 @@ export function P2FinancialsTab() {
 
   const kpi = data.kpi;
   const plan = data.plan;
+  const stmt = data.income_statement;
+  const months = stmt?.months ?? [];
+  const quarters = stmt?.quarters ?? [];
 
   return (
     <div className="space-y-6">
@@ -76,52 +104,77 @@ export function P2FinancialsTab() {
         />
       </div>
 
-      {/* Income Statement */}
+      {/* Income Statement — full line-item structure */}
       <div>
         <h3 className="mb-3 text-sm font-semibold text-foreground">
           Income Statement
         </h3>
-        {data.monthly_actuals.length > 0 ? (
-          <div className="overflow-x-auto">
+        {months.length > 0 ? (
+          <div className="overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pr-4 text-left font-medium">Period</th>
-                  <th className="py-2 pr-4 text-left font-medium">Source</th>
-                  <th className="py-2 pr-4 text-right font-medium">Orders</th>
-                  <th className="py-2 pr-4 text-right font-medium">Sales</th>
-                  <th className="py-2 pr-4 text-right font-medium">EBIT</th>
-                  <th className="py-2 pr-4 text-right font-medium">Margin</th>
-                  <th className="py-2 text-right font-medium">ROS</th>
+                  <th className="py-2 pl-4 pr-4 text-left font-medium">
+                    Line Item
+                  </th>
+                  {months.map((m) => (
+                    <th
+                      key={m.period}
+                      className="py-2 px-3 text-right font-medium"
+                    >
+                      {shortPeriod(m.period)}
+                    </th>
+                  ))}
+                  {quarters.map((q) => (
+                    <th
+                      key={q.period}
+                      className="py-2 px-3 text-right font-medium border-l border-border"
+                    >
+                      {shortPeriod(q.period)}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {data.monthly_actuals.map((row, i) => (
+                {STATEMENT_ROWS.map((row) => (
                   <tr
-                    key={`${row.period}-${row.source}-${i}`}
-                    className="border-b border-border/50"
+                    key={row.key}
+                    className={cn(
+                      "border-b border-border/50",
+                      row.isSummary && "bg-card font-medium",
+                    )}
                   >
-                    <td className="py-2 pr-4 font-medium text-foreground">
-                      {row.period}
+                    <td
+                      className={cn(
+                        "py-2 pr-4 text-foreground whitespace-nowrap",
+                        row.indent ? "pl-8 text-muted-foreground font-normal" : "pl-4",
+                      )}
+                    >
+                      {row.label}
                     </td>
-                    <td className="py-2 pr-4 text-[11px] text-muted-foreground">
-                      {row.source}
-                    </td>
-                    <td className="py-2 pr-4 text-right">
-                      <NumberCell value={row.orders} format="money" />
-                    </td>
-                    <td className="py-2 pr-4 text-right">
-                      <NumberCell value={row.sales} format="money" />
-                    </td>
-                    <td className="py-2 pr-4 text-right">
-                      <NumberCell value={row.ebit} format="money" />
-                    </td>
-                    <td className="py-2 pr-4 text-right">
-                      <NumberCell value={row.gross_margin} format="percent" />
-                    </td>
-                    <td className="py-2 text-right">
-                      <NumberCell value={row.ros} format="percent" />
-                    </td>
+                    {months.map((m) => (
+                      <td
+                        key={m.period}
+                        className="py-2 px-3 text-right"
+                      >
+                        <NumberCell
+                          value={m[row.key] as number}
+                          format={row.format}
+                        />
+                      </td>
+                    ))}
+                    {quarters.map((q) => (
+                      <td
+                        key={q.period}
+                        className="py-2 px-3 text-right border-l border-border"
+                      >
+                        <NumberCell
+                          value={q[row.key] as number}
+                          format={row.format}
+                          className={row.isSummary ? "font-semibold" : undefined}
+                        />
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -129,28 +182,26 @@ export function P2FinancialsTab() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground italic">
-            No monthly actuals loaded. Additional line items not yet parsed.
+            No income statement data loaded. Upload Trended Income Statement
+            documents via Vault to populate this view.
           </p>
         )}
-        <p className="mt-2 text-[11px] text-muted-foreground italic">
-          CTD requires multi-FY parser -- not yet ingested.
-        </p>
       </div>
 
-      {/* Contract P&L / Cost by Pool */}
+      {/* Cost Categories (by Pool) */}
       <div>
         <h3 className="mb-3 text-sm font-semibold text-foreground">
           Cost Categories (by Pool)
         </h3>
         {data.cost_by_pool.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pr-4 text-left font-medium">Pool</th>
+                  <th className="py-2 pr-4 pl-4 text-left font-medium">Pool</th>
                   <th className="py-2 pr-4 text-right font-medium">Target</th>
                   <th className="py-2 pr-4 text-right font-medium">Actual</th>
-                  <th className="py-2 text-right font-medium">Variance</th>
+                  <th className="py-2 pr-4 text-right font-medium">Variance</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,7 +210,7 @@ export function P2FinancialsTab() {
                     key={row.pool}
                     className="border-b border-border/50"
                   >
-                    <td className="py-2 pr-4 font-medium text-foreground">
+                    <td className="py-2 pr-4 pl-4 font-medium text-foreground">
                       {row.pool}
                     </td>
                     <td className="py-2 pr-4 text-right">
@@ -168,7 +219,7 @@ export function P2FinancialsTab() {
                     <td className="py-2 pr-4 text-right">
                       <NumberCell value={row.actual} format="money" />
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 pr-4 text-right">
                       <NumberCell
                         value={row.variance}
                         format="money"
@@ -192,10 +243,6 @@ export function P2FinancialsTab() {
             Vault.
           </p>
         )}
-        <p className="mt-2 text-[11px] text-muted-foreground italic">
-          Grouped by cost pool. Per-contract P&L requires contract key mapping --
-          pending parser enhancement.
-        </p>
       </div>
 
       <SourceFooter meta={data.meta} />

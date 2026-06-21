@@ -18,8 +18,8 @@ interface TrendPoint {
 
 const SOURCE_LABELS: Record<string, string> = {
   income_statement: "Income Statement",
-  l1_actual: "Project Revenue (L1-ACTUAL)",
-  l1_target: "Plan (L1-TARGET)",
+  l1_actual: "Project Revenue",
+  l1_target: "Revenue Plan",
 };
 
 function sourceLabel(source: string): string {

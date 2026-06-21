@@ -1019,14 +1019,26 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        LIMIT 1`,
     );
 
-    // Monthly actuals for income statement detail
+    // Monthly actuals — income_statement source only for the Income Statement
+    // section. l1_actual rows are a separate project-revenue ledger and must not
+    // appear as bare "l1_actual" labels in the CEO view.
     const { rows: monthlyRows } = await pool.query(
       `SELECT period, fiscal_year, quarter, source,
               actual_orders, actual_sales, actual_ebit,
               actual_gross_margin, actual_ros
        FROM financial_actuals
-       WHERE period NOT LIKE '%Q%'
+       WHERE source = 'income_statement' AND period NOT LIKE '%Q%'
        ORDER BY fiscal_year, quarter, period`,
+    );
+
+    // Quarter-total rows for the income statement (for YTD rollup)
+    const { rows: quarterRows } = await pool.query(
+      `SELECT period, fiscal_year, quarter,
+              actual_orders, actual_sales, actual_ebit,
+              actual_gross_margin, actual_ros
+       FROM financial_actuals
+       WHERE source = 'income_statement' AND period LIKE '%Q%'
+       ORDER BY fiscal_year, quarter`,
     );
 
     // Plan data
@@ -1083,12 +1095,52 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       plan_gross_margin: Number(plan.plan_gross_margin),
     } : null;
 
+    // Build full income statement line items per period from the stored metrics.
+    // Derived line items (Direct Costs, Gross Profit, Operating Expenses) are
+    // computed from Revenue (= sales) and the stored gross_margin% / EBIT so
+    // every number traces back to the real ingested data.
+    function buildStatementItems(r: {
+      actual_orders: unknown;
+      actual_sales: unknown;
+      actual_ebit: unknown;
+      actual_gross_margin: unknown;
+      actual_ros: unknown;
+      period: unknown;
+    }) {
+      const revenue = Number(r.actual_sales);
+      const gm = Number(r.actual_gross_margin);
+      const ebit = Number(r.actual_ebit);
+      const orders = Number(r.actual_orders);
+      const ros = Number(r.actual_ros);
+      const grossProfit = revenue * (gm / 100);
+      const directCosts = revenue - grossProfit;
+      const opExpenses = grossProfit - ebit;
+      return {
+        period: r.period as string,
+        revenue,
+        direct_costs: directCosts,
+        gross_profit: grossProfit,
+        gross_margin_pct: gm,
+        operating_expenses: opExpenses,
+        ebit,
+        ros_pct: ros,
+        new_orders: orders,
+      };
+    }
+
+    const incomeStatementMonths = monthlyRows.map(buildStatementItems);
+    const incomeStatementQuarters = quarterRows.map(buildStatementItems);
+
     return reply.send(successEnvelope({
       kpi: kpiData,
       plan: planData,
+      income_statement: {
+        months: incomeStatementMonths,
+        quarters: incomeStatementQuarters,
+      },
       monthly_actuals: monthlyRows.map((r) => ({
         period: r.period as string,
-        source: r.source as string,
+        source: 'Income Statement',
         orders: Number(r.actual_orders),
         sales: Number(r.actual_sales),
         ebit: Number(r.actual_ebit),
