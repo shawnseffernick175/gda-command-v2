@@ -7,7 +7,7 @@ import { apiGet, apiPost } from "@/lib/api";
 
 export interface DigestSignal {
   id: string;
-  type: "solicitation" | "gao_decision" | "regulation" | "budget" | "agency_intel";
+  type: "solicitation" | "gao_decision" | "regulation";
   title: string;
   agency: string | null;
   naics_code: string | null;

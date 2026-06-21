@@ -313,6 +313,150 @@ function extractRegCitations(text: string): string[] {
   return [...found];
 }
 
+interface ResolveResult {
+  doc_id: number;
+  filename: string;
+  extraction_status: ExtractionStatus;
+  resolved: boolean;
+  error?: string;
+}
+
+/**
+ * Re-run the full re-extract → AI parse → structured-ingest pipeline on a single
+ * document and persist the result. This is the SAME pipeline the per-document
+ * "Re-extract" action and a fresh upload run, factored out so the bulk
+ * "Resolve all" action can reuse it. Reads the file back from disk; if the file
+ * is missing the doc is marked 'failed' and reported as unresolved. Idempotent —
+ * all structured-ingest paths upsert on natural keys.
+ */
+async function resolveDocument(doc: {
+  id: number;
+  filename: string;
+  file_path: string | null;
+  doc_type: string | null;
+}): Promise<ResolveResult> {
+  const filePath = doc.file_path ? join(process.cwd(), 'data', doc.file_path) : null;
+
+  if (!filePath) {
+    await pool.query(
+      `UPDATE vault_documents SET extraction_status = 'failed', updated_at = NOW() WHERE id = $1`,
+      [doc.id],
+    );
+    return { doc_id: doc.id, filename: doc.filename, extraction_status: 'failed', resolved: false, error: 'No file path stored' };
+  }
+
+  let buf: Buffer;
+  try {
+    const { readFileSync } = await import('node:fs');
+    buf = readFileSync(filePath);
+  } catch {
+    await pool.query(
+      `UPDATE vault_documents SET extraction_status = 'failed', updated_at = NOW() WHERE id = $1`,
+      [doc.id],
+    );
+    return { doc_id: doc.id, filename: doc.filename, extraction_status: 'failed', resolved: false, error: 'File not found on disk' };
+  }
+
+  const fileSizeBytes = buf.length;
+
+  let extractedText = '';
+  try {
+    extractedText = await extractTextFromBuffer(buf, doc.filename);
+  } catch (err) {
+    logger.warn({ err, filename: doc.filename }, 'resolve: re-extraction failed');
+  }
+
+  const extractionStatus = determineExtractionStatus(doc.filename, extractedText, fileSizeBytes);
+
+  let aiSummary: string | null = null;
+  let aiTags: string[] | null = null;
+  let aiEntities: { name: string; type: string; value: string }[] | null = null;
+
+  if (extractedText.length > 0) {
+    try {
+      const llmResult = await llmRouter.route({
+        task: 'vault_document_parse',
+        input: { doc_type: doc.doc_type ?? 'other', filename: doc.filename, extracted_text: extractedText },
+      });
+      if (llmResult.ok && llmResult.output) {
+        aiSummary = llmResult.output.summary;
+        aiTags = llmResult.output.tags;
+        aiEntities = llmResult.output.entities;
+      }
+    } catch (err) {
+      logger.warn({ err, filename: doc.filename }, 'resolve: AI parse failed');
+    }
+  }
+
+  await pool.query(
+    `UPDATE vault_documents
+       SET extracted_text = $1, extraction_status = $2, ai_summary = $3, ai_tags = $4, ai_entities = $5,
+           file_size_bytes = $6, updated_at = NOW()
+     WHERE id = $7`,
+    [
+      extractedText || null,
+      extractionStatus,
+      aiSummary,
+      aiTags ? JSON.stringify(aiTags) : null,
+      aiEntities ? JSON.stringify(aiEntities) : null,
+      fileSizeBytes,
+      doc.id,
+    ],
+  );
+
+  await insertAudit(doc.id, 're_extracted', 'admin', `resolve-all: status=${extractionStatus}, text length: ${extractedText.length}`);
+
+  if (extractedText.length > 0) {
+    try {
+      const fin = await reingestFinancialDoc({
+        docId: doc.id,
+        filename: doc.filename,
+        extractedText,
+        docType: doc.doc_type,
+      });
+      if (fin.any_ingested) {
+        await insertAudit(
+          doc.id,
+          'financials_ingested',
+          'admin',
+          `resolve-all: plan=${fin.plan}, actual=${fin.actual}, bs=${fin.balance_sheet}, cd=${fin.cost_detail}, sie=${fin.sie}, rejected=${fin.rejected}`,
+        );
+      }
+    } catch (err) {
+      logger.warn({ err, docId: doc.id, filename: doc.filename }, 'resolve-all: financial re-ingest failed');
+    }
+
+    const looksVehicle =
+      /contract|vehicle|idiq|bpa|gwac|task.order|teaming/i.test(doc.filename) ||
+      doc.doc_type === 'contract' ||
+      doc.doc_type === 'subcontract_teaming';
+    if (looksVehicle) {
+      void extractVehicleFromVaultDoc(doc.id).catch((err) => {
+        logger.warn({ err, docId: doc.id, filename: doc.filename }, 'resolve-all: vehicle extraction failed — non-blocking');
+      });
+    }
+
+    try {
+      await smartIngestRouter(
+        doc.id,
+        doc.filename,
+        extractedText,
+        aiSummary,
+        doc.doc_type ? doc.doc_type !== 'other' : false,
+      );
+    } catch (err) {
+      logger.warn({ err, docId: doc.id, filename: doc.filename }, 'resolve-all: smart ingest routing failed');
+    }
+  }
+
+  return {
+    doc_id: doc.id,
+    filename: doc.filename,
+    extraction_status: extractionStatus,
+    resolved: extractionStatus === 'success',
+  };
+}
+
 async function smartIngestRouter(
   docId: number,
   filename: string,
@@ -1135,6 +1279,73 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send(
       successEnvelope({ ...updated.rows[0], reingest }, req.requestId),
+    );
+  });
+
+  // GET /v3/vault/unresolved-count — how many docs still need resolution
+  // (extraction_status is anything other than 'success': failed / pending /
+  // unsupported). Drives the "Resolve all" button + its badge in the UI.
+  app.get('/v3/vault/unresolved-count', async (req, reply) => {
+    const res = await pool.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count
+         FROM vault_documents
+        WHERE deleted_at IS NULL
+          AND extraction_status IS DISTINCT FROM 'success'`,
+    );
+    return reply.send(
+      successEnvelope({ count: res.rows[0]?.count ?? 0 }, req.requestId),
+    );
+  });
+
+  // POST /v3/vault/resolve-all — re-run the full re-extract + AI parse +
+  // structured-ingest pipeline on EVERY unresolved document (extraction_status
+  // != 'success'). This is the bulk equivalent of clicking "Re-extract" on each
+  // unresolved row. Idempotent. 'unsupported' file types (no extractor) cannot
+  // be resolved and remain reported as unresolved — they are not failures.
+  app.post('/v3/vault/resolve-all', async (req, reply) => {
+    const { rows: docs } = await pool.query<{
+      id: number;
+      filename: string;
+      file_path: string | null;
+      doc_type: string | null;
+    }>(
+      `SELECT id, filename, file_path, doc_type
+         FROM vault_documents
+        WHERE deleted_at IS NULL
+          AND extraction_status IS DISTINCT FROM 'success'
+          AND extraction_status IS DISTINCT FROM 'unsupported'
+        ORDER BY id`,
+    );
+
+    const results: ResolveResult[] = [];
+    for (const doc of docs) {
+      try {
+        results.push(await resolveDocument(doc));
+      } catch (err) {
+        logger.warn({ err, docId: doc.id, filename: doc.filename }, 'resolve-all: doc failed');
+        results.push({
+          doc_id: doc.id,
+          filename: doc.filename,
+          extraction_status: 'failed',
+          resolved: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    const resolved = results.filter((r) => r.resolved).length;
+    return reply.send(
+      successEnvelope(
+        {
+          summary: {
+            docs_considered: docs.length,
+            docs_resolved: resolved,
+            docs_still_unresolved: results.length - resolved,
+          },
+          results,
+        },
+        req.requestId,
+      ),
     );
   });
 
