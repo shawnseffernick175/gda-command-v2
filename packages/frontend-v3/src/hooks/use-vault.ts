@@ -203,6 +203,18 @@ export function useRegulatoryCatalog(params: { category?: string } = {}) {
   });
 }
 
+export function useDismissVaultDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) =>
+      apiPost<VaultDocument>(`/v3/vault/${id}/dismiss`, {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["vault"] });
+    },
+  });
+}
+
 export function useReExtractVaultDocument() {
   const queryClient = useQueryClient();
 

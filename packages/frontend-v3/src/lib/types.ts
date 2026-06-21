@@ -852,7 +852,7 @@ export interface VaultAuditEntry {
   created_at: string;
 }
 
-export type VaultExtractionStatus = 'pending' | 'success' | 'failed' | 'unsupported';
+export type VaultExtractionStatus = 'pending' | 'success' | 'failed' | 'unsupported' | 'dismissed';
 
 export interface VaultDocument {
   id: number;
