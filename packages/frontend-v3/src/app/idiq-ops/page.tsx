@@ -36,8 +36,8 @@ export default function IdiqOpsPage() {
     limit: 50,
   });
 
-  const { data: feedData, isLoading: feedLoading } = useIdiqOpsFeed(filters);
-  const { data: scoreboard, isLoading: scoreboardLoading } =
+  const { data: feedData, isLoading: feedLoading, error: feedError } = useIdiqOpsFeed(filters);
+  const { data: scoreboard, isLoading: scoreboardLoading, error: scoreboardError } =
     useIdiqOpsScoreboard();
   const { data: kpis } = useIdiqOpsKpis();
 
@@ -63,7 +63,7 @@ export default function IdiqOpsPage() {
 
       <KpiStrip kpis={kpis} />
 
-      {!feedLoading && !scoreboardLoading && (feedData?.total ?? 0) === 0 && (scoreboard ?? []).length === 0 ? (
+      {!feedLoading && !scoreboardLoading && !feedError && !scoreboardError && (feedData?.total ?? 0) === 0 && (scoreboard ?? []).length === 0 ? (
         <div className="rounded border border-border bg-gda-panel px-8 py-16 text-center">
           <p className="text-sm font-medium text-foreground">
             No task orders ingested yet
