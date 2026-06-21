@@ -93,11 +93,7 @@ function OverridesContent() {
               Override Audit
             </h1>
             <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-              An audit trail of every manual override applied on top of the
-              system's automated decisions and scores — who changed a stage,
-              field, or score away from what the model produced, when, and why.
-              Use it to review human judgment calls and keep automated and manual
-              decisions accountable.
+              {"An audit trail of every manual override applied on top of the system's automated decisions and scores — who changed a stage, field, or score away from what the model produced, when, and why. Use it to review human judgment calls and keep automated and manual decisions accountable."}
             </p>
           </div>
           <div className="flex gap-2">
