@@ -71,18 +71,20 @@ function CompetitorsContent() {
   return (
     <div className="space-y-6" ref={listRef}>
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-6 sticky-page-header">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="font-mono text-lg font-bold text-foreground">
-              Competitor Intelligence
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <div className="flex items-baseline gap-3">
+              <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
+                Competitor Intelligence
+              </h1>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Profiles of the companies you compete against, built from federal
+                award history. Size up incumbents and rivals, run black-hat analysis,
+                and understand who you are up against on a given pursuit.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
               Aggregated from USAspending.gov federal contract awards
-            </p>
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-              Profiles of the companies you compete against, built from federal
-              award history. Size up incumbents and rivals, run black-hat analysis,
-              and understand who you are up against on a given pursuit.
             </p>
           </div>
           {countData && (

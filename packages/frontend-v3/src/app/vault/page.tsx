@@ -269,20 +269,25 @@ export default function VaultPage() {
     <div className="space-y-6" ref={listRef}>
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="font-mono text-lg font-bold text-foreground">Vault</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-baseline gap-3">
+            <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">Vault</h1>
             {countData && (
               <Badge
                 variant="outline"
-                className="border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
+                className="shrink-0 border-gda-cyan/30 text-gda-cyan font-mono text-[11px]"
               >
                 {countData.count} documents
               </Badge>
             )}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Your central document library — proposals, work product, and reference
+              files tied to opportunities and captures. Browse and upload documents,
+              and pull up the source material behind your pursuits.
+            </p>
           </div>
           {activeTab === "work_product" && (
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {resolveMsg && (
                 <span className="text-[11px] font-mono text-muted-foreground">
                   {resolveMsg}
@@ -309,11 +314,6 @@ export default function VaultPage() {
             </div>
           )}
         </div>
-        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
-          Your central document library — proposals, work product, and reference
-          files tied to opportunities and captures. Browse and upload documents,
-          and pull up the source material behind your pursuits.
-        </p>
 
         {/* Tabs */}
         <div className="flex items-center gap-1 border-b border-border">

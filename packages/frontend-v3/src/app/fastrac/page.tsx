@@ -350,9 +350,9 @@ function FasTracContent() {
     <div className="space-y-6">
       {/* ── Sticky Page Header ──────────────────────────────── */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-6 sticky-page-header">
-        <div>
-          <h1 className="font-mono text-lg font-bold text-foreground">FasTrac</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
+        <div className="flex items-baseline gap-3">
+          <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">FasTrac</h1>
+          <p className="text-xs text-muted-foreground">
             Early-warning signal sensing — monitor DoD military innovation orgs for RFIs, CSOs, BAAs, and prize challenges that surface <span className="text-foreground">before</span> a formal sources-sought or SAM.gov solicitation posts
           </p>
         </div>

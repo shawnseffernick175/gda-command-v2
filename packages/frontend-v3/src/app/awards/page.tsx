@@ -168,21 +168,21 @@ function AwardsContent() {
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
         {/* Page title */}
-        <div className="flex items-center gap-3">
-          <h1 className="font-mono text-lg font-bold text-foreground">
+        <div className="flex items-baseline gap-3">
+          <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
             Awards & Intel
           </h1>
           {countData && (
-            <span className="text-xs font-mono text-muted-foreground">
+            <span className="shrink-0 text-xs font-mono text-muted-foreground">
               {countData.count.toLocaleString()} wheelhouse awards
             </span>
           )}
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Contracts already awarded in your wheelhouse — a window into incumbents,
+            expiring contracts, and recompetes. Find weak incumbents and upcoming
+            expirations, then turn the best targets into pursuits.
+          </p>
         </div>
-        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
-          Contracts already awarded in your wheelhouse — a window into incumbents,
-          expiring contracts, and recompetes. Find weak incumbents and upcoming
-          expirations, then turn the best targets into pursuits.
-        </p>
 
         {/* KPI Strip */}
         <div className="flex flex-wrap items-center gap-2">

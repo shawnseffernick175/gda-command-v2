@@ -218,16 +218,20 @@ export default function FinancialsPage() {
 
         {/* Page title + subtitle */}
         <div>
-          <h1 className="text-lg font-semibold text-foreground">
-            {tabTitle(activeTab)}
-            {yearControlsActive ? ` \u2014 ${fy}` : ""}
-          </h1>
+          <div className="flex items-baseline gap-3">
+            <h1 className="shrink-0 text-lg font-semibold text-foreground">
+              {tabTitle(activeTab)}
+              {yearControlsActive ? ` \u2014 ${fy}` : ""}
+            </h1>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              The Financial Bible \u2014 your single source of truth for plan, forecast,
+              and actuals. Move across the tabs to see the AOP plan, execution
+              against it, contract waterfall, and balance sheet, with every number
+              traceable to its source.
+            </p>
+          </div>
           <p className="text-[12px] text-muted-foreground">
             Envision Innovative Solutions {"\u2014"} Financial Bible
-          </p>
-          <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-            Single source of truth for plan, forecast, and actuals. Every number
-            traces to its source document.
           </p>
         </div>
       </div>
