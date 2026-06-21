@@ -38,8 +38,8 @@ export function ScoreExplain({
         ?
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Positioner side="bottom" align="start" sideOffset={4}>
-          <Popover.Popup className="z-50 w-72 rounded border border-border bg-gda-bg-raised p-3 text-xs shadow-lg">
+        <Popover.Positioner side="bottom" align="start" sideOffset={4} className="isolate z-[100]">
+          <Popover.Popup className="z-[100] w-72 rounded border border-border bg-gda-bg-raised p-3 text-xs shadow-lg">
             <p className="font-mono font-bold text-foreground">{label}</p>
 
             {score != null && (

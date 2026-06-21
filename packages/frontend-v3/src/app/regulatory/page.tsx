@@ -9,6 +9,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import { PendingState } from "@/components/shared/pending-state";
+import { PagePurpose } from "@/components/shared/page-purpose";
 
 /* ── Date formatter (Eastern Time, short) ─────────────────────── */
 
@@ -90,19 +91,16 @@ function RegulatoryContent() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="font-mono text-lg font-bold text-foreground">
-            Regulatory Notices
-          </h1>
-          {count !== null && (
-            <span className="font-mono text-xs text-muted-foreground">
-              {count} notice{count !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-      </div>
+      <PagePurpose
+        title="Regulatory Notices"
+        purpose="Tracks federal rulemaking and regulatory activity (from the Federal Register and related sources) that can reshape GovCon requirements, compliance obligations, and contract terms. Scan the latest notices, open the source document, and watch for changes that affect your pursuits."
+      >
+        {count !== null && (
+          <span className="font-mono text-xs text-muted-foreground">
+            {count} notice{count !== 1 ? "s" : ""}
+          </span>
+        )}
+      </PagePurpose>
 
       {/* Table */}
       {isLoading ? (

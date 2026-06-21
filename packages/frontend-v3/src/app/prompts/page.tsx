@@ -1083,12 +1083,21 @@ export default function PromptsPage() {
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pt-6 sticky-page-header">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <h1 className="font-mono text-base font-bold text-foreground">Prompts</h1>
-          {!isSpecialTab && (
-            <span className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green">
-              {prompts.length} prompts
-            </span>
-          )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <h1 className="font-mono text-base font-bold text-foreground">Prompts</h1>
+              {!isSpecialTab && (
+                <span className="rounded border border-gda-green/30 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green">
+                  {prompts.length} prompts
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+              The library of reusable AI prompts that power the analysis across
+              GDA Command. Browse prompts by the surface they drive, edit their
+              wording, and tune how the system reasons about your opportunities.
+            </p>
+          </div>
         </div>
 
         {/* Tab row */}

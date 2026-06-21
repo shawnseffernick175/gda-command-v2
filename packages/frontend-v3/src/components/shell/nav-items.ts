@@ -1,5 +1,4 @@
 import {
-  Rocket,
   Zap,
   Search,
   Target,
@@ -19,7 +18,6 @@ import {
   Activity,
   FileText,
   Hammer,
-  Wand2,
   SlidersHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -31,7 +29,6 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Launchpad", href: "/launchpad", icon: Rocket },
   { label: "Digest", href: "/digest", icon: Radio },
   { label: "FasTrac", href: "/fastrac", icon: Zap },
   { label: "Opportunities", href: "/opportunities", icon: Search },
@@ -61,9 +58,3 @@ export const SETTINGS_ITEM: NavItem = {
 export const SETTINGS_SUB_ITEMS: NavItem[] = [
   { label: "Scoring & Doctrine", href: "/settings/scoring-doctrine", icon: SlidersHorizontal },
 ];
-
-export const PROMPT_CREATOR_ITEM: NavItem = {
-  label: "Prompt Creator",
-  href: "/prompt-creator",
-  icon: Wand2,
-};

@@ -79,6 +79,11 @@ function CompetitorsContent() {
             <p className="text-xs text-muted-foreground mt-0.5">
               Aggregated from USAspending.gov federal contract awards
             </p>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+              Profiles of the companies you compete against, built from federal
+              award history. Size up incumbents and rivals, run black-hat analysis,
+              and understand who you are up against on a given pursuit.
+            </p>
           </div>
           {countData && (
             <Badge variant="outline" className="font-mono text-xs">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "./command-palette";
+import { KpiHeader } from "./kpi-header";
 
 export function TopBar() {
   const { user, logout } = useAuth();
@@ -12,20 +13,24 @@ export function TopBar() {
 
   return (
     <>
-      <div className="flex h-10 items-center justify-between border-b border-border bg-gda-bg-base px-4">
-        <div className="flex items-center gap-3">
-          <a
-            href="https://csr-llc.tech"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-xs font-bold text-gda-green hover:text-gda-green transition-colors"
-          >
-            Envision
-          </a>
-          <span className="text-[11px] text-muted-foreground">OU</span>
+      <div className="flex h-10 items-center justify-between gap-4 border-b border-border bg-gda-bg-base px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
+            <a
+              href="https://csr-llc.tech"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-xs font-bold text-gda-green hover:text-gda-green transition-colors"
+            >
+              Envision
+            </a>
+            <span className="text-[11px] text-muted-foreground">OU</span>
+          </div>
+          <span className="h-4 w-px shrink-0 bg-border" />
+          <KpiHeader />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => setCmdkOpen(true)}

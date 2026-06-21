@@ -186,8 +186,16 @@ function PipelineContent() {
     <div className="space-y-4">
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
-        <div className="flex items-center justify-between">
-          <h1 className="font-mono text-lg font-bold text-foreground">Pipeline</h1>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="font-mono text-lg font-bold text-foreground">Pipeline</h1>
+            <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+              Your active pursuits grouped by capture stage, from early interest
+              through submission and win. Track how opportunities move through the
+              funnel, see stage-by-stage value and conversion, and spot where
+              deals are stalling.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => exportCsv(items)}

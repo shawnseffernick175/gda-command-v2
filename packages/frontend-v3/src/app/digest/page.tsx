@@ -176,6 +176,12 @@ export default function DigestPage() {
               Refreshed daily
               {lastUpdated ? ` · Last updated: ${lastUpdated} ET` : ""}
             </p>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+              A daily briefing of what changed in your market — new
+              solicitations, GAO decisions, regulations, budget moves, and agency
+              intel. Skim the lead stories and filter by category to stay ahead of
+              the signals that affect your pursuits.
+            </p>
           </div>
           <button
             onClick={() => refresh.mutate()}

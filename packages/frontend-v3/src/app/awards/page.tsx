@@ -178,6 +178,11 @@ function AwardsContent() {
             </span>
           )}
         </div>
+        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          Contracts already awarded in your wheelhouse — a window into incumbents,
+          expiring contracts, and recompetes. Find weak incumbents and upcoming
+          expirations, then turn the best targets into pursuits.
+        </p>
 
         {/* KPI Strip */}
         <div className="flex flex-wrap items-center gap-2">

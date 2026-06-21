@@ -196,6 +196,12 @@ export default function FinancialsPage() {
           <p className="text-[12px] text-muted-foreground">
             Envision Innovative Solutions (OU3) {"\u2014"} 6% YoY Growth Target
           </p>
+          <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            The Financial Bible \u2014 your single source of truth for plan, forecast,
+            and actuals. Move across the tabs to see the AOP plan, execution
+            against it, contract waterfall, and balance sheet, with every number
+            traceable to its source.
+          </p>
         </div>
       </div>
 

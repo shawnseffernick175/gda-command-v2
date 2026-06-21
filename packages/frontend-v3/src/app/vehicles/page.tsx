@@ -122,10 +122,17 @@ export default function VehiclesPage() {
   return (
     <div className="space-y-4">
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
-        <div className="flex items-center justify-between">
-          <h1 className="text-section font-semibold text-foreground">
-            Contract Vehicles
-          </h1>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-section font-semibold text-foreground">
+              Contract Vehicles
+            </h1>
+            <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+              The government contract vehicles (GWACs, IDIQs, schedules, BPAs) you
+              hold or can access. Review which vehicles you are on, their scope and
+              ceiling, and how well each one positions you for upcoming work.
+            </p>
+          </div>
           <button
             type="button"
             className="h-8 rounded border border-border bg-gda-panel px-4 text-[13px] font-medium text-foreground transition-colors hover:bg-gda-bg-base"

@@ -30,6 +30,15 @@ export interface SortableHeaderProps {
     selected: string[];
     onToggle: (value: string) => void;
   };
+  /**
+   * Optional free-text column filter. When provided, a filter button opens a
+   * small text input; the parent applies `value` to the column generically.
+   */
+  textFilter?: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+  };
   /** Optional info tooltip rendered after sort/filter controls. */
   infoTooltip?: React.ReactNode;
 }
@@ -44,22 +53,25 @@ export function SortableHeader({
   align = "left",
   className,
   filter,
+  textFilter,
   infoTooltip,
 }: SortableHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [textOpen, setTextOpen] = useState(false);
   const ref = useRef<HTMLTableCellElement>(null);
   const active = field != null && sortBy === field;
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !textOpen) return;
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setMenuOpen(false);
+        setTextOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
+  }, [menuOpen, textOpen]);
 
   const indicator = active
     ? sortDir === "asc"
@@ -120,8 +132,45 @@ export function SortableHeader({
             {filterCount > 0 ? filterCount : "\u25BE"}
           </button>
         )}
+        {textFilter && (
+          <button
+            type="button"
+            onClick={() => setTextOpen((o) => !o)}
+            className={cn(
+              "ml-0.5 rounded px-1 text-[10px] transition-colors",
+              textFilter.value
+                ? "bg-gda-green/20 text-gda-green"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            title="Filter"
+          >
+            {"▾"}
+          </button>
+        )}
         {infoTooltip}
       </div>
+
+      {textFilter && textOpen && (
+        <div className="absolute left-0 top-full z-30 mt-1 w-48 rounded border border-border bg-gda-panel p-2 shadow-lg">
+          <input
+            autoFocus
+            type="text"
+            value={textFilter.value}
+            onChange={(e) => textFilter.onChange(e.target.value)}
+            placeholder={textFilter.placeholder ?? `Filter ${label}…`}
+            className="w-full rounded border border-border bg-gda-bg-base px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/60 focus:border-gda-green/50 focus:outline-none"
+          />
+          {textFilter.value && (
+            <button
+              type="button"
+              onClick={() => textFilter.onChange("")}
+              className="mt-1 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {filter && menuOpen && (
         <div className="absolute left-0 top-full z-30 mt-1 w-44 rounded border border-border bg-gda-panel shadow-lg">
