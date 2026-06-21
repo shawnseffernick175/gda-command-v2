@@ -10,6 +10,7 @@
  */
 
 import { pool } from '../../lib/db.js';
+import { recordAuditLog } from '../audit/audit-log.js';
 
 export interface AssessmentListItem {
   id: string;
@@ -98,20 +99,66 @@ export async function listPass(limit: number): Promise<AssessmentListItem[]> {
 
 /**
  * Rescue a passed opportunity back into the Ops Tracker. Reversible per the
- * owner rule. Returns the updated item, or null if not found / not in 'pass'.
+ * owner rule. Also clears relevance_status='auto_pass' back to 'relevant' so
+ * the opportunity reappears in the Active list (F-601).
+ *
+ * Returns the updated item, or null if not found / not in 'pass'.
  */
 export async function rescueToOpsTracker(opportunityId: string): Promise<AssessmentListItem | null> {
-  const { rows } = await pool.query<AssessmentRow>(
-    `UPDATE opportunities
-        SET assessment_status = 'ops_tracker',
-            assessment_reason = 'ops_tracker: rescued_from_pass',
-            assessed_at = NOW(),
-            updated_at = NOW()
-      WHERE id = $1 AND deleted_at IS NULL AND assessment_status = 'pass'
-      RETURNING ${LIST_COLUMNS}`,
-    [opportunityId],
-  );
-  return rows[0] ? rowToItem(rows[0]) : null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Snapshot old state for audit
+    const oldRes = await client.query<{ relevance_status: string | null; assessment_status: string }>(
+      `SELECT relevance_status, assessment_status FROM opportunities
+        WHERE id = $1 AND deleted_at IS NULL AND assessment_status = 'pass'`,
+      [opportunityId],
+    );
+    if (oldRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    const old = oldRes.rows[0]!;
+
+    const { rows } = await client.query<AssessmentRow>(
+      `UPDATE opportunities
+          SET assessment_status = 'ops_tracker',
+              assessment_reason = 'ops_tracker: rescued_from_pass',
+              relevance_status  = 'relevant',
+              relevance_reason  = 'rescued: owner pulled back to Ops Tracker',
+              assessed_at = NOW(),
+              updated_at = NOW()
+        WHERE id = $1 AND deleted_at IS NULL AND assessment_status = 'pass'
+        RETURNING ${LIST_COLUMNS}`,
+      [opportunityId],
+    );
+
+    if (rows[0]) {
+      await recordAuditLog(client, {
+        action: 'rescue_to_ops_tracker',
+        table_name: 'opportunities',
+        record_id: Number(opportunityId),
+        old_values: {
+          relevance_status: old.relevance_status,
+          assessment_status: old.assessment_status,
+        },
+        new_values: {
+          relevance_status: 'relevant',
+          assessment_status: 'ops_tracker',
+        },
+        actor: 'user:rescue',
+      });
+    }
+
+    await client.query('COMMIT');
+    return rows[0] ? rowToItem(rows[0]) : null;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export interface PromoteResult {

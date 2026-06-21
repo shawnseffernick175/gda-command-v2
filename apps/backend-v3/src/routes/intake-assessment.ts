@@ -9,6 +9,7 @@
  *   GET  /v3/intake/pass                          — auto-declined, with reason
  *   POST /v3/intake/:id/rescue                    — move a passed opp back to ops_tracker
  *   POST /v3/ops-tracker/:id/promote             — user-only promote into the pipeline
+ *   POST /v3/admin/backfill-auto-pass             — idempotent backfill: auto-pass within-30-day opps
  */
 
 import type { FastifyInstance } from 'fastify';
@@ -21,6 +22,7 @@ import {
   promoteToPipeline,
   PromoteError,
 } from '../services/assessment/views.js';
+import { runAutoPassDeadline } from '../cron/auto-pass-deadline.js';
 
 interface ListQuery {
   limit?: string;
@@ -76,5 +78,22 @@ export async function intakeAssessmentRoutes(app: FastifyInstance): Promise<void
       }
       throw err;
     }
+  });
+
+  // POST /v3/admin/backfill-auto-pass — idempotent backfill (F-601)
+  // Immediately auto-passes all opportunities with response_due_at within 30
+  // days that still have relevance_status NULL or 'relevant'. Safe: only flips
+  // a reversible status (no deletes). Operator runs this manually in prod.
+  app.post('/v3/admin/backfill-auto-pass', async (req, reply) => {
+    const body = req.body as Record<string, unknown> | undefined;
+    const dryRun = body?.dry_run === true;
+    const result = await runAutoPassDeadline({ dryRun });
+    return reply.status(200).send(successEnvelope({
+      ...result,
+      dry_run: dryRun,
+      message: dryRun
+        ? `Dry run: ${result.passed} opportunities would be auto-passed`
+        : `Backfill complete: ${result.passed} opportunities auto-passed`,
+    }, req.requestId));
   });
 }
