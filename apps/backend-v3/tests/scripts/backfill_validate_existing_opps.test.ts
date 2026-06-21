@@ -73,8 +73,12 @@ afterAll(async () => {
 
 beforeEach(async () => {
   // Clean all opportunities and pipeline_items between tests
-  await testPool.query("SET LOCAL gda.allow_pipeline_delete = 'true'");
-  await testPool.query('DELETE FROM pipeline_items');
+  await testPool.query(`
+    BEGIN;
+    SET LOCAL gda.allow_pipeline_delete = 'true';
+    DELETE FROM pipeline_items;
+    COMMIT
+  `);
   await testPool.query('DELETE FROM opportunities');
   // Clean logs dir
   const logsDir = path.resolve(import.meta.dirname, '../../logs');

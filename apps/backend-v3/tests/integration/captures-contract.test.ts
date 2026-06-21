@@ -103,11 +103,13 @@ beforeEach(async () => {
       WHERE o.title LIKE 'Cap_%'
     )
   `);
-  await pool.query("SET LOCAL gda.allow_pipeline_delete = 'true'");
   await pool.query(`
+    BEGIN;
+    SET LOCAL gda.allow_pipeline_delete = 'true';
     DELETE FROM pipeline_items WHERE opportunity_id IN (
       SELECT id FROM opportunities WHERE title LIKE 'Cap_%'
-    )
+    );
+    COMMIT
   `);
   await pool.query(`DELETE FROM opportunities WHERE title LIKE 'Cap_%'`);
 });

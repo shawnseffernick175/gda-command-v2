@@ -317,8 +317,12 @@ describe('Contract: POST /v3/opportunities/:id/qualify endpoint', () => {
     expect(data.teaming_flags.length).toBeGreaterThan(0);
     expect(data.teaming_flags[0]!.suggested_partner).toBe('riverstone');
 
-    await pool.query("SET LOCAL gda.allow_pipeline_delete = 'true'");
-    await pool.query('DELETE FROM pipeline_items WHERE opportunity_id = $1', [id]);
+    await pool.query(`
+      BEGIN;
+      SET LOCAL gda.allow_pipeline_delete = 'true';
+      DELETE FROM pipeline_items WHERE opportunity_id = ${id};
+      COMMIT
+    `);
     await pool.query("DELETE FROM opportunities WHERE title = 'Qualify Test'");
   });
 
