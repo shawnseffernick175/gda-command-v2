@@ -24,18 +24,18 @@ export function AopExecutionTab({ fy }: { fy: string }) {
   }
 
   const metrics = data?.metrics ?? (data?.revenue ? [data.revenue] : []);
-  const hasMetrics = metrics.length > 0 && metrics.some((m) => m.months.length > 0);
+  const hasPlan = data?.has_plan ?? false;
+  const hasMetrics = hasPlan && metrics.length > 0 && metrics.some((m) => m.months.length > 0);
   const hasCostItems = !!data && data.items.length > 0;
-  const isSeededPlan = data?.plan_source === "aop_seed";
 
-  if (!data || (!hasCostItems && !hasMetrics)) {
+  if (!data || (!hasPlan && !hasCostItems)) {
     return (
       <div className="rounded border border-dashed border-border bg-card p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No AOP execution data for {fy} yet. Enter your annual plan on the{" "}
-          <span className="font-medium text-foreground">AOP Plan</span> tab,
-          and/or upload cost detail (TGT vs ACT) financial documents via Vault,
-          to populate this tab.
+          No annual plan entered for {fy} yet. Enter your board-approved annual
+          targets on the{" "}
+          <span className="font-medium text-foreground">AOP Plan</span> tab to
+          see the 12-month plan vs actual view here.
         </p>
       </div>
     );
@@ -100,12 +100,6 @@ export function AopExecutionTab({ fy }: { fy: string }) {
           <h2 className="text-sm font-semibold text-foreground">
             AOP Plan vs Actual {"\u2014"} {fy}
           </h2>
-          {isSeededPlan && (
-            <div className="rounded border border-gda-amber/40 bg-gda-amber/10 px-4 py-3 text-[13px] text-gda-amber">
-              Seeded benchmark {"\u2014"} not owner-approved. Replace with
-              board-approved AOP.
-            </div>
-          )}
           {metrics.map((metric) => (
             <div key={metric.key} className="space-y-2">
               <div className="flex items-baseline justify-between">

@@ -661,34 +661,56 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       [fiscalYear],
     );
 
-    // Monthly revenue: AOP plan (financial_plan) vs actuals (financial_actuals income_statement).
-    // Ordered Jan..Dec so the frontend can lay months out left-to-right.
-    const monthOrder = `CASE p.period
-      WHEN 'FY${fiscalYear % 100} Jan' THEN 1 WHEN 'FY${fiscalYear % 100} Feb' THEN 2
-      WHEN 'FY${fiscalYear % 100} Mar' THEN 3 WHEN 'FY${fiscalYear % 100} Apr' THEN 4
-      WHEN 'FY${fiscalYear % 100} May' THEN 5 WHEN 'FY${fiscalYear % 100} Jun' THEN 6
-      WHEN 'FY${fiscalYear % 100} Jul' THEN 7 WHEN 'FY${fiscalYear % 100} Aug' THEN 8
-      WHEN 'FY${fiscalYear % 100} Sep' THEN 9 WHEN 'FY${fiscalYear % 100} Oct' THEN 10
-      WHEN 'FY${fiscalYear % 100} Nov' THEN 11 WHEN 'FY${fiscalYear % 100} Dec' THEN 12
-      ELSE 99 END`;
-    // Read the user's real, owner-entered AOP plan (source='user_aop',
-    // is_seed=false) — NOT the old fake 'aop_seed' benchmark rows. A FY with no
-    // user_aop plan simply yields no monthly plan rows here (honest empty state).
-    const { rows: planActualRows } = await pool.query(
-      `SELECT p.period AS period, p.source AS plan_source,
-              p.plan_orders AS plan_orders, a.actual_orders AS actual_orders,
-              p.plan_sales AS plan_sales, a.actual_sales AS actual_sales,
-              p.plan_ebit AS plan_ebit, a.actual_ebit AS actual_ebit,
-              p.plan_gross_margin AS plan_gross_margin, a.actual_gross_margin AS actual_gross_margin,
-              p.plan_ros AS plan_ros, a.actual_ros AS actual_ros
-       FROM financial_plan p
-       LEFT JOIN financial_actuals a
-         ON a.period = p.period AND a.source = 'income_statement'
-       WHERE p.source = 'user_aop' AND p.is_seed = false
-         AND p.fiscal_year = $1 AND p.period NOT LIKE '%Q%'
-       ORDER BY ${monthOrder}`,
+    // Build the full 12-month plan-vs-actual axis dynamically from AOP_MONTHS.
+    // Two separate queries (plan + actuals), then join in JS so every month is
+    // always represented — even months with no actuals yet.
+    const fyShort = `FY${fiscalYear % 100}`;
+
+    const { rows: planRows } = await pool.query(
+      `SELECT period, plan_orders, plan_sales, plan_ebit,
+              plan_gross_margin, plan_ros
+       FROM financial_plan
+       WHERE source = 'user_aop' AND is_seed = false
+         AND fiscal_year = $1 AND period NOT LIKE '%Q%'`,
       [fiscalYear],
     );
+
+    const hasPlan = planRows.length > 0;
+    const planByPeriod = new Map<string, (typeof planRows)[0]>();
+    for (const r of planRows) planByPeriod.set(r.period as string, r);
+
+    const { rows: actualRows } = await pool.query(
+      `SELECT period, actual_orders, actual_sales, actual_ebit,
+              actual_gross_margin, actual_ros
+       FROM financial_actuals
+       WHERE source = 'income_statement' AND fiscal_year = $1
+         AND period NOT LIKE '%Q%'`,
+      [fiscalYear],
+    );
+
+    const actualByPeriod = new Map<string, (typeof actualRows)[0]>();
+    for (const r of actualRows) actualByPeriod.set(r.period as string, r);
+
+    // Always 12 rows, Jan–Dec, regardless of what's in the DB.
+    const planActualRows = AOP_MONTHS.map(({ mon }) => {
+      const period = `${fyShort} ${mon}`;
+      const plan = planByPeriod.get(period);
+      const actual = actualByPeriod.get(period);
+      return {
+        period,
+        plan_source: hasPlan ? 'user_aop' : null,
+        plan_orders: plan?.plan_orders ?? null,
+        actual_orders: actual?.actual_orders ?? null,
+        plan_sales: plan?.plan_sales ?? null,
+        actual_sales: actual?.actual_sales ?? null,
+        plan_ebit: plan?.plan_ebit ?? null,
+        actual_ebit: actual?.actual_ebit ?? null,
+        plan_gross_margin: plan?.plan_gross_margin ?? null,
+        actual_gross_margin: actual?.actual_gross_margin ?? null,
+        plan_ros: plan?.plan_ros ?? null,
+        actual_ros: actual?.actual_ros ?? null,
+      };
+    });
 
     // Build one Plan/Actual/Variance metric block per line.
     // kind: 'currency' lines roll up by sum; 'percent' lines roll up by average.
@@ -709,8 +731,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
     const metrics = metricDefs.map((def) => {
       const months = planActualRows.map((r) => {
-        const planRaw = r[def.planCol];
-        const actualRaw = r[def.actualCol];
+        const row = r as Record<string, unknown>;
+        const planRaw = row[def.planCol];
+        const actualRaw = row[def.actualCol];
         const plan = planRaw !== null && planRaw !== undefined ? Number(planRaw) : 0;
         const actual = actualRaw !== null && actualRaw !== undefined ? Number(actualRaw) : null;
         return {
@@ -752,18 +775,13 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     // Keep `revenue` for backward-compatibility (the Sales block).
     const revenue = metrics.find((m) => m.key === 'sales') ?? null;
 
-    // Surface the provenance of the displayed AOP plan. The monthly plan rows are
-    // now pulled from financial_plan WHERE source = 'user_aop' — real, owner-entered
-    // numbers (annual targets divided flat across 12 months). 'user_aop' is real
-    // data, not a seeded benchmark; the UI no longer flags it. null = no plan yet.
-    const planSource = planActualRows.length > 0
-      ? (planActualRows[0].plan_source as string)
-      : null;
+    const planSource = hasPlan ? 'user_aop' : null;
 
     return reply.send(successEnvelope({
       items,
       metrics,
       revenue,
+      has_plan: hasPlan,
       plan_source: planSource,
       periods: periodRows.map((r) => r.period as string),
       meta: {
