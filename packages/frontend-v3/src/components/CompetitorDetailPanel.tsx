@@ -175,18 +175,9 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
               )}
             </div>
           ) : analyzeMutation.isError ? (
-            <div className="space-y-2">
-              <p className="text-sm text-red-600">
-                {analyzeMutation.error instanceof Error ? analyzeMutation.error.message : "Analysis failed"}
-              </p>
-              <button
-                type="button"
-                onClick={() => analyzeMutation.mutate()}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                Retry
-              </button>
-            </div>
+            <p className="text-sm text-gray-400">
+              {analyzeMutation.error instanceof Error ? analyzeMutation.error.message : "Analysis unavailable"}
+            </p>
           ) : (
             <p className="text-sm text-gray-400">Analysis not available</p>
           )}
