@@ -22,6 +22,7 @@ function classificationColor(c: CompetitorAnalysis["classification"]): string {
     case "THREAT": return "bg-red-100 text-red-800 border-red-200";
     case "PARTNER": return "bg-blue-100 text-blue-800 border-blue-200";
     case "MONITOR": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    default: return "bg-gray-100 text-gray-800 border-gray-200";
   }
 }
 
@@ -31,6 +32,7 @@ function actionColor(a: CompetitorAnalysis["recommended_action"]): string {
     case "Partner": return "bg-blue-100 text-blue-800 border-blue-200";
     case "Monitor": return "bg-yellow-100 text-yellow-800 border-yellow-200";
     case "Ignore": return "bg-gray-100 text-gray-800 border-gray-200";
+    default: return "bg-gray-100 text-gray-800 border-gray-200";
   }
 }
 
@@ -122,11 +124,25 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
           </div>
         </div>
 
+        {/* NAICS Codes */}
+        {(competitor.naics_codes?.length ?? 0) > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">NAICS Codes</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {competitor.naics_codes.map((code) => (
+                <span key={code} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 border border-gray-200 font-mono">
+                  {code}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Departments */}
         <div>
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Departments</h3>
           <div className="flex flex-wrap gap-1.5">
-            {competitor.agencies?.length > 0 ? (
+            {(competitor.agencies?.length ?? 0) > 0 ? (
               competitor.agencies.map((agency) => (
                 <span key={agency} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 border border-gray-200">
                   {agency}
@@ -158,6 +174,19 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
                 </div>
               )}
             </div>
+          ) : analyzeMutation.isError ? (
+            <div className="space-y-2">
+              <p className="text-sm text-red-600">
+                {analyzeMutation.error instanceof Error ? analyzeMutation.error.message : "Analysis failed"}
+              </p>
+              <button
+                type="button"
+                onClick={() => analyzeMutation.mutate()}
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Retry
+              </button>
+            </div>
           ) : (
             <p className="text-sm text-gray-400">Analysis not available</p>
           )}
@@ -168,7 +197,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Re-compete Opportunities</h3>
           {isLoading && !analysis ? (
             <SkeletonBlock />
-          ) : analysis && analysis.recompete_contracts.length > 0 ? (
+          ) : analysis && (analysis.recompete_contracts?.length ?? 0) > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
