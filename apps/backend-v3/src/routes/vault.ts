@@ -1347,9 +1347,8 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /v3/vault/resolve-all — re-run the full re-extract + AI parse +
   // structured-ingest pipeline on EVERY unresolved document (extraction_status
-  // != 'success'). This is the bulk equivalent of clicking "Re-extract" on each
-  // unresolved row. Idempotent. 'unsupported' file types (no extractor) cannot
-  // be resolved and remain reported as unresolved — they are not failures.
+  // is 'failed' or 'pending'). Skips 'unsupported' (no extractor) and
+  // 'dismissed' (owner explicitly cleared). Idempotent.
   app.post('/v3/vault/resolve-all', async (req, reply) => {
     const { rows: docs } = await pool.query<{
       id: number;
@@ -1360,8 +1359,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       `SELECT id, filename, file_path, doc_type
          FROM vault_documents
         WHERE deleted_at IS NULL
-          AND extraction_status IS DISTINCT FROM 'success'
-          AND extraction_status IS DISTINCT FROM 'unsupported'
+          AND extraction_status IN ('failed', 'pending')
         ORDER BY id`,
     );
 
