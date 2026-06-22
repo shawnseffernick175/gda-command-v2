@@ -27,6 +27,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_pipeline_items_no_delete ON pipeline_items;
+
 CREATE TRIGGER trg_pipeline_items_no_delete
   BEFORE DELETE ON pipeline_items
   FOR EACH ROW
