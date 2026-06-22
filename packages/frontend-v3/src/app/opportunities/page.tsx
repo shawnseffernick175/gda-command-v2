@@ -14,7 +14,6 @@ import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
 import { SourceChip } from "@/components/shared/source-chip";
-import { ScoreTooltip } from "@/components/shared/score-tooltip";
 import { FieldStatusBadge } from "@/components/field-status-badge";
 import { ErrorState } from "@/components/shared/error-state";
 import { useVaultDocuments } from "@/hooks/use-vault";
@@ -184,7 +183,7 @@ function OpportunityList() {
   const [hotFilter, setHotFilter] = useState(false);
   const [setAsideFilter, setSetAsideFilter] = useState<string[]>([]);
   const [valueRange, setValueRange] = useState(0);
-  const [dueFilter, setDueFilter] = useState("");
+
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
   const [relevantOnly, setRelevantOnly] = useState(true);
   const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(undefined);
@@ -203,7 +202,7 @@ function OpportunityList() {
       set_asides: setAsideFilter.length > 0 ? setAsideFilter : undefined,
       value_min: range?.min,
       value_max: range?.max,
-      due: dueFilter || undefined,
+
       sources: sourceFilter.length > 0 ? sourceFilter : undefined,
       stage: stageTab !== "all" ? stageTab : undefined,
       relevant_only: relevantOnly,
@@ -212,7 +211,7 @@ function OpportunityList() {
       sort_dir: sortParams.sort_dir,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, dueFilter, sourceFilter, stageTab, relevantOnly, idiqFilter, sortParams.sort_by, sortParams.sort_dir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, sortParams.sort_by, sortParams.sort_dir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -250,7 +249,7 @@ function OpportunityList() {
 
   const hasActiveFilters =
     debouncedQ || agencyFilter || hotFilter || setAsideFilter.length > 0 ||
-    valueRange !== 0 || dueFilter || sourceFilter.length > 0 || idiqFilter !== undefined;
+    valueRange !== 0 || sourceFilter.length > 0 || idiqFilter !== undefined;
 
   const handleClearFilters = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -260,7 +259,6 @@ function OpportunityList() {
     setHotFilter(false);
     setSetAsideFilter([]);
     setValueRange(0);
-    setDueFilter("");
     setSourceFilter([]);
     setIdiqFilter(undefined);
     // Strip ?agency from the URL so a remount does not re-apply a stale filter
@@ -277,11 +275,6 @@ function OpportunityList() {
     },
     [],
   );
-
-  // Intelligence bar chip click handlers
-  const handleDueThisWeekClick = useCallback(() => {
-    setDueFilter((prev) => (prev === "this_week" ? "" : "this_week"));
-  }, []);
 
   const handleHotClick = useCallback(() => {
     setHotFilter((prev) => !prev);
@@ -332,12 +325,6 @@ function OpportunityList() {
               active={false}
             />
             <IntelChip
-              icon="!"
-              label={`${meta.due_this_week} Due This Week`}
-              active={dueFilter === "this_week"}
-              onClick={handleDueThisWeekClick}
-            />
-            <IntelChip
               icon="?"
               label={`${meta.unscored_count} Unscored`}
               active={false}
@@ -372,7 +359,10 @@ function OpportunityList() {
             onChange={handleSearchChange}
             className="flex-grow min-w-[200px] rounded border border-border bg-gda-panel px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
           />
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <label
+            className="flex items-center gap-1.5 cursor-pointer select-none"
+            title="When checked, only shows opportunities matching Envision's IT and Consulting NAICS codes. Uncheck to see all opportunities."
+          >
             <input
               type="checkbox"
               checked={relevantOnly}
@@ -417,6 +407,7 @@ function OpportunityList() {
             <button
               type="button"
               onClick={() => setGroupBy(g => g === "none" ? "vehicle" : "none")}
+              title="Group opportunities by contract vehicle (IDIQ, BPA, GSA schedule, etc.) instead of a flat list"
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors",
                 groupBy === "vehicle"
@@ -474,7 +465,7 @@ function OpportunityList() {
                       <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                       <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
                       <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="100px" infoTooltip={<HeaderInfoTooltip text="Value pulled from SAM.gov when available. When SAM is missing the field, we fall back to GovWin and GovTribe estimates (shown with ~ and in muted color). Empty means no source had data." />} />
-                      <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" />
+                      <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="80px" infoTooltip={<HeaderInfoTooltip text="Probability of Win (0-100%). AI-scored from opportunity fit, competition, and Envision positioning. Green = forecast (65%+), amber = signal (45-64%), red = discovery (<45%)." />} />
                       <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="150px" />
                       <SortableHeader
                         label="Set-Aside"
@@ -532,7 +523,7 @@ function OpportunityList() {
   );
 }
 
-/* ── Hot (Pwin ≥ 70%) chip with tooltip ─────────────────────────── */
+/* ── Hot (Pwin ≥ 70%) chip with inline ? tooltip ────────────────── */
 
 function HotChip({
   count,
@@ -543,17 +534,20 @@ function HotChip({
   active: boolean;
   onClick?: () => void;
 }) {
+  const [showTip, setShowTip] = useState(false);
+
   return (
-    <ScoreTooltip
-      label="Hot"
-      explanation="Hot = opportunities with Pwin (probability of win) ≥ 70%. Count reflects the current filter / tab."
+    <span
+      className="relative inline-flex"
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
     >
       <button
         type="button"
         onClick={onClick}
         disabled={!onClick}
         className={cn(
-          "bg-gda-panel border rounded px-3 py-1.5 text-xs font-mono transition-colors",
+          "bg-gda-panel border rounded px-3 py-1.5 text-xs font-mono transition-colors inline-flex items-center gap-1.5",
           active
             ? "border-gda-green text-gda-green bg-gda-green/10"
             : "border-border text-foreground",
@@ -562,9 +556,16 @@ function HotChip({
             : "cursor-default",
         )}
       >
-        <svg className="inline-block h-3.5 w-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg> {count} Hot
+        <svg className="inline-block h-3.5 w-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+        {count} Hot
+        <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[11px] opacity-60">?</span>
       </button>
-    </ScoreTooltip>
+      {showTip && (
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-56 rounded border border-border bg-gda-bg-raised p-2.5 text-xs text-muted-foreground shadow-lg normal-case font-normal">
+          {"Hot = opportunities with Pwin (probability of win) \u2265 70%. Count reflects the current filter / tab."}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -875,15 +876,7 @@ function OpportunityRow({
       </td>
       <td className="px-3 py-1.5 text-left">
         {score != null ? (
-          <span className="inline-flex items-center gap-1">
-            <span className={cn("font-mono text-xs tabular-nums", pwinClass)}>{score}%</span>
-            <ScoreExplain
-              score={score}
-              label="Pwin"
-              scoreType="pwin"
-              inputs={{ top_drivers: opp.pwin?.top_drivers ?? [] }}
-            />
-          </span>
+          <span className={cn("font-mono text-xs tabular-nums", pwinClass)}>{score}%</span>
         ) : (
           <FieldStatusBadge reason={opp.ai_analyzed_at == null ? "pending_analysis" : "no_source_data"} />
         )}
