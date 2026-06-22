@@ -711,13 +711,15 @@ function ContactsContent() {
     <div className="space-y-6">
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
-        <h1 className="font-mono text-lg font-bold text-foreground">Contacts</h1>
-        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
-          Your relationship network across government, primes, and partners.
-          Track who you know, how warm each relationship is, and when you last
-          connected, and link contacts to the opportunities and captures they
-          influence.
-        </p>
+        <div className="flex items-baseline gap-3">
+          <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">Contacts</h1>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Your relationship network across government, primes, and partners.
+            Track who you know, how warm each relationship is, and when you last
+            connected, and link contacts to the opportunities and captures they
+            influence.
+          </p>
+        </div>
 
         {/* Intelligence Bar */}
         <div className="flex flex-wrap items-center gap-3">

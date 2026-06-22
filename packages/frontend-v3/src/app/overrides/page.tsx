@@ -88,11 +88,11 @@ function OverridesContent() {
       {/* Header */}
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="font-mono text-lg font-bold text-foreground">
+          <div className="flex min-w-0 items-baseline gap-3">
+            <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
               Override Audit
             </h1>
-            <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            <p className="text-xs leading-relaxed text-muted-foreground">
               {"An audit trail of every manual override applied on top of the system's automated decisions and scores — who changed a stage, field, or score away from what the model produced, when, and why. Use it to review human judgment calls and keep automated and manual decisions accountable."}
             </p>
           </div>

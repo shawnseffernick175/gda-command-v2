@@ -163,18 +163,20 @@ export default function DigestPage() {
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="font-mono text-lg font-bold text-foreground">
-              MARKET INTELLIGENCE DIGEST
-            </h1>
+            <div className="flex items-baseline gap-3">
+              <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
+                MARKET INTELLIGENCE DIGEST
+              </h1>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                A daily briefing of what changed in your market — new
+                solicitations, GAO decisions, regulations, budget moves, and agency
+                intel. Skim the lead stories and filter by category to stay ahead of
+                the signals that affect your pursuits.
+              </p>
+            </div>
             <p className="font-mono text-xs text-muted-foreground">
               Refreshed daily
               {lastUpdated ? ` · Last updated: ${lastUpdated} ET` : ""}
-            </p>
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-              A daily briefing of what changed in your market — new
-              solicitations, GAO decisions, regulations, budget moves, and agency
-              intel. Skim the lead stories and filter by category to stay ahead of
-              the signals that affect your pursuits.
             </p>
           </div>
           <button

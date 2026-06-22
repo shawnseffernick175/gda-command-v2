@@ -123,11 +123,11 @@ export default function VehiclesPage() {
     <div className="space-y-4">
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-section font-semibold text-foreground">
+          <div className="flex min-w-0 items-baseline gap-3">
+            <h1 className="shrink-0 text-section font-semibold text-foreground">
               Contract Vehicles
             </h1>
-            <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            <p className="text-xs leading-relaxed text-muted-foreground">
               The government contract vehicles (GWACs, IDIQs, schedules, BPAs) you
               hold or can access. Review which vehicles you are on, their scope and
               ceiling, and how well each one positions you for upcoming work.

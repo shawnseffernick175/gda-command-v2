@@ -231,14 +231,16 @@ function ActionItemsContent() {
   return (
     <div className="space-y-4">
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-3 sticky-page-header">
-        <h1 className="text-section font-semibold text-foreground">
-          Action Items
-        </h1>
-        <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
-          Your running to-do list of follow-ups generated from opportunities,
-          captures, and reviews. Filter by status, see what is due, and work
-          through the next steps that keep pursuits moving.
-        </p>
+        <div className="flex items-baseline gap-3">
+          <h1 className="shrink-0 text-section font-semibold text-foreground">
+            Action Items
+          </h1>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Your running to-do list of follow-ups generated from opportunities,
+            captures, and reviews. Filter by status, see what is due, and work
+            through the next steps that keep pursuits moving.
+          </p>
+        </div>
 
         {/* Status tabs */}
         <div className="flex gap-2">

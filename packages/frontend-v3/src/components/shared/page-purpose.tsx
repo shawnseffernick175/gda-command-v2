@@ -27,9 +27,9 @@ export function PagePurpose({
 }: PagePurposeProps) {
   return (
     <div className={cn("flex items-start justify-between gap-4", className)}>
-      <div className="min-w-0">
-        <h1 className="font-mono text-lg font-bold text-foreground">{title}</h1>
-        <p className="mt-0.5 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+      <div className="flex min-w-0 items-baseline gap-3">
+        <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">{title}</h1>
+        <p className="text-xs leading-relaxed text-muted-foreground">
           {purpose}
         </p>
       </div>
