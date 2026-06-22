@@ -1031,9 +1031,7 @@ export interface AopExecutionData {
   items: AopExecutionItem[];
   metrics?: AopMetric[];
   revenue?: AopMetric | null;
-  // Provenance of the displayed AOP plan. 'user_aop' = real owner-entered plan
-  // (annual targets divided flat across 12 months). 'aop_seed' = legacy fake
-  // benchmark (should no longer occur). null = no plan entered yet.
+  has_plan?: boolean;
   plan_source?: string | null;
   periods: string[];
   meta: FinancialMeta;
