@@ -204,6 +204,7 @@ export async function setFieldOverrideWithAudit(
       ip_address: input.ip_address ?? null,
       user_agent: input.user_agent ?? null,
       request_id: input.request_id ?? null,
+      source: 'user',
     });
 
     await client.query('COMMIT');

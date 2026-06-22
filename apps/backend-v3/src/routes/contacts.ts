@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { enrichContactsBatch } from '../services/contacts/enrich-batch.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 const VALID_CATEGORIES = ['government', 'teaming_partner', 'competitor', 'industry', 'internal', 'other'] as const;
 type ContactCategory = typeof VALID_CATEGORIES[number];
@@ -577,6 +578,17 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await pool.query('DELETE FROM govtribe_contacts WHERE id = $1', [Number(id)]);
+
+    recordAuditLog(pool, {
+      action: 'contact_delete',
+      table_name: 'govtribe_contacts',
+      record_id: Number(id),
+      old_values: { is_manual: true },
+      new_values: null,
+      actor: 'user',
+      source: 'user',
+    }).catch(() => { /* best-effort */ });
+
     return reply.status(204).send();
   });
 }

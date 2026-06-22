@@ -9,6 +9,7 @@ import {
 import { pipelineStageToDisplay } from '../lib/pipeline-stage.js';
 import type { JwtPayload } from '../middleware/auth.js';
 import type { Milestone } from '../services/pipeline/types.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 interface ListQuery {
   limit?: string;
@@ -346,6 +347,13 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    // Capture old values for audit trail
+    const oldRes = await pool.query<{ capture_owner: string | null; win_probability: number | null; stage: string | null }>(
+      'SELECT capture_owner, win_probability, stage FROM pipeline_items WHERE id = $1',
+      [id],
+    );
+    const oldRow = oldRes.rows[0];
+
     const item = await updatePipelineItem(id, {
       capture_owner: body.capture_owner,
       milestones: body.milestones,
@@ -359,6 +367,17 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
         errorEnvelope('NOT_FOUND', 'Pipeline item not found', req.requestId),
       );
     }
+
+    const user = (req as typeof req & { user?: JwtPayload }).user;
+    recordAuditLog(pool, {
+      action: 'pipeline_item_update',
+      table_name: 'pipeline_items',
+      record_id: Number(id),
+      old_values: oldRow ?? null,
+      new_values: body,
+      actor: user?.sub ? `user:${user.sub}` : 'user',
+      source: 'user',
+    }).catch(() => { /* best-effort */ });
 
     return reply.status(200).send(successEnvelope(item, req.requestId));
   });

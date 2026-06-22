@@ -148,6 +148,7 @@ export async function rescueToOpsTracker(opportunityId: string): Promise<Assessm
           assessment_status: 'ops_tracker',
         },
         actor: 'user:rescue',
+        source: 'user',
       });
     }
 

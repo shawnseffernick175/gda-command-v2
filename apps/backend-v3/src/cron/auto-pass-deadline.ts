@@ -111,6 +111,7 @@ export async function runAutoPassDeadline(
           assessment_status: 'pass',
         },
         actor: 'system:auto-pass-deadline',
+        source: 'system',
       });
 
       await client.query('COMMIT');
