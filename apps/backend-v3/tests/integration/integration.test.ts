@@ -74,7 +74,12 @@ beforeEach(async () => {
       )
     )
   `);
-  await pool.query(`DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE ${filter})`);
+  await pool.query(`
+    BEGIN;
+    SET LOCAL gda.allow_pipeline_delete = 'true';
+    DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE ${filter});
+    COMMIT
+  `);
   await pool.query(`DELETE FROM opportunities WHERE ${filter}`);
 });
 

@@ -77,8 +77,13 @@ beforeEach(async () => {
       )
     )
   `);
-  await pool.query("DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE title LIKE 'Test Pipeline%')");
-  await pool.query("DELETE FROM pipeline_items WHERE capture_owner LIKE 'test-%'");
+  await pool.query(`
+    BEGIN;
+    SET LOCAL gda.allow_pipeline_delete = 'true';
+    DELETE FROM pipeline_items WHERE opportunity_id IN (SELECT id FROM opportunities WHERE title LIKE 'Test Pipeline%');
+    DELETE FROM pipeline_items WHERE capture_owner LIKE 'test-%';
+    COMMIT
+  `);
   await pool.query("DELETE FROM opportunities WHERE title LIKE 'Test Pipeline%'");
 });
 

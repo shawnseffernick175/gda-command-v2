@@ -10,6 +10,8 @@ import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { parseFederalOrg } from '../../lib/orgHierarchy.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 import { normalizePipelineStage, ACTIVE_STAGE_KEYS, isTerminalStage } from '../../lib/pipeline-stage.js';
+import { recordAuditLog } from '../audit/audit-log.js';
+import { logger } from '../../lib/logger.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
   type OpportunityRow,
@@ -873,42 +875,99 @@ export async function updateOpportunity(
 
   setClauses.push(`updated_at = NOW()`);
 
+  // F-600: snapshot old relevance_status before the UPDATE so we can audit the change
+  let oldRelevanceStatus: string | null = null;
+  if (input.relevance_status !== undefined) {
+    const snap = await pool.query<{ relevance_status: string | null }>(
+      `SELECT relevance_status FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+    oldRelevanceStatus = snap.rows[0]?.relevance_status ?? null;
+  }
+
   const sql = `UPDATE opportunities SET ${setClauses.join(', ')} WHERE id = $${paramIdx} AND deleted_at IS NULL RETURNING *`;
   params.push(id);
 
   const res = await pool.query<OpportunityRow>(sql, params);
   const row = res.rows[0]!;
 
+  // F-600: audit trail for relevance_status change (user-initiated via PATCH)
+  if (input.relevance_status !== undefined) {
+    const newRelevanceStatus = (row as { relevance_status?: string | null }).relevance_status ?? null;
+    if (newRelevanceStatus !== oldRelevanceStatus) {
+      recordAuditLog(pool, {
+        action: 'UPDATE',
+        table_name: 'opportunities',
+        record_id: Number(id),
+        old_values: { relevance_status: oldRelevanceStatus },
+        new_values: { relevance_status: newRelevanceStatus },
+        actor: captureOwner,
+        source: 'user',
+      }).catch((err) => {
+        logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+      });
+    }
+  }
+
   // Write stage to pipeline_items (stages live there, not on opportunities).
-  // GUARD: an opportunity enters the pipeline ONLY when the owner qualifies it.
+  // GUARD (F-600): an opportunity enters the pipeline ONLY when the owner
+  // qualifies it. Pipeline items are NEVER deleted by automation — all 12 are
+  // owner-promoted; terminal stages are explicit owner decisions.
   // A stage update may MOVE an existing card between stages, but it must NEVER
   // create a card for an opportunity that was never qualified. If no card exists,
   // refuse -- the owner must qualify first.
-  // TODO(override-capture): route through override service when called from user-facing paths
   if (stageValue) {
     const dbStage = normalizePipelineStage(stageValue);
     if (!dbStage) {
       throw new Error(`Unknown pipeline stage: ${stageValue}`);
     }
-    const existing = await pool.query(
-      `SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
+    const existing = await pool.query<{ id: number; stage: string }>(
+      `SELECT id, stage FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
       [id],
     );
+    const oldStage = existing.rows[0]?.stage ?? null;
     if (existing.rows.length > 0) {
       await pool.query(
         `UPDATE pipeline_items SET stage = $1, updated_at = NOW() WHERE id = $2`,
         [dbStage, existing.rows[0].id],
       );
+
+      // F-600: audit trail for pipeline stage change (user-initiated)
+      recordAuditLog(pool, {
+        action: 'UPDATE',
+        table_name: 'pipeline_items',
+        record_id: existing.rows[0].id,
+        old_values: { stage: oldStage },
+        new_values: { stage: dbStage },
+        actor: captureOwner,
+        source: 'user',
+      }).catch((err) => {
+        logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+      });
     } else if (isTerminalStage(dbStage)) {
       // Terminal decisions (No Bid, Lost, Won, Government Cancelled) are explicit
       // owner verdicts that may be recorded directly from the Interest list, even
       // when the opportunity was never formally qualified. Create the card so the
       // decision persists into its terminal tab.
-      await pool.query(
+      const insertRes = await pool.query<{ id: number }>(
         `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-         VALUES ($1, $2, $3, $4)`,
+         VALUES ($1, $2, $3, $4) RETURNING id`,
         [id, captureOwner, dbStage, row.source_id],
       );
+
+      // F-600: audit trail for new pipeline item (terminal decision)
+      if (insertRes.rows[0]) {
+        recordAuditLog(pool, {
+          action: 'INSERT',
+          table_name: 'pipeline_items',
+          record_id: insertRes.rows[0].id,
+          new_values: { stage: dbStage, opportunity_id: id },
+          actor: captureOwner,
+          source: 'user',
+        }).catch((err) => {
+          logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+        });
+      }
     } else {
       // Forward-progression stages still require prior qualification.
       throw Object.assign(
@@ -938,21 +997,49 @@ export async function qualifyOpportunity(
   const row = res.rows[0]!;
 
   // Also write pipeline_items at 'qualify' so the stage is visible in tabs
-  const existing = await pool.query(
-    `SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
+  const existing = await pool.query<{ id: number; stage: string }>(
+    `SELECT id, stage FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1`,
     [id],
   );
   if (existing.rows.length > 0) {
+    const oldStage = existing.rows[0].stage;
     await pool.query(
       `UPDATE pipeline_items SET stage = 'qualify', updated_at = NOW() WHERE id = $1`,
       [existing.rows[0].id],
     );
+
+    // F-600: audit trail for pipeline stage change (user-initiated qualify)
+    recordAuditLog(pool, {
+      action: 'UPDATE',
+      table_name: 'pipeline_items',
+      record_id: existing.rows[0].id,
+      old_values: { stage: oldStage },
+      new_values: { stage: 'qualify' },
+      actor: qualifiedBy,
+      source: 'user',
+    }).catch((err) => {
+      logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+    });
   } else {
-    await pool.query(
+    const insertRes = await pool.query<{ id: number }>(
       `INSERT INTO pipeline_items (opportunity_id, capture_owner, stage, source_id)
-       VALUES ($1, $2, 'qualify', $3)`,
+       VALUES ($1, $2, 'qualify', $3) RETURNING id`,
       [id, qualifiedBy, row.source_id],
     );
+
+    // F-600: audit trail for new pipeline item (qualify)
+    if (insertRes.rows[0]) {
+      recordAuditLog(pool, {
+        action: 'INSERT',
+        table_name: 'pipeline_items',
+        record_id: insertRes.rows[0].id,
+        new_values: { stage: 'qualify', opportunity_id: id },
+        actor: qualifiedBy,
+        source: 'user',
+      }).catch((err) => {
+        logger.warn({ err, opportunityId: id }, 'F-600 audit_log write failed (non-critical)');
+      });
+    }
   }
 
   const teaming_flags = evaluateTeamingFlags(row);

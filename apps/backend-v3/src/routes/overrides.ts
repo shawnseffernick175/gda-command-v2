@@ -15,6 +15,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { CANONICAL_STAGE_KEYS, normalizePipelineStage, isTerminalStage } from '../lib/pipeline-stage.js';
 import { logger } from '../lib/logger.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 export async function overrideRoutes(app: FastifyInstance): Promise<void> {
   // POST /v3/opportunities/:id/override-stage
@@ -113,6 +114,22 @@ export async function overrideRoutes(app: FastifyInstance): Promise<void> {
           );
         } catch {
           await client.query('ROLLBACK TO SAVEPOINT csh_insert');
+        }
+
+        // F-600: audit trail for pipeline stage change (user-initiated)
+        try {
+          await client.query('SAVEPOINT audit_insert');
+          await recordAuditLog(client, {
+            action: pipelineRow ? 'UPDATE' : 'INSERT',
+            table_name: 'pipeline_items',
+            record_id: pipelineItemId,
+            ...(pipelineRow ? { old_values: { stage: currentStage } } : {}),
+            new_values: { stage: newStage, ...(pipelineRow ? {} : { opportunity_id: id }) },
+            actor: 'user',
+            source: 'user',
+          });
+        } catch {
+          await client.query('ROLLBACK TO SAVEPOINT audit_insert');
         }
 
         await client.query('COMMIT');

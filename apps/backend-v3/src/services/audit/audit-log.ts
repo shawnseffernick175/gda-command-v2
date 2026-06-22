@@ -7,7 +7,7 @@
  * transaction — making it atomic with the mutation it records.
  *
  * Columns written: action, table_name, record_id, record_ref, old_values,
- * new_values, actor, user_id, ip_address, user_agent, request_id.
+ * new_values, actor, user_id, ip_address, user_agent, request_id, source.
  */
 
 import type pg from 'pg';
@@ -26,6 +26,8 @@ export interface AuditLogWrite {
   ip_address?: string | null;
   user_agent?: string | null;
   request_id?: string | null;
+  /** 'system' | 'user' — distinguishes automated writes from owner actions (F-600). */
+  source?: 'system' | 'user' | null;
 }
 
 /**
@@ -41,8 +43,8 @@ export async function recordAuditLog(
     INSERT INTO audit_log
       (action, table_name, record_id, record_ref,
        old_values, new_values,
-       actor, user_id, ip_address, user_agent, request_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       actor, user_id, ip_address, user_agent, request_id, source)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING id`;
 
   const params = [
@@ -57,6 +59,7 @@ export async function recordAuditLog(
     entry.ip_address ?? null,
     entry.user_agent ?? null,
     entry.request_id ?? null,
+    entry.source ?? null,
   ];
 
   const res = await exec.query(sql, params);
@@ -76,6 +79,7 @@ export interface AuditLogEntry {
   actor: string | null;
   user_id: number | null;
   request_id: string | null;
+  source: string | null;
   created_at: string;
 }
 
@@ -154,7 +158,7 @@ export async function listAuditLog(
   const sql = `
     SELECT id, action, table_name, record_id, record_ref,
            old_values, new_values, actor, user_id, request_id,
-           created_at::text AS created_at
+           source, created_at::text AS created_at
       FROM audit_log
     ${where}
     ORDER BY COALESCE(created_at, '-infinity'::timestamptz) DESC, id DESC
@@ -178,6 +182,7 @@ export async function listAuditLog(
     actor: (r.actor as string) ?? null,
     user_id: r.user_id != null ? Number(r.user_id) : null,
     request_id: (r.request_id as string) ?? null,
+    source: (r.source as string) ?? null,
     created_at: r.created_at as string,
   }));
 

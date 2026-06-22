@@ -13,6 +13,7 @@
 import { pool } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
 import { ENVISION_NAICS } from '../constants/envision-naics.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 export interface AutoPassResult {
   scanned: number;
@@ -52,8 +53,8 @@ export async function runAutoPassDeadline(): Promise<AutoPassResult> {
 
   for (const opp of candidates) {
     // Check current pipeline stage
-    const { rows: pipelineRows } = await pool.query<{ stage: string }>(
-      `SELECT stage FROM pipeline_items
+    const { rows: pipelineRows } = await pool.query<{ id: string; stage: string }>(
+      `SELECT id::text, stage FROM pipeline_items
        WHERE opportunity_id = $1
        ORDER BY id DESC LIMIT 1`,
       [opp.id],
@@ -99,12 +100,29 @@ export async function runAutoPassDeadline(): Promise<AutoPassResult> {
 
     // Update the EXISTING user-owned pipeline item's stage to no_bid.
     // Preserve capture_owner — never overwrite it with 'system'.
+    const piId = Number(pipelineRows[0].id);
+
     await pool.query(
       `UPDATE pipeline_items SET stage = 'no_bid', updated_at = NOW()
        WHERE opportunity_id = $1
          AND id = (SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1)`,
       [opp.id],
     );
+
+    // F-600: audit trail for system-initiated stage change (auto-pass deadline)
+    if (piId != null) {
+      recordAuditLog(pool, {
+        action: 'UPDATE',
+        table_name: 'pipeline_items',
+        record_id: piId,
+        old_values: { stage: currentStage },
+        new_values: { stage: 'no_bid' },
+        actor: 'auto-pass-deadline',
+        source: 'system',
+      }).catch((err) => {
+        logger.warn({ err, opportunityId: opp.id }, 'F-600 audit_log write failed (non-critical)');
+      });
+    }
 
     result.passed++;
     logger.info(
