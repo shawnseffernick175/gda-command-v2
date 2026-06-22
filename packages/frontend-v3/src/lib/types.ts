@@ -1096,6 +1096,18 @@ export interface P2MonthlyActual {
   ros: number;
 }
 
+export interface IncomeStatementLineItem {
+  period: string;
+  revenue: number;
+  direct_costs: number;
+  gross_profit: number;
+  gross_margin_pct: number;
+  operating_expenses: number;
+  ebit: number;
+  ros_pct: number;
+  new_orders: number;
+}
+
 export interface P2FinancialsData {
   kpi: {
     ytd_revenue: number;
@@ -1109,6 +1121,10 @@ export interface P2FinancialsData {
     plan_ebit: number;
     plan_gross_margin: number;
   } | null;
+  income_statement: {
+    months: IncomeStatementLineItem[];
+    quarters: IncomeStatementLineItem[];
+  };
   monthly_actuals: P2MonthlyActual[];
   cost_by_pool: CostByPool[];
   meta: FinancialMeta;
