@@ -176,12 +176,12 @@ function CompetitorsContent() {
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
               <SortableHeader label="Company" field="name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="NAICS" field="naics_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Wins" field="win_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Total Obligated" field="total_obligated" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Largest Award" field="largest_award" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Last Win" field="last_win" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Agencies" field="agency_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="NAICS" field="naics_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>
@@ -221,6 +221,14 @@ function CompetitorsContent() {
                         <span className="text-[11px] text-muted-foreground font-mono">{c.awardee_uei}</span>
                       )}
                     </td>
+                    <td className="px-3 py-2 text-left text-xs text-muted-foreground">
+                      <span title={c.naics_codes?.join(", ")}>
+                        {naicsDisplay}
+                        {naicsMore > 0 && (
+                          <span className="text-[11px] ml-1">+{naicsMore}</span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-left">
                       <Badge variant="outline" className="text-[11px] font-mono">
                         {c.win_count}
@@ -243,14 +251,6 @@ function CompetitorsContent() {
                         {agencyDisplay}
                         {agencyMore > 0 && (
                           <span className="text-[11px] text-muted-foreground ml-1">+{agencyMore}</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-left text-xs text-muted-foreground">
-                      <span title={c.naics_codes?.join(", ")}>
-                        {naicsDisplay}
-                        {naicsMore > 0 && (
-                          <span className="text-[11px] ml-1">+{naicsMore}</span>
                         )}
                       </span>
                     </td>

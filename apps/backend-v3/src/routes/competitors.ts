@@ -7,9 +7,25 @@ import { ENVISION_COMPANY_CONTEXT } from '../constants/envision-naics.js';
 export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/competitors — aggregated from USAspending awards table
   app.get('/v3/competitors', async (req, reply) => {
-    const query = req.query as { q?: string; naics?: string; limit?: string; page?: string };
+    const query = req.query as { q?: string; naics?: string; limit?: string; page?: string; sort_by?: string; sort_dir?: string };
     const limit = Math.min(Number(query.limit ?? 50), 200);
     const pageParam = query.page ? Number(query.page) : undefined;
+
+    // Whitelist valid sort columns to prevent SQL injection
+    const SORTABLE_COLUMNS: Record<string, string> = {
+      name: 'name',
+      win_count: 'win_count',
+      total_obligated: 'total_obligated',
+      largest_award: 'largest_award',
+      last_win: 'last_win_date',
+      last_win_date: 'last_win_date',
+      agency_count: 'agency_count',
+      naics_count: 'naics_count',
+    };
+    const sortCol = SORTABLE_COLUMNS[query.sort_by ?? ''] ?? 'win_count';
+    const sortDir = query.sort_dir === 'asc' ? 'ASC' : 'DESC';
+    const nullsClause = sortDir === 'ASC' ? 'NULLS FIRST' : 'NULLS LAST';
+    const orderBy = `${sortCol} ${sortDir} ${nullsClause}`;
 
     const conditions: string[] = ['awardee_name IS NOT NULL', "awardee_name <> ''"];
     const params: unknown[] = [];
@@ -49,8 +65,12 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
           max(a.award_date)                                               AS last_win_date,
           array_agg(DISTINCT a.agency_name ORDER BY a.agency_name)
             FILTER (WHERE a.agency_name IS NOT NULL AND a.agency_name <> '') AS agencies,
+          count(DISTINCT a.agency_name)
+            FILTER (WHERE a.agency_name IS NOT NULL AND a.agency_name <> '')::int AS agency_count,
           array_agg(DISTINCT a.naics ORDER BY a.naics)
             FILTER (WHERE a.naics IS NOT NULL AND a.naics <> '')          AS naics_codes,
+          count(DISTINCT a.naics)
+            FILTER (WHERE a.naics IS NOT NULL AND a.naics <> '')::int     AS naics_count,
           array_agg(DISTINCT a.set_aside ORDER BY a.set_aside)
             FILTER (WHERE a.set_aside IS NOT NULL
               AND a.set_aside NOT IN ('NONE', ''))                        AS set_asides,
@@ -62,7 +82,7 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
         LEFT JOIN competitor_analysis_cache cac ON cac.competitor_name = a.awardee_name
         WHERE ${whereClause.replace(/awardee_name/g, 'a.awardee_name').replace(/naics ILIKE/g, 'a.naics ILIKE')}
         GROUP BY a.awardee_name, a.awardee_uei, cac.competitor_analysis
-        ORDER BY win_count DESC
+        ORDER BY ${orderBy}
         LIMIT $${params.length - 1} OFFSET $${params.length}`;
 
       const { rows } = await pool.query(dataSql, params);
@@ -84,8 +104,12 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
         max(a.award_date)                                               AS last_win_date,
         array_agg(DISTINCT a.agency_name ORDER BY a.agency_name)
           FILTER (WHERE a.agency_name IS NOT NULL AND a.agency_name <> '') AS agencies,
+        count(DISTINCT a.agency_name)
+          FILTER (WHERE a.agency_name IS NOT NULL AND a.agency_name <> '')::int AS agency_count,
         array_agg(DISTINCT a.naics ORDER BY a.naics)
           FILTER (WHERE a.naics IS NOT NULL AND a.naics <> '')          AS naics_codes,
+        count(DISTINCT a.naics)
+          FILTER (WHERE a.naics IS NOT NULL AND a.naics <> '')::int     AS naics_count,
         array_agg(DISTINCT a.set_aside ORDER BY a.set_aside)
           FILTER (WHERE a.set_aside IS NOT NULL
             AND a.set_aside NOT IN ('NONE', ''))                        AS set_asides,
@@ -97,7 +121,7 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
       LEFT JOIN competitor_analysis_cache cac ON cac.competitor_name = a.awardee_name
       WHERE ${whereClause.replace(/awardee_name/g, 'a.awardee_name').replace(/naics ILIKE/g, 'a.naics ILIKE')}
       GROUP BY a.awardee_name, a.awardee_uei, cac.competitor_analysis
-      ORDER BY win_count DESC
+      ORDER BY ${orderBy}
       LIMIT $${params.length}`;
 
     const { rows } = await pool.query(sql, params);

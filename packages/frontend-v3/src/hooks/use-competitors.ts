@@ -89,5 +89,7 @@ export function useCompetitorAnalysis(competitorName: string | null) {
         `/v3/competitors/${encodeURIComponent(competitorName)}/analyze`,
       );
     },
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
