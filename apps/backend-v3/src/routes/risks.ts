@@ -3,6 +3,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import type { RiskGenerationInput, RiskGenerationOutput } from '../lib/llm-router.types.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 export async function risksRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/risks
@@ -109,7 +110,27 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
   // DELETE /v3/risks/:id
   app.delete('/v3/risks/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
+
+    const oldRes = await pool.query<{ id: number; title: string | null; category: string | null }>(
+      'SELECT id, title, category FROM risks WHERE id = $1',
+      [Number(id)],
+    );
+    const oldRow = oldRes.rows[0];
+
     await pool.query('DELETE FROM risks WHERE id = $1', [Number(id)]);
+
+    if (oldRow) {
+      recordAuditLog(pool, {
+        action: 'risk_delete',
+        table_name: 'risks',
+        record_id: Number(id),
+        old_values: oldRow,
+        new_values: null,
+        actor: 'user',
+        source: 'user',
+      }).catch(() => { /* best-effort */ });
+    }
+
     return reply.status(204).send();
   });
 

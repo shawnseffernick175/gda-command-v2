@@ -178,7 +178,6 @@ function CompetitorsContent() {
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
               <SortableHeader label="Company" field="name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-              <SortableHeader label="NAICS" field="naics_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Wins" field="win_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Total Obligated" field="total_obligated" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Largest Award" field="largest_award" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -190,14 +189,14 @@ function CompetitorsContent() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i} className="border-b border-border animate-pulse">
-                  <td colSpan={7} className="px-3 py-2">
+                  <td colSpan={6} className="px-3 py-2">
                     <div className="h-3 bg-gda-panel rounded w-3/4" />
                   </td>
                 </tr>
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-xs text-muted-foreground">
+                <td colSpan={6} className="px-3 py-8 text-center text-xs text-muted-foreground">
                   No competitors match this search
                 </td>
               </tr>
@@ -205,8 +204,6 @@ function CompetitorsContent() {
               items.map((c) => {
                 const agencyDisplay = c.agencies?.[0] ?? "—";
                 const agencyMore = (c.agencies?.length ?? 0) - 1;
-                const naicsDisplay = c.naics_codes?.[0] ?? "—";
-                const naicsMore = (c.naics_codes?.length ?? 0) - 1;
 
                 return (
                   <tr
@@ -222,14 +219,6 @@ function CompetitorsContent() {
                       {c.awardee_uei && (
                         <span className="text-[11px] text-muted-foreground font-mono">{c.awardee_uei}</span>
                       )}
-                    </td>
-                    <td className="px-3 py-2 text-left text-xs text-muted-foreground">
-                      <span title={c.naics_codes?.join(", ")}>
-                        {naicsDisplay}
-                        {naicsMore > 0 && (
-                          <span className="text-[11px] ml-1">+{naicsMore}</span>
-                        )}
-                      </span>
                     </td>
                     <td className="px-3 py-2 text-left">
                       <Badge variant="outline" className="text-[11px] font-mono">

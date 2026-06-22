@@ -7,6 +7,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { logger } from '../lib/logger.js';
 import { buildRegulatoryContext } from '../utils/regulatory-context.js';
 import { generateReviewKillItems } from '../jobs/reviewKillItemsJob.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 const STAGES = ['blue', 'pink', 'red', 'green', 'white'] as const;
 type WorkflowStage = (typeof STAGES)[number];
@@ -291,6 +292,18 @@ export async function captureWorkflowRoutes(app: FastifyInstance): Promise<void>
         });
       }
 
+      // Audit log for stage update
+      recordAuditLog(pool, {
+        action: 'capture_stage_update',
+        table_name: 'capture_color_stages',
+        record_id: row.id,
+        record_ref: `capture:${id}/stage:${stage}`,
+        old_values: null,
+        new_values: body,
+        actor: 'user',
+        source: 'user',
+      }).catch(() => { /* best-effort */ });
+
       // Re-fetch with annotations
       const updated = await pool.query<StageRow>('SELECT * FROM capture_color_stages WHERE capture_id = $1 AND stage = $2', [id, stage]);
       const annRes = await pool.query<AnnotationRow>('SELECT * FROM capture_stage_annotations WHERE stage_id = $1 ORDER BY created_at ASC', [updated.rows[0]!.id]);
@@ -425,6 +438,17 @@ export async function captureWorkflowRoutes(app: FastifyInstance): Promise<void>
       if (delRes.rowCount === 0) {
         return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Annotation not found', req.requestId));
       }
+
+      recordAuditLog(pool, {
+        action: 'capture_annotation_delete',
+        table_name: 'capture_stage_annotations',
+        record_id: Number(annotationId),
+        record_ref: `capture:${id}/stage:${stage}`,
+        old_values: { annotation_id: annotationId },
+        new_values: null,
+        actor: 'user',
+        source: 'user',
+      }).catch(() => { /* best-effort */ });
 
       return reply.status(200).send(successEnvelope({ deleted: true }, req.requestId));
     },

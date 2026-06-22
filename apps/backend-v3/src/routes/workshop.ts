@@ -20,6 +20,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import { logger } from '../lib/logger.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 const UPLOAD_DIR = join(process.cwd(), 'data', 'workshop');
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -603,6 +604,16 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
     const vaultPaths = vaultRes.rows.map((r) => r.file_path);
 
     await pool.query('DELETE FROM document_uploads WHERE id = $1', [id]);
+
+    recordAuditLog(pool, {
+      action: 'workshop_upload_delete',
+      table_name: 'document_uploads',
+      record_id: Number(id),
+      old_values: { storage_path: storagePath },
+      new_values: null,
+      actor: 'user',
+      source: 'user',
+    }).catch(() => { /* best-effort */ });
 
     // Clean up physical files (best-effort)
     const { unlink } = await import('node:fs/promises');

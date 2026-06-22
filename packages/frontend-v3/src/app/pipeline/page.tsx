@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
@@ -118,11 +119,44 @@ export default function PipelinePage() {
 }
 
 function PipelineContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [search, setSearch] = useState("");
-  const [activeBucket, setActiveBucket] = useState<string | null>(null);
   const [moversOpen, setMoversOpen] = useState(true);
-  const [page, setPage] = useState(1);
   const { sortBy, sortDir, handleSort } = useTableSort();
+
+  // Persist stage filter + page in URL so sort survives filter changes
+  const activeBucket = searchParams.get("stage_filter") || null;
+  const page = Number(searchParams.get("page") ?? "1") || 1;
+
+  const setActiveBucket = useCallback(
+    (bucket: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (bucket) {
+        params.set("stage_filter", bucket);
+      } else {
+        params.delete("stage_filter");
+      }
+      params.delete("page");
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router, pathname],
+  );
+
+  const setPage = useCallback(
+    (p: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (p <= 1) {
+        params.delete("page");
+      } else {
+        params.set("page", String(p));
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router, pathname],
+  );
 
   const { data: summary, isLoading: summaryLoading } = usePipelineSummary();
 
@@ -153,7 +187,7 @@ function PipelineContent() {
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (filterKey !== prevFilterKey) {
     setPrevFilterKey(filterKey);
-    setPage(1);
+    if (page !== 1) setPage(1);
   }
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -175,9 +209,9 @@ function PipelineContent() {
 
   const handleBucketClick = useCallback(
     (label: string) => {
-      setActiveBucket((prev) => (prev === label ? null : label));
+      setActiveBucket(activeBucket === label ? null : label);
     },
-    [],
+    [activeBucket, setActiveBucket],
   );
 
   const isLoading = summaryLoading || listLoading;

@@ -3,6 +3,7 @@ import { pool } from '../lib/db.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
+import { recordAuditLog } from '../services/audit/audit-log.js';
 
 // Live, user-specific financials read from the DB on every request. They must
 // never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
@@ -937,6 +938,16 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       client.release();
     }
 
+    recordAuditLog(pool, {
+      action: 'financial_plan_upsert',
+      table_name: 'financial_plan',
+      record_ref: `fy:${fiscalYear}`,
+      old_values: null,
+      new_values: { fiscal_year: fiscalYear, plan_orders: planOrders, plan_sales: planSales, plan_ebit: planEbit, plan_gross_margin: planGm, plan_ros: planRos },
+      actor: 'user',
+      source: 'user',
+    }).catch(() => { /* best-effort */ });
+
     return reply.send(successEnvelope({
       fiscal_year: fiscalYear,
       fy: fyShort,
@@ -978,6 +989,16 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       `DELETE FROM financial_plan WHERE ${where}`,
       params,
     );
+
+    recordAuditLog(pool, {
+      action: 'financial_plan_delete',
+      table_name: 'financial_plan',
+      record_ref: fiscalYear ? `fy:${fiscalYear}` : 'all_seed',
+      old_values: { cleared: rowCount ?? 0, fiscal_year: fiscalYear },
+      new_values: null,
+      actor: 'user',
+      source: 'user',
+    }).catch(() => { /* best-effort */ });
 
     return reply.send(successEnvelope({
       cleared: rowCount ?? 0,
