@@ -500,7 +500,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const statusFilter = q.status || null;
     const primeOrSub = q.prime_or_sub || null;
 
-    let whereClause = 'WHERE 1=1';
+    let whereClause = 'WHERE t.is_seed = FALSE';
     const params: (string | number)[] = [];
     let paramIdx = 0;
 
@@ -599,11 +599,12 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const earliestPop = allStarts.length > 0 ? allStarts.sort()[0] : null;
     const latestPop = allEnds.length > 0 ? allEnds.sort().reverse()[0] : null;
 
-    // Fetch available parent vehicles for filters
+    // Fetch available parent vehicles for filters (only from real data)
     const { rows: vehicleRows } = await pool.query(
       `SELECT DISTINCT cv.id, cv.short_name
        FROM contract_vehicles cv
        INNER JOIN task_orders t ON t.parent_vehicle_id = cv.id
+       WHERE t.is_seed = FALSE
        ORDER BY cv.short_name`,
     );
 
@@ -1276,5 +1277,180 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       analysis: output?.analysis ?? 'Analysis unavailable.',
       generated_at: new Date().toISOString(),
     }, req.requestId));
+  });
+
+  // ─── Task Order CRUD (F-608) ───────────────────────────────────
+
+  // POST /v3/financials/task-orders — create a single task order
+  app.post('/v3/financials/task-orders', async (req, reply) => {
+    const body = req.body as {
+      to_name: string;
+      to_number: string;
+      parent_vehicle_id?: number | null;
+      prime_or_sub: 'PRIME' | 'SUB';
+      customer_agency?: string | null;
+      contracting_office?: string | null;
+      pop_start?: string | null;
+      pop_end?: string | null;
+      total_ceiling?: number | null;
+      funded_to_date?: number | null;
+      status?: string;
+      notes?: string | null;
+    };
+
+    if (!body.to_name || !body.to_number || !body.prime_or_sub) {
+      return reply.status(400).send(errorEnvelope(
+        'VALIDATION_ERROR',
+        'to_name, to_number, and prime_or_sub are required',
+        req.requestId,
+      ));
+    }
+
+    // Resolve parent vehicle short_name if parent_vehicle_id is provided
+    let parentShortName: string | null = null;
+    if (body.parent_vehicle_id) {
+      const { rows: vRows } = await pool.query(
+        'SELECT short_name FROM contract_vehicles WHERE id = $1',
+        [body.parent_vehicle_id],
+      );
+      if (vRows.length > 0) {
+        parentShortName = vRows[0].short_name as string;
+      }
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO task_orders
+         (to_name, to_number, parent_vehicle_id, parent_vehicle_short_name,
+          prime_or_sub, customer_agency, contracting_office,
+          pop_start, pop_end, total_ceiling, funded_to_date,
+          status, notes, is_seed)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, FALSE)
+       RETURNING id`,
+      [
+        body.to_name,
+        body.to_number,
+        body.parent_vehicle_id ?? null,
+        parentShortName,
+        body.prime_or_sub,
+        body.customer_agency ?? null,
+        body.contracting_office ?? null,
+        body.pop_start ?? null,
+        body.pop_end ?? null,
+        body.total_ceiling ?? null,
+        body.funded_to_date ?? null,
+        body.status ?? 'active',
+        body.notes ?? null,
+      ],
+    );
+
+    return reply.status(201).send(successEnvelope({ id: rows[0].id }, req.requestId));
+  });
+
+  // POST /v3/financials/task-orders/bulk — import multiple task orders at once
+  app.post('/v3/financials/task-orders/bulk', async (req, reply) => {
+    const body = req.body as {
+      task_orders: Array<{
+        to_name: string;
+        to_number: string;
+        parent_vehicle_short_name?: string | null;
+        prime_or_sub: 'PRIME' | 'SUB';
+        customer_agency?: string | null;
+        contracting_office?: string | null;
+        pop_start?: string | null;
+        pop_end?: string | null;
+        total_ceiling?: number | null;
+        funded_to_date?: number | null;
+        status?: string;
+        notes?: string | null;
+      }>;
+    };
+
+    if (!body.task_orders || !Array.isArray(body.task_orders) || body.task_orders.length === 0) {
+      return reply.status(400).send(errorEnvelope(
+        'VALIDATION_ERROR',
+        'task_orders array is required and must not be empty',
+        req.requestId,
+      ));
+    }
+
+    const ids: number[] = [];
+    let skipped = 0;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const to of body.task_orders) {
+        if (!to.to_name || !to.to_number || !to.prime_or_sub) {
+          skipped++;
+          continue;
+        }
+
+        // Try to resolve parent vehicle by short_name
+        let parentVehicleId: number | null = null;
+        if (to.parent_vehicle_short_name) {
+          const { rows: vRows } = await client.query(
+            'SELECT id FROM contract_vehicles WHERE short_name ILIKE $1 LIMIT 1',
+            [to.parent_vehicle_short_name],
+          );
+          if (vRows.length > 0) parentVehicleId = Number(vRows[0].id);
+        }
+
+        const { rows } = await client.query(
+          `INSERT INTO task_orders
+             (to_name, to_number, parent_vehicle_id, parent_vehicle_short_name,
+              prime_or_sub, customer_agency, contracting_office,
+              pop_start, pop_end, total_ceiling, funded_to_date,
+              status, notes, is_seed)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, FALSE)
+           RETURNING id`,
+          [
+            to.to_name,
+            to.to_number,
+            parentVehicleId,
+            to.parent_vehicle_short_name ?? null,
+            to.prime_or_sub,
+            to.customer_agency ?? null,
+            to.contracting_office ?? null,
+            to.pop_start ?? null,
+            to.pop_end ?? null,
+            to.total_ceiling ?? null,
+            to.funded_to_date ?? null,
+            to.status ?? 'active',
+            to.notes ?? null,
+          ],
+        );
+        ids.push(Number(rows[0].id));
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    return reply.status(201).send(successEnvelope({
+      inserted: ids.length,
+      skipped,
+      ids,
+    }, req.requestId));
+  });
+
+  // DELETE /v3/financials/task-orders/:id — delete a single task order
+  app.delete('/v3/financials/task-orders/:id', async (req, reply) => {
+    const id = Number((req.params as Record<string, string>).id);
+    if (!id || isNaN(id)) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'Invalid task order ID', req.requestId));
+    }
+
+    const { rowCount } = await pool.query(
+      'DELETE FROM task_orders WHERE id = $1',
+      [id],
+    );
+
+    if (!rowCount) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Task order not found', req.requestId));
+    }
+
+    return reply.send(successEnvelope({ deleted: true }, req.requestId));
   });
 }
