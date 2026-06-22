@@ -271,7 +271,7 @@ async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<str
   return '';
 }
 
-type ExtractionStatus = 'pending' | 'success' | 'failed' | 'unsupported';
+type ExtractionStatus = 'pending' | 'success' | 'failed' | 'unsupported' | 'dismissed';
 
 const SUPPORTED_EXTENSIONS = new Set(['pdf', 'docx', 'txt', 'csv', 'xlsx', 'zip', 'msg']);
 
@@ -1282,15 +1282,63 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
+  // POST /v3/vault/:id/dismiss — mark a failed/unsupported upload as dismissed
+  // so it no longer counts as unresolved. The document stays in the vault (not
+  // deleted) but the owner has acknowledged the extraction issue.
+  app.post('/v3/vault/:id/dismiss', async (req, reply) => {
+    const { id } = req.params as { id: string };
+
+    const docRes = await pool.query<{ id: number; extraction_status: string }>(
+      `SELECT id, extraction_status FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+
+    if (!docRes.rows[0]) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Document not found', req.requestId),
+      );
+    }
+
+    const current = docRes.rows[0].extraction_status;
+    if (current === 'success') {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'Cannot dismiss a successfully extracted document', req.requestId),
+      );
+    }
+
+    await pool.query(
+      `UPDATE vault_documents SET extraction_status = 'dismissed', updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
+
+    await insertAudit(Number(id), 'dismissed', 'admin', `Previous status: ${current}`);
+
+    const updated = await pool.query<VaultDocumentRow>(
+      `SELECT d.*, o.title AS opp_title,
+        (SELECT o2.title FROM captures c JOIN pipeline_items pi ON pi.id = c.pipeline_item_id JOIN opportunities o2 ON o2.id = pi.opportunity_id WHERE c.id = d.linked_capture_id LIMIT 1) AS capture_title,
+        a_ref.awardee_name AS award_title
+       FROM vault_documents d
+       LEFT JOIN opportunities o ON o.id = d.linked_opportunity_id
+       LEFT JOIN awards a_ref ON a_ref.id = d.linked_award_id
+       WHERE d.id = $1`,
+      [id],
+    );
+
+    return reply.send(
+      successEnvelope(updated.rows[0], req.requestId),
+    );
+  });
+
   // GET /v3/vault/unresolved-count — how many docs still need resolution
-  // (extraction_status is anything other than 'success': failed / pending /
-  // unsupported). Drives the "Resolve all" button + its badge in the UI.
+  // (extraction_status is 'failed' or 'pending'). 'success', 'unsupported',
+  // and 'dismissed' are excluded — unsupported files have no extractor and
+  // dismissed items were explicitly cleared by the owner.
   app.get('/v3/vault/unresolved-count', async (req, reply) => {
     const res = await pool.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count
          FROM vault_documents
         WHERE deleted_at IS NULL
-          AND extraction_status IS DISTINCT FROM 'success'`,
+          AND extraction_status IN ('failed', 'pending')`,
     );
     return reply.send(
       successEnvelope({ count: res.rows[0]?.count ?? 0 }, req.requestId),
@@ -1299,9 +1347,8 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /v3/vault/resolve-all — re-run the full re-extract + AI parse +
   // structured-ingest pipeline on EVERY unresolved document (extraction_status
-  // != 'success'). This is the bulk equivalent of clicking "Re-extract" on each
-  // unresolved row. Idempotent. 'unsupported' file types (no extractor) cannot
-  // be resolved and remain reported as unresolved — they are not failures.
+  // is 'failed' or 'pending'). Skips 'unsupported' (no extractor) and
+  // 'dismissed' (owner explicitly cleared). Idempotent.
   app.post('/v3/vault/resolve-all', async (req, reply) => {
     const { rows: docs } = await pool.query<{
       id: number;
@@ -1312,8 +1359,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
       `SELECT id, filename, file_path, doc_type
          FROM vault_documents
         WHERE deleted_at IS NULL
-          AND extraction_status IS DISTINCT FROM 'success'
-          AND extraction_status IS DISTINCT FROM 'unsupported'
+          AND extraction_status IN ('failed', 'pending')
         ORDER BY id`,
     );
 

@@ -15,6 +15,7 @@ import {
   useUpdateVaultDocType,
   useRegulatoryCatalog,
   useReExtractVaultDocument,
+  useDismissVaultDocument,
   useVaultUnresolvedCount,
   useResolveAllVault,
 } from "@/hooks/use-vault";
@@ -130,6 +131,15 @@ function ExtractionStatusBadge({ status }: { status: string }) {
           className="inline-block rounded px-1.5 py-0.5 text-[11px] font-mono border border-gda-amber/40 bg-gda-amber/10 text-gda-amber"
         >
           N/A
+        </span>
+      );
+    case "dismissed":
+      return (
+        <span
+          title="Dismissed by owner"
+          className="inline-block rounded px-1.5 py-0.5 text-[11px] font-mono border border-border text-muted-foreground"
+        >
+          CLEARED
         </span>
       );
     default:
@@ -492,6 +502,7 @@ function WorkProductTable({
 }) {
   const updateDocType = useUpdateVaultDocType();
   const reExtract = useReExtractVaultDocument();
+  const dismiss = useDismissVaultDocument();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { sortBy, sortDir, handleSort } = useTableSort("vault");
 
@@ -629,7 +640,7 @@ function WorkProductTable({
                   >
                     Link
                   </button>
-                  {doc.extraction_status !== 'success' && (
+                  {(doc.extraction_status === 'failed' || doc.extraction_status === 'pending') && (
                     <button
                       onClick={() => reExtract.mutate(doc.id, {
                         onError: () => setErrorMsg("Re-extraction failed. Try again."),
@@ -637,7 +648,18 @@ function WorkProductTable({
                       disabled={reExtract.isPending}
                       className="text-[11px] text-gda-amber hover:text-gda-amber/80 font-mono"
                     >
-                      {reExtract.isPending && reExtract.variables === doc.id ? "Extracting\u2026" : "Re-extract"}
+                      {reExtract.isPending && reExtract.variables === doc.id ? "Extracting\u2026" : "Retry"}
+                    </button>
+                  )}
+                  {doc.extraction_status !== 'success' && doc.extraction_status !== 'dismissed' && (
+                    <button
+                      onClick={() => dismiss.mutate(doc.id, {
+                        onError: () => setErrorMsg("Dismiss failed. Try again."),
+                      })}
+                      disabled={dismiss.isPending}
+                      className="text-[11px] text-muted-foreground hover:text-foreground font-mono"
+                    >
+                      {dismiss.isPending && dismiss.variables === doc.id ? "Clearing\u2026" : "Dismiss"}
                     </button>
                   )}
                   {!doc.is_system_doc && (
@@ -866,6 +888,8 @@ function DocumentReaderDrawer({
 }) {
   const { data: doc, isLoading } = useVaultDocument(docId);
   const { data: textData } = useVaultDocumentText(docId);
+  const reExtract = useReExtractVaultDocument();
+  const dismiss = useDismissVaultDocument();
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -1116,6 +1140,36 @@ function DocumentReaderDrawer({
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Extraction status + recovery actions */}
+              {doc.extraction_status !== 'success' && (
+                <div className="space-y-2">
+                  <h3 className="font-mono text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Extraction Status
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <ExtractionStatusBadge status={doc.extraction_status} />
+                    {(doc.extraction_status === 'failed' || doc.extraction_status === 'pending') && (
+                      <button
+                        onClick={() => reExtract.mutate(doc.id)}
+                        disabled={reExtract.isPending}
+                        className="rounded border border-gda-amber/40 bg-gda-amber/10 px-3 py-1 text-[11px] font-mono text-gda-amber hover:bg-gda-amber/20 transition-colors disabled:opacity-50"
+                      >
+                        {reExtract.isPending ? "Retrying\u2026" : "Retry Extraction"}
+                      </button>
+                    )}
+                    {doc.extraction_status !== 'dismissed' && (
+                      <button
+                        onClick={() => dismiss.mutate(doc.id)}
+                        disabled={dismiss.isPending}
+                        className="rounded border border-border px-3 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel transition-colors disabled:opacity-50"
+                      >
+                        {dismiss.isPending ? "Clearing\u2026" : "Dismiss"}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
