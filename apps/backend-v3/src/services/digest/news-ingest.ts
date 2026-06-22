@@ -32,9 +32,11 @@ const WHEELHOUSE_AGENCIES = [
   'dod', 'army', 'navy', 'usaf', 'air force', 'dla', 'dcsa', 'defense',
   'hhs', 'cdc', 'fda', 'cms', 'nih', 'ihs',
   'opm', 'noaa', 'uspto', 'dhs', 'nasa',
-  'gsa', 'va ', 'faa', 'uscg', 'coast guard',
+  'gsa', 'faa', 'uscg', 'coast guard',
   'pentagon', 'department of defense', 'tradoc', 'tacom',
 ];
+
+const VA_WORD_BOUNDARY = /\bva\b/;
 
 function isWheelhouse(title: string, blurb: string): boolean {
   const text = `${title} ${blurb}`.toLowerCase();
@@ -44,6 +46,7 @@ function isWheelhouse(title: string, blurb: string): boolean {
   for (const ag of WHEELHOUSE_AGENCIES) {
     if (text.includes(ag)) return true;
   }
+  if (VA_WORD_BOUNDARY.test(text)) return true;
   return false;
 }
 
@@ -114,8 +117,9 @@ function parseRssItems(xml: string, sourceName: string): RawNewsItem[] {
       const title = stripHtml(titleMatch[1] ?? '');
       const blurb = firstSentence(descMatch?.[1] ?? '');
       const url = (linkMatch[1] ?? '').trim();
-      const published_at = dateMatch?.[1]
-        ? new Date(dateMatch[1].trim()).toISOString()
+      const rawDate = dateMatch?.[1] ? new Date(dateMatch[1].trim()) : null;
+      const published_at = rawDate && !isNaN(rawDate.getTime())
+        ? rawDate.toISOString()
         : new Date().toISOString();
 
       if (title && url) {

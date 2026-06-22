@@ -238,7 +238,7 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
       items?: Array<{ topic: string; discussion?: string; action_items?: string; sort_order?: number }>;
     };
 
-    if (!body.sitrep_number || !body.week_ending) {
+    if (body.sitrep_number == null || !body.week_ending) {
       return reply.status(400).send(
         errorEnvelope('VALIDATION_ERROR', 'sitrep_number and week_ending are required', req.requestId),
       );
