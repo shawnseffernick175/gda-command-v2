@@ -52,7 +52,7 @@ export default function GovConNews() {
             <p className="font-mono text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
               {item.blurb}
             </p>
-            <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
               <span>{item.source_name}</span>
               <span>{formatNewsDate(item.published_at)}</span>
               {!item.is_wheelhouse && (

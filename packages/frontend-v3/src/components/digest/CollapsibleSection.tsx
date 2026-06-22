@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useCallback, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface CollapsibleSectionProps {
@@ -28,17 +28,17 @@ export default function CollapsibleSection({
   children,
   defaultExpanded = true,
 }: CollapsibleSectionProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(() =>
+    getStoredState(id, defaultExpanded),
+  );
 
-  useEffect(() => {
-    setExpanded(getStoredState(id, defaultExpanded));
-  }, [id, defaultExpanded]);
-
-  function toggle() {
-    const next = !expanded;
-    setExpanded(next);
-    setStoredState(id, next);
-  }
+  const toggle = useCallback(() => {
+    setExpanded((prev) => {
+      const next = !prev;
+      setStoredState(id, next);
+      return next;
+    });
+  }, [id]);
 
   return (
     <div className="rounded border border-border bg-gda-panel">

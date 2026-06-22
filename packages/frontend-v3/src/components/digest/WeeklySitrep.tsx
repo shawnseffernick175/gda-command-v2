@@ -29,6 +29,10 @@ function getNextFriday(): string {
   return d.toISOString().slice(0, 10);
 }
 
+const WEEK_AGO_ISO = new Date(Date.now() - 7 * 86_400_000)
+  .toISOString()
+  .slice(0, 10);
+
 export default function WeeklySitrep() {
   const { data: sitreps, isLoading } = useSitreps();
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -90,13 +94,13 @@ export default function WeeklySitrep() {
         <table className="w-full font-mono text-xs">
           <thead>
             <tr className="border-b border-border">
-              <th className="py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 #
               </th>
-              <th className="py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 Week Ending
               </th>
-              <th className="py-1.5 text-right text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+              <th className="py-1.5 text-right text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 Created
               </th>
             </tr>
@@ -179,9 +183,7 @@ function SitrepDetail({
     return <Skeleton className="h-40 bg-gda-panel-alt" />;
   }
 
-  const isCurrentWeek =
-    sitrep.week_ending >=
-    new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const isCurrentWeek = sitrep.week_ending >= WEEK_AGO_ISO;
 
   return (
     <div className="space-y-3">
@@ -264,16 +266,16 @@ function SitrepItemsTable({ items }: { items: SitrepItem[] }) {
     <table className="w-full font-mono text-xs">
       <thead>
         <tr className="border-b border-border">
-          <th className="py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium w-8">
+          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium w-8">
             #
           </th>
-          <th className="py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
             Topic
           </th>
-          <th className="py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
             Discussion
           </th>
-          <th className="py-1.5 text-left text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+          <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
             Action Items / Follow-Up
           </th>
         </tr>
