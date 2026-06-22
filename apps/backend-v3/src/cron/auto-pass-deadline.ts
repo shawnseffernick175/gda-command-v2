@@ -1,134 +1,134 @@
 /**
  * Auto-pass deadline job — daily cron.
  *
- * CEO rule: any in-pipeline opportunity where response_due_at < NOW() + 30 days
- * AND it has NOT been actively worked (no capture in flight, no proposal stage)
- * gets moved to no_bid with reason 'auto_pass_too_late_to_capture'.
+ * CEO rule (binding): any opportunity where response_due_at < NOW() + 30 days
+ * is auto-passed. This is a day-one OPPORTUNITIES rule with ZERO pipeline
+ * involvement. The cron marks opportunities directly on the opportunities table
+ * (relevance_status='auto_pass', assessment_status='pass') so they drop out of
+ * the Active list while remaining reversible via the rescue endpoint.
  *
- * Idempotent: if already no_bid/won/lost/gov_cancelled, skip.
- * Does NOT auto-pass opportunities in active capture or proposal stages
- * (pursue, solicitation, post_submittal) — those are human decisions.
+ * Scope:
+ *   - Operates on the opportunities table ONLY (no pipeline_items reads/writes).
+ *   - Skips rows already terminally disposed (auto_pass, manual_pass, off_profile,
+ *     unknown_naics).
+ *   - Every disposition change writes an audit_log row.
+ *   - Idempotent: re-running on an already-passed row is a no-op.
  */
 
 import { pool } from '../lib/db.js';
 import { logger } from '../lib/logger.js';
-import { ENVISION_NAICS } from '../constants/envision-naics.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
 
 export interface AutoPassResult {
   scanned: number;
   passed: number;
-  skipped_active_capture: number;
-  skipped_already_terminal: number;
+  skipped_already_disposed: number;
 }
 
-export async function runAutoPassDeadline(): Promise<AutoPassResult> {
+/**
+ * Core auto-pass logic. Exported so the backfill endpoint can reuse it.
+ *
+ * @param dryRun  When true, returns counts without mutating data.
+ */
+export async function runAutoPassDeadline(
+  opts: { dryRun?: boolean } = {},
+): Promise<AutoPassResult> {
   const startMs = Date.now();
   logger.info('[auto-pass-deadline] starting daily scan');
 
   const result: AutoPassResult = {
     scanned: 0,
     passed: 0,
-    skipped_active_capture: 0,
-    skipped_already_terminal: 0,
+    skipped_already_disposed: 0,
   };
 
-  // Find in-NAICS opportunities closing in <30 days that are not deleted
+  // Find opportunities closing within 30 days (or already past due within 30
+  // days) that are still in a non-terminal relevance state. These are the rows
+  // that currently show in Active when they should not.
   const { rows: candidates } = await pool.query<{
     id: string;
     title: string;
     response_due_at: string;
+    relevance_status: string | null;
+    assessment_status: string;
   }>(
-    `SELECT id::text, title, response_due_at::text
-     FROM opportunities
-     WHERE naics = ANY($1)
-       AND response_due_at IS NOT NULL
-       AND response_due_at < NOW() + INTERVAL '30 days'
-       AND response_due_at > NOW() - INTERVAL '30 days'
-       AND deleted_at IS NULL`,
-    [ENVISION_NAICS],
+    `SELECT id::text, title, response_due_at::text,
+            relevance_status, assessment_status
+       FROM opportunities
+      WHERE response_due_at IS NOT NULL
+        AND response_due_at < NOW() + INTERVAL '30 days'
+        AND deleted_at IS NULL
+        AND (relevance_status IS NULL OR relevance_status = 'relevant')`,
   );
 
   result.scanned = candidates.length;
 
-  for (const opp of candidates) {
-    // Check current pipeline stage
-    const { rows: pipelineRows } = await pool.query<{ id: string; stage: string }>(
-      `SELECT id::text, stage FROM pipeline_items
-       WHERE opportunity_id = $1
-       ORDER BY id DESC LIMIT 1`,
-      [opp.id],
-    );
-
-    const currentStage = pipelineRows[0]?.stage ?? null;
-
-    // Skip if already in a terminal stage
-    if (currentStage && ['won', 'lost', 'no_bid', 'gov_cancelled'].includes(currentStage)) {
-      result.skipped_already_terminal++;
-      continue;
-    }
-
-    // Skip if in active capture stages (pursue, solicitation, post_submittal)
-    // — these are human decisions
-    if (currentStage && ['pursue', 'solicitation', 'post_submittal'].includes(currentStage)) {
-      result.skipped_active_capture++;
-      continue;
-    }
-
-    // Check if there's an active capture linked to this opportunity
-    const { rows: captureRows } = await pool.query<{ id: string }>(
-      `SELECT c.id FROM captures c
-       JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
-       WHERE pi.opportunity_id = $1
-       LIMIT 1`,
-      [opp.id],
-    );
-
-    if (captureRows.length > 0) {
-      result.skipped_active_capture++;
-      continue;
-    }
-
-    // Owner rule (binding): NOTHING enters the pipeline unless the user puts
-    // it there. This job NEVER creates a pipeline_item. If no card exists, the
-    // opportunity is left untouched — deadline assessment is handled by the
-    // intake assessment flow (relevance/assessment status), not the pipeline.
-    if (pipelineRows.length === 0) {
-      result.skipped_already_terminal++;
-      continue;
-    }
-
-    // Update the EXISTING user-owned pipeline item's stage to no_bid.
-    // Preserve capture_owner — never overwrite it with 'system'.
-    const piId = Number(pipelineRows[0].id);
-
-    await pool.query(
-      `UPDATE pipeline_items SET stage = 'no_bid', updated_at = NOW()
-       WHERE opportunity_id = $1
-         AND id = (SELECT id FROM pipeline_items WHERE opportunity_id = $1 ORDER BY id DESC LIMIT 1)`,
-      [opp.id],
-    );
-
-    // F-600: audit trail for system-initiated stage change (auto-pass deadline)
-    if (piId != null) {
-      recordAuditLog(pool, {
-        action: 'UPDATE',
-        table_name: 'pipeline_items',
-        record_id: piId,
-        old_values: { stage: currentStage },
-        new_values: { stage: 'no_bid' },
-        actor: 'auto-pass-deadline',
-        source: 'system',
-      }).catch((err) => {
-        logger.warn({ err, opportunityId: opp.id }, 'F-600 audit_log write failed (non-critical)');
-      });
-    }
-
-    result.passed++;
+  if (opts.dryRun) {
+    result.passed = candidates.length;
+    const durationMs = Date.now() - startMs;
     logger.info(
-      { opportunityId: opp.id, title: opp.title, response_due_at: opp.response_due_at },
-      '[auto-pass-deadline] existing pipeline item moved to no_bid (too late to capture; owner preserved)',
+      { ...result, durationMs, dryRun: true },
+      '[auto-pass-deadline] dry-run scan completed',
     );
+    return result;
+  }
+
+  for (const opp of candidates) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const oldRelevance = opp.relevance_status;
+      const oldAssessment = opp.assessment_status;
+
+      await client.query(
+        `UPDATE opportunities
+            SET relevance_status  = 'auto_pass',
+                relevance_reason  = $2,
+                assessment_status = 'pass',
+                assessment_reason = $2,
+                assessed_at       = NOW(),
+                updated_at        = NOW()
+          WHERE id = $1
+            AND deleted_at IS NULL
+            AND (relevance_status IS NULL OR relevance_status = 'relevant')`,
+        [
+          opp.id,
+          `auto_pass: response due ${opp.response_due_at} is within 30-day threshold`,
+        ],
+      );
+
+      await recordAuditLog(client, {
+        action: 'auto_pass_deadline',
+        table_name: 'opportunities',
+        record_id: Number(opp.id),
+        old_values: {
+          relevance_status: oldRelevance,
+          assessment_status: oldAssessment,
+        },
+        new_values: {
+          relevance_status: 'auto_pass',
+          assessment_status: 'pass',
+        },
+        actor: 'system:auto-pass-deadline',
+      });
+
+      await client.query('COMMIT');
+
+      result.passed++;
+      logger.info(
+        { opportunityId: opp.id, title: opp.title, response_due_at: opp.response_due_at },
+        '[auto-pass-deadline] opportunity auto-passed (deadline within 30 days)',
+      );
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.error(
+        { opportunityId: opp.id, error: err instanceof Error ? err.message : String(err) },
+        '[auto-pass-deadline] failed to auto-pass opportunity',
+      );
+    } finally {
+      client.release();
+    }
   }
 
   const durationMs = Date.now() - startMs;

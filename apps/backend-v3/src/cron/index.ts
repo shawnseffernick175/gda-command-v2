@@ -334,13 +334,14 @@ export function startCronScheduler(): void {
   tasks.push(idiqOpsPollTask);
   logger.info({ schedule: '5 * * * *' }, '[cron] registered: idiq-ops-poll (5 * * * *)');
   // Auto-pass deadline — daily at 07:00 UTC (03:00 ET, after incumbent enrichment)
-  // CEO rule: opportunities with <30 days to deadline and no active capture are auto-passed
+  // CEO rule (binding): any opportunity due within 30 days is auto-passed.
+  // ZERO pipeline involvement — operates on the opportunities table only.
   const autoPassDeadlineTask = cron.schedule('0 7 * * *', async () => {
     try {
       logger.info('[cron] auto-pass-deadline starting');
       const result = await runAutoPassDeadline();
       logger.info(
-        { scanned: result.scanned, passed: result.passed, skipped_active: result.skipped_active_capture, skipped_terminal: result.skipped_already_terminal },
+        { scanned: result.scanned, passed: result.passed, skipped_disposed: result.skipped_already_disposed },
         '[cron] auto-pass-deadline completed',
       );
     } catch (err) {
