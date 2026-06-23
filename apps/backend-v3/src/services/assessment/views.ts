@@ -11,7 +11,7 @@
 
 import { pool } from '../../lib/db.js';
 import { recordAuditLog } from '../audit/audit-log.js';
-import { normalizePipelineStage } from '../../lib/pipeline-stage.js';
+import { normalizePipelineStage, isTerminalStage } from '../../lib/pipeline-stage.js';
 
 export interface AssessmentListItem {
   id: string;
@@ -254,6 +254,12 @@ export async function promoteToPipeline(
     const normalizedStage = normalizePipelineStage(targetStage);
     if (!normalizedStage) {
       throw new PromoteError(`Unknown pipeline stage: ${targetStage}`, 400);
+    }
+    if (isTerminalStage(normalizedStage)) {
+      throw new PromoteError(
+        `Cannot promote to terminal stage "${normalizedStage}". Terminal decisions (won/lost/no_bid/gov_cancelled) are recorded directly, not via promote.`,
+        400,
+      );
     }
 
     const insertRes = await client.query<{ id: string }>(

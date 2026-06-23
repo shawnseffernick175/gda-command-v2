@@ -285,18 +285,22 @@ function OpportunityList() {
     setPage(1);
   }, []);
 
-  // Compute stage tab counts from meta
+  // Compute stage tab counts from meta.stage_counts (always computed from
+  // baseWhere, without the active stage filter) so every tab badge reflects
+  // its own independent count regardless of which tab is currently selected.
   const getStageCount = useCallback(
     (key: string): number => {
       if (!meta) return 0;
-      if (key === "all") return meta.total_count;
+      const sc = meta.stage_counts;
+      if (key === "all") {
+        return Object.values(sc).reduce((sum, v) => sum + v, 0);
+      }
       if (key === "active") {
-        const sc = meta.stage_counts;
         return Object.entries(sc)
           .filter(([k]) => !["won", "lost", "no_bid", "gov_cancelled", "passed"].includes(k))
           .reduce((sum, [, v]) => sum + v, 0);
       }
-      return meta.stage_counts[key] ?? 0;
+      return sc[key] ?? 0;
     },
     [meta],
   );

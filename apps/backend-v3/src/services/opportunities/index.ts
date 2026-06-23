@@ -360,11 +360,22 @@ export async function listOpportunities(
   if (filters.stage === 'passed') {
     conditions.push(`relevance_status IN ('auto_pass', 'manual_pass')`);
   } else {
-    // F-614 bucket scope: the owner's opportunities are ONLY those with
-    // relevance_status='relevant' (the assessed, qualified bucket) plus
-    // legacy rows with NULL. off_profile, unknown_naics, auto_pass,
-    // manual_pass are excluded — they are NOT the owner's opportunities.
-    conditions.push(`(relevance_status IS NULL OR relevance_status = 'relevant')`);
+    // F-614 bucket gate: qualified-only, fact-checked. An opportunity
+    // qualifies for the owner bucket ONLY if ALL of:
+    //   1. relevance_status = 'relevant' (assessed-qualified; NO NULL)
+    //   2. naics IN Envision NAICS (belt-and-suspenders with C1)
+    //   3. response_due_at IS NULL OR > NOW() + 30 days (not deadline-cut)
+    //   4. NOT a commodity purchase (mirrors isCommodityPurchase)
+    conditions.push(`relevance_status = 'relevant'`);
+    conditions.push(`naics = ANY($${paramIdx++})`);
+    params.push(ENVISION_NAICS as unknown as string[]);
+    conditions.push(`(response_due_at IS NULL OR response_due_at > NOW() + INTERVAL '30 days')`);
+    conditions.push(`NOT (
+      (psc IS NOT NULL AND psc ~ '^[0-9]')
+      OR (part_number IS NOT NULL AND TRIM(part_number) != '')
+      OR (quantity IS NOT NULL AND quantity > 0)
+      OR (opportunity_type IS NOT NULL AND LOWER(TRIM(opportunity_type)) ~ '(product|supply|supplies|commodit|goods|equipment|hardware|part)')
+    )`);
   }
 
   // Stage filter (pipeline_items-based). Uses o.id since the main query aliases opportunities as o.
@@ -558,11 +569,22 @@ function buildFilterConditions(
   if (filters.stage === 'passed') {
     conditions.push(`o.relevance_status IN ('auto_pass', 'manual_pass')`);
   } else {
-    // F-614 bucket scope: the owner's opportunities are ONLY those with
-    // relevance_status='relevant' (the assessed, qualified bucket) plus
-    // legacy rows with NULL. off_profile, unknown_naics, auto_pass,
-    // manual_pass are excluded — they are NOT the owner's opportunities.
-    conditions.push(`(o.relevance_status IS NULL OR o.relevance_status = 'relevant')`);
+    // F-614 bucket gate: qualified-only, fact-checked. An opportunity
+    // qualifies for the owner bucket ONLY if ALL of:
+    //   1. relevance_status = 'relevant' (assessed-qualified; NO NULL)
+    //   2. naics IN Envision NAICS (belt-and-suspenders with C1)
+    //   3. response_due_at IS NULL OR > NOW() + 30 days (not deadline-cut)
+    //   4. NOT a commodity purchase (mirrors isCommodityPurchase)
+    conditions.push(`o.relevance_status = 'relevant'`);
+    conditions.push(`o.naics = ANY($${paramIdx++})`);
+    params.push(ENVISION_NAICS as unknown as string[]);
+    conditions.push(`(o.response_due_at IS NULL OR o.response_due_at > NOW() + INTERVAL '30 days')`);
+    conditions.push(`NOT (
+      (o.psc IS NOT NULL AND o.psc ~ '^[0-9]')
+      OR (o.part_number IS NOT NULL AND TRIM(o.part_number) != '')
+      OR (o.quantity IS NOT NULL AND o.quantity > 0)
+      OR (o.opportunity_type IS NOT NULL AND LOWER(TRIM(o.opportunity_type)) ~ '(product|supply|supplies|commodit|goods|equipment|hardware|part)')
+    )`);
   }
   if (filters.stage === 'active') {
     // Active = has an active-stage pipeline row OR has no pipeline row (defaults to interest)
@@ -991,6 +1013,16 @@ export async function updateOpportunity(
         }
         throw err;
       }
+    }
+
+    // Re-query the row after pipeline changes so the response reflects
+    // any updates made by promoteToPipeline (e.g. status = 'qualified').
+    const freshRes = await pool.query<OpportunityRow>(
+      `SELECT * FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+    if (freshRes.rows[0]) {
+      return { row: freshRes.rows[0], analysisAffected };
     }
   }
 
