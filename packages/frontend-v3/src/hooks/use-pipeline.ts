@@ -51,6 +51,9 @@ export interface PipelineListItem {
   pwin_score: number | null;
   pwin_band: string | null;
   solicitation_number: string | null;
+  resolved_value: number;
+  resolved_pwin: number | null;
+  resolved_weighted: number;
   teaming_partners: string[];
   created_at: string;
   updated_at: string;

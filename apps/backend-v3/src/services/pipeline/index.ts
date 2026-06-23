@@ -51,6 +51,21 @@ function buildSourceRef(
 }
 
 function rowToItem(row: PipelineRow): PipelineItem {
+  const estVal = row.estimated_value != null ? Number(row.estimated_value) : null;
+  const valMax = row.opportunity_value_max != null ? Number(row.opportunity_value_max) : null;
+  const valMin = row.opportunity_value_min != null ? Number(row.opportunity_value_min) : null;
+  const resolvedValue = estVal ?? valMax ?? valMin ?? 0;
+
+  // pwin_override is stored 0–1; win_probability / pwin_score are 0–100
+  const pwinOverride = row.pwin_override != null ? Number(row.pwin_override) * 100 : null;
+  const winProb = row.win_probability != null ? Number(row.win_probability) : null;
+  const analysisPwin = row.pwin_score != null ? Number(row.pwin_score) : null;
+  const resolvedPwin = pwinOverride ?? winProb ?? analysisPwin ?? null;
+
+  const resolvedWeighted = resolvedPwin != null
+    ? Math.round(resolvedValue * resolvedPwin / 100)
+    : 0;
+
   return {
     id: String(row.id),
     opportunity_id: String(row.opportunity_id),
@@ -64,9 +79,9 @@ function rowToItem(row: PipelineRow): PipelineItem {
     opportunity_set_aside_sources: row.opportunity_set_aside_sources ?? [],
     opportunity_due_at: row.opportunity_due_at,
     opportunity_due_at_sources: row.opportunity_due_at_sources ?? [],
-    opportunity_value_min: row.opportunity_value_min != null ? Number(row.opportunity_value_min) : null,
+    opportunity_value_min: valMin,
     opportunity_value_min_sources: row.opportunity_value_min_sources ?? [],
-    opportunity_value_max: row.opportunity_value_max != null ? Number(row.opportunity_value_max) : null,
+    opportunity_value_max: valMax,
     opportunity_value_max_sources: row.opportunity_value_max_sources ?? [],
     capture_owner: row.capture_owner,
     capture_owner_sources: buildSourceRef(
@@ -75,7 +90,7 @@ function rowToItem(row: PipelineRow): PipelineItem {
       row.pipeline_source_url,
       row.pipeline_source_retrieved_at,
     ),
-    win_prob_pct: row.win_probability != null ? Number(row.win_probability) : null,
+    win_prob_pct: winProb,
     win_prob_pct_sources: buildSourceRef(
       row.pipeline_source_kind,
       row.pipeline_source_title,
@@ -92,9 +107,12 @@ function rowToItem(row: PipelineRow): PipelineItem {
     stage: row.stage,
     milestones: parseMilestones(row.milestone_90day),
     teaming_partners: row.teaming_partners ?? [],
-    pwin_score: row.pwin_score != null ? Number(row.pwin_score) : null,
+    pwin_score: analysisPwin,
     pwin_band: row.pwin_band,
     solicitation_number: row.solicitation_number,
+    resolved_value: resolvedValue,
+    resolved_pwin: resolvedPwin,
+    resolved_weighted: resolvedWeighted,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -114,6 +132,7 @@ const BASE_SELECT = `
     pi.id, pi.opportunity_id, pi.capture_owner,
     pi.win_probability, pi.win_prob_evidence,
     pi.milestone_90day, pi.source_id,
+    pi.estimated_value, pi.pwin_override,
     pi.created_at, pi.updated_at,
 
     o.title           AS opportunity_title,

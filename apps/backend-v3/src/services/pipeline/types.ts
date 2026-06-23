@@ -40,6 +40,9 @@ export interface PipelineItem {
   pwin_score: number | null;
   pwin_band: string | null;
   solicitation_number: string | null;
+  resolved_value: number;
+  resolved_pwin: number | null;
+  resolved_weighted: number;
   created_at: string;
   updated_at: string;
 }
@@ -118,4 +121,6 @@ export interface PipelineRow {
   pwin_score: string | null;
   pwin_band: string | null;
   solicitation_number: string | null;
+  estimated_value: string | null;
+  pwin_override: string | null;
 }
