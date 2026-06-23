@@ -24,6 +24,10 @@ import {
   ingestBalanceSheetRows,
   ingestCostDetailRows,
   ingestSieRows,
+  ingestApRows,
+  ingestArRows,
+  ingestTrialBalanceRows,
+  ingestProjectRevenueRows,
 } from './ingest.js';
 
 export interface ReingestResult {
@@ -33,6 +37,10 @@ export interface ReingestResult {
   balance_sheet: number;
   cost_detail: number;
   sie: number;
+  ap: number;
+  ar: number;
+  trial_balance: number;
+  project_revenue: number;
   parsers_run: string[];
   any_ingested: boolean;
   parse_warnings: string[];
@@ -59,6 +67,10 @@ export async function reingestFinancialDoc(params: {
     balance_sheet: 0,
     cost_detail: 0,
     sie: 0,
+    ap: 0,
+    ar: 0,
+    trial_balance: 0,
+    project_revenue: 0,
     parsers_run: [],
     any_ingested: false,
     parse_warnings: [],
@@ -149,6 +161,78 @@ export async function reingestFinancialDoc(params: {
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: SIE parser failed');
+    }
+  }
+
+  // --- Parser 5: AP (Open Accounts Payable) ---
+  const looksAp = /\bap\b|accounts?.?payable|open.?ap/i.test(filename) || /accounts?.?payable|open.?ap/i.test(head);
+  if (looksAp) {
+    try {
+      const apResult = await llmRouter.route({
+        task: 'ap_extract' as const,
+        input: { filename, extracted_text: extractedText },
+      });
+      result.parsers_run.push('ap_extract');
+      if (apResult.ok && apResult.output.is_ap && apResult.output.rows.length > 0) {
+        result.ap = await ingestApRows(apResult.output.rows, docId);
+        if (result.ap > 0) result.any_ingested = true;
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: AP parser failed');
+    }
+  }
+
+  // --- Parser 6: AR (Aged Accounts Receivable) ---
+  const looksAr = /\bar\b|accounts?.?receivable|aged.?ar/i.test(filename) || /accounts?.?receivable|aged.?ar/i.test(head);
+  if (looksAr) {
+    try {
+      const arResult = await llmRouter.route({
+        task: 'ar_extract' as const,
+        input: { filename, extracted_text: extractedText },
+      });
+      result.parsers_run.push('ar_extract');
+      if (arResult.ok && arResult.output.is_ar && arResult.output.rows.length > 0) {
+        result.ar = await ingestArRows(arResult.output.rows, docId);
+        if (result.ar > 0) result.any_ingested = true;
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: AR parser failed');
+    }
+  }
+
+  // --- Parser 7: Trial Balance ---
+  const looksTrialBalance = /trial.?balance|trail.?balance/i.test(filename) || /trial.?balance/i.test(head);
+  if (looksTrialBalance) {
+    try {
+      const tbResult = await llmRouter.route({
+        task: 'trial_balance_extract' as const,
+        input: { filename, extracted_text: extractedText },
+      });
+      result.parsers_run.push('trial_balance_extract');
+      if (tbResult.ok && tbResult.output.is_trial_balance && tbResult.output.rows.length > 0) {
+        result.trial_balance = await ingestTrialBalanceRows(tbResult.output.rows, docId);
+        if (result.trial_balance > 0) result.any_ingested = true;
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: Trial Balance parser failed');
+    }
+  }
+
+  // --- Parser 8: Project Revenue Summary ---
+  const looksProjectRevenue = /proj.*revenue|revenue.*summary|full.?proj/i.test(filename) || /project.*revenue|revenue.*summary/i.test(head);
+  if (looksProjectRevenue) {
+    try {
+      const prResult = await llmRouter.route({
+        task: 'project_revenue_extract' as const,
+        input: { filename, extracted_text: extractedText },
+      });
+      result.parsers_run.push('project_revenue_extract');
+      if (prResult.ok && prResult.output.is_project_revenue && prResult.output.rows.length > 0) {
+        result.project_revenue = await ingestProjectRevenueRows(prResult.output.rows, docId);
+        if (result.project_revenue > 0) result.any_ingested = true;
+      }
+    } catch (err) {
+      logger.warn({ err, docId, filename }, 'reingest: Project Revenue parser failed');
     }
   }
 

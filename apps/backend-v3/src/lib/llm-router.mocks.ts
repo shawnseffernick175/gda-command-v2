@@ -30,6 +30,10 @@ import type {
   BalanceSheetExtractOutput,
   CostDetailExtractOutput,
   SieExtractOutput,
+  ApExtractOutput,
+  ArExtractOutput,
+  TrialBalanceExtractOutput,
+  ProjectRevenueExtractOutput,
   DigestLeadOutput,
   CompetitorContactDiscoveryOutput,
   PartnerContactDiscoveryOutput,
@@ -338,6 +342,79 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       notes: 'Mock SIE extraction.',
       model_used: 'mock-model',
     } satisfies SieExtractOutput,
+
+    ap_extract: {
+      is_ap: true,
+      rows: [
+        {
+          period: 'FY26 May',
+          fiscal_year: 2026,
+          quarter: 2,
+          vendor_name: 'Mock Vendor Inc',
+          invoice_number: 'INV-001',
+          invoice_date: '2026-04-15',
+          due_date: '2026-05-15',
+          amount: 12500,
+          age_bucket: 'Current',
+        },
+      ],
+      notes: 'Mock AP extraction.',
+      model_used: 'mock-model',
+    } satisfies ApExtractOutput,
+
+    ar_extract: {
+      is_ar: true,
+      rows: [
+        {
+          period: 'FY26 May',
+          fiscal_year: 2026,
+          quarter: 2,
+          customer_name: 'US Army TACOM',
+          invoice_number: 'AR-001',
+          invoice_date: '2026-03-15',
+          due_date: '2026-04-15',
+          amount: 85000,
+          age_bucket: '31-60',
+        },
+      ],
+      notes: 'Mock AR extraction.',
+      model_used: 'mock-model',
+    } satisfies ArExtractOutput,
+
+    trial_balance_extract: {
+      is_trial_balance: true,
+      rows: [
+        {
+          period: 'FY26 May',
+          fiscal_year: 2026,
+          quarter: 2,
+          account_code: '1000',
+          account_name: 'Cash - Operating',
+          debit: 150000,
+          credit: 0,
+        },
+      ],
+      notes: 'Mock trial balance extraction.',
+      model_used: 'mock-model',
+    } satisfies TrialBalanceExtractOutput,
+
+    project_revenue_extract: {
+      is_project_revenue: true,
+      rows: [
+        {
+          period: 'FY26 May',
+          fiscal_year: 2026,
+          quarter: 2,
+          project_name: 'RS3 Task Order 5',
+          contract_number: 'W56HZV-20-F-0005',
+          revenue: 250000,
+          cost: 210000,
+          margin_pct: 16.0,
+        },
+      ],
+      notes: 'Mock project revenue extraction.',
+      model_used: 'mock-model',
+    } satisfies ProjectRevenueExtractOutput,
 
     digest_lead: {
       headline: 'No significant developments in the last 24 hours',
