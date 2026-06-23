@@ -18,10 +18,9 @@ const WINDOWS: [CostWindow, string][] = [
   ["30d", "30d"],
 ];
 
-const STR_KEYS = new Set<string>(["task", "provider", "model"]);
-
+const S = new Set<string>(["task", "provider", "model"]);
 const fmt = (n: number) => n.toLocaleString("en-US");
-const fmtCost = (n: number) => `$${n.toFixed(6)}`;
+const fc = (n: number) => `$${n.toFixed(6)}`;
 
 type Col = { h: string; k: SortKey; r: boolean; mono?: boolean; fn: (e: CostRollupEntry) => string };
 const COLS: Col[] = [
@@ -34,20 +33,10 @@ const COLS: Col[] = [
   { h: "Avg Latency", k: "avg_latency_ms", r: true, fn: (e) => `${fmt(e.avg_latency_ms)} ms` },
   { h: "Tokens In", k: "total_tokens_input", r: true, fn: (e) => fmt(e.total_tokens_input) },
   { h: "Tokens Out", k: "total_tokens_output", r: true, fn: (e) => fmt(e.total_tokens_output) },
-  { h: "Est. Cost", k: "total_cost_usd", r: true, mono: true, fn: (e) => fmtCost(e.total_cost_usd) },
+  { h: "Est. Cost", k: "total_cost_usd", r: true, mono: true, fn: (e) => fc(e.total_cost_usd) },
 ];
 
-function fmtTime(iso: string) {
-  return (
-    new Date(iso).toLocaleTimeString("en-US", {
-      timeZone: "America/New_York",
-      hour: "numeric",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    }) + " ET"
-  );
-}
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString();
 
 export function AiModelCostTable() {
   const [window, setWindow] = useState<CostWindow>("live");
@@ -60,7 +49,7 @@ export function AiModelCostTable() {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir(STR_KEYS.has(key) ? "asc" : "desc");
+      setSortDir(S.has(key) ? "asc" : "desc");
     }
   }
 
@@ -80,9 +69,8 @@ export function AiModelCostTable() {
     return entries;
   })();
 
-  const hdrCls =
-    "px-3 py-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors";
-  const cellCls = "px-3 py-2 text-xs tabular-nums";
+  const H = "px-3 py-2 font-medium cursor-pointer select-none";
+  const C = "px-3 py-2 text-xs tabular-nums";
 
   return (
     <div className="space-y-3">
@@ -94,10 +82,10 @@ export function AiModelCostTable() {
               type="button"
               onClick={() => setWindow(v)}
               className={cn(
-                "rounded border px-2.5 py-1 text-[11px] font-mono transition-colors",
+                "rounded border px-2.5 py-1 text-[11px] font-mono",
                 window === v
                   ? "border-gda-cyan bg-gda-cyan/10 text-gda-cyan"
-                  : "border-border text-muted-foreground hover:text-foreground hover:bg-gda-bg-base",
+                  : "border-border text-muted-foreground",
               )}
             >
               {label}
@@ -115,19 +103,18 @@ export function AiModelCostTable() {
             onClick={() => refetch()}
             disabled={isFetching}
             className={cn(
-              "rounded border border-border px-2.5 py-1 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-gda-bg-base transition-colors",
+              "rounded border border-border px-2.5 py-1 text-[11px] font-mono text-muted-foreground",
               isFetching && "opacity-50",
             )}
           >
-            {isFetching ? "Refreshing…" : "Refresh"}
+            Refresh
           </button>
         </div>
       </div>
 
       <div className="rounded border border-border bg-gda-bg-base px-3 py-2">
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Cost reflects metered spend. Anthropic per-call cost metering is being
-          fixed (see #964); until then Anthropic rows may show $0.00.
+          Anthropic cost metering fix in progress (#964); those rows may show $0.00.
         </p>
       </div>
 
@@ -135,17 +122,17 @@ export function AiModelCostTable() {
         <p className="py-8 text-center text-xs text-muted-foreground">Loading…</p>
       ) : sorted.length === 0 ? (
         <p className="py-8 text-center text-xs text-muted-foreground">
-          No LLM calls recorded in this window.
+          No calls in this window.
         </p>
       ) : (
         <div className="rounded border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-[0.04em] text-muted-foreground">
+              <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wide text-muted-foreground">
                 {COLS.map((c) => (
                   <th
                     key={c.k}
-                    className={cn(hdrCls, c.r ? "text-right" : "text-left")}
+                    className={cn(H, c.r ? "text-right" : "text-left")}
                     onClick={() => handleSort(c.k)}
                   >
                     {c.h}
@@ -159,7 +146,7 @@ export function AiModelCostTable() {
             <tbody>
               {sorted.map((entry, idx) => (
                 <tr
-                  key={`${entry.task}-${entry.provider}-${entry.model}-${idx}`}
+                  key={`${entry.task}-${entry.model}-${idx}`}
                   className="border-b border-border"
                 >
                   {COLS.map((c) => {
@@ -168,7 +155,7 @@ export function AiModelCostTable() {
                       <td
                         key={c.k}
                         className={cn(
-                          cellCls,
+                          C,
                           c.r ? "text-right" : "text-left",
                           isErr ? "text-gda-red font-semibold" : c.mono ? "text-foreground" : "text-muted-foreground",
                           c.mono && "font-mono",
@@ -184,25 +171,11 @@ export function AiModelCostTable() {
             {data?.totals && (
               <tfoot>
                 <tr className="border-t border-border bg-gda-bg-base">
-                  <td colSpan={3} className="px-3 py-2 text-xs font-semibold text-foreground">
-                    Totals
-                  </td>
-                  <td className={cn(cellCls, "text-right font-semibold text-foreground")}>
-                    {fmt(data.totals.call_count)}
-                  </td>
-                  <td
-                    className={cn(
-                      cellCls,
-                      "text-right font-semibold",
-                      data.totals.error_count > 0 ? "text-gda-red" : "text-muted-foreground",
-                    )}
-                  >
-                    {fmt(data.totals.error_count)}
-                  </td>
+                  <td colSpan={3} className={cn(C, "font-semibold text-foreground")}>Totals</td>
+                  <td className={cn(C, "text-right font-semibold text-foreground")}>{fmt(data.totals.call_count)}</td>
+                  <td className={cn(C, "text-right font-semibold", data.totals.error_count > 0 ? "text-gda-red" : "text-muted-foreground")}>{fmt(data.totals.error_count)}</td>
                   <td colSpan={3} />
-                  <td className={cn(cellCls, "text-right font-semibold text-foreground font-mono")}>
-                    {fmtCost(data.totals.total_cost_usd)}
-                  </td>
+                  <td className={cn(C, "text-right font-semibold text-foreground font-mono")}>{fc(data.totals.total_cost_usd)}</td>
                 </tr>
               </tfoot>
             )}
