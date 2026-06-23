@@ -216,6 +216,8 @@ export interface ListFilters {
   relevantOnly?: boolean;
   /** Filter by IDIQ status: 'only' = IDIQs only, 'exclude' = hide IDIQs */
   idiq?: 'only' | 'exclude';
+  /** When true, show only SB Play opportunities (employee-based NAICS + SB set-aside) */
+  sb_play?: boolean;
   limit?: number;
   cursor?: string;
   page?: number;
@@ -252,6 +254,7 @@ export interface OpportunityMeta {
   total_value: number;
   hot_count: number;
   idiq_count: number;
+  sb_play_count: number;
   stage_counts: Record<string, number>;
 }
 

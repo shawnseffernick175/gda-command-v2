@@ -8,9 +8,10 @@ import { evaluateTeamingFlags } from './teaming.js';
 import { resolveSetAsideEligibility } from './eligibility.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { parseFederalOrg } from '../../lib/orgHierarchy.js';
-import { ENVISION_NAICS } from '../../constants/envision-naics.js';
+import { ENVISION_NAICS, ENVISION_SMALL_NAICS, SB_SET_ASIDE_VALUES } from '../../constants/envision-naics.js';
 import { normalizePipelineStage, ACTIVE_STAGE_KEYS, isTerminalStage } from '../../lib/pipeline-stage.js';
 import { recordAuditLog } from '../audit/audit-log.js';
+import { promoteToPipeline, PromoteError } from '../assessment/views.js';
 import { logger } from '../../lib/logger.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
@@ -359,7 +360,25 @@ export async function listOpportunities(
   // (Mirror of the paged builder.)
   if (filters.stage === 'passed') {
     conditions.push(`relevance_status IN ('auto_pass', 'manual_pass')`);
+  } else if (filters.relevantOnly !== false) {
+    // F-614 bucket gate: qualified-only, fact-checked. An opportunity
+    // qualifies for the owner bucket ONLY if ALL of:
+    //   1. relevance_status = 'relevant' (assessed-qualified; NO NULL)
+    //   2. naics IN Envision NAICS (belt-and-suspenders with C1)
+    //   3. response_due_at IS NULL OR > NOW() + 30 days (not deadline-cut)
+    //   4. NOT a commodity purchase (mirrors isCommodityPurchase)
+    conditions.push(`relevance_status = 'relevant'`);
+    conditions.push(`naics = ANY($${paramIdx++})`);
+    params.push(ENVISION_NAICS as unknown as string[]);
+    conditions.push(`(response_due_at IS NULL OR response_due_at > NOW() + INTERVAL '30 days')`);
+    conditions.push(`NOT (
+      (psc IS NOT NULL AND psc ~ '^[0-9]')
+      OR (part_number IS NOT NULL AND TRIM(part_number) != '')
+      OR (quantity IS NOT NULL AND quantity > 0)
+      OR (opportunity_type IS NOT NULL AND LOWER(TRIM(opportunity_type)) ~ '(product|supply|supplies|commodit|goods|equipment|hardware|part)')
+    )`);
   } else {
+    // relevant_only=false (test/admin bypass): exclude passed opps only
     conditions.push(`(relevance_status IS NULL OR relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
   }
 
@@ -548,12 +567,41 @@ function buildFilterConditions(
   } else if (filters.idiq === 'exclude') {
     conditions.push(`o.is_idiq = FALSE`);
   }
+  // SB Play filter: NAICS in ENVISION_SMALL_NAICS AND set_aside matches SB set-aside values
+  if (filters.sb_play) {
+    conditions.push(`o.naics = ANY($${paramIdx++})`);
+    params.push([...ENVISION_SMALL_NAICS]);
+    const sbParts: string[] = [];
+    for (const sa of SB_SET_ASIDE_VALUES) {
+      sbParts.push(`o.set_aside ILIKE $${paramIdx++}`);
+      params.push(`%${sa}%`);
+    }
+    conditions.push(`(${sbParts.join(' OR ')})`);
+  }
   // Passed view: auto-passed AND manually-passed opps get their own 'Passed'
   // tab. In every other view (all, active, specific stages, default), exclude
   // both so passed opps drop out of the working list.
   if (filters.stage === 'passed') {
     conditions.push(`o.relevance_status IN ('auto_pass', 'manual_pass')`);
+  } else if (filters.relevantOnly !== false) {
+    // F-614 bucket gate: qualified-only, fact-checked. An opportunity
+    // qualifies for the owner bucket ONLY if ALL of:
+    //   1. relevance_status = 'relevant' (assessed-qualified; NO NULL)
+    //   2. naics IN Envision NAICS (belt-and-suspenders with C1)
+    //   3. response_due_at IS NULL OR > NOW() + 30 days (not deadline-cut)
+    //   4. NOT a commodity purchase (mirrors isCommodityPurchase)
+    conditions.push(`o.relevance_status = 'relevant'`);
+    conditions.push(`o.naics = ANY($${paramIdx++})`);
+    params.push(ENVISION_NAICS as unknown as string[]);
+    conditions.push(`(o.response_due_at IS NULL OR o.response_due_at > NOW() + INTERVAL '30 days')`);
+    conditions.push(`NOT (
+      (o.psc IS NOT NULL AND o.psc ~ '^[0-9]')
+      OR (o.part_number IS NOT NULL AND TRIM(o.part_number) != '')
+      OR (o.quantity IS NOT NULL AND o.quantity > 0)
+      OR (o.opportunity_type IS NOT NULL AND LOWER(TRIM(o.opportunity_type)) ~ '(product|supply|supplies|commodit|goods|equipment|hardware|part)')
+    )`);
   } else {
+    // relevant_only=false (test/admin bypass): exclude passed opps only
     conditions.push(`(o.relevance_status IS NULL OR o.relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
   }
   if (filters.stage === 'active') {
@@ -613,7 +661,8 @@ export async function listOpportunitiesPaged(
       COUNT(*) FILTER (WHERE o.ai_analyzed_at IS NULL)::int AS unscored_count,
       COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)) FILTER (WHERE o.is_idiq = FALSE), 0)::bigint AS total_value,
       COUNT(*) FILTER (WHERE latest_pwin.pwin >= 0.70)::int AS hot_count,
-      COUNT(*) FILTER (WHERE o.is_idiq = TRUE)::int AS idiq_count
+      COUNT(*) FILTER (WHERE o.is_idiq = TRUE)::int AS idiq_count,
+      COUNT(*) FILTER (WHERE o.naics = ANY($${params.length + 1}) AND (${SB_SET_ASIDE_VALUES.map((_, i) => `o.set_aside ILIKE $${params.length + 2 + i}`).join(' OR ')}))::int AS sb_play_count
     FROM opportunities o
     LEFT JOIN (
       SELECT DISTINCT ON (opportunity_id) opportunity_id, pwin
@@ -622,6 +671,11 @@ export async function listOpportunitiesPaged(
     ) latest_pwin ON latest_pwin.opportunity_id = o.id
     ${where}
   `;
+  // Append SB Play params (NAICS array + ILIKE patterns) for the sb_play_count FILTER
+  const sbPlayMetaParams = [
+    [...ENVISION_SMALL_NAICS],
+    ...SB_SET_ASIDE_VALUES.map((v) => `%${v}%`),
+  ];
   const metaRes = await pool.query<{
     total_count: number;
     due_this_week: number;
@@ -629,7 +683,8 @@ export async function listOpportunitiesPaged(
     total_value: string;
     hot_count: number;
     idiq_count: number;
-  }>(metaSql, params);
+    sb_play_count: number;
+  }>(metaSql, [...params, ...sbPlayMetaParams]);
   const metaRow = metaRes.rows[0];
   const total = metaRow?.total_count ?? 0;
   const totalPages = Math.max(Math.ceil(total / limit), 1);
@@ -705,6 +760,7 @@ export async function listOpportunitiesPaged(
     total_value: Number(metaRow?.total_value ?? 0),
     hot_count: metaRow?.hot_count ?? 0,
     idiq_count: metaRow?.idiq_count ?? 0,
+    sb_play_count: metaRow?.sb_play_count ?? 0,
     stage_counts: stageCounts,
   };
 
@@ -970,13 +1026,29 @@ export async function updateOpportunity(
         });
       }
     } else {
-      // Forward-progression stages still require prior qualification.
-      throw Object.assign(
-        new Error(
-          'Opportunity is not in the pipeline. Qualify it first before setting a pipeline stage.',
-        ),
-        { statusCode: 409 },
-      );
+      // F-614: Forward-progression stage from Interest — promote via the
+      // canonical promoteToPipeline path so the item enters the pipeline
+      // with capture_owner = user. PromoteError → 409 when the prerequisite
+      // assessment hasn't happened yet (state conflict, not a validation error).
+      try {
+        await promoteToPipeline(id, captureOwner, null, dbStage);
+      } catch (err) {
+        if (err instanceof PromoteError) {
+          const code = err.statusCode === 400 ? 409 : err.statusCode;
+          throw Object.assign(new Error(err.message), { statusCode: code });
+        }
+        throw err;
+      }
+    }
+
+    // Re-query the row after pipeline changes so the response reflects
+    // any updates made by promoteToPipeline (e.g. status = 'qualified').
+    const freshRes = await pool.query<OpportunityRow>(
+      `SELECT * FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
+      [id],
+    );
+    if (freshRes.rows[0]) {
+      return { row: freshRes.rows[0], analysisAffected };
     }
   }
 

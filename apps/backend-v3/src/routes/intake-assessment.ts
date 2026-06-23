@@ -66,10 +66,13 @@ export async function intakeAssessmentRoutes(app: FastifyInstance): Promise<void
   });
 
   // POST /v3/ops-tracker/:id/promote — user-only promotion into the pipeline
+  // Optional body.stage selects the target pipeline stage (default 'qualify').
   app.post<{ Params: { id: string } }>('/v3/ops-tracker/:id/promote', async (req, reply) => {
     const { owner, userId } = requestingUser(req as typeof req & { user?: JwtPayload });
+    const body = req.body as Record<string, unknown> | undefined;
+    const targetStage = (body?.stage as string) ?? 'qualify';
     try {
-      const result = await promoteToPipeline(req.params.id, owner, userId);
+      const result = await promoteToPipeline(req.params.id, owner, userId, targetStage);
       return reply.status(result.created ? 201 : 200).send(successEnvelope(result, req.requestId));
     } catch (err) {
       if (err instanceof PromoteError) {
