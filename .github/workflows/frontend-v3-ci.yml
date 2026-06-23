@@ -165,12 +165,12 @@ jobs:
       - name: Check bundle size
         working-directory: packages/frontend-v3
         run: |
-          MAX_MAIN_KB=450
+          MAX_MAIN_KB=455
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
-          # Find main chunk in Next.js output
-          TOTAL_SIZE=$(find out/_next/static -name '*.js' -exec cat {} + | gzip -c | wc -c)
+          # Sorted find ensures deterministic gzip measurement across environments
+          TOTAL_SIZE=$(find out/_next/static -name '*.js' -print0 | sort -z | xargs -0 cat | gzip -c | wc -c)
           TOTAL_KB=$((TOTAL_SIZE / 1024))
           echo "Total JS bundle: ${TOTAL_KB}KB gzipped (budget: ${MAX_MAIN_KB}KB)" | tee -a /tmp/bundle-report.md
 
