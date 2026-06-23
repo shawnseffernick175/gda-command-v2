@@ -89,3 +89,35 @@ export const ENVISION_COMPANY_CONTEXT =
   'Riverstone for HUBZone) on those set-asides. Contract vehicles include GSA MAS ' +
   '(IT Professional Services 54151S, Highly Adaptive Cybersecurity 54151HACS). ' +
   'Primary customers: DoD, Army, Navy, DHS, FAA, GSA. Based in the DC metro area.';
+
+/**
+ * NAICS codes where Envision qualifies as SMALL (employee-based size standards).
+ *
+ * Under REVENUE-based standards Envision exceeds the cap and is LARGE.
+ * Only EMPLOYEE-BASED codes where Envision is under the headcount threshold
+ * belong in this set.
+ *
+ * Current:
+ *   541715 (R&D Physical/Engineering/Life Sciences) = 1,000 employees → SMALL
+ *
+ * To add more codes later, append here. No schema change needed.
+ *
+ * SYNC: Keep in sync with packages/frontend-v3/src/lib/sb-play.ts
+ */
+export const ENVISION_SMALL_NAICS: ReadonlySet<string> = new Set([
+  '541715', // R&D Physical/Engineering/Life Sciences — 1,000 employees (employee-based) → Envision SMALL
+]);
+
+/**
+ * Small-business set-aside values that qualify an opportunity for SB Play
+ * highlighting. Matched case-insensitively via substring.
+ *
+ * For now only core SB set-asides. Socioeconomic types (SDVOSB, WOSB,
+ * HUBZone, 8(a)) can be added later by appending to this list.
+ *
+ * SYNC: Keep in sync with packages/frontend-v3/src/lib/sb-play.ts
+ */
+export const SB_SET_ASIDE_VALUES: readonly string[] = [
+  'Total Small Business Set-Aside (FAR 19.5)',
+  'Partial Small Business Set-Aside (FAR 19.5)',
+];

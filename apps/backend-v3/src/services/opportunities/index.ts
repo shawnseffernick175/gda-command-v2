@@ -8,7 +8,7 @@ import { evaluateTeamingFlags } from './teaming.js';
 import { resolveSetAsideEligibility } from './eligibility.js';
 import { mapAgencyToDepartment } from '../../lib/departmentMap.js';
 import { parseFederalOrg } from '../../lib/orgHierarchy.js';
-import { ENVISION_NAICS } from '../../constants/envision-naics.js';
+import { ENVISION_NAICS, ENVISION_SMALL_NAICS, SB_SET_ASIDE_VALUES } from '../../constants/envision-naics.js';
 import { normalizePipelineStage, ACTIVE_STAGE_KEYS, isTerminalStage } from '../../lib/pipeline-stage.js';
 import { recordAuditLog } from '../audit/audit-log.js';
 import { promoteToPipeline, PromoteError } from '../assessment/views.js';
@@ -566,6 +566,17 @@ function buildFilterConditions(
   } else if (filters.idiq === 'exclude') {
     conditions.push(`o.is_idiq = FALSE`);
   }
+  // SB Play filter: NAICS in ENVISION_SMALL_NAICS AND set_aside matches SB set-aside values
+  if (filters.sb_play) {
+    conditions.push(`o.naics = ANY($${paramIdx++})`);
+    params.push([...ENVISION_SMALL_NAICS]);
+    const sbParts: string[] = [];
+    for (const sa of SB_SET_ASIDE_VALUES) {
+      sbParts.push(`o.set_aside ILIKE $${paramIdx++}`);
+      params.push(`%${sa}%`);
+    }
+    conditions.push(`(${sbParts.join(' OR ')})`);
+  }
   // Passed view: auto-passed AND manually-passed opps get their own 'Passed'
   // tab. In every other view (all, active, specific stages, default), exclude
   // both so passed opps drop out of the working list.
@@ -649,7 +660,8 @@ export async function listOpportunitiesPaged(
       COUNT(*) FILTER (WHERE o.ai_analyzed_at IS NULL)::int AS unscored_count,
       COALESCE(SUM(COALESCE(o.value_max, o.value_min, 0)) FILTER (WHERE o.is_idiq = FALSE), 0)::bigint AS total_value,
       COUNT(*) FILTER (WHERE latest_pwin.pwin >= 0.70)::int AS hot_count,
-      COUNT(*) FILTER (WHERE o.is_idiq = TRUE)::int AS idiq_count
+      COUNT(*) FILTER (WHERE o.is_idiq = TRUE)::int AS idiq_count,
+      COUNT(*) FILTER (WHERE o.naics = ANY($${params.length + 1}) AND (${SB_SET_ASIDE_VALUES.map((_, i) => `o.set_aside ILIKE $${params.length + 2 + i}`).join(' OR ')}))::int AS sb_play_count
     FROM opportunities o
     LEFT JOIN (
       SELECT DISTINCT ON (opportunity_id) opportunity_id, pwin
@@ -658,6 +670,11 @@ export async function listOpportunitiesPaged(
     ) latest_pwin ON latest_pwin.opportunity_id = o.id
     ${where}
   `;
+  // Append SB Play params (NAICS array + ILIKE patterns) for the sb_play_count FILTER
+  const sbPlayMetaParams = [
+    [...ENVISION_SMALL_NAICS],
+    ...SB_SET_ASIDE_VALUES.map((v) => `%${v}%`),
+  ];
   const metaRes = await pool.query<{
     total_count: number;
     due_this_week: number;
@@ -665,7 +682,8 @@ export async function listOpportunitiesPaged(
     total_value: string;
     hot_count: number;
     idiq_count: number;
-  }>(metaSql, params);
+    sb_play_count: number;
+  }>(metaSql, [...params, ...sbPlayMetaParams]);
   const metaRow = metaRes.rows[0];
   const total = metaRow?.total_count ?? 0;
   const totalPages = Math.max(Math.ceil(total / limit), 1);
@@ -741,6 +759,7 @@ export async function listOpportunitiesPaged(
     total_value: Number(metaRow?.total_value ?? 0),
     hot_count: metaRow?.hot_count ?? 0,
     idiq_count: metaRow?.idiq_count ?? 0,
+    sb_play_count: metaRow?.sb_play_count ?? 0,
     stage_counts: stageCounts,
   };
 
