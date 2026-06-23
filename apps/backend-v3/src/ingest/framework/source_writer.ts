@@ -15,13 +15,15 @@ import { checkIngestAnalysisDailyCap } from './ingest-analysis-cap.js';
 
 function enqueueIngestAnalysis(oppId: string): void {
   try {
-    // F-620: daily cap circuit-breaker — skip enqueue if cap exceeded
+    const boss = requireBoss();
+
+    // F-620: daily cap circuit-breaker — check AFTER boss is confirmed
+    // available so the counter isn't consumed by no-op calls during startup.
     if (checkIngestAnalysisDailyCap()) {
       logger.warn({ oppId }, 'ingest_analysis_daily_cap_exceeded — skipping enqueue');
       return;
     }
 
-    const boss = requireBoss();
     const jobData: AnalysisJobData = {
       entityType: 'opportunity',
       entityId: oppId,
