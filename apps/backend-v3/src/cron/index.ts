@@ -35,6 +35,7 @@ import { runCaptureStaleActionsJob } from '../jobs/captureStaleActionsJob.js';
 import { runCaptureDeadlineActionsJob } from '../jobs/captureDeadlineActionsJob.js';
 import { runRecompeteActionsJob } from '../jobs/recompeteActionsJob.js';
 import { runDigestRefresh } from './digest-refresh.js';
+import { runNewsRefresh } from './news-refresh.js';
 import { runAnalyzerSelfCheck } from '../workers/self-check.js';
 import { discoverCompetitorContacts } from '../services/contacts/competitor-discovery.js';
 import { discoverPartnerContacts } from '../services/contacts/partner-discovery.js';
@@ -208,6 +209,13 @@ export function startCronScheduler(): void {
   });
   tasks.push(digestRefreshTask);
   logger.info({ schedule: '0 11 * * *' }, '[cron] registered: digest.refresh (0 11 * * *)');
+
+  // GovCon News refresh — daily at 12:00 UTC (7:00 AM ET)
+  const newsRefreshTask = cron.schedule('0 12 * * *', async () => {
+    await runNewsRefresh();
+  });
+  tasks.push(newsRefreshTask);
+  logger.info({ schedule: '0 12 * * *' }, '[cron] registered: news.refresh (0 12 * * *)');
 
   // PWin nightly retrain — runs at 02:00 UTC (10 PM ET)
   const pwinRetrainTask = cron.schedule('0 2 * * *', async () => {

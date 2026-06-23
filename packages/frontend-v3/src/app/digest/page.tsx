@@ -18,6 +18,9 @@ import {
   Scale,
   ScrollText,
 } from "lucide-react";
+import CollapsibleSection from "@/components/digest/CollapsibleSection";
+import GovConNews from "@/components/digest/GovConNews";
+import WeeklySitrep from "@/components/digest/WeeklySitrep";
 
 // ────────────────────────────────────────────────────────────
 // Category filter tabs
@@ -31,6 +34,12 @@ const CATEGORIES: { key: Category; label: string }[] = [
   { key: "regulation", label: "Regulations" },
   { key: "gao_decision", label: "GAO Decisions" },
 ];
+
+// ────────────────────────────────────────────────────────────
+// Page-level tabs
+// ────────────────────────────────────────────────────────────
+
+type PageTab = "digest" | "sitrep";
 
 // ────────────────────────────────────────────────────────────
 // Signal type badges
@@ -63,7 +72,7 @@ function relativeTime(dateStr: string): string {
 }
 
 function daysUntil(dateStr: string | null): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "\u2014";
   const now = Date.now();
   const target = new Date(dateStr).getTime();
   const days = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
@@ -89,6 +98,7 @@ export default function DigestPage() {
   const { data, isLoading, error } = useDigest();
   const refresh = useDigestRefresh();
   const [activeCategory, setActiveCategory] = useState<Category>("all");
+  const [activeTab, setActiveTab] = useState<PageTab>("digest");
 
   const lastUpdated = data?.last_updated
     ? new Date(data.last_updated).toLocaleString("en-US", {
@@ -176,7 +186,7 @@ export default function DigestPage() {
             </div>
             <p className="font-mono text-xs text-muted-foreground">
               Refreshed daily
-              {lastUpdated ? ` · Last updated: ${lastUpdated} ET` : ""}
+              {lastUpdated ? ` \u00B7 Last updated: ${lastUpdated} ET` : ""}
             </p>
           </div>
           <button
@@ -189,72 +199,121 @@ export default function DigestPage() {
           </button>
         </div>
 
-        {/* ─── Category tabs ─────────────────────────────────── */}
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.key}
-              onClick={() => setActiveCategory(cat.key)}
-              className={cn(
-                "rounded px-2.5 py-1 font-mono text-xs transition-colors",
-                activeCategory === cat.key
-                  ? "bg-gda-green/15 text-gda-green border border-gda-green/40"
-                  : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30",
-              )}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ─── Main grid ─────────────────────────────────────── */}
-      <div className="grid gap-6 lg:grid-cols-5">
-        {/* ─── Left column (60%) ─────────────────────────── */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Lead story */}
-          {data.lead && <LeadStoryPanel lead={data.lead} />}
-
-          {/* Signal feed */}
-          <div className="space-y-2">
-            <h2 className="font-mono text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Signal Feed
-            </h2>
-            {filteredSignals.length === 0 ? (
-              <div className="rounded border border-border bg-gda-panel p-4 text-center">
-                <p className="font-mono text-xs text-muted-foreground">
-                  No signals in this category yet.
-                </p>
-              </div>
-            ) : (
-              filteredSignals.map((signal) => (
-                <SignalCard key={signal.id} signal={signal} />
-              ))
+        {/* ─── Page-level tabs (Digest / Weekly SITREP) ────── */}
+        <div className="flex items-center gap-4 border-b border-border">
+          <button
+            onClick={() => setActiveTab("digest")}
+            className={cn(
+              "pb-1.5 font-mono text-xs transition-colors",
+              activeTab === "digest"
+                ? "border-b-2 border-gda-cyan text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
-          </div>
+          >
+            Digest
+          </button>
+          <button
+            onClick={() => setActiveTab("sitrep")}
+            className={cn(
+              "pb-1.5 font-mono text-xs transition-colors",
+              activeTab === "sitrep"
+                ? "border-b-2 border-gda-cyan text-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Weekly SITREP
+          </button>
         </div>
 
-        {/* ─── Right column (40%) ────────────────────────── */}
-        <div className="lg:col-span-2 space-y-4">
-          <RegulatoryTrackerPanel items={data.regulatory} />
-          <UpcomingSolicitationsPanel items={data.upcoming_solicitations} />
-          <GaoWatchlistPanel items={data.gao_watchlist} />
-        </div>
+        {/* ─── Category tabs (only on Digest tab) ─────────── */}
+        {activeTab === "digest" && (
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => setActiveCategory(cat.key)}
+                className={cn(
+                  "rounded px-2.5 py-1 font-mono text-xs transition-colors",
+                  activeCategory === cat.key
+                    ? "bg-gda-green/15 text-gda-green border border-gda-green/40"
+                    : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30",
+                )}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* ─── Tab content ───────────────────────────────────── */}
+      {activeTab === "sitrep" ? (
+        <div className="rounded border border-border bg-gda-panel p-4">
+          <WeeklySitrep />
+        </div>
+      ) : (
+        <>
+          {/* ─── Main grid ─────────────────────────────────── */}
+          <div className="grid gap-6 lg:grid-cols-5">
+            {/* ─── Left column (60%) ─────────────────────── */}
+            <div className="lg:col-span-3 space-y-4">
+              {/* Lead story */}
+              {data.lead && (
+                <CollapsibleSection id="lead-story" title="Today's Lead">
+                  <LeadStoryContent lead={data.lead} />
+                </CollapsibleSection>
+              )}
+
+              {/* Signal feed */}
+              <CollapsibleSection id="signal-feed" title="Signal Feed">
+                {filteredSignals.length === 0 ? (
+                  <div className="text-center py-2">
+                    <p className="font-mono text-xs text-muted-foreground">
+                      No signals in this category yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredSignals.map((signal) => (
+                      <SignalCard key={signal.id} signal={signal} />
+                    ))}
+                  </div>
+                )}
+              </CollapsibleSection>
+            </div>
+
+            {/* ─── Right column (40%) ────────────────────── */}
+            <div className="lg:col-span-2 space-y-4">
+              <CollapsibleSection id="govcon-news" title="GovCon News">
+                <GovConNews />
+              </CollapsibleSection>
+
+              <CollapsibleSection id="regulatory-tracker" title="Regulatory Tracker">
+                <RegulatoryTrackerContent items={data.regulatory} />
+              </CollapsibleSection>
+
+              <CollapsibleSection id="upcoming-solicitations" title="Upcoming Solicitations">
+                <UpcomingSolicitationsContent items={data.upcoming_solicitations} />
+              </CollapsibleSection>
+
+              <CollapsibleSection id="gao-watchlist" title="GAO Watchlist">
+                <GaoWatchlistContent items={data.gao_watchlist} />
+              </CollapsibleSection>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────
-// Lead Story Panel
+// Lead Story Content (inner content, no wrapper)
 // ────────────────────────────────────────────────────────────
 
-function LeadStoryPanel({ lead }: { lead: DigestLeadStory }) {
+function LeadStoryContent({ lead }: { lead: DigestLeadStory }) {
   return (
-    <div className="rounded border border-gda-green/30 bg-gda-panel p-4 space-y-2">
-      <p className="font-mono text-[11px] font-bold text-gda-green uppercase tracking-widest">
-        Today{"'"}s Lead
-      </p>
+    <div className="space-y-2">
       <h3 className="font-mono text-sm font-bold text-foreground leading-tight">
         {lead.headline}
       </h3>
@@ -271,7 +330,7 @@ function LeadStoryPanel({ lead }: { lead: DigestLeadStory }) {
             }
             className="font-mono text-[11px] text-gda-cyan hover:underline"
           >
-            → View {lead.related_opportunity_ids.length} related{" "}
+            {"\u2192"} View {lead.related_opportunity_ids.length} related{" "}
             {lead.related_opportunity_ids.length === 1 ? "opportunity" : "opportunities"}
           </a>
         )}
@@ -331,8 +390,8 @@ function SignalCard({ signal }: { signal: DigestSignal }) {
       {/* Meta row */}
       <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
         {signal.naics_code && <span>{signal.naics_code}</span>}
-        {signal.value_estimate && <span>· {signal.value_estimate}</span>}
-        {signal.agency && <span>· {signal.agency}</span>}
+        {signal.value_estimate && <span>{"\u00B7"} {signal.value_estimate}</span>}
+        {signal.agency && <span>{"\u00B7"} {signal.agency}</span>}
       </div>
 
       {/* AI summary */}
@@ -358,58 +417,49 @@ function SignalCard({ signal }: { signal: DigestSignal }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Regulatory Tracker
+// Regulatory Tracker Content
 // ────────────────────────────────────────────────────────────
 
-function RegulatoryTrackerPanel({ items }: { items: RegulatoryEntry[] }) {
+function RegulatoryTrackerContent({ items }: { items: RegulatoryEntry[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="font-mono text-xs text-muted-foreground">
+        No active regulatory items tracked.
+      </p>
+    );
+  }
+
   return (
-    <div className="rounded border border-border bg-gda-panel p-3 space-y-2">
-      <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-        Regulatory Tracker
-      </h2>
-      {items.length === 0 ? (
-        <p className="font-mono text-xs text-muted-foreground">
-          No active regulatory items tracked.
-        </p>
-      ) : (
-        <div className="space-y-1.5">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="min-w-0"
+    <div className="space-y-1.5">
+      {items.map((item) => (
+        <div key={item.id} className="min-w-0">
+          {item.source_url ? (
+            <a
+              href={item.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
             >
-              {item.source_url ? (
-                <a
-                  href={item.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
-                >
-                  {item.title}
-                </a>
-              ) : (
-                <span className="font-mono text-[11px] text-foreground truncate block">
-                  {item.title}
-                </span>
-              )}
-            </div>
-          ))}
+              {item.title}
+            </a>
+          ) : (
+            <span className="font-mono text-[11px] text-foreground truncate block">
+              {item.title}
+            </span>
+          )}
         </div>
-      )}
+      ))}
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────
-// Upcoming Solicitations
+// Upcoming Solicitations Content
 // ────────────────────────────────────────────────────────────
 
-function UpcomingSolicitationsPanel({ items }: { items: UpcomingSolicitation[] }) {
+function UpcomingSolicitationsContent({ items }: { items: UpcomingSolicitation[] }) {
   return (
-    <div className="rounded border border-border bg-gda-panel p-3 space-y-2">
-      <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-        Upcoming Solicitations
-      </h2>
+    <div className="space-y-1.5">
       <p className="font-mono text-[11px] text-muted-foreground">
         In Envision{"'"}s NAICS space
       </p>
@@ -418,7 +468,7 @@ function UpcomingSolicitationsPanel({ items }: { items: UpcomingSolicitation[] }
           No upcoming solicitations in tracked NAICS codes.
         </p>
       ) : (
-        <div className="space-y-1.5">
+        <>
           {items.map((item) => (
             <div key={item.id} className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -443,16 +493,16 @@ function UpcomingSolicitationsPanel({ items }: { items: UpcomingSolicitation[] }
             href="/opportunities"
             className="block font-mono text-[11px] text-gda-cyan hover:underline pt-1"
           >
-            View all →
+            View all {"\u2192"}
           </a>
-        </div>
+        </>
       )}
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────
-// GAO Watchlist
+// GAO Watchlist Content
 // ────────────────────────────────────────────────────────────
 
 function outcomeStyle(outcome: string | null): string {
@@ -475,12 +525,9 @@ function outcomeLabel(outcome: string | null): string {
   return outcome.charAt(0).toUpperCase() + outcome.slice(1);
 }
 
-function GaoWatchlistPanel({ items }: { items: GaoDecision[] }) {
+function GaoWatchlistContent({ items }: { items: GaoDecision[] }) {
   return (
-    <div className="rounded border border-border bg-gda-panel p-3 space-y-2">
-      <h2 className="font-mono text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-        GAO Watchlist
-      </h2>
+    <div className="space-y-1.5">
       <p className="font-mono text-[11px] text-muted-foreground">
         Protests affecting Envision{"'"}s space
       </p>
@@ -489,31 +536,29 @@ function GaoWatchlistPanel({ items }: { items: GaoDecision[] }) {
           No GAO decisions tracked yet.
         </p>
       ) : (
-        <div className="space-y-1.5">
-          {items.map((item) => (
-            <div key={item.id} className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                {item.source_url ? (
-                  <a
-                    href={item.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
-                  >
-                    {item.title ?? item.decision_number}
-                  </a>
-                ) : (
-                  <span className="font-mono text-[11px] text-foreground truncate block">
-                    {item.title ?? item.decision_number}
-                  </span>
-                )}
-              </div>
-              <span className={cn("font-mono text-[11px] font-bold whitespace-nowrap", outcomeStyle(item.outcome))}>
-                {outcomeLabel(item.outcome)}
-              </span>
+        items.map((item) => (
+          <div key={item.id} className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              {item.source_url ? (
+                <a
+                  href={item.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[11px] text-foreground hover:text-gda-cyan hover:underline truncate block"
+                >
+                  {item.title ?? item.decision_number}
+                </a>
+              ) : (
+                <span className="font-mono text-[11px] text-foreground truncate block">
+                  {item.title ?? item.decision_number}
+                </span>
+              )}
             </div>
-          ))}
-        </div>
+            <span className={cn("font-mono text-[11px] font-bold whitespace-nowrap", outcomeStyle(item.outcome))}>
+              {outcomeLabel(item.outcome)}
+            </span>
+          </div>
+        ))
       )}
     </div>
   );
