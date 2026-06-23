@@ -341,10 +341,11 @@ async function recomputeQuarterTotals(
 export async function ingestFinancialRows(
   rows: FinancialStatementExtractOutput['rows'],
   sourceDocId?: number | null,
-): Promise<{ plan: number; actual: number; rejected: number }> {
+): Promise<{ plan: number; actual: number; rejected: number; parse_warnings: string[] }> {
   let plan = 0;
   let actual = 0;
   let rejected = 0;
+  const parse_warnings: string[] = [];
 
   // Clear seed/demo rows ONLY after a real row is successfully upserted. An empty
   // extract (rows=[]) or an all-failed extract must leave existing data intact,
@@ -404,7 +405,30 @@ export async function ingestFinancialRows(
     logger.warn({ err }, 'Quarter-total recompute failed');
   }
 
-  return { plan, actual, rejected };
+  // Layer 5: zero-actuals guard. If actuals were ingested but every actual row
+  // had sales=0 AND ebit=0 while the raw extract contained non-zero numeric
+  // content, flag it as a parse warning so ingestion-status can surface it
+  // instead of silently writing zeros.
+  if (actual > 0) {
+    const allZeroActuals = rows
+      .filter((r) => r.kind === 'actual')
+      .every((r) => {
+        const s = isFiniteNumber(r.sales) ? r.sales : 0;
+        const e = isFiniteNumber(r.ebit) ? r.ebit : 0;
+        const tr = isFiniteNumber(r.total_revenue) ? r.total_revenue : 0;
+        return s === 0 && e === 0 && tr === 0;
+      });
+    if (allZeroActuals) {
+      const warning = `doc_id=${sourceDocId ?? 'unknown'}: ingested ${actual} actual row(s) with all-zero sales/ebit/total_revenue — possible column-mapping failure`;
+      parse_warnings.push(warning);
+      logger.warn(
+        { sourceDocId, actual_count: actual },
+        'zero-actuals guard: all ingested actual rows have zero sales/ebit/revenue',
+      );
+    }
+  }
+
+  return { plan, actual, rejected, parse_warnings };
 }
 
 // ---------------------------------------------------------------------------

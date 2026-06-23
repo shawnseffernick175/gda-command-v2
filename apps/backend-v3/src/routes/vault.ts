@@ -49,6 +49,7 @@ interface ReingestDocResult {
   sie: number;
   rejected: number;
   parsers_run: string[];
+  parse_warnings: string[];
   error?: string;
 }
 interface ReingestJob {
@@ -926,11 +927,13 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
           if (finResult.ok && finResult.output.is_financial && finResult.output.rows.length > 0) {
             const counts = await ingestFinancialRows(finResult.output.rows, docId);
+            const auditMsg = `plan=${counts.plan}, actual=${counts.actual}, rejected=${counts.rejected}` +
+              (counts.parse_warnings.length > 0 ? ` | WARNINGS: ${counts.parse_warnings.join('; ')}` : '');
             await insertAudit(
               docId,
               'financials_ingested',
               'system',
-              `plan=${counts.plan}, actual=${counts.actual}, rejected=${counts.rejected}`,
+              auditMsg,
             );
           }
         } catch (err) {
@@ -1447,11 +1450,13 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             docType: doc.doc_type,
           });
           if (r.any_ingested) {
+            const auditMsg = `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, rejected=${r.rejected}` +
+              (r.parse_warnings.length > 0 ? ` | WARNINGS: ${r.parse_warnings.join('; ')}` : '');
             await insertAudit(
               doc.id,
               'financials_ingested',
               'admin',
-              `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, rejected=${r.rejected}`,
+              auditMsg,
             );
           }
           job.results.push({
@@ -1465,6 +1470,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             sie: r.sie,
             rejected: r.rejected,
             parsers_run: r.parsers_run,
+            parse_warnings: r.parse_warnings,
           });
         } catch (err) {
           logger.warn({ err, docId: doc.id, filename: doc.filename }, 'reingest-all: doc failed');
@@ -1474,6 +1480,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             status: 'error',
             plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, rejected: 0,
             parsers_run: [],
+            parse_warnings: [],
             error: err instanceof Error ? err.message : String(err),
           });
         }
