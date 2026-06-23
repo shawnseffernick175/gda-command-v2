@@ -619,6 +619,15 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         .send(errorEnvelope('NOT_FOUND', 'Resource not found', req.requestId));
     }
 
+    // Guard: verify the fetched row matches the resolved id (belt-and-suspenders
+    // safety for F-613 BUG 2 — detail page must never display a mismatched record).
+    if (String(row.id) !== String(id)) {
+      logger.error({ requestedId: id, fetchedId: row.id }, 'opportunity id mismatch');
+      return reply
+        .status(500)
+        .send(errorEnvelope('INTERNAL_ERROR', 'opportunity id mismatch', req.requestId));
+    }
+
     if (isCacheFresh(row)) {
       analysisCacheHits.inc();
       const detail = await rowToDetail(row);

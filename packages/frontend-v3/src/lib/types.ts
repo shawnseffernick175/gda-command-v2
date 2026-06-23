@@ -99,10 +99,9 @@ export interface OpportunityDetail extends OpportunitySummary {
   description: string | null;
   place_of_performance: string | null;
   solicitation_number: string | null;
-  notice_id: string | null;
+  sam_notice_id: string | null;
   response_deadline: string | null;
   posted_at: string | null;
-  source: string | null;
   org_path?: string | null;
   doctrine_badge?: DoctrineBadge | null;
   analysis?: AnalysisBlock | null;
