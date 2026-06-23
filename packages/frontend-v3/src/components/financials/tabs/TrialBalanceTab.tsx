@@ -28,8 +28,8 @@ export function TrialBalanceTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {items.length} account{items.length !== 1 ? "s" : ""} &middot; Debits{" "}
-          {formatMoney(totalDebit)} &middot; Credits {formatMoney(totalCredit)}
+          {items.length} account{items.length !== 1 ? "s" : ""} · Debits{" "}
+          {formatMoney(totalDebit)} · Credits {formatMoney(totalCredit)}
         </p>
       </div>
 

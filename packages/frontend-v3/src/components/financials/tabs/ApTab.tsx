@@ -32,7 +32,7 @@ export function ApTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {items.length} payable{items.length !== 1 ? "s" : ""} &middot; Total{" "}
+          {items.length} payable{items.length !== 1 ? "s" : ""} · Total{" "}
           {formatMoney(total)}
         </p>
       </div>

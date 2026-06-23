@@ -32,7 +32,7 @@ export function ArTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {items.length} receivable{items.length !== 1 ? "s" : ""} &middot;
+          {items.length} receivable{items.length !== 1 ? "s" : ""} ·
           Total {formatMoney(total)}
         </p>
       </div>

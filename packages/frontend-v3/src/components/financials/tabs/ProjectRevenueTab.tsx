@@ -29,8 +29,8 @@ export function ProjectRevenueTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {items.length} project{items.length !== 1 ? "s" : ""} &middot;
-          Revenue {formatMoney(totalRevenue)} &middot; Profit{" "}
+          {items.length} project{items.length !== 1 ? "s" : ""} ·
+          Revenue {formatMoney(totalRevenue)} · Profit{" "}
           {formatMoney(totalProfit)}
         </p>
       </div>
