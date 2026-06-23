@@ -11,6 +11,7 @@
 
 import { pool } from '../../lib/db.js';
 import { recordAuditLog } from '../audit/audit-log.js';
+import { normalizePipelineStage, isTerminalStage } from '../../lib/pipeline-stage.js';
 
 export interface AssessmentListItem {
   id: string;
@@ -184,11 +185,13 @@ export class PromoteError extends Error {
  * @param opportunityId  opportunity to promote
  * @param captureOwner   the requesting user's display identity (NEVER 'system')
  * @param createdByUserId numeric user id for created_by, or null
+ * @param targetStage    canonical pipeline stage to create the item at (default 'qualify')
  */
 export async function promoteToPipeline(
   opportunityId: string,
   captureOwner: string,
   createdByUserId: string | null,
+  targetStage: string = 'qualify',
 ): Promise<PromoteResult> {
   const owner = captureOwner?.trim();
   if (!owner || owner.toLowerCase() === 'system') {
@@ -247,13 +250,35 @@ export async function promoteToPipeline(
 
     const numericUserId = createdByUserId && /^\d+$/.test(createdByUserId) ? createdByUserId : null;
 
+    // Validate target stage against the canonical pipeline stage enum
+    const normalizedStage = normalizePipelineStage(targetStage);
+    if (!normalizedStage) {
+      throw new PromoteError(`Unknown pipeline stage: ${targetStage}`, 400);
+    }
+    if (isTerminalStage(normalizedStage)) {
+      throw new PromoteError(
+        `Cannot promote to terminal stage "${normalizedStage}". Terminal decisions (won/lost/no_bid/gov_cancelled) are recorded directly, not via promote.`,
+        400,
+      );
+    }
+
     const insertRes = await client.query<{ id: string }>(
       `INSERT INTO pipeline_items
          (opportunity_id, capture_owner, stage, source_id, created_by, created_at, updated_at)
-       VALUES ($1, $2, 'qualify', $3, $4, NOW(), NOW())
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
        RETURNING id::text`,
-      [opportunityId, owner, sourceId, numericUserId],
+      [opportunityId, owner, normalizedStage, sourceId, numericUserId],
     );
+
+    // F-614: audit trail for pipeline promotion (user-initiated)
+    await recordAuditLog(client, {
+      action: 'promote_to_pipeline',
+      table_name: 'pipeline_items',
+      record_id: Number(insertRes.rows[0]!.id),
+      new_values: { stage: normalizedStage, opportunity_id: opportunityId, capture_owner: owner },
+      actor: owner,
+      source: 'user',
+    });
 
     await client.query('COMMIT');
 
