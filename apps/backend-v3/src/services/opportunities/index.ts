@@ -418,8 +418,10 @@ export async function listOpportunities(
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const orderBy = buildOrderByClause(filters.sort_by, filters.sort_dir);
-  const sql = `SELECT o.*, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage, COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage, latest_pwin.pwin AS pwin_score FROM opportunities o LEFT JOIN ( SELECT DISTINCT ON (opportunity_id) opportunity_id, pwin FROM opportunity_analysis_cache ORDER BY opportunity_id, generated_at DESC ) latest_pwin ON latest_pwin.opportunity_id = o.id ${where} ${orderBy} LIMIT $${paramIdx}`;
+  // Cursor pagination relies on `id < cursor_id` keyset — ORDER BY must stay
+  // o.id DESC.  Custom sort_by/sort_dir is only supported by the offset-based
+  // listOpportunitiesPaged path.
+  const sql = `SELECT o.*, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage, COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage, latest_pwin.pwin AS pwin_score FROM opportunities o LEFT JOIN ( SELECT DISTINCT ON (opportunity_id) opportunity_id, pwin FROM opportunity_analysis_cache ORDER BY opportunity_id, generated_at DESC ) latest_pwin ON latest_pwin.opportunity_id = o.id ${where} ORDER BY o.id DESC LIMIT $${paramIdx}`;
   params.push(limit + 1);
 
   const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean; pipeline_stage: string; pwin_score: string | number | null }>(sql, params);
