@@ -278,6 +278,7 @@ export async function rowToDetail(row: OpportunityRow): Promise<OpportunityDetai
   return {
     ...summary,
     sam_notice_id: row.sam_notice_id,
+    data_source: row.data_source,
     sub_agency: row.sub_agency,
     org_path: row.org_path ?? null,
     description: row.description,

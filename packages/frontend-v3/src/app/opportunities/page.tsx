@@ -833,7 +833,6 @@ function OpportunityRow({
 
   const sources: string[] = [];
   if (opp.data_source) sources.push(opp.data_source);
-  if (opp.source && opp.source !== opp.data_source) sources.push(opp.source);
 
   return (
     <tr
@@ -1033,6 +1032,11 @@ function OpportunityDetail({ id }: { id: string }) {
 
   if (!opp) return null;
 
+  // F-613 BUG 2 guard: verify the returned record matches the requested id
+  if (String(opp.id) !== String(id)) {
+    return <ErrorState message={`Record mismatch: requested id ${id} but received id ${opp.id}`} />;
+  }
+
   const llm = opp.llm_analysis as LlmAnalysis | null | undefined;
   const currentStage = opp.pipeline_stage ? stageKeyToLabel(opp.pipeline_stage) : (opp.stage ?? "Interest");
   const timeline = opp.analysis?.timeline;
@@ -1134,7 +1138,7 @@ function OpportunityDetail({ id }: { id: string }) {
               SB PLAY
             </span>
           )}
-          {opp.source && <SourceChip label={opp.source} kind="real" />}
+          {opp.data_source && <SourceChip label={opp.data_source} kind="real" />}
           {opp.source_uri && (
             <a
               href={opp.source_uri}
@@ -1210,7 +1214,26 @@ function OpportunityDetail({ id }: { id: string }) {
               <MetaRow label="Set-Aside" value={opp.set_aside ?? "None"} />
               <MetaRow label="Place" value={opp.place_of_performance ?? "---"} />
               <MetaRow label="NAICS" value={opp.naics ?? "---"} mono />
-              <MetaRow label="Source" value={opp.source ?? "---"} />
+              {opp.source_uri ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Source</span>
+                  <span className="inline-flex items-center gap-2">
+                    <a
+                      href={opp.source_uri}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-xs text-gda-cyan hover:text-gda-green transition-colors truncate max-w-[220px] inline-block"
+                    >
+                      {opp.sam_notice_id ? `SAM ${opp.sam_notice_id}` : "View Source"} {"\u2197"}
+                    </a>
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Source</span>
+                  <FieldStatusBadge reason="no_source_data" />
+                </div>
+              )}
               {/* Doctrine Fit — demoted to one line */}
               {(doctrine || doctrineScore != null) && (
                 <div className="flex items-center justify-between">

@@ -139,6 +139,7 @@ export interface OpportunitySummary {
 
 export interface OpportunityDetail extends OpportunitySummary {
   sam_notice_id: string | null;
+  data_source: string;
   sub_agency: string | null;
   org_path: string | null;
   description: string | null;
