@@ -44,6 +44,9 @@ export function NumberCell({
     case "raw":
       display = value.toLocaleString();
       break;
+    default:
+      display = String(value);
+      break;
   }
 
   return (

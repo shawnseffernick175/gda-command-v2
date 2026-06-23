@@ -108,6 +108,8 @@ export function ScoringWorkspace({ reviewId, onClose }: ScoringWorkspaceProps) {
         case "1": case "2": case "3": case "4": case "5":
           setScore(Number(e.key));
           break;
+        default:
+          break;
       }
     }
     window.addEventListener("keydown", handleKeyDown);

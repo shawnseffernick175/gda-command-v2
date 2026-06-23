@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useRef, useCallback, useMemo } from "react";
+import { Suspense, useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -1014,6 +1014,26 @@ function OpportunityDetail({ id }: { id: string }) {
   const analyzeOpp = useAnalyzeOpportunity();
   const updateStage = useUpdateStage();
 
+  const llmForEffect = opp?.llm_analysis as LlmAnalysis | null | undefined;
+  const relevanceForEffect = opp?.relevance_status;
+  useEffect(() => {
+    const isPreAssessed =
+      relevanceForEffect === "off_profile" ||
+      relevanceForEffect === "auto_pass" ||
+      relevanceForEffect === "unknown_naics";
+    if (
+      opp &&
+      !llmForEffect &&
+      !isPreAssessed &&
+      !analyzeOpp.isPending &&
+      !analyzeOpp.data &&
+      !analyzeOpp.isError &&
+      analyzeOpp.analysisState === "idle"
+    ) {
+      analyzeOpp.mutate(id);
+    }
+  }, [id, opp, llmForEffect, relevanceForEffect, analyzeOpp]);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -1170,7 +1190,7 @@ function OpportunityDetail({ id }: { id: string }) {
         {/* ═══ COLUMN A ═══ */}
         <div className="space-y-4">
           {/* Decision Brief */}
-          <DecisionBriefPanel llm={llm} oppId={id} canonicalPwin={opp.pwin?.score ?? null} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} onAnalyze={() => analyzeOpp.mutate(id)} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
+          <DecisionBriefPanel llm={llm} oppId={id} canonicalPwin={opp.pwin?.score ?? null} analyzing={analyzeOpp.isPending || analyzeOpp.analysisState === "analyzing"} llmErrorKind={analyzeOpp.llmError ?? opp.llm_error_kind} relevanceStatus={opp.relevance_status} relevanceReason={opp.relevance_reason} />
 
           {/* Competitive Intelligence */}
           <CompetitiveIntelPanel llm={llm} incumbent={opp.pwin?.incumbent_competitor} />
@@ -1366,7 +1386,6 @@ function DecisionBriefPanel({
   llm,
   canonicalPwin,
   analyzing,
-  onAnalyze,
   llmErrorKind,
   relevanceStatus,
   relevanceReason,
@@ -1375,7 +1394,6 @@ function DecisionBriefPanel({
   oppId: string;
   canonicalPwin?: number | null;
   analyzing: boolean;
-  onAnalyze: () => void;
   llmErrorKind?: string | null;
   relevanceStatus?: string | null;
   relevanceReason?: string | null;
@@ -1430,16 +1448,8 @@ function DecisionBriefPanel({
               </p>
             )}
             <p className="text-[11px] text-muted-foreground/60 font-mono">
-              Skipped full analysis (not a fit). Run a full analysis manually if you disagree.
+              Skipped full analysis (not a fit).
             </p>
-            <button
-              type="button"
-              onClick={onAnalyze}
-              disabled={analyzing}
-              className="rounded border border-gda-green/30 px-3 py-1.5 text-xs font-mono text-gda-green/80 hover:bg-gda-green/10 transition-colors disabled:opacity-50"
-            >
-              {analyzing ? "Analyzing..." : "Analyze Anyway"}
-            </button>
           </CardContent>
         </Card>
       );
@@ -1465,23 +1475,16 @@ function DecisionBriefPanel({
               </p>
             </div>
           ) : (
-            <>
-              <p className="text-xs text-muted-foreground mb-3 font-mono">
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-xs text-muted-foreground font-mono">
                 Analysis pending
               </p>
               {llmErrorKind && (
-                <p className="text-[11px] text-gda-red/80 mb-2 font-mono">
+                <p className="text-[11px] text-gda-red/80 font-mono">
                   Error: {llmErrorKind}
                 </p>
               )}
-              <button
-                type="button"
-                onClick={onAnalyze}
-                className="rounded border border-gda-green/40 px-3 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/10 transition-colors"
-              >
-                Run Analysis
-              </button>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

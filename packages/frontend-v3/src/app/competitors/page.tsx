@@ -79,7 +79,7 @@ function CompetitorsContent() {
               </h1>
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Profiles of the companies you compete against, built from federal
-                award history. Size up incumbents and rivals, run black-hat analysis,
+                award history. Size up incumbents and rivals with automatic black-hat analysis
                 and understand who you are up against on a given pursuit.
               </p>
             </div>
@@ -283,6 +283,12 @@ function BlackHatSection() {
   const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
   const blackHat = useBlackHatAnalysis(selectedCompetitor);
 
+  useEffect(() => {
+    if (selectedCompetitor && !blackHat.isPending && !blackHat.data && !blackHat.isError) {
+      blackHat.mutate();
+    }
+  }, [selectedCompetitor, blackHat]);
+
   // Source the picker from the top competitors by win count across the whole
   // dataset, not just whoever happens to be on the current page.
   const { data: topData } = useCompetitorsPaged({
@@ -311,14 +317,9 @@ function BlackHatSection() {
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          disabled={!selectedCompetitor || blackHat.isPending}
-          onClick={() => blackHat.mutate()}
-          className="rounded bg-gda-green/20 px-3 py-1 text-xs font-medium text-gda-green hover:bg-gda-green/30 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {blackHat.isPending ? "Analyzing..." : "Run Black Hat Analysis"}
-        </button>
+        {blackHat.isPending && (
+          <span className="text-xs font-mono text-gda-cyan animate-pulse">Analyzing...</span>
+        )}
       </div>
 
       {blackHat.isPending && (
