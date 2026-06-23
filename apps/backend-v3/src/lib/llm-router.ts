@@ -31,7 +31,7 @@ import { callAnthropic } from './providers/anthropic.js';
 import { callOpenAIEmbed } from './providers/openai.js';
 import { callPerplexity } from './providers/perplexity.js';
 
-/** Cost per token by model. */
+/** Cost per token by model family (base alias without date pin). */
 const COST_TABLE: Record<string, { input: number; output: number }> = {
   'claude-haiku-4-5': { input: 0.00000025, output: 0.00000125 },
   'claude-sonnet-4-5': { input: 0.000003, output: 0.000015 },
@@ -40,14 +40,27 @@ const COST_TABLE: Record<string, { input: number; output: number }> = {
   'sonar-pro': { input: 0.000003, output: 0.000015 },
 };
 
+/**
+ * Normalize a model id to its base family for COST_TABLE lookup.
+ * Strips date-pin suffixes: 'claude-sonnet-4-5-20250929' → 'claude-sonnet-4-5'.
+ */
+function normalizeModelForCost(model: string): string {
+  // Try exact match first
+  if (COST_TABLE[model]) return model;
+  // Strip trailing date suffix (pattern: -YYYYMMDD)
+  const stripped = model.replace(/-\d{8}$/, '');
+  if (COST_TABLE[stripped]) return stripped;
+  return model;
+}
+
 /** Model id to use when caller explicitly requests a tier. */
 const MODEL_TIER_MAP: Record<ModelTier, string> = {
-  sonnet: 'claude-sonnet-4-5',
+  sonnet: 'claude-sonnet-4-5-20250929',
   opus: 'claude-opus-4-5',
 };
 
 function estimateCost(model: string, tokens: TokenUsage): number {
-  const rates = COST_TABLE[model];
+  const rates = COST_TABLE[normalizeModelForCost(model)];
   if (!rates) return 0;
   let inputCost = tokens.input * rates.input;
   // Adjust for prompt caching: cache writes cost 25% more, reads cost 90% less

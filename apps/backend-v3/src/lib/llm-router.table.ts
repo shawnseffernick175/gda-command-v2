@@ -18,7 +18,7 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
   {
     task: 'opportunity_analysis',
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-5-20250929',
     timeout_ms: 75_000,
     fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 30_000 },
   },

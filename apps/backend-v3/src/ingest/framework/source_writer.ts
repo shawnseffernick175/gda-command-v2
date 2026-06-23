@@ -11,9 +11,16 @@ import { requireBoss, QUEUE_NAMES, type AnalysisJobData } from '../../lib/queue.
 import { mirrorOpportunityToUnified } from '../../services/opportunities/unified-mirror.js';
 import { evaluateRelevance } from '../../constants/relevance.js';
 import { validateAndRecompute, rejectReason } from './opportunity_validation.js';
+import { checkIngestAnalysisDailyCap } from './ingest-analysis-cap.js';
 
 function enqueueIngestAnalysis(oppId: string): void {
   try {
+    // F-620: daily cap circuit-breaker — skip enqueue if cap exceeded
+    if (checkIngestAnalysisDailyCap()) {
+      logger.warn({ oppId }, 'ingest_analysis_daily_cap_exceeded — skipping enqueue');
+      return;
+    }
+
     const boss = requireBoss();
     const jobData: AnalysisJobData = {
       entityType: 'opportunity',
@@ -257,8 +264,11 @@ export async function upsertOpportunityWithSources(
         await upsertContactsForOpportunity(oppId, validated.data_source, validated.contacts);
       }
 
-      // F-605: auto-enqueue analysis on ingest
-      enqueueIngestAnalysis(String(oppId));
+      // F-620: only enqueue analysis for relevant (or pending) opps.
+      // Matches the cron predicate: (relevance_status IS NULL OR relevance_status = 'relevant')
+      if (rel.status === 'relevant') {
+        enqueueIngestAnalysis(String(oppId));
+      }
 
       // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
       try {
@@ -433,8 +443,11 @@ export async function upsertExternalOpportunity(
     await client.query('COMMIT');
 
     if (xReason === null) {
-      // F-605: auto-enqueue analysis on ingest
-      enqueueIngestAnalysis(String(oppId));
+      // F-620: only enqueue analysis for relevant (or pending) opps.
+      // Matches the cron predicate: (relevance_status IS NULL OR relevance_status = 'relevant')
+      if (rel.status === 'relevant') {
+        enqueueIngestAnalysis(String(oppId));
+      }
 
       // F-401: mirror into unified_opportunities (best-effort, never fails ingest)
       try {
