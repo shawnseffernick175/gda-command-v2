@@ -980,13 +980,14 @@ export async function updateOpportunity(
     } else {
       // F-614: Forward-progression stage from Interest — promote via the
       // canonical promoteToPipeline path so the item enters the pipeline
-      // with capture_owner = user. Falls through to PromoteError (400) if
-      // the opportunity hasn't been assessed to ops_tracker yet.
+      // with capture_owner = user. PromoteError → 409 when the prerequisite
+      // assessment hasn't happened yet (state conflict, not a validation error).
       try {
         await promoteToPipeline(id, captureOwner, null, dbStage);
       } catch (err) {
         if (err instanceof PromoteError) {
-          throw Object.assign(new Error(err.message), { statusCode: err.statusCode });
+          const code = err.statusCode === 400 ? 409 : err.statusCode;
+          throw Object.assign(new Error(err.message), { statusCode: code });
         }
         throw err;
       }
