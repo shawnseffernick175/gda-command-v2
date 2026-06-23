@@ -41,6 +41,7 @@ function groupColor(group: WeightDef["group"]): string {
     case "bonus": return "text-gda-green";
     case "penalty": return "text-gda-red";
     case "multiplier": return "text-gda-cyan";
+    default: return "text-muted-foreground";
   }
 }
 
@@ -49,6 +50,7 @@ function sliderTrackColor(group: WeightDef["group"]): string {
     case "bonus": return "accent-[#22c55e]";
     case "penalty": return "accent-[#ef4444]";
     case "multiplier": return "accent-[#06b6d4]";
+    default: return "accent-gray-400";
   }
 }
 

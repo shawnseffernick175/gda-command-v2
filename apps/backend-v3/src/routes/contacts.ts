@@ -15,7 +15,20 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
       q?: string; agency?: string; category?: string;
       temperature?: string; linked?: string; source?: string;
       limit?: string; cursor?: string; page?: string;
+      sort_by?: string; sort_dir?: string;
     };
+
+    const SORTABLE_COLUMNS: Record<string, string> = {
+      name: 'c.name',
+      title: 'c.title',
+      agency: 'c.agency',
+      email: 'c.email',
+      last_contacted_at: 'c.last_contacted_at',
+    };
+    const sortCol = SORTABLE_COLUMNS[query.sort_by ?? ''] ?? 'c.id';
+    const sortDir = query.sort_dir === 'asc' ? 'ASC' : 'DESC';
+    const nullsClause = sortDir === 'ASC' ? 'NULLS FIRST' : 'NULLS LAST';
+    const orderBy = `${sortCol} ${sortDir} ${nullsClause}`;
     const page = query.page ? Number(query.page) : null;
 
     const conditions: string[] = ['1=1'];
@@ -70,7 +83,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
                c.linked_opportunity_ids, c.linked_capture_ids
         FROM govtribe_contacts c
         WHERE ${whereClause}
-        ORDER BY c.id DESC
+        ORDER BY ${orderBy}
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
 
       const { rows } = await pool.query(sql, dataParams);
@@ -178,7 +191,7 @@ export async function contactsRoutes(app: FastifyInstance): Promise<void> {
              c.linked_opportunity_ids, c.linked_capture_ids
       FROM govtribe_contacts c
       WHERE ${conditions.join(' AND ')}
-      ORDER BY c.id DESC
+      ORDER BY ${orderBy}
       LIMIT $${params.length}`;
 
     const { rows } = await pool.query(sql, params);

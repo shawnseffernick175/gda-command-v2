@@ -93,6 +93,9 @@ export function sortData<T extends Record<string, unknown>>(
       case "enum":
         cmp = compareEnum(va, vb, col.enumOrder ?? []);
         break;
+      default:
+        cmp = compareString(String(va), String(vb));
+        break;
     }
 
     return cmp * dirMul;

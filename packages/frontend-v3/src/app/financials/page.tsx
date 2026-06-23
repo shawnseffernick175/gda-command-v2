@@ -82,6 +82,8 @@ function tabTitle(tab: Tab): string {
       return "Balance Sheet";
     case "definitions":
       return "Definitions";
+    default:
+      return String(tab);
   }
 }
 
