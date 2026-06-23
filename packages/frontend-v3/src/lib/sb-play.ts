@@ -12,6 +12,8 @@
  * cap → Envision is LARGE for those codes.
  *
  * To add more codes later, just append to this Set. No schema change needed.
+ *
+ * SYNC: Keep in sync with apps/backend-v3/src/constants/envision-naics.ts
  */
 export const ENVISION_SMALL_NAICS: ReadonlySet<string> = new Set([
   '541715', // R&D Physical/Engineering/Life Sciences — 1,000 employees (employee-based) → Envision SMALL
@@ -24,6 +26,8 @@ export const ENVISION_SMALL_NAICS: ReadonlySet<string> = new Set([
  * For now we include only the two core SB set-asides. To add
  * socioeconomic types (SDVOSB, WOSB, HUBZone, 8(a)) later, append
  * the relevant substring to this list — no code change needed.
+ *
+ * SYNC: Keep in sync with apps/backend-v3/src/constants/envision-naics.ts
  */
 export const SB_SET_ASIDE_VALUES: readonly string[] = [
   'Total Small Business Set-Aside (FAR 19.5)',

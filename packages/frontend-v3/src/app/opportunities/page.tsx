@@ -209,11 +209,12 @@ function OpportunityList() {
       stage: stageTab !== "all" ? stageTab : undefined,
       relevant_only: relevantOnly,
       idiq: idiqFilter,
+      sb_play: sbPlayOnly || undefined,
       sort_by: sortParams.sort_by,
       sort_dir: sortParams.sort_dir,
       limit: 50,
     };
-  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, sortParams.sort_by, sortParams.sort_dir]);
+  }, [debouncedQ, agencyFilter, hotFilter, setAsideFilter, valueRange, sourceFilter, stageTab, relevantOnly, idiqFilter, sbPlayOnly, sortParams.sort_by, sortParams.sort_dir]);
 
   // Any change to the active filter set returns the user to page 1.
   // Adjust state during render (React's supported pattern) rather than in an
@@ -232,15 +233,7 @@ function OpportunityList() {
     refetch,
   } = useOpportunitiesPaged({ ...filterParams, page });
 
-  const rawItems = useMemo(() => data?.items ?? [], [data]);
-  const sbPlayCount = useMemo(
-    () => rawItems.filter((o) => isSmallBizPlay(o.naics, o.set_aside)).length,
-    [rawItems],
-  );
-  const allItems = useMemo(
-    () => sbPlayOnly ? rawItems.filter((o) => isSmallBizPlay(o.naics, o.set_aside)) : rawItems,
-    [rawItems, sbPlayOnly],
-  );
+  const allItems = useMemo(() => data?.items ?? [], [data]);
   const meta: OpportunityMeta | undefined = data?.meta;
   const totalPages = data?.totalPages ?? 1;
 
@@ -360,10 +353,10 @@ function OpportunityList() {
                 onClick={() => setIdiqFilter((prev) => prev === 'only' ? undefined : 'only')}
               />
             )}
-            {sbPlayCount > 0 && (
+            {(meta.sb_play_count > 0 || sbPlayOnly) && (
               <IntelChip
                 icon="S"
-                label={`${sbPlayCount} SB Play`}
+                label={`${meta.sb_play_count} SB Play`}
                 active={sbPlayOnly}
                 onClick={() => setSbPlayOnly((prev) => !prev)}
               />
