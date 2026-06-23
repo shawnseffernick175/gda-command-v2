@@ -1007,7 +1007,7 @@ export interface AopExecutionItem {
 
 export interface AopMetricMonth {
   period: string;
-  plan: number;
+  plan: number | null;
   actual: number | null;
   variance: number | null;
 }
@@ -1018,7 +1018,7 @@ export interface AopMetric {
   kind: "currency" | "percent";
   favorable: "higher" | "lower";
   months: AopMetricMonth[];
-  plan_total: number;
+  plan_total: number | null;
   actual_total: number | null;
   variance_total: number | null;
 }
