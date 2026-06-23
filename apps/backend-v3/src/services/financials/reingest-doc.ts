@@ -35,6 +35,7 @@ export interface ReingestResult {
   sie: number;
   parsers_run: string[];
   any_ingested: boolean;
+  parse_warnings: string[];
 }
 
 /**
@@ -60,6 +61,7 @@ export async function reingestFinancialDoc(params: {
     sie: 0,
     parsers_run: [],
     any_ingested: false,
+    parse_warnings: [],
   };
 
   if (!extractedText || extractedText.trim().length === 0) {
@@ -85,6 +87,7 @@ export async function reingestFinancialDoc(params: {
         result.plan = counts.plan;
         result.actual = counts.actual;
         result.rejected = counts.rejected;
+        if (counts.parse_warnings.length > 0) result.parse_warnings.push(...counts.parse_warnings);
         if (counts.plan > 0 || counts.actual > 0) result.any_ingested = true;
       }
     } catch (err) {

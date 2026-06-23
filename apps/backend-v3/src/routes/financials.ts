@@ -481,12 +481,30 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY vd.filename`,
     );
 
+    // Parse-warning guard: detect financial_actuals rows where all KPI columns
+    // are zero (sales=0, ebit=0) — symptom of a column-mapping failure. Surface
+    // them so the user knows a re-ingest may be needed instead of silently
+    // showing $0 on the dashboard.
+    const { rows: zeroActualDocs } = await pool.query<{ source_doc_id: number; period: string; source: string }>(
+      `SELECT fa.source_doc_id, fa.period, fa.source
+       FROM financial_actuals fa
+       WHERE fa.source_doc_id IS NOT NULL
+         AND fa.period NOT LIKE '%Q%'
+         AND COALESCE(fa.actual_sales, 0) = 0
+         AND COALESCE(fa.actual_ebit, 0) = 0
+       ORDER BY fa.fiscal_year DESC, fa.quarter DESC, fa.period DESC`,
+    );
+    const parse_warnings: string[] = zeroActualDocs.map(
+      (r) => `doc_id=${r.source_doc_id}, period=${r.period}, source=${r.source}: actual sales and ebit are both $0 — possible column-mapping failure`,
+    );
+
     return reply.send(successEnvelope({
       docs_ingested: Number(docCounts?.docs_ingested ?? 0),
       docs_total: Number(docCounts?.docs_total ?? 0),
       max_period: (periodRow?.max_period as string) ?? null,
       last_refresh: (refreshRow?.last_refresh as string) ?? null,
       doc_filenames: docFiles.map((d) => d.filename as string),
+      parse_warnings,
     }, req.requestId));
   });
 
