@@ -230,9 +230,9 @@ describe('Sonnet default — no Opus in routing table defaults', () => {
   it('every Anthropic task defaults to sonnet or haiku', () => {
     const anthropicEntries = ROUTING_TABLE.filter((e) => e.provider === 'anthropic');
     for (const entry of anthropicEntries) {
-      expect(
-        entry.model === 'claude-sonnet-4-5' || entry.model === 'claude-haiku-4-5',
-      ).toBe(true);
+      const isSonnet = entry.model === 'claude-sonnet-4-5' || entry.model.startsWith('claude-sonnet-4-5-');
+      const isHaiku = entry.model === 'claude-haiku-4-5' || entry.model.startsWith('claude-haiku-4-5-');
+      expect(isSonnet || isHaiku).toBe(true);
     }
   });
 });
