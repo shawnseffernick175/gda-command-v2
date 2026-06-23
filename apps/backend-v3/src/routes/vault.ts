@@ -957,6 +957,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
         filename,
         extractedText,
         docType: docTypeConfirmed,
+        skipParsers: ['financial_statement_extract'],
       }).then((r) => {
         if (r.any_ingested) {
           const parts: string[] = [];
@@ -1271,7 +1272,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             Number(id),
             'financials_ingested',
             'admin',
-            `re-ingest: plan=${reingest.financial.plan}, actual=${reingest.financial.actual}, bs=${reingest.financial.balance_sheet}, cd=${reingest.financial.cost_detail}, sie=${reingest.financial.sie}, rejected=${reingest.financial.rejected}`,
+            `re-ingest: plan=${reingest.financial.plan}, actual=${reingest.financial.actual}, bs=${reingest.financial.balance_sheet}, cd=${reingest.financial.cost_detail}, sie=${reingest.financial.sie}, ap=${reingest.financial.ap}, ar=${reingest.financial.ar}, tb=${reingest.financial.trial_balance}, pr=${reingest.financial.project_revenue}, rejected=${reingest.financial.rejected}`,
           );
         }
       } catch (err) {

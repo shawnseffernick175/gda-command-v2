@@ -57,8 +57,9 @@ export async function reingestFinancialDoc(params: {
   filename: string;
   extractedText: string;
   docType?: string | null;
+  skipParsers?: string[];
 }): Promise<ReingestResult> {
-  const { docId, filename, extractedText, docType } = params;
+  const { docId, filename, extractedText, docType, skipParsers = [] } = params;
 
   const result: ReingestResult = {
     plan: 0,
@@ -87,7 +88,7 @@ export async function reingestFinancialDoc(params: {
   const looksFinancial =
     /financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\bact\b/i.test(filename) ||
     docType === 'financial';
-  if (looksFinancial) {
+  if (looksFinancial && !skipParsers.includes('financial_statement_extract')) {
     try {
       const finResult = await llmRouter.route({
         task: 'financial_statement_extract' as const,
