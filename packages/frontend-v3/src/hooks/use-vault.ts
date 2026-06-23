@@ -259,3 +259,34 @@ export function useResolveAllVault() {
     },
   });
 }
+
+export interface SendToSitrepResponse {
+  item: {
+    id: number;
+    sitrep_id: number;
+    topic: string;
+    discussion: string;
+    action_items: string;
+    sort_order: number;
+    source_document_id: number;
+    source_document_url: string | null;
+    created_at: string;
+  };
+  sitrep_id: number;
+  week_ending: string;
+}
+
+export function useSendToSitrep() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (documentId: number) =>
+      apiPost<SendToSitrepResponse>("/v3/digest/sitrep/from-document", {
+        document_id: documentId,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["vault"] });
+      void queryClient.invalidateQueries({ queryKey: ["digest"] });
+    },
+  });
+}

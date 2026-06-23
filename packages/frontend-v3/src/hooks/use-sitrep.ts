@@ -10,6 +10,8 @@ export interface SitrepItem {
   discussion: string;
   action_items: string;
   sort_order: number;
+  source_document_id?: number | null;
+  source_document_url?: string | null;
   created_at?: string;
 }
 

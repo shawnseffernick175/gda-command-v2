@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import {
   useSitreps,
   useSitrep,
@@ -284,7 +285,17 @@ function SitrepItemsTable({ items }: { items: SitrepItem[] }) {
         {items.map((item, idx) => (
           <tr key={item.id ?? idx} className="border-b border-border align-top">
             <td className="py-1.5 text-muted-foreground tabular-nums">{idx + 1}</td>
-            <td className="py-1.5 text-foreground font-medium">{item.topic}</td>
+            <td className="py-1.5 text-foreground font-medium">
+              {item.topic}
+              {item.source_document_id && (
+                <Link
+                  href={`/vault?id=${item.source_document_id}`}
+                  className="ml-2 text-[11px] text-accent hover:underline font-normal"
+                >
+                  [doc]
+                </Link>
+              )}
+            </td>
             <td className="py-1.5 text-foreground whitespace-pre-wrap">{item.discussion}</td>
             <td className="py-1.5 text-foreground whitespace-pre-wrap">{item.action_items}</td>
           </tr>

@@ -18,6 +18,7 @@ import {
   useDismissVaultDocument,
   useVaultUnresolvedCount,
   useResolveAllVault,
+  useSendToSitrep,
 } from "@/hooks/use-vault";
 import { Pagination } from "@/components/shared/Pagination";
 import { PendingState } from "@/components/shared/pending-state";
@@ -503,7 +504,9 @@ function WorkProductTable({
   const updateDocType = useUpdateVaultDocType();
   const reExtract = useReExtractVaultDocument();
   const dismiss = useDismissVaultDocument();
+  const sendToSitrep = useSendToSitrep();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [sitrepMsg, setSitrepMsg] = useState<string | null>(null);
   const { sortBy, sortDir, handleSort } = useTableSort("vault");
 
   const sorted = useMemo(() => {
@@ -516,6 +519,13 @@ function WorkProductTable({
     const t = setTimeout(() => setErrorMsg(null), 4000);
     return () => clearTimeout(t);
   }, [errorMsg]);
+
+  useEffect(() => {
+    if (!sitrepMsg) return;
+    const t = setTimeout(() => setSitrepMsg(null), 5000);
+    return () => clearTimeout(t);
+  }, [sitrepMsg]);
+
   if (isLoading && !items.length) {
     return (
       <div className="space-y-2">
@@ -540,6 +550,14 @@ function WorkProductTable({
       {errorMsg && (
         <div className="absolute top-2 right-2 z-50 bg-red-900/90 text-red-100 text-xs px-3 py-2 rounded shadow-lg">
           {errorMsg}
+        </div>
+      )}
+      {sitrepMsg && (
+        <div className="absolute top-2 right-2 z-50 bg-accent/90 text-white text-xs px-3 py-2 rounded shadow-lg flex items-center gap-2">
+          <span>{sitrepMsg}</span>
+          <Link href="/digest?tab=sitrep" className="underline font-medium">
+            View SITREP
+          </Link>
         </div>
       )}
       <table className="w-full text-sm">
@@ -639,6 +657,27 @@ function WorkProductTable({
                     className="text-[11px] text-muted-foreground hover:text-foreground font-mono"
                   >
                     Link
+                  </button>
+                  <button
+                    onClick={() => {
+                      sendToSitrep.mutate(doc.id, {
+                        onSuccess: () => setSitrepMsg(`"${doc.filename}" added to SITREP`),
+                        onError: (err) => {
+                          const msg = err instanceof Error ? err.message : "Failed";
+                          if (msg.toLowerCase().includes("already")) {
+                            setSitrepMsg("Already in this week\u2019s SITREP");
+                          } else {
+                            setErrorMsg(msg);
+                          }
+                        },
+                      });
+                    }}
+                    disabled={sendToSitrep.isPending && sendToSitrep.variables === doc.id}
+                    className="text-[11px] text-accent hover:text-accent/80 font-mono"
+                  >
+                    {sendToSitrep.isPending && sendToSitrep.variables === doc.id
+                      ? "Sending\u2026"
+                      : "SITREP"}
                   </button>
                   {(doc.extraction_status === 'failed' || doc.extraction_status === 'pending') && (
                     <button
@@ -890,6 +929,8 @@ function DocumentReaderDrawer({
   const { data: textData } = useVaultDocumentText(docId);
   const reExtract = useReExtractVaultDocument();
   const dismiss = useDismissVaultDocument();
+  const sendToSitrep = useSendToSitrep();
+  const [drawerSitrepMsg, setDrawerSitrepMsg] = useState<string | null>(null);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -1173,6 +1214,41 @@ function DocumentReaderDrawer({
                   </div>
                 </div>
               )}
+
+              {/* Send to SITREP */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      sendToSitrep.mutate(doc.id, {
+                        onSuccess: () => setDrawerSitrepMsg("Added to SITREP"),
+                        onError: (err) => {
+                          const msg = err instanceof Error ? err.message : "Failed";
+                          if (msg.toLowerCase().includes("already")) {
+                            setDrawerSitrepMsg("Already in this week\u2019s SITREP");
+                          } else {
+                            setDrawerSitrepMsg(msg);
+                          }
+                        },
+                      });
+                    }}
+                    disabled={sendToSitrep.isPending}
+                    className="rounded border border-accent/40 bg-accent/10 px-4 py-1.5 text-xs font-mono text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                  >
+                    {sendToSitrep.isPending ? "Sending\u2026" : "Send to SITREP"}
+                  </button>
+                  {drawerSitrepMsg && (
+                    <span className="text-xs font-mono text-accent">
+                      {drawerSitrepMsg}{" "}
+                      <Link href="/digest?tab=sitrep" className="underline">
+                        View
+                      </Link>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <hr className="border-border" />
 
               {/* Delete button */}
               {!doc.is_system_doc && (
