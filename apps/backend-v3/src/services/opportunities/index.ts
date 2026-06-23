@@ -11,6 +11,7 @@ import { parseFederalOrg } from '../../lib/orgHierarchy.js';
 import { ENVISION_NAICS } from '../../constants/envision-naics.js';
 import { normalizePipelineStage, ACTIVE_STAGE_KEYS, isTerminalStage } from '../../lib/pipeline-stage.js';
 import { recordAuditLog } from '../audit/audit-log.js';
+import { promoteToPipeline, PromoteError } from '../assessment/views.js';
 import { logger } from '../../lib/logger.js';
 import {
   ANALYSIS_AFFECTING_FIELDS,
@@ -359,7 +360,11 @@ export async function listOpportunities(
   if (filters.stage === 'passed') {
     conditions.push(`relevance_status IN ('auto_pass', 'manual_pass')`);
   } else {
-    conditions.push(`(relevance_status IS NULL OR relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
+    // F-614 bucket scope: the owner's opportunities are ONLY those with
+    // relevance_status='relevant' (the assessed, qualified bucket) plus
+    // legacy rows with NULL. off_profile, unknown_naics, auto_pass,
+    // manual_pass are excluded — they are NOT the owner's opportunities.
+    conditions.push(`(relevance_status IS NULL OR relevance_status = 'relevant')`);
   }
 
   // Stage filter (pipeline_items-based). Uses o.id since the main query aliases opportunities as o.
@@ -553,7 +558,11 @@ function buildFilterConditions(
   if (filters.stage === 'passed') {
     conditions.push(`o.relevance_status IN ('auto_pass', 'manual_pass')`);
   } else {
-    conditions.push(`(o.relevance_status IS NULL OR o.relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
+    // F-614 bucket scope: the owner's opportunities are ONLY those with
+    // relevance_status='relevant' (the assessed, qualified bucket) plus
+    // legacy rows with NULL. off_profile, unknown_naics, auto_pass,
+    // manual_pass are excluded — they are NOT the owner's opportunities.
+    conditions.push(`(o.relevance_status IS NULL OR o.relevance_status = 'relevant')`);
   }
   if (filters.stage === 'active') {
     // Active = has an active-stage pipeline row OR has no pipeline row (defaults to interest)
@@ -969,13 +978,18 @@ export async function updateOpportunity(
         });
       }
     } else {
-      // Forward-progression stages still require prior qualification.
-      throw Object.assign(
-        new Error(
-          'Opportunity is not in the pipeline. Qualify it first before setting a pipeline stage.',
-        ),
-        { statusCode: 409 },
-      );
+      // F-614: Forward-progression stage from Interest — promote via the
+      // canonical promoteToPipeline path so the item enters the pipeline
+      // with capture_owner = user. Falls through to PromoteError (400) if
+      // the opportunity hasn't been assessed to ops_tracker yet.
+      try {
+        await promoteToPipeline(id, captureOwner, null, dbStage);
+      } catch (err) {
+        if (err instanceof PromoteError) {
+          throw Object.assign(new Error(err.message), { statusCode: err.statusCode });
+        }
+        throw err;
+      }
     }
   }
 
