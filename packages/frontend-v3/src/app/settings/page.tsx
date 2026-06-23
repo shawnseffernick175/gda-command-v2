@@ -28,6 +28,9 @@ const MatchApprovals = dynamic(
 const WheelhouseNaicsPanel = dynamic(
   () => import("@/components/settings/wheelhouse-naics").then((m) => m.WheelhouseNaicsPanel),
 );
+const AiModelCostTable = dynamic(
+  () => import("@/components/settings/AiModelCostTable").then((m) => m.AiModelCostTable),
+);
 
 /* ── Config key editor ──────────────────────────────────────────── */
 function ConfigKeyRow({ row }: { row: DoctrineConfigRow }) {
@@ -574,6 +577,11 @@ export default function SettingsPage() {
         ) : (
           <SystemHealthSection sysHealth={sysHealth} />
         )}
+      </CollapseSection>
+
+      {/* ── AI Model Usage & Cost ──────────────────────────────── */}
+      <CollapseSection id="settings-ai-cost" title="AI MODEL USAGE & COST" defaultOpen={false}>
+        <AiModelCostTable />
       </CollapseSection>
 
       {/* ── Wheelhouse Filter ──────────────────────────────────── */}

@@ -1033,13 +1033,17 @@ export interface LlmCallRow {
 // ---------------------------------------------------------------------------
 
 export interface CostRollupQuery {
-  window: '1d' | '7d' | '30d';
+  window: 'live' | '1d' | '7d' | '30d';
 }
 
 export interface CostRollupEntry {
   task: Task;
+  provider: string;
+  model: string;
   call_count: number;
+  error_count: number;
   total_latency_ms: number;
+  avg_latency_ms: number;
   total_tokens_input: number;
   total_tokens_output: number;
   total_cost_usd: number;
@@ -1050,6 +1054,7 @@ export interface CostRollupResponse {
   entries: CostRollupEntry[];
   totals: {
     call_count: number;
+    error_count: number;
     total_cost_usd: number;
   };
   generated_at: string;
