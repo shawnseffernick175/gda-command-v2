@@ -88,10 +88,8 @@ const Q = (s: string | null) => `"${(s ?? "").replace(/"/g, '""')}"`;
 function exportCsv(items: PipelineListItem[]) {
   const h = "Title,Agency,Stage,Value,Weighted,Pwin,Due,Sol#";
   const rows = items.map((it) => {
-    const v = it.opportunity_value_max ?? it.opportunity_value_min ?? 0;
-    const p = it.pwin_score ?? 0;
     return [Q(it.opportunity_title), Q(it.opportunity_agency), Q(pipelineStageLabel(it.stage)),
-      v, Math.round(v * p / 100), p, it.opportunity_due_at ?? "", Q(it.solicitation_number)].join(",");
+      it.resolved_value, it.resolved_weighted, it.resolved_pwin ?? 0, it.opportunity_due_at ?? "", Q(it.solicitation_number)].join(",");
   });
   const blob = new Blob([[h, ...rows].join("\n")], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -104,9 +102,9 @@ function exportCsv(items: PipelineListItem[]) {
 const PIPELINE_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string", accessor: (r) => (r.opportunity_title as string) ?? "" },
   { field: "stage", type: "enum", enumOrder: ["Interest", "Qualify", "Pursue", "Solicitation", "Submission", "Won"], accessor: (r) => stageKeyToLabel(r.stage as string) },
-  { field: "value", type: "number", accessor: (r) => (r.opportunity_value_max as number) ?? (r.opportunity_value_min as number) ?? 0 },
-  { field: "weighted", type: "number", accessor: (r) => { const v = (r.opportunity_value_max as number) ?? (r.opportunity_value_min as number) ?? 0; const p = (r.pwin_score as number) ?? 0; return Math.round(v * (p / 100)); } },
-  { field: "pwin", type: "number", accessor: (r) => (r.pwin_score as number) ?? null },
+  { field: "value", type: "number", accessor: (r) => (r.resolved_value as number) ?? 0 },
+  { field: "weighted", type: "number", accessor: (r) => (r.resolved_weighted as number) ?? 0 },
+  { field: "pwin", type: "number", accessor: (r) => (r.resolved_pwin as number) ?? null },
   { field: "due", type: "date", accessor: (r) => (r.opportunity_due_at as string) ?? null },
 ];
 
@@ -180,7 +178,7 @@ function PipelineContent() {
     if (sortBy) {
       return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, PIPELINE_SORT_COLS) as unknown as typeof raw;
     }
-    return [...raw].sort((a, b) => (b.pwin_score ?? 0) - (a.pwin_score ?? 0));
+    return [...raw].sort((a, b) => (b.resolved_pwin ?? 0) - (a.resolved_pwin ?? 0));
   }, [listData, sortBy, sortDir]);
 
   const filterKey = `${search}|${activeBucket ?? ""}`;
@@ -486,9 +484,9 @@ function IntelChip({
 /* ── PipelineRow ──────────────────────────────────────────────── */
 
 function PipelineRow({ item }: { item: PipelineListItem }) {
-  const rawValue = item.opportunity_value_max ?? item.opportunity_value_min ?? 0;
-  const pwinScore = item.pwin_score ?? 0;
-  const weightedValue = Math.round(rawValue * (pwinScore / 100));
+  const resolvedValue = item.resolved_value;
+  const resolvedPwin = item.resolved_pwin;
+  const resolvedWeighted = item.resolved_weighted;
   const daysLeft = formatDaysLeft(item.opportunity_due_at);
   const stageLabel = pipelineStageLabel(item.stage);
 
@@ -520,15 +518,15 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
         </span>
       </td>
       <td className="px-3 py-1.5 text-left font-mono text-xs text-foreground tabular-nums">
-        {formatMoney(rawValue)}
+        {formatMoney(resolvedValue)}
       </td>
       <td className="px-3 py-1.5 text-left font-mono text-xs text-gda-green tabular-nums">
-        {formatMoney(weightedValue)}
+        {formatMoney(resolvedWeighted)}
       </td>
       <td className="px-3 py-1.5 text-left">
-        {pwinScore > 0 ? (
+        {resolvedPwin != null && resolvedPwin > 0 ? (
           <div className="flex items-center gap-1">
-            <span className="font-mono text-xs text-foreground">{pwinScore}%</span>
+            <span className="font-mono text-xs text-foreground">{Math.round(resolvedPwin)}%</span>
             {item.pwin_band && (
               <span
                 className={cn(
@@ -542,7 +540,7 @@ function PipelineRow({ item }: { item: PipelineListItem }) {
               </span>
             )}
             <ScoreExplain
-              score={pwinScore}
+              score={Math.round(resolvedPwin)}
               label="Pwin"
               scoreType="pwin"
               inputs={{ top_drivers: [] }}
