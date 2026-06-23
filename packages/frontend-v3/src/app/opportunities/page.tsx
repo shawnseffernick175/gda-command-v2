@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScoreExplain } from "@/components/shared/score-explainers";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { isSmallBizPlay, sbPlayTooltip } from "@/lib/sb-play";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
@@ -187,6 +188,7 @@ function OpportunityList() {
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
   const [relevantOnly, setRelevantOnly] = useState(true);
   const [idiqFilter, setIdiqFilter] = useState<'only' | 'exclude' | undefined>(undefined);
+  const [sbPlayOnly, setSbPlayOnly] = useState(false);
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const [page, setPage] = useState(1);
@@ -230,7 +232,15 @@ function OpportunityList() {
     refetch,
   } = useOpportunitiesPaged({ ...filterParams, page });
 
-  const allItems = useMemo(() => data?.items ?? [], [data]);
+  const rawItems = useMemo(() => data?.items ?? [], [data]);
+  const sbPlayCount = useMemo(
+    () => rawItems.filter((o) => isSmallBizPlay(o.naics, o.set_aside)).length,
+    [rawItems],
+  );
+  const allItems = useMemo(
+    () => sbPlayOnly ? rawItems.filter((o) => isSmallBizPlay(o.naics, o.set_aside)) : rawItems,
+    [rawItems, sbPlayOnly],
+  );
   const meta: OpportunityMeta | undefined = data?.meta;
   const totalPages = data?.totalPages ?? 1;
 
@@ -249,7 +259,7 @@ function OpportunityList() {
 
   const hasActiveFilters =
     debouncedQ || agencyFilter || hotFilter || setAsideFilter.length > 0 ||
-    valueRange !== 0 || sourceFilter.length > 0 || idiqFilter !== undefined;
+    valueRange !== 0 || sourceFilter.length > 0 || idiqFilter !== undefined || sbPlayOnly;
 
   const handleClearFilters = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -261,6 +271,7 @@ function OpportunityList() {
     setValueRange(0);
     setSourceFilter([]);
     setIdiqFilter(undefined);
+    setSbPlayOnly(false);
     // Strip ?agency from the URL so a remount does not re-apply a stale filter
     if (searchParams.get("agency")) {
       router.replace("/opportunities");
@@ -347,6 +358,14 @@ function OpportunityList() {
                 label={`${meta.idiq_count} IDIQ`}
                 active={idiqFilter === 'only'}
                 onClick={() => setIdiqFilter((prev) => prev === 'only' ? undefined : 'only')}
+              />
+            )}
+            {sbPlayCount > 0 && (
+              <IntelChip
+                icon="S"
+                label={`${sbPlayCount} SB Play`}
+                active={sbPlayOnly}
+                onClick={() => setSbPlayOnly((prev) => !prev)}
               />
             )}
           </div>
@@ -796,6 +815,7 @@ function OpportunityRow({
   const daysLeft = formatDaysLeft(opp);
   const pipelineStage = opp.pipeline_stage;
   const score = opp.pwin?.score;
+  const isSbPlay = isSmallBizPlay(opp.naics, opp.set_aside);
   // Pwin color band: green (strong), amber (moderate), red (weak).
   const pwinClass =
     score == null
@@ -819,17 +839,28 @@ function OpportunityRow({
       className={cn(
         "border-b border-border hover:bg-gda-panel/50 transition-colors h-9",
         heat ? `border-l-[3px] ${heat}` : "border-l-[3px] border-l-transparent",
+        isSbPlay && "bg-gda-green/[0.03]",
       )}
     >
       <td className="p-0 w-0" />
       <td className="px-3 py-1.5">
         <div>
-          <Link
-            href={`/opportunities?id=${opp.id}`}
-            className="text-foreground hover:text-gda-green truncate block max-w-xs text-sm"
-          >
-            {opp.title}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/opportunities?id=${opp.id}`}
+              className="text-foreground hover:text-gda-green truncate block max-w-xs text-sm"
+            >
+              {opp.title}
+            </Link>
+            {isSbPlay && (
+              <span
+                className="shrink-0 rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono font-bold text-gda-green"
+                title={sbPlayTooltip(opp.naics, opp.set_aside)}
+              >
+                SB PLAY
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2 mt-0.5">
             {sources.length > 0 && (
               <span className="text-[11px] font-mono text-muted-foreground/40">
@@ -1093,6 +1124,14 @@ function OpportunityDetail({ id }: { id: string }) {
           )}
           {opp.set_aside && (
             <Badge variant="outline" className="text-xs">{opp.set_aside}</Badge>
+          )}
+          {isSmallBizPlay(opp.naics, opp.set_aside) && (
+            <span
+              className="rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono font-bold text-gda-green"
+              title={sbPlayTooltip(opp.naics, opp.set_aside)}
+            >
+              SB PLAY
+            </span>
           )}
           {opp.source && <SourceChip label={opp.source} kind="real" />}
           {opp.source_uri && (
