@@ -686,12 +686,18 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     // always represented — even months with no actuals yet.
     const fyShort = `FY${fiscalYear % 100}`;
 
+    // Plan: source precedence user_aop > l1_target. DISTINCT ON picks the
+    // highest-priority source per period so we never double-count.
     const { rows: planRows } = await pool.query(
-      `SELECT period, plan_orders, plan_sales, plan_ebit,
+      `SELECT DISTINCT ON (period)
+              period, source, plan_orders, plan_sales, plan_ebit,
               plan_gross_margin, plan_ros
        FROM financial_plan
-       WHERE source = 'user_aop' AND is_seed = false
-         AND fiscal_year = $1 AND period NOT LIKE '%Q%'`,
+       WHERE is_seed = false
+         AND source IN ('user_aop', 'l1_target')
+         AND fiscal_year = $1 AND period NOT LIKE '%Q%'
+       ORDER BY period,
+                CASE source WHEN 'user_aop' THEN 0 WHEN 'l1_target' THEN 1 ELSE 2 END`,
       [fiscalYear],
     );
 
@@ -699,17 +705,29 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const planByPeriod = new Map<string, (typeof planRows)[0]>();
     for (const r of planRows) planByPeriod.set(r.period as string, r);
 
+    // Actuals: source precedence income_statement > l1_actual. DISTINCT ON
+    // ensures one canonical row per period — income_statement (monthly P&L)
+    // is preferred; l1_actual (project ledger) fills gaps where no P&L exists.
     const { rows: actualRows } = await pool.query(
-      `SELECT period, actual_orders, actual_sales, actual_ebit,
+      `SELECT DISTINCT ON (period)
+              period, source, actual_orders, actual_sales, actual_ebit,
               actual_gross_margin, actual_ros
        FROM financial_actuals
-       WHERE source = 'income_statement' AND fiscal_year = $1
-         AND period NOT LIKE '%Q%'`,
+       WHERE is_seed = false
+         AND source IN ('income_statement', 'l1_actual')
+         AND fiscal_year = $1 AND period NOT LIKE '%Q%'
+       ORDER BY period,
+                CASE source WHEN 'income_statement' THEN 0 WHEN 'l1_actual' THEN 1 ELSE 2 END`,
       [fiscalYear],
     );
 
     const actualByPeriod = new Map<string, (typeof actualRows)[0]>();
     for (const r of actualRows) actualByPeriod.set(r.period as string, r);
+
+    // Determine the winning plan source for the response metadata.
+    const planSource: string | null = hasPlan
+      ? (planRows[0].source as string)
+      : null;
 
     // Always 12 rows, Jan–Dec, regardless of what's in the DB.
     const planActualRows = AOP_MONTHS.map(({ mon }) => {
@@ -718,7 +736,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       const actual = actualByPeriod.get(period);
       return {
         period,
-        plan_source: hasPlan ? 'user_aop' : null,
+        plan_source: plan ? (plan.source as string) : null,
+        actual_source: actual ? (actual.source as string) : null,
         plan_orders: plan?.plan_orders ?? null,
         actual_orders: actual?.actual_orders ?? null,
         plan_sales: plan?.plan_sales ?? null,
@@ -754,28 +773,30 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         const row = r as Record<string, unknown>;
         const planRaw = row[def.planCol];
         const actualRaw = row[def.actualCol];
-        const plan = planRaw !== null && planRaw !== undefined ? Number(planRaw) : 0;
+        const plan = planRaw !== null && planRaw !== undefined ? Number(planRaw) : null;
         const actual = actualRaw !== null && actualRaw !== undefined ? Number(actualRaw) : null;
         return {
           period: r.period as string,
           plan,
           actual,
-          variance: actual !== null ? actual - plan : null,
+          variance: actual !== null && plan !== null ? actual - plan : null,
         };
       });
+      const monthsWithPlan = months.filter((m) => m.plan !== null);
       const monthsWithActual = months.filter((m) => m.actual !== null);
-      let planTotal: number;
+      let planTotal: number | null;
       let actualTotal: number | null;
       if (def.kind === 'percent') {
-        // Average across months; actual averaged only over months that have data.
-        planTotal = months.length
-          ? months.reduce((s, m) => s + m.plan, 0) / months.length
-          : 0;
+        planTotal = monthsWithPlan.length
+          ? monthsWithPlan.reduce((s, m) => s + (m.plan ?? 0), 0) / monthsWithPlan.length
+          : null;
         actualTotal = monthsWithActual.length
           ? monthsWithActual.reduce((s, m) => s + (m.actual ?? 0), 0) / monthsWithActual.length
           : null;
       } else {
-        planTotal = months.reduce((s, m) => s + m.plan, 0);
+        planTotal = monthsWithPlan.length
+          ? monthsWithPlan.reduce((s, m) => s + (m.plan ?? 0), 0)
+          : null;
         actualTotal = monthsWithActual.length
           ? monthsWithActual.reduce((s, m) => s + (m.actual ?? 0), 0)
           : null;
@@ -788,14 +809,12 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         months,
         plan_total: planTotal,
         actual_total: actualTotal,
-        variance_total: actualTotal !== null ? actualTotal - planTotal : null,
+        variance_total: actualTotal !== null && planTotal !== null ? actualTotal - planTotal : null,
       };
     });
 
     // Keep `revenue` for backward-compatibility (the Sales block).
     const revenue = metrics.find((m) => m.key === 'sales') ?? null;
-
-    const planSource = hasPlan ? 'user_aop' : null;
 
     return reply.send(successEnvelope({
       items,
