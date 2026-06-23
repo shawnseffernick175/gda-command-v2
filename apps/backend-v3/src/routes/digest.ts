@@ -1,16 +1,17 @@
 /**
- * Market Intelligence Digest routes — F-629 + F-611
+ * Market Intelligence Digest routes — F-629 + F-611 + F-612
  *
  * GET  /v3/digest          — full digest page data
  * GET  /v3/digest/signals  — paginated signal feed
  * GET  /v3/digest/lead     — today's lead story (cached)
  * POST /v3/digest/refresh  — force regenerate lead (admin only)
  * GET  /v3/digest/news     — GovCon news feed (wheelhouse-filtered)
- * GET  /v3/digest/sitrep          — list SITREPs
- * GET  /v3/digest/sitrep/:id      — single SITREP with items
- * POST /v3/digest/sitrep          — create SITREP
- * PUT  /v3/digest/sitrep/:id      — update SITREP
- * DELETE /v3/digest/sitrep/:id    — delete SITREP
+ * GET  /v3/digest/sitrep                — list SITREPs
+ * GET  /v3/digest/sitrep/:id            — single SITREP with items
+ * POST /v3/digest/sitrep                — create SITREP
+ * PUT  /v3/digest/sitrep/:id            — update SITREP
+ * DELETE /v3/digest/sitrep/:id          — delete SITREP
+ * POST /v3/digest/sitrep/from-document  — send a Vault doc to SITREP (F-612)
  */
 
 import type { FastifyInstance } from 'fastify';
@@ -98,6 +99,8 @@ interface SitrepItemRow {
   discussion: string;
   action_items: string;
   sort_order: number;
+  source_document_id: number | null;
+  source_document_url: string | null;
   created_at: string;
 }
 
@@ -192,6 +195,115 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── SITREP CRUD ─────────────────────────────────────────────
 
+  // POST /v3/digest/sitrep/from-document — send Vault doc to SITREP (F-612)
+  app.post('/v3/digest/sitrep/from-document', async (req, reply) => {
+    const body = req.body as { document_id?: number };
+
+    if (!body.document_id) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', 'document_id is required', req.requestId),
+      );
+    }
+
+    const docRes = await pool.query<{ id: number; filename: string; file_path: string | null }>(
+      `SELECT id, filename, file_path FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+      [body.document_id],
+    );
+    if (docRes.rows.length === 0) {
+      return reply.status(404).send(
+        errorEnvelope('NOT_FOUND', 'Document not found', req.requestId),
+      );
+    }
+    const doc = docRes.rows[0]!;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Find or create current-week SITREP (week ending = next Friday)
+      const now = new Date();
+      const day = now.getDay();
+      const daysUntilFri = day <= 5 ? 5 - day : 5 + (7 - day);
+      const friday = new Date(now);
+      friday.setDate(friday.getDate() + daysUntilFri);
+      const weekEnding = friday.toISOString().slice(0, 10);
+
+      let sitrepId: number;
+      const existingRes = await client.query<{ id: number }>(
+        `SELECT id FROM sitreps WHERE week_ending = $1`,
+        [weekEnding],
+      );
+
+      if (existingRes.rows.length > 0) {
+        sitrepId = existingRes.rows[0]!.id;
+      } else {
+        // Create new SITREP with next number
+        const maxRes = await client.query<{ max_num: number | null }>(
+          `SELECT MAX(sitrep_number) AS max_num FROM sitreps`,
+        );
+        const nextNumber = (maxRes.rows[0]?.max_num ?? 0) + 1;
+        const insertRes = await client.query<{ id: number }>(
+          `INSERT INTO sitreps (sitrep_number, week_ending) VALUES ($1, $2) RETURNING id`,
+          [nextNumber, weekEnding],
+        );
+        sitrepId = insertRes.rows[0]!.id;
+      }
+
+      // Duplicate check: same source_document_id in the same SITREP
+      const dupRes = await client.query<{ id: number }>(
+        `SELECT id FROM sitrep_items WHERE sitrep_id = $1 AND source_document_id = $2`,
+        [sitrepId, doc.id],
+      );
+      if (dupRes.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return reply.status(409).send(
+          errorEnvelope('CONFLICT', 'This document has already been added to the current week SITREP', req.requestId),
+        );
+      }
+
+      // Insert item at end
+      const maxSortRes = await client.query<{ max_sort: number | null }>(
+        `SELECT MAX(sort_order) AS max_sort FROM sitrep_items WHERE sitrep_id = $1`,
+        [sitrepId],
+      );
+      const nextSort = (maxSortRes.rows[0]?.max_sort ?? -1) + 1;
+
+      const sourceUrl = doc.file_path ? `/v3/vault/${doc.id}/text` : null;
+
+      const itemRes = await client.query<{ id: number; sitrep_id: number; topic: string; discussion: string; action_items: string; sort_order: number; source_document_id: number; source_document_url: string | null; created_at: string }>(
+        `INSERT INTO sitrep_items (sitrep_id, topic, discussion, action_items, sort_order, source_document_id, source_document_url)
+         VALUES ($1, $2, '', '', $3, $4, $5)
+         RETURNING id, sitrep_id, topic, discussion, action_items, sort_order, source_document_id, source_document_url, created_at::text`,
+        [sitrepId, doc.filename, nextSort, doc.id, sourceUrl],
+      );
+
+      await recordAuditLog(client, {
+        action: 'send_to_sitrep',
+        table_name: 'sitrep_items',
+        record_id: itemRes.rows[0]!.id,
+        new_values: { document_id: doc.id, filename: doc.filename, sitrep_id: sitrepId },
+        source: 'user',
+        request_id: req.requestId,
+      });
+
+      await client.query('COMMIT');
+
+      return reply.status(201).send(successEnvelope({
+        item: itemRes.rows[0],
+        sitrep_id: sitrepId,
+        week_ending: weekEnding,
+      }, req.requestId));
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.error({ error: err instanceof Error ? err.message : String(err) }, 'sitrep_from_document_error');
+      return reply.status(500).send(
+        errorEnvelope('INTERNAL_ERROR', 'Failed to send document to SITREP', req.requestId),
+      );
+    } finally {
+      client.release();
+    }
+  });
+
   // GET /v3/digest/sitrep — list all SITREPs
   app.get('/v3/digest/sitrep', async (req, reply) => {
     const { rows } = await pool.query<SitrepRow>(
@@ -218,7 +330,7 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
     const sitrep = sitrepRes.rows[0]!;
     const itemsRes = await pool.query<SitrepItemRow>(
       `SELECT id, sitrep_id, topic, discussion, action_items, sort_order,
-              created_at::text
+              source_document_id, source_document_url, created_at::text
        FROM sitrep_items
        WHERE sitrep_id = $1
        ORDER BY sort_order ASC, id ASC`,
@@ -432,7 +544,8 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
     const sitrep = sitrepRes.rows[0];
     if (!sitrep) return null;
     const itemsRes = await pool.query<SitrepItemRow>(
-      `SELECT id, sitrep_id, topic, discussion, action_items, sort_order, created_at::text
+      `SELECT id, sitrep_id, topic, discussion, action_items, sort_order,
+             source_document_id, source_document_url, created_at::text
        FROM sitrep_items WHERE sitrep_id = $1 ORDER BY sort_order ASC, id ASC`,
       [sitrepId],
     );

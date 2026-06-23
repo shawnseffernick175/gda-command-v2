@@ -117,3 +117,4 @@ v3_108_vault_dismiss_failed.sql
 v3_109_task_orders_real_data.sql
 v3_110_news_items.sql
 v3_111_sitreps.sql
+v3_112_sitrep_source_document.sql

@@ -65,3 +65,7 @@ bare-column:opportunities:canonical_stage
 audit_log.source
 # F-600: prevent_pipeline_item_delete trigger function created by v3_106
 prevent_pipeline_item_delete
+
+# F-612: sitrep_items.source_document_id + source_document_url added by v3_112
+sitrep_items.source_document_id
+sitrep_items.source_document_url
