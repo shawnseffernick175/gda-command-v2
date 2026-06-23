@@ -579,7 +579,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       sort_dir: query.sort_dir === 'asc' ? 'asc' : query.sort_dir === 'desc' ? 'desc' : undefined,
     };
 
-    if (filters.page) {
+    // Use the paged path when page is explicitly provided OR when a
+    // non-default sort is requested — cursor pagination hardcodes
+    // ORDER BY o.id DESC and silently ignores sort_by/sort_dir.
+    if (filters.page || (filters.sort_by && filters.sort_by !== 'recency')) {
       const result = await listOpportunitiesPaged(filters);
       return reply.status(200).send(successEnvelope(result, req.requestId));
     }
