@@ -359,7 +359,7 @@ export async function listOpportunities(
   // (Mirror of the paged builder.)
   if (filters.stage === 'passed') {
     conditions.push(`relevance_status IN ('auto_pass', 'manual_pass')`);
-  } else {
+  } else if (filters.relevantOnly !== false) {
     // F-614 bucket gate: qualified-only, fact-checked. An opportunity
     // qualifies for the owner bucket ONLY if ALL of:
     //   1. relevance_status = 'relevant' (assessed-qualified; NO NULL)
@@ -376,6 +376,9 @@ export async function listOpportunities(
       OR (quantity IS NOT NULL AND quantity > 0)
       OR (opportunity_type IS NOT NULL AND LOWER(TRIM(opportunity_type)) ~ '(product|supply|supplies|commodit|goods|equipment|hardware|part)')
     )`);
+  } else {
+    // relevant_only=false (test/admin bypass): exclude passed opps only
+    conditions.push(`(relevance_status IS NULL OR relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
   }
 
   // Stage filter (pipeline_items-based). Uses o.id since the main query aliases opportunities as o.
@@ -568,7 +571,7 @@ function buildFilterConditions(
   // both so passed opps drop out of the working list.
   if (filters.stage === 'passed') {
     conditions.push(`o.relevance_status IN ('auto_pass', 'manual_pass')`);
-  } else {
+  } else if (filters.relevantOnly !== false) {
     // F-614 bucket gate: qualified-only, fact-checked. An opportunity
     // qualifies for the owner bucket ONLY if ALL of:
     //   1. relevance_status = 'relevant' (assessed-qualified; NO NULL)
@@ -585,6 +588,9 @@ function buildFilterConditions(
       OR (o.quantity IS NOT NULL AND o.quantity > 0)
       OR (o.opportunity_type IS NOT NULL AND LOWER(TRIM(o.opportunity_type)) ~ '(product|supply|supplies|commodit|goods|equipment|hardware|part)')
     )`);
+  } else {
+    // relevant_only=false (test/admin bypass): exclude passed opps only
+    conditions.push(`(o.relevance_status IS NULL OR o.relevance_status NOT IN ('auto_pass', 'manual_pass'))`);
   }
   if (filters.stage === 'active') {
     // Active = has an active-stage pipeline row OR has no pipeline row (defaults to interest)
