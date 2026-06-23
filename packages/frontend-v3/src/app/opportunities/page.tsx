@@ -302,9 +302,9 @@ function OpportunityList() {
   );
 
   return (
-    <div className="space-y-4">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
+    <div className="flex flex-col h-full">
+      {/* Page header (stays above table scroll area) */}
+      <div className="shrink-0 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4">
         {/* Page header */}
         <div className="flex items-baseline gap-3">
           <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
@@ -426,42 +426,46 @@ function OpportunityList() {
 
       {/* Error */}
       {error && (
-        <ErrorState
-          message={(error as Error).message}
-          onRetry={() => void refetch()}
-        />
+        <div className="shrink-0 mt-4">
+          <ErrorState
+            message={(error as Error).message}
+            onRetry={() => void refetch()}
+          />
+        </div>
       )}
 
       {/* Vehicle-grouped view */}
       {groupBy === "vehicle" ? (
         vehiclesLoading ? (
-          <div className="space-y-2">
+          <div className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-16 bg-gda-panel" />
             ))}
           </div>
         ) : (
-          <VehicleGroupedView
-            vehicles={vehiclesData ?? []}
-            onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
-            onAgencyFilter={applyAgencyFilter}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto mt-4">
+            <VehicleGroupedView
+              vehicles={vehiclesData ?? []}
+              onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
+              onAgencyFilter={applyAgencyFilter}
+            />
+          </div>
         )
       ) : (
         <>
           {/* Loading skeleton */}
           {isLoading && allItems.length === 0 ? (
-            <div className="space-y-2">
+            <div className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-2">
               {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-10 bg-gda-panel" />
               ))}
             </div>
           ) : (
             <>
-              {/* Table — no inner scroll; the outer page scrolls */}
-              <div className="rounded border border-border overflow-x-auto">
+              {/* Table — scroll container with sticky thead */}
+              <div className="flex-1 min-h-0 mt-4 overflow-y-auto overflow-x-clip rounded border border-border">
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-gda-bg-base">
                     <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
                       <th className="w-[3px] p-0 bg-gda-bg-base" />
                       <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -506,7 +510,7 @@ function OpportunityList() {
 
               {/* Page selector */}
               {allItems.length > 0 && (
-                <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="shrink-0 mt-3 flex items-center justify-between gap-3">
                   <span className="text-xs text-muted-foreground font-mono">
                     Page {page} of {totalPages}
                   </span>
