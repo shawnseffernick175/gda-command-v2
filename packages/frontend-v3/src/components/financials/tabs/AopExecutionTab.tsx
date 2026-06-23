@@ -3,9 +3,20 @@
 import { useAopExecution } from "@/hooks/use-financial-bible";
 import { NumberCell } from "@/components/financials/primitives/NumberCell";
 import { SourceFooter } from "@/components/financials/SourceFooter";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const EXEC_SORT_COLS: ColumnSortConfig[] = [
+  { field: "element", type: "string" },
+  { field: "totalPlanned", type: "number" },
+  { field: "totalActual", type: "number" },
+  { field: "totalVariance", type: "number" },
+];
 
 export function AopExecutionTab({ fy }: { fy: string }) {
   const { data, isLoading, error } = useAopExecution(fy);
+  const { sortBy, sortDir, handleSort } = useTableSort("exec");
 
   if (isLoading) {
     return (
@@ -72,7 +83,7 @@ export function AopExecutionTab({ fy }: { fy: string }) {
   }
 
   // Compute totals per cost_element across all periods
-  const elementTotals = Array.from(byElement.entries()).map(
+  const elementTotalsRaw = Array.from(byElement.entries()).map(
     ([element, items]) => {
       const totalPlanned = items.reduce((s, i) => s + i.planned, 0);
       const totalActual = items.reduce((s, i) => s + i.actual, 0);
@@ -80,6 +91,10 @@ export function AopExecutionTab({ fy }: { fy: string }) {
       return { element, totalPlanned, totalActual, totalVariance, items };
     },
   );
+
+  const elementTotals = sortBy
+    ? sortData(elementTotalsRaw as unknown as Record<string, unknown>[], sortBy, sortDir, EXEC_SORT_COLS) as unknown as typeof elementTotalsRaw
+    : elementTotalsRaw;
 
   // Grand totals
   const grandPlanned = elementTotals.reduce((s, e) => s + e.totalPlanned, 0);
@@ -227,12 +242,10 @@ export function AopExecutionTab({ fy }: { fy: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="py-2 pr-4 text-left font-medium">
-                Cost Element / Pool
-              </th>
-              <th className="py-2 pr-4 text-right font-medium">Planned</th>
-              <th className="py-2 pr-4 text-right font-medium">Actual</th>
-              <th className="py-2 text-right font-medium">Variance</th>
+              <SortableHeader label="Cost Element / Pool" field="element" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Planned" field="totalPlanned" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="Actual" field="totalActual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="Variance" field="totalVariance" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
             </tr>
           </thead>
           <tbody>

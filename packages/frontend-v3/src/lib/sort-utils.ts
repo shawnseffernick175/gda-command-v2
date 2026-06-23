@@ -7,7 +7,7 @@
 
 export type SortDirection = "asc" | "desc";
 
-export type SortType = "string" | "number" | "date" | "enum";
+export type SortType = "string" | "number" | "date" | "enum" | "period";
 
 export interface ColumnSortConfig {
   field: string;
@@ -48,6 +48,52 @@ function compareEnum(a: unknown, b: unknown, order: readonly string[]): number {
   const ia = order.indexOf(String(a));
   const ib = order.indexOf(String(b));
   return (ia === -1 ? order.length : ia) - (ib === -1 ? order.length : ib);
+}
+
+/** Month abbreviation → 0-based index for chronological period sorting. */
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+/**
+ * Parse fiscal period strings like "FY26 Jan", "FY25 Q3", "2026-01", etc.
+ * Returns a numeric value suitable for chronological comparison.
+ */
+export function parsePeriod(v: unknown): number {
+  const s = String(v).trim().toLowerCase();
+
+  // "FY26 Jan" or "FY2026 Jan"
+  const fyMonth = s.match(/fy(\d{2,4})\s+([a-z]{3})/);
+  if (fyMonth) {
+    const yr = fyMonth[1].length === 2 ? 2000 + Number(fyMonth[1]) : Number(fyMonth[1]);
+    return yr * 12 + (MONTH_INDEX[fyMonth[2]] ?? 0);
+  }
+
+  // "FY26 Q1"
+  const fyQ = s.match(/fy(\d{2,4})\s+q(\d)/);
+  if (fyQ) {
+    const yr = fyQ[1].length === 2 ? 2000 + Number(fyQ[1]) : Number(fyQ[1]);
+    return yr * 12 + (Number(fyQ[2]) - 1) * 3;
+  }
+
+  // "Jan 2026" or "January 2026"
+  const monthYear = s.match(/^([a-z]{3})[a-z]*\s+(\d{4})$/);
+  if (monthYear) {
+    return Number(monthYear[2]) * 12 + (MONTH_INDEX[monthYear[1]] ?? 0);
+  }
+
+  // ISO-like "2026-01"
+  const iso = s.match(/^(\d{4})-(\d{2})/);
+  if (iso) {
+    return Number(iso[1]) * 12 + (Number(iso[2]) - 1);
+  }
+
+  return 0;
+}
+
+function comparePeriod(a: unknown, b: unknown): number {
+  return parsePeriod(a) - parsePeriod(b);
 }
 
 /**
@@ -92,6 +138,9 @@ export function sortData<T extends Record<string, unknown>>(
         break;
       case "enum":
         cmp = compareEnum(va, vb, col.enumOrder ?? []);
+        break;
+      case "period":
+        cmp = comparePeriod(va, vb);
         break;
       default:
         cmp = compareString(String(va), String(vb));

@@ -1,9 +1,21 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import { useFinancialsTrend } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const TREND_SORT_COLS: ColumnSortConfig[] = [
+  { field: "period", type: "period" },
+  { field: "orders", type: "number" },
+  { field: "sales", type: "number" },
+  { field: "ebit", type: "number" },
+  { field: "gross_margin", type: "number" },
+  { field: "ros", type: "number" },
+];
 
 interface TrendPoint {
   source: string;
@@ -55,12 +67,24 @@ export function TrendChart({
   onPeriodClick?: (period: string) => void;
 }) {
   const { data, isLoading } = useFinancialsTrend();
+  const { sortBy, sortDir, handleSort } = useTableSort("trend");
+
+  const { items, grouped, flatSorted } = useMemo(() => {
+    const raw: TrendPoint[] = data?.items ?? [];
+    const sources = Array.from(new Set(raw.map((i) => i.source)));
+    const g = sources.map((s) => ({
+      source: s,
+      rows: raw.filter((i) => i.source === s),
+    }));
+    const flat = sortBy
+      ? sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, TREND_SORT_COLS) as unknown as TrendPoint[]
+      : null;
+    return { items: raw, grouped: g, flatSorted: flat };
+  }, [data, sortBy, sortDir]);
 
   if (isLoading) {
     return <div className="h-64 animate-pulse rounded bg-gda-panel" />;
   }
-
-  const items: TrendPoint[] = data?.items ?? [];
 
   if (items.length === 0) {
     return <p className="text-xs text-muted-foreground py-4 text-center">No trend data yet</p>;
@@ -69,12 +93,6 @@ export function TrendChart({
   const monthRows = items.filter((i) => !i.is_quarter);
   const sparkRows = monthRows.filter((i) => i.source === "income_statement");
   const spark = sparkRows.length > 0 ? sparkRows : monthRows;
-
-  const sources = Array.from(new Set(items.map((i) => i.source)));
-  const grouped = sources.map((s) => ({
-    source: s,
-    rows: items.filter((i) => i.source === s),
-  }));
 
   const maxOrders = Math.max(...spark.map((i) => i.orders), 1);
   const maxSales  = Math.max(...spark.map((i) => i.sales), 1);
@@ -143,49 +161,77 @@ export function TrendChart({
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Period</th>
-              <th className="px-3 py-2 text-left font-medium text-gda-cyan">Orders</th>
-              <th className="px-3 py-2 text-left font-medium text-gda-green">Sales</th>
-              <th className="px-3 py-2 text-left font-medium text-amber-400">EBIT</th>
-              <th className="px-3 py-2 text-left font-medium">Gross Margin</th>
-              <th className="px-3 py-2 text-left font-medium">ROS</th>
+              <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Orders" field="orders" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-cyan" />
+              <SortableHeader label="Sales" field="sales" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-gda-green" />
+              <SortableHeader label="EBIT" field="ebit" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-amber-400" />
+              <SortableHeader label="Gross Margin" field="gross_margin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="ROS" field="ros" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>
-            {grouped.map((g) => (
-              <Fragment key={g.source}>
-                <tr className="border-b border-border bg-gda-bg-base">
-                  <td colSpan={6} className="px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                    {sourceLabel(g.source)}
+            {flatSorted ? (
+              flatSorted.map((item) => (
+                <tr
+                  key={`${item.source}-${item.period}`}
+                  className={cn(
+                    "border-b border-border",
+                    item.is_quarter && "bg-gda-panel/40 font-bold",
+                    clickable && "cursor-pointer hover:bg-gda-panel/50",
+                    !clickable && "hover:bg-gda-panel/50",
+                  )}
+                  onClick={clickable ? () => onPeriodClick(item.period) : undefined}
+                >
+                  <td className="px-3 py-2 text-left text-foreground">{item.period}</td>
+                  <td className="px-3 py-2 text-left text-gda-cyan">{formatMoney(item.orders)}</td>
+                  <td className="px-3 py-2 text-left text-gda-green">{formatMoney(item.sales)}</td>
+                  <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-amber-400" : "text-red-400")}>
+                    {formatMoney(item.ebit)}
+                  </td>
+                  <td className="px-3 py-2 text-left text-foreground tabular-nums">
+                    {item.gross_margin.toFixed(1)}%
+                  </td>
+                  <td className="px-3 py-2 text-left text-foreground tabular-nums">
+                    {item.ros.toFixed(1)}%
                   </td>
                 </tr>
-                {g.rows.map((item) => (
-                  <tr
-                    key={`${g.source}-${item.period}`}
-                    className={cn(
-                      "border-b border-border",
-                      item.is_quarter && "bg-gda-panel/40 font-bold",
-                      clickable && "cursor-pointer hover:bg-gda-panel/50",
-                      !clickable && "hover:bg-gda-panel/50",
-                    )}
-                    onClick={clickable ? () => onPeriodClick(item.period) : undefined}
-                  >
-                    <td className="px-3 py-2 text-left text-foreground">{item.period}</td>
-                    <td className="px-3 py-2 text-left text-gda-cyan">{formatMoney(item.orders)}</td>
-                    <td className="px-3 py-2 text-left text-gda-green">{formatMoney(item.sales)}</td>
-                    <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-amber-400" : "text-red-400")}>
-                      {formatMoney(item.ebit)}
-                    </td>
-                    <td className="px-3 py-2 text-left text-foreground tabular-nums">
-                      {item.gross_margin.toFixed(1)}%
-                    </td>
-                    <td className="px-3 py-2 text-left text-foreground tabular-nums">
-                      {item.ros.toFixed(1)}%
+              ))
+            ) : (
+              grouped.map((g) => (
+                <Fragment key={g.source}>
+                  <tr className="border-b border-border bg-gda-bg-base">
+                    <td colSpan={6} className="px-3 py-1.5 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      {sourceLabel(g.source)}
                     </td>
                   </tr>
-                ))}
-              </Fragment>
-            ))}
+                  {g.rows.map((item) => (
+                    <tr
+                      key={`${g.source}-${item.period}`}
+                      className={cn(
+                        "border-b border-border",
+                        item.is_quarter && "bg-gda-panel/40 font-bold",
+                        clickable && "cursor-pointer hover:bg-gda-panel/50",
+                        !clickable && "hover:bg-gda-panel/50",
+                      )}
+                      onClick={clickable ? () => onPeriodClick(item.period) : undefined}
+                    >
+                      <td className="px-3 py-2 text-left text-foreground">{item.period}</td>
+                      <td className="px-3 py-2 text-left text-gda-cyan">{formatMoney(item.orders)}</td>
+                      <td className="px-3 py-2 text-left text-gda-green">{formatMoney(item.sales)}</td>
+                      <td className={cn("px-3 py-2 text-left", item.ebit >= 0 ? "text-amber-400" : "text-red-400")}>
+                        {formatMoney(item.ebit)}
+                      </td>
+                      <td className="px-3 py-2 text-left text-foreground tabular-nums">
+                        {item.gross_margin.toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-2 text-left text-foreground tabular-nums">
+                        {item.ros.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
+              ))
+            )}
           </tbody>
         </table>
       </div>

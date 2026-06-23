@@ -7,6 +7,16 @@ import { SourceFooter } from "@/components/financials/SourceFooter";
 import { formatMoney } from "@/lib/format-money";
 import type { IncomeStatementLineItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const POOL_SORT_COLS: ColumnSortConfig[] = [
+  { field: "pool", type: "string" },
+  { field: "target", type: "number" },
+  { field: "actual", type: "number" },
+  { field: "variance", type: "number" },
+];
 
 interface StatementRow {
   label: string;
@@ -33,6 +43,7 @@ function shortPeriod(period: string): string {
 
 export function P2FinancialsTab() {
   const { data, isLoading, error } = useP2Financials();
+  const { sortBy, sortDir, handleSort } = useTableSort("p2pool");
 
   if (isLoading) {
     return (
@@ -198,14 +209,17 @@ export function P2FinancialsTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pr-4 pl-4 text-left font-medium">Pool</th>
-                  <th className="py-2 pr-4 text-right font-medium">Target</th>
-                  <th className="py-2 pr-4 text-right font-medium">Actual</th>
-                  <th className="py-2 pr-4 text-right font-medium">Variance</th>
+                  <SortableHeader label="Pool" field="pool" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortableHeader label="Target" field="target" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+                  <SortableHeader label="Actual" field="actual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+                  <SortableHeader label="Variance" field="variance" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
                 </tr>
               </thead>
               <tbody>
-                {data.cost_by_pool.map((row) => (
+                {(sortBy
+                  ? sortData(data.cost_by_pool as unknown as Record<string, unknown>[], sortBy, sortDir, POOL_SORT_COLS) as unknown as typeof data.cost_by_pool
+                  : data.cost_by_pool
+                ).map((row) => (
                   <tr
                     key={row.pool}
                     className="border-b border-border/50"

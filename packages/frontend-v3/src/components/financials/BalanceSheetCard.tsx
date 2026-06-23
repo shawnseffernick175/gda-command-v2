@@ -1,8 +1,22 @@
 "use client";
 
+import { useMemo } from "react";
 import { useBalanceSheet } from "@/hooks/use-balance-sheet";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, parsePeriod, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const BS_SORT_COLS: ColumnSortConfig[] = [
+  { field: "period", type: "period" },
+  { field: "total_assets", type: "number" },
+  { field: "total_liabilities", type: "number" },
+  { field: "total_equity", type: "number" },
+  { field: "cash", type: "number" },
+  { field: "accounts_receivable", type: "number" },
+  { field: "accounts_payable", type: "number" },
+];
 
 function SparkLine({
   points,
@@ -41,6 +55,19 @@ function SparkLine({
 
 export function BalanceSheetCard() {
   const { data, isLoading } = useBalanceSheet();
+  const { sortBy, sortDir, handleSort } = useTableSort("bs");
+
+  const sortedTrend = useMemo(() => {
+    const trend = data?.trend;
+    if (!trend) return [];
+    const rows = trend as unknown as Record<string, unknown>[];
+    if (sortBy) {
+      return sortData(rows, sortBy, sortDir, BS_SORT_COLS) as unknown as typeof trend;
+    }
+    return [...trend].sort(
+      (a, b) => parsePeriod(a.period) - parsePeriod(b.period),
+    );
+  }, [data, sortBy, sortDir]);
 
   if (isLoading) {
     return <div className="h-48 animate-pulse rounded bg-gda-panel" />;
@@ -54,8 +81,8 @@ export function BalanceSheetCard() {
     );
   }
 
-  const { latest, trend } = data;
-  const totalAssetsMax = Math.max(...trend.map((r) => r.total_assets), 1);
+  const { latest } = data;
+  const totalAssetsMax = Math.max(...sortedTrend.map((r) => r.total_assets), 1);
 
   const summaryCards = [
     { label: "Cash", value: latest.cash, textClass: "text-gda-cyan" },
@@ -98,13 +125,13 @@ export function BalanceSheetCard() {
         ))}
       </div>
 
-      {trend.length >= 2 && (
+      {sortedTrend.length >= 2 && (
         <div className="rounded border border-border bg-gda-panel p-3 space-y-1">
           <p className="text-[11px] text-muted-foreground">
             Total Assets Trend
           </p>
           <SparkLine
-            points={trend.map((r) => r.total_assets).reverse()}
+            points={sortedTrend.map((r) => r.total_assets).reverse()}
             max={totalAssetsMax}
             color="var(--color-gda-cyan)"
           />
@@ -115,23 +142,17 @@ export function BalanceSheetCard() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Period</th>
-              <th className="px-3 py-2 text-right font-medium">
-                Total Assets
-              </th>
-              <th className="px-3 py-2 text-right font-medium">
-                Total Liabilities
-              </th>
-              <th className="px-3 py-2 text-right font-medium">
-                Total Equity
-              </th>
-              <th className="px-3 py-2 text-right font-medium">Cash</th>
-              <th className="px-3 py-2 text-right font-medium">AR</th>
-              <th className="px-3 py-2 text-right font-medium">AP</th>
+              <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Total Assets" field="total_assets" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="Total Liabilities" field="total_liabilities" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="Total Equity" field="total_equity" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="Cash" field="cash" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="AR" field="accounts_receivable" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="AP" field="accounts_payable" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
             </tr>
           </thead>
           <tbody>
-            {trend.map((r) => (
+            {sortedTrend.map((r) => (
               <tr
                 key={r.period}
                 className="border-b border-border hover:bg-gda-panel/50"

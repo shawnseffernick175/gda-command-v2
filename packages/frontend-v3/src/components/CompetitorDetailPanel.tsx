@@ -1,8 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useCompetitorAnalysis } from "@/hooks/use-competitors";
 import type { Competitor, CompetitorAnalysis } from "@/lib/types";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const RECOMPETE_SORT_COLS: ColumnSortConfig[] = [
+  { field: "title", type: "string" },
+  { field: "agency", type: "string" },
+  { field: "value", type: "number" },
+  { field: "expiration_date", type: "date" },
+];
 
 interface CompetitorDetailPanelProps {
   competitor: Competitor;
@@ -70,6 +80,15 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
   const analyzeMutation = useCompetitorAnalysis(competitor.name);
   const analysis: CompetitorAnalysis | null = analyzeMutation.data ?? competitor.competitor_analysis ?? null;
   const isLoading = analyzeMutation.isPending;
+  const { sortBy, sortDir, handleSort } = useTableSort("recomp");
+
+  const sortedRecompetes = useMemo(() => {
+    const items = analysis?.recompete_contracts ?? [];
+    if (sortBy && items.length > 0) {
+      return sortData(items as unknown as Record<string, unknown>[], sortBy, sortDir, RECOMPETE_SORT_COLS) as unknown as typeof items;
+    }
+    return items;
+  }, [analysis?.recompete_contracts, sortBy, sortDir]);
 
   useEffect(() => {
     if (!competitor.competitor_analysis) {
@@ -193,14 +212,14 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-1.5 font-medium text-gray-500">Title</th>
-                    <th className="text-left py-1.5 font-medium text-gray-500">Agency</th>
-                    <th className="text-right py-1.5 font-medium text-gray-500">Value</th>
-                    <th className="text-right py-1.5 font-medium text-gray-500">Expires</th>
+                    <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+                    <SortableHeader label="Expires" field="expiration_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
                   </tr>
                 </thead>
                 <tbody>
-                  {analysis.recompete_contracts.map((rc, i) => (
+                  {sortedRecompetes.map((rc, i) => (
                     <tr key={i} className="border-b border-gray-100">
                       <td className="py-1.5 pr-2 text-gray-800">{rc.title}</td>
                       <td className="py-1.5 pr-2 text-gray-600">{rc.agency}</td>
