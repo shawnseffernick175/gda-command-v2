@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   useSitreps,
@@ -11,6 +11,15 @@ import {
 } from "@/hooks/use-sitrep";
 import type { SitrepItem } from "@/hooks/use-sitrep";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const SITREP_SORT_COLS: ColumnSortConfig[] = [
+  { field: "sitrep_number", type: "number" },
+  { field: "week_ending", type: "date" },
+  { field: "created_at", type: "date" },
+];
 
 function formatWeekEnding(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00Z");
@@ -36,9 +45,18 @@ const WEEK_AGO_ISO = new Date(Date.now() - 7 * 86_400_000)
 
 export default function WeeklySitrep() {
   const { data: sitreps, isLoading } = useSitreps();
+  const { sortBy, sortDir, handleSort } = useTableSort("sitrep");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  const sortedSitreps = useMemo(() => {
+    if (!sitreps) return sitreps;
+    if (sortBy) {
+      return sortData(sitreps as unknown as Record<string, unknown>[], sortBy, sortDir, SITREP_SORT_COLS) as unknown as typeof sitreps;
+    }
+    return sitreps;
+  }, [sitreps, sortBy, sortDir]);
 
   if (isLoading) {
     return (
@@ -94,20 +112,14 @@ export default function WeeklySitrep() {
       ) : (
         <table className="w-full font-mono text-xs">
           <thead>
-            <tr className="border-b border-border">
-              <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                #
-              </th>
-              <th className="py-1.5 text-left text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Week Ending
-              </th>
-              <th className="py-1.5 text-right text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                Created
-              </th>
+            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+              <SortableHeader label="#" field="sitrep_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Week Ending" field="week_ending" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Created" field="created_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
             </tr>
           </thead>
           <tbody>
-            {sitreps.map((s) => (
+            {(sortedSitreps ?? []).map((s) => (
               <tr
                 key={s.id}
                 onClick={() => setSelectedId(s.id)}

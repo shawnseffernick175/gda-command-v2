@@ -1,8 +1,20 @@
 "use client";
 
+import { useMemo } from "react";
 import { useFinancialsForecast } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const FORECAST_SORT_COLS: ColumnSortConfig[] = [
+  { field: "period", type: "period" },
+  { field: "plan_orders", type: "number" },
+  { field: "actual_orders", type: "number" },
+  { field: "plan_sales", type: "number" },
+  { field: "actual_sales", type: "number" },
+];
 
 export function ForecastChart({
   onPeriodClick,
@@ -10,12 +22,19 @@ export function ForecastChart({
   onPeriodClick?: (period: string) => void;
 }) {
   const { data, isLoading } = useFinancialsForecast();
+  const { sortBy, sortDir, handleSort } = useTableSort("forecast");
+
+  const items = useMemo(() => {
+    const raw = data?.items ?? [];
+    if (sortBy) {
+      return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, FORECAST_SORT_COLS) as unknown as typeof raw;
+    }
+    return raw;
+  }, [data, sortBy, sortDir]);
 
   if (isLoading) {
     return <div className="h-64 animate-pulse rounded bg-gda-panel" />;
   }
-
-  const items = data?.items ?? [];
 
   if (items.length === 0) {
     return <p className="text-xs text-muted-foreground py-4 text-center">No forecast data yet</p>;
@@ -102,11 +121,11 @@ export function ForecastChart({
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Period</th>
-              <th className="px-3 py-2 text-left font-medium">Plan Orders</th>
-              <th className="px-3 py-2 text-left font-medium">Actual Orders</th>
-              <th className="px-3 py-2 text-left font-medium">Plan Sales</th>
-              <th className="px-3 py-2 text-left font-medium">Actual Sales</th>
+              <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Plan Orders" field="plan_orders" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Actual Orders" field="actual_orders" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Plan Sales" field="plan_sales" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Actual Sales" field="actual_sales" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <th className="px-3 py-2 text-left font-medium">Status</th>
             </tr>
           </thead>

@@ -1,8 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import { useAopCapture } from "@/hooks/use-financial-bible";
 import { NumberCell } from "@/components/financials/primitives/NumberCell";
 import { SourceFooter } from "@/components/financials/SourceFooter";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 
 const STAGE_LABELS: Record<string, string> = {
   interest: "Investigating",
@@ -12,8 +16,27 @@ const STAGE_LABELS: Record<string, string> = {
   post_submittal: "Submitted",
 };
 
+const CAPTURE_SORT_COLS: ColumnSortConfig[] = [
+  { field: "title", type: "string" },
+  { field: "agency", type: "string" },
+  { field: "stage", type: "enum", enumOrder: ["interest", "qualify", "pursue", "proposal", "post_submittal"] },
+  { field: "value", type: "number" },
+  { field: "pwin", type: "number" },
+  { field: "capture_owner", type: "string" },
+  { field: "response_due_at", type: "date" },
+];
+
 export function AopCaptureTab({ fy }: { fy: string }) {
   const { data, isLoading, error } = useAopCapture(fy);
+  const { sortBy, sortDir, handleSort } = useTableSort("cap");
+
+  const sortedItems = useMemo(() => {
+    const raw = data?.items ?? [];
+    if (sortBy) {
+      return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, CAPTURE_SORT_COLS) as unknown as typeof raw;
+    }
+    return raw;
+  }, [data?.items, sortBy, sortDir]);
 
   if (isLoading) {
     return (
@@ -52,17 +75,17 @@ export function AopCaptureTab({ fy }: { fy: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="py-2 pr-4 text-left font-medium">Title</th>
-              <th className="py-2 pr-4 text-left font-medium">Agency</th>
-              <th className="py-2 pr-4 text-left font-medium">Stage</th>
-              <th className="py-2 pr-4 text-right font-medium">Value</th>
-              <th className="py-2 pr-4 text-right font-medium">pWin</th>
-              <th className="py-2 pr-4 text-left font-medium">Owner</th>
-              <th className="py-2 text-left font-medium">Due Date</th>
+              <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Value" field="value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="pWin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="Owner" field="capture_owner" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Due Date" field="response_due_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>
-            {data.items.map((item) => (
+            {sortedItems.map((item) => (
               <tr
                 key={item.id}
                 className="border-b border-border/50"

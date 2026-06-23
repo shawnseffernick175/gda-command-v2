@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
 import { BarChart } from "echarts/charts";
@@ -11,6 +12,16 @@ import {
 import { CanvasRenderer } from "echarts/renderers";
 import { useIndirectExpensesTrend } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const INDIRECT_SORT_COLS: ColumnSortConfig[] = [
+  { field: "period", type: "period" },
+  { field: "pool", type: "string" },
+  { field: "period_actual", type: "number" },
+  { field: "period_budget", type: "number" },
+];
 
 echarts.use([
   BarChart,
@@ -30,12 +41,19 @@ const FALLBACK_COLOR = "var(--color-fin-sand)";
 
 export function IndirectExpensePanel() {
   const { data, isLoading } = useIndirectExpensesTrend();
+  const { sortBy, sortDir, handleSort } = useTableSort("indirect");
+
+  const items = useMemo(() => {
+    const raw = data?.items ?? [];
+    if (sortBy) {
+      return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, INDIRECT_SORT_COLS) as unknown as typeof raw;
+    }
+    return raw;
+  }, [data, sortBy, sortDir]);
 
   if (isLoading) {
     return <div className="h-48 animate-pulse rounded bg-gda-panel" />;
   }
-
-  const items = data?.items ?? [];
 
   if (items.length === 0) {
     return (
@@ -128,10 +146,10 @@ export function IndirectExpensePanel() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground uppercase tracking-wider">
-              <th className="px-3 py-2 text-left font-medium">Period</th>
-              <th className="px-3 py-2 text-left font-medium">Pool</th>
-              <th className="px-3 py-2 text-right font-medium">Actual</th>
-              <th className="px-3 py-2 text-right font-medium">Budget</th>
+              <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Pool" field="pool" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Actual" field="period_actual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+              <SortableHeader label="Budget" field="period_budget" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
               <th className="px-3 py-2 text-right font-medium">Variance</th>
             </tr>
           </thead>

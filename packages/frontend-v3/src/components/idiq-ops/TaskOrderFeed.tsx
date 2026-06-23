@@ -1,10 +1,24 @@
 "use client";
 
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { TaskOrderFeedItem } from "@/hooks/use-idiq-ops";
 import { EligibilityChip } from "./EligibilityChip";
 import { HeatIcon } from "./HeatIcon";
 import { useStartCapture } from "@/hooks/use-idiq-ops";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const TO_FEED_SORT_COLS: ColumnSortConfig[] = [
+  { field: "days_left", type: "number" },
+  { field: "title", type: "string" },
+  { field: "vehicle_short_name", type: "string" },
+  { field: "agency", type: "string" },
+  { field: "est_value_usd", type: "number" },
+  { field: "posted_date", type: "date" },
+  { field: "response_due", type: "date" },
+];
 
 interface TaskOrderFeedProps {
   items: TaskOrderFeedItem[];
@@ -22,7 +36,15 @@ export function TaskOrderFeed({
   onPageChange,
 }: TaskOrderFeedProps) {
   const startCapture = useStartCapture();
+  const { sortBy, sortDir, handleSort } = useTableSort("tofeed");
   const totalPages = Math.ceil(total / limit);
+
+  const sortedItems = useMemo(() => {
+    if (sortBy) {
+      return sortData(items as unknown as Record<string, unknown>[], sortBy, sortDir, TO_FEED_SORT_COLS) as unknown as TaskOrderFeedItem[];
+    }
+    return items;
+  }, [items, sortBy, sortDir]);
 
   return (
     <div className="flex-1 min-w-0">
@@ -31,14 +53,14 @@ export function TaskOrderFeed({
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-2 py-2 text-left font-medium w-[28px]" />
-              <th className="px-2 py-2 text-right font-medium w-[52px]">Days</th>
-              <th className="px-2 py-2 text-left font-medium">Title</th>
-              <th className="px-2 py-2 text-left font-medium w-[90px]">Vehicle</th>
+              <SortableHeader label="Days" field="days_left" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" className="w-[52px]" />
+              <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Vehicle" field="vehicle_short_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[90px]" />
               <th className="px-2 py-2 text-left font-medium w-[120px]">Pool / Set-aside</th>
-              <th className="px-2 py-2 text-left font-medium w-[100px]">Agency</th>
-              <th className="px-2 py-2 text-right font-medium w-[80px]">Value</th>
-              <th className="px-2 py-2 text-left font-medium w-[72px]">Posted</th>
-              <th className="px-2 py-2 text-left font-medium w-[72px]">Closes</th>
+              <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[100px]" />
+              <SortableHeader label="Value" field="est_value_usd" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" className="w-[80px]" />
+              <SortableHeader label="Posted" field="posted_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[72px]" />
+              <SortableHeader label="Closes" field="response_due" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="w-[72px]" />
               <th className="px-2 py-2 text-left font-medium w-[80px]">Eligibility</th>
               <th className="px-2 py-2 text-left font-medium w-[80px]">Capture</th>
             </tr>
@@ -54,7 +76,7 @@ export function TaskOrderFeed({
                 </td>
               </tr>
             ) : (
-              items.map((to) => (
+              sortedItems.map((to) => (
                 <tr
                   key={to.id}
                   className="border-b border-border hover:bg-gda-panel/50 transition-colors"

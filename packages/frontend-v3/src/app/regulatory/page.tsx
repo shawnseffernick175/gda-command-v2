@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useMemo } from "react";
 import {
   useRegulatoryList,
   useRegulatoryCount,
@@ -10,6 +10,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/shared/error-state";
 import { PendingState } from "@/components/shared/pending-state";
 import { PagePurpose } from "@/components/shared/page-purpose";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const REG_SORT_COLS: ColumnSortConfig[] = [
+  { field: "document_number", type: "string" },
+  { field: "title", type: "string" },
+  { field: "publication_date", type: "date" },
+  { field: "data_source", type: "string" },
+];
 
 /* ── Date formatter (Eastern Time, short) ─────────────────────── */
 
@@ -62,6 +72,7 @@ export default function RegulatoryPage() {
 function RegulatoryContent() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [history, setHistory] = useState<string[]>([]);
+  const { sortBy, sortDir, handleSort } = useTableSort("reg");
 
   const { data, isLoading, error } = useRegulatoryList({
     limit: 50,
@@ -69,11 +80,17 @@ function RegulatoryContent() {
   });
   const { data: countData } = useRegulatoryCount();
 
-  if (error) return <ErrorState message={error.message} />;
-
-  const items = data?.items ?? [];
+  const items = useMemo(() => {
+    const raw = data?.items ?? [];
+    if (sortBy) {
+      return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, REG_SORT_COLS) as unknown as typeof raw;
+    }
+    return raw;
+  }, [data, sortBy, sortDir]);
   const nextCursor = data?.next_cursor ?? null;
   const count = countData?.count ?? null;
+
+  if (error) return <ErrorState message={error.message} />;
 
   function handleNext() {
     if (!nextCursor) return;
@@ -114,22 +131,12 @@ function RegulatoryContent() {
           <div className="overflow-x-auto rounded border border-border">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-gda-bg-base">
-                  <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Document #
-                  </th>
-                  <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Title
-                  </th>
-                  <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Agencies
-                  </th>
-                  <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Publication Date
-                  </th>
-                  <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Source
-                  </th>
+                <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <SortableHeader label="Document #" field="document_number" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <th className="px-3 py-2 text-left font-medium">Agencies</th>
+                  <SortableHeader label="Publication Date" field="publication_date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+                  <SortableHeader label="Source" field="data_source" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                 </tr>
               </thead>
               <tbody>

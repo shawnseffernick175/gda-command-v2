@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/format-money";
@@ -11,6 +11,17 @@ import {
   type CoverageLayer,
   type CoveragePursuit,
 } from "@/hooks/use-pipeline-coverage";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const PURSUIT_SORT_COLS: ColumnSortConfig[] = [
+  { field: "title", type: "string" },
+  { field: "capture_value", type: "number" },
+  { field: "stage", type: "string" },
+  { field: "pwin", type: "number" },
+  { field: "capture_owner", type: "string" },
+];
 
 const FY_OPTIONS = [2026, 2027, 2028] as const;
 
@@ -183,19 +194,27 @@ function CoverageRow({
 }
 
 function DrilldownTable({ pursuits }: { pursuits: CoveragePursuit[] }) {
+  const { sortBy, sortDir, handleSort } = useTableSort("covdrill");
+  const sorted = useMemo(() => {
+    if (sortBy) {
+      return sortData(pursuits as unknown as Record<string, unknown>[], sortBy, sortDir, PURSUIT_SORT_COLS) as unknown as typeof pursuits;
+    }
+    return pursuits;
+  }, [pursuits, sortBy, sortDir]);
+
   return (
     <table className="w-full text-xs">
       <thead>
         <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-          <th className="px-4 py-1.5 text-left font-medium">Pursuit</th>
-          <th className="px-4 py-1.5 text-right font-medium">Value</th>
-          <th className="px-4 py-1.5 text-left font-medium">Stage</th>
-          <th className="px-4 py-1.5 text-right font-medium">Pwin</th>
-          <th className="px-4 py-1.5 text-left font-medium">Owner</th>
+          <SortableHeader label="Pursuit" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Value" field="capture_value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+          <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+          <SortableHeader label="Pwin" field="pwin" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
+          <SortableHeader label="Owner" field="capture_owner" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
         </tr>
       </thead>
       <tbody>
-        {pursuits.map((p) => (
+        {sorted.map((p) => (
           <tr
             key={p.pipeline_item_id}
             className="border-b border-border/50 hover:bg-gda-panel/30 transition-colors"

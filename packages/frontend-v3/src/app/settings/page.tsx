@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSentinel } from "@/hooks/use-sentinel";
 import { useSystemHealth, type SystemHealth } from "@/hooks/use-system-health";
 import {
@@ -20,7 +20,17 @@ import {
 } from "@/hooks/use-admin-users";
 import { IngestPipelineSection } from "@/components/settings/ingest-pipeline";
 import { useMatchSuggestions } from "@/hooks/use-approvals";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import dynamic from "next/dynamic";
+
+const USER_SORT_COLS: ColumnSortConfig[] = [
+  { field: "display_name", type: "string" },
+  { field: "role", type: "enum", enumOrder: ["admin", "operator", "viewer"] },
+  { field: "is_active", type: "string" },
+  { field: "last_login_at", type: "date" },
+];
 
 const MatchApprovals = dynamic(
   () => import("@/components/settings/MatchApprovals").then((m) => m.MatchApprovals),
@@ -287,12 +297,19 @@ function UserManagementPanel() {
   const createUser = useCreateAdminUser();
   const updateUser = useUpdateAdminUser();
   const deactivate = useDeactivateAdminUser();
+  const { sortBy, sortDir, handleSort } = useTableSort("users");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_USER });
   const [saving, setSaving] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
-  const users = data?.items ?? [];
+  const users = useMemo(() => {
+    const raw = data?.items ?? [];
+    if (sortBy) {
+      return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, USER_SORT_COLS) as unknown as typeof raw;
+    }
+    return raw;
+  }, [data, sortBy, sortDir]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -423,10 +440,10 @@ function UserManagementPanel() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">User</th>
-              <th className="px-3 py-2 text-left font-medium">Role</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-              <th className="px-3 py-2 text-left font-medium">Last Login</th>
+              <SortableHeader label="User" field="display_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Role" field="role" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Status" field="is_active" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="Last Login" field="last_login_at" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <th className="px-3 py-2 text-left font-medium">Actions</th>
             </tr>
           </thead>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,24 @@ import {
 } from "@/hooks/use-financials";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { SortableHeader } from "@/components/shared/SortableHeader";
+import { useTableSort } from "@/hooks/use-table-sort";
+import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+
+const COST_DRILL_COLS: ColumnSortConfig[] = [
+  { field: "cost_element", type: "string" },
+  { field: "pool", type: "string" },
+  { field: "target_amount", type: "number" },
+  { field: "actual_amount", type: "number" },
+  { field: "variance_amount", type: "number" },
+];
+
+const SIE_DRILL_COLS: ColumnSortConfig[] = [
+  { field: "pool", type: "string" },
+  { field: "account_name", type: "string" },
+  { field: "current_period_actual", type: "number" },
+  { field: "current_period_budget", type: "number" },
+];
 
 export function PeriodDrillDrawer({
   period,
@@ -26,6 +45,24 @@ export function PeriodDrillDrawer({
   const { data, isLoading } = usePeriodDetail(open ? period : null);
   const { data: costData } = useCostDetail(open ? period : null);
   const { data: sieData } = useIndirectExpenses(open ? period : null);
+  const { sortBy: costSortBy, sortDir: costSortDir, handleSort: costHandleSort } = useTableSort("drillcost");
+  const { sortBy: sieSortBy, sortDir: sieSortDir, handleSort: sieHandleSort } = useTableSort("drillsie");
+
+  const sortedCostItems = useMemo(() => {
+    const items = costData?.items ?? [];
+    if (costSortBy) {
+      return sortData(items as unknown as Record<string, unknown>[], costSortBy, costSortDir, COST_DRILL_COLS) as unknown as typeof items;
+    }
+    return items;
+  }, [costData?.items, costSortBy, costSortDir]);
+
+  const sortedSieItems = useMemo(() => {
+    const items = sieData?.items ?? [];
+    if (sieSortBy) {
+      return sortData(items as unknown as Record<string, unknown>[], sieSortBy, sieSortDir, SIE_DRILL_COLS) as unknown as typeof items;
+    }
+    return items;
+  }, [sieData?.items, sieSortBy, sieSortDir]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,25 +119,15 @@ export function PeriodDrillDrawer({
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
-                        <th className="px-3 py-2 text-left font-medium">
-                          Element
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium">
-                          Pool
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Target
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Actual
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Variance
-                        </th>
+                        <SortableHeader label="Element" field="cost_element" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} />
+                        <SortableHeader label="Pool" field="pool" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} />
+                        <SortableHeader label="Target" field="target_amount" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} align="right" />
+                        <SortableHeader label="Actual" field="actual_amount" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} align="right" />
+                        <SortableHeader label="Variance" field="variance_amount" sortBy={costSortBy} sortDir={costSortDir} onSort={costHandleSort} align="right" />
                       </tr>
                     </thead>
                     <tbody>
-                      {costData.items.map((r) => (
+                      {sortedCostItems.map((r) => (
                         <tr
                           key={`${r.cost_element}-${r.pool}`}
                           className="border-b border-border"
@@ -145,22 +172,14 @@ export function PeriodDrillDrawer({
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
-                        <th className="px-3 py-2 text-left font-medium">
-                          Pool
-                        </th>
-                        <th className="px-3 py-2 text-left font-medium">
-                          Account
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Actual
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium">
-                          Budget
-                        </th>
+                        <SortableHeader label="Pool" field="pool" sortBy={sieSortBy} sortDir={sieSortDir} onSort={sieHandleSort} />
+                        <SortableHeader label="Account" field="account_name" sortBy={sieSortBy} sortDir={sieSortDir} onSort={sieHandleSort} />
+                        <SortableHeader label="Actual" field="current_period_actual" sortBy={sieSortBy} sortDir={sieSortDir} onSort={sieHandleSort} align="right" />
+                        <SortableHeader label="Budget" field="current_period_budget" sortBy={sieSortBy} sortDir={sieSortDir} onSort={sieHandleSort} align="right" />
                       </tr>
                     </thead>
                     <tbody>
-                      {sieData.items.map((r) => (
+                      {sortedSieItems.map((r) => (
                         <tr
                           key={`${r.pool}-${r.account_code ?? ""}-${r.account_name}`}
                           className="border-b border-border"
