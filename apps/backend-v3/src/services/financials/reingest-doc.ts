@@ -42,6 +42,7 @@ export interface ReingestResult {
   trial_balance: number;
   project_revenue: number;
   parsers_run: string[];
+  parsers_skipped: string[];
   any_ingested: boolean;
   parse_warnings: string[];
 }
@@ -73,6 +74,7 @@ export async function reingestFinancialDoc(params: {
     trial_balance: 0,
     project_revenue: 0,
     parsers_run: [],
+    parsers_skipped: [],
     any_ingested: false,
     parse_warnings: [],
   };
@@ -110,7 +112,7 @@ export async function reingestFinancialDoc(params: {
 
   // --- Parser 2: Balance Sheet ---
   const looksBalanceSheet = /balance.?sheet/i.test(filename) || /balance.?sheet/i.test(head);
-  if (looksBalanceSheet) {
+  if (looksBalanceSheet && !skipParsers.includes('balance_sheet_extract')) {
     try {
       const bsResult = await llmRouter.route({
         task: 'balance_sheet_extract' as const,
@@ -127,8 +129,9 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 3: Cost Detail (TGT vs ACT) ---
-  const looksCostDetail = /tgt.?vs.?act/i.test(filename) || /target.?vs.?actual/i.test(filename);
-  if (looksCostDetail) {
+  const looksCostDetail = /tgt.?vs.?act/i.test(filename) || /target.?vs.?actual/i.test(filename)
+    || /cost.?detail|gl.?detail|ytd.?gl/i.test(filename) || /cost.?detail|gl.?detail/i.test(head);
+  if (looksCostDetail && !skipParsers.includes('cost_detail_extract')) {
     try {
       const cdResult = await llmRouter.route({
         task: 'cost_detail_extract' as const,
@@ -149,7 +152,7 @@ export async function reingestFinancialDoc(params: {
     /\bsie\b/i.test(filename) ||
     /statement.?of.?indirect/i.test(filename) ||
     /indirect.?expense/i.test(head);
-  if (looksSie) {
+  if (looksSie && !skipParsers.includes('sie_extract')) {
     try {
       const sieResult = await llmRouter.route({
         task: 'sie_extract' as const,
@@ -166,8 +169,8 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 5: AP (Open Accounts Payable) ---
-  const looksAp = /\bap\b|accounts?.?payable|open.?ap/i.test(filename) || /accounts?.?payable|open.?ap/i.test(head);
-  if (looksAp) {
+  const looksAp = /\bap\b|accounts?.?payable|open.?ap/i.test(filename) || /accounts?.?payable|open.?ap|\bap\b/i.test(head);
+  if (looksAp && !skipParsers.includes('ap_extract')) {
     try {
       const apResult = await llmRouter.route({
         task: 'ap_extract' as const,
@@ -184,8 +187,8 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 6: AR (Aged Accounts Receivable) ---
-  const looksAr = /\bar\b|accounts?.?receivable|aged.?ar/i.test(filename) || /accounts?.?receivable|aged.?ar/i.test(head);
-  if (looksAr) {
+  const looksAr = /\bar\b|accounts?.?receivable|aged.?ar/i.test(filename) || /accounts?.?receivable|aged.?ar|\bar\b/i.test(head);
+  if (looksAr && !skipParsers.includes('ar_extract')) {
     try {
       const arResult = await llmRouter.route({
         task: 'ar_extract' as const,
@@ -202,8 +205,8 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 7: Trial Balance ---
-  const looksTrialBalance = /trial.?balance|trail.?balance/i.test(filename) || /trial.?balance/i.test(head);
-  if (looksTrialBalance) {
+  const looksTrialBalance = /trial.?balance|trail.?balance/i.test(filename) || /trial.?balance|trail.?balance/i.test(head);
+  if (looksTrialBalance && !skipParsers.includes('trial_balance_extract')) {
     try {
       const tbResult = await llmRouter.route({
         task: 'trial_balance_extract' as const,
@@ -220,8 +223,8 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 8: Project Revenue Summary ---
-  const looksProjectRevenue = /proj.*revenue|revenue.*summary|full.?proj/i.test(filename) || /project.*revenue|revenue.*summary/i.test(head);
-  if (looksProjectRevenue) {
+  const looksProjectRevenue = /proj.*revenue|revenue.*summary|full.?proj/i.test(filename) || /project.*revenue|revenue.*summary|full.?proj/i.test(head);
+  if (looksProjectRevenue && !skipParsers.includes('project_revenue_extract')) {
     try {
       const prResult = await llmRouter.route({
         task: 'project_revenue_extract' as const,
@@ -234,6 +237,23 @@ export async function reingestFinancialDoc(params: {
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: Project Revenue parser failed');
+    }
+  }
+
+  // Populate parsers_skipped: any parser whose heuristic didn't match.
+  const allParsers = [
+    { key: 'financial_statement_extract', matched: looksFinancial },
+    { key: 'balance_sheet_extract', matched: looksBalanceSheet },
+    { key: 'cost_detail_extract', matched: looksCostDetail },
+    { key: 'sie_extract', matched: looksSie },
+    { key: 'ap_extract', matched: looksAp },
+    { key: 'ar_extract', matched: looksAr },
+    { key: 'trial_balance_extract', matched: looksTrialBalance },
+    { key: 'project_revenue_extract', matched: looksProjectRevenue },
+  ];
+  for (const p of allParsers) {
+    if (!p.matched && !skipParsers.includes(p.key)) {
+      result.parsers_skipped.push(p.key);
     }
   }
 

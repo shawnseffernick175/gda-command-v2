@@ -17,6 +17,16 @@ function noStore(reply: FastifyReply): void {
   reply.removeHeader('Last-Modified');
 }
 
+/**
+ * Parse a fiscal-year query param ("FY26", "FY2026", "2026") into a full
+ * 4-digit year.  Two-digit shorthand (< 100) is expanded to 2000+.
+ */
+function normalizeFiscalYear(fy: string, fallback = 2026): number {
+  const raw = parseInt(fy.replace(/\D/g, ''), 10);
+  if (!raw || Number.isNaN(raw)) return fallback;
+  return raw < 100 ? raw + 2000 : raw;
+}
+
 export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/kpi/header
   // Headline KPIs: LEFT JOIN so actuals display even when plan is missing.
@@ -853,7 +863,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/financials/aop-execution', async (req, reply) => {
     noStore(reply);
     const fy = (req.query as Record<string, string>).fy ?? 'FY26';
-    const fiscalYear = parseInt(fy.replace(/\D/g, ''), 10) || 2026;
+    const fiscalYear = normalizeFiscalYear(fy);
 
     const { rows } = await pool.query(
       `SELECT period, cost_element, pool,
@@ -1071,7 +1081,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/financials/aop-plan', async (req, reply) => {
     noStore(reply);
     const fy = (req.query as Record<string, string>).fy ?? 'FY26';
-    const fiscalYear = parseInt(fy.replace(/\D/g, ''), 10) || 2026;
+    const fiscalYear = normalizeFiscalYear(fy);
 
     const { rows } = await pool.query(
       `SELECT
@@ -1115,9 +1125,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const body = (req.body ?? {}) as Record<string, unknown>;
 
     const fyRaw = typeof body.fy === 'string' ? body.fy : '';
-    const fiscalYear = parseInt(fyRaw.replace(/\D/g, ''), 10);
+    const fiscalYear = normalizeFiscalYear(fyRaw, 0);
     if (!fiscalYear || fiscalYear < 2000 || fiscalYear > 2100) {
-      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'A valid fiscal year (e.g. "FY26") is required', req.requestId));
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'A valid fiscal year (e.g. "FY2026" or "FY26") is required', req.requestId));
     }
 
     // Each metric must be a finite number. Percentages must be 0..100.
@@ -1221,7 +1231,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   app.post('/v3/financials/aop-plan/clear-seed', async (req, reply) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const fyRaw = typeof body.fy === 'string' ? body.fy : '';
-    const fiscalYear = fyRaw ? parseInt(fyRaw.replace(/\D/g, ''), 10) : null;
+    const fiscalYear = fyRaw ? normalizeFiscalYear(fyRaw, 0) || null : null;
 
     const params: number[] = [];
     let where = "source = 'aop_seed'";
