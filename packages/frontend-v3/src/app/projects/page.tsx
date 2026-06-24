@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useMemo, Suspense } from "react";
-import { useRouter } from "next/navigation";
-import { useProjectList } from "@/hooks/use-projects";
+import { useState, useMemo, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { useProjectList, useProjectSnapshot, useProjectTrend } from "@/hooks/use-projects";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { SortableHeader } from "@/components/shared/SortableHeader";
+import { ProjectKpiStrip } from "@/components/projects/ProjectKpiStrip";
+import { ActualVsTargetChart } from "@/components/projects/ActualVsTargetChart";
+import { ProfitMarginCard } from "@/components/projects/ProfitMarginCard";
+import { ItdBurnChart } from "@/components/projects/ItdBurnChart";
+import { MonthlyRevenueTrend } from "@/components/projects/MonthlyRevenueTrend";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +26,116 @@ const SORT_COLS: ColumnSortConfig[] = [
   { field: "margin_pct", type: "number" },
 ];
 
+/* ─── Snapshot (drill-down) view ─── */
+
+function ProjectSnapshotView({
+  projectKey,
+  period,
+  onBack,
+}: {
+  projectKey: string;
+  period: string | undefined;
+  onBack: () => void;
+}) {
+  const { data, isLoading, error } = useProjectSnapshot(projectKey, period);
+  const { data: trendData, isLoading: trendLoading } =
+    useProjectTrend(projectKey);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-4 p-6">
+        <div className="h-8 w-64 animate-pulse rounded bg-gda-panel" />
+        <div className="grid grid-cols-6 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded bg-gda-panel" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="h-72 animate-pulse rounded bg-gda-panel" />
+          <div className="h-72 animate-pulse rounded bg-gda-panel" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data?.project) {
+    return (
+      <div className="mx-auto max-w-7xl p-6">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-4 flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Projects
+        </button>
+        <div className="rounded border border-dashed border-border bg-gda-panel/30 py-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            Project not found or no data for this period
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const project = data.project;
+  const trendItems = trendData?.items ?? [];
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
+      <div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-3 flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Projects
+        </button>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h1 className="text-xl font-semibold text-foreground">
+            {project.project_id ?? project.project_name}
+          </h1>
+          {project.project_id && (
+            <span className="text-sm text-muted-foreground">
+              {project.project_name}
+            </span>
+          )}
+        </div>
+        <div className="mt-1 flex items-center gap-4 text-xs text-muted-foreground">
+          {project.contract_number && (
+            <span>Contract: {project.contract_number}</span>
+          )}
+          <span>Period: {project.period}</span>
+          <span>Contract Value: {formatMoney(project.itd_value)}</span>
+        </div>
+      </div>
+
+      <ProjectKpiStrip project={project} />
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ActualVsTargetChart project={project} />
+        <ProfitMarginCard project={project} />
+        <ItdBurnChart project={project} />
+        {trendLoading ? (
+          <div className="h-72 animate-pulse rounded bg-gda-panel" />
+        ) : (
+          <MonthlyRevenueTrend items={trendItems} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── List view ─── */
+
 function ProjectsContent() {
   const router = useRouter();
-  const [selectedPeriod, setSelectedPeriod] = useState<string | undefined>();
+  const searchParams = useSearchParams();
+  const activeProject = searchParams.get("project");
+  const periodParam = searchParams.get("period") ?? undefined;
+
+  const [selectedPeriod, setSelectedPeriod] = useState<string | undefined>(periodParam);
   const [search, setSearch] = useState("");
   const { data, isLoading, error } = useProjectList(selectedPeriod);
   const { sortBy, sortDir, handleSort } = useTableSort("proj");
@@ -53,21 +166,39 @@ function ProjectsContent() {
   const activePeriod =
     selectedPeriod ?? (items.length > 0 ? items[0].period : null);
 
-  function handleRowClick(projectKey: string) {
-    const params = activePeriod
-      ? `?period=${encodeURIComponent(activePeriod)}`
-      : "";
-    router.push(`/projects/${encodeURIComponent(projectKey)}${params}`);
+  const handleRowClick = useCallback(
+    (projectKey: string) => {
+      const params = new URLSearchParams();
+      params.set("project", projectKey);
+      if (activePeriod) params.set("period", activePeriod);
+      router.push(`/projects?${params.toString()}`);
+    },
+    [router, activePeriod],
+  );
+
+  const handleBack = useCallback(() => {
+    const params = new URLSearchParams();
+    if (selectedPeriod) params.set("period", selectedPeriod);
+    const qs = params.toString();
+    router.push(`/projects${qs ? `?${qs}` : ""}`);
+  }, [router, selectedPeriod]);
+
+  if (activeProject) {
+    return (
+      <ProjectSnapshotView
+        projectKey={decodeURIComponent(activeProject)}
+        period={periodParam}
+        onBack={handleBack}
+      />
+    );
   }
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-6">
-      {/* Sticky header */}
       <div className="sticky-page-header sticky top-0 z-20 -mx-6 bg-background/95 px-6 pb-3 pt-4 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-foreground">Projects</h1>
           <div className="flex items-center gap-3">
-            {/* Period selector */}
             <select
               value={selectedPeriod ?? ""}
               onChange={(e) =>
@@ -82,7 +213,6 @@ function ProjectsContent() {
                 </option>
               ))}
             </select>
-            {/* Search */}
             <input
               type="text"
               placeholder="Search projects..."
@@ -94,7 +224,6 @@ function ProjectsContent() {
         </div>
       </div>
 
-      {/* Loading / error / empty */}
       {isLoading && (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -119,7 +248,6 @@ function ProjectsContent() {
         </div>
       )}
 
-      {/* Table */}
       {!isLoading && items.length > 0 && (
         <div className="rounded border border-border overflow-x-auto">
           <table className="w-full text-xs">
@@ -224,7 +352,9 @@ function ProjectsContent() {
                       "px-3 py-2 text-right",
                       row.margin_pct != null && row.margin_pct >= 0
                         ? "text-gda-green"
-                        : "text-gda-red",
+                        : row.margin_pct != null
+                          ? "text-gda-red"
+                          : "text-muted-foreground",
                     )}
                   >
                     {row.margin_pct != null

@@ -24,7 +24,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
   }
 
   const periods = items.map((r) => r.period);
-  const actuals = items.map((r) => r.actual_period_revenue || null);
+  const actuals = items.map((r) => r.actual_period_revenue ?? null);
   const targets = items.map((r) =>
     r.target_period_revenue > 0 ? r.target_period_revenue : null,
   );

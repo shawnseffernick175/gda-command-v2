@@ -74,7 +74,7 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
           position: "inside",
           fontSize: 11,
           fontWeight: 600,
-          color: "#ffffff",
+          color: "var(--background)",
           formatter: (p: { value: number }) => formatMoney(p.value),
         },
       },
