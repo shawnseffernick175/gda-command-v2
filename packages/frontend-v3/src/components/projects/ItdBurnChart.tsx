@@ -1,18 +1,7 @@
 "use client";
 
-import ReactEChartsCore from "echarts-for-react/lib/core";
-import * as echarts from "echarts/core";
-import { BarChart } from "echarts/charts";
-import {
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-} from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
 import type { ProjectFullRow } from "@/lib/types";
 import { formatMoney } from "@/lib/format-money";
-
-echarts.use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
 export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
   const funded = project.itd_funding;
@@ -31,87 +20,58 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
     );
   }
 
-  const option: Record<string, unknown> = {
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) =>
-        params
-          .map((p) => `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}`)
-          .join("<br/>"),
-    },
-    legend: {
-      data: ["Billed", "Remaining"],
-      bottom: 0,
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
-    },
-    grid: { left: 80, right: 24, top: 16, bottom: 40 },
-    xAxis: {
-      type: "value",
-      axisLabel: {
-        color: "var(--color-fin-stone)",
-        fontSize: 11,
-        formatter: (v: number) => formatMoney(v),
-      },
-      splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
-    },
-    yAxis: {
-      type: "category",
-      data: ["Contract"],
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
-      axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
-    },
-    series: [
-      {
-        name: "Billed",
-        type: "bar",
-        stack: "total",
-        data: [billed],
-        itemStyle: { color: "var(--color-fin-teal)", borderRadius: [2, 0, 0, 2] },
-        barWidth: 28,
-        label: {
-          show: true,
-          position: "inside",
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--background)",
-          formatter: (p: { value: number }) => formatMoney(p.value),
-        },
-      },
-      {
-        name: "Remaining",
-        type: "bar",
-        stack: "total",
-        data: [remaining],
-        itemStyle: { color: "var(--color-fin-sand)", borderRadius: [0, 2, 2, 0] },
-        barWidth: 28,
-        label: {
-          show: true,
-          position: "inside",
-          fontSize: 11,
-          color: "var(--color-fin-ink)",
-          formatter: (p: { value: number }) => formatMoney(p.value),
-        },
-      },
-    ],
-  };
+  const billedPct = contractValue > 0 ? Math.min((billed / contractValue) * 100, 100) : 0;
+  const fundedPct = contractValue > 0 ? Math.min((funded / contractValue) * 100, 100) : 0;
 
   return (
     <div className="rounded border border-border bg-white p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <h3 className="text-sm font-medium text-fin-ink">
-          ITD Contract Burn
-        </h3>
-        <span className="text-xs text-muted-foreground">
-          {burnPct.toFixed(1)}% consumed
-        </span>
+        <h3 className="text-sm font-medium text-fin-ink">ITD Contract Burn</h3>
+        <span className="text-xs text-muted-foreground">{burnPct.toFixed(1)}% consumed</span>
       </div>
-      <ReactEChartsCore
-        echarts={echarts}
-        option={option}
-        style={{ height: 100 }}
-        notMerge
-      />
+
+      <div className="space-y-3">
+        <div>
+          <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Billed vs Contract Value</span>
+            <span>{formatMoney(billed)} / {formatMoney(contractValue)}</span>
+          </div>
+          <div className="relative h-7 overflow-hidden rounded bg-fin-sand/30">
+            <div
+              className="absolute inset-y-0 left-0 flex items-center rounded-l bg-fin-teal px-2"
+              style={{ width: `${Math.max(billedPct, 1)}%` }}
+            >
+              {billedPct > 15 && (
+                <span className="text-[11px] font-semibold text-white">{formatMoney(billed)}</span>
+              )}
+            </div>
+            {billedPct < 85 && (
+              <div
+                className="absolute inset-y-0 flex items-center px-2 text-[11px] text-fin-ink"
+                style={{ left: `${billedPct + 1}%` }}
+              >
+                {formatMoney(remaining)} remaining
+              </div>
+            )}
+          </div>
+        </div>
+
+        {funded > 0 && (
+          <div>
+            <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Funded</span>
+              <span>{formatMoney(funded)}</span>
+            </div>
+            <div className="relative h-4 overflow-hidden rounded bg-fin-sand/30">
+              <div
+                className="absolute inset-y-0 left-0 rounded bg-fin-stone/40"
+                style={{ width: `${Math.max(fundedPct, 1)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="mt-3 grid grid-cols-3 gap-4 text-center text-xs">
         <div>
           <p className="text-muted-foreground">Contract Value</p>

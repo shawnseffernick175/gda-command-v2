@@ -1,48 +1,26 @@
 "use client";
 
-import ReactEChartsCore from "echarts-for-react/lib/core";
-import * as echarts from "echarts/core";
-import { BarChart } from "echarts/charts";
-import {
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-} from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
 import type { ProjectFullRow } from "@/lib/types";
 import { formatMoney } from "@/lib/format-money";
+import { cn } from "@/lib/utils";
 
-echarts.use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
+interface BarPair {
+  label: string;
+  actual: number;
+  target: number;
+}
 
 export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
-  const categories = [
-    "Period Costs",
-    "Period Profit",
-    "Period Revenue",
-    "YTD Costs",
-    "YTD Profit",
-    "YTD Revenue",
+  const pairs: BarPair[] = [
+    { label: "Period Costs", actual: project.actual_period_costs, target: project.target_period_costs },
+    { label: "Period Profit", actual: project.actual_period_profit, target: project.target_period_profit },
+    { label: "Period Revenue", actual: project.actual_period_revenue, target: project.target_period_revenue },
+    { label: "YTD Costs", actual: project.actual_ytd_costs, target: project.target_ytd_costs },
+    { label: "YTD Profit", actual: project.actual_ytd_profit, target: project.target_ytd_profit },
+    { label: "YTD Revenue", actual: project.actual_ytd_revenue, target: project.target_ytd_revenue },
   ];
 
-  const actuals = [
-    project.actual_period_costs,
-    project.actual_period_profit,
-    project.actual_period_revenue,
-    project.actual_ytd_costs,
-    project.actual_ytd_profit,
-    project.actual_ytd_revenue,
-  ];
-
-  const targets = [
-    project.target_period_costs,
-    project.target_period_profit,
-    project.target_period_revenue,
-    project.target_ytd_costs,
-    project.target_ytd_profit,
-    project.target_ytd_revenue,
-  ];
-
-  const hasData = actuals.some((v) => v !== 0) || targets.some((v) => v !== 0);
+  const hasData = pairs.some((p) => p.actual !== 0 || p.target !== 0);
   if (!hasData) {
     return (
       <div className="flex h-48 items-center justify-center rounded border border-dashed border-border bg-gda-panel/30">
@@ -51,79 +29,55 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
     );
   }
 
-  const option: Record<string, unknown> = {
-    tooltip: {
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) =>
-        params
-          .map((p) => `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}`)
-          .join("<br/>"),
-    },
-    legend: {
-      data: ["Actual", "Target"],
-      bottom: 0,
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
-    },
-    grid: { left: 64, right: 16, top: 16, bottom: 40 },
-    xAxis: {
-      type: "category",
-      data: categories,
-      axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, rotate: 20 },
-      axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
-      axisTick: { show: false },
-    },
-    yAxis: {
-      type: "value",
-      axisLabel: {
-        color: "var(--color-fin-stone)",
-        fontSize: 11,
-        formatter: (v: number) => formatMoney(v),
-      },
-      splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
-    },
-    series: [
-      {
-        name: "Actual",
-        type: "bar",
-        data: actuals,
-        barGap: "10%",
-        itemStyle: { color: "var(--color-fin-teal)", borderRadius: [2, 2, 0, 0] },
-        label: {
-          show: true,
-          position: "top",
-          fontSize: 10,
-          color: "var(--color-fin-stone)",
-          formatter: (p: { value: number }) => formatMoney(p.value),
-        },
-      },
-      {
-        name: "Target",
-        type: "bar",
-        data: targets,
-        itemStyle: { color: "var(--color-fin-sand)", borderRadius: [2, 2, 0, 0] },
-        label: {
-          show: true,
-          position: "top",
-          fontSize: 10,
-          color: "var(--color-fin-stone)",
-          formatter: (p: { value: number }) => formatMoney(p.value),
-        },
-      },
-    ],
-  };
+  const maxVal = Math.max(...pairs.flatMap((p) => [Math.abs(p.actual), Math.abs(p.target)]), 1);
 
   return (
     <div className="rounded border border-border bg-white p-4">
-      <h3 className="mb-3 text-sm font-medium text-fin-ink">
-        Actual vs Target
-      </h3>
-      <ReactEChartsCore
-        echarts={echarts}
-        option={option}
-        style={{ height: 280 }}
-        notMerge
-      />
+      <h3 className="mb-3 text-sm font-medium text-fin-ink">Actual vs Target</h3>
+      <div className="space-y-3">
+        {pairs.map((p) => {
+          const actualPct = (Math.abs(p.actual) / maxVal) * 100;
+          const targetPct = (Math.abs(p.target) / maxVal) * 100;
+          return (
+            <div key={p.label}>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">{p.label}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {formatMoney(p.actual)} / {formatMoney(p.target)}
+                </span>
+              </div>
+              <div className="flex gap-1">
+                <div className="relative h-5 flex-1 overflow-hidden rounded-sm bg-fin-sand/30">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-sm bg-fin-teal transition-all"
+                    style={{ width: `${actualPct}%` }}
+                  />
+                </div>
+                <div className="relative h-5 flex-1 overflow-hidden rounded-sm bg-fin-sand/30">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-sm bg-fin-sand transition-all"
+                    style={{ width: `${targetPct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="mt-0.5 flex gap-1 text-[10px]">
+                <span className="flex-1 text-fin-teal">Actual</span>
+                <span className="flex-1 text-fin-stone">Target</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex items-center gap-4 text-[11px]">
+        <span className="flex items-center gap-1">
+          <span className={cn("inline-block h-2.5 w-2.5 rounded-sm bg-fin-teal")} />
+          Actual
+        </span>
+        <span className="flex items-center gap-1">
+          <span className={cn("inline-block h-2.5 w-2.5 rounded-sm bg-fin-sand")} />
+          Target
+        </span>
+      </div>
     </div>
   );
 }

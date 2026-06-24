@@ -2,51 +2,18 @@
 
 import { useState, useMemo, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import { useProjectList, useProjectSnapshot, useProjectTrend } from "@/hooks/use-projects";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { ProjectKpiStrip } from "@/components/projects/ProjectKpiStrip";
+import { ActualVsTargetChart } from "@/components/projects/ActualVsTargetChart";
+import { ProfitMarginCard } from "@/components/projects/ProfitMarginCard";
+import { ItdBurnChart } from "@/components/projects/ItdBurnChart";
+import { MonthlyRevenueTrend } from "@/components/projects/MonthlyRevenueTrend";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
-
-const ChartPlaceholder = () => (
-  <div className="h-72 animate-pulse rounded bg-gda-panel" />
-);
-
-const ActualVsTargetChart = dynamic(
-  () =>
-    import("@/components/projects/ActualVsTargetChart").then(
-      (m) => m.ActualVsTargetChart,
-    ),
-  { ssr: false, loading: ChartPlaceholder },
-);
-
-const ProfitMarginCard = dynamic(
-  () =>
-    import("@/components/projects/ProfitMarginCard").then(
-      (m) => m.ProfitMarginCard,
-    ),
-  { ssr: false, loading: ChartPlaceholder },
-);
-
-const ItdBurnChart = dynamic(
-  () =>
-    import("@/components/projects/ItdBurnChart").then(
-      (m) => m.ItdBurnChart,
-    ),
-  { ssr: false, loading: ChartPlaceholder },
-);
-
-const MonthlyRevenueTrend = dynamic(
-  () =>
-    import("@/components/projects/MonthlyRevenueTrend").then(
-      (m) => m.MonthlyRevenueTrend,
-    ),
-  { ssr: false, loading: ChartPlaceholder },
-);
 
 const SORT_COLS: ColumnSortConfig[] = [
   { field: "project_id", type: "string" },
