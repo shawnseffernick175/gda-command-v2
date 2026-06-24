@@ -588,18 +588,26 @@ Return JSON exactly matching this schema:
 }
 
 function buildCostDetailExtractPrompt(input: CostDetailExtractInput): string {
-  const text = input.extracted_text.slice(0, 15000);
+  const text = input.extracted_text.slice(0, 50000);
   return `Filename: ${input.filename}
-Extracted text (first 15000 chars):
+Extracted text (first 50000 chars):
 ${text}
 
-Extract all cost element × pool combinations from this TGT vs ACT workbook. Use the filename to determine the period (e.g. "TGT vs ACT MAR-26.xlsx" -> "FY26 Mar", quarter=1, fiscal_year=2026).
+Extract cost detail from this financial workbook. Use the filename to determine the period (e.g. "TGT vs ACT MAR-26.xlsx" -> "FY26 Mar", quarter=1, fiscal_year=2026; "YTD GL Detail MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
 
-The workbook has sections: TGT - YTD (target), ACT - YTD (actual), VAR (variance).
-Cost elements: DL Offsite, DL Onsite, Subcontractor, Consultant, Dir Travel, Sub Material, Direct Material, ODC.
-Pool columns: DIRECT, OH, SMH, G&A, Total Cost.
+This file may be in one of TWO formats:
 
-For each cost element row, extract the target_amount (from TGT section) and actual_amount (from ACT section) for each pool column.
+FORMAT A — TGT vs ACT (Target vs Actual cost build-up):
+- Sections: TGT - YTD (target), ACT - YTD (actual), VAR (variance).
+- Cost elements: DL Offsite, DL Onsite, Subcontractor, Consultant, Dir Travel, Sub Material, Direct Material, ODC.
+- Pool columns: DIRECT, OH, SMH, G&A, Total Cost.
+- Extract target_amount (from TGT section) and actual_amount (from ACT section) for each cost element × pool.
+
+FORMAT B — YTD GL Detail (journal entry level, large file):
+- Header row 0: FY | PD | SP | Jrnl | Seq | Proj Classification | Project ID | ... | Account | ... | Amount (26 cols)
+- Data rows: individual journal entries. PD = period number (1-12, where PD=5 is May).
+- For FORMAT B: AGGREGATE by Proj Classification (as pool) and Account (as cost_element). Sum amounts as actual_amount, set target_amount = 0.
+- Filter to the ingest period if possible (PD matching the month number from the filename).
 
 Return JSON exactly matching this schema:
 {
@@ -621,33 +629,40 @@ Return JSON exactly matching this schema:
 }
 
 function buildSieExtractPrompt(input: SieExtractInput): string {
-  const text = input.extracted_text.slice(0, 15000);
+  const text = input.extracted_text.slice(0, 30000);
   return `Filename: ${input.filename}
-Extracted text (first 15000 chars):
+Extracted text (first 30000 chars):
 ${text}
 
-Extract all account-level rows from this Statement of Indirect Expenses (SIE). Use the filename to determine the period (e.g. "SIE JAN-26 Final.pdf" -> "FY26 Jan", quarter=1, fiscal_year=2026).
+Extract data from this Statement of Indirect Expenses (SIE) or Trend Rate Summary. Use the filename to determine the period (e.g. "SIE JAN-26 Final.pdf" -> "FY26 Jan", quarter=1, fiscal_year=2026; "Trend SIE MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
 
-The SIE has per-pool sections: Fringe, OH (Overhead), G&A.
-Each row has: account_code (e.g. "600001"), account_name (e.g. "PTO Vacation"), and four value columns: Current Period Actual, Current Period Budget, Year To Date Actual, Year To Date Budget.
+This file may be in one of TWO formats:
 
-For "Total" / summary rows (e.g. "Total Labor", "Total Fringe"), include them with account_code=null.
+FORMAT A — Traditional SIE (per-pool sections with account-level rows):
+- Sections: Fringe, OH (Overhead), G&A.
+- Each row: account_code, account_name, Current Period Actual, Current Period Budget, Year To Date Actual, Year To Date Budget.
+
+FORMAT B — TREND RATE SUMMARY (pool-level rates per month):
+- Row 0 is a TITLE row (e.g. "TREND RATE SUMMARY") — NOT the header.
+- The REAL header is on row 1: Pool Number | Pool Name | ACT JAN-2026 | ACT FEB-2026 | ... | ACT MAY-2026 | ...
+- Data rows (row 2+): pool number, pool name, then monthly rate values. Pools include: 100 Fringe, 500 OH Offsite, 550 OH Onsite, 700 MHx, 800 G&A.
+- For FORMAT B: set pool = Pool Name, account_code = Pool Number (as string), account_name = Pool Name, current_period_actual = the rate from the column matching the ingest month (e.g. "ACT MAY-2026" column for May), current_period_budget = 0, ytd_actual = 0, ytd_budget = 0.
 
 Return JSON exactly matching this schema:
 {
   "is_sie": true or false,
   "rows": [
     {
-      "period": "FY26 Jan",
+      "period": "FY26 May",
       "fiscal_year": 2026,
-      "quarter": 1,
+      "quarter": 2,
       "pool": "Fringe",
-      "account_code": "600001" or null,
-      "account_name": "PTO Vacation",
-      "current_period_actual": number,
-      "current_period_budget": number,
-      "ytd_actual": number,
-      "ytd_budget": number
+      "account_code": "100" or null,
+      "account_name": "Fringe",
+      "current_period_actual": 0.45054537,
+      "current_period_budget": 0,
+      "ytd_actual": 0,
+      "ytd_budget": 0
     }
   ],
   "notes": "brief extraction notes",
@@ -656,16 +671,24 @@ Return JSON exactly matching this schema:
 }
 
 function buildApExtractPrompt(input: ApExtractInput): string {
-  const text = input.extracted_text.slice(0, 15000);
+  const text = input.extracted_text.slice(0, 40000);
   return `Filename: ${input.filename}
-Extracted text (first 15000 chars):
+Extracted text (first 40000 chars):
 ${text}
 
 Extract all line items from this Open AP (Accounts Payable) report. Use the filename to determine the period (e.g. "Open AP Report MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
 
-Each row is a vendor payable. Fields: vendor_name, invoice_number (null if not shown), invoice_date (YYYY-MM-DD or null), due_date (YYYY-MM-DD or null), amount (positive $), age_bucket (e.g. "Current", "1-30", "31-60", "61-90", "Over 90", or null).
+IMPORTANT FORMAT NOTES for this specific file:
+- Headers may contain "_x000D_" (XML carriage return encoding) — strip these when matching column names (e.g. "Current_x000D_Status" -> "Current Status", "Invoice_x000D_Date" -> "Invoice Date").
+- Data is GROUPED: rows like "Account: 200-001" and "Organization: 1..." are group headers — SKIP them.
+- Below group headers is a VENDOR NAME row (single non-empty cell on the line). CARRY this vendor name down to all subsequent detail rows until the next vendor name row.
+- Detail rows have a BLANK first column (vendor), followed by voucher #, status, invoice #, dates, amounts.
+- "Subtotal for <vendor>" rows are summaries — SKIP them.
+- Only include individual voucher/invoice line items.
 
-Do NOT include total/summary rows. Only include individual vendor line items.
+Each row is a vendor payable. Fields: vendor_name (carried from the group vendor row above), invoice_number (the invoice or voucher number, null if not shown), invoice_date (YYYY-MM-DD or null), due_date (YYYY-MM-DD or null), amount (positive $), age_bucket (e.g. "Current", "1-30", "31-60", "61-90", "Over 90", or null).
+
+Do NOT include total/summary/subtotal rows.
 
 Return JSON exactly matching this schema:
 {
@@ -689,16 +712,25 @@ Return JSON exactly matching this schema:
 }
 
 function buildArExtractPrompt(input: ArExtractInput): string {
-  const text = input.extracted_text.slice(0, 15000);
+  const text = input.extracted_text.slice(0, 25000);
   return `Filename: ${input.filename}
-Extracted text (first 15000 chars):
+Extracted text (first 25000 chars):
 ${text}
 
 Extract all line items from this Aged AR (Accounts Receivable) report. Use the filename to determine the period (e.g. "Aged AR MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
 
-Each row is a customer receivable. Fields: customer_name, invoice_number (null if not shown), invoice_date (YYYY-MM-DD or null), due_date (YYYY-MM-DD or null), amount (positive $), age_bucket (e.g. "Current", "1-30", "31-60", "61-90", "Over 90", or null).
+IMPORTANT FORMAT NOTES for this specific file:
+- Sheet is typically "DataSetLandTbl" with columns: Customer | Project | Invoice Number | Due Date | Current | 31 to 60 | 61 to 90 | (91+/over) | Total
+- Data rows have a BLANK Customer column — they are grouped under "Customer Account" subheader rows.
+- CARRY the customer name from the most recent Customer Account group-header row down to all subsequent data rows.
+- Each data row represents one invoice. The aging columns (Current, 31 to 60, 61 to 90, 91+) show the amount by age. Use the "Total" column as the row amount.
+- Set age_bucket based on which aging column is non-zero: "Current", "31-60", "61-90", or "Over 90".
+- SKIP rows where Project starts with "Total for Project..." (subtotals) and the Customer Account header rows themselves.
+- invoice_date is not available in this format (set null).
 
-Do NOT include total/summary rows. Only include individual customer line items.
+Fields: customer_name (from group header), invoice_number (Invoice Number column), invoice_date (null), due_date (YYYY-MM-DD or null), amount (Total column, positive $), age_bucket.
+
+Do NOT include total/summary rows.
 
 Return JSON exactly matching this schema:
 {
@@ -710,10 +742,10 @@ Return JSON exactly matching this schema:
       "quarter": 2,
       "customer_name": "US Army TACOM",
       "invoice_number": "AR-001" or null,
-      "invoice_date": "2026-03-15" or null,
+      "invoice_date": null,
       "due_date": "2026-04-15" or null,
       "amount": 85000.00,
-      "age_bucket": "31-60" or null
+      "age_bucket": "Current" or null
     }
   ],
   "notes": "brief extraction notes",
@@ -722,16 +754,19 @@ Return JSON exactly matching this schema:
 }
 
 function buildTrialBalanceExtractPrompt(input: TrialBalanceExtractInput): string {
-  const text = input.extracted_text.slice(0, 15000);
+  const text = input.extracted_text.slice(0, 25000);
   return `Filename: ${input.filename}
-Extracted text (first 15000 chars):
+Extracted text (first 25000 chars):
 ${text}
 
 Extract all account rows from this Trial Balance report. Use the filename to determine the period (e.g. "Trail Balance MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
 
-Each row is a GL account with debit and credit balances. Fields: account_code (the account number), account_name (the description), debit (positive $ amount in debit column, 0 if blank), credit (positive $ amount in credit column, 0 if blank).
-
-Include all account rows. Do NOT include the total/summary row at the bottom that shows total debits = total credits.
+IMPORTANT FORMAT NOTES for this specific file:
+- Sheet is typically "DataSetLandTbl" with columns: Account | Account Name | Organization | Beginning Balance | Prior Period(s) | Current Pd Activity | Ending Balance
+- This file does NOT have separate debit/credit columns. It has Beginning Balance, Prior Period(s), Current Pd Activity, and Ending Balance.
+- MAP to debit/credit as follows: If Ending Balance is POSITIVE, set debit=Ending Balance and credit=0. If Ending Balance is NEGATIVE, set debit=0 and credit=abs(Ending Balance).
+- Account code is the "Account" column (e.g. "100-001").
+- Include ALL account rows. Skip any total/summary row at the bottom.
 
 Return JSON exactly matching this schema:
 {
@@ -741,9 +776,9 @@ Return JSON exactly matching this schema:
       "period": "FY26 May",
       "fiscal_year": 2026,
       "quarter": 2,
-      "account_code": "1000",
-      "account_name": "Cash - Operating",
-      "debit": 150000.00,
+      "account_code": "100-001",
+      "account_name": "MSB Operating",
+      "debit": 339036.98,
       "credit": 0
     }
   ],
@@ -753,16 +788,22 @@ Return JSON exactly matching this schema:
 }
 
 function buildProjectRevenueExtractPrompt(input: ProjectRevenueExtractInput): string {
-  const text = input.extracted_text.slice(0, 15000);
+  const text = input.extracted_text.slice(0, 40000);
   return `Filename: ${input.filename}
-Extracted text (first 15000 chars):
+Extracted text (first 40000 chars):
 ${text}
 
 Extract all project-level rows from this Project Revenue Summary. Use the filename to determine the period (e.g. "Full Proj Revenue Summary MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
 
-Each row is a project/contract with revenue and cost. Fields: project_name (the project or task order name), contract_number (contract/TO number, null if not shown), revenue ($ revenue amount), cost ($ cost amount), margin_pct (profit margin %, null if not in the data — do NOT calculate it yourself).
-
-Include individual project rows. Do NOT include grand total/summary rows.
+IMPORTANT FORMAT NOTES for this specific file:
+- Sheet is typically "Page1" with 29 columns. Row 0 header includes: Revenue Project (ID) | Revenue Project (name) | ITD Value | ITD Funding | ITD Billed Amount | Open AR | Prior Year Costs | ... and more.
+- One row per project starting from row 1.
+- Map: project_name = "Revenue Project (name)" column, contract_number = "Revenue Project (ID)" column.
+- For revenue: use "ITD Value" or any period-specific revenue column if present.
+- For cost: use "Prior Year Costs" or total costs column if present. If no clear cost column, use 0.
+- margin_pct: calculate as (revenue - cost) / revenue * 100 if both are non-zero, else null.
+- Include ALL individual project rows. Do NOT include grand total/summary rows.
+- Skip rows where all numeric columns are 0.
 
 Return JSON exactly matching this schema:
 {
@@ -772,11 +813,11 @@ Return JSON exactly matching this schema:
       "period": "FY26 May",
       "fiscal_year": 2026,
       "quarter": 2,
-      "project_name": "RS3 Task Order 5",
-      "contract_number": "W56HZV-20-F-0005" or null,
-      "revenue": 250000.00,
-      "cost": 210000.00,
-      "margin_pct": 16.0 or null
+      "project_name": "OY4",
+      "contract_number": "1010.003" or null,
+      "revenue": 224020.80,
+      "cost": 0,
+      "margin_pct": null
     }
   ],
   "notes": "brief extraction notes",
