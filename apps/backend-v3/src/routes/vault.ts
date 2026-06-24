@@ -53,6 +53,7 @@ interface ReingestDocResult {
   project_revenue: number;
   rejected: number;
   parsers_run: string[];
+  parsers_skipped: string[];
   parse_warnings: string[];
   error?: string;
 }
@@ -1468,7 +1469,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
           AND length(trim(extracted_text)) > 0
           AND (
             doc_type IN ('financial', 'other')
-            OR filename ~* '(financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\\msie\\M)'
+            OR filename ~* '(financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\\msie\\M|\\map\\M|\\mar\\M|receivable|payable|trial.?balance|trail.?balance|gl.?detail|cost.?detail|indirect)'
           )
           ${idFilter ? 'AND id = ANY($1)' : ''}
         ORDER BY id`,
@@ -1509,6 +1510,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             project_revenue: r.project_revenue,
             rejected: r.rejected,
             parsers_run: r.parsers_run,
+            parsers_skipped: r.parsers_skipped,
             parse_warnings: r.parse_warnings,
           });
         } catch (err) {
@@ -1519,6 +1521,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             status: 'error',
             plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, ap: 0, ar: 0, trial_balance: 0, project_revenue: 0, rejected: 0,
             parsers_run: [],
+            parsers_skipped: [],
             parse_warnings: [],
             error: err instanceof Error ? err.message : String(err),
           });
