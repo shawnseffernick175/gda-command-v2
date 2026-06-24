@@ -178,19 +178,26 @@ export function parseAgedAr(
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = splitRow(lines[i]);
+
+    // Detect "Customer Account" group-header rows BEFORE the length check —
+    // these rows often have < 5 columns (e.g. "Customer Account: A00001   Name,,Customer Account: ...")
+    const rawFirst = cols[0] || '';
+    if (/customer\s*account/i.test(rawFirst) || /customer\s*account/i.test(cols[2] || '')) {
+      // Extract customer name: strip the "Customer Account: XXXXX   " prefix
+      const fullText = /customer\s*account/i.test(rawFirst) ? rawFirst : (cols[2] || '');
+      const match = fullText.match(/customer\s*account[:\s]*\S+\s+(.*)/i);
+      currentCustomer = match ? match[1].trim() : fullText.replace(/^customer\s*account[:\s]*/i, '').trim();
+      continue;
+    }
+
     if (cols.length < 5) continue;
 
-    const firstCol = cols[0] || '';
+    const firstCol = rawFirst;
     const projectCol = getCol(cols, colMap, 'project') || cols[1] || '';
     const invoiceCol = getCol(cols, colMap, 'invoice number', 'invoice') || cols[2] || '';
 
-    // Detect "Customer Account" group-header rows
+    // Detect standalone customer name rows (non-blank first col, no project/invoice)
     if (firstCol && !projectCol && !invoiceCol) {
-      // This is a customer header row
-      currentCustomer = firstCol.replace(/^customer\s*account[:\s]*/i, '').trim();
-      continue;
-    }
-    if (/customer\s*account/i.test(firstCol)) {
       currentCustomer = firstCol.replace(/^customer\s*account[:\s]*/i, '').trim();
       continue;
     }
@@ -220,18 +227,26 @@ export function parseAgedAr(
     const amount = total !== 0 ? total : (currentAmt + days31_60 + days61_90 + days91plus);
     const customerName = currentCustomer || firstCol || projectCol;
 
-    // Parse due date
+    // Parse due date — handles ISO, US date, and JS Date.toString() format
     const dueDateRaw = getCol(cols, colMap, 'due date') || cols[3] || '';
     let dueDate: string | null = null;
     if (dueDateRaw) {
       const dateMatch = dueDateRaw.match(/(\d{4})-(\d{2})-(\d{2})/);
       if (dateMatch) {
-        dueDate = dueDateRaw.trim();
+        dueDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
       } else {
         const altMatch = dueDateRaw.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
         if (altMatch) {
           const yr = altMatch[3].length === 2 ? `20${altMatch[3]}` : altMatch[3];
           dueDate = `${yr}-${altMatch[1].padStart(2, '0')}-${altMatch[2].padStart(2, '0')}`;
+        } else {
+          // Handle JS Date.toString(): "Tue Jun 30 2026 00:00:00 GMT+0000 (...)"
+          const jsDateMatch = dueDateRaw.match(/\w{3}\s+(\w{3})\s+(\d{1,2})\s+(\d{4})/);
+          if (jsDateMatch) {
+            const monthMap: Record<string, string> = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' };
+            const mm = monthMap[jsDateMatch[1]] || '01';
+            dueDate = `${jsDateMatch[3]}-${mm}-${jsDateMatch[2].padStart(2, '0')}`;
+          }
         }
       }
     }
@@ -302,17 +317,18 @@ export function parseProjectRevenueSummary(
 
     // Look for revenue/cost columns - try various likely names
     const itdValue = parseNum(getCol(cols, colMap, 'itd value', 'itd revenue', 'total revenue', 'revenue'));
-    const itdCosts = parseNum(getCol(cols, colMap, 'prior year costs', 'itd costs', 'total costs', 'cost', 'costs'));
+    const itdFunding = parseNum(getCol(cols, colMap, 'itd funding'));
+    const itdCosts = parseNum(getCol(cols, colMap, 'actual itd costs', 'itd costs', 'total costs', 'cost', 'costs'));
 
-    // Also check for period-specific columns
-    const periodRevenue = parseNum(getCol(cols, colMap, 'period revenue', 'current revenue', 'current period revenue'));
-    const periodCosts = parseNum(getCol(cols, colMap, 'period costs', 'current costs', 'current period costs'));
+    // Also check for period-specific columns (real headers use "Actual Period Revenue/Costs")
+    const periodRevenue = parseNum(getCol(cols, colMap, 'actual period revenue', 'period revenue', 'current revenue', 'current period revenue'));
+    const periodCosts = parseNum(getCol(cols, colMap, 'actual period costs', 'period costs', 'current costs', 'current period costs'));
 
     const revenue = periodRevenue !== 0 ? periodRevenue : itdValue;
     const cost = periodCosts !== 0 ? periodCosts : itdCosts;
 
-    // Skip rows with no financial data
-    if (revenue === 0 && cost === 0) continue;
+    // Skip rows with no financial data at all (no revenue, no cost, no funding)
+    if (revenue === 0 && cost === 0 && itdFunding === 0) continue;
 
     const marginPct = revenue !== 0 ? Math.round(((revenue - cost) / revenue) * 10000) / 100 : null;
 
@@ -480,13 +496,35 @@ export function parseTrialBalance(
     return null;
   }
 
-  // Find header: Account | Account Name | Organization | Beginning Balance | Prior Period(s) | Current Pd Activity | Ending Balance
+  // Find header: Account | Account Name | Organization | Beginning Balance | Prior Period(s) YTD Activity | Current Pd Activity | Ending Balance
+  // NOTE: Some cells contain newlines (e.g. "Prior Period(s)\nYTD Activity") which split
+  // the header across two extracted lines. Detect this and merge the lines if needed.
   let effectiveHeaderIdx = findHeaderRow(lines, ['account', 'beginning balance', 'ending balance']);
   if (effectiveHeaderIdx === -1) {
     effectiveHeaderIdx = findHeaderRow(lines, ['account', 'account name', 'balance']);
-    if (effectiveHeaderIdx === -1) return null;
+    if (effectiveHeaderIdx === -1) {
+      effectiveHeaderIdx = findHeaderRow(lines, ['account', 'beginning balance']);
+      if (effectiveHeaderIdx === -1) return null;
+    }
   }
-  const colMap = buildColumnMap(lines[effectiveHeaderIdx]);
+  // If the header line doesn't contain "ending balance", it might be split across two lines.
+  // Merge with the next line to reconstruct the full header.
+  let headerLine = lines[effectiveHeaderIdx];
+  const headerLower = headerLine.toLowerCase();
+  if (!headerLower.includes('ending balance') && !headerLower.includes('ending bal')) {
+    const headerColCount = splitRow(headerLine).length;
+    if (effectiveHeaderIdx + 1 < lines.length) {
+      const nextLine = lines[effectiveHeaderIdx + 1];
+      const nextLower = nextLine.toLowerCase();
+      // If next line has fewer columns and contains balance-related terms, it's the continuation
+      if (nextLower.includes('ending') || nextLower.includes('activity') || splitRow(nextLine).length < headerColCount) {
+        headerLine = headerLine + ',' + nextLine;
+        // Skip the continuation line during data processing
+        effectiveHeaderIdx++;
+      }
+    }
+  }
+  const colMap = buildColumnMap(headerLine);
   const rows: TrialBalanceExtractOutput['rows'] = [];
 
   for (let i = effectiveHeaderIdx + 1; i < lines.length; i++) {
@@ -561,20 +599,38 @@ export function parseTrendSie(
   }
   if (headerIdx === -1) return null;
 
-  const colMap = buildColumnMap(lines[headerIdx]);
   const headerCols = splitRow(lines[headerIdx]);
 
-  // Find the column for the target month (e.g., "ACT MAY-2026" or "ACT MAY-26")
-  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  const targetMonth = monthNames[Math.ceil(periodInfo.quarter * 3) - 3 + ((periodInfo.period.match(/Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i)?.[0]?.toLowerCase().slice(0, 3)) === monthNames[0] ? 0 : 0)];
+  // Detect the left-table boundary: find the empty separator column or the second
+  // occurrence of "pool number"/"pool name" which indicates the right-side table.
+  // The left table has: Pool Number, Pool Name, then monthly ACT columns.
+  // Headers often render as "[object Object]" when cells contain RichText formatting.
+  let leftTableEnd = headerCols.length;
+  for (let c = 2; c < headerCols.length; c++) {
+    const val = headerCols[c].trim().toLowerCase();
+    // Empty separator column between left and right tables
+    if (val === '' && c > 2) {
+      leftTableEnd = c;
+      break;
+    }
+    // Or if we hit another "pool number" / "pool name" (right table header)
+    if (val === 'pool number' || val === 'pool name') {
+      leftTableEnd = c;
+      break;
+    }
+  }
 
-  // Extract month from period label
+  // The monthly ACT columns are at indices 2..(leftTableEnd-1) in order JAN, FEB, MAR, ...
+  // Since headers may be [object Object], we use positional logic based on month number.
   const periodMonthMatch = periodInfo.period.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
   const periodMonthStr = periodMonthMatch ? periodMonthMatch[1].toLowerCase() : null;
 
-  // Find the matching ACT column
+  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const monthIdx = periodMonthStr ? monthNames.indexOf(periodMonthStr) : -1;
+
+  // Try name-based matching first (works when headers are not [object Object])
   let targetColIdx = -1;
-  for (let c = 0; c < headerCols.length; c++) {
+  for (let c = 2; c < leftTableEnd; c++) {
     const colLower = headerCols[c].toLowerCase().trim();
     if (periodMonthStr && colLower.includes('act') && colLower.includes(periodMonthStr)) {
       targetColIdx = c;
@@ -582,14 +638,17 @@ export function parseTrendSie(
     }
   }
 
-  // If no specific month column found, try the last ACT column
-  if (targetColIdx === -1) {
-    for (let c = headerCols.length - 1; c >= 0; c--) {
-      if (headerCols[c].toLowerCase().includes('act')) {
-        targetColIdx = c;
-        break;
-      }
+  // Fallback: positional logic — month columns start at index 2 in chronological order
+  if (targetColIdx === -1 && monthIdx >= 0) {
+    const positionalIdx = 2 + monthIdx; // JAN=2, FEB=3, MAR=4, APR=5, MAY=6, ...
+    if (positionalIdx < leftTableEnd) {
+      targetColIdx = positionalIdx;
     }
+  }
+
+  if (targetColIdx === -1) {
+    logger.warn({ filename, headerCols: headerCols.slice(0, leftTableEnd) }, 'SIE deterministic: could not identify target month column');
+    return null;
   }
 
   const rows: SieExtractOutput['rows'] = [];
@@ -598,17 +657,20 @@ export function parseTrendSie(
     const cols = splitRow(lines[i]);
     if (cols.length < 3) continue;
 
-    const poolNumber = getCol(cols, colMap, 'pool number', 'pool no', 'pool #') || cols[0] || '';
-    const poolName = getCol(cols, colMap, 'pool name', 'pool') || cols[1] || '';
+    // Always use positional cols 0 and 1 for pool number/name (left table)
+    const poolNumber = cols[0] || '';
+    const poolName = cols[1] || '';
 
     if (!poolNumber && !poolName) continue;
+    // Stop at "POOL DETAIL" section
+    if (/^pool\s*detail/i.test(poolNumber) || /^pool\s*detail/i.test(poolName)) break;
     // Skip headers/titles/blank rows
-    if (/^(trend|rate|summary|pool detail)/i.test(poolNumber)) continue;
-    if (/^(trend|rate|summary|pool detail)/i.test(poolName)) continue;
-    // Pool number should be numeric or empty
+    if (/^(trend|rate|summary|acct)/i.test(poolNumber)) continue;
+    if (/^(trend|rate|summary|acct)/i.test(poolName)) continue;
+    // Pool number should be numeric
     if (poolNumber && !/^\d+$/.test(poolNumber.trim())) continue;
 
-    const rate = targetColIdx >= 0 && targetColIdx < cols.length
+    const rate = targetColIdx < cols.length
       ? parseNum(cols[targetColIdx])
       : 0;
 
