@@ -184,7 +184,7 @@ export function parseAgedAr(
     const rawFirst = cols[0] || '';
     if (/customer\s*account/i.test(rawFirst) || /customer\s*account/i.test(cols[2] || '')) {
       // Extract customer name: strip the "Customer Account: XXXXX   " prefix
-      const fullText = rawFirst || cols[2] || '';
+      const fullText = /customer\s*account/i.test(rawFirst) ? rawFirst : (cols[2] || '');
       const match = fullText.match(/customer\s*account[:\s]*\S+\s+(.*)/i);
       currentCustomer = match ? match[1].trim() : fullText.replace(/^customer\s*account[:\s]*/i, '').trim();
       continue;
