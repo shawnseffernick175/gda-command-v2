@@ -277,14 +277,11 @@ export function parseProjectRevenueSummary(
   }
 
   // Find header row containing "Revenue Project" or "Project"
-  const headerIdx = findHeaderRow(lines, ['revenue project', 'itd value', 'itd funding']);
-  if (headerIdx === -1) {
-    // Try alternative headers
-    const altIdx = findHeaderRow(lines, ['project', 'revenue', 'cost', 'funding']);
-    if (altIdx === -1) return null;
+  let effectiveHeaderIdx = findHeaderRow(lines, ['revenue project', 'itd value', 'itd funding']);
+  if (effectiveHeaderIdx === -1) {
+    effectiveHeaderIdx = findHeaderRow(lines, ['project', 'revenue', 'cost', 'funding']);
+    if (effectiveHeaderIdx === -1) return null;
   }
-
-  const effectiveHeaderIdx = headerIdx !== -1 ? headerIdx : 0;
   const colMap = buildColumnMap(lines[effectiveHeaderIdx]);
   const rows: ProjectRevenueExtractOutput['rows'] = [];
 
@@ -484,14 +481,11 @@ export function parseTrialBalance(
   }
 
   // Find header: Account | Account Name | Organization | Beginning Balance | Prior Period(s) | Current Pd Activity | Ending Balance
-  const headerIdx = findHeaderRow(lines, ['account', 'beginning balance', 'ending balance']);
-  if (headerIdx === -1) {
-    // Try alternative
-    const altIdx = findHeaderRow(lines, ['account', 'account name', 'balance']);
-    if (altIdx === -1) return null;
+  let effectiveHeaderIdx = findHeaderRow(lines, ['account', 'beginning balance', 'ending balance']);
+  if (effectiveHeaderIdx === -1) {
+    effectiveHeaderIdx = findHeaderRow(lines, ['account', 'account name', 'balance']);
+    if (effectiveHeaderIdx === -1) return null;
   }
-
-  const effectiveHeaderIdx = headerIdx !== -1 ? headerIdx : 0;
   const colMap = buildColumnMap(lines[effectiveHeaderIdx]);
   const rows: TrialBalanceExtractOutput['rows'] = [];
 
