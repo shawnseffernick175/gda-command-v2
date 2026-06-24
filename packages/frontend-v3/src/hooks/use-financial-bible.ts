@@ -13,6 +13,11 @@ import type {
   P2FinancialsData,
   DefinitionsData,
   AiAnalyzeResponse,
+  ApData,
+  ArData,
+  TrialBalanceData,
+  ProjectRevenueData,
+  IngestionCoverageData,
 } from "@/lib/types";
 
 export function useIngestionStatus() {
@@ -203,5 +208,56 @@ export function useAiAnalyze() {
         margin: number | null;
       }>;
     }) => apiPost<AiAnalyzeResponse>("/v3/financials/ai-analyze", payload),
+  });
+}
+
+export function useApData() {
+  return useQuery({
+    queryKey: ["financials", "ap"],
+    queryFn: () => apiGet<ApData>("/v3/financials/ap"),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useArData() {
+  return useQuery({
+    queryKey: ["financials", "ar"],
+    queryFn: () => apiGet<ArData>("/v3/financials/ar"),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useTrialBalance() {
+  return useQuery({
+    queryKey: ["financials", "trial-balance"],
+    queryFn: () => apiGet<TrialBalanceData>("/v3/financials/trial-balance"),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useProjectRevenue() {
+  return useQuery({
+    queryKey: ["financials", "project-revenue"],
+    queryFn: () => apiGet<ProjectRevenueData>("/v3/financials/project-revenue"),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useIngestionCoverage() {
+  return useQuery({
+    queryKey: ["financials", "ingestion-coverage"],
+    queryFn: () =>
+      apiGet<IngestionCoverageData>("/v3/financials/ingestion-coverage"),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }

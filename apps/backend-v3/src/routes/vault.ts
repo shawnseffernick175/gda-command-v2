@@ -47,6 +47,10 @@ interface ReingestDocResult {
   balance_sheet: number;
   cost_detail: number;
   sie: number;
+  ap: number;
+  ar: number;
+  trial_balance: number;
+  project_revenue: number;
   rejected: number;
   parsers_run: string[];
   parse_warnings: string[];
@@ -73,6 +77,10 @@ function summarizeJob(job: ReingestJob): Record<string, number> {
     total_balance_sheet: job.results.reduce((s, r) => s + r.balance_sheet, 0),
     total_cost_detail: job.results.reduce((s, r) => s + r.cost_detail, 0),
     total_sie: job.results.reduce((s, r) => s + r.sie, 0),
+    total_ap: job.results.reduce((s, r) => s + r.ap, 0),
+    total_ar: job.results.reduce((s, r) => s + r.ar, 0),
+    total_trial_balance: job.results.reduce((s, r) => s + r.trial_balance, 0),
+    total_project_revenue: job.results.reduce((s, r) => s + r.project_revenue, 0),
     total_rejected: job.results.reduce((s, r) => s + r.rejected, 0),
   };
 }
@@ -420,7 +428,7 @@ async function resolveDocument(doc: {
           doc.id,
           'financials_ingested',
           'admin',
-          `resolve-all: plan=${fin.plan}, actual=${fin.actual}, bs=${fin.balance_sheet}, cd=${fin.cost_detail}, sie=${fin.sie}, rejected=${fin.rejected}`,
+          `resolve-all: plan=${fin.plan}, actual=${fin.actual}, bs=${fin.balance_sheet}, cd=${fin.cost_detail}, sie=${fin.sie}, ap=${fin.ap}, ar=${fin.ar}, tb=${fin.trial_balance}, pr=${fin.project_revenue}, rejected=${fin.rejected}`,
         );
       }
     } catch (err) {
@@ -940,6 +948,33 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
           logger.warn({ err, filename }, 'Financial extraction/ingest failed - upload not affected');
         }
       }
+
+      // F-625: Run additional financial parsers on upload (best-effort, non-blocking).
+      // reingestFinancialDoc already handles all parsers including the new AP/AR/TB/ProjRev ones.
+      // Fire-and-forget so the upload response is not delayed.
+      void reingestFinancialDoc({
+        docId,
+        filename,
+        extractedText,
+        docType: docTypeConfirmed,
+        skipParsers: ['financial_statement_extract'],
+      }).then((r) => {
+        if (r.any_ingested) {
+          const parts: string[] = [];
+          if (r.balance_sheet > 0) parts.push(`bs=${r.balance_sheet}`);
+          if (r.cost_detail > 0) parts.push(`cd=${r.cost_detail}`);
+          if (r.sie > 0) parts.push(`sie=${r.sie}`);
+          if (r.ap > 0) parts.push(`ap=${r.ap}`);
+          if (r.ar > 0) parts.push(`ar=${r.ar}`);
+          if (r.trial_balance > 0) parts.push(`tb=${r.trial_balance}`);
+          if (r.project_revenue > 0) parts.push(`pr=${r.project_revenue}`);
+          if (parts.length > 0) {
+            insertAudit(docId, 'financials_ingested', 'system', `upload multi-parse: ${parts.join(', ')}`).catch(() => {});
+          }
+        }
+      }).catch((err) => {
+        logger.warn({ err, docId, filename }, 'Upload multi-parser reingest failed — non-blocking');
+      });
     }
 
     // Vehicle extraction for contract-type docs (best-effort, non-blocking)
@@ -1237,7 +1272,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             Number(id),
             'financials_ingested',
             'admin',
-            `re-ingest: plan=${reingest.financial.plan}, actual=${reingest.financial.actual}, bs=${reingest.financial.balance_sheet}, cd=${reingest.financial.cost_detail}, sie=${reingest.financial.sie}, rejected=${reingest.financial.rejected}`,
+            `re-ingest: plan=${reingest.financial.plan}, actual=${reingest.financial.actual}, bs=${reingest.financial.balance_sheet}, cd=${reingest.financial.cost_detail}, sie=${reingest.financial.sie}, ap=${reingest.financial.ap}, ar=${reingest.financial.ar}, tb=${reingest.financial.trial_balance}, pr=${reingest.financial.project_revenue}, rejected=${reingest.financial.rejected}`,
           );
         }
       } catch (err) {
@@ -1450,7 +1485,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             docType: doc.doc_type,
           });
           if (r.any_ingested) {
-            const auditMsg = `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, rejected=${r.rejected}` +
+            const auditMsg = `reingest-all: plan=${r.plan}, actual=${r.actual}, bs=${r.balance_sheet}, cd=${r.cost_detail}, sie=${r.sie}, ap=${r.ap}, ar=${r.ar}, tb=${r.trial_balance}, pr=${r.project_revenue}, rejected=${r.rejected}` +
               (r.parse_warnings.length > 0 ? ` | WARNINGS: ${r.parse_warnings.join('; ')}` : '');
             await insertAudit(
               doc.id,
@@ -1468,6 +1503,10 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             balance_sheet: r.balance_sheet,
             cost_detail: r.cost_detail,
             sie: r.sie,
+            ap: r.ap,
+            ar: r.ar,
+            trial_balance: r.trial_balance,
+            project_revenue: r.project_revenue,
             rejected: r.rejected,
             parsers_run: r.parsers_run,
             parse_warnings: r.parse_warnings,
@@ -1478,7 +1517,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
             doc_id: doc.id,
             filename: doc.filename,
             status: 'error',
-            plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, rejected: 0,
+            plan: 0, actual: 0, balance_sheet: 0, cost_detail: 0, sie: 0, ap: 0, ar: 0, trial_balance: 0, project_revenue: 0, rejected: 0,
             parsers_run: [],
             parse_warnings: [],
             error: err instanceof Error ? err.message : String(err),

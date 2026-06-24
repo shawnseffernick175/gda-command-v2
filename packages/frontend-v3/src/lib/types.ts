@@ -558,6 +558,109 @@ export interface BalanceSheetData {
   trend: BalanceSheetRow[];
 }
 
+/* ── Accounts Payable (F-625) ─────────────────────────────────── */
+
+export interface ApRow {
+  id: number;
+  period: string;
+  fiscal_year: number;
+  quarter: number | null;
+  vendor_name: string;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  due_date: string | null;
+  amount: number;
+  age_bucket: string | null;
+  source_doc_id: number | null;
+}
+
+export interface ApData {
+  items: ApRow[];
+  meta: { table: string; row_count: number };
+}
+
+/* ── Accounts Receivable (F-625) ──────────────────────────────── */
+
+export interface ArRow {
+  id: number;
+  period: string;
+  fiscal_year: number;
+  quarter: number | null;
+  customer_name: string;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  due_date: string | null;
+  amount: number;
+  age_bucket: string | null;
+  source_doc_id: number | null;
+}
+
+export interface ArData {
+  items: ArRow[];
+  meta: { table: string; row_count: number };
+}
+
+/* ── Trial Balance (F-625) ────────────────────────────────────── */
+
+export interface TrialBalanceRow {
+  id: number;
+  period: string;
+  fiscal_year: number;
+  quarter: number | null;
+  account_code: string;
+  account_name: string;
+  debit: number;
+  credit: number;
+  net_balance: number;
+  source_doc_id: number | null;
+}
+
+export interface TrialBalanceData {
+  items: TrialBalanceRow[];
+  meta: { table: string; row_count: number };
+}
+
+/* ── Project Revenue (F-625) ──────────────────────────────────── */
+
+export interface ProjectRevenueRow {
+  id: number;
+  period: string;
+  fiscal_year: number;
+  quarter: number | null;
+  project_name: string;
+  contract_number: string | null;
+  revenue: number;
+  cost: number;
+  profit: number;
+  margin_pct: number | null;
+  source_doc_id: number | null;
+}
+
+export interface ProjectRevenueData {
+  items: ProjectRevenueRow[];
+  meta: { table: string; row_count: number };
+}
+
+/* ── Ingestion Coverage (F-625) ───────────────────────────────── */
+
+export interface IngestionCoverageDoc {
+  doc_id: number;
+  filename: string;
+  extraction_status: string;
+  destinations: Array<{ table: string; row_count: number }>;
+  status: "ingested" | "no_handler" | "extraction_failed";
+}
+
+export interface IngestionCoverageData {
+  coverage: IngestionCoverageDoc[];
+  summary: {
+    total: number;
+    ingested: number;
+    no_handler: number;
+    extraction_failed: number;
+  };
+}
+
 /* ── Cost Detail (TGT vs ACT) ─────────────────────────────────── */
 
 export interface CostDetailItem {

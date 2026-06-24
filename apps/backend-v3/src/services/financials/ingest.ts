@@ -32,7 +32,7 @@
 
 import { pool } from '../../lib/db.js';
 import { logger } from '../../lib/logger.js';
-import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput } from '../../lib/llm-router.types.js';
+import type { FinancialStatementExtractOutput, BalanceSheetExtractOutput, CostDetailExtractOutput, SieExtractOutput, ApExtractOutput, ArExtractOutput, TrialBalanceExtractOutput, ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js';
 
 type FinancialRow = FinancialStatementExtractOutput['rows'][number];
 
@@ -556,6 +556,171 @@ export async function ingestSieRows(
       count++;
     } catch (err) {
       logger.warn({ err, period: row.period, pool: row.pool }, 'SIE row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Accounts Payable (Open AP) ingest (F-625)
+// ---------------------------------------------------------------------------
+
+type ApRow = ApExtractOutput['rows'][number];
+
+export async function ingestApRows(
+  rows: ApRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  let count = 0;
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year || !row.vendor_name) continue;
+    try {
+      await pool.query(
+        `INSERT INTO ap_actuals
+           (period, fiscal_year, quarter, vendor_name, invoice_number,
+            invoice_date, due_date, amount, age_bucket, source, source_doc_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'open_ap', $10)
+         ON CONFLICT (source, period, vendor_name, COALESCE(invoice_number, ''))
+         DO UPDATE SET
+           invoice_date = EXCLUDED.invoice_date,
+           due_date = EXCLUDED.due_date,
+           amount = EXCLUDED.amount,
+           age_bucket = EXCLUDED.age_bucket,
+           source_doc_id = EXCLUDED.source_doc_id`,
+        [
+          row.period, row.fiscal_year, row.quarter,
+          row.vendor_name, row.invoice_number,
+          row.invoice_date, row.due_date,
+          row.amount, row.age_bucket,
+          sourceDocId ?? null,
+        ],
+      );
+      count++;
+    } catch (err) {
+      logger.warn({ err, period: row.period, vendor_name: row.vendor_name }, 'AP row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Accounts Receivable (Aged AR) ingest (F-625)
+// ---------------------------------------------------------------------------
+
+type ArRow = ArExtractOutput['rows'][number];
+
+export async function ingestArRows(
+  rows: ArRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  let count = 0;
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year || !row.customer_name) continue;
+    try {
+      await pool.query(
+        `INSERT INTO ar_actuals
+           (period, fiscal_year, quarter, customer_name, invoice_number,
+            invoice_date, due_date, amount, age_bucket, source, source_doc_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'aged_ar', $10)
+         ON CONFLICT (source, period, customer_name, COALESCE(invoice_number, ''))
+         DO UPDATE SET
+           invoice_date = EXCLUDED.invoice_date,
+           due_date = EXCLUDED.due_date,
+           amount = EXCLUDED.amount,
+           age_bucket = EXCLUDED.age_bucket,
+           source_doc_id = EXCLUDED.source_doc_id`,
+        [
+          row.period, row.fiscal_year, row.quarter,
+          row.customer_name, row.invoice_number,
+          row.invoice_date, row.due_date,
+          row.amount, row.age_bucket,
+          sourceDocId ?? null,
+        ],
+      );
+      count++;
+    } catch (err) {
+      logger.warn({ err, period: row.period, customer_name: row.customer_name }, 'AR row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Trial Balance ingest (F-625)
+// ---------------------------------------------------------------------------
+
+type TrialBalanceRow = TrialBalanceExtractOutput['rows'][number];
+
+export async function ingestTrialBalanceRows(
+  rows: TrialBalanceRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  let count = 0;
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year || !row.account_code) continue;
+    try {
+      await pool.query(
+        `INSERT INTO trial_balance
+           (period, fiscal_year, quarter, account_code, account_name,
+            debit, credit, source, source_doc_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'trial_balance', $8)
+         ON CONFLICT (source, period, account_code)
+         DO UPDATE SET
+           account_name = EXCLUDED.account_name,
+           debit = EXCLUDED.debit,
+           credit = EXCLUDED.credit,
+           source_doc_id = EXCLUDED.source_doc_id`,
+        [
+          row.period, row.fiscal_year, row.quarter,
+          row.account_code, row.account_name,
+          row.debit, row.credit,
+          sourceDocId ?? null,
+        ],
+      );
+      count++;
+    } catch (err) {
+      logger.warn({ err, period: row.period, account_code: row.account_code }, 'Trial balance row upsert failed');
+    }
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Project Revenue Summary ingest (F-625)
+// ---------------------------------------------------------------------------
+
+type ProjectRevenueRow = ProjectRevenueExtractOutput['rows'][number];
+
+export async function ingestProjectRevenueRows(
+  rows: ProjectRevenueRow[],
+  sourceDocId?: number | null,
+): Promise<number> {
+  let count = 0;
+  for (const row of rows) {
+    if (!row.period || !row.fiscal_year || !row.project_name) continue;
+    try {
+      await pool.query(
+        `INSERT INTO project_revenue_actuals
+           (period, fiscal_year, quarter, project_name, contract_number,
+            revenue, cost, margin_pct, source, source_doc_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'proj_revenue', $9)
+         ON CONFLICT (source, period, project_name)
+         DO UPDATE SET
+           contract_number = EXCLUDED.contract_number,
+           revenue = EXCLUDED.revenue,
+           cost = EXCLUDED.cost,
+           margin_pct = EXCLUDED.margin_pct,
+           source_doc_id = EXCLUDED.source_doc_id`,
+        [
+          row.period, row.fiscal_year, row.quarter,
+          row.project_name, row.contract_number,
+          row.revenue, row.cost, row.margin_pct,
+          sourceDocId ?? null,
+        ],
+      );
+      count++;
+    } catch (err) {
+      logger.warn({ err, period: row.period, project_name: row.project_name }, 'Project revenue row upsert failed');
     }
   }
   return count;

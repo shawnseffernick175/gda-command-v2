@@ -10,6 +10,11 @@ import { AopCaptureTab } from "@/components/financials/tabs/AopCaptureTab";
 import { P2FinancialsTab } from "@/components/financials/tabs/P2FinancialsTab";
 import { DefinitionsTab } from "@/components/financials/tabs/DefinitionsTab";
 import { BalanceSheetCard } from "@/components/financials/BalanceSheetCard";
+import { ApTab } from "@/components/financials/tabs/ApTab";
+import { ArTab } from "@/components/financials/tabs/ArTab";
+import { TrialBalanceTab } from "@/components/financials/tabs/TrialBalanceTab";
+import { ProjectRevenueTab } from "@/components/financials/tabs/ProjectRevenueTab";
+import { IngestionCoverageTab } from "@/components/financials/tabs/IngestionCoverageTab";
 import {
   useAiAnalyze,
   useP2Financials,
@@ -23,6 +28,11 @@ type Tab =
   | "capture"
   | "p2"
   | "balance-sheet"
+  | "ap"
+  | "ar"
+  | "trial-balance"
+  | "project-revenue"
+  | "ingestion-coverage"
   | "definitions";
 
 interface TabGroup {
@@ -36,6 +46,14 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { id: "p2", label: "Income Statement" },
       { id: "balance-sheet", label: "Balance Sheet" },
+      { id: "trial-balance", label: "Trial Balance" },
+    ],
+  },
+  {
+    label: "Receivables & Payables",
+    tabs: [
+      { id: "ap", label: "Accounts Payable" },
+      { id: "ar", label: "Accounts Receivable" },
     ],
   },
   {
@@ -48,11 +66,17 @@ const TAB_GROUPS: TabGroup[] = [
   },
   {
     label: "Contracts",
-    tabs: [{ id: "waterfall", label: "Contract Waterfall" }],
+    tabs: [
+      { id: "waterfall", label: "Contract Waterfall" },
+      { id: "project-revenue", label: "Project Revenue" },
+    ],
   },
   {
     label: "Reference",
-    tabs: [{ id: "definitions", label: "Definitions" }],
+    tabs: [
+      { id: "definitions", label: "Definitions" },
+      { id: "ingestion-coverage", label: "Ingestion Coverage" },
+    ],
   },
 ];
 
@@ -80,6 +104,16 @@ function tabTitle(tab: Tab): string {
       return "Income Statement";
     case "balance-sheet":
       return "Balance Sheet";
+    case "ap":
+      return "Accounts Payable";
+    case "ar":
+      return "Accounts Receivable";
+    case "trial-balance":
+      return "Trial Balance";
+    case "project-revenue":
+      return "Project Revenue";
+    case "ingestion-coverage":
+      return "Ingestion Coverage";
     case "definitions":
       return "Definitions";
     default:
@@ -246,6 +280,11 @@ export default function FinancialsPage() {
         {activeTab === "capture" && <AopCaptureTab fy={fy} />}
         {activeTab === "p2" && <P2FinancialsTab />}
         {activeTab === "balance-sheet" && <BalanceSheetCard />}
+        {activeTab === "ap" && <ApTab />}
+        {activeTab === "ar" && <ArTab />}
+        {activeTab === "trial-balance" && <TrialBalanceTab />}
+        {activeTab === "project-revenue" && <ProjectRevenueTab />}
+        {activeTab === "ingestion-coverage" && <IngestionCoverageTab />}
         {activeTab === "definitions" && <DefinitionsTab />}
       </div>
 

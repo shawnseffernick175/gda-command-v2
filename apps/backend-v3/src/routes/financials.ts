@@ -423,6 +423,194 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
+  // ─── AP / AR / Trial Balance / Project Revenue endpoints (F-625) ───
+
+  // GET /v3/financials/ap
+  app.get('/v3/financials/ap', async (req, reply) => {
+    noStore(reply);
+    const { rows } = await pool.query(
+      `SELECT id, period, fiscal_year, quarter, vendor_name, invoice_number,
+              invoice_date, due_date, amount, age_bucket, source_doc_id, created_at
+       FROM ap_actuals
+       ORDER BY fiscal_year DESC, quarter DESC, period DESC, vendor_name`,
+    );
+    const items = rows.map((r) => ({
+      id: Number(r.id),
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: r.quarter != null ? Number(r.quarter) : null,
+      vendor_name: r.vendor_name as string,
+      invoice_number: (r.invoice_number as string) ?? null,
+      invoice_date: (r.invoice_date as string) ?? null,
+      due_date: (r.due_date as string) ?? null,
+      amount: Number(r.amount),
+      age_bucket: (r.age_bucket as string) ?? null,
+      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+    }));
+    return reply.send(successEnvelope({
+      items,
+      meta: { table: 'ap_actuals', row_count: items.length },
+    }, req.requestId));
+  });
+
+  // GET /v3/financials/ar
+  app.get('/v3/financials/ar', async (req, reply) => {
+    noStore(reply);
+    const { rows } = await pool.query(
+      `SELECT id, period, fiscal_year, quarter, customer_name, invoice_number,
+              invoice_date, due_date, amount, age_bucket, source_doc_id, created_at
+       FROM ar_actuals
+       ORDER BY fiscal_year DESC, quarter DESC, period DESC, customer_name`,
+    );
+    const items = rows.map((r) => ({
+      id: Number(r.id),
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: r.quarter != null ? Number(r.quarter) : null,
+      customer_name: r.customer_name as string,
+      invoice_number: (r.invoice_number as string) ?? null,
+      invoice_date: (r.invoice_date as string) ?? null,
+      due_date: (r.due_date as string) ?? null,
+      amount: Number(r.amount),
+      age_bucket: (r.age_bucket as string) ?? null,
+      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+    }));
+    return reply.send(successEnvelope({
+      items,
+      meta: { table: 'ar_actuals', row_count: items.length },
+    }, req.requestId));
+  });
+
+  // GET /v3/financials/trial-balance
+  app.get('/v3/financials/trial-balance', async (req, reply) => {
+    noStore(reply);
+    const { rows } = await pool.query(
+      `SELECT id, period, fiscal_year, quarter, account_code, account_name,
+              debit, credit, net_balance, source_doc_id, created_at
+       FROM trial_balance
+       ORDER BY fiscal_year DESC, quarter DESC, period DESC, account_code`,
+    );
+    const items = rows.map((r) => ({
+      id: Number(r.id),
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: r.quarter != null ? Number(r.quarter) : null,
+      account_code: r.account_code as string,
+      account_name: r.account_name as string,
+      debit: Number(r.debit),
+      credit: Number(r.credit),
+      net_balance: Number(r.net_balance),
+      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+    }));
+    return reply.send(successEnvelope({
+      items,
+      meta: { table: 'trial_balance', row_count: items.length },
+    }, req.requestId));
+  });
+
+  // GET /v3/financials/project-revenue
+  app.get('/v3/financials/project-revenue', async (req, reply) => {
+    noStore(reply);
+    const { rows } = await pool.query(
+      `SELECT id, period, fiscal_year, quarter, project_name, contract_number,
+              revenue, cost, profit, margin_pct, source_doc_id, created_at
+       FROM project_revenue_actuals
+       ORDER BY fiscal_year DESC, quarter DESC, period DESC, project_name`,
+    );
+    const items = rows.map((r) => ({
+      id: Number(r.id),
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: r.quarter != null ? Number(r.quarter) : null,
+      project_name: r.project_name as string,
+      contract_number: (r.contract_number as string) ?? null,
+      revenue: Number(r.revenue),
+      cost: Number(r.cost),
+      profit: Number(r.profit),
+      margin_pct: r.margin_pct != null ? Number(r.margin_pct) : null,
+      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+    }));
+    return reply.send(successEnvelope({
+      items,
+      meta: { table: 'project_revenue_actuals', row_count: items.length },
+    }, req.requestId));
+  });
+
+  // GET /v3/financials/ingestion-coverage
+  // For each financial vault doc, show destination table + row count, or reason it didn't ingest.
+  app.get('/v3/financials/ingestion-coverage', async (req, reply) => {
+    noStore(reply);
+    const { rows: docs } = await pool.query(
+      `SELECT id, filename, doc_type, extraction_status, uploaded_at
+       FROM vault_documents
+       WHERE deleted_at IS NULL
+         AND (doc_type = 'financial' OR doc_type = 'other')
+       ORDER BY uploaded_at DESC`,
+    );
+
+    const coverage: Array<{
+      doc_id: number;
+      filename: string;
+      extraction_status: string;
+      destinations: Array<{ table: string; row_count: number }>;
+      status: 'ingested' | 'no_handler' | 'extraction_failed';
+    }> = [];
+
+    for (const doc of docs) {
+      const docId = Number(doc.id);
+      const destinations: Array<{ table: string; row_count: number }> = [];
+
+      const tables = [
+        'financial_actuals',
+        'financial_plan',
+        'balance_sheet_actuals',
+        'cost_detail_actuals',
+        'indirect_expense_actuals',
+        'ap_actuals',
+        'ar_actuals',
+        'trial_balance',
+        'project_revenue_actuals',
+      ];
+
+      for (const table of tables) {
+        const { rows: [countRow] } = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM ${table} WHERE source_doc_id = $1`,
+          [docId],
+        );
+        const cnt = Number(countRow?.cnt ?? 0);
+        if (cnt > 0) destinations.push({ table, row_count: cnt });
+      }
+
+      const extractionStatus = doc.extraction_status as string;
+      let status: 'ingested' | 'no_handler' | 'extraction_failed';
+      if (extractionStatus !== 'success') {
+        status = 'extraction_failed';
+      } else if (destinations.length > 0) {
+        status = 'ingested';
+      } else {
+        status = 'no_handler';
+      }
+
+      coverage.push({
+        doc_id: docId,
+        filename: doc.filename as string,
+        extraction_status: extractionStatus,
+        destinations,
+        status,
+      });
+    }
+
+    return reply.send(successEnvelope({
+      coverage,
+      summary: {
+        total: coverage.length,
+        ingested: coverage.filter((c) => c.status === 'ingested').length,
+        no_handler: coverage.filter((c) => c.status === 'no_handler').length,
+        extraction_failed: coverage.filter((c) => c.status === 'extraction_failed').length,
+      },
+    }, req.requestId));
+  });
+
   // ─── Financial Bible v3 endpoints ──────────────────────────────
 
   // GET /v3/financials/ingestion-status
@@ -438,6 +626,14 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
             SELECT source_doc_id FROM indirect_expense_actuals WHERE source_doc_id IS NOT NULL
             UNION
             SELECT source_doc_id FROM financial_actuals WHERE source_doc_id IS NOT NULL
+            UNION
+            SELECT source_doc_id FROM ap_actuals WHERE source_doc_id IS NOT NULL
+            UNION
+            SELECT source_doc_id FROM ar_actuals WHERE source_doc_id IS NOT NULL
+            UNION
+            SELECT source_doc_id FROM trial_balance WHERE source_doc_id IS NOT NULL
+            UNION
+            SELECT source_doc_id FROM project_revenue_actuals WHERE source_doc_id IS NOT NULL
           ) AS all_docs
          ) AS docs_ingested,
          (SELECT COUNT(*) FROM vault_documents
@@ -459,6 +655,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
          (SELECT MAX(created_at) FROM balance_sheet_actuals),
          (SELECT MAX(created_at) FROM cost_detail_actuals),
          (SELECT MAX(created_at) FROM indirect_expense_actuals),
+         (SELECT MAX(created_at) FROM ap_actuals),
+         (SELECT MAX(created_at) FROM ar_actuals),
+         (SELECT MAX(created_at) FROM trial_balance),
+         (SELECT MAX(created_at) FROM project_revenue_actuals),
          (SELECT MAX(vd.uploaded_at) FROM financial_actuals fa
             JOIN vault_documents vd ON vd.id = fa.source_doc_id
           WHERE fa.source_doc_id IS NOT NULL)
@@ -477,6 +677,14 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
            SELECT source_doc_id FROM indirect_expense_actuals WHERE source_doc_id IS NOT NULL
            UNION
            SELECT source_doc_id FROM financial_actuals WHERE source_doc_id IS NOT NULL
+           UNION
+           SELECT source_doc_id FROM ap_actuals WHERE source_doc_id IS NOT NULL
+           UNION
+           SELECT source_doc_id FROM ar_actuals WHERE source_doc_id IS NOT NULL
+           UNION
+           SELECT source_doc_id FROM trial_balance WHERE source_doc_id IS NOT NULL
+           UNION
+           SELECT source_doc_id FROM project_revenue_actuals WHERE source_doc_id IS NOT NULL
          )
        ORDER BY vd.filename`,
     );

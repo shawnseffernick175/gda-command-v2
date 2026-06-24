@@ -39,6 +39,10 @@ export type Task =
   | 'balance_sheet_extract'
   | 'cost_detail_extract'
   | 'sie_extract'
+  | 'ap_extract'
+  | 'ar_extract'
+  | 'trial_balance_extract'
+  | 'project_revenue_extract'
   | 'digest_lead'
   | 'competitor_contact_discovery'
   | 'partner_contact_discovery'
@@ -508,6 +512,95 @@ export interface SieExtractOutput {
   model_used: string;
 }
 
+// ---------------------------------------------------------------------------
+// AP / AR / Trial Balance / Project Revenue extract types (F-625)
+// ---------------------------------------------------------------------------
+
+export interface ApExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface ApExtractOutput {
+  is_ap: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    vendor_name: string;
+    invoice_number: string | null;
+    invoice_date: string | null;
+    due_date: string | null;
+    amount: number;
+    age_bucket: string | null;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
+export interface ArExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface ArExtractOutput {
+  is_ar: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    customer_name: string;
+    invoice_number: string | null;
+    invoice_date: string | null;
+    due_date: string | null;
+    amount: number;
+    age_bucket: string | null;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
+export interface TrialBalanceExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface TrialBalanceExtractOutput {
+  is_trial_balance: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    account_code: string;
+    account_name: string;
+    debit: number;
+    credit: number;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
+export interface ProjectRevenueExtractInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface ProjectRevenueExtractOutput {
+  is_project_revenue: boolean;
+  rows: {
+    period: string;
+    fiscal_year: number;
+    quarter: number | null;
+    project_name: string;
+    contract_number: string | null;
+    revenue: number;
+    cost: number;
+    margin_pct: number | null;
+  }[];
+  notes: string;
+  model_used: string;
+}
+
 export interface FinancialStatementExtractOutput {
   is_financial: boolean;
   currency: string;
@@ -852,6 +945,10 @@ export interface TaskInputMap {
   balance_sheet_extract: BalanceSheetExtractInput;
   cost_detail_extract: CostDetailExtractInput;
   sie_extract: SieExtractInput;
+  ap_extract: ApExtractInput;
+  ar_extract: ArExtractInput;
+  trial_balance_extract: TrialBalanceExtractInput;
+  project_revenue_extract: ProjectRevenueExtractInput;
   digest_lead: DigestLeadInput;
   competitor_contact_discovery: CompetitorContactDiscoveryInput;
   partner_contact_discovery: PartnerContactDiscoveryInput;
@@ -881,6 +978,10 @@ export interface TaskOutputMap {
   balance_sheet_extract: BalanceSheetExtractOutput;
   cost_detail_extract: CostDetailExtractOutput;
   sie_extract: SieExtractOutput;
+  ap_extract: ApExtractOutput;
+  ar_extract: ArExtractOutput;
+  trial_balance_extract: TrialBalanceExtractOutput;
+  project_revenue_extract: ProjectRevenueExtractOutput;
   digest_lead: DigestLeadOutput;
   competitor_contact_discovery: CompetitorContactDiscoveryOutput;
   partner_contact_discovery: PartnerContactDiscoveryOutput;

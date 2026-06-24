@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, FinancialAnalyzeInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -655,6 +655,135 @@ Return JSON exactly matching this schema:
 }`;
 }
 
+function buildApExtractPrompt(input: ApExtractInput): string {
+  const text = input.extracted_text.slice(0, 15000);
+  return `Filename: ${input.filename}
+Extracted text (first 15000 chars):
+${text}
+
+Extract all line items from this Open AP (Accounts Payable) report. Use the filename to determine the period (e.g. "Open AP Report MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
+
+Each row is a vendor payable. Fields: vendor_name, invoice_number (null if not shown), invoice_date (YYYY-MM-DD or null), due_date (YYYY-MM-DD or null), amount (positive $), age_bucket (e.g. "Current", "1-30", "31-60", "61-90", "Over 90", or null).
+
+Do NOT include total/summary rows. Only include individual vendor line items.
+
+Return JSON exactly matching this schema:
+{
+  "is_ap": true or false,
+  "rows": [
+    {
+      "period": "FY26 May",
+      "fiscal_year": 2026,
+      "quarter": 2,
+      "vendor_name": "Acme Corp",
+      "invoice_number": "INV-001" or null,
+      "invoice_date": "2026-04-15" or null,
+      "due_date": "2026-05-15" or null,
+      "amount": 12500.00,
+      "age_bucket": "Current" or null
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
+function buildArExtractPrompt(input: ArExtractInput): string {
+  const text = input.extracted_text.slice(0, 15000);
+  return `Filename: ${input.filename}
+Extracted text (first 15000 chars):
+${text}
+
+Extract all line items from this Aged AR (Accounts Receivable) report. Use the filename to determine the period (e.g. "Aged AR MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
+
+Each row is a customer receivable. Fields: customer_name, invoice_number (null if not shown), invoice_date (YYYY-MM-DD or null), due_date (YYYY-MM-DD or null), amount (positive $), age_bucket (e.g. "Current", "1-30", "31-60", "61-90", "Over 90", or null).
+
+Do NOT include total/summary rows. Only include individual customer line items.
+
+Return JSON exactly matching this schema:
+{
+  "is_ar": true or false,
+  "rows": [
+    {
+      "period": "FY26 May",
+      "fiscal_year": 2026,
+      "quarter": 2,
+      "customer_name": "US Army TACOM",
+      "invoice_number": "AR-001" or null,
+      "invoice_date": "2026-03-15" or null,
+      "due_date": "2026-04-15" or null,
+      "amount": 85000.00,
+      "age_bucket": "31-60" or null
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
+function buildTrialBalanceExtractPrompt(input: TrialBalanceExtractInput): string {
+  const text = input.extracted_text.slice(0, 15000);
+  return `Filename: ${input.filename}
+Extracted text (first 15000 chars):
+${text}
+
+Extract all account rows from this Trial Balance report. Use the filename to determine the period (e.g. "Trail Balance MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
+
+Each row is a GL account with debit and credit balances. Fields: account_code (the account number), account_name (the description), debit (positive $ amount in debit column, 0 if blank), credit (positive $ amount in credit column, 0 if blank).
+
+Include all account rows. Do NOT include the total/summary row at the bottom that shows total debits = total credits.
+
+Return JSON exactly matching this schema:
+{
+  "is_trial_balance": true or false,
+  "rows": [
+    {
+      "period": "FY26 May",
+      "fiscal_year": 2026,
+      "quarter": 2,
+      "account_code": "1000",
+      "account_name": "Cash - Operating",
+      "debit": 150000.00,
+      "credit": 0
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
+function buildProjectRevenueExtractPrompt(input: ProjectRevenueExtractInput): string {
+  const text = input.extracted_text.slice(0, 15000);
+  return `Filename: ${input.filename}
+Extracted text (first 15000 chars):
+${text}
+
+Extract all project-level rows from this Project Revenue Summary. Use the filename to determine the period (e.g. "Full Proj Revenue Summary MAY-2026.xlsx" -> "FY26 May", quarter=2, fiscal_year=2026). Two-digit year YY -> 20YY.
+
+Each row is a project/contract with revenue and cost. Fields: project_name (the project or task order name), contract_number (contract/TO number, null if not shown), revenue ($ revenue amount), cost ($ cost amount), margin_pct (profit margin %, null if not in the data — do NOT calculate it yourself).
+
+Include individual project rows. Do NOT include grand total/summary rows.
+
+Return JSON exactly matching this schema:
+{
+  "is_project_revenue": true or false,
+  "rows": [
+    {
+      "period": "FY26 May",
+      "fiscal_year": 2026,
+      "quarter": 2,
+      "project_name": "RS3 Task Order 5",
+      "contract_number": "W56HZV-20-F-0005" or null,
+      "revenue": 250000.00,
+      "cost": 210000.00,
+      "margin_pct": 16.0 or null
+    }
+  ],
+  "notes": "brief extraction notes",
+  "model_used": "{model}"
+}`;
+}
+
 function buildFinancialAnalyzePrompt(input: FinancialAnalyzeInput): string {
   const fmt = (v: number | null, unit: string) => v !== null ? `${v.toLocaleString()}${unit}` : 'not yet ingested';
   const lines = [
@@ -743,6 +872,14 @@ export async function callAnthropic(opts: {
     ? buildCostDetailExtractPrompt(opts.input as CostDetailExtractInput)
     : opts.task === 'sie_extract'
     ? buildSieExtractPrompt(opts.input as SieExtractInput)
+    : opts.task === 'ap_extract'
+    ? buildApExtractPrompt(opts.input as ApExtractInput)
+    : opts.task === 'ar_extract'
+    ? buildArExtractPrompt(opts.input as ArExtractInput)
+    : opts.task === 'trial_balance_extract'
+    ? buildTrialBalanceExtractPrompt(opts.input as TrialBalanceExtractInput)
+    : opts.task === 'project_revenue_extract'
+    ? buildProjectRevenueExtractPrompt(opts.input as ProjectRevenueExtractInput)
     : opts.task === 'financial_analyze'
     ? buildFinancialAnalyzePrompt(opts.input as FinancialAnalyzeInput)
     : opts.task === 'vault_vehicle_extract'
