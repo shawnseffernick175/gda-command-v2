@@ -641,6 +641,62 @@ export interface ProjectRevenueData {
   meta: { table: string; row_count: number };
 }
 
+/* ── Project Financial Drill-Down (F-628) ─────────────────────── */
+
+export interface ProjectFullRow {
+  id: number;
+  period: string;
+  fiscal_year: number;
+  quarter: number | null;
+  project_id: string | null;
+  project_name: string;
+  contract_number: string | null;
+  revenue: number;
+  cost: number;
+  profit: number;
+  margin_pct: number | null;
+  itd_value: number;
+  itd_funding: number;
+  itd_billed_amount: number;
+  open_ar: number;
+  prior_year_costs: number;
+  prior_year_profit: number;
+  prior_year_revenue: number;
+  actual_period_costs: number;
+  actual_period_profit: number;
+  actual_period_revenue: number;
+  actual_ytd_costs: number;
+  actual_ytd_profit: number;
+  actual_ytd_revenue: number;
+  actual_itd_costs: number;
+  actual_itd_profit: number;
+  actual_itd_revenue: number;
+  target_period_costs: number;
+  target_period_profit: number;
+  target_period_revenue: number;
+  target_ytd_costs: number;
+  target_ytd_profit: number;
+  target_ytd_revenue: number;
+  target_itd_costs: number;
+  target_itd_profit: number;
+  target_itd_revenue: number;
+  source_doc_id: number | null;
+}
+
+export interface ProjectListData {
+  items: ProjectFullRow[];
+  periods: string[];
+  meta: { table: string; row_count: number };
+}
+
+export interface ProjectSnapshotData {
+  project: ProjectFullRow;
+}
+
+export interface ProjectTrendData {
+  items: ProjectFullRow[];
+}
+
 /* ── Ingestion Coverage (F-625) ───────────────────────────────── */
 
 export interface IngestionCoverageDoc {

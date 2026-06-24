@@ -1729,4 +1729,138 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send(successEnvelope({ deleted: true }, req.requestId));
   });
+
+  // ─── Project Financial Drill-Down (F-628) ───────────────────────
+
+  // Helper: map a project_revenue_actuals row to full JSON shape
+  function mapProjectRow(r: Record<string, unknown>) {
+    return {
+      id: Number(r.id),
+      period: r.period as string,
+      fiscal_year: Number(r.fiscal_year),
+      quarter: r.quarter != null ? Number(r.quarter) : null,
+      project_id: (r.project_id as string) ?? null,
+      project_name: r.project_name as string,
+      contract_number: (r.contract_number as string) ?? null,
+      revenue: Number(r.revenue ?? 0),
+      cost: Number(r.cost ?? 0),
+      profit: Number(r.profit ?? 0),
+      margin_pct: r.margin_pct != null ? Number(r.margin_pct) : null,
+      itd_value: Number(r.itd_value ?? 0),
+      itd_funding: Number(r.itd_funding ?? 0),
+      itd_billed_amount: Number(r.itd_billed_amount ?? 0),
+      open_ar: Number(r.open_ar ?? 0),
+      prior_year_costs: Number(r.prior_year_costs ?? 0),
+      prior_year_profit: Number(r.prior_year_profit ?? 0),
+      prior_year_revenue: Number(r.prior_year_revenue ?? 0),
+      actual_period_costs: Number(r.actual_period_costs ?? 0),
+      actual_period_profit: Number(r.actual_period_profit ?? 0),
+      actual_period_revenue: Number(r.actual_period_revenue ?? 0),
+      actual_ytd_costs: Number(r.actual_ytd_costs ?? 0),
+      actual_ytd_profit: Number(r.actual_ytd_profit ?? 0),
+      actual_ytd_revenue: Number(r.actual_ytd_revenue ?? 0),
+      actual_itd_costs: Number(r.actual_itd_costs ?? 0),
+      actual_itd_profit: Number(r.actual_itd_profit ?? 0),
+      actual_itd_revenue: Number(r.actual_itd_revenue ?? 0),
+      target_period_costs: Number(r.target_period_costs ?? 0),
+      target_period_profit: Number(r.target_period_profit ?? 0),
+      target_period_revenue: Number(r.target_period_revenue ?? 0),
+      target_ytd_costs: Number(r.target_ytd_costs ?? 0),
+      target_ytd_profit: Number(r.target_ytd_profit ?? 0),
+      target_ytd_revenue: Number(r.target_ytd_revenue ?? 0),
+      target_itd_costs: Number(r.target_itd_costs ?? 0),
+      target_itd_profit: Number(r.target_itd_profit ?? 0),
+      target_itd_revenue: Number(r.target_itd_revenue ?? 0),
+      source_doc_id: r.source_doc_id != null ? Number(r.source_doc_id) : null,
+    };
+  }
+
+  // GET /v3/financials/projects — list projects for selected period
+  app.get('/v3/financials/projects', async (req, reply) => {
+    noStore(reply);
+    const q = req.query as Record<string, string>;
+    const period = q.period || null;
+
+    let sql: string;
+    const params: string[] = [];
+
+    if (period) {
+      sql = `SELECT * FROM project_revenue_actuals WHERE period = $1
+             ORDER BY project_name`;
+      params.push(period);
+    } else {
+      // Default: latest period with data
+      sql = `SELECT * FROM project_revenue_actuals
+             WHERE period = (
+               SELECT period FROM project_revenue_actuals
+               ORDER BY fiscal_year DESC, quarter DESC NULLS LAST, period DESC
+               LIMIT 1
+             )
+             ORDER BY project_name`;
+    }
+
+    const { rows } = await pool.query(sql, params);
+    const items = rows.map(mapProjectRow);
+
+    // Distinct periods for the period selector
+    const { rows: periodRows } = await pool.query(
+      `SELECT DISTINCT period, fiscal_year, quarter
+       FROM project_revenue_actuals
+       ORDER BY fiscal_year DESC, quarter DESC NULLS LAST, period DESC`,
+    );
+
+    return reply.send(successEnvelope({
+      items,
+      periods: periodRows.map((p) => p.period as string),
+      meta: { table: 'project_revenue_actuals', row_count: items.length },
+    }, req.requestId));
+  });
+
+  // GET /v3/financials/projects/:projectKey — single project snapshot
+  // projectKey = project_id (e.g. "1010.003") or project_name
+  app.get('/v3/financials/projects/:projectKey', async (req, reply) => {
+    noStore(reply);
+    const projectKey = decodeURIComponent((req.params as Record<string, string>).projectKey);
+    const q = req.query as Record<string, string>;
+    const period = q.period || null;
+
+    let sql: string;
+    const params: string[] = [projectKey, projectKey];
+
+    if (period) {
+      sql = `SELECT * FROM project_revenue_actuals
+             WHERE (COALESCE(project_id, '') = $1 OR project_name = $2) AND period = $3
+             LIMIT 1`;
+      params.push(period);
+    } else {
+      sql = `SELECT * FROM project_revenue_actuals
+             WHERE COALESCE(project_id, '') = $1 OR project_name = $2
+             ORDER BY fiscal_year DESC, quarter DESC NULLS LAST, period DESC
+             LIMIT 1`;
+    }
+
+    const { rows } = await pool.query(sql, params);
+    if (!rows.length) {
+      return reply.status(404).send(errorEnvelope('NOT_FOUND', 'Project not found', req.requestId));
+    }
+
+    return reply.send(successEnvelope({ project: mapProjectRow(rows[0]) }, req.requestId));
+  });
+
+  // GET /v3/financials/projects/:projectKey/trend — monthly rows for trend chart
+  app.get('/v3/financials/projects/:projectKey/trend', async (req, reply) => {
+    noStore(reply);
+    const projectKey = decodeURIComponent((req.params as Record<string, string>).projectKey);
+
+    const { rows } = await pool.query(
+      `SELECT * FROM project_revenue_actuals
+       WHERE COALESCE(project_id, '') = $1 OR project_name = $2
+       ORDER BY fiscal_year ASC, quarter ASC NULLS LAST, period ASC`,
+      [projectKey, projectKey],
+    );
+
+    return reply.send(successEnvelope({
+      items: rows.map(mapProjectRow),
+    }, req.requestId));
+  });
 }

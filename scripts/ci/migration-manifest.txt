@@ -119,3 +119,4 @@ v3_110_news_items.sql
 v3_111_sitreps.sql
 v3_112_sitrep_source_document.sql
 v3_113_full_financial_ingestion.sql
+v3_114_project_revenue_full_columns.sql
