@@ -29,6 +29,14 @@ import {
   ingestTrialBalanceRows,
   ingestProjectRevenueRows,
 } from './ingest.js';
+import {
+  parseAgedAr,
+  parseOpenAp,
+  parseTrialBalance,
+  parseTrendSie,
+  parseYtdGlDetail,
+  parseProjectRevenueSummary,
+} from './deterministic-parsers.js';
 
 export interface ReingestResult {
   plan: number;
@@ -128,40 +136,65 @@ export async function reingestFinancialDoc(params: {
     }
   }
 
-  // --- Parser 3: Cost Detail (TGT vs ACT) ---
+  // --- Parser 3: Cost Detail (TGT vs ACT / YTD GL Detail) ---
   const looksCostDetail = /tgt.?vs.?act/i.test(filename) || /target.?vs.?actual/i.test(filename)
     || /cost.?detail|gl.?detail|ytd.?gl/i.test(filename) || /cost.?detail|gl.?detail/i.test(head);
   if (looksCostDetail && !skipParsers.includes('cost_detail_extract')) {
     try {
-      const cdResult = await llmRouter.route({
-        task: 'cost_detail_extract' as const,
-        input: { filename, extracted_text: extractedText },
-      });
-      result.parsers_run.push('cost_detail_extract');
-      if (cdResult.ok && cdResult.output.is_cost_detail && cdResult.output.rows.length > 0) {
-        result.cost_detail = await ingestCostDetailRows(cdResult.output.rows, docId);
+      // Try deterministic GL Detail parser first (handles large files)
+      const detGl = parseYtdGlDetail(extractedText, filename);
+      if (detGl && detGl.rows.length > 0) {
+        result.parsers_run.push('cost_detail_extract (deterministic)');
+        result.cost_detail = await ingestCostDetailRows(detGl.rows, docId);
         if (result.cost_detail > 0) result.any_ingested = true;
+      } else {
+        // Fallback to LLM parser
+        const cdResult = await llmRouter.route({
+          task: 'cost_detail_extract' as const,
+          input: { filename, extracted_text: extractedText },
+        });
+        result.parsers_run.push('cost_detail_extract');
+        if (cdResult.ok && cdResult.output.is_cost_detail && cdResult.output.rows.length > 0) {
+          result.cost_detail = await ingestCostDetailRows(cdResult.output.rows, docId);
+          if (result.cost_detail > 0) result.any_ingested = true;
+        } else {
+          logger.warn({ docId, filename, is_cost_detail: cdResult.ok ? cdResult.output.is_cost_detail : false }, 'reingest: cost_detail_extract returned 0 rows — header/row detection failed');
+          result.parse_warnings.push('cost_detail_extract: 0 rows (header/row detection failed)');
+        }
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: cost detail parser failed');
     }
   }
 
-  // --- Parser 4: SIE (Statement of Indirect Expenses) ---
+  // --- Parser 4: SIE (Statement of Indirect Expenses / Trend Rate Summary) ---
   const looksSie =
     /\bsie\b/i.test(filename) ||
     /statement.?of.?indirect/i.test(filename) ||
-    /indirect.?expense/i.test(head);
+    /indirect.?expense/i.test(head) ||
+    /trend.?rate|trend.?sie/i.test(filename);
   if (looksSie && !skipParsers.includes('sie_extract')) {
     try {
-      const sieResult = await llmRouter.route({
-        task: 'sie_extract' as const,
-        input: { filename, extracted_text: extractedText },
-      });
-      result.parsers_run.push('sie_extract');
-      if (sieResult.ok && sieResult.output.is_sie && sieResult.output.rows.length > 0) {
-        result.sie = await ingestSieRows(sieResult.output.rows, docId);
+      // Try deterministic Trend SIE parser first
+      const detSie = parseTrendSie(extractedText, filename);
+      if (detSie && detSie.rows.length > 0) {
+        result.parsers_run.push('sie_extract (deterministic)');
+        result.sie = await ingestSieRows(detSie.rows, docId);
         if (result.sie > 0) result.any_ingested = true;
+      } else {
+        // Fallback to LLM parser
+        const sieResult = await llmRouter.route({
+          task: 'sie_extract' as const,
+          input: { filename, extracted_text: extractedText },
+        });
+        result.parsers_run.push('sie_extract');
+        if (sieResult.ok && sieResult.output.is_sie && sieResult.output.rows.length > 0) {
+          result.sie = await ingestSieRows(sieResult.output.rows, docId);
+          if (result.sie > 0) result.any_ingested = true;
+        } else {
+          logger.warn({ docId, filename, is_sie: sieResult.ok ? sieResult.output.is_sie : false }, 'reingest: sie_extract returned 0 rows — header/row detection failed');
+          result.parse_warnings.push('sie_extract: 0 rows (header/row detection failed)');
+        }
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: SIE parser failed');
@@ -172,14 +205,26 @@ export async function reingestFinancialDoc(params: {
   const looksAp = /\bap\b|accounts?.?payable|open.?ap/i.test(filename) || /accounts?.?payable|open.?ap|\bap\b/i.test(head);
   if (looksAp && !skipParsers.includes('ap_extract')) {
     try {
-      const apResult = await llmRouter.route({
-        task: 'ap_extract' as const,
-        input: { filename, extracted_text: extractedText },
-      });
-      result.parsers_run.push('ap_extract');
-      if (apResult.ok && apResult.output.is_ap && apResult.output.rows.length > 0) {
-        result.ap = await ingestApRows(apResult.output.rows, docId);
+      // Try deterministic AP parser first (handles _x000D_ headers and grouped vendors)
+      const detAp = parseOpenAp(extractedText, filename);
+      if (detAp && detAp.rows.length > 0) {
+        result.parsers_run.push('ap_extract (deterministic)');
+        result.ap = await ingestApRows(detAp.rows, docId);
         if (result.ap > 0) result.any_ingested = true;
+      } else {
+        // Fallback to LLM parser
+        const apResult = await llmRouter.route({
+          task: 'ap_extract' as const,
+          input: { filename, extracted_text: extractedText },
+        });
+        result.parsers_run.push('ap_extract');
+        if (apResult.ok && apResult.output.is_ap && apResult.output.rows.length > 0) {
+          result.ap = await ingestApRows(apResult.output.rows, docId);
+          if (result.ap > 0) result.any_ingested = true;
+        } else {
+          logger.warn({ docId, filename, is_ap: apResult.ok ? apResult.output.is_ap : false }, 'reingest: ap_extract returned 0 rows — header/row detection failed (check for _x000D_ in headers or grouped vendor rows)');
+          result.parse_warnings.push('ap_extract: 0 rows (header/row detection failed)');
+        }
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: AP parser failed');
@@ -190,14 +235,26 @@ export async function reingestFinancialDoc(params: {
   const looksAr = /\bar\b|accounts?.?receivable|aged.?ar/i.test(filename) || /accounts?.?receivable|aged.?ar|\bar\b/i.test(head);
   if (looksAr && !skipParsers.includes('ar_extract')) {
     try {
-      const arResult = await llmRouter.route({
-        task: 'ar_extract' as const,
-        input: { filename, extracted_text: extractedText },
-      });
-      result.parsers_run.push('ar_extract');
-      if (arResult.ok && arResult.output.is_ar && arResult.output.rows.length > 0) {
-        result.ar = await ingestArRows(arResult.output.rows, docId);
+      // Try deterministic AR parser first (handles grouped customer rows)
+      const detAr = parseAgedAr(extractedText, filename);
+      if (detAr && detAr.rows.length > 0) {
+        result.parsers_run.push('ar_extract (deterministic)');
+        result.ar = await ingestArRows(detAr.rows, docId);
         if (result.ar > 0) result.any_ingested = true;
+      } else {
+        // Fallback to LLM parser
+        const arResult = await llmRouter.route({
+          task: 'ar_extract' as const,
+          input: { filename, extracted_text: extractedText },
+        });
+        result.parsers_run.push('ar_extract');
+        if (arResult.ok && arResult.output.is_ar && arResult.output.rows.length > 0) {
+          result.ar = await ingestArRows(arResult.output.rows, docId);
+          if (result.ar > 0) result.any_ingested = true;
+        } else {
+          logger.warn({ docId, filename, is_ar: arResult.ok ? arResult.output.is_ar : false }, 'reingest: ar_extract returned 0 rows — header/row detection failed (check for grouped customer rows with blank Customer column)');
+          result.parse_warnings.push('ar_extract: 0 rows (header/row detection failed)');
+        }
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: AR parser failed');
@@ -208,14 +265,26 @@ export async function reingestFinancialDoc(params: {
   const looksTrialBalance = /trial.?balance|trail.?balance/i.test(filename) || /trial.?balance|trail.?balance/i.test(head);
   if (looksTrialBalance && !skipParsers.includes('trial_balance_extract')) {
     try {
-      const tbResult = await llmRouter.route({
-        task: 'trial_balance_extract' as const,
-        input: { filename, extracted_text: extractedText },
-      });
-      result.parsers_run.push('trial_balance_extract');
-      if (tbResult.ok && tbResult.output.is_trial_balance && tbResult.output.rows.length > 0) {
-        result.trial_balance = await ingestTrialBalanceRows(tbResult.output.rows, docId);
+      // Try deterministic TB parser first (handles Beginning/Prior/Current/Ending format)
+      const detTb = parseTrialBalance(extractedText, filename);
+      if (detTb && detTb.rows.length > 0) {
+        result.parsers_run.push('trial_balance_extract (deterministic)');
+        result.trial_balance = await ingestTrialBalanceRows(detTb.rows, docId);
         if (result.trial_balance > 0) result.any_ingested = true;
+      } else {
+        // Fallback to LLM parser
+        const tbResult = await llmRouter.route({
+          task: 'trial_balance_extract' as const,
+          input: { filename, extracted_text: extractedText },
+        });
+        result.parsers_run.push('trial_balance_extract');
+        if (tbResult.ok && tbResult.output.is_trial_balance && tbResult.output.rows.length > 0) {
+          result.trial_balance = await ingestTrialBalanceRows(tbResult.output.rows, docId);
+          if (result.trial_balance > 0) result.any_ingested = true;
+        } else {
+          logger.warn({ docId, filename, is_trial_balance: tbResult.ok ? tbResult.output.is_trial_balance : false }, 'reingest: trial_balance_extract returned 0 rows — this file uses Beginning/Prior/Current/Ending Balance columns, not debit/credit');
+          result.parse_warnings.push('trial_balance_extract: 0 rows (header/row detection failed)');
+        }
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: Trial Balance parser failed');
@@ -226,14 +295,26 @@ export async function reingestFinancialDoc(params: {
   const looksProjectRevenue = /proj.*revenue|revenue.*summary|full.?proj/i.test(filename) || /project.*revenue|revenue.*summary|full.?proj/i.test(head);
   if (looksProjectRevenue && !skipParsers.includes('project_revenue_extract')) {
     try {
-      const prResult = await llmRouter.route({
-        task: 'project_revenue_extract' as const,
-        input: { filename, extracted_text: extractedText },
-      });
-      result.parsers_run.push('project_revenue_extract');
-      if (prResult.ok && prResult.output.is_project_revenue && prResult.output.rows.length > 0) {
-        result.project_revenue = await ingestProjectRevenueRows(prResult.output.rows, docId);
+      // Try deterministic parser first (handles 29-col ITD format)
+      const detPr = parseProjectRevenueSummary(extractedText, filename);
+      if (detPr && detPr.rows.length > 0) {
+        result.parsers_run.push('project_revenue_extract (deterministic)');
+        result.project_revenue = await ingestProjectRevenueRows(detPr.rows, docId);
         if (result.project_revenue > 0) result.any_ingested = true;
+      } else {
+        // Fallback to LLM parser
+        const prResult = await llmRouter.route({
+          task: 'project_revenue_extract' as const,
+          input: { filename, extracted_text: extractedText },
+        });
+        result.parsers_run.push('project_revenue_extract');
+        if (prResult.ok && prResult.output.is_project_revenue && prResult.output.rows.length > 0) {
+          result.project_revenue = await ingestProjectRevenueRows(prResult.output.rows, docId);
+          if (result.project_revenue > 0) result.any_ingested = true;
+        } else {
+          logger.warn({ docId, filename, is_project_revenue: prResult.ok ? prResult.output.is_project_revenue : false }, 'reingest: project_revenue_extract returned 0 rows — expected 29-col ITD format with Revenue Project (ID)/(name) headers');
+          result.parse_warnings.push('project_revenue_extract: 0 rows (header/row detection failed)');
+        }
       }
     } catch (err) {
       logger.warn({ err, docId, filename }, 'reingest: Project Revenue parser failed');
