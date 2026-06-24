@@ -655,13 +655,11 @@ export function parseYtdGlDetail(
   }
 
   // Find header row: FY | PD | SP | Jrnl | Seq | Proj Classification | Project ID | ...
-  const headerIdx = findHeaderRow(lines, ['fy', 'pd', 'proj classification', 'project id']);
-  if (headerIdx === -1) {
-    const altIdx = findHeaderRow(lines, ['fy', 'pd', 'project', 'account']);
-    if (altIdx === -1) return null;
+  let effectiveHeaderIdx = findHeaderRow(lines, ['fy', 'pd', 'proj classification', 'project id']);
+  if (effectiveHeaderIdx === -1) {
+    effectiveHeaderIdx = findHeaderRow(lines, ['fy', 'pd', 'project', 'account']);
+    if (effectiveHeaderIdx === -1) return null;
   }
-
-  const effectiveHeaderIdx = headerIdx !== -1 ? headerIdx : 0;
   const colMap = buildColumnMap(lines[effectiveHeaderIdx]);
   const headerCols = splitRow(lines[effectiveHeaderIdx]);
 
