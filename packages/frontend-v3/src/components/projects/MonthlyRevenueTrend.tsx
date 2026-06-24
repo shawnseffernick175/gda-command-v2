@@ -83,7 +83,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
                 y={y + 3}
                 textAnchor="end"
                 className="fill-fin-stone"
-                fontSize="8"
+                fontSize="11"
               >
                 {formatMoney(val)}
               </text>
@@ -149,7 +149,7 @@ export function MonthlyRevenueTrend({ items }: { items: ProjectFullRow[] }) {
             y={svgH - 1}
             textAnchor="middle"
             className="fill-fin-stone"
-            fontSize="8"
+            fontSize="11"
           >
             {p.replace(/^FY\d+\s*/, "")}
           </text>

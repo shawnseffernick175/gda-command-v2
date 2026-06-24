@@ -60,7 +60,7 @@ export function ActualVsTargetChart({ project }: { project: ProjectFullRow }) {
                   />
                 </div>
               </div>
-              <div className="mt-0.5 flex gap-1 text-[10px]">
+              <div className="mt-0.5 flex gap-1 text-[11px]">
                 <span className="flex-1 text-fin-teal">Actual</span>
                 <span className="flex-1 text-fin-stone">Target</span>
               </div>
