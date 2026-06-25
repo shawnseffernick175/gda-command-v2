@@ -7,6 +7,9 @@ import { SourceFooter } from "@/components/financials/SourceFooter";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+import { formatMoney } from "@/lib/format-money";
+import { Kpi } from "@/components/financials/primitives/Kpi";
+import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 
 const STAGE_LABELS: Record<string, string> = {
   interest: "Investigating",
@@ -65,16 +68,82 @@ export function AopCaptureTab({ fy }: { fy: string }) {
     );
   }
 
+  const totalValue = data.items.reduce((s, i) => s + (i.value ?? 0), 0);
+  const avgPwin =
+    data.items.length > 0
+      ? data.items.reduce((s, i) => s + (i.pwin ?? 0), 0) / data.items.length
+      : 0;
+
+  const stageCounts = new Map<string, { count: number; value: number }>();
+  for (const item of data.items) {
+    const label = STAGE_LABELS[item.stage] ?? item.stage;
+    const prev = stageCounts.get(label) ?? { count: 0, value: 0 };
+    stageCounts.set(label, { count: prev.count + 1, value: prev.value + (item.value ?? 0) });
+  }
+  const stageEntries = [...stageCounts.entries()];
+
   return (
     <div className="space-y-4">
-      <p className="text-[12px] text-muted-foreground">
-        {data.items.length} active capture{data.items.length !== 1 ? "s" : ""}
-      </p>
+      {/* KPI tiles */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Kpi label="Active Captures" value={String(data.items.length)} />
+        <Kpi label="Total Pipeline" value={formatMoney(totalValue)} />
+        <Kpi label="Avg pWin" value={`${avgPwin.toFixed(1)}%`} />
+        <Kpi label="Stages" value={String(stageEntries.length)} />
+      </div>
 
-      <div className="overflow-x-auto">
+      {/* Pipeline by stage chart (G1) */}
+      <div className="rounded border border-border bg-white p-4">
+        <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+          Pipeline by Stage
+        </p>
+        <ReactEChartsCore
+          echarts={echarts}
+          style={{ height: 220 }}
+          notMerge
+          option={{
+            tooltip: {
+              trigger: "axis" as const,
+              axisPointer: { type: "shadow" as const },
+            },
+            grid: { left: 80, right: 16, top: 8, bottom: 32 },
+            xAxis: {
+              type: "category" as const,
+              data: stageEntries.map(([s]) => s),
+              axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+              axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
+            },
+            yAxis: {
+              type: "value" as const,
+              axisLabel: {
+                color: "var(--color-fin-stone)",
+                fontSize: 11,
+                formatter: (v: number) => formatMoney(v),
+              },
+              splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
+            },
+            series: [
+              {
+                type: "bar" as const,
+                data: stageEntries.map(([, v]) => v.value),
+                itemStyle: { color: "var(--color-fin-navy)" },
+                label: {
+                  show: true,
+                  position: "top" as const,
+                  fontSize: 11,
+                  color: "var(--color-fin-stone)",
+                  formatter: (p: { value: number }) => formatMoney(p.value),
+                },
+              },
+            ],
+          }}
+        />
+      </div>
+
+      <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Stage" field="stage" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />

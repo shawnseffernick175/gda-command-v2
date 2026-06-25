@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/format-money";
+import { formatMoneyFull } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
 type NumberFormat = "money" | "percent" | "days" | "docs" | "raw";
@@ -30,7 +30,7 @@ export function NumberCell({
   let display: string;
   switch (format) {
     case "money":
-      display = formatMoney(value);
+      display = formatMoneyFull(value);
       break;
     case "percent":
       display = `${value.toFixed(1)}%`;
