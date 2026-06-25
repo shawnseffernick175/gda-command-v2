@@ -15,6 +15,7 @@
 import { logger } from '../../lib/logger.js';
 import { pool } from '../../lib/db.js';
 import { getSAMApiKey } from '../sam/client.js';
+import { isCommoditySignal } from '../fastrac/commodity-filter.js';
 import {
   TIER1_INSTALLATIONS,
   TIER1_UNIT_CHANNELS,
@@ -214,7 +215,21 @@ async function ingestInstallation(
         raw.title?.toLowerCase().includes(kw.toLowerCase()),
       );
       if (!orgMatch && !titleMatch) {
-        // Keyword hit but no org-path or title match — likely false positive
+        skipped++;
+        continue;
+      }
+
+      // F-631: reject commodity/supply/facilities junk
+      const commodityCheck = isCommoditySignal(
+        raw.title ?? '',
+        raw.description,
+        raw.classificationCode,
+      );
+      if (commodityCheck.rejected) {
+        logger.debug(
+          { installation: inst.name, title: raw.title, reason: commodityCheck.reason },
+          'fastrac_army_commodity_rejected',
+        );
         skipped++;
         continue;
       }
@@ -278,6 +293,21 @@ async function ingestUnitChannel(
       const sourceUrl = raw.uiLink ?? buildSAMUrl(raw.noticeId);
       if (seenUrls.has(sourceUrl)) continue;
       seenUrls.add(sourceUrl);
+
+      // F-631: reject commodity/supply/facilities junk
+      const commodityCheck = isCommoditySignal(
+        raw.title ?? '',
+        raw.description,
+        raw.classificationCode,
+      );
+      if (commodityCheck.rejected) {
+        logger.debug(
+          { unit: ch.name, title: raw.title, reason: commodityCheck.reason },
+          'fastrac_army_unit_commodity_rejected',
+        );
+        skipped++;
+        continue;
+      }
 
       const bodyTags = extractBodyTags(raw.title ?? '', raw.description);
       const allTags = [...new Set([...ch.missionTags, ...bodyTags])];

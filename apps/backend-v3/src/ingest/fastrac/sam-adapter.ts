@@ -8,6 +8,7 @@
 
 import { logger } from '../../lib/logger.js';
 import { inferHorizon, inferSignalType, extractMissionTags } from './normalize.js';
+import { isCommoditySignal } from './commodity-filter.js';
 import type { FasTracSignal, SourceConfig } from './types.js';
 
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2/search';
@@ -108,12 +109,35 @@ export async function fetchSAMSignals(source: SourceConfig): Promise<FasTracSign
         'fastrac_sam_keyword_fetched',
       );
 
+      let commodityRejected = 0;
       for (const opp of opps) {
         if (!opp.title || !opp.uiLink) continue;
 
+        const filter = isCommoditySignal(
+          opp.title,
+          opp.description,
+          opp.classificationCode,
+        );
+        if (filter.rejected) {
+          commodityRejected++;
+          logger.debug(
+            { source: source.name, title: opp.title, reason: filter.reason },
+            'fastrac_commodity_rejected',
+          );
+          continue;
+        }
+
         const textBlob = `${opp.title} ${opp.description ?? ''}`;
+
+        // F-631: verify source label — only use the org name if the
+        // record actually mentions it; otherwise label as SAM.gov
+        const mentionsSource = source.samKeywords?.some((kw) =>
+          textBlob.toLowerCase().includes(kw.toLowerCase()),
+        ) ?? false;
+        const effectiveSource = mentionsSource ? source.name : `SAM.gov`;
+
         const signal: FasTracSignal = {
-          source: source.name,
+          source: effectiveSource,
           source_url: opp.uiLink,
           title: opp.title,
           mission_tags: extractMissionTags(textBlob),
@@ -125,6 +149,13 @@ export async function fetchSAMSignals(source: SourceConfig): Promise<FasTracSign
           summary: opp.description?.slice(0, 500) ?? null,
         };
         signals.push(signal);
+      }
+
+      if (commodityRejected > 0) {
+        logger.info(
+          { source: source.name, keyword, commodityRejected },
+          'fastrac_commodity_filter_applied',
+        );
       }
 
       // Rate limit between keyword queries
