@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -40,10 +41,14 @@ export default function RootLayout({
       <head>
         <meta
           httpEquiv="Content-Security-Policy"
-          content="default-src 'self'; connect-src 'self' https://gda-v3.csr-llc.tech http://localhost:4000; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-eval' 'unsafe-inline';"
+          content="default-src 'self'; connect-src 'self' https://gda-v3.csr-llc.tech http://localhost:4000; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net;"
         />
       </head>
       <body className="antialiased">
+        <Script
+          src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"
+          strategy="beforeInteractive"
+        />
         <Providers>{children}</Providers>
       </body>
     </html>

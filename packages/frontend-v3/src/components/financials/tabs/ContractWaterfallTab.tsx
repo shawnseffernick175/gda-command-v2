@@ -1,58 +1,55 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   useContractWaterfall,
   useCreateTaskOrder,
 } from "@/hooks/use-financial-bible";
 import { formatMoney } from "@/lib/format-money";
-import type { TaskOrderRow } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import type { CSSProperties } from "react";
+import type { ContractWaterfallData, WaterfallContract } from "@/lib/types";
 
-function barPos(
-  leftPct: number,
-  widthPct: number,
-  fill: string,
-): CSSProperties {
-  return {
-    left: `${leftPct}%`,
-    width: `${Math.max(widthPct, 0.5)}%`,
-    "--gf": fill,
-  } as CSSProperties;
-}
-
-function defaultFrom(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 12);
-  return d.toISOString().slice(0, 10);
-}
-function defaultTo(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 60);
-  return d.toISOString().slice(0, 10);
-}
-
+type ViewMode = "revenue" | "profit" | "both";
 type StatusFilter = "" | "active" | "closeout" | "expired" | "awarded_not_started";
 type RoleFilter = "" | "PRIME" | "SUB";
 
+// allowed-hex
+const VEHICLE_COLORS: Record<string, string> = {
+  RS3: "var(--color-fin-teal)",
+  TRAYSYS: "#2D6A4F", // allowed-hex
+  "Seaport NxG": "#1B4332", // allowed-hex
+  "GSA MAS": "#3D405B", // allowed-hex
+  "OASIS SB Pool 1": "#5F0F40", // allowed-hex
+  "OASIS SB Pool 3": "#6A4C93", // allowed-hex
+  eFAST: "#264653", // allowed-hex
+  EAGLE: "#2A9D8F", // allowed-hex
+  "TSS-E": "#E76F51", // allowed-hex
+  "CIO-SP3 SB": "#F4A261", // allowed-hex
+  "CIO-SP3 8(a)": "#E9C46A", // allowed-hex
+};
+
+function getContractColor(c: WaterfallContract, idx: number): string {
+  if (c.parent_vehicle_short_name && VEHICLE_COLORS[c.parent_vehicle_short_name]) {
+    return VEHICLE_COLORS[c.parent_vehicle_short_name];
+  }
+  const palette = [
+    "#01696F", "#2D6A4F", "#3D405B", "#5F0F40", "#6A4C93", "#264653", "#E76F51", // allowed-hex
+  ];
+  return palette[idx % palette.length];
+}
+
 export function ContractWaterfallTab() {
-  const [fromDate, setFromDate] = useState(defaultFrom);
-  const [toDate, setToDate] = useState(defaultTo);
-  const [vehicleFilter, setVehicleFilter] = useState<number[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("both");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("");
-  const [selectedTO, setSelectedTO] = useState<TaskOrderRow | null>(null);
+  const [vehicleFilter, setVehicleFilter] = useState<number[]>([]);
   const [addFormOpen, setAddFormOpen] = useState(false);
 
   const params = useMemo(
     () => ({
-      from: fromDate,
-      to: toDate,
       status: statusFilter || undefined,
       prime_or_sub: roleFilter || undefined,
     }),
-    [fromDate, toDate, statusFilter, roleFilter],
+    [statusFilter, roleFilter],
   );
 
   const { data, isLoading, error } = useContractWaterfall(params);
@@ -60,7 +57,7 @@ export function ContractWaterfallTab() {
   if (isLoading) {
     return (
       <div className="text-sm text-muted-foreground">
-        Loading task orders…
+        Loading contract waterfall…
       </div>
     );
   }
@@ -68,12 +65,12 @@ export function ContractWaterfallTab() {
   if (error) {
     return (
       <div className="text-sm text-fin-plum">
-        Failed to load task orders: {error.message}
+        Failed to load waterfall: {error.message}
       </div>
     );
   }
 
-  if (!data || data.task_orders.length === 0) {
+  if (!data || data.contracts.length === 0) {
     return (
       <WaterfallEmptyState
         onAddTaskOrder={() => setAddFormOpen(true)}
@@ -83,56 +80,28 @@ export function ContractWaterfallTab() {
     );
   }
 
-  const withDates = data.task_orders.filter((t) => t.pop_start && t.pop_end);
-  const missingDates = data.task_orders.filter(
-    (t) => !t.pop_start || !t.pop_end,
-  );
-
-  const filtered =
-    vehicleFilter.length > 0
-      ? withDates.filter(
-          (t) =>
-            t.parent_vehicle_id !== null &&
-            vehicleFilter.includes(t.parent_vehicle_id),
-        )
-      : withDates;
-
   return (
     <div className="space-y-4">
-      <WaterfallFilters
-        availableVehicles={data.available_vehicles}
-        vehicleFilter={vehicleFilter}
-        setVehicleFilter={setVehicleFilter}
+      <WaterfallControls
+        viewMode={viewMode}
+        setViewMode={setViewMode}
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         roleFilter={roleFilter}
         setRoleFilter={setRoleFilter}
-        fromDate={fromDate}
-        setFromDate={setFromDate}
-        toDate={toDate}
-        setToDate={setToDate}
+        availableVehicles={data.available_vehicles}
+        vehicleFilter={vehicleFilter}
+        setVehicleFilter={setVehicleFilter}
         onAddTaskOrder={() => setAddFormOpen(true)}
       />
 
-      <FundedSummaryStrip taskOrders={data.task_orders} />
+      <ForecastSummaryStrip data={data} />
 
-      <WaterfallLegend taskOrders={data.task_orders} />
+      <WaterfallChart data={data} viewMode={viewMode} />
 
-      {filtered.length > 0 && (
-        <GanttChart
-          taskOrders={filtered}
-          today={data.today}
-          onSelect={setSelectedTO}
-        />
-      )}
+      <ContractTable contracts={data.contracts} portfolioMargin={data.portfolio_avg_margin} />
 
-      {missingDates.length > 0 && (
-        <MissingDatesSection taskOrders={missingDates} />
-      )}
-
-      {selectedTO && (
-        <TaskOrderDrawer to={selectedTO} onClose={() => setSelectedTO(null)} />
-      )}
+      {data.pipeline.length === 0 && <PipelineScaffold />}
 
       {addFormOpen && (
         <AddTaskOrderDrawer onClose={() => setAddFormOpen(false)} />
@@ -153,186 +122,114 @@ function WaterfallEmptyState({
   onCloseAddForm: () => void;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="rounded border border-dashed border-border bg-card p-12 text-center">
-        <p className="text-[15px] font-medium text-foreground">
-          No task orders on file
-        </p>
-        <p className="mt-2 max-w-lg mx-auto text-[12px] text-muted-foreground leading-relaxed">
-          The Contract Waterfall displays funded dollars flowing through awarded
-          Task Orders. Upload a contract document to the Vault, or add task
-          orders manually to populate this view.
-        </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <button
-            type="button"
-            className="rounded border border-border bg-card px-4 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-gda-bg-deep"
-            onClick={onAddTaskOrder}
-          >
-            Add task order
-          </button>
-          <a
-            href="/vault"
-            className="rounded bg-fin-teal px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:opacity-90"
-          >
-            Upload to Vault
-          </a>
-        </div>
-      </div>
+    <div className="rounded border border-dashed border-border bg-card p-8 text-center">
+      <p className="text-sm text-muted-foreground mb-3">
+        No signed task orders found. Add a contract to see the revenue forecast waterfall.
+      </p>
+      <button
+        type="button"
+        className="rounded bg-fin-teal px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:opacity-90"
+        onClick={onAddTaskOrder}
+      >
+        + Add Task Order
+      </button>
       {addFormOpen && <AddTaskOrderDrawer onClose={onCloseAddForm} />}
     </div>
   );
 }
 
-/* ── Funded Summary Strip ─────────────────────────── */
+/* ── Controls ─────────────────────────────────────── */
 
-function FundedSummaryStrip({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
-  const stats = useMemo(() => {
-    let totalFunded = 0;
-    let totalCeiling = 0;
-    let fundedCount = 0;
-    let activeCount = 0;
-
-    for (const to of taskOrders) {
-      if (to.funded_to_date != null && to.funded_to_date > 0) {
-        totalFunded += to.funded_to_date;
-        fundedCount++;
-      }
-      if (to.ceiling != null) totalCeiling += to.ceiling;
-      if (to.status === "active") activeCount++;
-    }
-
-    return {
-      totalFunded,
-      totalCeiling,
-      fundedCount,
-      activeCount,
-      totalCount: taskOrders.length,
-      burnPct:
-        totalCeiling > 0
-          ? Math.round((totalFunded / totalCeiling) * 100)
-          : null,
-    };
-  }, [taskOrders]);
-
-  return (
-    <div className="flex flex-wrap items-center gap-6 rounded border border-border bg-card px-4 py-2">
-      <KpiItem label="Total funded" value={formatMoney(stats.totalFunded)} />
-      <KpiItem label="Total ceiling" value={formatMoney(stats.totalCeiling)} />
-      {stats.burnPct !== null && (
-        <KpiItem label="Funded %" value={`${stats.burnPct}%`} />
-      )}
-      <KpiItem label="Active TOs" value={String(stats.activeCount)} />
-      <KpiItem label="Total TOs" value={String(stats.totalCount)} />
-    </div>
-  );
-}
-
-function KpiItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-        {label}
-      </span>
-      <span className="text-[13px] font-medium tabular-nums text-foreground">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-/* ── Filters ──────────────────────────────────────── */
-
-function WaterfallFilters({
-  availableVehicles,
-  vehicleFilter,
-  setVehicleFilter,
+function WaterfallControls({
+  viewMode,
+  setViewMode,
   statusFilter,
   setStatusFilter,
   roleFilter,
   setRoleFilter,
-  fromDate,
-  setFromDate,
-  toDate,
-  setToDate,
+  availableVehicles,
+  vehicleFilter,
+  setVehicleFilter,
   onAddTaskOrder,
 }: {
-  availableVehicles: { id: number; short_name: string }[];
-  vehicleFilter: number[];
-  setVehicleFilter: (v: number[]) => void;
+  viewMode: ViewMode;
+  setViewMode: (v: ViewMode) => void;
   statusFilter: StatusFilter;
   setStatusFilter: (v: StatusFilter) => void;
   roleFilter: RoleFilter;
   setRoleFilter: (v: RoleFilter) => void;
-  fromDate: string;
-  setFromDate: (v: string) => void;
-  toDate: string;
-  setToDate: (v: string) => void;
+  availableVehicles: { id: number; short_name: string }[];
+  vehicleFilter: number[];
+  setVehicleFilter: (v: number[]) => void;
   onAddTaskOrder: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Date range */}
-      <FilterGroup label="From">
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
-        />
-      </FilterGroup>
-      <FilterGroup label="To">
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
-        />
-      </FilterGroup>
+      {/* View toggle */}
+      <div className="flex items-center rounded border border-border bg-card">
+        {(["revenue", "profit", "both"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            className={`px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
+              viewMode === m
+                ? "bg-fin-teal text-white"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => setViewMode(m)}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
 
-      {/* Vehicle multi-select dropdown */}
+      {/* Status filter */}
+      <select
+        value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+        className="rounded border border-border bg-card px-2 py-1 text-[11px] text-foreground"
+      >
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="awarded_not_started">Awarded</option>
+        <option value="closeout">Closeout</option>
+        <option value="expired">Expired</option>
+      </select>
+
+      {/* Role filter */}
+      <select
+        value={roleFilter}
+        onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+        className="rounded border border-border bg-card px-2 py-1 text-[11px] text-foreground"
+      >
+        <option value="">All roles</option>
+        <option value="PRIME">Prime</option>
+        <option value="SUB">Sub</option>
+      </select>
+
+      {/* Vehicle filter */}
       {availableVehicles.length > 0 && (
-        <FilterGroup label="Vehicle">
-          <VehicleDropdown
-            vehicles={availableVehicles}
-            selected={vehicleFilter}
-            onChange={setVehicleFilter}
-          />
-        </FilterGroup>
+        <select
+          value={vehicleFilter.length === 1 ? String(vehicleFilter[0]) : ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            setVehicleFilter(val ? [Number(val)] : []);
+          }}
+          className="rounded border border-border bg-card px-2 py-1 text-[11px] text-foreground"
+        >
+          <option value="">All vehicles</option>
+          {availableVehicles.map((v) => (
+            <option key={v.id} value={String(v.id)}>
+              {v.short_name}
+            </option>
+          ))}
+        </select>
       )}
-
-      {/* Status */}
-      <FilterGroup label="Status">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
-        >
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="closeout">Closeout</option>
-          <option value="expired">Expired</option>
-          <option value="awarded_not_started">Awarded (not started)</option>
-        </select>
-      </FilterGroup>
-
-      {/* Prime vs Sub */}
-      <FilterGroup label="Role">
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
-          className="rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
-        >
-          <option value="">Prime & Sub</option>
-          <option value="PRIME">Prime only</option>
-          <option value="SUB">Sub only</option>
-        </select>
-      </FilterGroup>
 
       <div className="ml-auto">
         <button
           type="button"
-          className="rounded border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-gda-bg-deep"
+          className="rounded bg-fin-teal px-3 py-1 text-[11px] font-medium text-white transition-colors hover:opacity-90"
           onClick={onAddTaskOrder}
         >
           + Add TO
@@ -342,427 +239,247 @@ function WaterfallFilters({
   );
 }
 
-function FilterGroup({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+/* ── Summary Strip ────────────────────────────────── */
+
+function ForecastSummaryStrip({ data }: { data: ContractWaterfallData }) {
+  const totalCeiling = data.contracts.reduce((s, c) => s + c.ceiling, 0);
+  const totalFunded = data.contracts.reduce((s, c) => s + c.funded_to_date, 0);
+  const totalForecastRevenue = data.forecast.reduce((s, f) => s + f.total_revenue, 0);
+  const totalForecastProfit = data.forecast.reduce((s, f) => s + f.total_profit, 0);
+
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-        {label}
-      </span>
-      {children}
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <MetricCard label="Total Ceiling" value={formatMoney(totalCeiling)} />
+      <MetricCard label="Funded to Date" value={formatMoney(totalFunded)} accent />
+      <MetricCard label="Forecast Revenue" value={formatMoney(totalForecastRevenue)} sub={`${data.forecast.length} months`} />
+      <MetricCard label="Forecast Profit" value={formatMoney(totalForecastProfit)} sub={`${data.portfolio_avg_margin.toFixed(1)}% avg margin`} />
     </div>
   );
 }
 
-/* ── Vehicle Multi-Select Dropdown ────────────────── */
-
-function VehicleDropdown({
-  vehicles,
-  selected,
-  onChange,
-}: {
-  vehicles: { id: number; short_name: string }[];
-  selected: number[];
-  onChange: (ids: number[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
-  const handleToggle = useCallback(
-    (id: number) => {
-      if (selected.includes(id)) {
-        onChange(selected.filter((v) => v !== id));
-      } else {
-        onChange([...selected, id]);
-      }
-    },
-    [selected, onChange],
-  );
-
-  const label =
-    selected.length === 0
-      ? "All vehicles"
-      : selected.length === 1
-        ? vehicles.find((v) => v.id === selected[0])?.short_name ?? "1 selected"
-        : `${selected.length} selected`;
-
+function MetricCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
   return (
-    <div ref={wrapperRef} className="relative">
-      <button
-        type="button"
-        className="flex items-center gap-1 rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
-        onClick={() => setOpen(!open)}
-        onBlur={(e) => {
-          if (!wrapperRef.current?.contains(e.relatedTarget as Node)) {
-            setOpen(false);
-          }
-        }}
-      >
-        <span>{label}</span>
-        <span className="text-muted-foreground text-[11px]">▾</span>
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 z-30 mt-1 min-w-[180px] rounded border border-border bg-card shadow-md">
-          {selected.length > 0 && (
-            <button
-              type="button"
-              className="w-full border-b border-border px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-gda-bg-deep"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onChange([]);
-              }}
-            >
-              Clear all
-            </button>
-          )}
-          <div className="max-h-[200px] overflow-y-auto py-1">
-            {vehicles.map((v) => {
-              const checked = selected.includes(v.id);
-              return (
-                <label
-                  key={v.id}
-                  className="flex cursor-pointer items-center gap-2 px-3 py-1 text-[12px] text-foreground hover:bg-gda-bg-deep"
-                  onMouseDown={(e) => e.preventDefault()}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => handleToggle(v.id)}
-                    className="h-3 w-3 rounded border-border"
-                  />
-                  {v.short_name}
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      )}
+    <div className="rounded border border-border bg-card p-3">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
+      <p className={`text-[16px] tabular-nums font-semibold ${accent ? "text-fin-teal" : "text-foreground"}`}>{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   );
 }
 
-/* ── Legend ────────────────────────────────────────── */
+/* ── ECharts Waterfall Chart (CDN-loaded) ─────────── */
 
-function WaterfallLegend({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
-  const legend = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of taskOrders) {
-      const name = t.parent_vehicle_short_name ?? "Non-IDIQ";
-      if (!map.has(name)) map.set(name, t.parent_color);
-    }
-    return Array.from(map.entries());
-  }, [taskOrders]);
+function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewMode: ViewMode }) {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const instanceRef = useRef<EChartsInstance | null>(null);
 
-  return (
-    <div className="flex flex-wrap items-center gap-4">
-      {legend.map(([name, hue]) => {
-        const swatch = { "--gf": hue } as React.CSSProperties;
-        return (
-          <div key={name} className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-3 w-3 rounded-[2px] bg-[var(--gf)]"
-              style={swatch}
-            />
-            <span className="text-[11px] text-muted-foreground">{name}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+  const option = useMemo(() => {
+    const months = data.forecast.map((f) => f.month);
+    const showRevenue = viewMode === "revenue" || viewMode === "both";
+    const showProfit = viewMode === "profit" || viewMode === "both";
 
-/* ── Gantt Chart ──────────────────────────────────── */
+    const series: Record<string, unknown>[] = [];
 
-function GanttChart({
-  taskOrders,
-  today,
-  onSelect,
-}: {
-  taskOrders: TaskOrderRow[];
-  today: string;
-  onSelect: (to: TaskOrderRow) => void;
-}) {
-  const allStarts = taskOrders.map((t) => new Date(t.pop_start!).getTime());
-  const allEnds = taskOrders.map((t) => new Date(t.pop_end!).getTime());
-  const rangeStart = Math.min(...allStarts);
-  const rangeEnd = Math.max(...allEnds);
-  const totalDays = (rangeEnd - rangeStart) / (1000 * 60 * 60 * 24);
+    if (showRevenue) {
+      for (let i = 0; i < data.contracts.length; i++) {
+        const contract = data.contracts[i];
+        const color = getContractColor(contract, i);
 
-  const todayMs = new Date(today).getTime();
-  const todayPct =
-    totalDays > 0
-      ? ((todayMs - rangeStart) / (rangeEnd - rangeStart)) * 100
-      : 0;
+        series.push({
+          name: `${contract.to_name} (funded)`,
+          type: "bar",
+          stack: "revenue",
+          data: data.forecast.map((f) => {
+            const entry = f.by_contract.find((bc) => bc.contract_id === contract.id);
+            return entry ? entry.funded_revenue : 0;
+          }),
+          itemStyle: { color },
+          emphasis: { focus: "series" },
+        });
 
-  const groups = useMemo(() => {
-    const map = new Map<string, TaskOrderRow[]>();
-    for (const t of taskOrders) {
-      const groupKey = t.parent_vehicle_short_name ?? "Standalone / Non-IDIQ";
-      const existing = map.get(groupKey) ?? [];
-      existing.push(t);
-      map.set(groupKey, existing);
-    }
-    return Array.from(map.entries());
-  }, [taskOrders]);
-
-  const yearMarkers = useMemo(() => {
-    const startYear = new Date(rangeStart).getFullYear();
-    const endYear = new Date(rangeEnd).getFullYear();
-    const markers: { year: number; pct: number }[] = [];
-    for (let y = startYear; y <= endYear; y++) {
-      const yearMs = new Date(y, 0, 1).getTime();
-      if (yearMs >= rangeStart && yearMs <= rangeEnd) {
-        const pct = ((yearMs - rangeStart) / (rangeEnd - rangeStart)) * 100;
-        markers.push({ year: y, pct });
+        series.push({
+          name: `${contract.to_name} (unfunded)`,
+          type: "bar",
+          stack: "revenue",
+          data: data.forecast.map((f) => {
+            const entry = f.by_contract.find((bc) => bc.contract_id === contract.id);
+            return entry ? entry.unfunded_revenue : 0;
+          }),
+          itemStyle: {
+            color,
+            opacity: 0.4,
+            decal: {
+              symbol: "rect",
+              dashArrayX: [1, 0],
+              dashArrayY: [2, 5],
+              rotation: Math.PI / 4,
+            },
+          },
+          emphasis: { focus: "series" },
+        });
       }
     }
-    return markers;
-  }, [rangeStart, rangeEnd]);
 
-  const currentYear = new Date().getFullYear();
+    if (showProfit) {
+      series.push({
+        name: "Profit",
+        type: "line",
+        data: data.forecast.map((f) => Math.round(f.total_profit * 100) / 100),
+        lineStyle: { color: "#A12C7B", width: 2 }, // allowed-hex
+        itemStyle: { color: "#A12C7B" }, // allowed-hex
+        symbol: "circle",
+        symbolSize: 4,
+        yAxisIndex: showRevenue ? 1 : 0,
+      });
+    }
+
+    return {
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+      },
+      legend: {
+        type: "scroll",
+        bottom: 0,
+        textStyle: { fontSize: 10, color: "#7A7974" }, // allowed-hex
+      },
+      grid: {
+        left: 80,
+        right: showRevenue && showProfit ? 80 : 40,
+        top: 40,
+        bottom: 60,
+      },
+      xAxis: {
+        type: "category",
+        data: months,
+        axisLabel: {
+          fontSize: 10,
+          color: "#7A7974", // allowed-hex
+          rotate: 45,
+        },
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: "#D4D1CA" } }, // allowed-hex
+      },
+      yAxis: [
+        {
+          type: "value",
+          name: showRevenue ? "Revenue ($)" : "Profit ($)",
+          nameTextStyle: { fontSize: 10, color: "#7A7974" }, // allowed-hex
+          axisLabel: { fontSize: 10, color: "#7A7974" }, // allowed-hex
+          splitLine: { lineStyle: { color: "#D4D1CA", type: "dashed" } }, // allowed-hex
+        },
+        ...(showRevenue && showProfit
+          ? [
+              {
+                type: "value",
+                name: "Profit ($)",
+                nameTextStyle: { fontSize: 10, color: "#A12C7B" }, // allowed-hex
+                axisLabel: { fontSize: 10, color: "#A12C7B" }, // allowed-hex
+                splitLine: { show: false },
+              },
+            ]
+          : []),
+      ],
+      dataZoom: [
+        { type: "inside", start: 0, end: 100 },
+        { type: "slider", start: 0, end: 100, height: 20, bottom: 30 },
+      ],
+      series,
+    };
+  }, [data, viewMode]);
+
+  useEffect(() => {
+    if (!chartRef.current || typeof window === "undefined" || !window.echarts) return;
+
+    if (!instanceRef.current) {
+      instanceRef.current = window.echarts.init(chartRef.current);
+    }
+    instanceRef.current.setOption(option, true);
+
+    const handleResize = () => instanceRef.current?.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [option]);
+
+  useEffect(() => {
+    return () => {
+      instanceRef.current?.dispose();
+      instanceRef.current = null;
+    };
+  }, []);
 
   return (
-    <div className="rounded border border-border bg-card p-4 overflow-x-auto">
-      {/* X-axis: year markers */}
-      <div className="relative h-6 mb-1 border-b border-border/50">
-        {yearMarkers.map((m) => (
-          <span
-            key={m.year}
-            className={cn(
-              "absolute text-[11px] tabular-nums -translate-x-1/2",
-              m.year === currentYear
-                ? "font-semibold text-foreground"
-                : "text-muted-foreground",
-            )}
-            style={{ left: `${m.pct}%` }}
-          >
-            {m.year}
-          </span>
-        ))}
+    <div className="rounded border border-border bg-card p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Revenue/Profit Forecast Waterfall
+        </h3>
+        <span className="text-[11px] text-muted-foreground">
+          Spread: ceiling ÷ 12 = annual, ÷ 12 = monthly
+        </span>
       </div>
-
-      {/* Today line + gantt rows */}
-      <div className="relative">
-        {todayPct > 0 && todayPct < 100 && (
-          <div
-            className="absolute top-0 bottom-0 w-px z-10 bg-fin-plum"
-            style={{ left: `${todayPct}%` }}
-          >
-            <span className="absolute -top-5 -translate-x-1/2 text-[11px] text-fin-plum font-medium">
-              Today
-            </span>
-          </div>
-        )}
-
-        {groups.map(([groupName, tos]) => (
-          <div key={groupName} className="mb-3">
-            <div className="flex items-center gap-2 py-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                ── {groupName} ──
-              </span>
-            </div>
-
-            {tos.map((to) => {
-              const startMs = new Date(to.pop_start!).getTime();
-              const endMs = new Date(to.pop_end!).getTime();
-              const leftPct =
-                ((startMs - rangeStart) / (rangeEnd - rangeStart)) * 100;
-              const widthPct =
-                ((endMs - startMs) / (rangeEnd - rangeStart)) * 100;
-
-              const isSub = to.prime_or_sub === "SUB";
-              const fundedLabel = to.funded_to_date
-                ? formatMoney(to.funded_to_date)
-                : to.ceiling
-                  ? formatMoney(to.ceiling)
-                  : "";
-              const barLabel = `${to.to_name}${fundedLabel ? ` — ${fundedLabel}` : ""}`;
-
-              return (
-                <div
-                  key={to.id}
-                  className="group relative h-7 my-1 cursor-pointer"
-                  onClick={() => onSelect(to)}
-                >
-                  <div
-                    className={cn(
-                      "absolute top-0.5 h-6 rounded-[3px] flex items-center px-2 transition-opacity hover:opacity-90 bg-[var(--gf)]",
-                      to.is_expiring_soon && "ring-2 ring-fin-plum",
-                      isSub && "gantt-bar-hatched",
-                    )}
-                    style={barPos(leftPct, widthPct, to.parent_color)}
-                    title={`${to.to_name}\nPoP: ${to.pop_start} → ${to.pop_end}\nCeiling: ${formatMoney(to.ceiling)}\nFunded: ${formatMoney(to.funded_to_date)}\nDays remaining: ${to.days_until_expiration ?? "N/A"}\nParent: ${to.parent_vehicle_short_name ?? "None"}`}
-                  >
-                    {widthPct > 8 && (
-                      <span className="truncate text-[11px] font-medium text-white leading-none">
-                        {barLabel}
-                      </span>
-                    )}
-                  </div>
-
-                  {widthPct <= 8 && (
-                    <span
-                      className="absolute top-1 text-[11px] text-muted-foreground truncate max-w-[120px]"
-                      style={{ left: `${leftPct + widthPct + 0.5}%` }}
-                    >
-                      {to.to_name}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+      <div ref={chartRef} style={{ height: 380, width: "100%" }} />
     </div>
   );
 }
 
-/* ── Missing Dates Section ────────────────────────── */
+/* ── Contract Table ───────────────────────────────── */
 
-function MissingDatesSection({ taskOrders }: { taskOrders: TaskOrderRow[] }) {
+function ContractTable({ contracts, portfolioMargin }: { contracts: WaterfallContract[]; portfolioMargin: number }) {
+  return (
+    <div className="rounded border border-border bg-card overflow-x-auto">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="border-b border-border bg-gda-bg-deep">
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Contract</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Vehicle</th>
+            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Ceiling</th>
+            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Funded</th>
+            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Monthly Rev</th>
+            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Annual Rev</th>
+            <th className="px-3 py-2 text-right font-medium text-muted-foreground">Margin</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Source</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">PoP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contracts.map((c) => (
+            <tr key={c.id} className="border-b border-border/50 hover:bg-gda-bg-deep/50">
+              <td className="px-3 py-2 font-medium text-foreground">{c.to_name}</td>
+              <td className="px-3 py-2 text-muted-foreground">{c.parent_vehicle_short_name ?? "—"}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoney(c.ceiling)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-fin-teal font-medium">{formatMoney(c.funded_to_date)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoney(c.monthly_revenue)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoney(c.annual_revenue)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{c.margin_pct.toFixed(1)}%</td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {c.margin_source === "actual" ? "Actuals" : `Portfolio (${portfolioMargin.toFixed(1)}%)`}
+              </td>
+              <td className="px-3 py-2 tabular-nums text-muted-foreground whitespace-nowrap">
+                {c.pop_start.slice(0, 7)} → {c.pop_end.slice(0, 7)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── Pipeline Scaffold (CW-3) ─────────────────────── */
+
+function PipelineScaffold() {
   return (
     <div className="rounded border border-dashed border-border bg-card p-4">
-      <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-        Missing dates — needs Vault parse
+      <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+        Pipeline Forecast Layer
       </h3>
-      <div className="space-y-1">
-        {taskOrders.map((to) => {
-          const dot = { "--gf": to.parent_color } as CSSProperties;
-          return (
-            <div key={to.id} className="flex items-center gap-3 text-[12px]">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[var(--gf)]"
-                style={dot}
-              />
-              <span className="text-foreground font-medium">{to.to_name}</span>
-              <span className="text-muted-foreground">
-                {to.parent_vehicle_short_name ?? "Non-IDIQ"}
-              </span>
-              <span className="text-muted-foreground italic">
-                {to.prime_or_sub}
-              </span>
-              {to.funded_to_date != null && (
-                <span className="tabular-nums text-fin-teal font-medium">
-                  {formatMoney(to.funded_to_date)} funded
-                </span>
-              )}
-              {to.ceiling != null && (
-                <span className="tabular-nums text-muted-foreground">
-                  {formatMoney(to.ceiling)} ceiling
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ── Task Order Detail Drawer ─────────────────────── */
-
-function TaskOrderDrawer({
-  to,
-  onClose,
-}: {
-  to: TaskOrderRow;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-y-0 right-0 z-50 w-[400px] max-w-full bg-card border-l border-border shadow-lg overflow-y-auto">
-      <div className="p-6 space-y-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-[15px] font-semibold text-foreground">
-              {to.to_name}
-            </h2>
-            <p className="text-[12px] text-muted-foreground tabular-nums">
-              {to.to_number}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground text-[18px] leading-none"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <StatusBadge status={to.status} isExpiringSoon={to.is_expiring_soon} />
-          {to.prime_or_sub === "SUB" && (
-            <span className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              SUB
-            </span>
-          )}
-        </div>
-
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[12px]">
-          <dt className="text-muted-foreground">Parent IDIQ</dt>
-          <dd className="text-foreground font-medium">
-            {to.parent_vehicle_short_name ?? "Standalone / Non-IDIQ"}
-          </dd>
-
-          <dt className="text-muted-foreground">Customer</dt>
-          <dd className="text-foreground">
-            {to.customer_agency ?? "—"}
-          </dd>
-
-          <dt className="text-muted-foreground">Contracting Office</dt>
-          <dd className="text-foreground">
-            {to.contracting_office ?? "—"}
-          </dd>
-
-          <dt className="text-muted-foreground">PoP Start</dt>
-          <dd className="text-foreground tabular-nums">
-            {to.pop_start ?? "TBD"}
-          </dd>
-
-          <dt className="text-muted-foreground">PoP End</dt>
-          <dd className="text-foreground tabular-nums">
-            {to.pop_end ?? "TBD"}
-          </dd>
-
-          <dt className="text-muted-foreground">Days Remaining</dt>
-          <dd className="text-foreground tabular-nums">
-            {to.days_until_expiration != null
-              ? `${to.days_until_expiration} days`
-              : "—"}
-          </dd>
-
-          <dt className="text-muted-foreground">Funded to Date</dt>
-          <dd className="text-foreground tabular-nums font-medium text-fin-teal">
-            {formatMoney(to.funded_to_date)}
-          </dd>
-
-          <dt className="text-muted-foreground">Ceiling</dt>
-          <dd className="text-foreground tabular-nums">
-            {formatMoney(to.ceiling)}
-          </dd>
-
-          <dt className="text-muted-foreground">CPARS Status</dt>
-          <dd className="text-foreground">
-            {to.cpars_status ?? "—"}
-          </dd>
-        </dl>
-
-        {to.notes && (
-          <div className="border-t border-border pt-3">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1">
-              Notes
-            </p>
-            <p className="text-[12px] text-foreground">{to.notes}</p>
-          </div>
-        )}
-      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Weighted pipeline / capture opportunities will overlay signed backlog once a pipeline data source is connected.
+        This layer renders probability-weighted revenue from active pursuits on top of the contracted forecast.
+      </p>
     </div>
   );
 }
@@ -993,51 +710,4 @@ function FormField({
       />
     </div>
   );
-}
-
-/* ── Status Badge ─────────────────────────────────── */
-
-function StatusBadge({
-  status,
-  isExpiringSoon,
-}: {
-  status: string;
-  isExpiringSoon: boolean;
-}) {
-  if (isExpiringSoon) {
-    return (
-      <span className="rounded px-2 py-0.5 text-[11px] font-semibold bg-fin-plum text-white">
-        EXPIRING SOON
-      </span>
-    );
-  }
-
-  switch (status) {
-    case "active":
-      return (
-        <span className="rounded border border-fin-teal px-2 py-0.5 text-[11px] font-medium text-fin-teal">
-          Active
-        </span>
-      );
-    case "awarded_not_started":
-      return (
-        <span className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-          Awarded — Not Started
-        </span>
-      );
-    case "closeout":
-      return (
-        <span className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-          Closeout
-        </span>
-      );
-    case "expired":
-      return (
-        <span className="rounded px-2 py-0.5 text-[11px] font-semibold bg-fin-plum text-white">
-          Expired
-        </span>
-      );
-    default:
-      return null;
-  }
 }
