@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useSyncExternalStore } from "react";
 import { StatusStrip } from "@/components/financials/StatusStrip";
 import { AiAnalyzeModal } from "@/components/financials/AiAnalyzeModal";
 import { ContractWaterfallTab } from "@/components/financials/tabs/ContractWaterfallTab";
@@ -89,6 +89,20 @@ const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set([
 
 const CALENDAR_MODE_KEY = "gda-financial-bible-calendar-mode";
 
+function subscribeToStorage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function getCalendarSnapshot(): CalendarMode {
+  const stored = localStorage.getItem(CALENDAR_MODE_KEY);
+  return stored === "CY" ? "CY" : "FY";
+}
+
+function getCalendarServerSnapshot(): CalendarMode {
+  return "FY";
+}
+
 const YEARS = ["26", "27", "28"] as const;
 
 function tabTitle(tab: Tab): string {
@@ -124,12 +138,15 @@ function tabTitle(tab: Tab): string {
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("p2");
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("FY");
+  const calendarMode = useSyncExternalStore(
+    subscribeToStorage,
+    getCalendarSnapshot,
+    getCalendarServerSnapshot,
+  );
 
-  // Restore persisted preference after hydration (avoids SSR mismatch).
-  useEffect(() => {
-    const stored = localStorage.getItem(CALENDAR_MODE_KEY);
-    if (stored === "CY") setCalendarMode("CY");
+  const setCalendarMode = useCallback((mode: CalendarMode) => {
+    localStorage.setItem(CALENDAR_MODE_KEY, mode);
+    window.dispatchEvent(new StorageEvent("storage", { key: CALENDAR_MODE_KEY }));
   }, []);
   const [selectedYear, setSelectedYear] = useState<string>("26");
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -231,10 +248,7 @@ export default function FinancialsPage() {
                       : "text-muted-foreground hover:text-foreground",
                     !yearControlsActive && "cursor-not-allowed",
                   )}
-                  onClick={() => {
-                    setCalendarMode(mode);
-                    localStorage.setItem(CALENDAR_MODE_KEY, mode);
-                  }}
+                  onClick={() => setCalendarMode(mode)}
                 >
                   {mode}
                 </button>
