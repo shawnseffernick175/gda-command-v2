@@ -49,6 +49,64 @@ function getSheetLinesMulti(text: string, names: string[]): string[] | null {
   return null;
 }
 
+/** Extract all sheet names from extracted text. */
+function getAllSheetNames(text: string): string[] {
+  const names: string[] = [];
+  const regex = /\[Sheet: ([^\]]+)\]/g;
+  let m;
+  while ((m = regex.exec(text)) !== null) names.push(m[1]);
+  return names;
+}
+
+/**
+ * Select a worksheet by CONTENT, not by name.
+ * 1. If no [Sheet:] markers → treat entire text as one sheet.
+ * 2. If only one sheet → use it.
+ * 3. Otherwise → pick the sheet whose first ~15 lines best match headerSignature.
+ * 4. Fallback → try fallbackNames in order (legacy name-based tiebreaker).
+ */
+function getSheetLinesByContent(
+  text: string,
+  headerSignature: string[],
+  fallbackNames: string[],
+): string[] | null {
+  if (!text.includes('[Sheet:')) {
+    const lines = text.split('\n').filter((l) => l.trim().length > 0);
+    return lines.length > 0 ? lines : null;
+  }
+
+  const sheetNames = getAllSheetNames(text);
+
+  if (sheetNames.length === 1) {
+    const lines = getSheetLines(text, sheetNames[0]);
+    return lines && lines.length > 0 ? lines : null;
+  }
+
+  const lowerSig = headerSignature.map((s) => s.toLowerCase());
+  let bestSheet: string | null = null;
+  let bestScore = 0;
+
+  for (const name of sheetNames) {
+    const lines = getSheetLines(text, name);
+    if (!lines || lines.length < 3) continue;
+
+    for (let i = 0; i < Math.min(lines.length, 15); i++) {
+      const lower = lines[i].toLowerCase().replace(/_x000d_/gi, '');
+      const matchCount = lowerSig.filter((s) => lower.includes(s)).length;
+      if (matchCount > bestScore) {
+        bestScore = matchCount;
+        bestSheet = name;
+      }
+    }
+  }
+
+  if (bestSheet && bestScore >= Math.ceil(lowerSig.length * 0.4)) {
+    return getSheetLines(text, bestSheet);
+  }
+
+  return getSheetLinesMulti(text, fallbackNames);
+}
+
 /**
  * Split a CSV-like row respecting that values were joined with commas.
  * Handles the case where Date.toString() produces strings with commas
@@ -159,7 +217,11 @@ export function parseAgedAr(
   extractedText: string,
   filename: string,
 ): ArExtractOutput | null {
-  const lines = getSheetLinesMulti(extractedText, ['DataSetLandTbl', 'Sheet1', 'Page1']);
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['project', 'invoice', 'due date', 'current'],
+    ['DataSetLandTbl', 'Sheet1', 'Page1'],
+  );
   if (!lines || lines.length < 3) return null;
 
   const periodInfo = inferPeriod(filename);
@@ -282,7 +344,11 @@ export function parseProjectRevenueSummary(
   extractedText: string,
   filename: string,
 ): ProjectRevenueExtractOutput | null {
-  const lines = getSheetLinesMulti(extractedText, ['Page1', 'Sheet1', 'DataSetLandTbl']);
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['revenue project', 'itd value', 'itd funding'],
+    ['Page1', 'Sheet1', 'DataSetLandTbl'],
+  );
   if (!lines || lines.length < 3) return null;
 
   const periodInfo = inferPeriod(filename);
@@ -362,7 +428,11 @@ export function parseOpenAp(
   extractedText: string,
   filename: string,
 ): ApExtractOutput | null {
-  const lines = getSheetLinesMulti(extractedText, ['Detail', 'Sheet1', 'Page1']);
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['vendor', 'voucher', 'invoice', 'amount'],
+    ['Detail', 'Sheet1', 'Page1'],
+  );
   if (!lines || lines.length < 3) return null;
 
   const periodInfo = inferPeriod(filename);
@@ -487,7 +557,11 @@ export function parseTrialBalance(
   extractedText: string,
   filename: string,
 ): TrialBalanceExtractOutput | null {
-  const lines = getSheetLinesMulti(extractedText, ['DataSetLandTbl', 'Sheet1', 'Page1']);
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['account', 'beginning balance', 'ending balance'],
+    ['DataSetLandTbl', 'Sheet1', 'Page1'],
+  );
   if (!lines || lines.length < 3) return null;
 
   const periodInfo = inferPeriod(filename);
@@ -579,7 +653,11 @@ export function parseTrendSie(
   extractedText: string,
   filename: string,
 ): SieExtractOutput | null {
-  const lines = getSheetLinesMulti(extractedText, ['Page1', 'Sheet1']);
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['pool number', 'pool name'],
+    ['Page1', 'Sheet1'],
+  );
   if (!lines || lines.length < 4) return null;
 
   const periodInfo = inferPeriod(filename);
@@ -707,7 +785,11 @@ export function parseYtdGlDetail(
   extractedText: string,
   filename: string,
 ): CostDetailExtractOutput | null {
-  const lines = getSheetLinesMulti(extractedText, ['Page1', 'Sheet1']);
+  const lines = getSheetLinesByContent(
+    extractedText,
+    ['fy', 'pd', 'proj classification', 'project id'],
+    ['Page1', 'Sheet1'],
+  );
   if (!lines || lines.length < 3) return null;
 
   const periodInfo = inferPeriod(filename);
