@@ -120,7 +120,7 @@ export function P2FinancialsTab() {
       {months.length > 0 && (
         <div className="rounded border border-border bg-white p-4">
           <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-            Revenue &amp; Profit Trend
+            Revenue & Profit Trend
           </p>
           <ReactEChartsCore
             echarts={echarts}

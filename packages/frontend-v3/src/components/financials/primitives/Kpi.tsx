@@ -29,7 +29,7 @@ export function Kpi({
       {subtitle ? (
         <p className="mt-1 text-[11px] text-muted-foreground">{subtitle}</p>
       ) : (
-        <p className="mt-1 text-[11px] text-transparent select-none">&nbsp;</p>
+        <p className="mt-1 text-[11px] text-transparent select-none">{"\u00A0"}</p>
       )}
     </div>
   );
