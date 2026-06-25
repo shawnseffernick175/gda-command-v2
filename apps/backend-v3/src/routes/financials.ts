@@ -4,6 +4,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
+import { parseCalendarMode, getMonthsForMode, type CalendarMode } from '../lib/fiscal-calendar.js';
 
 // Live, user-specific financials read from the DB on every request. They must
 // never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
@@ -863,7 +864,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v3/financials/aop-execution', async (req, reply) => {
     noStore(reply);
     const fy = (req.query as Record<string, string>).fy ?? 'FY26';
+    const mode: CalendarMode = parseCalendarMode(fy);
     const fiscalYear = normalizeFiscalYear(fy);
+    const orderedMonths = getMonthsForMode(mode);
 
     const { rows } = await pool.query(
       `SELECT period, cost_element, pool,
@@ -899,7 +902,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       [fiscalYear],
     );
 
-    // Build the full 12-month plan-vs-actual axis dynamically from AOP_MONTHS.
+    // Build the full 12-month plan-vs-actual axis using mode-aware month order.
     // Two separate queries (plan + actuals), then join in JS so every month is
     // always represented — even months with no actuals yet.
     const fyShort = `FY${fiscalYear % 100}`;
@@ -947,8 +950,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       ? (planRows[0].source as string)
       : null;
 
-    // Always 12 rows, Jan–Dec, regardless of what's in the DB.
-    const planActualRows = AOP_MONTHS.map(({ mon }) => {
+    // Always 12 rows in the mode's month order (FY: Oct–Sep, CY: Jan–Dec).
+    const planActualRows = orderedMonths.map(({ mon }) => {
       const period = `${fyShort} ${mon}`;
       const plan = planByPeriod.get(period);
       const actual = actualByPeriod.get(period);
@@ -1040,6 +1043,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       revenue,
       has_plan: hasPlan,
       plan_source: planSource,
+      calendar_mode: mode,
       periods: periodRows.map((r) => r.period as string),
       meta: {
         sources: srcDocs.map((d) => ({
@@ -1067,13 +1071,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   //   • percentages (gross_margin, ros) are applied UNCHANGED to every month
   // and write 12 monthly rows (source='user_aop', is_seed=false) into financial_plan.
 
-  // The 12 fiscal-year months in order, with their calendar quarter (ceil(m/3)).
-  const AOP_MONTHS: ReadonlyArray<{ mon: string; quarter: number }> = [
-    { mon: 'Jan', quarter: 1 }, { mon: 'Feb', quarter: 1 }, { mon: 'Mar', quarter: 1 },
-    { mon: 'Apr', quarter: 2 }, { mon: 'May', quarter: 2 }, { mon: 'Jun', quarter: 2 },
-    { mon: 'Jul', quarter: 3 }, { mon: 'Aug', quarter: 3 }, { mon: 'Sep', quarter: 3 },
-    { mon: 'Oct', quarter: 4 }, { mon: 'Nov', quarter: 4 }, { mon: 'Dec', quarter: 4 },
-  ];
+  // All 12 calendar months (used for plan writes — always writes all 12 months
+  // with the mode-appropriate quarter assignment).
+  const ALL_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
   // GET /v3/financials/aop-plan?fy=FY26
   // Returns the owner's annual AOP plan for a fiscal year (reconstructed from the
@@ -1174,7 +1174,11 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         [fiscalYear],
       );
 
-      for (const { mon, quarter } of AOP_MONTHS) {
+      // Write all 12 months with FY-aware quarter assignments so
+      // downstream queries that group by quarter see the correct buckets.
+      const planMode = parseCalendarMode(fyRaw);
+      const planMonths = getMonthsForMode(planMode);
+      for (const { mon, quarter } of planMonths) {
         await client.query(
           `INSERT INTO financial_plan
              (period, fiscal_year, quarter, plan_orders, plan_sales, plan_ebit,
@@ -1206,7 +1210,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(successEnvelope({
       fiscal_year: fiscalYear,
       fy: fyShort,
-      months_written: AOP_MONTHS.length,
+      months_written: ALL_MONTHS.length,
       plan: {
         plan_orders: planOrders,
         plan_sales: planSales,

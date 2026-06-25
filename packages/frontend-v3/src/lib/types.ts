@@ -1129,12 +1129,15 @@ export interface AopMetric {
 // Back-compat alias for the Sales metric block.
 export type AopRevenue = AopMetric;
 
+export type CalendarMode = "FY" | "CY";
+
 export interface AopExecutionData {
   items: AopExecutionItem[];
   metrics?: AopMetric[];
   revenue?: AopMetric | null;
   has_plan?: boolean;
   plan_source?: string | null;
+  calendar_mode?: CalendarMode;
   periods: string[];
   meta: FinancialMeta;
 }
