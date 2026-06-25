@@ -41,19 +41,29 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const now = new Date();
     const currentCalMonth = now.getMonth() + 1; // 1-based
     const currentYear = now.getFullYear();
-    // Fiscal year: if month >= Oct (10), FY = year+1; otherwise FY = year
+    // Fiscal year label: if month >= Oct (10), FY = year+1; otherwise FY = year
     const currentFY = currentCalMonth >= 10 ? currentYear + 1 : currentYear;
-    const fyShort = currentFY % 100; // e.g. 26
 
-    // Build the list of month abbreviations that are "to-date" for the mode
+    // DB period convention: "FY<YY> <Mon>" where YY = calendar year of the month
+    // (e.g. Oct 2025 → "FY25 Oct", Jan 2026 → "FY26 Jan")
+    const MONTH_CAL_NUM: Record<string, number> = {
+      Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+      Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+    };
     const MONTH_ABBREVS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const currentMonthAbbrev = MONTH_ABBREVS[currentCalMonth - 1];
     const months = getMonthsForMode(mode);
 
-    // Collect period strings up to and including the current month
+    // Build period strings with the correct calendar-year prefix per month.
+    // CY mode: all months are in currentYear.
+    // FY mode: Oct-Dec are in the previous calendar year when currentCalMonth < 10.
     const periodStrings: string[] = [];
     for (const m of months) {
-      periodStrings.push(`FY${fyShort} ${m.mon}`);
+      let calYear = currentYear;
+      if (mode === 'FY' && MONTH_CAL_NUM[m.mon] >= 10 && currentCalMonth < 10) {
+        calYear = currentYear - 1;
+      }
+      periodStrings.push(`FY${calYear % 100} ${m.mon}`);
       if (m.mon === currentMonthAbbrev) break;
     }
 
@@ -103,7 +113,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     // Period label for the response
     const periodLabel = mode === 'CY'
       ? `CY${currentYear % 100} to date`
-      : `FY${fyShort} to date`;
+      : `FY${currentFY % 100} to date`;
 
     const data = {
       period: periodLabel,
