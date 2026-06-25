@@ -4,7 +4,7 @@ import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
 import { llmRouter } from '../lib/llm-router.js';
 import type { FinancialAnalyzeInput } from '../lib/llm-router.types.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
-import { parseCalendarMode, getMonthsForMode, type CalendarMode } from '../lib/fiscal-calendar.js';
+import { parseCalendarMode, getMonthsForMode, fiscalMonthIndex, type CalendarMode } from '../lib/fiscal-calendar.js';
 
 // Live, user-specific financials read from the DB on every request. They must
 // never be served from an HTTP cache (browser/proxy) or a 304 revalidation,
@@ -167,16 +167,24 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // exposed so the Financials tab can label the series and visually separate the
   // quarter total from its months.
   app.get('/v3/financials/trend', async (req, reply) => {
+    // IS#2: DISTINCT ON dedup — income_statement > l1_actual per period.
+    // IS#3: Normalize gross-margin units (l1_actual stores fraction, IS stores %).
     const { rows } = await pool.query(
-      `SELECT source, period, fiscal_year, quarter,
+      `SELECT DISTINCT ON (period)
+              source, period, fiscal_year, quarter,
               (period LIKE '%Q%') AS is_quarter,
               actual_orders AS orders, actual_sales AS sales,
-              actual_ebit AS ebit, actual_gross_margin AS gross_margin,
+              actual_ebit AS ebit,
+              CASE WHEN source = 'l1_actual' THEN actual_gross_margin * 100
+                   ELSE actual_gross_margin END AS gross_margin,
               actual_ros AS ros
        FROM financial_actuals
-       ORDER BY source, fiscal_year, quarter, (period LIKE '%Q%'), period`,
+       WHERE source IN ('income_statement', 'l1_actual')
+       ORDER BY period,
+                CASE source WHEN 'income_statement' THEN 0 WHEN 'l1_actual' THEN 1 ELSE 2 END`,
     );
 
+    // IS#1: Sort by fiscal month order, not alphabetical
     const items = rows.map((r) => ({
       source: r.source as string,
       period: r.period as string,
@@ -187,6 +195,15 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       gross_margin: Number(r.gross_margin),
       ros: Number(r.ros),
     }));
+
+    items.sort((a, b) => {
+      const aQ = a.is_quarter ? 1 : 0;
+      const bQ = b.is_quarter ? 1 : 0;
+      if (aQ !== bQ) return aQ - bQ;
+      const aMonth = a.period.split(' ')[1] || '';
+      const bMonth = b.period.split(' ')[1] || '';
+      return fiscalMonthIndex(aMonth) - fiscalMonthIndex(bMonth);
+    });
 
     return reply.send(successEnvelope({ items }, req.requestId));
   });
@@ -528,15 +545,42 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
-  // GET /v3/financials/project-revenue
+  // GET /v3/financials/project-revenue?period=FY26+May
+  // PR-1: Supports optional period filter so tiles reflect a single period,
+  // not a blind sum of every month. Returns available_periods for the selector.
   app.get('/v3/financials/project-revenue', async (req, reply) => {
     noStore(reply);
-    const { rows } = await pool.query(
-      `SELECT id, period, fiscal_year, quarter, project_name, contract_number,
-              revenue, cost, profit, margin_pct, source_doc_id, created_at
-       FROM project_revenue_actuals
-       ORDER BY fiscal_year DESC, quarter DESC, period DESC, project_name`,
+    const qp = req.query as Record<string, string>;
+    const periodFilter = qp.period || null;
+
+    // Fetch available periods for the selector dropdown
+    const { rows: periodRows } = await pool.query(
+      `SELECT DISTINCT period FROM project_revenue_actuals ORDER BY period DESC`,
     );
+    const availablePeriods = periodRows.map((r) => r.period as string);
+
+    // Apply period filter if provided; otherwise default to latest period
+    const effectivePeriod = periodFilter || availablePeriods[0] || null;
+
+    let rows;
+    if (effectivePeriod) {
+      ({ rows } = await pool.query(
+        `SELECT id, period, fiscal_year, quarter, project_name, contract_number,
+                revenue, cost, profit, margin_pct, source_doc_id, created_at
+         FROM project_revenue_actuals
+         WHERE period = $1
+         ORDER BY project_name`,
+        [effectivePeriod],
+      ));
+    } else {
+      ({ rows } = await pool.query(
+        `SELECT id, period, fiscal_year, quarter, project_name, contract_number,
+                revenue, cost, profit, margin_pct, source_doc_id, created_at
+         FROM project_revenue_actuals
+         ORDER BY fiscal_year DESC, quarter DESC, period DESC, project_name`,
+      ));
+    }
+
     const items = rows.map((r) => ({
       id: Number(r.id),
       period: r.period as string,
@@ -552,6 +596,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }));
     return reply.send(successEnvelope({
       items,
+      available_periods: availablePeriods,
+      selected_period: effectivePeriod,
       meta: { table: 'project_revenue_actuals', row_count: items.length },
     }, req.requestId));
   });
@@ -1052,7 +1098,15 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     );
 
     const actualByPeriod = new Map<string, (typeof actualRows)[0]>();
-    for (const r of actualRows) actualByPeriod.set(r.period as string, r);
+    for (const r of actualRows) {
+      // IS#3: Normalize gross-margin units — l1_actual stores fractions,
+      // income_statement stores percentages. Convert fractions → percentage.
+      if (r.source === 'l1_actual' && r.actual_gross_margin != null) {
+        const gm = Number(r.actual_gross_margin);
+        if (Math.abs(gm) <= 1.5) r.actual_gross_margin = String(gm * 100);
+      }
+      actualByPeriod.set(r.period as string, r);
+    }
 
     // Determine the winning plan source for the response metadata.
     const planSource: string | null = hasPlan
@@ -1536,6 +1590,12 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const incomeStatementMonths = monthlyRows.map(buildStatementItems);
+    // IS#1: Sort months by fiscal calendar order, not alphabetical
+    incomeStatementMonths.sort((a, b) => {
+      const aMonth = a.period.split(' ')[1] || '';
+      const bMonth = b.period.split(' ')[1] || '';
+      return fiscalMonthIndex(aMonth) - fiscalMonthIndex(bMonth);
+    });
     const incomeStatementQuarters = quarterRows.map(buildStatementItems);
 
     return reply.send(successEnvelope({
@@ -1553,7 +1613,11 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         ebit: Number(r.actual_ebit),
         gross_margin: Number(r.actual_gross_margin),
         ros: Number(r.actual_ros),
-      })),
+      })).sort((a, b) => {
+        const aMonth = a.period.split(' ')[1] || '';
+        const bMonth = b.period.split(' ')[1] || '';
+        return fiscalMonthIndex(aMonth) - fiscalMonthIndex(bMonth);
+      }),
       cost_by_pool: costByPool.map((r) => ({
         pool: r.pool as string,
         target: Number(r.total_target),
