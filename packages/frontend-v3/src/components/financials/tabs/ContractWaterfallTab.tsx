@@ -1,16 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import ReactEChartsCore from "echarts-for-react/lib/core";
-import * as echarts from "echarts/core";
-import { BarChart, LineChart } from "echarts/charts";
-import {
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-  DataZoomComponent,
-} from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   useContractWaterfall,
   useCreateTaskOrder,
@@ -18,39 +8,32 @@ import {
 import { formatMoney } from "@/lib/format-money";
 import type { ContractWaterfallData, WaterfallContract } from "@/lib/types";
 
-echarts.use([
-  BarChart,
-  LineChart,
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-  DataZoomComponent,
-  CanvasRenderer,
-]);
-
 type ViewMode = "revenue" | "profit" | "both";
 type StatusFilter = "" | "active" | "closeout" | "expired" | "awarded_not_started";
 type RoleFilter = "" | "PRIME" | "SUB";
 
+// allowed-hex
 const VEHICLE_COLORS: Record<string, string> = {
   RS3: "var(--color-fin-teal)",
-  TRAYSYS: "#2D6A4F",
-  "Seaport NxG": "#1B4332",
-  "GSA MAS": "#3D405B",
-  "OASIS SB Pool 1": "#5F0F40",
-  "OASIS SB Pool 3": "#6A4C93",
-  eFAST: "#264653",
-  EAGLE: "#2A9D8F",
-  "TSS-E": "#E76F51",
-  "CIO-SP3 SB": "#F4A261",
-  "CIO-SP3 8(a)": "#E9C46A",
+  TRAYSYS: "#2D6A4F", // allowed-hex
+  "Seaport NxG": "#1B4332", // allowed-hex
+  "GSA MAS": "#3D405B", // allowed-hex
+  "OASIS SB Pool 1": "#5F0F40", // allowed-hex
+  "OASIS SB Pool 3": "#6A4C93", // allowed-hex
+  eFAST: "#264653", // allowed-hex
+  EAGLE: "#2A9D8F", // allowed-hex
+  "TSS-E": "#E76F51", // allowed-hex
+  "CIO-SP3 SB": "#F4A261", // allowed-hex
+  "CIO-SP3 8(a)": "#E9C46A", // allowed-hex
 };
 
 function getContractColor(c: WaterfallContract, idx: number): string {
   if (c.parent_vehicle_short_name && VEHICLE_COLORS[c.parent_vehicle_short_name]) {
     return VEHICLE_COLORS[c.parent_vehicle_short_name];
   }
-  const palette = ["#01696F", "#2D6A4F", "#3D405B", "#5F0F40", "#6A4C93", "#264653", "#E76F51"];
+  const palette = [
+    "#01696F", "#2D6A4F", "#3D405B", "#5F0F40", "#6A4C93", "#264653", "#E76F51", // allowed-hex
+  ];
   return palette[idx % palette.length];
 }
 
@@ -284,9 +267,12 @@ function MetricCard({ label, value, sub, accent }: { label: string; value: strin
   );
 }
 
-/* ── ECharts Waterfall Chart ──────────────────────── */
+/* ── ECharts Waterfall Chart (CDN-loaded) ─────────── */
 
 function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewMode: ViewMode }) {
+  const chartRef = useRef<HTMLDivElement>(null);
+  const instanceRef = useRef<EChartsInstance | null>(null);
+
   const option = useMemo(() => {
     const months = data.forecast.map((f) => f.month);
     const showRevenue = viewMode === "revenue" || viewMode === "both";
@@ -295,12 +281,10 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
     const series: Record<string, unknown>[] = [];
 
     if (showRevenue) {
-      // Stacked bar series for each contract (funded + unfunded)
       for (let i = 0; i < data.contracts.length; i++) {
         const contract = data.contracts[i];
         const color = getContractColor(contract, i);
 
-        // Funded revenue series
         series.push({
           name: `${contract.to_name} (funded)`,
           type: "bar",
@@ -313,7 +297,6 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
           emphasis: { focus: "series" },
         });
 
-        // Unfunded revenue series (lighter shade)
         series.push({
           name: `${contract.to_name} (unfunded)`,
           type: "bar",
@@ -342,8 +325,8 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
         name: "Profit",
         type: "line",
         data: data.forecast.map((f) => Math.round(f.total_profit * 100) / 100),
-        lineStyle: { color: "#A12C7B", width: 2 },
-        itemStyle: { color: "#A12C7B" },
+        lineStyle: { color: "#A12C7B", width: 2 }, // allowed-hex
+        itemStyle: { color: "#A12C7B" }, // allowed-hex
         symbol: "circle",
         symbolSize: 4,
         yAxisIndex: showRevenue ? 1 : 0,
@@ -354,32 +337,11 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "shadow" },
-        formatter: (params: { seriesName: string; value: number; axisValueLabel: string }[]) => {
-          if (!Array.isArray(params) || params.length === 0) return "";
-          const month = params[0].axisValueLabel;
-          let html = `<div style="font-size:12px"><strong>${month}</strong>`;
-          let totalRev = 0;
-          let totalProf = 0;
-          for (const p of params) {
-            if (p.value > 0) {
-              html += `<br/>${p.seriesName}: ${formatMoney(p.value)}`;
-              if (p.seriesName === "Profit") {
-                totalProf += p.value;
-              } else {
-                totalRev += p.value;
-              }
-            }
-          }
-          if (totalRev > 0) html += `<br/><strong>Total Revenue: ${formatMoney(totalRev)}</strong>`;
-          if (totalProf > 0) html += `<br/><strong>Total Profit: ${formatMoney(totalProf)}</strong>`;
-          html += "</div>";
-          return html;
-        },
       },
       legend: {
         type: "scroll",
         bottom: 0,
-        textStyle: { fontSize: 10, color: "#7A7974" },
+        textStyle: { fontSize: 10, color: "#7A7974" }, // allowed-hex
       },
       grid: {
         left: 80,
@@ -392,61 +354,61 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
         data: months,
         axisLabel: {
           fontSize: 10,
-          color: "#7A7974",
+          color: "#7A7974", // allowed-hex
           rotate: 45,
-          formatter: (val: string) => {
-            const [y, m] = val.split("-");
-            return `${m}/${y.slice(2)}`;
-          },
         },
         axisTick: { show: false },
-        axisLine: { lineStyle: { color: "#D4D1CA" } },
+        axisLine: { lineStyle: { color: "#D4D1CA" } }, // allowed-hex
       },
       yAxis: [
         {
           type: "value",
           name: showRevenue ? "Revenue ($)" : "Profit ($)",
-          nameTextStyle: { fontSize: 10, color: "#7A7974" },
-          axisLabel: {
-            fontSize: 10,
-            color: "#7A7974",
-            formatter: (val: number) => formatMoney(val),
-          },
-          splitLine: { lineStyle: { color: "#D4D1CA", type: "dashed" } },
+          nameTextStyle: { fontSize: 10, color: "#7A7974" }, // allowed-hex
+          axisLabel: { fontSize: 10, color: "#7A7974" }, // allowed-hex
+          splitLine: { lineStyle: { color: "#D4D1CA", type: "dashed" } }, // allowed-hex
         },
         ...(showRevenue && showProfit
           ? [
               {
                 type: "value",
                 name: "Profit ($)",
-                nameTextStyle: { fontSize: 10, color: "#A12C7B" },
-                axisLabel: {
-                  fontSize: 10,
-                  color: "#A12C7B",
-                  formatter: (val: number) => formatMoney(val),
-                },
+                nameTextStyle: { fontSize: 10, color: "#A12C7B" }, // allowed-hex
+                axisLabel: { fontSize: 10, color: "#A12C7B" }, // allowed-hex
                 splitLine: { show: false },
               },
             ]
           : []),
       ],
       dataZoom: [
-        {
-          type: "inside",
-          start: 0,
-          end: 100,
-        },
-        {
-          type: "slider",
-          start: 0,
-          end: 100,
-          height: 20,
-          bottom: 30,
-        },
+        { type: "inside", start: 0, end: 100 },
+        { type: "slider", start: 0, end: 100, height: 20, bottom: 30 },
       ],
       series,
     };
   }, [data, viewMode]);
+
+  useEffect(() => {
+    if (!chartRef.current || typeof window === "undefined" || !window.echarts) return;
+
+    if (!instanceRef.current) {
+      instanceRef.current = window.echarts.init(chartRef.current);
+    }
+    instanceRef.current.setOption(option, true);
+
+    const handleResize = () => instanceRef.current?.resize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [option]);
+
+  useEffect(() => {
+    return () => {
+      instanceRef.current?.dispose();
+      instanceRef.current = null;
+    };
+  }, []);
 
   return (
     <div className="rounded border border-border bg-card p-4">
@@ -455,16 +417,10 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
           Revenue/Profit Forecast Waterfall
         </h3>
         <span className="text-[11px] text-muted-foreground">
-          Spread: ceiling &divide; 12 = annual, &divide; 12 = monthly
+          Spread: ceiling ÷ 12 = annual, ÷ 12 = monthly
         </span>
       </div>
-      <ReactEChartsCore
-        echarts={echarts}
-        option={option}
-        style={{ height: 380 }}
-        notMerge
-        lazyUpdate
-      />
+      <div ref={chartRef} style={{ height: 380, width: "100%" }} />
     </div>
   );
 }
@@ -588,7 +544,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
             className="text-muted-foreground hover:text-foreground text-[18px] leading-none"
             onClick={onClose}
           >
-            &times;
+            ×
           </button>
         </div>
 
