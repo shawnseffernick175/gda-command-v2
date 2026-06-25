@@ -1,0 +1,209 @@
+## Sheet: DataSetLandTbl
+Account | Account Name | Organization | Beginning Balance | Prior Period(s)
+YTD Activity | Current Pd Activity | Ending Balance
+100-001 | MSB Operating | 1  Envision - Consolidation | -20728.61 | 535662.44 | -175896.85 | 339036.98
+100-002 | MSB Checking 2 | 1  Envision - Consolidation | 11572.07 | -9131.33 | -283.52 | 2157.22
+100-003 | MSB Payroll | 1  Envision - Consolidation | 51029.01 | 294087.68 | -337867.37 | 7249.320000000007
+100-004 | MM Checking | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+100-009 | Legalist Account | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+102-001 | Petty Cash | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+110-001 | Accounts Receivable Gov | 1  Envision - Consolidation | 4244152.5600000005 | 1684790.47 | -2719985.23 | 3208957.8000000003
+110-100 | Accounts Receivable Com | 1  Envision - Consolidation | 1429.039999999979 | 15239.05 | -16668.09 | -2.9103830456733704e-11
+115-001 | Unbilled Receivable Gov | 1  Envision - Consolidation | 383507.02 | 9143.63 | -38702.44 | 353948.21
+115-002 | Unbilled Retainage Gov | 1  Envision - Consolidation | 34256.92 | 12258.1 | 2900.21 | 49415.229999999996
+115-100 | Unbilled Receivable Com | 1  Envision - Consolidation | 74819.68 | 55169.2 | 0 | 129988.87999999999
+116-500 | OH OFFSITE VARIANCE | 1  Envision - Consolidation | 0 | 13776.11 | 9602.32 | 23378.43
+116-550 | OH ONSITE VARIANCE | 1  Envision - Consolidation | 0 | 232899.68 | 143088.98 | 375988.66000000003
+116-700 | SMH VARIANCE | 1  Envision - Consolidation | 0 | -102193.7 | 14432.82 | -87760.88
+116-800 | G&A VARIANCE | 1  Envision - Consolidation | 0 | 444719.08 | 160880.32 | 605599.4
+118-001 | Due From PD Systems | 1  Envision - Consolidation | 0 | 12639024.54 | 4387906.35 | 17026930.89
+120-001 | Employee Advances | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+130-001 | Pre-Paid Expenses Gen | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+130-003 | Pre-Paid Insurance | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+130-005 | Pre-Paid Rent | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+150-001 | FA - Furniture & Fix - NJ | 1  Envision - Consolidation | 31895.72 | 0 | 0 | 31895.72
+150-002 | FA - Furniture & Fix - MD | 1  Envision - Consolidation | 3942.42 | 0 | 0 | 3942.42
+150-101 | AD - Furniture & Fix - NJ | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+150-102 | AD - Furniture & Fix - MD | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+150-500 | Building Fixtures | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+151-001 | FA - Computer Equip NJ | 1  Envision - Consolidation | 188518.69 | 1172.86 | 0 | 189691.55
+151-002 | FA - Computer Equip MD | 1  Envision - Consolidation | 26744.95 | 0 | 0 | 26744.95
+151-101 | AD - Computer Equip NJ | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+151-500 | Comp & Equip | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+153-001 | FA - Leasehold Imp | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+153-002 | FA - Leasehold Imp-MD | 1  Envision - Consolidation | 27016.5 | 0 | 0 | 27016.5
+153-003 | FA - Leasehold Imp-NJ | 1  Envision - Consolidation | 52826.49 | 0 | 0 | 52826.49
+154-001 | Accumulated Depreciation | 1  Envision - Consolidation | -246125.33 | -10881.13 | -7028.15 | -264034.61
+160-001 | Rent Security | 1  Envision - Consolidation | 16901.82 | 0 | 0 | 16901.82
+160-003 | Loan to Enspired | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+160-004 | Payroll Clearing | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+160-005 | Right Of Use (ROU) | 1  Envision - Consolidation | 166678 | 0 | 0 | 166678
+160-298 | Patents and Trademarks | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+200-001 | Accounts Payable | 1  Envision - Consolidation | -3104633.24 | -3812950.13 | 470408.79 | -6447174.58
+210-001 | Accrued Salaries | 1  Envision - Consolidation | -386139.79 | -218228.75 | 288688.48 | -315680.06000000006
+215-001 | PTO | 1  Envision - Consolidation | -277494.25 | 5782.27 | -278.33 | -271990.31
+220-001 | Payroll Liability Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+220-002 | Health Insurance Accrued | 1  Envision - Consolidation | 0 | 4517.37 | -4160.62 | 356.75
+220-003 | Health Ins SCA Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+220-004 | IRA Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+220-005 | IRA Employer Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+220-006 | AFLAC Accrued | 1  Envision - Consolidation | 0 | 247.7 | -230.54 | 17.159999999999997
+220-007 | Dental Accrued | 1  Envision - Consolidation | 0 | 299.84 | -372.25 | -72.41000000000003
+220-008 | Life Insurance Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+220-009 | Employer HSA -Don't Use | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+220-010 | Employee HSA Accured | 1  Envision - Consolidation | 0 | 3112.57 | -4434.38 | -1321.81
+220-011 | Vision Accrued | 1  Envision - Consolidation | 0 | 58.53 | -60.89 | -2.3599999999999994
+220-012 | EE State Withholding | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+228-001 | Due To PD Systems | 1  Envision - Consolidation | -621182.62 | -11674760.32 | -2158969.07 | -14454912.01
+230-002 | Due to Customer Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-003 | Taxes Payable Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-004 | Employee Reimb Exp Accrue | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-005 | MD Tax Payable Accrued | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-006 | MD Child Spt Payable Accr | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-007 | DE Child Spt Payable Accr | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-008 | Deferred Rent | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-009 | NJ Child Spt Payable Accr | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+230-010 | Wage Garnishment | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+240-001 | MSB LOC #8180 | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+250-001 | Distributions Payable | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+275-002 | Lease Liability-Long Term | 1  Envision - Consolidation | -62903.48 | 0 | 0 | -62903.48
+275-003 | Lease Liability-Current | 1  Envision - Consolidation | -117493 | 0 | 0 | -117493
+310-001 | Common Stock - Cortez | 1  Envision - Consolidation | -9000 | 0 | 0 | -9000
+310-002 | Common Stock - Kulcsar | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+310-003 | Common Stock - Salwen | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+320-001 | Treasury Stock | 1  Envision - Consolidation | 320000 | 0 | 0 | 320000
+325-001 | Distributions - Cortez | 1  Envision - Consolidation | 1822858.8 | 0 | 0 | 1822858.8
+325-002 | Distributions - Kulcsar | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+350-001 | CY Retained Earnings | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+350-002 | PY Retained Earnings | 1  Envision - Consolidation | -2612449.37 | 0 | 0 | -2612449.37
+400-001 | Government Revenue | 1  Envision - Consolidation | 0 | -13779615.72 | -1695938.53 | -15475554.25
+400-100 | Commercial Revenue | 1  Envision - Consolidation | 0 | -98392.35 | 0 | -98392.35
+402-500 | OH OFFSITE VARIANCE | 1  Envision - Consolidation | 0 | -13776.11 | -9602.32 | -23378.43
+402-550 | OH ONSITE VARIANCE | 1  Envision - Consolidation | 0 | -232899.68 | -143088.98 | -375988.66000000003
+402-700 | SMH VARIANCE | 1  Envision - Consolidation | 0 | 102193.7 | -14432.82 | 87760.87999999999
+402-800 | G&A VARIANCE | 1  Envision - Consolidation | 0 | -444719.07999999996 | -160880.32 | -605599.4
+500-001 | Direct Labor OFFSITE | 1  Envision - Consolidation | 0 | 249190.89 | 46589.65 | 295780.54
+500-501 | Direct Labor ONSITE | 1  Envision - Consolidation | 0 | 1766116.14 | 392882.76 | 2158998.9
+510-001 | Direct Travel | 1  Envision - Consolidation | 0 | 49679.94 | 102 | 49781.94
+515-001 | Subcontractor Labor | 1  Envision - Consolidation | 0 | 6543616.13 | 740515.65 | 7284131.78
+515-002 | Subcontractor Travel | 1  Envision - Consolidation | 0 | 54564.76 | 8432.23 | 62996.990000000005
+515-003 | Subcontractor Materials | 1  Envision - Consolidation | 0 | 2556241.13 | 97280.58 | 2653521.71
+520-001 | Consultant Labor | 1  Envision - Consolidation | 0 | 115451.37 | 23425 | 138876.37
+525-001 | Direct Materials | 1  Envision - Consolidation | 0 | 1055609.07 | 117148.71 | 1172757.78
+530-001 | Other Direct Cost | 1  Envision - Consolidation | 0 | 1038.54 | 202.28 | 1240.82
+600-001 | PTO Vacation | 1  Envision - Consolidation | 0 | 125356.05 | 44764.54 | 170120.59
+600-002 | Holiday Expense | 1  Envision - Consolidation | 0 | 87790.64 | 29313.28 | 117103.92
+600-003 | Sick | 1  Envision - Consolidation | 0 | 79816.66 | 23427.38 | 103244.04000000001
+600-007 | Bereavement | 1  Envision - Consolidation | 0 | 2062.72 | 2588.56 | 4651.28
+600-008 | MiIitary Leave | 1  Envision - Consolidation | 0 | 393.12 | 0 | 393.12
+610-001 | Health Insurance | 1  Envision - Consolidation | 0 | 49265.92 | 10618.36 | 59884.28
+610-002 | Dental Insurance | 1  Envision - Consolidation | 0 | 2618.19 | 457.64 | 3075.83
+610-003 | 401K Match | 1  Envision - Consolidation | 0 | 63615.5 | 23782.41 | 87397.91
+610-004 | Life Insurance | 1  Envision - Consolidation | 0 | 2928.77 | 674.63 | 3603.4
+610-005 | Vision Insurance | 1  Envision - Consolidation | 0 | 1547.9 | 349.69 | 1897.5900000000001
+610-006 | LT Disability Ins | 1  Envision - Consolidation | 0 | 3155.41 | 825.1 | 3980.5099999999998
+610-011 | HSA Medical | 1  Envision - Consolidation | 0 | 27970.63 | 3707.36 | 31677.99
+610-012 | HSA Employer Contribution | 1  Envision - Consolidation | 0 | 8512.76 | 1991.06 | 10503.82
+610-101 | Health Insurance - Onsite | 1  Envision - Consolidation | 0 | 60288.89 | 14734.68 | 75023.57
+610-102 | Dental Insurance - Onsite | 1  Envision - Consolidation | 0 | 6412.6 | 1577.18 | 7989.780000000001
+610-103 | HSA Medical Onsite | 1  Envision - Consolidation | 0 | 35779.44 | 9430.01 | 45209.450000000004
+610-104 | Life Insurance - Onsite | 1  Envision - Consolidation | 0 | 9163.97 | 2325.53 | 11489.5
+610-106 | LT Disab Ins - Onsite | 1  Envision - Consolidation | 0 | 9640.7 | 2569.23 | 12209.93
+620-001 | Social Security | 1  Envision - Consolidation | 0 | 150199.65 | 57301.73 | 207501.38
+620-002 | FUTA | 1  Envision - Consolidation | 0 | 3126.66 | 51.8 | 3178.46
+620-003 | SUTA | 1  Envision - Consolidation | 0 | 27104.87 | 3595.14 | 30700.01
+620-004 | Medicare | 1  Envision - Consolidation | 0 | 35127.34 | 13401.21 | 48528.549999999996
+630-002 | Tuition Reimbursement | 1  Envision - Consolidation | 0 | 2955.45 | 8104 | 11059.45
+650-001 | Workers Comp | 1  Envision - Consolidation | 0 | 4980.74 | 0 | 4980.74
+690-001 | Rent | 1  Envision - Consolidation | 0 | 49442.48 | 12360.62 | 61803.100000000006
+690-002 | Utilities | 1  Envision - Consolidation | 0 | 3373.1 | 750.73 | 4123.83
+690-003 | Security | 1  Envision - Consolidation | 0 | 1284.25 | 698.81 | 1983.06
+690-004 | Cleaning/Janitorial | 1  Envision - Consolidation | 0 | 2349.4 | 621.1 | 2970.5
+690-005 | Telephone | 1  Envision - Consolidation | 0 | 2163.34 | 223.16 | 2386.5
+690-006 | Internet | 1  Envision - Consolidation | 0 | 1385.97 | 110.01 | 1495.98
+695-002 | Postage & Delivery | 1  Envision - Consolidation | 0 | 496.67 | 25.82 | 522.49
+695-004 | Office Supplies | 1  Envision - Consolidation | 0 | 1188.08 | 250.66 | 1438.74
+695-005 | Professional Development | 1  Envision - Consolidation | 0 | 2970 | 231.08 | 3201.08
+695-006 | Prof/General Liab Ins | 1  Envision - Consolidation | 0 | 20126.72 | 2873.69 | 23000.41
+700-001 | OH Labor - OFFSITE | 1  Envision - Consolidation | 0 | 91047.65 | 34224.26 | 125271.91
+700-003 | OH Recruiting - LBR - OFF | 1  Envision - Consolidation | 0 | 15888.4 | 9616 | 25504.4
+710-002 | Travel - Meals | 1  Envision - Consolidation | 0 | 675.73 | 0 | 675.73
+710-003 | Travel Transportation | 1  Envision - Consolidation | 0 | 3677.2 | 236.51 | 3913.71
+710-004 | Travel Lodging | 1  Envision - Consolidation | 0 | 806.84 | 0 | 806.84
+720-001 | Consultant - Indirect | 1  Envision - Consolidation | 0 | 61056.25 | 20575 | 81631.25
+740-007 | Dues & Subscriptions | 1  Envision - Consolidation | 0 | 2587.67 | 489.55 | 3077.2200000000003
+740-009 | Misc Exp - Credit Due | 1  Envision - Consolidation | 0 | 13975.57 | 10280.95 | 24256.52
+740-010 | Meals & Entertainment | 1  Envision - Consolidation | 0 | 360.71 | 397.71 | 758.42
+740-012 | OH Recruiting Expenses | 1  Envision - Consolidation | 0 | 44773.39 | 15135.47 | 59908.86
+740-013 | Bank Fees | 1  Envision - Consolidation | 0 | 347.2 | 39.4 | 386.59999999999997
+745-001 | Depreciation | 1  Envision - Consolidation | 0 | 10881.13 | 7028.15 | 17909.28
+780-001 | Mat & Subk Labor | 1  Envision - Consolidation | 0 | 73180.87 | 18142.12 | 91322.98999999999
+800-001 | Labor G&A | 1  Envision - Consolidation | 0 | 96409.41 | 37695.04 | 134104.45
+800-002 | Shared G&A Labor | 1  Envision - Consolidation | 0 | 115709.35 | 35533.39 | 151242.74
+805-001 | Shared G&A Non Labor | 1  Envision - Consolidation | 0 | 99050.97 | 23435.68 | 122486.65
+815-002 | Prof Fees - Legal | 1  Envision - Consolidation | 0 | 405 | 0 | 405
+815-003 | Payroll Process Fees | 1  Envision - Consolidation | 0 | 6972.24 | 1523.16 | 8495.4
+815-007 | Outside Consulting | 1  Envision - Consolidation | 0 | 70500 | 17500 | 88000
+815-008 | Human Resource Svcs | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+850-003 | Computer Licensing & Supp | 1  Envision - Consolidation | 0 | 69943.18 | 14988.28 | 84931.45999999999
+875-001 | BD Labor | 1  Envision - Consolidation | 0 | 20333.36 | 4759.65 | 25093.010000000002
+875-003 | BD Consultant | 1  Envision - Consolidation | 0 | 30952 | 3309.76 | 34261.76
+875-004 | BD Expenses | 1  Envision - Consolidation | 0 | 90 | 0 | 90
+880-001 | B&P Labor | 1  Envision - Consolidation | 0 | 113261.43 | 23381.93 | 136643.36
+880-003 | B&P Consultant | 1  Envision - Consolidation | 0 | 71631 | 32397.75 | 104028.75
+890-001 | IR&D Labor | 1  Envision - Consolidation | 0 | 2115.5 | 0 | 2115.5
+890-003 | IR&D Consultant | 1  Envision - Consolidation | 0 | 17500 | 0 | 17500
+910-001 | Meals & Entertainment | 1  Envision - Consolidation | 0 | 4400.95 | 0 | 4400.95
+925-001 | U/A Professional Fees | 1  Envision - Consolidation | 0 | 28801 | 0 | 28801
+950-001 | Interest Income | 1  Envision - Consolidation | 0 | -43.08 | -32.39 | -75.47
+ADM-CRT | G&A Allocation CR | 1  Envision - Consolidation | 0 | -884018.09 | -250950.92 | -1134969.01
+ADM-DBT | G&A Allocation DR | 1  Envision - Consolidation | 0 | 884018.0900000001 | 250950.92 | 1134969.01
+ASF-CRT | SVCF ALLOC CR | 1  Envision - Consolidation | 0 | -40181.85 | -21344.43 | -61526.28
+ASF-EST | SVCF ALLOC OH CO | 1  Envision - Consolidation | 0 | 8899.87 | 2262.51 | 11162.380000000001
+ASF-GNA | SVCF ALLOC G&A | 1  Envision - Consolidation | 0 | 50982.97 | 15794.88 | 66777.85
+ASF-SMH | SVCF ALLOC SMH | 1  Envision - Consolidation | 0 | 10900.66 | 3287.04 | 14187.7
+ASN-CRT | SVCN ALLOC CR | 1  Envision - Consolidation | 0 | -127529.02 | -51246.92 | -178775.94
+ASN-CST | SVCN ALLOC OH CL | 1  Envision - Consolidation | 0 | 107538.3 | 39700.82 | 147239.12
+ASN-EST | SVCN ALLOC OH CO | 1  Envision - Consolidation | 0 | 14794.71 | 4707.26 | 19501.97
+ASN-SMH | SVCN ALLOC SMH | 1  Envision - Consolidation | 0 | 18839.27 | 6838.84 | 25678.11
+ASO-CRT | SVCO ALLOC CR | 1  Envision - Consolidation | 0 | -134043.65 | -50223.77 | -184267.41999999998
+ASO-CST | SVCO ALLOC OH CL | 1  Envision - Consolidation | 0 | 117258.43 | 44900.05 | 162158.47999999998
+ASO-EST | SVCO ALLOC OH CO | 1  Envision - Consolidation | 0 | 16785.22 | 5323.72 | 22108.940000000002
+ASP-CRT | SVCP ALLOC CR | 1  Envision - Consolidation | 0 | -1631.45 | -738.21 | -2369.66
+ASP-EST | SVCP ALLOC OH CO | 1  Envision - Consolidation | 0 | 235.09 | 92.49 | 327.58
+ASP-GNA | SVCP ALLOC G&A | 1  Envision - Consolidation | 0 | 1396.36 | 645.72 | 2042.08
+ASU-CRT | SVCU ALLOC CR | 1  Envision - Consolidation | 0 | -33201.95 | 0 | -33201.95
+ASU-EST | SVCU ALLOC OH CO | 1  Envision - Consolidation | 0 | 33201.95 | 0 | 33201.95
+FAC-BPR | NON Facilities on B&P Lab | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-CRT | Facilities Corp Alloc CR | 1  Envision - Consolidation | 0 | -44244.91 | 0 | -44244.91
+FAC-DLC | NON Facilities on Dir Lab | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-DLR | Facilities on Dir Lab | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-DLS | NON Fac on Dir Lab Onsite | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-GAL | Facilities G&A | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-GNA | NON Facilities on G&A | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-IRD | Facilities on IR&D Labor | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-IRL | NONFacilities on IR&D Lab | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-MAH | Facilities on MAH Labor | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-MNH | NON Facilities on M&H | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-OHD | Non Facilities OH | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FAC-OVH | Facilities on Overhead | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+FRG-ASN | Fringe on SvcCtr N | 1  Envision - Consolidation | 0 | 29997.91 | 14148.97 | 44146.88
+FRG-ASO | Fringe on SvcCtr O | 1  Envision - Consolidation | 0 | 5234.83 | 3753.14 | 8987.97
+FRG-BDL | Fringe on BD Labor | 1  Envision - Consolidation | 0 | 6699.33 | 2143.66 | 8842.99
+FRG-BPL | Fringe on B&P Labor | 1  Envision - Consolidation | 0 | 37316.79 | 10837.48 | 48154.270000000004
+FRG-CRT | Fringe Allocation CR | 1  Envision - Consolidation | 0 | -799814.58 | -255590.52 | -1055405.0999999999
+FRG-DLC | Fringe on DL Client | 1  Envision - Consolidation | 0 | 581890.85 | 178958.54 | 760849.39
+FRG-DLR | Fringe on Direct Labor | 1  Envision - Consolidation | 0 | 82102.13 | 22133.42 | 104235.55
+FRG-GAL | Fringe on G&A Labor | 1  Envision - Consolidation | 0 | 31764.48 | 15495.06 | 47259.54
+FRG-IRD | Fringe on IR&D Labor | 1  Envision - Consolidation | 0 | 697 | 48.52 | 745.52
+FRG-MAH | Fringe on Matl Handling | 1  Envision - Consolidation | 0 | 24111.26 | 8071.73 | 32182.989999999998
+FRG-OHL | Fringe on OH Labor | 1  Envision - Consolidation | 0 | 0 | 0 | 0
+MAT-CRT | Material Handling Credit | 1  Envision - Consolidation | 0 | -127032.03 | -36339.77 | -163371.8
+MAT-DBT | Material Handling Debit | 1  Envision - Consolidation | 0 | 127032.03 | 36339.77 | 163371.80000000002
+OHC-CRT | OH Client Credit | 1  Envision - Consolidation | 0 | -820663.15 | -273840.35 | -1094503.5
+OHC-DLR | OH Client Direct Labor | 1  Envision - Consolidation | 0 | 820663.15 | 273840.35 | 1094503.5
+OHD-BPL | OH Company B&P Labor | 1  Envision - Consolidation | 0 | 39549.02 | 11410.71 | 50959.729999999996
+OHD-CRT | OH Company Credit | 1  Envision - Consolidation | 0 | -127301.06 | -34755.91 | -162056.97
+OHD-DLR | OH Company Direct Labor | 1  Envision - Consolidation | 0 | 87013.34 | 23294.949999999997 | 110308.29
+OHD-IRD | OH Company IRD Labor | 1  Envision - Consolidation | 0 | 738.7 | 50.25 | 788.95
+AMOUNT OUT OF BALANCE |  |  | 0 | -6.294385457294993e-9 | -5.294396032695659e-10 | 1.1580141290323809e-9
