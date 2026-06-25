@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useSyncExternalStore } from "react";
 import { StatusStrip } from "@/components/financials/StatusStrip";
 import { AiAnalyzeModal } from "@/components/financials/AiAnalyzeModal";
 import { ContractWaterfallTab } from "@/components/financials/tabs/ContractWaterfallTab";
@@ -20,6 +20,7 @@ import {
   useP2Financials,
 } from "@/hooks/use-financial-bible";
 import { cn } from "@/lib/utils";
+import type { CalendarMode } from "@/lib/types";
 
 type Tab =
   | "waterfall"
@@ -86,7 +87,21 @@ const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set([
   "capture",
 ]);
 
-type CalendarMode = "FY" | "CY";
+const CALENDAR_MODE_KEY = "gda-financial-bible-calendar-mode";
+
+function subscribeToStorage(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function getCalendarSnapshot(): CalendarMode {
+  const stored = localStorage.getItem(CALENDAR_MODE_KEY);
+  return stored === "CY" ? "CY" : "FY";
+}
+
+function getCalendarServerSnapshot(): CalendarMode {
+  return "FY";
+}
 
 const YEARS = ["26", "27", "28"] as const;
 
@@ -123,7 +138,16 @@ function tabTitle(tab: Tab): string {
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("p2");
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("FY");
+  const calendarMode = useSyncExternalStore(
+    subscribeToStorage,
+    getCalendarSnapshot,
+    getCalendarServerSnapshot,
+  );
+
+  const setCalendarMode = useCallback((mode: CalendarMode) => {
+    localStorage.setItem(CALENDAR_MODE_KEY, mode);
+    window.dispatchEvent(new StorageEvent("storage", { key: CALENDAR_MODE_KEY }));
+  }, []);
   const [selectedYear, setSelectedYear] = useState<string>("26");
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
