@@ -533,8 +533,10 @@ export interface KpiHeaderData {
   orders: KpiMetric;
   sales: KpiMetric;
   ebit: KpiMetric;
-  gross_margin: KpiMetric;
+  gross_margin?: KpiMetric;
   ros: KpiMetric;
+  funded_backlog: KpiMetric;
+  backlog: KpiMetric;
 }
 
 /* ── Balance Sheet ────────────────────────────────────────────── */

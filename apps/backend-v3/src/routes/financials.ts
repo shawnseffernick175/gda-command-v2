@@ -30,90 +30,89 @@ function normalizeFiscalYear(fy: string, fallback = 2026): number {
 
 export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/kpi/header
-  // Headline KPIs: LEFT JOIN so actuals display even when plan is missing.
-  // Returns plan: null and delta: null per metric when plan is absent.
-  // Only 404s when BOTH actuals AND plan are completely empty.
+  // Executive KPI header — sums CY-to-date or FY-to-date monthly rows.
+  // Source precedence: income_statement > l1_actual (DISTINCT ON period).
+  // Backlog metrics come from task_orders (is_seed=false).
   app.get('/v3/kpi/header', async (req, reply) => {
-    const { rows } = await pool.query(
-      `SELECT
-         a.period,
-         a.actual_orders, a.actual_sales, a.actual_ebit,
-         a.actual_gross_margin, a.actual_ros,
-         p.plan_orders, p.plan_sales, p.plan_ebit,
-         p.plan_gross_margin, p.plan_ros
-       FROM financial_actuals a
-       LEFT JOIN financial_plan p
-         ON p.fiscal_year = a.fiscal_year AND p.quarter = a.quarter
-        AND p.source = 'l1_target' AND p.period LIKE '%Q%'
-       WHERE a.source = 'income_statement' AND a.period LIKE '%Q%'
-       ORDER BY a.fiscal_year DESC, a.quarter DESC
-       LIMIT 1`,
-    );
+    const query = req.query as Record<string, string | undefined>;
+    const mode: CalendarMode = query.calendarMode === 'FY' ? 'FY' : 'CY';
 
-    if (!rows.length) {
-      // Fallback: check if plan-only rows exist (no actuals yet)
-      const { rows: planOnly } = await pool.query(
-        `SELECT 1 FROM financial_plan WHERE source = 'l1_target' LIMIT 1`,
-      );
-      if (!planOnly.length) {
-        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'No financial data available', req.requestId));
-      }
-      // Plan exists but no actuals — return empty actuals with plan
-      const { rows: pRows } = await pool.query(
-        `SELECT period, plan_orders, plan_sales, plan_ebit,
-                plan_gross_margin, plan_ros
-         FROM financial_plan
-         WHERE source = 'l1_target' AND period LIKE '%Q%'
-         ORDER BY fiscal_year DESC, quarter DESC
-         LIMIT 1`,
-      );
-      if (!pRows.length) {
-        return reply.status(404).send(errorEnvelope('NOT_FOUND', 'No financial data available', req.requestId));
-      }
-      const p = pRows[0];
-      const data = {
-        period: p.period as string,
-        orders: { value: 0, delta: null, plan: Number(p.plan_orders) },
-        sales: { value: 0, delta: null, plan: Number(p.plan_sales) },
-        ebit: { value: 0, delta: null, plan: Number(p.plan_ebit) },
-        gross_margin: { value: 0, delta: null, plan: Number(p.plan_gross_margin) },
-        ros: { value: 0, delta: null, plan: Number(p.plan_ros) },
-      };
-      return reply.send(successEnvelope(data, req.requestId));
+    // Determine the current month abbreviation and fiscal year
+    const now = new Date();
+    const currentCalMonth = now.getMonth() + 1; // 1-based
+    const currentYear = now.getFullYear();
+    // Fiscal year: if month >= Oct (10), FY = year+1; otherwise FY = year
+    const currentFY = currentCalMonth >= 10 ? currentYear + 1 : currentYear;
+    const fyShort = currentFY % 100; // e.g. 26
+
+    // Build the list of month abbreviations that are "to-date" for the mode
+    const MONTH_ABBREVS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const currentMonthAbbrev = MONTH_ABBREVS[currentCalMonth - 1];
+    const months = getMonthsForMode(mode);
+
+    // Collect period strings up to and including the current month
+    const periodStrings: string[] = [];
+    for (const m of months) {
+      periodStrings.push(`FY${fyShort} ${m.mon}`);
+      if (m.mon === currentMonthAbbrev) break;
     }
 
-    const r = rows[0];
-    const hasPlan = r.plan_orders !== null;
-    const delta = (actual: number, plan: number | null) =>
-      plan === null || plan === 0 ? null : Number((((actual - plan) / plan) * 100).toFixed(1));
+    // Query monthly actuals with source precedence (income_statement > l1_actual)
+    // DISTINCT ON (period) keeps only the highest-priority source per month
+    let orders = 0;
+    let sales = 0;
+    let ebit = 0;
+
+    if (periodStrings.length > 0) {
+      const { rows: actualsRows } = await pool.query(
+        `SELECT actual_orders, actual_sales, actual_ebit
+         FROM (
+           SELECT DISTINCT ON (period)
+             period, actual_orders, actual_sales, actual_ebit
+           FROM financial_actuals
+           WHERE period = ANY($1)
+             AND source IN ('income_statement', 'l1_actual')
+             AND is_seed = false
+             AND period NOT LIKE '%Q%'
+           ORDER BY period,
+             CASE source WHEN 'income_statement' THEN 1 ELSE 2 END
+         ) ranked`,
+        [periodStrings],
+      );
+
+      for (const r of actualsRows) {
+        orders += Number(r.actual_orders) || 0;
+        sales += Number(r.actual_sales) || 0;
+        ebit += Number(r.actual_ebit) || 0;
+      }
+    }
+
+    const ros = sales !== 0 ? (ebit / sales) * 100 : 0;
+
+    // Backlog metrics from task_orders (real data only)
+    const { rows: backlogRows } = await pool.query(
+      `SELECT
+         COALESCE(SUM(funded_to_date), 0) AS funded_backlog,
+         COALESCE(SUM(total_ceiling), 0) AS backlog
+       FROM task_orders
+       WHERE is_seed = false`,
+    );
+    const fundedBacklog = Number(backlogRows[0]?.funded_backlog) || 0;
+    const backlog = Number(backlogRows[0]?.backlog) || 0;
+
+    // Period label for the response
+    const periodLabel = mode === 'CY'
+      ? `CY${currentYear % 100} to date`
+      : `FY${fyShort} to date`;
 
     const data = {
-      period: r.period as string,
-      orders: {
-        value: Number(r.actual_orders),
-        delta: hasPlan ? delta(Number(r.actual_orders), Number(r.plan_orders)) : null,
-        plan: hasPlan ? Number(r.plan_orders) : null,
-      },
-      sales: {
-        value: Number(r.actual_sales),
-        delta: hasPlan ? delta(Number(r.actual_sales), Number(r.plan_sales)) : null,
-        plan: hasPlan ? Number(r.plan_sales) : null,
-      },
-      ebit: {
-        value: Number(r.actual_ebit),
-        delta: hasPlan ? delta(Number(r.actual_ebit), Number(r.plan_ebit)) : null,
-        plan: hasPlan ? Number(r.plan_ebit) : null,
-      },
-      gross_margin: {
-        value: Number(r.actual_gross_margin),
-        delta: hasPlan ? delta(Number(r.actual_gross_margin), Number(r.plan_gross_margin)) : null,
-        plan: hasPlan ? Number(r.plan_gross_margin) : null,
-      },
-      ros: {
-        value: Number(r.actual_ros),
-        delta: hasPlan ? delta(Number(r.actual_ros), Number(r.plan_ros)) : null,
-        plan: hasPlan ? Number(r.plan_ros) : null,
-      },
+      period: periodLabel,
+      orders: { value: orders, delta: null, plan: null },
+      sales: { value: sales, delta: null, plan: null },
+      ebit: { value: ebit, delta: null, plan: null },
+      ros: { value: ros, delta: null, plan: null },
+      funded_backlog: { value: fundedBacklog, delta: null, plan: null },
+      backlog: { value: backlog, delta: null, plan: null },
     };
 
     return reply.send(successEnvelope(data, req.requestId));
