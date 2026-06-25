@@ -2,6 +2,7 @@
  * Regression tests for the 4 deterministic financial parsers using REAL .xlsx fixtures.
  * F-627: ensures each parser returns ≥1 row with correct key fields from actual vault files.
  * F-629: adds Jan fixtures (sheet=JAN-2026) to verify content-based sheet selection.
+ * F-632: adds extracted_text tests (pipe-delimited production format).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -277,6 +278,141 @@ describe('deterministic-parsers (real fixture files)', () => {
 
     it('correctly extracts known projects', () => {
       const result = parseProjectRevenueSummary(prTextMay, 'proj-revenue-summary-may-2026.xlsx')!;
+      const projectNames = result.rows.map((r) => r.project_name);
+      expect(projectNames).toContain('OY4');
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-632: extracted_text (pipe-delimited) fixtures — the production format
+// ---------------------------------------------------------------------------
+const EXTRACTED_TEXT_DIR = join(FIXTURES, 'extracted_text');
+
+describe('deterministic-parsers (extracted_text pipe-delimited format)', () => {
+  let arText: string;
+  let tbText: string;
+  let sieText: string;
+  let prText: string;
+
+  beforeAll(() => {
+    arText = readFileSync(join(EXTRACTED_TEXT_DIR, 'aged-ar-may-2026.extracted.txt'), 'utf-8');
+    tbText = readFileSync(join(EXTRACTED_TEXT_DIR, 'trial-balance-may-2026.extracted.txt'), 'utf-8');
+    sieText = readFileSync(join(EXTRACTED_TEXT_DIR, 'trend-sie-may-2026.extracted.txt'), 'utf-8');
+    prText = readFileSync(join(EXTRACTED_TEXT_DIR, 'proj-revenue-may-2026.extracted.txt'), 'utf-8');
+  });
+
+  describe('parseAgedAr (extracted_text)', () => {
+    it('returns ≥1 row from extracted_text fixture', () => {
+      const result = parseAgedAr(arText, 'aged-ar-may-2026.extracted.txt');
+      expect(result).not.toBeNull();
+      expect(result!.rows.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('correctly carries down customer name from group headers', () => {
+      const result = parseAgedAr(arText, 'aged-ar-may-2026.extracted.txt')!;
+      const customers = [...new Set(result.rows.map((r) => r.customer_name))];
+      expect(customers.length).toBeGreaterThan(1);
+      expect(customers.some((c) => /army|booz|caci|gsa|nakupuna/i.test(c))).toBe(true);
+    });
+
+    it('skips subtotal and total rows', () => {
+      const result = parseAgedAr(arText, 'aged-ar-may-2026.extracted.txt')!;
+      for (const row of result.rows) {
+        expect(row.invoice_number).not.toMatch(/^Total/i);
+      }
+    });
+
+    it('populates key fields correctly', () => {
+      const result = parseAgedAr(arText, 'aged-ar-may-2026.extracted.txt')!;
+      const row = result.rows[0];
+      expect(row.period).toBe('FY26 May');
+      expect(row.fiscal_year).toBe(2026);
+      expect(row.invoice_number).toBeTruthy();
+      expect(row.amount).not.toBe(0);
+      expect(['Current', '31-60', '61-90', 'Over 90']).toContain(row.age_bucket);
+    });
+  });
+
+  describe('parseTrialBalance (extracted_text)', () => {
+    it('returns ≥1 row from extracted_text fixture', () => {
+      const result = parseTrialBalance(tbText, 'trial-balance-may-2026.extracted.txt');
+      expect(result).not.toBeNull();
+      expect(result!.rows.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('handles wrapped headers (Prior Period(s) / YTD Activity split across 2 lines)', () => {
+      const result = parseTrialBalance(tbText, 'trial-balance-may-2026.extracted.txt')!;
+      expect(result.rows.length).toBeGreaterThanOrEqual(100);
+    });
+
+    it('populates key fields correctly', () => {
+      const result = parseTrialBalance(tbText, 'trial-balance-may-2026.extracted.txt')!;
+      const row = result.rows[0];
+      expect(row.period).toBe('FY26 May');
+      expect(row.fiscal_year).toBe(2026);
+      expect(row.account_code).toMatch(/^\d{3}-\d{3}$/);
+      expect(row.account_name).toBeTruthy();
+      expect(typeof row.debit).toBe('number');
+      expect(typeof row.credit).toBe('number');
+    });
+  });
+
+  describe('parseTrendSie (extracted_text)', () => {
+    it('returns ≥1 row from extracted_text fixture', () => {
+      const result = parseTrendSie(sieText, 'trend-sie-may-2026.extracted.txt');
+      expect(result).not.toBeNull();
+      expect(result!.rows.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('extracts all 5 cost pools', () => {
+      const result = parseTrendSie(sieText, 'trend-sie-may-2026.extracted.txt')!;
+      expect(result.rows.length).toBe(5);
+      const pools = result.rows.map((r) => r.pool);
+      expect(pools).toContain('Fringe');
+      expect(pools).toContain('OH Offsite');
+      expect(pools).toContain('OH Onsite');
+      expect(pools).toContain('MHx');
+      expect(pools).toContain('G&A');
+    });
+
+    it('correctly extracts the May rate by name-based column matching', () => {
+      const result = parseTrendSie(sieText, 'trend-sie-may-2026.extracted.txt')!;
+      const fringe = result.rows.find((r) => r.pool === 'Fringe')!;
+      expect(fringe.current_period_actual).toBeCloseTo(0.45054537, 5);
+    });
+
+    it('stops at POOL DETAIL section', () => {
+      const result = parseTrendSie(sieText, 'trend-sie-may-2026.extracted.txt')!;
+      expect(result.rows.length).toBe(5);
+    });
+  });
+
+  describe('parseProjectRevenueSummary (extracted_text)', () => {
+    it('returns ≥1 row from extracted_text fixture', () => {
+      const result = parseProjectRevenueSummary(prText, 'proj-revenue-may-2026.extracted.txt');
+      expect(result).not.toBeNull();
+      expect(result!.rows.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('handles empty spacer columns and maps by header name', () => {
+      const result = parseProjectRevenueSummary(prText, 'proj-revenue-may-2026.extracted.txt')!;
+      expect(result.rows.length).toBeGreaterThanOrEqual(50);
+    });
+
+    it('populates key fields correctly', () => {
+      const result = parseProjectRevenueSummary(prText, 'proj-revenue-may-2026.extracted.txt')!;
+      const row = result.rows[0];
+      expect(row.period).toBe('FY26 May');
+      expect(row.fiscal_year).toBe(2026);
+      expect(row.project_name).toBeTruthy();
+      expect(row.contract_number).toBeTruthy();
+      expect(typeof row.revenue).toBe('number');
+      expect(typeof row.cost).toBe('number');
+    });
+
+    it('correctly extracts known projects', () => {
+      const result = parseProjectRevenueSummary(prText, 'proj-revenue-may-2026.extracted.txt')!;
       const projectNames = result.rows.map((r) => r.project_name);
       expect(projectNames).toContain('OY4');
     });
