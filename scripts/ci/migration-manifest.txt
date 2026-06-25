@@ -120,3 +120,4 @@ v3_111_sitreps.sql
 v3_112_sitrep_source_document.sql
 v3_113_full_financial_ingestion.sql
 v3_114_project_revenue_full_columns.sql
+v3_115_fastrac_commodity_cleanup.sql
