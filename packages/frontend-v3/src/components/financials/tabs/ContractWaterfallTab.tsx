@@ -5,7 +5,7 @@ import {
   useContractWaterfall,
   useCreateTaskOrder,
 } from "@/hooks/use-financial-bible";
-import { formatMoney } from "@/lib/format-money";
+import { formatMoney, formatMoneyFull } from "@/lib/format-money";
 import type { ContractWaterfallData, WaterfallContract } from "@/lib/types";
 
 type ViewMode = "revenue" | "profit" | "both";
@@ -449,10 +449,10 @@ function ContractTable({ contracts, portfolioMargin }: { contracts: WaterfallCon
             <tr key={c.id} className="border-b border-border/50 hover:bg-gda-bg-deep/50">
               <td className="px-3 py-2 font-medium text-foreground">{c.to_name}</td>
               <td className="px-3 py-2 text-muted-foreground">{c.parent_vehicle_short_name ?? "—"}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoney(c.ceiling)}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-fin-teal font-medium">{formatMoney(c.funded_to_date)}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoney(c.monthly_revenue)}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoney(c.annual_revenue)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoneyFull(c.ceiling)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-fin-teal font-medium">{formatMoneyFull(c.funded_to_date)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoneyFull(c.monthly_revenue)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoneyFull(c.annual_revenue)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-foreground">{c.margin_pct.toFixed(1)}%</td>
               <td className="px-3 py-2 text-muted-foreground">
                 {c.margin_source === "actual" ? "Actuals" : `Portfolio (${portfolioMargin.toFixed(1)}%)`}

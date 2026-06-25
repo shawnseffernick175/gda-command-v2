@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 
 const POOL_SORT_COLS: ColumnSortConfig[] = [
   { field: "pool", type: "string" },
@@ -115,16 +116,78 @@ export function P2FinancialsTab() {
         />
       </div>
 
+      {/* Revenue Trend Chart (G1) */}
+      {months.length > 0 && (
+        <div className="rounded border border-border bg-white p-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+            Revenue & Profit Trend
+          </p>
+          <ReactEChartsCore
+            echarts={echarts}
+            style={{ height: 240 }}
+            notMerge
+            option={{
+              tooltip: {
+                trigger: "axis" as const,
+                axisPointer: { type: "cross" as const },
+              },
+              legend: {
+                data: ["Revenue", "Gross Profit", "EBIT"],
+                textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+              },
+              grid: { left: 60, right: 16, top: 32, bottom: 32 },
+              xAxis: {
+                type: "category" as const,
+                data: months.map((m) => shortPeriod(m.period)),
+                axisLabel: { color: "var(--color-fin-stone)", fontSize: 11 },
+                axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
+              },
+              yAxis: {
+                type: "value" as const,
+                axisLabel: {
+                  color: "var(--color-fin-stone)",
+                  fontSize: 11,
+                  formatter: (v: number) => formatMoney(v),
+                },
+                splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
+              },
+              series: [
+                {
+                  name: "Revenue",
+                  type: "bar" as const,
+                  data: months.map((m) => m.revenue),
+                  itemStyle: { color: "var(--color-fin-navy)" },
+                },
+                {
+                  name: "Gross Profit",
+                  type: "line" as const,
+                  data: months.map((m) => m.gross_profit),
+                  lineStyle: { color: "var(--color-gda-green)" },
+                  itemStyle: { color: "var(--color-gda-green)" },
+                },
+                {
+                  name: "EBIT",
+                  type: "line" as const,
+                  data: months.map((m) => m.ebit),
+                  lineStyle: { color: "var(--color-fin-plum)" },
+                  itemStyle: { color: "var(--color-fin-plum)" },
+                },
+              ],
+            }}
+          />
+        </div>
+      )}
+
       {/* Income Statement — full line-item structure */}
       <div>
         <h3 className="mb-3 text-sm font-semibold text-foreground">
           Income Statement
         </h3>
         {months.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-border">
+          <div className="overflow-x-auto rounded border border-border max-h-[480px] overflow-y-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
                   <th className="py-2 pl-4 pr-4 text-left font-medium">
                     Line Item
                   </th>
@@ -205,10 +268,10 @@ export function P2FinancialsTab() {
           Cost Categories (by Pool)
         </h3>
         {data.cost_by_pool.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-border">
+          <div className="overflow-x-auto rounded border border-border max-h-[480px] overflow-y-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+              <thead className="sticky top-0 z-10">
+                <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
                   <SortableHeader label="Pool" field="pool" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                   <SortableHeader label="Target" field="target" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
                   <SortableHeader label="Actual" field="actual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />

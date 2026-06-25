@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { useBalanceSheet } from "@/hooks/use-balance-sheet";
-import { formatMoney } from "@/lib/format-money";
-import { cn } from "@/lib/utils";
+import { formatMoney, formatMoneyFull } from "@/lib/format-money";
+import { Kpi } from "@/components/financials/primitives/Kpi";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, parsePeriod, type ColumnSortConfig } from "@/lib/sort-utils";
@@ -85,22 +85,10 @@ export function BalanceSheetCard() {
   const totalAssetsMax = Math.max(...sortedTrend.map((r) => r.total_assets), 1);
 
   const summaryCards = [
-    { label: "Cash", value: latest.cash, textClass: "text-gda-cyan" },
-    {
-      label: "Accounts Receivable",
-      value: latest.accounts_receivable,
-      textClass: "text-gda-green",
-    },
-    {
-      label: "Accounts Payable",
-      value: latest.accounts_payable,
-      textClass: "text-amber-400",
-    },
-    {
-      label: "Total Equity",
-      value: latest.total_equity,
-      textClass: "text-foreground",
-    },
+    { label: "Cash", value: latest.cash },
+    { label: "Accounts Receivable", value: latest.accounts_receivable },
+    { label: "Accounts Payable", value: latest.accounts_payable },
+    { label: "Total Equity", value: latest.total_equity },
   ];
 
   return (
@@ -113,15 +101,11 @@ export function BalanceSheetCard() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {summaryCards.map((c) => (
-          <div
+          <Kpi
             key={c.label}
-            className="rounded border border-border bg-gda-panel p-3 space-y-1"
-          >
-            <p className="text-[11px] text-muted-foreground">{c.label}</p>
-            <p className={cn("text-base font-bold tabular-nums", c.textClass)}>
-              {formatMoney(c.value)}
-            </p>
-          </div>
+            label={c.label}
+            value={formatMoney(c.value)}
+          />
         ))}
       </div>
 
@@ -138,10 +122,10 @@ export function BalanceSheetCard() {
         </div>
       )}
 
-      <div className="rounded border border-border overflow-x-auto">
+      <div className="rounded border border-border overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-border bg-gda-bg-base text-[11px] text-muted-foreground">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Period" field="period" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Total Assets" field="total_assets" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
               <SortableHeader label="Total Liabilities" field="total_liabilities" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
@@ -161,22 +145,22 @@ export function BalanceSheetCard() {
                   {r.period}
                 </td>
                 <td className="px-3 py-2 text-right text-foreground tabular-nums">
-                  {formatMoney(r.total_assets)}
+                  {formatMoneyFull(r.total_assets)}
                 </td>
                 <td className="px-3 py-2 text-right text-foreground tabular-nums">
-                  {formatMoney(r.total_liabilities)}
+                  {formatMoneyFull(r.total_liabilities)}
                 </td>
                 <td className="px-3 py-2 text-right text-foreground tabular-nums">
-                  {formatMoney(r.total_equity)}
+                  {formatMoneyFull(r.total_equity)}
                 </td>
-                <td className="px-3 py-2 text-right text-gda-cyan tabular-nums">
-                  {formatMoney(r.cash)}
+                <td className="px-3 py-2 text-right text-foreground tabular-nums">
+                  {formatMoneyFull(r.cash)}
                 </td>
-                <td className="px-3 py-2 text-right text-gda-green tabular-nums">
-                  {formatMoney(r.accounts_receivable)}
+                <td className="px-3 py-2 text-right text-foreground tabular-nums">
+                  {formatMoneyFull(r.accounts_receivable)}
                 </td>
-                <td className="px-3 py-2 text-right text-amber-400 tabular-nums">
-                  {formatMoney(r.accounts_payable)}
+                <td className="px-3 py-2 text-right text-foreground tabular-nums">
+                  {formatMoneyFull(r.accounts_payable)}
                 </td>
               </tr>
             ))}

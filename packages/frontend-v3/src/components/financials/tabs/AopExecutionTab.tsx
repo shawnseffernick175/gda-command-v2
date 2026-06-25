@@ -6,6 +6,9 @@ import { SourceFooter } from "@/components/financials/SourceFooter";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
+import { formatMoney, formatMoneyFull } from "@/lib/format-money";
+import { Kpi } from "@/components/financials/primitives/Kpi";
+import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 
 const EXEC_SORT_COLS: ColumnSortConfig[] = [
   { field: "element", type: "string" },
@@ -110,6 +113,76 @@ export function AopExecutionTab({ fy }: { fy: string }) {
 
   return (
     <div className="space-y-6">
+      {/* KPI tiles */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Kpi label="Planned" value={formatMoney(grandPlanned)} />
+        <Kpi label="Actual" value={formatMoney(grandActual)} />
+        <Kpi
+          label="Variance"
+          value={formatMoney(grandVariance)}
+          subtitle={gapPercent !== null ? `${Number(gapPercent) > 0 ? "+" : ""}${gapPercent}%` : null}
+        />
+        <Kpi label="Elements" value={String(elementTotals.length)} />
+      </div>
+
+      {/* Plan vs Actual chart (G1) */}
+      {hasCostItems && elementTotals.length > 0 && (
+        <div className="rounded border border-border bg-white p-4">
+          <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+            Plan vs Actual by Cost Element
+          </p>
+          <ReactEChartsCore
+            echarts={echarts}
+            style={{ height: 260 }}
+            notMerge
+            option={{
+              tooltip: {
+                trigger: "axis" as const,
+                axisPointer: { type: "shadow" as const },
+                formatter: (params: Array<{ seriesName: string; value: number; marker: string }>) =>
+                  params.map((p) => `${p.marker} ${p.seriesName}: ${formatMoneyFull(p.value)}`).join("<br/>"),
+              },
+              legend: {
+                data: ["Planned", "Actual"],
+                textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+              },
+              grid: { left: 60, right: 16, top: 32, bottom: 48 },
+              xAxis: {
+                type: "category" as const,
+                data: elementTotals.map((e) =>
+                  e.element.length > 14 ? e.element.slice(0, 12) + "\u2026" : e.element,
+                ),
+                axisLabel: { color: "var(--color-fin-stone)", fontSize: 10, rotate: 15 },
+                axisLine: { lineStyle: { color: "var(--color-fin-sand)" } },
+              },
+              yAxis: {
+                type: "value" as const,
+                axisLabel: {
+                  color: "var(--color-fin-stone)",
+                  fontSize: 11,
+                  formatter: (v: number) => formatMoney(v),
+                },
+                splitLine: { lineStyle: { color: "var(--color-fin-sand)", type: "dashed" as const } },
+              },
+              series: [
+                {
+                  name: "Planned",
+                  type: "bar" as const,
+                  data: elementTotals.map((e) => e.totalPlanned),
+                  itemStyle: { color: "var(--color-fin-navy)" },
+                },
+                {
+                  name: "Actual",
+                  type: "bar" as const,
+                  data: elementTotals.map((e) => e.totalActual),
+                  itemStyle: { color: "var(--color-fin-plum)" },
+                },
+              ],
+            }}
+          />
+        </div>
+      )}
+
       {hasMetrics && (
         <div className="space-y-6">
           <h2 className="text-sm font-semibold text-foreground">
@@ -125,11 +198,11 @@ export function AopExecutionTab({ fy }: { fy: string }) {
                   FY Plan {fmt(metric.plan_total, metric.kind)}
                 </span>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
-                      <th className="py-2 pr-4 text-left font-medium">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
+                      <th className="py-2 pr-4 text-left font-medium bg-gda-bg-base">
                         {"\u2014"}
                       </th>
                       {metric.months.map((m) => (
@@ -238,10 +311,10 @@ export function AopExecutionTab({ fy }: { fy: string }) {
         </span>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto max-h-[480px] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted-foreground">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
               <SortableHeader label="Cost Element / Pool" field="element" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Planned" field="totalPlanned" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
               <SortableHeader label="Actual" field="totalActual" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
