@@ -36,12 +36,14 @@ export function Q1HeroCard({ data }: { data: KpiHeaderData }) {
             plan={data.ebit.plan !== null ? formatMoney(data.ebit.plan) : null}
             delta={data.ebit.delta}
           />
-          <MetricCell
-            label="Gross Margin"
-            value={`${data.gross_margin.value.toFixed(1)}%`}
-            plan={data.gross_margin.plan !== null ? `${data.gross_margin.plan.toFixed(1)}%` : null}
-            delta={data.gross_margin.delta}
-          />
+          {data.gross_margin && (
+            <MetricCell
+              label="Gross Margin"
+              value={`${data.gross_margin.value.toFixed(1)}%`}
+              plan={data.gross_margin.plan !== null ? `${data.gross_margin.plan.toFixed(1)}%` : null}
+              delta={data.gross_margin.delta}
+            />
+          )}
           <MetricCell
             label="ROS"
             value={`${data.ros.value.toFixed(1)}%`}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useKpiHeader } from "@/hooks/use-kpi";
 import { formatMoney } from "@/lib/format-money";
@@ -7,50 +8,40 @@ import { cn } from "@/lib/utils";
 import { ScoreExplain } from "@/components/shared/score-explainers";
 import type { ScoreType } from "@/components/shared/score-explainers";
 
-type KpiMetricKey = "orders" | "sales" | "ebit" | "gross_margin" | "ros";
+type CalendarMode = "CY" | "FY";
 
-interface KpiItem {
+type KpiMetricKey =
+  | "orders"
+  | "sales"
+  | "ebit"
+  | "ros"
+  | "funded_backlog"
+  | "backlog";
+
+interface KpiTile {
   label: string;
   key: KpiMetricKey;
   scoreType: ScoreType;
+  color: "navy" | "green";
   format: (v: number) => string;
 }
 
-const KPI_ITEMS: KpiItem[] = [
-  {
-    label: "Orders",
-    key: "orders",
-    scoreType: "orders",
-    format: formatMoney,
-  },
-  {
-    label: "Sales",
-    key: "sales",
-    scoreType: "sales",
-    format: formatMoney,
-  },
-  {
-    label: "EBIT",
-    key: "ebit",
-    scoreType: "ebit",
-    format: formatMoney,
-  },
-  {
-    label: "Gross Margin",
-    key: "gross_margin",
-    scoreType: "gross_margin",
-    format: (v) => `${v.toFixed(1)}%`,
-  },
-  {
-    label: "ROS",
-    key: "ros",
-    scoreType: "ros",
-    format: (v) => `${v.toFixed(1)}%`,
-  },
+const KPI_TILES: KpiTile[] = [
+  { label: "ORDERS", key: "orders", scoreType: "orders", color: "navy", format: formatMoney },
+  { label: "SALES", key: "sales", scoreType: "sales", color: "navy", format: formatMoney },
+  { label: "EBIT", key: "ebit", scoreType: "ebit", color: "green", format: formatMoney },
+  { label: "ROS", key: "ros", scoreType: "ros", color: "green", format: (v) => `${v.toFixed(1)}%` },
+  { label: "FUNDED BACKLOG", key: "funded_backlog", scoreType: "funded_backlog", color: "navy", format: formatMoney },
+  { label: "BACKLOG", key: "backlog", scoreType: "backlog", color: "navy", format: formatMoney },
 ];
 
+function Divider() {
+  return <div className="h-7 w-px shrink-0 bg-gray-200" />;
+}
+
 export function KpiHeader() {
-  const { data, isLoading, error } = useKpiHeader();
+  const [mode, setMode] = useState<CalendarMode>("CY");
+  const { data, isLoading, error } = useKpiHeader(mode);
 
   if (error) {
     return (
@@ -61,53 +52,80 @@ export function KpiHeader() {
   }
 
   return (
-    <div className="flex items-center gap-6 overflow-x-auto">
-      {KPI_ITEMS.map((kpi) => {
-        const item = data?.[kpi.key];
-        const value = item?.value;
-        const delta = item?.delta;
+    <div className="flex items-center gap-3">
+      {/* CY/FY Toggle */}
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          onClick={() => setMode("CY")}
+          className={cn(
+            "px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded transition-colors",
+            mode === "CY"
+              ? "bg-fin-navy text-white"
+              : "text-gray-400 hover:text-gray-200",
+          )}
+        >
+          CY
+        </button>
+        <button
+          onClick={() => setMode("FY")}
+          className={cn(
+            "px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded transition-colors",
+            mode === "FY"
+              ? "bg-fin-navy text-white"
+              : "text-gray-400 hover:text-gray-200",
+          )}
+        >
+          FY
+        </button>
+        <span className="ml-1 text-[11px] text-gray-500 whitespace-nowrap">
+          {data?.period ?? (mode === "CY" ? "CY to date" : "FY to date")}
+        </span>
+      </div>
 
-        return (
-          <span key={kpi.key} className="inline-flex items-center gap-1">
-            <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <span className="text-[11px] text-muted-foreground">
-                {kpi.label}
-              </span>
-              {isLoading ? (
-                <span className="h-3 w-12 animate-pulse rounded bg-gda-panel" />
-              ) : value != null ? (
-                <>
-                  <Link
-                    href="/financials"
-                    className="font-mono text-xs font-medium text-foreground tabular-nums hover:text-gda-green transition-colors cursor-pointer"
-                  >
-                    {kpi.format(value)}
-                  </Link>
-                  {delta != null && (
-                    <span
+      <Divider />
+
+      {/* 6 KPI Tiles */}
+      <div className="flex items-center gap-4 overflow-x-auto">
+        {KPI_TILES.map((tile, idx) => {
+          const item = data?.[tile.key];
+          const value = item?.value;
+
+          return (
+            <div key={tile.key} className="flex items-center gap-4">
+              <span className="inline-flex items-center gap-1">
+                <Link
+                  href="/financials"
+                  className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-gray-500">
+                    {tile.label}
+                  </div>
+                  {isLoading ? (
+                    <div className="h-5 w-14 animate-pulse rounded bg-gda-panel mt-0.5" />
+                  ) : (
+                    <div
                       className={cn(
-                        "font-mono text-[11px] tabular-nums",
-                        delta >= 0 ? "text-gda-green-muted" : "text-gda-red",
+                        "text-base font-bold tabular-nums",
+                        tile.color === "navy"
+                          ? "text-fin-navy"
+                          : "text-fin-chart-green",
                       )}
                     >
-                      {delta >= 0 ? "▲" : "▼"}
-                      {Math.abs(delta).toFixed(1)}%
-                    </span>
+                      {value != null ? tile.format(value) : "\u2014"}
+                    </div>
                   )}
-                </>
-              ) : (
-                <span className="text-[11px] text-muted-foreground">—</span>
-              )}
+                </Link>
+                <ScoreExplain
+                  score={value != null ? tile.format(value) : null}
+                  label={tile.label}
+                  scoreType={tile.scoreType}
+                />
+              </span>
+              {idx < KPI_TILES.length - 1 && <Divider />}
             </div>
-            <ScoreExplain
-              score={value != null ? kpi.format(value) : null}
-              label={kpi.label}
-              scoreType={kpi.scoreType}
-              inputs={{ delta }}
-            />
-          </span>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

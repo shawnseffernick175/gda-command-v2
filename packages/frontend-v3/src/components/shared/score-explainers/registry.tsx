@@ -17,6 +17,8 @@ export type ScoreType =
   | "ebit"
   | "gross_margin"
   | "ros"
+  | "funded_backlog"
+  | "backlog"
   | "signal_strength"
   | "urgency";
 
@@ -377,7 +379,25 @@ const EXPLAINERS: Record<ScoreType, Explainer> = {
       ) : null,
   },
 
-  /* ── 11. Signal Strength ────────────────────────────────────── */
+  /* ── 11. KPI: Funded Backlog ─────────────────────────────────── */
+  funded_backlog: {
+    description:
+      "Total funded value remaining on active task orders (is_seed=false).",
+    renderFormula: () => (
+      <p>SUM(task_orders.funded_to_date) WHERE is_seed = false.</p>
+    ),
+  },
+
+  /* ── 12. KPI: Backlog ────────────────────────────────────────── */
+  backlog: {
+    description:
+      "Total ceiling value (funded + unfunded) of active task orders (is_seed=false).",
+    renderFormula: () => (
+      <p>SUM(task_orders.total_ceiling) WHERE is_seed = false.</p>
+    ),
+  },
+
+  /* ── 13. Signal Strength ────────────────────────────────────── */
   signal_strength: {
     description:
       "Dot rating (1–5) on each FasTrac signal, representing overall signal quality.",
