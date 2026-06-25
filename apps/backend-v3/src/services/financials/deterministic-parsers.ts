@@ -59,12 +59,36 @@ function getAllSheetNames(text: string): string[] {
 }
 
 /**
+ * Normalize a line for fuzzy header-token matching: lowercase, drop the embedded
+ * carriage-return marker ExcelJS leaves in multi-line cells, strip parentheses
+ * (so "Prior Period(s)" matches "prior period"), and collapse whitespace.
+ */
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/_x000d_/gi, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Select a worksheet by CONTENT, not by name.
  * 1. If no [Sheet:] markers → treat entire text as one sheet.
  * 2. If only one sheet → use it.
- * 3. Otherwise → pick the sheet whose first ~15 lines best match headerSignature.
+ * 3. Otherwise → pick the sheet whose header best matches headerSignature.
  * 4. Fallback → try fallbackNames in order (legacy name-based tiebreaker).
+ *
+ * Scoring sums the count of DISTINCT signature tokens found within a sliding
+ * window of consecutive lines, not within a single line. This is essential
+ * because ExcelJS splits a header cell that contains a newline (e.g. the Trial
+ * Balance "Prior Period(s)\nYTD Activity" / "...Ending Balance" cell) across two
+ * extracted lines — so no single line carries the full signature and a per-line
+ * scorer caps the real sheet below a decoy/cover sheet that happens to mention a
+ * couple of the tokens in prose, mis-selecting it and yielding no_rows.
  */
+const SHEET_MATCH_WINDOW = 3;
+
 function getSheetLinesByContent(
   text: string,
   headerSignature: string[],
@@ -82,7 +106,7 @@ function getSheetLinesByContent(
     return lines && lines.length > 0 ? lines : null;
   }
 
-  const lowerSig = headerSignature.map((s) => s.toLowerCase());
+  const lowerSig = headerSignature.map((s) => normalizeForMatch(s));
   let bestSheet: string | null = null;
   let bestScore = 0;
 
@@ -90,9 +114,11 @@ function getSheetLinesByContent(
     const lines = getSheetLines(text, name);
     if (!lines || lines.length < 3) continue;
 
-    for (let i = 0; i < Math.min(lines.length, 15); i++) {
-      const lower = lines[i].toLowerCase().replace(/_x000d_/gi, '');
-      const matchCount = lowerSig.filter((s) => lower.includes(s)).length;
+    const scan = Math.min(lines.length, 20);
+    const norm = lines.slice(0, scan).map(normalizeForMatch);
+    for (let i = 0; i < scan; i++) {
+      const windowText = norm.slice(i, i + SHEET_MATCH_WINDOW).join(' ');
+      const matchCount = lowerSig.filter((s) => windowText.includes(s)).length;
       if (matchCount > bestScore) {
         bestScore = matchCount;
         bestSheet = name;
@@ -100,7 +126,7 @@ function getSheetLinesByContent(
     }
   }
 
-  if (bestSheet && bestScore >= Math.ceil(lowerSig.length * 0.4)) {
+  if (bestSheet && bestScore >= Math.ceil(lowerSig.length * 0.5)) {
     return getSheetLines(text, bestSheet);
   }
 
@@ -655,7 +681,7 @@ export function parseTrendSie(
 ): SieExtractOutput | null {
   const lines = getSheetLinesByContent(
     extractedText,
-    ['pool number', 'pool name'],
+    ['pool number', 'pool name', 'wrap rate'],
     ['Page1', 'Sheet1'],
   );
   if (!lines || lines.length < 4) return null;

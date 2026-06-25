@@ -691,6 +691,20 @@ export async function ingestTrialBalanceRows(
 
 type ProjectRevenueRow = ProjectRevenueExtractOutput['rows'][number];
 
+// project_revenue_actuals.margin_pct is NUMERIC(7,2): representable range is
+// [-99999.99, 99999.99]. The parser derives margin from (revenue - cost)/revenue,
+// which is unbounded — a loss project with tiny revenue and real cost yields a
+// value far outside this range (e.g. -9999900). Inserting it raises a Postgres
+// "numeric field overflow", which the per-row try/catch below would swallow,
+// silently dropping the row. Null it when it cannot be stored; the row's revenue,
+// cost, and generated profit column remain intact, and margin is recomputable.
+const PG_NUMERIC_7_2_LIMIT = 99999.99;
+function storableMarginPct(v: number | null | undefined): number | null {
+  if (v === null || v === undefined || !Number.isFinite(v)) return null;
+  if (v > PG_NUMERIC_7_2_LIMIT || v < -PG_NUMERIC_7_2_LIMIT) return null;
+  return v;
+}
+
 export async function ingestProjectRevenueRows(
   rows: ProjectRevenueRow[],
   sourceDocId?: number | null,
@@ -714,7 +728,7 @@ export async function ingestProjectRevenueRows(
         [
           row.period, row.fiscal_year, row.quarter,
           row.project_name, row.contract_number,
-          row.revenue, row.cost, row.margin_pct,
+          row.revenue, row.cost, storableMarginPct(row.margin_pct),
           sourceDocId ?? null,
         ],
       );
