@@ -5,12 +5,8 @@ import Link from "next/link";
 import { useKpiHeader } from "@/hooks/use-kpi";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { ScoreExplain } from "@/components/shared/score-explainers";
+import type { ScoreType } from "@/components/shared/score-explainers";
 
 type CalendarMode = "CY" | "FY";
 
@@ -25,41 +21,19 @@ type KpiMetricKey =
 interface KpiTile {
   label: string;
   key: KpiMetricKey;
+  scoreType: ScoreType;
   color: "navy" | "green";
   format: (v: number) => string;
 }
 
 const KPI_TILES: KpiTile[] = [
-  { label: "ORDERS", key: "orders", color: "navy", format: formatMoney },
-  { label: "SALES", key: "sales", color: "navy", format: formatMoney },
-  { label: "EBIT", key: "ebit", color: "green", format: formatMoney },
-  {
-    label: "ROS",
-    key: "ros",
-    color: "green",
-    format: (v) => `${v.toFixed(1)}%`,
-  },
-  {
-    label: "FUNDED BACKLOG",
-    key: "funded_backlog",
-    color: "navy",
-    format: formatMoney,
-  },
-  { label: "BACKLOG", key: "backlog", color: "navy", format: formatMoney },
+  { label: "ORDERS", key: "orders", scoreType: "orders", color: "navy", format: formatMoney },
+  { label: "SALES", key: "sales", scoreType: "sales", color: "navy", format: formatMoney },
+  { label: "EBIT", key: "ebit", scoreType: "ebit", color: "green", format: formatMoney },
+  { label: "ROS", key: "ros", scoreType: "ros", color: "green", format: (v) => `${v.toFixed(1)}%` },
+  { label: "FUNDED BACKLOG", key: "funded_backlog", scoreType: "funded_backlog", color: "navy", format: formatMoney },
+  { label: "BACKLOG", key: "backlog", scoreType: "backlog", color: "navy", format: formatMoney },
 ];
-
-const KPI_DEFINITIONS: Record<string, string> = {
-  ORDERS:
-    "The total value of new contract awards, task orders, and option exercises booked during a given period.",
-  SALES:
-    "Revenue recognized for work actually performed and billed during a given period.",
-  EBIT: "Earnings Before Interest and Taxes, calculated as revenue minus all direct and indirect operating costs.",
-  ROS: "Return on Sales, calculated as EBIT divided by Sales and expressed as a percentage.",
-  "FUNDED BACKLOG":
-    "Total funded value remaining on active task orders (real data only).",
-  BACKLOG:
-    "Total ceiling value (funded + unfunded) of active task orders (real data only).",
-};
 
 function Divider() {
   return <div className="h-7 w-px shrink-0 bg-gray-200" />;
@@ -118,59 +92,40 @@ export function KpiHeader() {
 
           return (
             <div key={tile.key} className="flex items-center gap-4">
-              <Link
-                href="/financials"
-                className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
-              >
-                <div className="text-[11px] font-semibold uppercase tracking-[1px] text-gray-500">
-                  {tile.label}
-                </div>
-                {isLoading ? (
-                  <div className="h-5 w-14 animate-pulse rounded bg-gda-panel mt-0.5" />
-                ) : (
-                  <div
-                    className={cn(
-                      "text-base font-bold tabular-nums",
-                      tile.color === "navy"
-                        ? "text-fin-navy"
-                        : "text-fin-chart-green",
-                    )}
-                  >
-                    {value != null ? tile.format(value) : "\u2014"}
+              <span className="inline-flex items-center gap-1">
+                <Link
+                  href="/financials"
+                  className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[1px] text-gray-500">
+                    {tile.label}
                   </div>
-                )}
-              </Link>
+                  {isLoading ? (
+                    <div className="h-5 w-14 animate-pulse rounded bg-gda-panel mt-0.5" />
+                  ) : (
+                    <div
+                      className={cn(
+                        "text-base font-bold tabular-nums",
+                        tile.color === "navy"
+                          ? "text-fin-navy"
+                          : "text-fin-chart-green",
+                      )}
+                    >
+                      {value != null ? tile.format(value) : "\u2014"}
+                    </div>
+                  )}
+                </Link>
+                <ScoreExplain
+                  score={value != null ? tile.format(value) : null}
+                  label={tile.label}
+                  scoreType={tile.scoreType}
+                />
+              </span>
               {idx < KPI_TILES.length - 1 && <Divider />}
             </div>
           );
         })}
       </div>
-
-      {/* Info tooltip */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger className="ml-2 shrink-0 text-gray-500 hover:text-gray-300 transition-colors text-sm cursor-pointer">
-            &#9432;
-          </TooltipTrigger>
-          <TooltipContent
-            side="bottom"
-            align="end"
-            className="max-w-sm bg-gda-panel border border-border p-3"
-          >
-            <div className="font-bold text-fin-navy text-xs mb-2">
-              KPI Definitions
-            </div>
-            <div className="space-y-1.5">
-              {Object.entries(KPI_DEFINITIONS).map(([label, definition]) => (
-                <div key={label} className="text-[11px] leading-relaxed">
-                  <span className="font-bold text-fin-navy">{label}:</span>{" "}
-                  <span className="text-muted-foreground">{definition}</span>
-                </div>
-              ))}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
     </div>
   );
 }
