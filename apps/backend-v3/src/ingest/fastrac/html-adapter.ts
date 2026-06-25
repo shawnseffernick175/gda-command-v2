@@ -12,6 +12,7 @@
 import * as cheerio from 'cheerio';
 import { logger } from '../../lib/logger.js';
 import { inferHorizon, inferSignalType, extractMissionTags } from './normalize.js';
+import { isCommoditySignal } from './commodity-filter.js';
 import type { FasTracSignal, SourceConfig } from './types.js';
 
 const REQUEST_TIMEOUT_MS = 20_000;
@@ -151,7 +152,15 @@ export async function fetchHTMLSignals(source: SourceConfig): Promise<FasTracSig
       .sort((a, b) => b.score - a.score)
       .slice(0, 50); // cap at 50 signals per page
 
+    let commodityRejected = 0;
     for (const link of scored) {
+      // F-631: reject commodity/supply/facilities junk
+      const filter = isCommoditySignal(link.title);
+      if (filter.rejected) {
+        commodityRejected++;
+        continue;
+      }
+
       const textBlob = link.title;
       const signal: FasTracSignal = {
         source: source.name,
@@ -168,8 +177,15 @@ export async function fetchHTMLSignals(source: SourceConfig): Promise<FasTracSig
       signals.push(signal);
     }
 
+    if (commodityRejected > 0) {
+      logger.debug(
+        { source: source.name, url: pageUrl, commodityRejected },
+        'fastrac_html_commodity_filtered',
+      );
+    }
+
     logger.info(
-      { source: source.name, url: pageUrl, linksFound: links.length, signalsKept: scored.length },
+      { source: source.name, url: pageUrl, linksFound: links.length, signalsKept: scored.length - commodityRejected },
       'fastrac_html_scraped',
     );
   }
