@@ -573,7 +573,6 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
       const tables = [
         'financial_actuals',
-        'financial_plan',
         'balance_sheet_actuals',
         'cost_detail_actuals',
         'indirect_expense_actuals',
