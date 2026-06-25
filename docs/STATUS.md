@@ -1,10 +1,31 @@
 # GDA Command v2 — Operational Status
 
-**Last Updated:** 2026-06-18
+**Last Updated:** 2026-06-25
 **Production:** https://gda.csr-llc.tech
 **Repository:** https://github.com/shawnseffernick175/gda-command-v2
 **Latest commit on main (live in prod):** `74986e1` (migration-parity baseline 42→19 + grade-removal doc fix, PR #897)
 **Schema version in prod:** `v3_102_capture_review_engine`
+
+---
+
+## 0. Session Reconciliation — 2026-06-25
+
+Work completed this session (Financial Bible defect pass + FORCE booking + rate recommendation):
+
+1. **FORCE task order booked to Orders ($107,279,341.63).** Fully-executed FORCE task order (W15P7T19D0206 / W56KGU26FA010, W6QK ACC-APG, Army Aberdeen Proving Ground) loaded to the vault as doc id=194 (bucket "contract"). `task_orders` id=5 updated with real ceiling $107,279,341.63, funded $30,000, PoP 2026-06-15 → 2031-12-30, `is_seed=false` (now the only non-seed task order). Booked $107,279,341.63 to Orders in `financial_actuals` (source='income_statement', period='FY26 Jun', FY2026 Q3, `is_seed=false`, source_doc_id=194). **Revenue/billing stays $0 until July 1, 2026** per operator instruction — FORCE per-year amounts (Base Yr through 6-mo extension) tie to $107.3M exactly, spread = each contract year (Jul1–Jun30) ÷ 12.
+
+2. **Financial Bible full-tab audit complete; 5 devin-ready GitHub issues filed.** Operator verdicts: AI Analyze and Definitions tabs are GOOD (no change). All other tabs have defects, now specced in:
+   - **#994** Global UI rules (exec charts, sticky+sortable tables, number formatting, visual alignment)
+   - **#995** KPI Header rebuild — 6-tile exec header (ORDERS · SALES · EBIT · ROS · FUNDED BACKLOG · BACKLOG), CY/FY selector on header, CY-to-date default, real Orders/Backlog wiring
+   - **#996** Backend quick fixes — Ingestion Coverage 500 crash, remove AOP Capture tab from FB, FORCE note cleanup (Vault ID 120 → 194)
+   - **#997** Contract Waterfall rebuild — revenue+profit forecast (was a Gantt), ceiling/12 spread, per-contract margin, pipeline layer
+   - **#998** Parser/data fixes — Project Revenue mapping, AP detail, AR 4-bucket aging, IS/AOP dedup + GM units + month ordering
+   - Full spec preserved at `docs/dev-notes/2026-06-25_fb-defect-spec.md`.
+   - Devin opened PRs **#999 (→#996), #1000 (→#997), #1001 (→#995)**; as of session end CI was not yet clean-green on any (Schema dry-run, Lighthouse, token/JSX lint failures). No PR yet for #994 or #998.
+
+3. **Envision indirect rate recommendation produced for the CFO.** Forward-pricing rates derived from FY26 YTD trial balance, reconciled to Envision's own allocation pools: Fringe 36.0%, Overhead 49.6% onsite / 54.7% offsite, G&A 4.7%, Material Handling 1.4%. Wrap ~1.94x onsite / ~2.00x offsite; bill ~2.10–2.20x at 8–10% fee. Book-derived, NOT DCAA-approved. Recorded at `docs/canonical/envision_indirect_rates_v1.md`. Feeds the <8% gross-margin doctrine rule.
+
+**Open threads:** (a) Review/merge/deploy/verify Devin PRs #999–1001 + remaining issues #994, #998 as PRs land. (b) AR-by-contract breakdown — pending operator's BVN/subcontractor→contract mapping.
 
 ---
 
