@@ -23,7 +23,7 @@ export const COMMODITY_KEYWORDS: string[] = [
   // Mechanical parts / hardware
   'assembly',
   'bushing',
-  'seal\\b',
+  'seal',
   'cable',
   'valve',
   'fitting',
@@ -97,7 +97,7 @@ export const COMMODITY_KEYWORDS: string[] = [
  * Each keyword is wrapped in a case-insensitive regex.
  */
 const COMMODITY_REGEXES: RegExp[] = COMMODITY_KEYWORDS.map(
-  (kw) => new RegExp(kw, 'i'),
+  (kw) => kw.includes(' ') ? new RegExp(`\\b${kw}`, 'i') : new RegExp(`\\b${kw}\\b`, 'i'),
 );
 
 /**

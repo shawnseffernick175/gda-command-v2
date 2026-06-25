@@ -135,6 +135,24 @@ describe('isCommoditySignal', () => {
     });
   });
 
+  // ── Word boundary correctness ─────────────────────────────────
+  describe('word boundaries prevent substring false positives', () => {
+    const nonCommodityTitles = [
+      'Springfield Arsenal Innovation Lab',
+      'Springboard Accelerator Program',
+      'Nutmeg State Innovation Challenge',
+      'Screwtape Letters AI Analysis',
+      'Bolted-On Security Architecture',
+    ];
+
+    for (const title of nonCommodityTitles) {
+      it(`does NOT reject substring false positive: "${title}"`, () => {
+        const result = isCommoditySignal(title);
+        expect(result.rejected).toBe(false);
+      });
+    }
+  });
+
   // ── Edge cases ────────────────────────────────────────────────
   describe('edge cases', () => {
     it('handles empty title', () => {
