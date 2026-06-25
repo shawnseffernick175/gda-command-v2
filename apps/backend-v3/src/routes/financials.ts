@@ -728,7 +728,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // GET /v3/financials/contract-waterfall?from=YYYY-MM-DD&to=YYYY-MM-DD&parent_vehicle_id=&status=
-  // Returns task orders (NOT IDIQs) for the Gantt waterfall view.
+  // Revenue/profit forecast waterfall: spreads each signed task order's ceiling
+  // into monthly projected revenue over its PoP. Includes per-contract margin
+  // and a pipeline scaffold layer.
   app.get('/v3/financials/contract-waterfall', async (req, reply) => {
     const q = req.query as Record<string, string>;
     const today = new Date().toISOString().slice(0, 10);
@@ -768,76 +770,170 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       params.push(primeOrSub);
     }
 
+    // 1. Fetch signed task orders
     const { rows } = await pool.query(
       `SELECT t.id, t.to_name, t.to_number,
               t.parent_vehicle_id, t.parent_vehicle_short_name,
-              t.prime_or_sub, t.customer_agency, t.contracting_office,
-              t.pop_start, t.pop_end, t.base_pop_end,
-              t.option_periods, t.total_ceiling, t.funded_to_date,
-              t.status, t.cpars_status, t.notes,
+              t.prime_or_sub, t.pop_start, t.pop_end,
+              t.total_ceiling, t.funded_to_date, t.status,
               cv.short_name AS cv_short_name
        FROM task_orders t
        LEFT JOIN contract_vehicles cv ON cv.id = t.parent_vehicle_id
        ${whereClause}
-       ORDER BY t.parent_vehicle_short_name NULLS LAST, t.pop_end NULLS LAST, t.to_name`,
+       ORDER BY t.parent_vehicle_short_name NULLS LAST, t.to_name`,
       params,
     );
 
-    // Assign colors per parent IDIQ for grouping
-    const vehicleColors: Record<string, string> = {
-      'RS3': '#01696F',
-      'TRAYSYS': '#2D6A4F',
-      'Seaport NxG': '#1B4332',
-      'GSA MAS': '#3D405B',
-      'OASIS SB Pool 1': '#5F0F40',
-      'OASIS SB Pool 3': '#6A4C93',
-      'eFAST': '#264653',
-      'EAGLE': '#2A9D8F',
-      'TSS-E': '#E76F51',
-      'CIO-SP3 SB': '#F4A261',
-      'CIO-SP3 8(a)': '#E9C46A',
-    };
+    // 2. Fetch per-contract margins from project_revenue_actuals
+    const { rows: marginRows } = await pool.query(
+      `SELECT contract_number,
+              COALESCE(AVG(margin_pct), 0) AS avg_margin_pct,
+              SUM(revenue) AS total_revenue,
+              SUM(cost) AS total_cost
+       FROM project_revenue_actuals
+       WHERE contract_number IS NOT NULL
+       GROUP BY contract_number`,
+    );
+    const marginByContract = new Map<string, number>();
+    let portfolioTotalRev = 0;
+    let portfolioTotalCost = 0;
+    for (const m of marginRows) {
+      const pct = Number(m.avg_margin_pct);
+      if (m.contract_number) marginByContract.set(m.contract_number as string, pct);
+      portfolioTotalRev += Number(m.total_revenue || 0);
+      portfolioTotalCost += Number(m.total_cost || 0);
+    }
+    const portfolioAvgMargin = portfolioTotalRev > 0
+      ? ((portfolioTotalRev - portfolioTotalCost) / portfolioTotalRev) * 100
+      : 15; // default 15% if no data
 
-    const taskOrders = rows.map((r) => {
-      const popEnd = r.pop_end ? new Date(r.pop_end as string) : null;
-      const todayDate = new Date(today);
-      const daysUntilExpiration = popEnd
-        ? Math.ceil((popEnd.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24))
-        : null;
+    // 3. Build contract forecasts
+    const contracts: {
+      id: number;
+      to_name: string;
+      to_number: string;
+      parent_vehicle_short_name: string | null;
+      ceiling: number;
+      funded_to_date: number;
+      pop_start: string;
+      pop_end: string;
+      annual_revenue: number;
+      monthly_revenue: number;
+      margin_pct: number;
+      margin_source: 'actual' | 'portfolio_average';
+      status: string;
+    }[] = [];
 
+    // Map of month -> { contract_id -> { funded_revenue, unfunded_revenue, profit } }
+    const monthlyMap = new Map<string, Map<number, { funded_revenue: number; unfunded_revenue: number; profit: number }>>();
+
+    for (const r of rows) {
+      const id = Number(r.id);
+      const toName = r.to_name as string;
+      const toNumber = r.to_number as string;
       const parentShort = (r.parent_vehicle_short_name as string | null) ?? (r.cv_short_name as string | null);
+      const ceiling = r.total_ceiling !== null ? Number(r.total_ceiling) : 0;
+      const fundedToDate = r.funded_to_date !== null ? Number(r.funded_to_date) : 0;
+      const popStart = r.pop_start ? (r.pop_start as string) : null;
+      const popEnd = r.pop_end ? (r.pop_end as string) : null;
+
+      if (!popStart || !popEnd || ceiling <= 0) continue;
+
+      // Spread method: ceiling / 12 = annual revenue, / 12 again = monthly
+      const annualRevenue = ceiling / 12;
+      const monthlyRevenue = annualRevenue / 12;
+
+      // Per-contract margin lookup
+      let marginPct = marginByContract.get(toNumber) ?? null;
+      const marginSource: 'actual' | 'portfolio_average' = marginPct !== null ? 'actual' : 'portfolio_average';
+      if (marginPct === null) marginPct = portfolioAvgMargin;
+
+      contracts.push({
+        id,
+        to_name: toName,
+        to_number: toNumber,
+        parent_vehicle_short_name: parentShort,
+        ceiling,
+        funded_to_date: fundedToDate,
+        pop_start: popStart,
+        pop_end: popEnd,
+        annual_revenue: annualRevenue,
+        monthly_revenue: monthlyRevenue,
+        margin_pct: Math.round(marginPct * 100) / 100,
+        margin_source: marginSource,
+        status: r.status as string,
+      });
+
+      // Generate monthly buckets from pop_start to pop_end
+      const start = new Date(popStart);
+      const end = new Date(popEnd);
+      let cumulativeRevenue = 0;
+
+      const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+      const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
+      while (cur <= endMonth) {
+        const monthKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+        cumulativeRevenue += monthlyRevenue;
+
+        // Determine funded vs unfunded based on cumulative recognition vs funded_to_date
+        let fundedRev: number;
+        let unfundedRev: number;
+        if (cumulativeRevenue <= fundedToDate) {
+          fundedRev = monthlyRevenue;
+          unfundedRev = 0;
+        } else if (cumulativeRevenue - monthlyRevenue >= fundedToDate) {
+          fundedRev = 0;
+          unfundedRev = monthlyRevenue;
+        } else {
+          fundedRev = fundedToDate - (cumulativeRevenue - monthlyRevenue);
+          unfundedRev = monthlyRevenue - fundedRev;
+        }
+
+        const profit = monthlyRevenue * (marginPct / 100);
+
+        if (!monthlyMap.has(monthKey)) monthlyMap.set(monthKey, new Map());
+        const contractMap = monthlyMap.get(monthKey)!;
+        contractMap.set(id, { funded_revenue: fundedRev, unfunded_revenue: unfundedRev, profit });
+
+        cur.setMonth(cur.getMonth() + 1);
+      }
+    }
+
+    // 4. Build sorted time series
+    const allMonths = Array.from(monthlyMap.keys()).sort();
+    const forecast = allMonths.map((month) => {
+      const contractMap = monthlyMap.get(month)!;
+      let totalRevenue = 0;
+      let totalProfit = 0;
+      let totalFunded = 0;
+      let totalUnfunded = 0;
+      const byContract: { contract_id: number; funded_revenue: number; unfunded_revenue: number; profit: number }[] = [];
+
+      for (const [contractId, data] of contractMap) {
+        totalRevenue += data.funded_revenue + data.unfunded_revenue;
+        totalProfit += data.profit;
+        totalFunded += data.funded_revenue;
+        totalUnfunded += data.unfunded_revenue;
+        byContract.push({
+          contract_id: contractId,
+          funded_revenue: Math.round(data.funded_revenue * 100) / 100,
+          unfunded_revenue: Math.round(data.unfunded_revenue * 100) / 100,
+          profit: Math.round(data.profit * 100) / 100,
+        });
+      }
 
       return {
-        id: Number(r.id),
-        to_name: r.to_name as string,
-        to_number: r.to_number as string,
-        parent_vehicle_id: r.parent_vehicle_id ? Number(r.parent_vehicle_id) : null,
-        parent_vehicle_short_name: parentShort,
-        parent_color: parentShort ? (vehicleColors[parentShort] ?? '#7A7974') : '#7A7974',
-        prime_or_sub: r.prime_or_sub as string,
-        customer_agency: r.customer_agency as string | null,
-        contracting_office: r.contracting_office as string | null,
-        pop_start: r.pop_start ? (r.pop_start as string) : null,
-        pop_end: r.pop_end ? (r.pop_end as string) : null,
-        base_pop_end: r.base_pop_end ? (r.base_pop_end as string) : null,
-        option_periods: r.option_periods ?? null,
-        ceiling: r.total_ceiling !== null ? Number(r.total_ceiling) : null,
-        funded_to_date: r.funded_to_date !== null ? Number(r.funded_to_date) : null,
-        status: r.status as string,
-        cpars_status: r.cpars_status as string | null,
-        days_until_expiration: daysUntilExpiration,
-        is_expiring_soon: daysUntilExpiration !== null && daysUntilExpiration > 0 && daysUntilExpiration <= 365,
-        notes: r.notes as string | null,
+        month,
+        total_revenue: Math.round(totalRevenue * 100) / 100,
+        total_profit: Math.round(totalProfit * 100) / 100,
+        total_funded: Math.round(totalFunded * 100) / 100,
+        total_unfunded: Math.round(totalUnfunded * 100) / 100,
+        by_contract: byContract,
       };
     });
 
-    // Compute range metadata
-    const allStarts = taskOrders.filter((t) => t.pop_start).map((t) => t.pop_start as string);
-    const allEnds = taskOrders.filter((t) => t.pop_end).map((t) => t.pop_end as string);
-    const earliestPop = allStarts.length > 0 ? allStarts.sort()[0] : null;
-    const latestPop = allEnds.length > 0 ? allEnds.sort().reverse()[0] : null;
-
-    // Fetch available parent vehicles for filters (only from real data)
+    // 5. Fetch available parent vehicles for filters
     const { rows: vehicleRows } = await pool.query(
       `SELECT DISTINCT cv.id, cv.short_name
        FROM contract_vehicles cv
@@ -847,13 +943,18 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     );
 
     return reply.send(successEnvelope({
-      task_orders: taskOrders,
+      contracts,
+      forecast,
+      pipeline: [], // CW-3: scaffold — empty until pipeline data source is wired
+      spread_method: 'ceiling_div_12_annual',
+      portfolio_avg_margin: Math.round(portfolioAvgMargin * 100) / 100,
       today,
-      earliest_pop: earliestPop,
-      latest_pop: latestPop,
       available_vehicles: vehicleRows.map((v) => ({ id: Number(v.id), short_name: v.short_name as string })),
       meta: {
-        sources: [{ table: 'task_orders', row_count: taskOrders.length }],
+        sources: [
+          { table: 'task_orders', row_count: contracts.length },
+          { table: 'project_revenue_actuals', row_count: marginRows.length },
+        ],
         last_refresh: new Date().toISOString(),
         period: null,
       },

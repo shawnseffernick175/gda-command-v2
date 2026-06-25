@@ -1146,11 +1146,49 @@ export interface TaskOrderRow {
   notes: string | null;
 }
 
+export interface WaterfallContract {
+  id: number;
+  to_name: string;
+  to_number: string;
+  parent_vehicle_short_name: string | null;
+  ceiling: number;
+  funded_to_date: number;
+  pop_start: string;
+  pop_end: string;
+  annual_revenue: number;
+  monthly_revenue: number;
+  margin_pct: number;
+  margin_source: "actual" | "portfolio_average";
+  status: string;
+}
+
+export interface WaterfallForecastMonth {
+  month: string;
+  total_revenue: number;
+  total_profit: number;
+  total_funded: number;
+  total_unfunded: number;
+  by_contract: {
+    contract_id: number;
+    funded_revenue: number;
+    unfunded_revenue: number;
+    profit: number;
+  }[];
+}
+
+export interface WaterfallPipelineMonth {
+  month: string;
+  weighted_value: number;
+  opportunities: { name: string; value: number; pwin: number }[];
+}
+
 export interface ContractWaterfallData {
-  task_orders: TaskOrderRow[];
+  contracts: WaterfallContract[];
+  forecast: WaterfallForecastMonth[];
+  pipeline: WaterfallPipelineMonth[];
+  spread_method: "ceiling_div_12_annual" | "ceiling_div_pop_months";
+  portfolio_avg_margin: number;
   today: string;
-  earliest_pop: string | null;
-  latest_pop: string | null;
   available_vehicles: { id: number; short_name: string }[];
   meta: FinancialMeta;
 }
