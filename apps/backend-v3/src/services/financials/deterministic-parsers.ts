@@ -248,11 +248,19 @@ function buildColumnMap(headerLine: string): Map<string, number> {
   return map;
 }
 
-/** Get column value by approximate key match. */
+/** Get column value by approximate key match (exact then substring). */
 function getCol(cols: string[], colMap: Map<string, number>, ...keys: string[]): string {
+  // Exact match first
   for (const key of keys) {
     const idx = colMap.get(key.toLowerCase());
     if (idx !== undefined && idx < cols.length) return cols[idx];
+  }
+  // Substring fallback: handle format drift where headers contain extra words
+  for (const key of keys) {
+    const lk = key.toLowerCase();
+    for (const [header, idx] of colMap.entries()) {
+      if (header.includes(lk) && idx < cols.length) return cols[idx];
+    }
   }
   return '';
 }
@@ -344,13 +352,6 @@ export function parseAgedAr(
 
     if (total === 0 && currentAmt === 0 && days31_60 === 0 && days61_90 === 0 && days91plus === 0) continue;
 
-    // Determine age bucket from which column is non-zero
-    let ageBucket = 'Current';
-    if (days91plus !== 0) ageBucket = 'Over 90';
-    else if (days61_90 !== 0) ageBucket = '61-90';
-    else if (days31_60 !== 0) ageBucket = '31-60';
-
-    const amount = total !== 0 ? total : (currentAmt + days31_60 + days61_90 + days91plus);
     const customerName = currentCustomer || firstCol || projectCol;
 
     // Parse due date — handles ISO, US date, and JS Date.toString() format
@@ -377,17 +378,27 @@ export function parseAgedAr(
       }
     }
 
-    rows.push({
-      period: periodInfo.period,
-      fiscal_year: periodInfo.fiscal_year,
-      quarter: periodInfo.quarter,
-      customer_name: customerName,
-      invoice_number: invoiceCol || null,
-      invoice_date: null,
-      due_date: dueDate,
-      amount,
-      age_bucket: ageBucket,
-    });
+    // Emit one row per non-zero aging bucket (AR-DATA-1: capture all 4 buckets)
+    const buckets: Array<{ bucket: string; amt: number }> = [
+      { bucket: 'Current', amt: currentAmt },
+      { bucket: '31-60', amt: days31_60 },
+      { bucket: '61-90', amt: days61_90 },
+      { bucket: 'Over 90', amt: days91plus },
+    ];
+    for (const { bucket, amt } of buckets) {
+      if (amt === 0) continue;
+      rows.push({
+        period: periodInfo.period,
+        fiscal_year: periodInfo.fiscal_year,
+        quarter: periodInfo.quarter,
+        customer_name: customerName,
+        invoice_number: invoiceCol || null,
+        invoice_date: null,
+        due_date: dueDate,
+        amount: Math.abs(amt),
+        age_bucket: bucket,
+      });
+    }
   }
 
   if (rows.length === 0) return null;
@@ -445,22 +456,37 @@ export function parseProjectRevenueSummary(
     const displayName = projectName || projectId;
     const contractNum = projectId || null;
 
-    // Look for revenue/cost columns - try various likely names
-    const itdValue = parseNum(getCol(cols, colMap, 'itd value', 'itd revenue', 'total revenue', 'revenue'));
+    // Period-specific columns (preferred — these are the single-period values)
+    const periodRevenue = parseNum(getCol(cols, colMap,
+      'actual period revenue', 'period revenue', 'current revenue',
+      'current period revenue', 'act period revenue', 'act per revenue',
+      'act. period revenue', 'actual per revenue'));
+    const periodCosts = parseNum(getCol(cols, colMap,
+      'actual period costs', 'period costs', 'current costs',
+      'current period costs', 'act period costs', 'act per costs',
+      'act. period costs', 'actual per costs'));
+    const periodProfit = parseNum(getCol(cols, colMap,
+      'actual period profit', 'period profit', 'current profit',
+      'current period profit', 'act period profit', 'act per profit'));
+
+    // ITD columns (only used as signal that a row has data, never as revenue)
     const itdFunding = parseNum(getCol(cols, colMap, 'itd funding'));
-    const itdCosts = parseNum(getCol(cols, colMap, 'actual itd costs', 'itd costs', 'total costs', 'cost', 'costs'));
+    const itdValue = parseNum(getCol(cols, colMap, 'itd value', 'itd revenue', 'total revenue'));
 
-    // Also check for period-specific columns (real headers use "Actual Period Revenue/Costs")
-    const periodRevenue = parseNum(getCol(cols, colMap, 'actual period revenue', 'period revenue', 'current revenue', 'current period revenue'));
-    const periodCosts = parseNum(getCol(cols, colMap, 'actual period costs', 'period costs', 'current costs', 'current period costs'));
+    // Revenue/cost: use period columns only — never fall back to ITD cumulative
+    // values which inflate monthly totals by the full contract lifetime amount.
+    const revenue = periodRevenue;
+    const cost = periodCosts;
 
-    const revenue = periodRevenue !== 0 ? periodRevenue : itdValue;
-    const cost = periodCosts !== 0 ? periodCosts : itdCosts;
+    // Skip rows with no financial data at all
+    if (revenue === 0 && cost === 0 && itdFunding === 0 && itdValue === 0) continue;
 
-    // Skip rows with no financial data at all (no revenue, no cost, no funding)
-    if (revenue === 0 && cost === 0 && itdFunding === 0) continue;
-
-    const marginPct = revenue !== 0 ? Math.round(((revenue - cost) / revenue) * 10000) / 100 : null;
+    // Compute margin from period values; clamp to plausible range
+    let marginPct: number | null = null;
+    if (revenue !== 0) {
+      const raw = ((revenue - cost) / revenue) * 100;
+      marginPct = raw > 200 || raw < -200 ? null : Math.round(raw * 100) / 100;
+    }
 
     rows.push({
       period: periodInfo.period,
@@ -492,11 +518,27 @@ export function parseOpenAp(
   extractedText: string,
   filename: string,
 ): ApExtractOutput | null {
-  const lines = getSheetLinesByContent(
+  // Try primary signature, then relaxed signatures to handle month-to-month
+  // layout drift (AP-DATA-2). Some months omit 'voucher' or rename 'amount'.
+  let lines = getSheetLinesByContent(
     extractedText,
     ['vendor', 'voucher', 'invoice', 'amount'],
     ['Detail', 'Sheet1', 'Page1'],
   );
+  if (!lines || lines.length < 3) {
+    lines = getSheetLinesByContent(
+      extractedText,
+      ['vendor', 'invoice', 'due'],
+      ['Detail', 'Sheet1', 'Page1'],
+    );
+  }
+  if (!lines || lines.length < 3) {
+    lines = getSheetLinesByContent(
+      extractedText,
+      ['vendor', 'amount'],
+      ['Detail', 'Sheet1', 'Page1', 'AP Detail'],
+    );
+  }
   if (!lines || lines.length < 3) return null;
 
   const periodInfo = inferPeriod(filename);
@@ -505,12 +547,13 @@ export function parseOpenAp(
     return null;
   }
 
-  // Find header row - strip _x000D_ when searching
+  // Find header row - strip _x000D_ when searching; handle varied month formats
   let headerIdx = -1;
   for (let i = 0; i < Math.min(lines.length, 10); i++) {
     const cleaned = lines[i].replace(/_x000D_/gi, '').replace(/\r/g, '').toLowerCase();
-    if ((cleaned.includes('vendor') || cleaned.includes('voucher')) &&
-        (cleaned.includes('invoice') || cleaned.includes('amount') || cleaned.includes('due'))) {
+    if ((cleaned.includes('vendor') || cleaned.includes('voucher') || cleaned.includes('supplier')) &&
+        (cleaned.includes('invoice') || cleaned.includes('amount') || cleaned.includes('due') ||
+         cleaned.includes('balance') || cleaned.includes('total'))) {
       headerIdx = i;
       break;
     }
@@ -563,8 +606,22 @@ export function parseOpenAp(
     const invoiceDateRaw = getCol(cols, colMap, 'invoice date', 'invoice_date') || '';
     const dueDateRaw = getCol(cols, colMap, 'due date', 'due_date') || '';
 
-    // Find amount columns
-    const amountStr = getCol(cols, colMap, 'amount', 'current', 'balance', 'total', 'open amount', 'invoice amount');
+    // Find amount columns — try many patterns to handle month-to-month layout drift
+    let amountStr = getCol(cols, colMap,
+      'amount', 'amount due', 'balance', 'balance due', 'total',
+      'open amount', 'invoice amount', 'current', 'net amount',
+      'amt', 'amt due', 'document amount', 'original amount',
+      'open balance', 'remaining amount', 'amount remaining');
+    // Positional fallback: if getCol found nothing, try the last numeric column
+    if (!amountStr) {
+      for (let ci = cols.length - 1; ci >= 3; ci--) {
+        const candidate = cols[ci];
+        if (candidate && /^[\s$()\d,.-]+$/.test(candidate) && parseNum(candidate) !== 0) {
+          amountStr = candidate;
+          break;
+        }
+      }
+    }
     const amount = parseNum(amountStr);
 
     // If no identifiable data, skip
