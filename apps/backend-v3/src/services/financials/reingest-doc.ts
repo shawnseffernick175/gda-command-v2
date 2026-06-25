@@ -38,6 +38,124 @@ import {
   parseProjectRevenueSummary,
 } from './deterministic-parsers.js';
 
+/**
+ * Per-document parser routing flags. One boolean per financial doc type. A doc
+ * may legitimately match more than one (e.g. an FS-detail PDF that contains both
+ * an income statement and a balance sheet), but a specialized type (AR / AP /
+ * Trial Balance / SIE / Cost Detail / Project Revenue / Balance Sheet) is
+ * mutually exclusive with the generic P&L parser: see `is_financial` below.
+ */
+export interface FinancialDocClassification {
+  is_financial: boolean;
+  is_balance_sheet: boolean;
+  is_cost_detail: boolean;
+  is_sie: boolean;
+  is_ap: boolean;
+  is_ar: boolean;
+  is_trial_balance: boolean;
+  is_project_revenue: boolean;
+}
+
+/**
+ * Decide which financial parser(s) a document should be routed to.
+ *
+ * WHY THIS EXISTS: the previous routing was filename-only and the P&L gate
+ * (`/financ|...|proj|revenue|.../`) matched any file with "proj" or "revenue" in
+ * its name — so a "Full Proj Revenue Summary" file was ALSO run through
+ * `financial_statement_extract`, which rejected every row ("implausible
+ * financial row — not stored") and produced log noise, while the file's own
+ * project-revenue rows depended on a separate, brittle filename check. The same
+ * brittleness meant a doc whose filename didn't carry the exact token never
+ * reached its correct parser at all.
+ *
+ * The fix routes by EITHER signal:
+ *   (a) a filename keyword, OR
+ *   (b) a header-signature sniff of the extracted text head.
+ * A doc routes to a specialized parser when either matches. The generic P&L
+ * parser (`is_financial`) is then SUPPRESSED whenever any specialized type
+ * matched, so non-P&L docs are never fed to `financial_statement_extract`.
+ *
+ * The content head is normalized (lowercased, `_x000D_` and newlines collapsed
+ * to spaces) so header cells that ExcelJS splits across lines — e.g. the Trial
+ * Balance "Prior Period(s)\nYTD Activity ... Ending Balance" cell — still match.
+ */
+export function classifyFinancialDoc(
+  filename: string,
+  extractedText: string,
+  docType?: string | null,
+): FinancialDocClassification {
+  const fn = filename || '';
+  const head = (extractedText || '').slice(0, 2000);
+  const headNorm = head
+    .toLowerCase()
+    .replace(/_x000d_/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // --- Specialized types: filename keyword OR header-signature content sniff ---
+  const is_project_revenue =
+    /proj.*revenue|revenue.*summary|full.?proj/i.test(fn) ||
+    (/revenue project/.test(headNorm) && /\bitd\b/.test(headNorm));
+
+  const is_ar =
+    /aged.?ar|accounts?.?receivable|\bar\b/i.test(fn) ||
+    (/customer/.test(headNorm) &&
+      /invoice/.test(headNorm) &&
+      /(due date|31 to 60|61 to 90|over 90|current)/.test(headNorm));
+
+  const is_trial_balance =
+    /trial.?balance|trail.?balance/i.test(fn) ||
+    (/account/.test(headNorm) &&
+      /beginning balance/.test(headNorm) &&
+      /ending balance/.test(headNorm));
+
+  const is_sie =
+    /\bsie\b|statement.?of.?indirect|trend.?rate|trend.?sie/i.test(fn) ||
+    /indirect.?expense/.test(headNorm) ||
+    ((/pool number/.test(headNorm) || /pool name/.test(headNorm)) &&
+      (/wrap rate/.test(headNorm) || /trend rate/.test(headNorm) || /\bact\b/.test(headNorm)));
+
+  const is_ap =
+    /\bap\b|accounts?.?payable|open.?ap/i.test(fn) ||
+    /accounts?.?payable|open.?ap|\bap\b/i.test(head) ||
+    (/vendor/.test(headNorm) && /voucher/.test(headNorm));
+
+  const is_cost_detail =
+    /tgt.?vs.?act|target.?vs.?actual|cost.?detail|gl.?detail|ytd.?gl/i.test(fn) ||
+    /cost.?detail|gl.?detail/i.test(head) ||
+    /proj classification/.test(headNorm);
+
+  const is_balance_sheet = /balance.?sheet/i.test(fn) || /balance.?sheet/i.test(head);
+
+  const anySpecialized =
+    is_balance_sheet ||
+    is_cost_detail ||
+    is_sie ||
+    is_ap ||
+    is_ar ||
+    is_trial_balance ||
+    is_project_revenue;
+
+  // Generic P&L / KPI parser. The keyword set is intentionally broad (it must
+  // catch L1-TARGET / L1-ACTUAL income statements), but it is gated on
+  // `!anySpecialized` so it NEVER fires on a doc that already matched a
+  // specialized type — that gate is the core of the fix.
+  const looksFinancialKeyword =
+    /financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\bact\b/i.test(fn);
+  const is_financial = (looksFinancialKeyword || docType === 'financial') && !anySpecialized;
+
+  return {
+    is_financial,
+    is_balance_sheet,
+    is_cost_detail,
+    is_sie,
+    is_ap,
+    is_ar,
+    is_trial_balance,
+    is_project_revenue,
+  };
+}
+
 export interface ReingestResult {
   plan: number;
   actual: number;
@@ -91,14 +209,13 @@ export async function reingestFinancialDoc(params: {
     return result;
   }
 
-  const head = extractedText.slice(0, 2000);
+  // Route by filename keyword OR header-signature content sniff. Specialized
+  // types suppress the generic P&L parser so non-P&L docs are never fed to
+  // financial_statement_extract (which would reject every row as "implausible").
+  const cls = classifyFinancialDoc(filename, extractedText, docType);
 
   // --- Parser 1: KPI (Income Statement / L1-TARGET / L1-ACTUAL) ---
-  // Same gate the upload route uses, plus the explicit doc_type=financial force.
-  const looksFinancial =
-    /financ|p&l|income|balance|budget|forecast|tgt|target|plan|proj|revenue|\bact\b/i.test(filename) ||
-    docType === 'financial';
-  if (looksFinancial && !skipParsers.includes('financial_statement_extract')) {
+  if (cls.is_financial && !skipParsers.includes('financial_statement_extract')) {
     try {
       const finResult = await llmRouter.route({
         task: 'financial_statement_extract' as const,
@@ -119,8 +236,7 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 2: Balance Sheet ---
-  const looksBalanceSheet = /balance.?sheet/i.test(filename) || /balance.?sheet/i.test(head);
-  if (looksBalanceSheet && !skipParsers.includes('balance_sheet_extract')) {
+  if (cls.is_balance_sheet && !skipParsers.includes('balance_sheet_extract')) {
     try {
       const bsResult = await llmRouter.route({
         task: 'balance_sheet_extract' as const,
@@ -137,9 +253,7 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 3: Cost Detail (TGT vs ACT / YTD GL Detail) ---
-  const looksCostDetail = /tgt.?vs.?act/i.test(filename) || /target.?vs.?actual/i.test(filename)
-    || /cost.?detail|gl.?detail|ytd.?gl/i.test(filename) || /cost.?detail|gl.?detail/i.test(head);
-  if (looksCostDetail && !skipParsers.includes('cost_detail_extract')) {
+  if (cls.is_cost_detail && !skipParsers.includes('cost_detail_extract')) {
     try {
       // Try deterministic GL Detail parser first (handles large files)
       const detGl = parseYtdGlDetail(extractedText, filename);
@@ -168,12 +282,7 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 4: SIE (Statement of Indirect Expenses / Trend Rate Summary) ---
-  const looksSie =
-    /\bsie\b/i.test(filename) ||
-    /statement.?of.?indirect/i.test(filename) ||
-    /indirect.?expense/i.test(head) ||
-    /trend.?rate|trend.?sie/i.test(filename);
-  if (looksSie && !skipParsers.includes('sie_extract')) {
+  if (cls.is_sie && !skipParsers.includes('sie_extract')) {
     try {
       // Try deterministic Trend SIE parser first
       const detSie = parseTrendSie(extractedText, filename);
@@ -202,8 +311,7 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 5: AP (Open Accounts Payable) ---
-  const looksAp = /\bap\b|accounts?.?payable|open.?ap/i.test(filename) || /accounts?.?payable|open.?ap|\bap\b/i.test(head);
-  if (looksAp && !skipParsers.includes('ap_extract')) {
+  if (cls.is_ap && !skipParsers.includes('ap_extract')) {
     try {
       // Try deterministic AP parser first (handles _x000D_ headers and grouped vendors)
       const detAp = parseOpenAp(extractedText, filename);
@@ -232,8 +340,7 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 6: AR (Aged Accounts Receivable) ---
-  const looksAr = /\bar\b|accounts?.?receivable|aged.?ar/i.test(filename) || /accounts?.?receivable|aged.?ar|\bar\b/i.test(head);
-  if (looksAr && !skipParsers.includes('ar_extract')) {
+  if (cls.is_ar && !skipParsers.includes('ar_extract')) {
     try {
       // Try deterministic AR parser first (handles grouped customer rows)
       const detAr = parseAgedAr(extractedText, filename);
@@ -262,8 +369,7 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 7: Trial Balance ---
-  const looksTrialBalance = /trial.?balance|trail.?balance/i.test(filename) || /trial.?balance|trail.?balance/i.test(head);
-  if (looksTrialBalance && !skipParsers.includes('trial_balance_extract')) {
+  if (cls.is_trial_balance && !skipParsers.includes('trial_balance_extract')) {
     try {
       // Try deterministic TB parser first (handles Beginning/Prior/Current/Ending format)
       const detTb = parseTrialBalance(extractedText, filename);
@@ -292,8 +398,7 @@ export async function reingestFinancialDoc(params: {
   }
 
   // --- Parser 8: Project Revenue Summary ---
-  const looksProjectRevenue = /proj.*revenue|revenue.*summary|full.?proj/i.test(filename) || /project.*revenue|revenue.*summary|full.?proj/i.test(head);
-  if (looksProjectRevenue && !skipParsers.includes('project_revenue_extract')) {
+  if (cls.is_project_revenue && !skipParsers.includes('project_revenue_extract')) {
     try {
       // Try deterministic parser first (handles 29-col ITD format)
       const detPr = parseProjectRevenueSummary(extractedText, filename);
@@ -323,14 +428,14 @@ export async function reingestFinancialDoc(params: {
 
   // Populate parsers_skipped: any parser whose heuristic didn't match.
   const allParsers = [
-    { key: 'financial_statement_extract', matched: looksFinancial },
-    { key: 'balance_sheet_extract', matched: looksBalanceSheet },
-    { key: 'cost_detail_extract', matched: looksCostDetail },
-    { key: 'sie_extract', matched: looksSie },
-    { key: 'ap_extract', matched: looksAp },
-    { key: 'ar_extract', matched: looksAr },
-    { key: 'trial_balance_extract', matched: looksTrialBalance },
-    { key: 'project_revenue_extract', matched: looksProjectRevenue },
+    { key: 'financial_statement_extract', matched: cls.is_financial },
+    { key: 'balance_sheet_extract', matched: cls.is_balance_sheet },
+    { key: 'cost_detail_extract', matched: cls.is_cost_detail },
+    { key: 'sie_extract', matched: cls.is_sie },
+    { key: 'ap_extract', matched: cls.is_ap },
+    { key: 'ar_extract', matched: cls.is_ar },
+    { key: 'trial_balance_extract', matched: cls.is_trial_balance },
+    { key: 'project_revenue_extract', matched: cls.is_project_revenue },
   ];
   for (const p of allParsers) {
     if (!p.matched && !skipParsers.includes(p.key)) {
