@@ -6,7 +6,6 @@ import { AiAnalyzeModal } from "@/components/financials/AiAnalyzeModal";
 import { ContractWaterfallTab } from "@/components/financials/tabs/ContractWaterfallTab";
 import { AopPlanTab } from "@/components/financials/tabs/AopPlanTab";
 import { AopExecutionTab } from "@/components/financials/tabs/AopExecutionTab";
-import { AopCaptureTab } from "@/components/financials/tabs/AopCaptureTab";
 import { P2FinancialsTab } from "@/components/financials/tabs/P2FinancialsTab";
 import { DefinitionsTab } from "@/components/financials/tabs/DefinitionsTab";
 import { BalanceSheetCard } from "@/components/financials/BalanceSheetCard";
@@ -26,7 +25,6 @@ type Tab =
   | "waterfall"
   | "plan"
   | "execution"
-  | "capture"
   | "p2"
   | "balance-sheet"
   | "ap"
@@ -62,7 +60,6 @@ const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { id: "plan", label: "AOP Plan" },
       { id: "execution", label: "AOP Execution" },
-      { id: "capture", label: "AOP Capture" },
     ],
   },
   {
@@ -84,7 +81,6 @@ const TAB_GROUPS: TabGroup[] = [
 const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set([
   "plan",
   "execution",
-  "capture",
 ]);
 
 const CALENDAR_MODE_KEY = "gda-financial-bible-calendar-mode";
@@ -113,8 +109,6 @@ function tabTitle(tab: Tab): string {
       return "AOP Plan";
     case "execution":
       return "AOP Execution";
-    case "capture":
-      return "AOP Capture";
     case "p2":
       return "Income Statement";
     case "balance-sheet":
@@ -232,7 +226,7 @@ export default function FinancialsPage() {
             title={
               yearControlsActive
                 ? undefined
-                : "Year selection applies only to AOP Plan, AOP Execution and AOP Capture"
+                : "Year selection applies only to AOP Plan and AOP Execution"
             }
           >
             <div className="flex rounded border border-border">
@@ -301,7 +295,6 @@ export default function FinancialsPage() {
         {activeTab === "waterfall" && <ContractWaterfallTab />}
         {activeTab === "plan" && <AopPlanTab fy={fy} />}
         {activeTab === "execution" && <AopExecutionTab fy={fy} />}
-        {activeTab === "capture" && <AopCaptureTab fy={fy} />}
         {activeTab === "p2" && <P2FinancialsTab />}
         {activeTab === "balance-sheet" && <BalanceSheetCard />}
         {activeTab === "ap" && <ApTab />}
