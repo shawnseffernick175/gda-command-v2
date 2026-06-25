@@ -89,12 +89,6 @@ const YEAR_AWARE_TABS: ReadonlySet<Tab> = new Set([
 
 const CALENDAR_MODE_KEY = "gda-financial-bible-calendar-mode";
 
-function loadCalendarMode(): CalendarMode {
-  if (typeof window === "undefined") return "FY";
-  const stored = localStorage.getItem(CALENDAR_MODE_KEY);
-  return stored === "CY" ? "CY" : "FY";
-}
-
 const YEARS = ["26", "27", "28"] as const;
 
 function tabTitle(tab: Tab): string {
@@ -130,11 +124,13 @@ function tabTitle(tab: Tab): string {
 
 export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("p2");
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>(loadCalendarMode);
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("FY");
 
+  // Restore persisted preference after hydration (avoids SSR mismatch).
   useEffect(() => {
-    localStorage.setItem(CALENDAR_MODE_KEY, calendarMode);
-  }, [calendarMode]);
+    const stored = localStorage.getItem(CALENDAR_MODE_KEY);
+    if (stored === "CY") setCalendarMode("CY");
+  }, []);
   const [selectedYear, setSelectedYear] = useState<string>("26");
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
@@ -235,7 +231,10 @@ export default function FinancialsPage() {
                       : "text-muted-foreground hover:text-foreground",
                     !yearControlsActive && "cursor-not-allowed",
                   )}
-                  onClick={() => setCalendarMode(mode)}
+                  onClick={() => {
+                    setCalendarMode(mode);
+                    localStorage.setItem(CALENDAR_MODE_KEY, mode);
+                  }}
                 >
                   {mode}
                 </button>

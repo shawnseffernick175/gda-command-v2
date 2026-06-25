@@ -1174,11 +1174,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         [fiscalYear],
       );
 
-      // Write all 12 months with FY-aware quarter assignments so
-      // downstream queries that group by quarter see the correct buckets.
-      const planMode = parseCalendarMode(fyRaw);
-      const planMonths = getMonthsForMode(planMode);
-      for (const { mon, quarter } of planMonths) {
+      // Write all 12 months with CY quarters (ceil(month/3)) to stay
+      // consistent with financial_actuals ingestion convention.
+      const CY_PLAN_MONTHS = getMonthsForMode('CY');
+      for (const { mon, quarter } of CY_PLAN_MONTHS) {
         await client.query(
           `INSERT INTO financial_plan
              (period, fiscal_year, quarter, plan_orders, plan_sales, plan_ebit,
