@@ -62,40 +62,43 @@ export function IngestionCoverageTab() {
   const pctIngested =
     summary.total > 0 ? ((summary.ingested / summary.total) * 100).toFixed(1) : "0.0";
 
+  const categories: string[] = [];
+  const values: number[] = [];
+  const colors: string[] = [];
+  if (summary.ingested > 0) {
+    categories.push("Ingested");
+    values.push(summary.ingested);
+    colors.push("var(--color-gda-green)");
+  }
+  if (summary.no_handler > 0) {
+    categories.push("No Handler");
+    values.push(summary.no_handler);
+    colors.push("var(--color-fin-amber)");
+  }
+  if (summary.extraction_failed > 0) {
+    categories.push("Failed");
+    values.push(summary.extraction_failed);
+    colors.push("var(--color-gda-red)");
+  }
+
   const chartOption = {
-    tooltip: {
-      trigger: "item" as const,
-      formatter: (p: { name: string; value: number; percent: number; marker: string }) =>
-        `${p.marker} ${p.name}: ${p.value} (${p.percent.toFixed(1)}%)`,
+    tooltip: { trigger: "axis" as const },
+    grid: { left: 40, right: 16, top: 16, bottom: 32 },
+    xAxis: {
+      type: "category" as const,
+      data: categories,
+      axisLabel: { fontSize: 11, color: "var(--color-fin-stone)" },
     },
-    legend: {
-      orient: "vertical" as const,
-      right: 16,
-      top: "center" as const,
-      textStyle: { color: "var(--color-fin-stone)", fontSize: 11 },
+    yAxis: {
+      type: "value" as const,
+      axisLabel: { fontSize: 11, color: "var(--color-fin-stone)" },
     },
     series: [
       {
-        type: "pie" as const,
-        radius: ["40%", "70%"],
-        center: ["35%", "50%"],
-        avoidLabelOverlap: true,
-        label: {
-          show: true,
-          position: "outside" as const,
-          fontSize: 11,
-          color: "var(--color-fin-stone)",
-          formatter: (p: { name: string; value: number }) => `${p.name}: ${p.value}`,
-        },
-        data: [
-          { name: "Ingested", value: summary.ingested, itemStyle: { color: "var(--color-gda-green)" } },
-          ...(summary.no_handler > 0
-            ? [{ name: "No Handler", value: summary.no_handler, itemStyle: { color: "var(--color-fin-amber)" } }]
-            : []),
-          ...(summary.extraction_failed > 0
-            ? [{ name: "Failed", value: summary.extraction_failed, itemStyle: { color: "var(--color-gda-red)" } }]
-            : []),
-        ],
+        type: "bar" as const,
+        data: values.map((v, i) => ({ value: v, itemStyle: { color: colors[i] } })),
+        label: { show: true, position: "top" as const, fontSize: 11 },
+        barMaxWidth: 48,
       },
     ],
   };

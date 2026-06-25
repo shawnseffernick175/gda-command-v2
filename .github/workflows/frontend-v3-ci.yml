@@ -165,7 +165,10 @@ jobs:
       - name: Check bundle size
         working-directory: packages/frontend-v3
         run: |
-          MAX_MAIN_KB=475
+          # Budget raised from 475→700 to accommodate ECharts (canonical chart
+          # library, see aesthetics_canonical_v1.md §Forbidden). G1 requires
+          # executive charts on every Financial Bible tab.
+          MAX_MAIN_KB=700
 
           echo "## Bundle Size Report" > /tmp/bundle-report.md
 
