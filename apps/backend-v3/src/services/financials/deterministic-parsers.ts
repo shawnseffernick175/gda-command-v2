@@ -26,12 +26,29 @@ import type { ProjectRevenueExtractOutput } from '../../lib/llm-router.types.js'
 
 /** Extract lines from a specific sheet section of the extracted text. */
 function getSheetLines(text: string, sheetName: string): string[] | null {
-  const marker = `[Sheet: ${sheetName}]`;
-  const idx = text.indexOf(marker);
+  // Support both formats: [Sheet: X] (xlsx extraction) and ## Sheet: X (vault extracted_text)
+  const markers = [`[Sheet: ${sheetName}]`, `## Sheet: ${sheetName}`];
+  let idx = -1;
+  let markerLen = 0;
+  for (const marker of markers) {
+    idx = text.indexOf(marker);
+    if (idx !== -1) {
+      markerLen = marker.length;
+      break;
+    }
+  }
   if (idx === -1) return null;
 
-  const start = idx + marker.length;
-  const nextSheet = text.indexOf('[Sheet:', start);
+  const start = idx + markerLen;
+  // Find the next sheet marker (either format)
+  const nextBracket = text.indexOf('[Sheet:', start);
+  const nextHash = text.indexOf('## Sheet:', start);
+  let nextSheet: number;
+  if (nextBracket === -1 && nextHash === -1) nextSheet = -1;
+  else if (nextBracket === -1) nextSheet = nextHash;
+  else if (nextHash === -1) nextSheet = nextBracket;
+  else nextSheet = Math.min(nextBracket, nextHash);
+
   const section = nextSheet === -1 ? text.slice(start) : text.slice(start, nextSheet);
   return section.split('\n').filter((l) => l.trim().length > 0);
 }
@@ -43,7 +60,7 @@ function getSheetLinesMulti(text: string, names: string[]): string[] | null {
     if (lines && lines.length > 0) return lines;
   }
   // Fallback: if no sheet marker, treat entire text as lines
-  if (!text.includes('[Sheet:')) {
+  if (!text.includes('[Sheet:') && !text.includes('## Sheet:')) {
     return text.split('\n').filter((l) => l.trim().length > 0);
   }
   return null;
@@ -52,9 +69,10 @@ function getSheetLinesMulti(text: string, names: string[]): string[] | null {
 /** Extract all sheet names from extracted text. */
 function getAllSheetNames(text: string): string[] {
   const names: string[] = [];
-  const regex = /\[Sheet: ([^\]]+)\]/g;
+  // Support both [Sheet: X] and ## Sheet: X formats
+  const regex = /(?:\[Sheet: ([^\]]+)\]|## Sheet: (.+?)$)/gm;
   let m;
-  while ((m = regex.exec(text)) !== null) names.push(m[1]);
+  while ((m = regex.exec(text)) !== null) names.push(m[1] || m[2]);
   return names;
 }
 
@@ -94,7 +112,7 @@ function getSheetLinesByContent(
   headerSignature: string[],
   fallbackNames: string[],
 ): string[] | null {
-  if (!text.includes('[Sheet:')) {
+  if (!text.includes('[Sheet:') && !text.includes('## Sheet:')) {
     const lines = text.split('\n').filter((l) => l.trim().length > 0);
     return lines.length > 0 ? lines : null;
   }
@@ -134,11 +152,15 @@ function getSheetLinesByContent(
 }
 
 /**
- * Split a CSV-like row respecting that values were joined with commas.
- * Handles the case where Date.toString() produces strings with commas
- * by being lenient about column counts.
+ * Split a row into columns. Auto-detects pipe-delimited (vault extracted_text)
+ * vs comma-delimited (xlsx extraction) format.
  */
 function splitRow(line: string): string[] {
+  // Pipe-delimited format: used by vault extracted_text
+  if (line.includes('|')) {
+    return line.split('|').map((v) => v.trim());
+  }
+  // Comma-delimited: legacy xlsx extraction format
   return line.split(',').map((v) => v.trim());
 }
 
@@ -257,8 +279,14 @@ export function parseAgedAr(
   }
 
   // Find header row containing "Project" and "Invoice"
-  const headerIdx = findHeaderRow(lines, ['project', 'invoice', 'due date', 'current', 'total']);
-  if (headerIdx === -1) return null;
+  let headerIdx = findHeaderRow(lines, ['project', 'invoice', 'due date', 'current', 'balance due']);
+  if (headerIdx === -1) {
+    headerIdx = findHeaderRow(lines, ['project', 'invoice', 'due date', 'current', 'total']);
+    if (headerIdx === -1) {
+      headerIdx = findHeaderRow(lines, ['project', 'invoice', 'current']);
+      if (headerIdx === -1) return null;
+    }
+  }
 
   const colMap = buildColumnMap(lines[headerIdx]);
   const rows: ArExtractOutput['rows'] = [];
@@ -266,15 +294,21 @@ export function parseAgedAr(
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = splitRow(lines[i]);
+    const rawLine = lines[i];
 
     // Detect "Customer Account" group-header rows BEFORE the length check —
-    // these rows often have < 5 columns (e.g. "Customer Account: A00001   Name,,Customer Account: ...")
+    // In pipe format: "Customer Account: A00001   US Army Contracting Cmd |  | Customer Account: ..."
     const rawFirst = cols[0] || '';
     if (/customer\s*account/i.test(rawFirst) || /customer\s*account/i.test(cols[2] || '')) {
       // Extract customer name: strip the "Customer Account: XXXXX   " prefix
       const fullText = /customer\s*account/i.test(rawFirst) ? rawFirst : (cols[2] || '');
-      const match = fullText.match(/customer\s*account[:\s]*\S+\s+(.*)/i);
-      currentCustomer = match ? match[1].trim() : fullText.replace(/^customer\s*account[:\s]*/i, '').trim();
+      const match = fullText.match(/customer\s*account[:\s]*\S+\s{2,}(.*)/i);
+      if (match) {
+        currentCustomer = match[1].trim();
+      } else {
+        const match2 = fullText.match(/customer\s*account[:\s]*\S+\s+(.*)/i);
+        currentCustomer = match2 ? match2[1].trim() : fullText.replace(/^customer\s*account[:\s]*/i, '').trim();
+      }
       continue;
     }
 
@@ -290,9 +324,13 @@ export function parseAgedAr(
       continue;
     }
 
-    // Skip subtotal rows
-    if (/^total\s+for/i.test(projectCol) || /^total\s+for/i.test(firstCol)) continue;
+    // Skip subtotal rows — in pipe format these look like: " | Total for Project: ... | ..."
+    if (/^total\s*(for|$)/i.test(projectCol) || /^total\s*(for|$)/i.test(firstCol)) continue;
     if (/^grand\s+total/i.test(firstCol) || /^grand\s+total/i.test(projectCol)) continue;
+    // Also catch "Total for Customer Account:" rows
+    if (/total\s+for\s+(customer|project)/i.test(rawLine)) continue;
+    // Skip the final "Total" summary row
+    if (/^\s*\|?\s*total\s*$/i.test(projectCol) || projectCol.toLowerCase() === 'total') continue;
 
     // Data row: needs at least a project/invoice
     if (!projectCol && !invoiceCol) continue;
@@ -301,8 +339,8 @@ export function parseAgedAr(
     const currentAmt = parseNum(getCol(cols, colMap, 'current') || cols[4] || '0');
     const days31_60 = parseNum(getCol(cols, colMap, '31 to 60', '31-60') || cols[5] || '0');
     const days61_90 = parseNum(getCol(cols, colMap, '61 to 90', '61-90') || cols[6] || '0');
-    const days91plus = parseNum(getCol(cols, colMap, '(91+/over)', '91+', 'over 90') || cols[7] || '0');
-    const total = parseNum(getCol(cols, colMap, 'total') || cols[cols.length - 1] || '0');
+    const days91plus = parseNum(getCol(cols, colMap, 'over 90', '(91+/over)', '91+') || cols[7] || '0');
+    const total = parseNum(getCol(cols, colMap, 'balance due', 'total') || cols[cols.length - 1] || '0');
 
     if (total === 0 && currentAmt === 0 && days31_60 === 0 && days61_90 === 0 && days91plus === 0) continue;
 
@@ -597,37 +635,51 @@ export function parseTrialBalance(
   }
 
   // Find header: Account | Account Name | Organization | Beginning Balance | Prior Period(s) YTD Activity | Current Pd Activity | Ending Balance
-  // NOTE: Some cells contain newlines (e.g. "Prior Period(s)\nYTD Activity") which split
-  // the header across two extracted lines. Detect this and merge the lines if needed.
+  // NOTE: In extracted_text format, the header wraps across two physical lines:
+  //   Line A: Account | Account Name | Organization | Beginning Balance | Prior Period(s)
+  //   Line B: YTD Activity | Current Pd Activity | Ending Balance
+  // Detect the wrap and reconstruct a single logical header.
   let effectiveHeaderIdx = findHeaderRow(lines, ['account', 'beginning balance', 'ending balance']);
   if (effectiveHeaderIdx === -1) {
     effectiveHeaderIdx = findHeaderRow(lines, ['account', 'account name', 'balance']);
     if (effectiveHeaderIdx === -1) {
       effectiveHeaderIdx = findHeaderRow(lines, ['account', 'beginning balance']);
-      if (effectiveHeaderIdx === -1) return null;
+      if (effectiveHeaderIdx === -1) {
+        effectiveHeaderIdx = findHeaderRow(lines, ['account', 'account name', 'beginning']);
+        if (effectiveHeaderIdx === -1) return null;
+      }
     }
   }
   // If the header line doesn't contain "ending balance", it might be split across two lines.
   // Merge with the next line to reconstruct the full header.
   let headerLine = lines[effectiveHeaderIdx];
   const headerLower = headerLine.toLowerCase();
+  const isPipeFormat = headerLine.includes('|');
+  let dataStartIdx = effectiveHeaderIdx + 1;
   if (!headerLower.includes('ending balance') && !headerLower.includes('ending bal')) {
-    const headerColCount = splitRow(headerLine).length;
     if (effectiveHeaderIdx + 1 < lines.length) {
       const nextLine = lines[effectiveHeaderIdx + 1];
       const nextLower = nextLine.toLowerCase();
-      // If next line has fewer columns and contains balance-related terms, it's the continuation
-      if (nextLower.includes('ending') || nextLower.includes('activity') || splitRow(nextLine).length < headerColCount) {
-        headerLine = headerLine + ',' + nextLine;
-        // Skip the continuation line during data processing
-        effectiveHeaderIdx++;
+      // If next line contains balance-related terms or "activity", it's the continuation
+      if (nextLower.includes('ending') || nextLower.includes('activity') || nextLower.includes('current pd')) {
+        // For pipe format, join with pipe; for CSV, join with comma
+        const joiner = isPipeFormat ? ' | ' : ',';
+        headerLine = headerLine + joiner + nextLine;
+        dataStartIdx = effectiveHeaderIdx + 2;
       }
     }
   }
+
+  // For the Trial Balance extracted_text format, we have a merged 8-column header
+  // but data rows only have 7 columns (Organization + Beginning Balance are combined
+  // or Prior Period(s) is missing from data). Detect and handle this alignment:
+  // Header (8 cols after merge): Account | Account Name | Organization | Beginning Balance | Prior Period(s) | YTD Activity | Current Pd Activity | Ending Balance
+  // Data (7 cols): Account | Account Name | Organization | Beginning Balance | YTD Activity | Current Pd Activity | Ending Balance
+  // The trick: build a map from the known column NAMES the data actually has.
   const colMap = buildColumnMap(headerLine);
   const rows: TrialBalanceExtractOutput['rows'] = [];
 
-  for (let i = effectiveHeaderIdx + 1; i < lines.length; i++) {
+  for (let i = dataStartIdx; i < lines.length; i++) {
     const cols = splitRow(lines[i]);
     if (cols.length < 4) continue;
 
@@ -635,12 +687,14 @@ export function parseTrialBalance(
     const accountName = getCol(cols, colMap, 'account name', 'name', 'description') || cols[1] || '';
 
     if (!accountCode) continue;
-    // Skip total/summary rows
+    // Skip total/summary rows and "AMOUNT OUT OF BALANCE" rows
     if (/^total/i.test(accountCode) || /^grand/i.test(accountCode)) continue;
-    // Account code should look like a code (contain digits)
-    if (!/\d/.test(accountCode)) continue;
+    if (/^amount\s+out/i.test(accountCode)) continue;
+    // Account code should look like a code (contain digits or known alpha patterns like ADM-CRT, FRG-DLR)
+    if (!/\d/.test(accountCode) && !/^[A-Z]{2,4}-[A-Z]{2,4}$/i.test(accountCode)) continue;
 
     // Get ending balance (primary value for debit/credit mapping)
+    // In pipe format with 7 data cols vs 8 header cols, ending balance is always the LAST column
     const endingBalance = parseNum(
       getCol(cols, colMap, 'ending balance', 'ending bal', 'end balance', 'balance') || cols[cols.length - 1] || '0',
     );
