@@ -174,7 +174,9 @@ function PipelineContent() {
   });
 
   const items = useMemo(() => {
-    const raw = listData?.items ?? [];
+    const raw = (listData?.items ?? []).filter(
+      (item) => item.stage !== "no_bid",
+    );
     if (sortBy) {
       return sortData(raw as unknown as Record<string, unknown>[], sortBy, sortDir, PIPELINE_SORT_COLS) as unknown as typeof raw;
     }

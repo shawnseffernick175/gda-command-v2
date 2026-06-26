@@ -191,7 +191,9 @@ const BASE_SELECT = `
 export async function listPipelineItems(
   filters: PipelineListFilters,
 ): Promise<PaginatedResult<PipelineItem>> {
-  const conditions: string[] = [];
+  const conditions: string[] = [
+    "pi.stage NOT IN ('no_bid', 'lost', 'gov_cancelled')",
+  ];
   const params: unknown[] = [];
   let paramIdx = 0;
 
