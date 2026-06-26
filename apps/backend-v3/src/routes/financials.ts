@@ -1011,6 +1011,29 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       params,
     );
 
+    // 1b. Fetch per-contract-year breakdowns (task_order_years)
+    const taskOrderIds = rows.map((r) => Number(r.id));
+    const yearsByTaskOrder = new Map<number, { period_start: Date; period_end: Date; ceiling: number; months_in_period: number }[]>();
+    if (taskOrderIds.length > 0) {
+      const { rows: yearRows } = await pool.query(
+        `SELECT task_order_id, period_start, period_end, ceiling, months_in_period
+         FROM task_order_years
+         WHERE task_order_id = ANY($1)
+         ORDER BY task_order_id, period_start`,
+        [taskOrderIds],
+      );
+      for (const yr of yearRows) {
+        const toId = Number(yr.task_order_id);
+        if (!yearsByTaskOrder.has(toId)) yearsByTaskOrder.set(toId, []);
+        yearsByTaskOrder.get(toId)!.push({
+          period_start: new Date(yr.period_start as string),
+          period_end: new Date(yr.period_end as string),
+          ceiling: Number(yr.ceiling),
+          months_in_period: Number(yr.months_in_period),
+        });
+      }
+    }
+
     // 2. Fetch per-contract margins from project_revenue_actuals
     const { rows: marginRows } = await pool.query(
       `SELECT contract_number,
@@ -1066,14 +1089,43 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
       if (!popStart || !popEnd || ceiling <= 0) continue;
 
-      // Spread method: ceiling / 12 = annual revenue, / 12 again = monthly
-      const annualRevenue = ceiling / 12;
-      const monthlyRevenue = annualRevenue / 12;
+      // Per-contract-year spread: if task_order_years rows exist, use each
+      // year's ceiling / months_in_period. Otherwise fall back to a uniform
+      // spread of total_ceiling / total_PoP_months.
+      const contractYears = yearsByTaskOrder.get(id);
+
+      // Helper: for a given month (first-of-month Date), return monthly revenue
+      // from the matching contract year, or the uniform fallback.
+      const start = new Date(popStart);
+      const end = new Date(popEnd);
+      const totalPopMonths = (end.getFullYear() - start.getFullYear()) * 12
+        + (end.getMonth() - start.getMonth()) + 1;
+      const uniformMonthly = totalPopMonths > 0 ? ceiling / totalPopMonths : 0;
+
+      function monthlyRevenueForDate(monthStart: Date): number {
+        if (!contractYears || contractYears.length === 0) return uniformMonthly;
+        const ym = monthStart.getFullYear() * 100 + monthStart.getMonth();
+        for (const cy of contractYears) {
+          const cyStart = cy.period_start.getFullYear() * 100 + cy.period_start.getMonth();
+          const cyEnd = cy.period_end.getFullYear() * 100 + cy.period_end.getMonth();
+          if (ym >= cyStart && ym <= cyEnd) {
+            return cy.ceiling / cy.months_in_period;
+          }
+        }
+        return uniformMonthly;
+      }
 
       // Per-contract margin lookup
       let marginPct = marginByContract.get(toNumber) ?? null;
       const marginSource: 'actual' | 'portfolio_average' = marginPct !== null ? 'actual' : 'portfolio_average';
       if (marginPct === null) marginPct = portfolioAvgMargin;
+
+      // Compute a representative annual/monthly for the contract summary
+      // (uses first contract year if available, else uniform)
+      const summaryMonthly = contractYears && contractYears.length > 0
+        ? contractYears[0].ceiling / contractYears[0].months_in_period
+        : uniformMonthly;
+      const summaryAnnual = summaryMonthly * 12;
 
       contracts.push({
         id,
@@ -1084,16 +1136,14 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         funded_to_date: fundedToDate,
         pop_start: popStart,
         pop_end: popEnd,
-        annual_revenue: annualRevenue,
-        monthly_revenue: monthlyRevenue,
+        annual_revenue: summaryAnnual,
+        monthly_revenue: summaryMonthly,
         margin_pct: Math.round(marginPct * 100) / 100,
         margin_source: marginSource,
         status: r.status as string,
       });
 
       // Generate monthly buckets from pop_start to pop_end
-      const start = new Date(popStart);
-      const end = new Date(popEnd);
       let cumulativeRevenue = 0;
 
       const cur = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -1101,23 +1151,24 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
       while (cur <= endMonth) {
         const monthKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
-        cumulativeRevenue += monthlyRevenue;
+        const monthRev = monthlyRevenueForDate(cur);
+        cumulativeRevenue += monthRev;
 
         // Determine funded vs unfunded based on cumulative recognition vs funded_to_date
         let fundedRev: number;
         let unfundedRev: number;
         if (cumulativeRevenue <= fundedToDate) {
-          fundedRev = monthlyRevenue;
+          fundedRev = monthRev;
           unfundedRev = 0;
-        } else if (cumulativeRevenue - monthlyRevenue >= fundedToDate) {
+        } else if (cumulativeRevenue - monthRev >= fundedToDate) {
           fundedRev = 0;
-          unfundedRev = monthlyRevenue;
+          unfundedRev = monthRev;
         } else {
-          fundedRev = fundedToDate - (cumulativeRevenue - monthlyRevenue);
-          unfundedRev = monthlyRevenue - fundedRev;
+          fundedRev = fundedToDate - (cumulativeRevenue - monthRev);
+          unfundedRev = monthRev - fundedRev;
         }
 
-        const profit = monthlyRevenue * (marginPct / 100);
+        const profit = monthRev * (marginPct / 100);
 
         if (!monthlyMap.has(monthKey)) monthlyMap.set(monthKey, new Map());
         const contractMap = monthlyMap.get(monthKey)!;
@@ -1173,7 +1224,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       contracts,
       forecast,
       pipeline: [], // CW-3: scaffold — empty until pipeline data source is wired
-      spread_method: 'ceiling_div_12_annual',
+      spread_method: 'per_year_ceiling',
       portfolio_avg_margin: Math.round(portfolioAvgMargin * 100) / 100,
       today,
       available_vehicles: vehicleRows.map((v) => ({ id: Number(v.id), short_name: v.short_name as string })),
