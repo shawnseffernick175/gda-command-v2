@@ -15,6 +15,7 @@ import type {
   AiAnalyzeResponse,
   ApData,
   ArData,
+  ArByContractData,
   TrialBalanceData,
   ProjectRevenueData,
   IngestionCoverageData,
@@ -225,6 +226,16 @@ export function useArData() {
   return useQuery({
     queryKey: ["financials", "ar"],
     queryFn: () => apiGet<ArData>("/v3/financials/ar"),
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useArByContract(mode: "CY" | "FY") {
+  return useQuery({
+    queryKey: ["financials", "ar-by-contract", mode],
+    queryFn: () => apiGet<ArByContractData>("/v3/financials/ar/by-contract", { mode }),
     retry: false,
     staleTime: 0,
     refetchOnMount: "always",

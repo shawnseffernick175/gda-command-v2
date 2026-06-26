@@ -602,6 +602,30 @@ export interface ArData {
   meta: { table: string; row_count: number };
 }
 
+/* ── AR By Contract (issue #1007) ─────────────────────────────── */
+
+export interface ArContractRow {
+  contract: string;
+  is_rs3: boolean;
+  months: Record<string, number>;
+  total: number;
+}
+
+export interface ArContractSubtotal {
+  label: string;
+  months: Record<string, number>;
+  total: number;
+}
+
+export interface ArByContractData {
+  mode: CalendarMode;
+  period_label: string;
+  month_columns: string[];
+  contracts: ArContractRow[];
+  rs3_subtotal: ArContractSubtotal;
+  grand_total: { months: Record<string, number>; total: number };
+}
+
 /* ── Trial Balance (F-625) ────────────────────────────────────── */
 
 export interface TrialBalanceRow {

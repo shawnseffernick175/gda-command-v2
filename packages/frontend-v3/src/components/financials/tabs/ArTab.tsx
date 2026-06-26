@@ -8,6 +8,7 @@ import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
 import { sortData, type ColumnSortConfig } from "@/lib/sort-utils";
 import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
+import { ArContractMatrix } from "@/components/financials/tabs/ArContractMatrix";
 
 const AR_SORT_COLS: ColumnSortConfig[] = [
   { field: "period", type: "period" },
@@ -96,7 +97,10 @@ export function ArTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Contract × month matrix */}
+      <ArContractMatrix />
+
       {/* KPI tiles */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <Kpi label="Total Receivables" value={formatMoney(total)} subtitle={`${items.length} items`} />
