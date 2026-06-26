@@ -1,4 +1,4 @@
-# Commercial AR/VR Contracts — Canonical Record
+# Commercial XR Contracts — Canonical Record
 
 **Last updated:** 2026-06-26
 **Authority:** Shawn Seffernick, President, Envision Innovative Solutions
@@ -7,7 +7,7 @@
 
 ## Overview
 
-These are non-govcon, commercial contracts. All are AR/VR work performed by Jonathan Carr. These do NOT belong in the govcon pipeline, Contract Waterfall, or IDIQ tracking. Track separately as commercial revenue.
+These are non-govcon, commercial contracts. All are XR work performed by Jonathan Carr. These do NOT belong in the govcon pipeline, Contract Waterfall, or IDIQ tracking. Track separately as commercial revenue.
 
 ---
 
@@ -15,17 +15,17 @@ These are non-govcon, commercial contracts. All are AR/VR work performed by Jona
 
 ### 1. My Energy Game Ltd
 - **Type:** Commercial
-- **Work:** AR/VR (Jonathan Carr)
+- **Work:** XR (Jonathan Carr)
 - **Details:** TBD — populate from contract documents in Vault
 
 ### 2. Bricklayers & Allied Craftworkers (CADC)
 - **Type:** Commercial / Trade Association
-- **Work:** AR/VR (Jonathan Carr)
+- **Work:** XR (Jonathan Carr)
 - **Details:** TBD — populate from contract documents in Vault
 
 ### 3. Rowan-Cabarrus Community College
 - **Type:** Commercial / Education
-- **Work:** AR/VR (Jonathan Carr)
+- **Work:** XR (Jonathan Carr)
 - **Details:** TBD — populate from contract documents in Vault
 
 ---
@@ -38,4 +38,4 @@ These are non-govcon, commercial contracts. All are AR/VR work performed by Jona
 
 ---
 
-*This file is the canonical commercial AR/VR contract record. Populate details once Shawn uploads contracts to the Vault.*
+*This file is the canonical commercial XR contract record. Populate details once Shawn uploads contracts to the Vault.*
