@@ -24,11 +24,11 @@ All Army task orders below are draws under **one IDIQ: RS3 — W15P7T-19-D-0206*
 
 Non-RS3 / other receivables (bucket by **customer_name**, NOT invoice prefix — the `INV-` prefix is shared across many customers):
 - **GSA FAS AAS Region 03** = **PM Mission Command** (direct, our second-largest receivable).
-- **Sev1Tech** = sub.
-- **Booz Allen Hamilton** = sub (PDNET).
-- **Nakupuna Solutions** = sub.
-- **CACI** = sub.
-- **Techximius** = sub.
+- **Sev1Tech** = CP IS&W (PM IS&A) sub; invoice prefix `SEV1-`.
+- **Booz Allen Hamilton** = CPE C2IN (NEBULA) sub; invoice prefix `PDNET`.
+- **Nakupuna Solutions** = C5ISR Center CIO sub.
+- **CACI** = C5ISR Center (CYBERTRON) sub.
+- **Techximius** = C5ISR Center (CYBERTRON) sub (small business); invoice prefix `TECHX-`.
 - **My Energy Game Ltd**, **Bricklayers & Allied CADC**, **Rowan-Cabarrus CC** = direct clients (commercial/other), each a distinct customer.
 - Negative `Army-other/adjustment` rows = credits/reversals on Army invoices.
 
@@ -47,11 +47,11 @@ Bucketed by customer + task order (corrected: PM Mission Command split out of th
 | C5ISR (F0209) | 102,558 | 102,604 | 111,576 | 109,014 | 50,167 | **475,919** |
 | CECOM (F0038) | 22,992 | 39,295 | 36,318 | 34,420 | 1,082 | **134,107** |
 | PM Mission Command (GSA) | 502,700 | 478,030 | 517,298 | 561,552 | 481,383 | **2,540,963** |
-| Sev1Tech (sub) | 109,831 | 110,765 | 120,196 | 129,877 | 100,360 | **571,029** |
-| Booz Allen (sub) | 61,446 | 57,699 | 58,234 | 57,699 | 56,540 | **291,618** |
-| Nakupuna (sub) | 26,587 | 53,934 | 59,632 | 28,297 | 21,650 | **190,100** |
-| CACI (sub) | 34,094 | 45,844 | 17,475 | 19,330 | 5,724 | **122,467** |
-| Techximius (sub) | — | — | — | 11,437 | 23,476 | **34,913** |
+| Sev1Tech — CP IS&W | 109,831 | 110,765 | 120,196 | 129,877 | 100,360 | **571,029** |
+| Booz Allen — NEBULA | 61,446 | 57,699 | 58,234 | 57,699 | 56,540 | **291,618** |
+| Nakupuna — C5ISR CIO | 26,587 | 53,934 | 59,632 | 28,297 | 21,650 | **190,100** |
+| CACI — CYBERTRON | 34,094 | 45,844 | 17,475 | 19,330 | 5,724 | **122,467** |
+| Techximius — CYBERTRON (SB) | — | — | — | 11,437 | 23,476 | **34,913** |
 | Army-other/adjustment | -51,250 | -51,250 | -51,250 | -51,250 | — | **-205,000** |
 | Bricklayers & Allied CADC | 16,668 | 16,668 | 16,668 | 16,668 | — | **66,672** |
 | My Energy Game | 10,690 | 10,691 | — | — | — | **21,381** |
@@ -81,11 +81,11 @@ Bucket each `ar_actuals` row by regex on `invoice_number`:
 | `F?0038` | CECOM (F0038) |
 | `FA010` | FORCE (FA010) |
 | customer `GSA%` | PM Mission Command (GSA) |
-| customer `Sev1%` | Sev1Tech (sub) |
-| customer `Booz%` | Booz Allen (sub) |
-| customer `Nakupuna%` | Nakupuna (sub) |
-| customer `CACI%` | CACI (sub) |
-| customer `Techximius%` | Techximius (sub) |
+| customer `%Sev1%` OR invoice `SEV1-%` | Sev1Tech — CP IS&W |
+| customer `%Booz%` OR invoice `PDNET%` | Booz Allen — NEBULA |
+| customer `%Nakupuna%` | Nakupuna — C5ISR CIO |
+| customer `%CACI%` | CACI — CYBERTRON |
+| customer `%Techximius%` OR invoice `TECHX-%` | Techximius — CYBERTRON (SB) |
 | else | Other: <customer_name> |
 
 **Critical:** bucket the non-Army rows by **`customer_name`, not the `INV-` invoice prefix** — that prefix is shared across GSA, Booz Allen, Nakupuna, CACI, Sev1Tech, and others. The Army task orders bucket by the `F####` suffix + Army customer.
