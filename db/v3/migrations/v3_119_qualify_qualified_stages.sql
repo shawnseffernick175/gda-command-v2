@@ -1,4 +1,4 @@
--- v3_118: Qualify/Qualified pipeline stage split (#1010)
+-- v3_119: Qualify/Qualified pipeline stage split (#1010)
 --
 -- Pipeline stages: rename existing 'qualify' → 'qualified', add 'qualify' as staging.
 --
