@@ -29,7 +29,7 @@ Non-RS3 / other receivables (bucket by **customer_name**, NOT invoice prefix —
 - **Nakupuna Solutions** = sub.
 - **CACI** = sub.
 - **Techximius** = sub.
-- **Bricklayers & Allied CADC**, **My Energy Game**, **Rowan-Cabarrus CC** = small non-govcon / other.
+- **My Energy Game Ltd**, **Bricklayers & Allied CADC**, **Rowan-Cabarrus CC** = direct clients (commercial/other), each a distinct customer.
 - Negative `Army-other/adjustment` rows = credits/reversals on Army invoices.
 
 > Example (operator): "F002834 is BVN0034 under the IEWS contract" — i.e. the BVN# is the PIEE invoice ID, the F#### is the task order.
