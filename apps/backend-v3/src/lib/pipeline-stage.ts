@@ -1,15 +1,19 @@
 /**
  * Canonical pipeline stage taxonomy.
  *
- * Single source of truth for the 9-stage pipeline:
- *   interest, qualify, pursue, solicitation, post_submittal,
- *   won, lost, no_bid, gov_cancelled.
+ * Single source of truth for the 10-stage pipeline:
+ *   interest, qualify (staging), qualified, pursue, solicitation,
+ *   post_submittal, won, lost, no_bid, gov_cancelled.
+ *
+ * `qualify` is a staging holding area — excluded from all metrics.
+ * `qualified` is the normal pipeline stage (previously named qualify).
  */
 
 /** Ordered canonical DB keys. */
 export const CANONICAL_STAGE_KEYS = [
   'interest',
   'qualify',
+  'qualified',
   'pursue',
   'solicitation',
   'post_submittal',
@@ -21,14 +25,23 @@ export const CANONICAL_STAGE_KEYS = [
 
 export type CanonicalStageKey = (typeof CANONICAL_STAGE_KEYS)[number];
 
-/** Active (non-terminal) stages. */
+/** Active (non-terminal) stages — excludes `qualify` (staging). */
 export const ACTIVE_STAGE_KEYS: readonly CanonicalStageKey[] = [
   'interest',
-  'qualify',
+  'qualified',
   'pursue',
   'solicitation',
   'post_submittal',
 ] as const;
+
+/** Staging stages — excluded from pipeline metrics. */
+export const STAGING_STAGE_KEYS: readonly CanonicalStageKey[] = [
+  'qualify',
+] as const;
+
+export function isStagingStage(key: string): boolean {
+  return (STAGING_STAGE_KEYS as readonly string[]).includes(key);
+}
 
 /**
  * Terminal decision stages. These are explicit owner decisions (including
@@ -49,6 +62,7 @@ export function isTerminalStage(key: string): boolean {
 const DB_KEY_TO_DISPLAY: Record<CanonicalStageKey, string> = {
   interest: 'Interest',
   qualify: 'Qualify',
+  qualified: 'Qualified',
   pursue: 'Pursue',
   solicitation: 'Solicitation',
   post_submittal: 'Post-Submittal',
@@ -68,7 +82,7 @@ const VALID_KEYS = new Set<string>(CANONICAL_STAGE_KEYS);
 const ALIAS_TO_KEY: Record<string, CanonicalStageKey> = {
   interest: 'interest',
   qualify: 'qualify',
-  qualified: 'qualify',
+  qualified: 'qualified',
   pursue: 'pursue',
   pursuit: 'pursue',
   solicitation: 'solicitation',

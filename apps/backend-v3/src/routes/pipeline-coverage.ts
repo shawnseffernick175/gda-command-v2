@@ -16,7 +16,7 @@ const LAYER_CONFIG = {
     label: 'Total Qualified',
     multiple_min: 5,
     multiple_max: null,
-    stages: ['qualify', 'pursue', 'solicitation', 'post_submittal'],
+    stages: ['qualified', 'pursue', 'solicitation', 'post_submittal'],
   },
   active_capture: {
     label: 'Active Capture',
@@ -49,7 +49,7 @@ const LAYER_ORDER: LayerKey[] = [
 
 const DEFAULT_STAGE_PWIN: Record<string, number> = {
   interest: 0.10,
-  qualify: 0.25,
+  qualified: 0.25,
   pursue: 0.50,
   solicitation: 0.75,
   post_submittal: 1.00,

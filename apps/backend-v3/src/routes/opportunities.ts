@@ -799,7 +799,7 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
         .send(
           errorEnvelope(
             'VALIDATION_ERROR',
-            `Unknown pipeline stage "${input.stage}". Accepted values: Interest, Qualify, Pursue, Solicitation, Post-Submittal, Won, Lost, No Bid, Government Cancelled (or their DB keys).`,
+            `Unknown pipeline stage "${input.stage}". Accepted values: Interest, Qualify, Qualified, Pursue, Solicitation, Post-Submittal, Won, Lost, No Bid, Government Cancelled (or their DB keys).`,
             req.requestId,
           ),
         );

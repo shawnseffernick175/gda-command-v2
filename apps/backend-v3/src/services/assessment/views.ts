@@ -185,13 +185,13 @@ export class PromoteError extends Error {
  * @param opportunityId  opportunity to promote
  * @param captureOwner   the requesting user's display identity (NEVER 'system')
  * @param createdByUserId numeric user id for created_by, or null
- * @param targetStage    canonical pipeline stage to create the item at (default 'qualify')
+ * @param targetStage    canonical pipeline stage to create the item at (default 'qualified')
  */
 export async function promoteToPipeline(
   opportunityId: string,
   captureOwner: string,
   createdByUserId: string | null,
-  targetStage: string = 'qualify',
+  targetStage: string = 'qualified',
 ): Promise<PromoteResult> {
   const owner = captureOwner?.trim();
   if (!owner || owner.toLowerCase() === 'system') {

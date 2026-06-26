@@ -88,6 +88,7 @@ function pipelineStageToLabel(stage: string): string {
   const map: Record<string, string> = {
     interest: 'Interest',
     qualify: 'Qualify',
+    qualified: 'Qualified',
     pursue: 'Pursue',
     solicitation: 'Solicitation',
     post_submittal: 'Post-Submittal',

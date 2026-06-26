@@ -10,7 +10,6 @@ import {
   useUpdateStage,
   type OpportunityMeta,
 } from "@/hooks/use-opportunities";
-import { useToast } from "@/components/ui/toast";
 import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
@@ -37,6 +36,7 @@ import {
   stageKeyToLabel,
   CANONICAL_STAGE_KEYS,
   DB_KEY_TO_LABEL,
+  isStagingStage,
   type ActiveStage,
 } from "@/lib/stages";
 import type {
@@ -192,9 +192,8 @@ function OpportunityList() {
   const [sbPlayOnly, setSbPlayOnly] = useState(false);
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
-  const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
-  const qualifyStage = useUpdateStage();
-  const { toast } = useToast();
+  const [showStagingQueue, setShowStagingQueue] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -240,6 +239,11 @@ function OpportunityList() {
   const allItems = useMemo(() => data?.items ?? [], [data]);
   const meta: OpportunityMeta | undefined = data?.meta;
   const totalPages = data?.totalPages ?? 1;
+
+  const stagingQuery = useOpportunitiesPaged({ stage: "qualify", relevant_only: false, limit: 50 });
+  const stagingItems = useMemo(() => stagingQuery.data?.items ?? [], [stagingQuery.data]);
+  const stagingCount = stagingQuery.data?.meta?.total_count ?? 0;
+  const updateStageList = useUpdateStage();
 
   // Vehicle grouping
   const { data: vehiclesData, isLoading: vehiclesLoading } = useVehicles();
@@ -307,7 +311,7 @@ function OpportunityList() {
       }
       if (key === "active") {
         return Object.entries(sc)
-          .filter(([k]) => !["won", "lost", "no_bid", "gov_cancelled", "passed", "qualify"].includes(k))
+          .filter(([k]) => !["qualify", "won", "lost", "no_bid", "gov_cancelled", "passed"].includes(k))
           .reduce((sum, [, v]) => sum + v, 0);
       }
       return sc[key] ?? 0;
@@ -427,33 +431,28 @@ function OpportunityList() {
               </button>
             );
           })}
-          <div className="ml-auto flex items-center gap-2 pl-3">
+          <div className="ml-auto pl-3 flex items-center gap-2">
             <button
               type="button"
-              disabled={!selectedOppId || qualifyStage.isPending}
               onClick={() => {
-                if (!selectedOppId) return;
-                qualifyStage.mutate(
-                  { id: selectedOppId, stage: "qualify" },
-                  {
-                    onSuccess: () => {
-                      toast("Moved to Qualify staging", "success");
-                      setSelectedOppId(null);
-                    },
-                    onError: (err) =>
-                      toast(`Failed to qualify: ${err.message}`, "error"),
-                  },
-                );
+                if (selectedIds.size > 0) {
+                  for (const sid of selectedIds) {
+                    updateStageList.mutate({ id: sid, stage: "qualify" });
+                  }
+                  setSelectedIds(new Set());
+                } else {
+                  setShowStagingQueue((v) => !v);
+                }
               }}
-              title={selectedOppId ? "Move selected opportunity to Qualify staging" : "Select a row first"}
+              title={selectedIds.size > 0 ? "Move selected to Qualify staging queue" : "Toggle Qualify staging queue view"}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors",
-                selectedOppId
-                  ? "border-gda-green text-gda-green bg-gda-green/10 hover:bg-gda-green/20 cursor-pointer"
-                  : "border-border text-muted-foreground/50 cursor-not-allowed",
+                showStagingQueue
+                  ? "border-gda-green text-gda-green bg-gda-green/10"
+                  : "border-border text-muted-foreground hover:border-gda-green/50",
               )}
             >
-              Qualify
+              Qualify{stagingCount > 0 ? ` (${stagingCount})` : ""}
             </button>
             <button
               type="button"
@@ -483,8 +482,73 @@ function OpportunityList() {
         </div>
       )}
 
-      {/* Vehicle-grouped view */}
-      {groupBy === "vehicle" ? (
+      {/* Staging queue view */}
+      {showStagingQueue ? (
+        <div className="flex-1 min-h-0 mt-4 overflow-y-auto overflow-x-clip rounded border border-border">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-gda-bg-base">
+              <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium">Title</th>
+                <th className="px-3 py-2 text-left font-medium w-[140px]">Agency</th>
+                <th className="px-3 py-2 text-left font-medium w-[80px]">Pwin</th>
+                <th className="px-3 py-2 text-left font-medium w-[100px]">Source</th>
+                <th className="px-3 py-2 text-left font-medium w-[100px]">Date Staged</th>
+                <th className="px-3 py-2 text-left font-medium w-[160px]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stagingItems.map((opp) => (
+                <tr key={String(opp.internal_id ?? opp.id)} className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9">
+                  <td className="px-3 py-1.5">
+                    <Link href={`/opportunities?id=${opp.id}`} className="text-foreground hover:text-gda-green truncate block max-w-xs text-sm">
+                      {opp.title}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[140px]">
+                    {opp.agency_name ?? opp.department ?? opp.agency ?? "---"}
+                  </td>
+                  <td className="px-3 py-1.5 text-xs font-mono tabular-nums">
+                    {opp.pwin?.score != null ? (
+                      <span className={opp.pwin.score >= 65 ? "text-gda-green" : opp.pwin.score >= 45 ? "text-gda-amber" : "text-red-400"}>
+                        {opp.pwin.score}%
+                      </span>
+                    ) : "---"}
+                  </td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                    {opp.data_source ?? "---"}
+                  </td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                    {opp.updated_at ? new Date(opp.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "---"}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateStageList.mutate({ id: String(opp.id), stage: "qualified" })}
+                        className="rounded border border-gda-green/40 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
+                      >
+                        Promote
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateStageList.mutate({ id: String(opp.id), stage: "interest" })}
+                        className="rounded border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground hover:border-gda-green/40 transition-colors"
+                      >
+                        Return
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {stagingItems.length === 0 && (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No opportunities in the Qualify staging queue.
+            </div>
+          )}
+        </div>
+      ) : groupBy === "vehicle" ? (
         vehiclesLoading ? (
           <div className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -546,8 +610,12 @@ function OpportunityList() {
                         opp={opp}
                         onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
                         onAgencyFilter={applyAgencyFilter}
-                        selected={selectedOppId === String(opp.id)}
-                        onSelect={(id) => setSelectedOppId((prev) => prev === id ? null : id)}
+                        selected={selectedIds.has(String(opp.id))}
+                        onSelect={(id) => setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(id)) next.delete(id); else next.add(id);
+                          return next;
+                        })}
                       />
                     ))}
                   </tbody>
@@ -973,7 +1041,7 @@ function OpportunityRow({
           )}
         >
           {!pipelineStage && <option value="">---</option>}
-          {CANONICAL_STAGE_KEYS.map((key) => (
+          {CANONICAL_STAGE_KEYS.filter((key) => !isStagingStage(key)).map((key) => (
             <option key={key} value={key}>
               {DB_KEY_TO_LABEL[key]}
             </option>
