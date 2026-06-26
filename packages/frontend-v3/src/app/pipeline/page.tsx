@@ -19,6 +19,8 @@ import {
   type PipelineListItem,
   type PipelineStageStats,
 } from "@/hooks/use-pipeline";
+import { useUpdateStage } from "@/hooks/use-opportunities";
+import { useToast } from "@/components/ui/toast";
 import { PipelineCoverageCard } from "./PipelineCoverageCard";
 
 const PAGE_SIZE = 50;
@@ -27,7 +29,6 @@ const PAGE_SIZE = 50;
 
 const PIPELINE_BUCKETS = [
   { label: "Interest", dbKey: "interest" },
-  { label: "Qualify", dbKey: "qualify" },
   { label: "Pursue", dbKey: "pursue" },
   { label: "Solicitation", dbKey: "solicitation" },
   { label: "Submission", dbKey: "post_submittal" },
@@ -101,7 +102,7 @@ function exportCsv(items: PipelineListItem[]) {
 
 const PIPELINE_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string", accessor: (r) => (r.opportunity_title as string) ?? "" },
-  { field: "stage", type: "enum", enumOrder: ["Interest", "Qualify", "Pursue", "Solicitation", "Submission", "Won"], accessor: (r) => stageKeyToLabel(r.stage as string) },
+  { field: "stage", type: "enum", enumOrder: ["Interest", "Pursue", "Solicitation", "Submission", "Won"], accessor: (r) => stageKeyToLabel(r.stage as string) },
   { field: "value", type: "number", accessor: (r) => (r.resolved_value as number) ?? 0 },
   { field: "weighted", type: "number", accessor: (r) => (r.resolved_weighted as number) ?? 0 },
   { field: "pwin", type: "number", accessor: (r) => (r.resolved_pwin as number) ?? null },
@@ -157,6 +158,14 @@ function PipelineContent() {
   );
 
   const { data: summary, isLoading: summaryLoading } = usePipelineSummary();
+
+  const {
+    data: qualifyData,
+    isLoading: qualifyLoading,
+  } = usePipelineList({ stage: "qualify", limit: 200 });
+  const qualifyItems = qualifyData?.items ?? [];
+  const updateStage = useUpdateStage();
+  const { toast } = useToast();
 
   const dbStage = activeBucket
     ? PIPELINE_BUCKETS.find((b) => b.label === activeBucket)?.dbKey
@@ -288,7 +297,7 @@ function PipelineContent() {
       {summaryLoading ? (
         <Skeleton className="h-24 bg-gda-panel" />
       ) : summary ? (
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-5 gap-2">
           {PIPELINE_BUCKETS.map((bucket) => {
             const displayLabel = pipelineStageLabel(bucket.dbKey);
             const stats: PipelineStageStats =
@@ -379,6 +388,101 @@ function PipelineContent() {
           </span>
         </div>
       )}
+
+      {/* ── Qualify Staging Section ─────────────────────────────── */}
+      {qualifyLoading ? (
+        <Skeleton className="h-16 bg-gda-panel" />
+      ) : qualifyItems.length > 0 ? (
+        <div className="rounded border border-border bg-gda-panel overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+            <span className="font-mono text-xs font-bold uppercase text-muted-foreground">
+              Qualify — Staging (Not Counted)
+            </span>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {qualifyItems.length} opp{qualifyItems.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
+                <th className="px-3 py-1.5 text-left font-medium">Title</th>
+                <th className="px-3 py-1.5 text-left font-medium w-[120px]">Agency</th>
+                <th className="px-3 py-1.5 text-left font-medium w-[60px]">Pwin</th>
+                <th className="px-3 py-1.5 text-left font-medium w-[80px]">Source</th>
+                <th className="px-3 py-1.5 text-left font-medium w-[90px]">Qualified</th>
+                <th className="px-3 py-1.5 text-left font-medium w-[180px]">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {qualifyItems.map((item) => (
+                <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-gda-bg-base/50 transition-colors h-9">
+                  <td className="px-3 py-1.5">
+                    <Link
+                      href={`/opportunities?id=${item.opportunity_id}`}
+                      className="text-foreground hover:text-gda-green truncate block max-w-xs"
+                    >
+                      {item.opportunity_title}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[120px]">
+                    {item.opportunity_agency ?? "—"}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-foreground">
+                    {item.resolved_pwin != null && item.resolved_pwin > 0
+                      ? `${Math.round(item.resolved_pwin)}%`
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                    {item.solicitation_number ?? "—"}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">
+                    {new Date(item.updated_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={updateStage.isPending}
+                        onClick={() =>
+                          updateStage.mutate(
+                            { id: item.opportunity_id, stage: "forecast" },
+                            {
+                              onSuccess: () => toast("Promoted to Pipeline", "success"),
+                              onError: (err) => toast(`Failed: ${err.message}`, "error"),
+                            },
+                          )
+                        }
+                        className="rounded border border-gda-green px-2 py-0.5 text-[11px] font-mono text-gda-green hover:bg-gda-green/10 transition-colors"
+                      >
+                        Promote to Pipeline
+                      </button>
+                      <button
+                        type="button"
+                        disabled={updateStage.isPending}
+                        onClick={() =>
+                          updateStage.mutate(
+                            { id: item.opportunity_id, stage: "signal" },
+                            {
+                              onSuccess: () => toast("Returned to Ops Tracker", "success"),
+                              onError: (err) => toast(`Failed: ${err.message}`, "error"),
+                            },
+                          )
+                        }
+                        className="rounded border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground hover:bg-gda-bg-base transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
 
       {/* ── Section 4: Search bar ─────────────────────────────────── */}
       <div className="flex items-center gap-3">

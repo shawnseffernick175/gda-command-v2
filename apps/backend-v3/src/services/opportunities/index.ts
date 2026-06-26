@@ -405,6 +405,13 @@ export async function listOpportunities(
     }
   }
 
+  // Qualify staging: exclude qualify-staged opps from default and active views.
+  if (!filters.stage || filters.stage === 'active') {
+    conditions.push(
+      `NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = 'qualify')`,
+    );
+  }
+
   if (filters.cursor) {
     try {
       const decoded = JSON.parse(Buffer.from(filters.cursor, 'base64').toString('utf-8')) as {
@@ -630,6 +637,15 @@ function buildFilterConditions(
       );
       params.push(normalized);
     }
+  }
+
+  // Qualify staging: exclude qualify-staged opps from all views except the
+  // explicit qualify tab. Qualify is a non-counted staging state that only
+  // appears in the Pipeline staging section.
+  if (!filters.stage || filters.stage === 'active') {
+    conditions.push(
+      `NOT EXISTS(SELECT 1 FROM pipeline_items pi2 WHERE pi2.opportunity_id = o.id AND pi2.stage = 'qualify')`,
+    );
   }
 
   return { conditions, params, paramIdx };

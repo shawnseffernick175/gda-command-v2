@@ -358,6 +358,8 @@ export function useUpdateStage() {
     onSettled: (_data, _err, vars) => {
       void qc.invalidateQueries({ queryKey: ["opportunity", vars.id] });
       void qc.invalidateQueries({ queryKey: ["opportunities-paged"] });
+      void qc.invalidateQueries({ queryKey: ["pipeline-list"] });
+      void qc.invalidateQueries({ queryKey: ["pipeline-summary"] });
     },
   });
 }
