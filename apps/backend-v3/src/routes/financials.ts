@@ -571,8 +571,9 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const currentYear = now.getFullYear();
     const currentFY = currentCalMonth >= 10 ? currentYear + 1 : currentYear;
 
-    // Build period strings (e.g. "FY26 Jan") for each month.
-    // Database periods always use the FY label: FY26 = Oct 2025 – Sep 2026.
+    // Build period strings (e.g. "FY25 Oct", "FY26 Jan") for each month.
+    // DB convention: "FY<YY> <Mon>" where YY = calendar year of the month,
+    // NOT the fiscal year (e.g. Oct 2025 → "FY25 Oct", Jan 2026 → "FY26 Jan").
     const MONTH_NUM: Record<string, number> = {
       Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
       Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
@@ -580,14 +581,15 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     const periodToMonth = new Map<string, string>();
     for (const mon of MONTH_ABBREVS) {
       const calMonthNum = MONTH_NUM[mon];
-      let fy: number;
+      let calYear: number;
       if (mode === 'FY') {
-        fy = currentFY;
+        // Oct-Dec belong to the previous calendar year relative to currentFY
+        calYear = calMonthNum >= 10 ? currentFY - 1 : currentFY;
       } else {
-        // CY mode: Jan-Sep belong to FY=currentYear, Oct-Dec belong to FY=currentYear+1
-        fy = calMonthNum >= 10 ? currentYear + 1 : currentYear;
+        // CY mode: all months are in currentYear
+        calYear = currentYear;
       }
-      const periodStr = `FY${fy % 100} ${mon}`;
+      const periodStr = `FY${calYear % 100} ${mon}`;
       periodToMonth.set(periodStr, mon);
     }
 
