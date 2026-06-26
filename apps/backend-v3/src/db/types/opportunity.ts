@@ -8,6 +8,8 @@
 
 export type LifecycleStage =
   | 'signal'
+  | 'qualify'
+  | 'qualified'
   | 'forecast'
   | 'pre_sol'
   | 'solicitation'

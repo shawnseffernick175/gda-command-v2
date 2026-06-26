@@ -60,9 +60,9 @@ export function RowActionsMenu({
 
   function handleAddToPipeline() {
     updateStage.mutate(
-      { id: opportunityId, stage: "qualify" },
+      { id: opportunityId, stage: "qualified" },
       {
-        onSuccess: () => toast("Moved to Qualify", "success"),
+        onSuccess: () => toast("Moved to Qualified", "success"),
         onError: (err) =>
           toast(`Failed to move to pipeline: ${err.message}`, "error"),
       },

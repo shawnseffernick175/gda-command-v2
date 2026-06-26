@@ -3,7 +3,7 @@
  *
  * Doctrine source: capture_stale
  *
- * Creates action items for active captures (stage in qualify, pursue,
+ * Creates action items for active captures (stage in qualified, pursue,
  * solicitation) that have not been updated in >14 days.
  * Deduplicates: only one open/in_progress item per capture.
  */
@@ -29,7 +29,7 @@ export async function runCaptureStaleActionsJob(): Promise<{ created: number; sk
     FROM captures c
     JOIN pipeline_items pi ON pi.id = c.pipeline_item_id
     JOIN opportunities o   ON o.id = pi.opportunity_id
-    WHERE pi.stage IN ('qualify', 'pursue', 'solicitation')
+    WHERE pi.stage IN ('qualified', 'pursue', 'solicitation')
       AND c.updated_at < NOW() - INTERVAL '14 days'
       AND NOT EXISTS (
         SELECT 1 FROM action_items ai

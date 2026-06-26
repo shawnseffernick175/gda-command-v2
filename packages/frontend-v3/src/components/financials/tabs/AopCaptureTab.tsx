@@ -22,7 +22,7 @@ const STAGE_LABELS: Record<string, string> = {
 const CAPTURE_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string" },
   { field: "agency", type: "string" },
-  { field: "stage", type: "enum", enumOrder: ["interest", "qualify", "pursue", "proposal", "post_submittal"] },
+  { field: "stage", type: "enum", enumOrder: ["interest", "qualified", "pursue", "proposal", "post_submittal"] },
   { field: "value", type: "number" },
   { field: "pwin", type: "number" },
   { field: "capture_owner", type: "string" },

@@ -27,7 +27,7 @@ const PAGE_SIZE = 50;
 
 const PIPELINE_BUCKETS = [
   { label: "Interest", dbKey: "interest" },
-  { label: "Qualify", dbKey: "qualify" },
+  { label: "Qualified", dbKey: "qualified" },
   { label: "Pursue", dbKey: "pursue" },
   { label: "Solicitation", dbKey: "solicitation" },
   { label: "Submission", dbKey: "post_submittal" },
@@ -36,7 +36,7 @@ const PIPELINE_BUCKETS = [
 
 const STAGE_BAR_COLORS: Record<string, string> = {
   Interest: "bg-muted-foreground/40",
-  Qualify: "bg-foreground/30",
+  Qualified: "bg-foreground/30",
   Pursue: "bg-gda-cyan/60",
   Solicitation: "bg-gda-cyan/60",
   Submission: "bg-gda-cyan/80",
@@ -45,7 +45,7 @@ const STAGE_BAR_COLORS: Record<string, string> = {
 
 const STAGE_BADGE_COLORS: Record<string, string> = {
   interest: "border-muted text-muted-foreground",
-  qualify: "border-foreground/40 text-foreground",
+  qualified: "border-foreground/40 text-foreground",
   pursue: "border-gda-cyan text-gda-cyan",
   solicitation: "border-gda-cyan text-gda-cyan",
   post_submittal: "border-gda-cyan/80 text-gda-cyan",
@@ -54,7 +54,7 @@ const STAGE_BADGE_COLORS: Record<string, string> = {
 
 const STAGE_ARROW_COLORS: Record<string, string> = {
   Interest: "bg-muted text-muted-foreground",
-  Qualify: "bg-foreground/10 text-foreground",
+  Qualified: "bg-foreground/10 text-foreground",
   Pursue: "bg-gda-cyan/20 text-gda-cyan",
   Solicitation: "bg-gda-cyan/20 text-gda-cyan",
   Submission: "bg-gda-cyan/20 text-gda-cyan",
@@ -101,7 +101,7 @@ function exportCsv(items: PipelineListItem[]) {
 
 const PIPELINE_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string", accessor: (r) => (r.opportunity_title as string) ?? "" },
-  { field: "stage", type: "enum", enumOrder: ["Interest", "Qualify", "Pursue", "Solicitation", "Submission", "Won"], accessor: (r) => stageKeyToLabel(r.stage as string) },
+  { field: "stage", type: "enum", enumOrder: ["Interest", "Qualified", "Pursue", "Solicitation", "Submission", "Won"], accessor: (r) => stageKeyToLabel(r.stage as string) },
   { field: "value", type: "number", accessor: (r) => (r.resolved_value as number) ?? 0 },
   { field: "weighted", type: "number", accessor: (r) => (r.resolved_weighted as number) ?? 0 },
   { field: "pwin", type: "number", accessor: (r) => (r.resolved_pwin as number) ?? null },
