@@ -10,6 +10,7 @@ import {
   useUpdateStage,
   type OpportunityMeta,
 } from "@/hooks/use-opportunities";
+import { useToast } from "@/components/ui/toast";
 import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
 import { useAskAi } from "@/hooks/use-llm";
@@ -191,6 +192,9 @@ function OpportunityList() {
   const [sbPlayOnly, setSbPlayOnly] = useState(false);
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
+  const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
+  const qualifyStage = useUpdateStage();
+  const { toast } = useToast();
   const [page, setPage] = useState(1);
   const { sortBy, sortDir, handleSort, sortParams } = useTableSort();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -297,11 +301,13 @@ function OpportunityList() {
       if (!meta) return 0;
       const sc = meta.stage_counts;
       if (key === "all") {
-        return Object.values(sc).reduce((sum, v) => sum + v, 0);
+        return Object.entries(sc)
+          .filter(([k]) => k !== "qualify")
+          .reduce((sum, [, v]) => sum + v, 0);
       }
       if (key === "active") {
         return Object.entries(sc)
-          .filter(([k]) => !["won", "lost", "no_bid", "gov_cancelled", "passed"].includes(k))
+          .filter(([k]) => !["won", "lost", "no_bid", "gov_cancelled", "passed", "qualify"].includes(k))
           .reduce((sum, [, v]) => sum + v, 0);
       }
       return sc[key] ?? 0;
@@ -421,7 +427,34 @@ function OpportunityList() {
               </button>
             );
           })}
-          <div className="ml-auto pl-3">
+          <div className="ml-auto flex items-center gap-2 pl-3">
+            <button
+              type="button"
+              disabled={!selectedOppId || qualifyStage.isPending}
+              onClick={() => {
+                if (!selectedOppId) return;
+                qualifyStage.mutate(
+                  { id: selectedOppId, stage: "qualify" },
+                  {
+                    onSuccess: () => {
+                      toast("Moved to Qualify staging", "success");
+                      setSelectedOppId(null);
+                    },
+                    onError: (err) =>
+                      toast(`Failed to qualify: ${err.message}`, "error"),
+                  },
+                );
+              }}
+              title={selectedOppId ? "Move selected opportunity to Qualify staging" : "Select a row first"}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors",
+                selectedOppId
+                  ? "border-gda-green text-gda-green bg-gda-green/10 hover:bg-gda-green/20 cursor-pointer"
+                  : "border-border text-muted-foreground/50 cursor-not-allowed",
+              )}
+            >
+              Qualify
+            </button>
             <button
               type="button"
               onClick={() => setGroupBy(g => g === "none" ? "vehicle" : "none")}
@@ -513,6 +546,8 @@ function OpportunityList() {
                         opp={opp}
                         onNavigate={(id) => router.push(`/opportunities?id=${id}`)}
                         onAgencyFilter={applyAgencyFilter}
+                        selected={selectedOppId === String(opp.id)}
+                        onSelect={(id) => setSelectedOppId((prev) => prev === id ? null : id)}
                       />
                     ))}
                   </tbody>
@@ -806,10 +841,14 @@ function OpportunityRow({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onNavigate,
   onAgencyFilter,
+  selected,
+  onSelect,
 }: {
   opp: OpportunitySummary;
   onNavigate: (id: number | string) => void;
   onAgencyFilter?: (value: string) => void;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
 }) {
   const updateStage = useUpdateStage();
   const heat = getHeatColor(opp);
@@ -836,10 +875,12 @@ function OpportunityRow({
 
   return (
     <tr
+      onClick={() => onSelect?.(String(opp.id))}
       className={cn(
-        "border-b border-border hover:bg-gda-panel/50 transition-colors h-9",
+        "border-b border-border hover:bg-gda-panel/50 transition-colors h-9 cursor-pointer",
         heat ? `border-l-[3px] ${heat}` : "border-l-[3px] border-l-transparent",
         isSbPlay && "bg-gda-green/[0.03]",
+        selected && "bg-gda-green/[0.06] ring-1 ring-inset ring-gda-green/30",
       )}
     >
       <td className="p-0 w-0" />

@@ -99,7 +99,7 @@ export async function pipelineRoutes(app: FastifyInstance): Promise<void> {
         ), 0)::bigint AS weighted_value
       FROM pipeline_items pi
       INNER JOIN opportunities o ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
-      WHERE pi.stage NOT IN ('lost', 'no_bid', 'gov_cancelled')
+      WHERE pi.stage NOT IN ('lost', 'no_bid', 'gov_cancelled', 'qualify')
       GROUP BY pi.stage
     `;
     const stagesRes = await pool.query<{

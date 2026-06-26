@@ -230,6 +230,8 @@ export async function listPipelineItems(
     paramIdx++;
     conditions.push(`pi.stage = $${paramIdx}`);
     params.push(normalized);
+  } else {
+    conditions.push(`pi.stage <> 'qualify'`);
   }
   if (filters.q) {
     paramIdx++;
