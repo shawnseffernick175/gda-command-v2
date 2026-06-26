@@ -518,6 +518,177 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     }, req.requestId));
   });
 
+  // GET /v3/financials/ar/by-contract?mode=CY|FY
+  // Contract × month matrix derived from ar_actuals using invoice/customer classification.
+  app.get('/v3/financials/ar/by-contract', async (req, reply) => {
+    noStore(reply);
+    const query = req.query as Record<string, string | undefined>;
+    const mode: CalendarMode = query.mode === 'CY' ? 'CY' : 'FY';
+
+    const { rows } = await pool.query(
+      `SELECT period, fiscal_year, quarter, customer_name, invoice_number, amount
+       FROM ar_actuals
+       ORDER BY fiscal_year, quarter, period`,
+    );
+
+    // Classification logic per ar_by_contract.md
+    function classifyContract(customerName: string, invoiceNumber: string | null): string {
+      const inv = invoiceNumber ?? '';
+      const cust = customerName ?? '';
+      const isArmy = /army/i.test(cust);
+
+      if (isArmy) {
+        // Strip R/TR retention/revision suffixes for matching
+        const stripped = inv.replace(/[RT]+$/i, '');
+        if (/F?0016/i.test(stripped)) return 'STEP (F0016)';
+        if (/F?0028/i.test(stripped)) return 'PEO IEWS SETA (F0028)';
+        if (/F?0209/i.test(stripped)) return 'C5ISR (F0209)';
+        if (/F?0038/i.test(stripped)) return 'CECOM (F0038)';
+        if (/FA010/i.test(stripped)) return 'FORCE (FA010)';
+        return 'Army-other/adjustment';
+      }
+
+      // Non-Army: bucket by customer_name
+      if (/^GSA/i.test(cust)) return 'PM Mission Command (GSA)';
+      if (/^Sev1/i.test(cust)) return 'Sev1Tech (sub)';
+      if (/^Booz/i.test(cust)) return 'Booz Allen (sub)';
+      if (/^Nakupuna/i.test(cust)) return 'Nakupuna (sub)';
+      if (/^CACI/i.test(cust)) return 'CACI (sub)';
+      if (/^Techximius/i.test(cust)) return 'Techximius (sub)';
+      if (/^My Energy Game/i.test(cust)) return 'My Energy Game';
+      if (/^Bricklayers/i.test(cust)) return 'Bricklayers & Allied CADC';
+      if (/^Rowan/i.test(cust)) return 'Rowan-Cabarrus CC';
+      return `Other: ${cust}`;
+    }
+
+    // Build month list based on CY/FY mode
+    const months = getMonthsForMode(mode);
+    const MONTH_ABBREVS = months.map((m) => m.mon);
+
+    // Determine the current FY / CY year context
+    const now = new Date();
+    const currentCalMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const currentFY = currentCalMonth >= 10 ? currentYear + 1 : currentYear;
+
+    // Build period strings (e.g. "FY26 Jan") for each month.
+    // Database periods always use the FY label: FY26 = Oct 2025 – Sep 2026.
+    const MONTH_NUM: Record<string, number> = {
+      Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+      Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+    };
+    const periodToMonth = new Map<string, string>();
+    for (const mon of MONTH_ABBREVS) {
+      const calMonthNum = MONTH_NUM[mon];
+      let fy: number;
+      if (mode === 'FY') {
+        fy = currentFY;
+      } else {
+        // CY mode: Jan-Sep belong to FY=currentYear, Oct-Dec belong to FY=currentYear+1
+        fy = calMonthNum >= 10 ? currentYear + 1 : currentYear;
+      }
+      const periodStr = `FY${fy % 100} ${mon}`;
+      periodToMonth.set(periodStr, mon);
+    }
+
+    // Accumulate amounts: contract → month → amount
+    const contractMonths = new Map<string, Map<string, number>>();
+
+    for (const r of rows) {
+      const period = r.period as string;
+      const mon = periodToMonth.get(period);
+      if (!mon) continue; // outside selected CY/FY window
+
+      const contract = classifyContract(r.customer_name as string, r.invoice_number as string | null);
+      if (!contractMonths.has(contract)) {
+        contractMonths.set(contract, new Map());
+      }
+      const monthMap = contractMonths.get(contract)!;
+      monthMap.set(mon, (monthMap.get(mon) ?? 0) + Number(r.amount));
+    }
+
+    // RS3 task order contracts
+    const RS3_CONTRACTS = [
+      'STEP (F0016)',
+      'PEO IEWS SETA (F0028)',
+      'C5ISR (F0209)',
+      'CECOM (F0038)',
+      'FORCE (FA010)',
+    ];
+
+    // Desired display order
+    const DISPLAY_ORDER = [
+      ...RS3_CONTRACTS,
+      'Army-other/adjustment',
+      'PM Mission Command (GSA)',
+      'Sev1Tech (sub)',
+      'Booz Allen (sub)',
+      'Nakupuna (sub)',
+      'CACI (sub)',
+      'Techximius (sub)',
+      'Bricklayers & Allied CADC',
+      'My Energy Game',
+      'Rowan-Cabarrus CC',
+    ];
+
+    // Collect all contract names, maintaining display order then remainder
+    const allContracts = new Set<string>(DISPLAY_ORDER.filter((c) => contractMonths.has(c)));
+    for (const c of contractMonths.keys()) {
+      allContracts.add(c);
+    }
+
+    // Build result rows
+    const contractRows: Array<{
+      contract: string;
+      is_rs3: boolean;
+      months: Record<string, number>;
+      total: number;
+    }> = [];
+
+    let rs3Total = 0;
+    const rs3Months: Record<string, number> = {};
+    let grandTotal = 0;
+    const grandMonths: Record<string, number> = {};
+
+    for (const contract of allContracts) {
+      const monthMap = contractMonths.get(contract) ?? new Map();
+      const monthData: Record<string, number> = {};
+      let rowTotal = 0;
+
+      for (const mon of MONTH_ABBREVS) {
+        const amt = monthMap.get(mon) ?? 0;
+        monthData[mon] = amt;
+        rowTotal += amt;
+
+        grandMonths[mon] = (grandMonths[mon] ?? 0) + amt;
+      }
+
+      const isRs3 = RS3_CONTRACTS.includes(contract);
+      if (isRs3) {
+        rs3Total += rowTotal;
+        for (const mon of MONTH_ABBREVS) {
+          rs3Months[mon] = (rs3Months[mon] ?? 0) + (monthData[mon] ?? 0);
+        }
+      }
+
+      grandTotal += rowTotal;
+      contractRows.push({ contract, is_rs3: isRs3, months: monthData, total: rowTotal });
+    }
+
+    const periodLabel = mode === 'CY'
+      ? `CY${currentYear % 100}`
+      : `FY${currentFY % 100}`;
+
+    return reply.send(successEnvelope({
+      mode,
+      period_label: periodLabel,
+      month_columns: MONTH_ABBREVS,
+      contracts: contractRows,
+      rs3_subtotal: { label: 'RS3 IDIQ (W15P7T-19-D-0206)', months: rs3Months, total: rs3Total },
+      grand_total: { months: grandMonths, total: grandTotal },
+    }, req.requestId));
+  });
+
   // GET /v3/financials/trial-balance
   app.get('/v3/financials/trial-balance', async (req, reply) => {
     noStore(reply);
