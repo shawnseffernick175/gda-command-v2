@@ -548,13 +548,13 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         return 'Army-other/adjustment';
       }
 
-      // Non-Army: bucket by customer_name
+      // Non-Army: bucket by customer_name (+ invoice prefix where applicable)
       if (/^GSA/i.test(cust)) return 'PM Mission Command (GSA)';
-      if (/^Sev1/i.test(cust)) return 'Sev1Tech (sub)';
-      if (/^Booz/i.test(cust)) return 'Booz Allen (sub)';
-      if (/^Nakupuna/i.test(cust)) return 'Nakupuna (sub)';
-      if (/^CACI/i.test(cust)) return 'CACI (sub)';
-      if (/^Techximius/i.test(cust)) return 'Techximius (sub)';
+      if (/Sev1/i.test(cust) || /^SEV1-/i.test(inv)) return 'Sev1Tech \u2014 CP IS&W';
+      if (/Booz/i.test(cust) || /^PDNET/i.test(inv)) return 'Booz Allen \u2014 NEBULA';
+      if (/Nakupuna/i.test(cust)) return 'Nakupuna \u2014 C5ISR CIO';
+      if (/CACI/i.test(cust)) return 'CACI \u2014 CYBERTRON';
+      if (/Techximius/i.test(cust) || /^TECHX-/i.test(inv)) return 'Techximius \u2014 CYBERTRON (SB)';
       if (/^My Energy Game/i.test(cust)) return 'My Energy Game';
       if (/^Bricklayers/i.test(cust)) return 'Bricklayers & Allied CADC';
       if (/^Rowan/i.test(cust)) return 'Rowan-Cabarrus CC';
@@ -623,11 +623,11 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       ...RS3_CONTRACTS,
       'Army-other/adjustment',
       'PM Mission Command (GSA)',
-      'Sev1Tech (sub)',
-      'Booz Allen (sub)',
-      'Nakupuna (sub)',
-      'CACI (sub)',
-      'Techximius (sub)',
+      'Sev1Tech \u2014 CP IS&W',
+      'Booz Allen \u2014 NEBULA',
+      'Nakupuna \u2014 C5ISR CIO',
+      'CACI \u2014 CYBERTRON',
+      'Techximius \u2014 CYBERTRON (SB)',
       'Bricklayers & Allied CADC',
       'My Energy Game',
       'Rowan-Cabarrus CC',
