@@ -132,7 +132,7 @@ export async function pipelineCoverageRoutes(app: FastifyInstance): Promise<void
       FROM pipeline_items pi
       INNER JOIN opportunities o
         ON o.id = pi.opportunity_id AND o.deleted_at IS NULL
-      WHERE pi.stage NOT IN ('won', 'lost', 'no_bid', 'gov_cancelled')
+      WHERE pi.stage NOT IN ('qualify', 'won', 'lost', 'no_bid', 'gov_cancelled')
         AND COALESCE(o.value_max, o.value_min, 0) > 1
       ORDER BY COALESCE(o.value_max, o.value_min, 0) DESC
     `;

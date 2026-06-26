@@ -13,7 +13,7 @@ import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 
 const STAGE_LABELS: Record<string, string> = {
   interest: "Investigating",
-  qualify: "Qualify",
+  qualified: "Qualified",
   pursue: "Pursue",
   proposal: "Proposal",
   post_submittal: "Submitted",
