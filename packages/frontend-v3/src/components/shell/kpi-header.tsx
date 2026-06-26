@@ -92,7 +92,7 @@ export function KpiHeader() {
 
           return (
             <div key={tile.key} className="flex items-center gap-4">
-              <span className="inline-flex items-center gap-1">
+              <span className="relative inline-flex items-center gap-1 pr-5">
                 <Link
                   href="/financials"
                   className="text-center whitespace-nowrap hover:opacity-80 transition-opacity"
@@ -107,7 +107,7 @@ export function KpiHeader() {
                       className={cn(
                         "text-base font-bold tabular-nums",
                         tile.color === "navy"
-                          ? "text-fin-navy"
+                          ? "text-white"
                           : "text-fin-chart-green",
                       )}
                     >
@@ -119,6 +119,7 @@ export function KpiHeader() {
                   score={value != null ? tile.format(value) : null}
                   label={tile.label}
                   scoreType={tile.scoreType}
+                  className="absolute top-0.5 right-0"
                 />
               </span>
               {idx < KPI_TILES.length - 1 && <Divider />}
