@@ -106,7 +106,7 @@ function exportCsv(items: PipelineListItem[]) {
 
 const PIPELINE_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string", accessor: (r) => (r.opportunity_title as string) ?? "" },
-  { field: "stage", type: "enum", enumOrder: ["Interest", "Pursue", "Solicitation", "Submission", "Won"], accessor: (r) => stageKeyToLabel(r.stage as string) },
+  { field: "stage", type: "enum", enumOrder: ["Interest", "Qualified", "Pursue", "Solicitation", "Submission", "Won"], accessor: (r) => stageKeyToLabel(r.stage as string) },
   { field: "value", type: "number", accessor: (r) => (r.resolved_value as number) ?? 0 },
   { field: "weighted", type: "number", accessor: (r) => (r.resolved_weighted as number) ?? 0 },
   { field: "pwin", type: "number", accessor: (r) => (r.resolved_pwin as number) ?? null },
