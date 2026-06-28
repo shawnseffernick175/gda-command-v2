@@ -37,6 +37,7 @@ import {
   stageKeyToLabel,
   CANONICAL_STAGE_KEYS,
   DB_KEY_TO_LABEL,
+  isStagingStage,
   type ActiveStage,
 } from "@/lib/stages";
 import type {
@@ -973,7 +974,7 @@ function OpportunityRow({
           )}
         >
           {!pipelineStage && <option value="">---</option>}
-          {CANONICAL_STAGE_KEYS.map((key) => (
+          {CANONICAL_STAGE_KEYS.filter((key) => !isStagingStage(key)).map((key) => (
             <option key={key} value={key}>
               {DB_KEY_TO_LABEL[key]}
             </option>

@@ -29,6 +29,7 @@ const PAGE_SIZE = 50;
 
 const PIPELINE_BUCKETS = [
   { label: "Interest", dbKey: "interest" },
+  { label: "Qualified", dbKey: "qualified" },
   { label: "Pursue", dbKey: "pursue" },
   { label: "Solicitation", dbKey: "solicitation" },
   { label: "Submission", dbKey: "post_submittal" },
@@ -38,6 +39,7 @@ const PIPELINE_BUCKETS = [
 const STAGE_BAR_COLORS: Record<string, string> = {
   Interest: "bg-muted-foreground/40",
   Qualify: "bg-foreground/30",
+  Qualified: "bg-gda-blue/50",
   Pursue: "bg-gda-cyan/60",
   Solicitation: "bg-gda-cyan/60",
   Submission: "bg-gda-cyan/80",
@@ -47,6 +49,7 @@ const STAGE_BAR_COLORS: Record<string, string> = {
 const STAGE_BADGE_COLORS: Record<string, string> = {
   interest: "border-muted text-muted-foreground",
   qualify: "border-foreground/40 text-foreground",
+  qualified: "border-gda-blue text-gda-blue",
   pursue: "border-gda-cyan text-gda-cyan",
   solicitation: "border-gda-cyan text-gda-cyan",
   post_submittal: "border-gda-cyan/80 text-gda-cyan",
@@ -56,6 +59,7 @@ const STAGE_BADGE_COLORS: Record<string, string> = {
 const STAGE_ARROW_COLORS: Record<string, string> = {
   Interest: "bg-muted text-muted-foreground",
   Qualify: "bg-foreground/10 text-foreground",
+  Qualified: "bg-gda-blue/10 text-gda-blue",
   Pursue: "bg-gda-cyan/20 text-gda-cyan",
   Solicitation: "bg-gda-cyan/20 text-gda-cyan",
   Submission: "bg-gda-cyan/20 text-gda-cyan",

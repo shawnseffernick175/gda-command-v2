@@ -26,7 +26,7 @@ import { useAssignOwner, usePassOpportunity, useAddNote, useUpdateTags } from "@
 import { UserPicker } from "./UserPicker";
 import { TagPicker } from "./TagPicker";
 import { NoteModal } from "./NoteModal";
-import { ALL_STAGES, LABEL_TO_DB_KEY, type Stage } from "@/lib/stages";
+import { ALL_STAGES, LABEL_TO_DB_KEY, isStagingStage, type Stage } from "@/lib/stages";
 
 interface RowActionsMenuProps {
   opportunityId: string;
@@ -60,9 +60,9 @@ export function RowActionsMenu({
 
   function handleAddToPipeline() {
     updateStage.mutate(
-      { id: opportunityId, stage: "qualify" },
+      { id: opportunityId, stage: "qualified" },
       {
-        onSuccess: () => toast("Moved to Qualify", "success"),
+        onSuccess: () => toast("Moved to Qualified", "success"),
         onError: (err) =>
           toast(`Failed to move to pipeline: ${err.message}`, "error"),
       },
@@ -161,7 +161,9 @@ export function RowActionsMenu({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Move to Stage…</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              {ALL_STAGES.map((stage) => (
+              {ALL_STAGES.filter(
+                (stage) => !isStagingStage(LABEL_TO_DB_KEY[stage]),
+              ).map((stage) => (
                 <DropdownMenuItem
                   key={stage}
                   onClick={() => handleStageMove(stage)}

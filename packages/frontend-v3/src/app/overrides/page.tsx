@@ -35,6 +35,7 @@ const RANGES: { label: string; value: Range }[] = [
 const STAGES = [
   "interest",
   "qualify",
+  "qualified",
   "pursue",
   "solicitation",
   "post_submittal",
