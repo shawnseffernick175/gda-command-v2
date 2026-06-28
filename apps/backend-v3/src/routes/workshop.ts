@@ -80,6 +80,108 @@ interface WorkshopOutputRow {
   rendered_text: string | null;
 }
 
+/* ── .docx table extraction (server-side, via OOXML) ─────────── */
+
+function ensureArray(val: unknown): unknown[] {
+  if (!val) return [];
+  return Array.isArray(val) ? val : [val];
+}
+
+/** Walk an OOXML node tree and collect all <w:t> text values. */
+function collectCellText(node: unknown): string {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (typeof node === 'boolean') return '';
+  if (Array.isArray(node)) return node.map(collectCellText).join('');
+
+  const obj = node as Record<string, unknown>;
+  const parts: string[] = [];
+  for (const [key, val] of Object.entries(obj)) {
+    if (key === 't') {
+      if (typeof val === 'string') parts.push(val);
+      else if (typeof val === 'number') parts.push(String(val));
+      else if (Array.isArray(val)) {
+        for (const item of val) {
+          if (typeof item === 'string') parts.push(item);
+          else if (typeof item === 'number') parts.push(String(item));
+        }
+      }
+      continue;
+    }
+    // Skip formatting / property nodes
+    if (['tblPr', 'tblGrid', 'trPr', 'tcPr', 'pPr', 'rPr', 'sectPr'].includes(key)) continue;
+    parts.push(collectCellText(val));
+  }
+  return parts.join('');
+}
+
+/** Extract tables from a .docx buffer by parsing word/document.xml. */
+async function extractTablesFromDocx(
+  buf: Buffer,
+): Promise<{ caption: string; rows: string[][]; csv: string }[]> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(buf);
+  const docFile = zip.files['word/document.xml'];
+  if (!docFile) return [];
+
+  const xml = await docFile.async('string');
+  const { XMLParser } = await import('fast-xml-parser');
+  const parser = new XMLParser({ ignoreAttributes: true, removeNSPrefix: true });
+  const parsed = parser.parse(xml);
+
+  const body = parsed?.document?.body;
+  if (!body) return [];
+
+  const results: { caption: string; rows: string[][]; csv: string }[] = [];
+
+  function processTbl(tbl: unknown): void {
+    if (!tbl || typeof tbl !== 'object') return;
+    const tblObj = tbl as Record<string, unknown>;
+    const trList = ensureArray(tblObj.tr);
+    if (trList.length === 0) return;
+
+    const rows: string[][] = [];
+    for (const tr of trList) {
+      if (!tr || typeof tr !== 'object') continue;
+      const tcList = ensureArray((tr as Record<string, unknown>).tc);
+      const cells: string[] = [];
+      for (const tc of tcList) {
+        cells.push(collectCellText(tc).trim());
+      }
+      if (cells.length > 0) rows.push(cells);
+    }
+    if (rows.length === 0) return;
+
+    const csv = rows.map((r) => r.join(',')).join('\n');
+    results.push({
+      caption: `Table ${results.length + 1}`,
+      rows,
+      csv,
+    });
+  }
+
+  function findTables(node: unknown): void {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      for (const item of node) findTables(item);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    if ('tbl' in obj) {
+      const tblList = ensureArray(obj.tbl);
+      for (const tbl of tblList) processTbl(tbl);
+    }
+    for (const [key, val] of Object.entries(obj)) {
+      if (key === 'tbl') continue; // already handled above
+      if (val && typeof val === 'object') findTables(val);
+    }
+  }
+
+  findTables(body);
+  return results;
+}
+
 async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<string> {
   const ext = filename.toLowerCase().split('.').pop();
 
@@ -661,6 +763,24 @@ async function runTeardown(uploadId: string, classification: string): Promise<vo
       analysis = JSON.parse(rawOutput) as Record<string, unknown>;
     } catch {
       analysis = { raw_text: rawOutput };
+    }
+
+    // Server-side table extraction for .docx files
+    const ext = upload.filename.toLowerCase().split('.').pop();
+    if (ext === 'docx') {
+      logger.info({ uploadId, filename: upload.filename }, 'Workshop: running server-side .docx table extraction');
+      try {
+        const serverTables = await extractTablesFromDocx(buf);
+        logger.info(
+          { uploadId, tableCount: serverTables.length },
+          'Workshop: .docx table extraction complete',
+        );
+        if (serverTables.length > 0) {
+          analysis.tables_extracted = serverTables;
+        }
+      } catch (tableErr) {
+        logger.warn({ err: tableErr, uploadId }, 'Workshop: .docx table extraction failed — falling back to LLM-only tables');
+      }
     }
 
     await pool.query(

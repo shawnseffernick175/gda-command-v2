@@ -1389,6 +1389,7 @@ export interface TeardownKeyNumber {
 export interface TeardownTable {
   caption: string;
   csv: string;
+  rows?: string[][];
 }
 
 export interface TeardownFigure {
