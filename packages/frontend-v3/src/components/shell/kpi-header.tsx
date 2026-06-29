@@ -22,17 +22,17 @@ interface KpiTile {
   label: string;
   key: KpiMetricKey;
   scoreType: ScoreType;
-  color: "navy" | "green";
+  colorCoded: boolean;
   format: (v: number) => string;
 }
 
 const KPI_TILES: KpiTile[] = [
-  { label: "ORDERS", key: "orders", scoreType: "orders", color: "navy", format: formatMoney },
-  { label: "SALES", key: "sales", scoreType: "sales", color: "navy", format: formatMoney },
-  { label: "EBIT", key: "ebit", scoreType: "ebit", color: "green", format: formatMoney },
-  { label: "ROS", key: "ros", scoreType: "ros", color: "green", format: (v) => `${v.toFixed(1)}%` },
-  { label: "FUNDED BACKLOG", key: "funded_backlog", scoreType: "funded_backlog", color: "navy", format: formatMoney },
-  { label: "BACKLOG", key: "backlog", scoreType: "backlog", color: "navy", format: formatMoney },
+  { label: "ORDERS", key: "orders", scoreType: "orders", colorCoded: false, format: formatMoney },
+  { label: "SALES", key: "sales", scoreType: "sales", colorCoded: false, format: formatMoney },
+  { label: "EBIT", key: "ebit", scoreType: "ebit", colorCoded: true, format: formatMoney },
+  { label: "ROS", key: "ros", scoreType: "ros", colorCoded: true, format: (v) => `${v.toFixed(1)}%` },
+  { label: "FUNDED BACKLOG", key: "funded_backlog", scoreType: "funded_backlog", colorCoded: false, format: formatMoney },
+  { label: "BACKLOG", key: "backlog", scoreType: "backlog", colorCoded: false, format: formatMoney },
 ];
 
 function Divider() {
@@ -106,9 +106,9 @@ export function KpiHeader() {
                     <div
                       className={cn(
                         "text-base font-bold tabular-nums",
-                        tile.color === "navy"
-                          ? "text-white"
-                          : "text-fin-chart-green",
+                        tile.colorCoded
+                          ? (value != null && value >= 0 ? "text-gda-green-muted" : "text-gda-red")
+                          : "text-white",
                       )}
                     >
                       {value != null ? tile.format(value) : "\u2014"}
