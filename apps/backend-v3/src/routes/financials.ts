@@ -1105,8 +1105,19 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
       let contractYears = yearsByTaskOrder.get(id);
 
-      // If no explicit yearly breakdown exists, generate synthetic contract
-      // years using Jul 1 – Jun 30 boundaries with proportional ceiling.
+      // Guard: if DB-sourced years exist but their ceiling sum covers less
+      // than 95% of total_ceiling, treat them as incomplete and fall back to
+      // synthetic generation to avoid silently zeroing revenue.
+      if (contractYears && contractYears.length > 0) {
+        const yearsCeilingSum = contractYears.reduce((s, cy) => s + cy.ceiling, 0);
+        if (yearsCeilingSum < ceiling * 0.95) {
+          contractYears = undefined;
+        }
+      }
+
+      // If no explicit yearly breakdown exists (or incomplete), generate
+      // synthetic contract years using Jul 1 – Jun 30 boundaries with
+      // proportional ceiling.
       if (!contractYears || contractYears.length === 0) {
         contractYears = [];
         // Walk PoP in Jul–Jun year segments
