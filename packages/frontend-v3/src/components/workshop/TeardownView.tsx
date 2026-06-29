@@ -345,19 +345,54 @@ function TablesPanel({
 }) {
   if (!tables || tables.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No tables extracted.</p>
+      <p className="text-sm text-muted-foreground">
+        No tables found in this document.
+      </p>
     );
   }
   return (
     <div className="space-y-4">
       {tables.map((t, i) => (
         <div key={i}>
-          <h4 className="mb-1 text-[13px] font-medium text-foreground">
+          <h4 className="mb-2 text-[13px] font-medium text-foreground">
             {t.caption || `Table ${i + 1}`}
           </h4>
-          <pre className="overflow-x-auto rounded border border-border bg-gda-bg-base p-3 text-xs text-muted-foreground">
-            {t.csv}
-          </pre>
+          {t.rows && t.rows.length > 0 ? (
+            <div className="overflow-x-auto rounded border border-border">
+              <table className="w-full text-left text-[13px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    {t.rows[0].map((cell, ci) => (
+                      <th
+                        key={ci}
+                        className="px-3 py-2 text-xs uppercase tracking-wide text-muted-foreground font-medium"
+                      >
+                        {cell}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {t.rows.slice(1).map((row, ri) => (
+                    <tr
+                      key={ri}
+                      className="border-b border-border last:border-0"
+                    >
+                      {row.map((cell, ci) => (
+                        <td key={ci} className="px-3 py-2 text-foreground">
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : t.csv ? (
+            <pre className="overflow-x-auto rounded border border-border bg-gda-bg-base p-3 text-xs text-muted-foreground">
+              {t.csv}
+            </pre>
+          ) : null}
         </div>
       ))}
     </div>
