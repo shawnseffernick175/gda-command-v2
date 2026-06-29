@@ -179,8 +179,13 @@ export class PromoteError extends Error {
 }
 
 /**
- * Promote an Ops Tracker opportunity into the pipeline. This is the ONLY new
+ * Promote a relevant opportunity into the pipeline. This is the ONLY new
  * path into pipeline_items. capture_owner is forced to the requesting user.
+ *
+ * Eligible: assessment_status='ops_tracker' OR relevance_status='relevant'.
+ * The owner's bucket shows all relevant items; per doctrine the owner (not AI)
+ * decides what enters the pipeline, so assessment-declined items that are still
+ * relevance-qualified can be promoted as an owner override.
  *
  * @param opportunityId  opportunity to promote
  * @param captureOwner   the requesting user's display identity (NEVER 'system')
