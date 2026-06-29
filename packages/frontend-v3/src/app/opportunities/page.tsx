@@ -1055,6 +1055,7 @@ function OpportunityDetail({ id }: { id: string }) {
   const { data: opp, isLoading, error } = useOpportunity(id);
   const analyzeOpp = useAnalyzeOpportunity();
   const updateStage = useUpdateStage();
+  const { toast: detailToast } = useToast();
 
   const llmForEffect = opp?.llm_analysis as LlmAnalysis | null | undefined;
   const relevanceForEffect = opp?.relevance_status;
@@ -1357,7 +1358,21 @@ function OpportunityDetail({ id }: { id: string }) {
                   <button
                     key={action.label}
                     type="button"
-                    onClick={() => action.stage && updateStage.mutate({ id, stage: action.stage })}
+                    onClick={() =>
+                      action.stage &&
+                      updateStage.mutate(
+                        { id, stage: action.stage },
+                        {
+                          onSuccess: () =>
+                            detailToast(`Moved to ${action.label}`, "success"),
+                          onError: (err) =>
+                            detailToast(
+                              `Stage change failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+                              "error",
+                            ),
+                        },
+                      )
+                    }
                     disabled={updateStage.isPending}
                     className="block w-full text-left rounded border border-border px-3 py-1.5 text-xs font-mono text-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors disabled:opacity-50"
                   >
