@@ -14,15 +14,16 @@ import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 const STAGE_LABELS: Record<string, string> = {
   interest: "Investigating",
   qualify: "Qualify",
+  qualified: "Qualified",
   pursue: "Pursue",
-  proposal: "Proposal",
+  solicitation: "Solicitation",
   post_submittal: "Submitted",
 };
 
 const CAPTURE_SORT_COLS: ColumnSortConfig[] = [
   { field: "title", type: "string" },
   { field: "agency", type: "string" },
-  { field: "stage", type: "enum", enumOrder: ["interest", "qualify", "pursue", "proposal", "post_submittal"] },
+  { field: "stage", type: "enum", enumOrder: ["interest", "qualify", "qualified", "pursue", "solicitation", "post_submittal"] },
   { field: "value", type: "number" },
   { field: "pwin", type: "number" },
   { field: "capture_owner", type: "string" },

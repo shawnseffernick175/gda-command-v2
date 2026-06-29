@@ -1,7 +1,10 @@
 /**
  * Canonical stage model -- tool-wide.
- * Active: Interest -> Qualify -> Pursue -> Solicitation -> Post-Submittal
+ * Active: Interest -> Qualify (staging) -> Qualified -> Pursue -> Solicitation -> Post-Submittal
  * Terminal: Won, Lost, No Bid, Government Cancelled
+ *
+ * 'qualify' is a pre-pipeline staging state (not counted in metrics).
+ * 'qualified' is the first counted pipeline stage.
  */
 
 /* ---- DB key constants --------------------------------------------------- */
@@ -9,6 +12,7 @@
 export const CANONICAL_STAGE_KEYS = [
   "interest",
   "qualify",
+  "qualified",
   "pursue",
   "solicitation",
   "post_submittal",
@@ -23,16 +27,27 @@ export type CanonicalStageKey = (typeof CANONICAL_STAGE_KEYS)[number];
 export const ACTIVE_STAGE_KEYS: readonly CanonicalStageKey[] = [
   "interest",
   "qualify",
+  "qualified",
   "pursue",
   "solicitation",
   "post_submittal",
 ] as const;
+
+/** Staging stages: pre-pipeline, not counted in metrics. */
+export const STAGING_STAGE_KEYS: readonly CanonicalStageKey[] = [
+  "qualify",
+] as const;
+
+export function isStagingStage(key: string): boolean {
+  return (STAGING_STAGE_KEYS as readonly string[]).includes(key);
+}
 
 /* ---- Display labels ----------------------------------------------------- */
 
 export const ACTIVE_STAGES = [
   "Interest",
   "Qualify",
+  "Qualified",
   "Pursue",
   "Solicitation",
   "Post-Submittal",
@@ -56,6 +71,7 @@ export type Stage = (typeof ALL_STAGES)[number];
 export const DB_KEY_TO_LABEL: Record<CanonicalStageKey, Stage> = {
   interest: "Interest",
   qualify: "Qualify",
+  qualified: "Qualified",
   pursue: "Pursue",
   solicitation: "Solicitation",
   post_submittal: "Post-Submittal",
@@ -68,6 +84,7 @@ export const DB_KEY_TO_LABEL: Record<CanonicalStageKey, Stage> = {
 export const LABEL_TO_DB_KEY: Record<Stage, CanonicalStageKey> = {
   Interest: "interest",
   Qualify: "qualify",
+  Qualified: "qualified",
   Pursue: "pursue",
   Solicitation: "solicitation",
   "Post-Submittal": "post_submittal",
@@ -84,6 +101,7 @@ export const STAGE_TABS: ReadonlyArray<{ key: string; label: string }> = [
   { key: "active", label: "Active" },
   { key: "interest", label: "Interest" },
   { key: "qualify", label: "Qualify" },
+  { key: "qualified", label: "Qualified" },
   { key: "pursue", label: "Pursue" },
   { key: "solicitation", label: "Solicitation" },
   { key: "post_submittal", label: "Post-Submittal" },
@@ -109,6 +127,10 @@ export const STAGE_ACTIONS: Record<
     { label: "Add to Watch List" },
   ],
   Qualify: [
+    { label: "Advance to Qualified", stage: "qualified" },
+    { label: "No Bid", stage: "no_bid" },
+  ],
+  Qualified: [
     { label: "Advance to Pursue", stage: "pursue" },
     { label: "No Bid", stage: "no_bid" },
   ],
@@ -134,6 +156,7 @@ export const STAGE_ACTIONS: Record<
 export const STAGE_BADGE_STYLES: Record<string, string> = {
   interest: "border-muted text-muted-foreground",
   qualify: "border-gda-cyan text-gda-cyan",
+  qualified: "border-gda-blue text-gda-blue",
   pursue: "border-gda-amber text-gda-amber",
   solicitation: "border-gda-green text-gda-green",
   post_submittal: "border-gda-green text-gda-green",
@@ -154,6 +177,8 @@ export function stageColor(stage: string): string {
     case "Interest":
       return "text-gda-cyan";
     case "Qualify":
+      return "text-gda-blue";
+    case "Qualified":
       return "text-gda-blue";
     case "Pursue":
       return "text-gda-green-muted";
@@ -178,6 +203,8 @@ export function stageBgColor(stage: string): string {
     case "Interest":
       return "bg-gda-cyan/10 border-gda-cyan/30";
     case "Qualify":
+      return "bg-gda-blue/10 border-gda-blue/30";
+    case "Qualified":
       return "bg-gda-blue/10 border-gda-blue/30";
     case "Pursue":
       return "bg-gda-green-muted/10 border-gda-green-muted/30";

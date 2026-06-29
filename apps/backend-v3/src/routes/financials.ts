@@ -1654,7 +1654,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
   // GET /v3/financials/aop-capture?fy=FY26
   app.get('/v3/financials/aop-capture', async (req, reply) => {
     noStore(reply);
-    const captureStages = ['interest', 'qualify', 'pursue', 'proposal', 'post_submittal'];
+    const captureStages = ['interest', 'qualified', 'pursue', 'solicitation', 'post_submittal'];
 
     const { rows } = await pool.query(
       `SELECT pi.id, pi.stage, pi.estimated_value, pi.win_probability,

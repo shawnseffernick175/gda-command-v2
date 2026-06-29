@@ -1,15 +1,19 @@
 /**
  * Canonical pipeline stage taxonomy.
  *
- * Single source of truth for the 9-stage pipeline:
- *   interest, qualify, pursue, solicitation, post_submittal,
- *   won, lost, no_bid, gov_cancelled.
+ * Single source of truth for the 10-stage pipeline:
+ *   interest, qualify (staging), qualified, pursue, solicitation,
+ *   post_submittal, won, lost, no_bid, gov_cancelled.
+ *
+ * 'qualify' is a pre-pipeline staging state (not counted in metrics).
+ * 'qualified' is the first counted pipeline stage.
  */
 
 /** Ordered canonical DB keys. */
 export const CANONICAL_STAGE_KEYS = [
   'interest',
   'qualify',
+  'qualified',
   'pursue',
   'solicitation',
   'post_submittal',
@@ -25,10 +29,20 @@ export type CanonicalStageKey = (typeof CANONICAL_STAGE_KEYS)[number];
 export const ACTIVE_STAGE_KEYS: readonly CanonicalStageKey[] = [
   'interest',
   'qualify',
+  'qualified',
   'pursue',
   'solicitation',
   'post_submittal',
 ] as const;
+
+/** Staging stages: pre-pipeline, not counted in metrics. */
+export const STAGING_STAGE_KEYS: readonly CanonicalStageKey[] = [
+  'qualify',
+] as const;
+
+export function isStagingStage(key: string): boolean {
+  return (STAGING_STAGE_KEYS as readonly string[]).includes(key);
+}
 
 /**
  * Terminal decision stages. These are explicit owner decisions (including
@@ -49,6 +63,7 @@ export function isTerminalStage(key: string): boolean {
 const DB_KEY_TO_DISPLAY: Record<CanonicalStageKey, string> = {
   interest: 'Interest',
   qualify: 'Qualify',
+  qualified: 'Qualified',
   pursue: 'Pursue',
   solicitation: 'Solicitation',
   post_submittal: 'Post-Submittal',
@@ -68,7 +83,7 @@ const VALID_KEYS = new Set<string>(CANONICAL_STAGE_KEYS);
 const ALIAS_TO_KEY: Record<string, CanonicalStageKey> = {
   interest: 'interest',
   qualify: 'qualify',
-  qualified: 'qualify',
+  qualified: 'qualified',
   pursue: 'pursue',
   pursuit: 'pursue',
   solicitation: 'solicitation',
