@@ -1089,30 +1089,65 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
 
       if (!popStart || !popEnd || ceiling <= 0) continue;
 
-      // Per-contract-year spread: if task_order_years rows exist, use each
-      // year's ceiling / months_in_period. Otherwise fall back to a uniform
-      // spread of total_ceiling / total_PoP_months.
-      const contractYears = yearsByTaskOrder.get(id);
-
-      // Helper: for a given month (first-of-month Date), return monthly revenue
-      // from the matching contract year, or the uniform fallback.
+      // Per-contract-year spread: use task_order_years when available,
+      // otherwise generate synthetic Jul 1 – Jun 30 contract years from
+      // the PoP and spread ceiling proportionally. Months outside any
+      // contract year get $0 revenue.
       const start = new Date(popStart);
       const end = new Date(popEnd);
-      const totalPopMonths = (end.getFullYear() - start.getFullYear()) * 12
-        + (end.getMonth() - start.getMonth()) + 1;
-      const uniformMonthly = totalPopMonths > 0 ? ceiling / totalPopMonths : 0;
 
+      // Use UTC to avoid timezone-shift issues with date-only ISO strings
+      const startYear = start.getUTCFullYear();
+      const startMonth = start.getUTCMonth(); // 0-based
+      const endYear = end.getUTCFullYear();
+      const endMonth_ = end.getUTCMonth();
+      const totalPopMonths = (endYear - startYear) * 12 + (endMonth_ - startMonth) + 1;
+
+      let contractYears = yearsByTaskOrder.get(id);
+
+      // If no explicit yearly breakdown exists, generate synthetic contract
+      // years using Jul 1 – Jun 30 boundaries with proportional ceiling.
+      if (!contractYears || contractYears.length === 0) {
+        contractYears = [];
+        // Walk PoP in Jul–Jun year segments
+        let segStart = new Date(Date.UTC(startYear, startMonth, 1));
+        while (segStart <= end) {
+          const segStartM = segStart.getUTCMonth();
+          const segStartY = segStart.getUTCFullYear();
+          let nextJul1: Date;
+          if (segStartM < 6) {
+            nextJul1 = new Date(Date.UTC(segStartY, 6, 1));
+          } else {
+            nextJul1 = new Date(Date.UTC(segStartY + 1, 6, 1));
+          }
+          // Segment end: last month before next Jul 1, capped at PoP end
+          const segEndDate = new Date(Math.min(nextJul1.getTime() - 1, end.getTime()));
+          const segEndFirst = new Date(Date.UTC(segEndDate.getUTCFullYear(), segEndDate.getUTCMonth(), 1));
+          const months = (segEndFirst.getUTCFullYear() - segStart.getUTCFullYear()) * 12
+            + (segEndFirst.getUTCMonth() - segStart.getUTCMonth()) + 1;
+          const yearCeiling = totalPopMonths > 0 ? ceiling * (months / totalPopMonths) : 0;
+          contractYears.push({
+            period_start: new Date(segStart),
+            period_end: segEndFirst,
+            ceiling: yearCeiling,
+            months_in_period: months,
+          });
+          segStart = nextJul1;
+        }
+      }
+
+      // Helper: for a given month (first-of-month Date), return monthly revenue
+      // from the matching contract year. Returns 0 for months outside all years.
       function monthlyRevenueForDate(monthStart: Date): number {
-        if (!contractYears || contractYears.length === 0) return uniformMonthly;
-        const ym = monthStart.getFullYear() * 100 + monthStart.getMonth();
-        for (const cy of contractYears) {
-          const cyStart = cy.period_start.getFullYear() * 100 + cy.period_start.getMonth();
-          const cyEnd = cy.period_end.getFullYear() * 100 + cy.period_end.getMonth();
+        const ym = monthStart.getUTCFullYear() * 100 + monthStart.getUTCMonth();
+        for (const cy of contractYears!) {
+          const cyStart = cy.period_start.getUTCFullYear() * 100 + cy.period_start.getUTCMonth();
+          const cyEnd = cy.period_end.getUTCFullYear() * 100 + cy.period_end.getUTCMonth();
           if (ym >= cyStart && ym <= cyEnd) {
             return cy.ceiling / cy.months_in_period;
           }
         }
-        return uniformMonthly;
+        return 0;
       }
 
       // Per-contract margin lookup
@@ -1121,10 +1156,10 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
       if (marginPct === null) marginPct = portfolioAvgMargin;
 
       // Compute a representative annual/monthly for the contract summary
-      // (uses first contract year if available, else uniform)
-      const summaryMonthly = contractYears && contractYears.length > 0
+      // (uses first contract year rate)
+      const summaryMonthly = contractYears.length > 0
         ? contractYears[0].ceiling / contractYears[0].months_in_period
-        : uniformMonthly;
+        : 0;
       const summaryAnnual = summaryMonthly * 12;
 
       contracts.push({
@@ -1143,14 +1178,14 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         status: r.status as string,
       });
 
-      // Generate monthly buckets from pop_start to pop_end
+      // Generate monthly buckets from pop_start to pop_end (UTC)
       let cumulativeRevenue = 0;
 
-      const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-      const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+      const cur = new Date(Date.UTC(startYear, startMonth, 1));
+      const endMonthDate = new Date(Date.UTC(endYear, endMonth_, 1));
 
-      while (cur <= endMonth) {
-        const monthKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`;
+      while (cur <= endMonthDate) {
+        const monthKey = `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, '0')}`;
         const monthRev = monthlyRevenueForDate(cur);
         cumulativeRevenue += monthRev;
 
@@ -1174,7 +1209,7 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
         const contractMap = monthlyMap.get(monthKey)!;
         contractMap.set(id, { funded_revenue: fundedRev, unfunded_revenue: unfundedRev, profit });
 
-        cur.setMonth(cur.getMonth() + 1);
+        cur.setUTCMonth(cur.getUTCMonth() + 1);
       }
     }
 
