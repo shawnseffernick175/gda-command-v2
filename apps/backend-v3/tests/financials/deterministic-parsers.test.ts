@@ -356,6 +356,18 @@ describe('deterministic-parsers (extracted_text pipe-delimited format)', () => {
       expect(typeof row.debit).toBe('number');
       expect(typeof row.credit).toBe('number');
     });
+
+    it('reads ending balance from the correct column despite header-data column count mismatch', () => {
+      const result = parseTrialBalance(tbText, 'trial-balance-may-2026.extracted.txt')!;
+      // Account 100-001: ending balance = 339036.98 (positive → debit)
+      const row100 = result.rows.find((r) => r.account_code === '100-001')!;
+      expect(row100.debit).toBeCloseTo(339036.98, 2);
+      expect(row100.credit).toBe(0);
+      // Account 400-001: ending balance = -15475554.25 (negative → credit)
+      const row400 = result.rows.find((r) => r.account_code === '400-001')!;
+      expect(row400.debit).toBe(0);
+      expect(row400.credit).toBeCloseTo(15475554.25, 2);
+    });
   });
 
   describe('parseTrendSie (extracted_text)', () => {
@@ -380,6 +392,13 @@ describe('deterministic-parsers (extracted_text pipe-delimited format)', () => {
       const result = parseTrendSie(sieText, 'trend-sie-may-2026.extracted.txt')!;
       const fringe = result.rows.find((r) => r.pool === 'Fringe')!;
       expect(fringe.current_period_actual).toBeCloseTo(0.45054537, 5);
+    });
+
+    it('extracts ACT YTD and PROV YTD values', () => {
+      const result = parseTrendSie(sieText, 'trend-sie-may-2026.extracted.txt')!;
+      const fringe = result.rows.find((r) => r.pool === 'Fringe')!;
+      expect(fringe.ytd_actual).toBeCloseTo(0.35240842, 5);
+      expect(fringe.ytd_budget).toBeCloseTo(0.3119, 4);
     });
 
     it('stops at POOL DETAIL section', () => {
@@ -415,6 +434,13 @@ describe('deterministic-parsers (extracted_text pipe-delimited format)', () => {
       const result = parseProjectRevenueSummary(prText, 'proj-revenue-may-2026.extracted.txt')!;
       const projectNames = result.rows.map((r) => r.project_name);
       expect(projectNames).toContain('OY4');
+    });
+
+    it('extracts non-zero revenue/cost through spacer columns', () => {
+      const result = parseProjectRevenueSummary(prText, 'proj-revenue-may-2026.extracted.txt')!;
+      const p = result.rows.find((r) => r.contract_number === '1047.010')!;
+      expect(p.revenue).toBeCloseTo(732241.85, 2);
+      expect(p.cost).toBeCloseTo(748121.73, 2);
     });
   });
 });
