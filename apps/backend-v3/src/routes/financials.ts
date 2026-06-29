@@ -531,15 +531,20 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY fiscal_year, quarter, period`,
     );
 
-    // Classification logic per ar_by_contract.md
+    // Classification logic per ar_by_contract.md §3
+    // Army invoices: extract task-order suffix after the last "-" (BVN####-F####
+    // format) so the F?#### regex never false-matches a BVN number.
+    // Non-Army: bucket by customer_name, NOT the shared INV- prefix.
     function classifyContract(customerName: string, invoiceNumber: string | null): string {
       const inv = invoiceNumber ?? '';
       const cust = customerName ?? '';
       const isArmy = /army/i.test(cust);
 
       if (isArmy) {
-        // Strip R/TR retention/revision suffixes for matching
-        const stripped = inv.replace(/[RT]+$/i, '');
+        // Extract task-order suffix (part after last dash); bare "0028" stays as-is
+        const suffix = inv.includes('-') ? inv.slice(inv.lastIndexOf('-') + 1) : inv;
+        // Strip R/TR retention/revision suffixes (e.g. F0209R, F0038TR)
+        const stripped = suffix.replace(/[RT]+$/i, '');
         if (/F?0016/i.test(stripped)) return 'STEP (F0016)';
         if (/F?0028/i.test(stripped)) return 'PEO IEWS SETA (F0028)';
         if (/F?0209/i.test(stripped)) return 'C5ISR (F0209)';
