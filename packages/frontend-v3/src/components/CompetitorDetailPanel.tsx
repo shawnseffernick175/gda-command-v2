@@ -150,7 +150,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
           <div>
             <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">NAICS Codes</h3>
             <div className="flex flex-wrap gap-1.5">
-              {competitor.naics_codes.map((code) => (
+              {competitor.naics_codes!.map((code) => (
                 <span key={code} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 border border-gray-200 font-mono">
                   {code}
                 </span>
@@ -164,7 +164,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Departments</h3>
           <div className="flex flex-wrap gap-1.5">
             {(competitor.agencies?.length ?? 0) > 0 ? (
-              competitor.agencies.map((agency) => (
+              competitor.agencies!.map((agency) => (
                 <span key={agency} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 border border-gray-200">
                   {agency}
                 </span>
