@@ -412,11 +412,11 @@ export async function listOpportunities(
     );
   }
 
-  // Cursor keyset (id < cursor_id) only works with the default id-based sort.
-  // For non-default sorts the route layer redirects to listOpportunitiesPaged;
-  // but as defense-in-depth the cursor is silently ignored here when the sort
-  // is non-default so the ORDER BY stays correct.
-  const isDefaultSort = !filters.sort_by || filters.sort_by === 'recency';
+  // Cursor keyset (id < cursor_id) only works with ORDER BY o.id DESC.
+  // For non-default sorts or ascending direction the route layer redirects
+  // to listOpportunitiesPaged; as defense-in-depth the cursor is silently
+  // ignored here when the sort is incompatible with the keyset operator.
+  const isDefaultSort = (!filters.sort_by || filters.sort_by === 'recency') && filters.sort_dir !== 'asc';
   if (filters.cursor && isDefaultSort) {
     try {
       const decoded = JSON.parse(Buffer.from(filters.cursor, 'base64').toString('utf-8')) as {
