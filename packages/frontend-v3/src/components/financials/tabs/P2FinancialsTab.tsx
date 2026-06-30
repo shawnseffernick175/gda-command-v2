@@ -5,7 +5,7 @@ import { Kpi } from "@/components/financials/primitives/Kpi";
 import { NumberCell } from "@/components/financials/primitives/NumberCell";
 import { SourceFooter } from "@/components/financials/SourceFooter";
 import { formatMoney } from "@/lib/format-money";
-import type { IncomeStatementLineItem } from "@/lib/types";
+import type { IncomeStatementLineItem, CostDetailItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
@@ -19,27 +19,123 @@ const POOL_SORT_COLS: ColumnSortConfig[] = [
   { field: "variance", type: "number" },
 ];
 
-interface StatementRow {
+/* ── Income Statement row definitions ──
+ *
+ * "summary" rows use the derived fields from financial_actuals (Revenue, Gross
+ * Profit, EBIT, etc.) — these are the authoritative, audited figures.
+ *
+ * "detail" rows pull from cost_detail_actuals / indirect_expense_actuals for
+ * the per-period breakdown. When detail data is absent the summary lines still
+ * render correctly; detail rows degrade to "—".
+ *
+ * Row types:
+ *   summary   — bold line derived from financial_actuals
+ *   detail    — indented line from cost_detail or indirect breakdown
+ *   section   — gray section header (no numbers)
+ *   separator — blank visual spacer row
+ */
+
+type RowKind = "summary" | "detail" | "section" | "separator";
+
+interface StatementRowDef {
+  kind: RowKind;
   label: string;
-  key: keyof IncomeStatementLineItem;
-  format: "money" | "percent";
-  isSummary?: boolean;
-  indent?: boolean;
+  /** For summary rows: which field on IncomeStatementLineItem to read */
+  key?: keyof IncomeStatementLineItem;
+  /** For detail rows: which breakdown map to read (direct / indirect) */
+  detailSource?: "direct" | "indirect";
+  /** For detail rows: the label key to match in the breakdown array */
+  detailKey?: string;
+  format?: "money" | "percent";
+  /** Visual nesting depth (0 = flush left, 1 = indented) */
+  indent?: number;
 }
 
-const STATEMENT_ROWS: StatementRow[] = [
-  { label: "Revenue", key: "revenue", format: "money", isSummary: true },
-  { label: "Direct Costs (COGS)", key: "direct_costs", format: "money", indent: true },
-  { label: "Gross Profit", key: "gross_profit", format: "money", isSummary: true },
-  { label: "Gross Margin %", key: "gross_margin_pct", format: "percent", indent: true },
-  { label: "Operating Expenses", key: "operating_expenses", format: "money", indent: true },
-  { label: "EBIT (Operating Income)", key: "ebit", format: "money", isSummary: true },
-  { label: "Return on Sales %", key: "ros_pct", format: "percent", indent: true },
-  { label: "New Orders (Bookings)", key: "new_orders", format: "money" },
+const STATEMENT_ROWS: StatementRowDef[] = [
+  // ── Revenue ──
+  { kind: "section", label: "Revenue" },
+  { kind: "summary", label: "Total Revenue", key: "revenue", format: "money" },
+
+  // ── Cost of Revenue ──
+  { kind: "section", label: "Cost of Revenue (Direct Costs)" },
+  { kind: "detail", label: "Direct Labor — Onsite", detailSource: "direct", detailKey: "DL Onsite", format: "money", indent: 1 },
+  { kind: "detail", label: "Direct Labor — Offsite", detailSource: "direct", detailKey: "DL Offsite", format: "money", indent: 1 },
+  { kind: "detail", label: "Subcontractor", detailSource: "direct", detailKey: "Subcontractor", format: "money", indent: 1 },
+  { kind: "detail", label: "Consultant", detailSource: "direct", detailKey: "Consultant", format: "money", indent: 1 },
+  { kind: "detail", label: "Travel", detailSource: "direct", detailKey: "Dir Travel", format: "money", indent: 1 },
+  { kind: "detail", label: "Sub Material", detailSource: "direct", detailKey: "Sub Material", format: "money", indent: 1 },
+  { kind: "detail", label: "Direct Material", detailSource: "direct", detailKey: "Direct Material", format: "money", indent: 1 },
+  { kind: "detail", label: "Other Direct Costs (ODC)", detailSource: "direct", detailKey: "ODC", format: "money", indent: 1 },
+  { kind: "summary", label: "Total Direct Costs", key: "direct_costs", format: "money" },
+
+  { kind: "separator", label: "" },
+
+  // ── Gross Profit ──
+  { kind: "summary", label: "Gross Profit", key: "gross_profit", format: "money" },
+  { kind: "detail", label: "Gross Margin %", key: "gross_margin_pct", format: "percent", indent: 1 },
+
+  { kind: "separator", label: "" },
+
+  // ── Operating Expenses ──
+  { kind: "section", label: "Operating Expenses (Indirect)" },
+  { kind: "detail", label: "Fringe Benefits", detailSource: "indirect", detailKey: "Fringe", format: "money", indent: 1 },
+  { kind: "detail", label: "Overhead", detailSource: "indirect", detailKey: "Overhead", format: "money", indent: 1 },
+  { kind: "detail", label: "Selling, Marketing & Handling", detailSource: "indirect", detailKey: "SMH", format: "money", indent: 1 },
+  { kind: "detail", label: "General & Administrative", detailSource: "indirect", detailKey: "G&A", format: "money", indent: 1 },
+  { kind: "summary", label: "Total Operating Expenses", key: "operating_expenses", format: "money" },
+
+  { kind: "separator", label: "" },
+
+  // ── Operating Income ──
+  { kind: "summary", label: "EBIT (Operating Income)", key: "ebit", format: "money" },
+  { kind: "detail", label: "Return on Sales %", key: "ros_pct", format: "percent", indent: 1 },
+
+  { kind: "separator", label: "" },
+
+  // ── Bookings ──
+  { kind: "summary", label: "New Orders (Bookings)", key: "new_orders", format: "money" },
 ];
 
 function shortPeriod(period: string): string {
   return period.replace(/^FY\d{2}\s+/, "");
+}
+
+function resolveDetailValue(
+  period: string,
+  row: StatementRowDef,
+  directDetail: Record<string, CostDetailItem[]>,
+  indirectDetail: Record<string, CostDetailItem[]>,
+): number | null {
+  if (row.detailSource && row.detailKey) {
+    const map = row.detailSource === "direct" ? directDetail : indirectDetail;
+    const items = map[period];
+    if (!items) return null;
+    const found = items.find(
+      (i) => i.label.toLowerCase() === row.detailKey!.toLowerCase(),
+    );
+    return found ? found.amount : null;
+  }
+  return null;
+}
+
+function resolveCellValue(
+  periodData: IncomeStatementLineItem | undefined,
+  row: StatementRowDef,
+  period: string,
+  directDetail: Record<string, CostDetailItem[]>,
+  indirectDetail: Record<string, CostDetailItem[]>,
+): number | null {
+  if (row.kind === "section" || row.kind === "separator") return null;
+
+  if (row.key && periodData) {
+    return periodData[row.key] as number;
+  }
+
+  if (row.detailSource) {
+    return resolveDetailValue(period, row, directDetail, indirectDetail);
+  }
+
+  return null;
 }
 
 export function P2FinancialsTab() {
@@ -78,6 +174,13 @@ export function P2FinancialsTab() {
   const stmt = data.income_statement;
   const months = stmt?.months ?? [];
   const quarters = stmt?.quarters ?? [];
+  const directDetail = stmt?.direct_cost_detail ?? {};
+  const indirectDetail = stmt?.indirect_cost_detail ?? {};
+
+  const monthByPeriod = new Map<string, IncomeStatementLineItem>();
+  for (const m of months) monthByPeriod.set(m.period, m);
+  const quarterByPeriod = new Map<string, IncomeStatementLineItem>();
+  for (const q of quarters) quarterByPeriod.set(q.period, q);
 
   return (
     <div className="space-y-6">
@@ -107,16 +210,16 @@ export function P2FinancialsTab() {
         <Kpi
           label="Funded Backlog"
           value={"\u2014"}
-          subtitle="From balance sheet / AR aging -- not yet ingested"
+          subtitle="From balance sheet / AR aging"
         />
         <Kpi
           label="DSO"
           value={"\u2014"}
-          subtitle="Requires AR detail -- not yet ingested"
+          subtitle="Requires AR detail"
         />
       </div>
 
-      {/* Revenue Trend Chart (G1) */}
+      {/* Revenue Trend Chart */}
       {months.length > 0 && (
         <div className="rounded border border-border bg-white p-4">
           <p className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -184,17 +287,17 @@ export function P2FinancialsTab() {
           Income Statement
         </h3>
         {months.length > 0 ? (
-          <div className="overflow-x-auto rounded border border-border max-h-[480px] overflow-y-auto">
+          <div className="overflow-x-auto rounded border border-border max-h-[640px] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-border bg-gda-bg-base text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 pl-4 pr-4 text-left font-medium">
+                  <th className="py-2 pl-4 pr-4 text-left font-medium min-w-[220px]">
                     Line Item
                   </th>
                   {months.map((m) => (
                     <th
                       key={m.period}
-                      className="py-2 px-3 text-right font-medium"
+                      className="py-2 px-3 text-right font-medium whitespace-nowrap"
                     >
                       {shortPeriod(m.period)}
                     </th>
@@ -202,7 +305,7 @@ export function P2FinancialsTab() {
                   {quarters.map((q) => (
                     <th
                       key={q.period}
-                      className="py-2 px-3 text-right font-medium border-l border-border"
+                      className="py-2 px-3 text-right font-medium border-l border-border whitespace-nowrap"
                     >
                       {shortPeriod(q.period)}
                     </th>
@@ -210,47 +313,93 @@ export function P2FinancialsTab() {
                 </tr>
               </thead>
               <tbody>
-                {STATEMENT_ROWS.map((row) => (
-                  <tr
-                    key={row.key}
-                    className={cn(
-                      "border-b border-border/50",
-                      row.isSummary && "bg-card font-medium",
-                    )}
-                  >
-                    <td
+                {STATEMENT_ROWS.map((row, idx) => {
+                  if (row.kind === "separator") {
+                    return (
+                      <tr key={`sep-${idx}`} className="h-2">
+                        <td colSpan={1 + months.length + quarters.length} />
+                      </tr>
+                    );
+                  }
+
+                  if (row.kind === "section") {
+                    return (
+                      <tr
+                        key={`sec-${idx}`}
+                        className="bg-gda-bg-base"
+                      >
+                        <td
+                          colSpan={1 + months.length + quarters.length}
+                          className="py-2 pl-4 text-[11px] uppercase tracking-wider text-muted-foreground font-medium"
+                        >
+                          {row.label}
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  const isSummary = row.kind === "summary";
+
+                  return (
+                    <tr
+                      key={`${row.label}-${idx}`}
                       className={cn(
-                        "py-2 pr-4 text-foreground whitespace-nowrap",
-                        row.indent ? "pl-8 text-muted-foreground font-normal" : "pl-4",
+                        "border-b border-border/50",
+                        isSummary && "bg-card font-medium",
                       )}
                     >
-                      {row.label}
-                    </td>
-                    {months.map((m) => (
                       <td
-                        key={m.period}
-                        className="py-2 px-3 text-right"
+                        className={cn(
+                          "py-2 pr-4 whitespace-nowrap",
+                          row.indent ? "pl-8" : "pl-4",
+                          isSummary
+                            ? "text-foreground font-medium"
+                            : "text-muted-foreground font-normal",
+                        )}
                       >
-                        <NumberCell
-                          value={m[row.key] as number}
-                          format={row.format}
-                        />
+                        {row.label}
                       </td>
-                    ))}
-                    {quarters.map((q) => (
-                      <td
-                        key={q.period}
-                        className="py-2 px-3 text-right border-l border-border"
-                      >
-                        <NumberCell
-                          value={q[row.key] as number}
-                          format={row.format}
-                          className={row.isSummary ? "font-semibold" : undefined}
-                        />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                      {months.map((m) => {
+                        const val = resolveCellValue(
+                          monthByPeriod.get(m.period),
+                          row,
+                          m.period,
+                          directDetail,
+                          indirectDetail,
+                        );
+                        return (
+                          <td key={m.period} className="py-2 px-3 text-right">
+                            <NumberCell
+                              value={val}
+                              format={row.format}
+                            />
+                          </td>
+                        );
+                      })}
+                      {quarters.map((q) => {
+                        const val = resolveCellValue(
+                          quarterByPeriod.get(q.period),
+                          row,
+                          q.period,
+                          directDetail,
+                          indirectDetail,
+                        );
+                        return (
+                          <td
+                            key={q.period}
+                            className="py-2 px-3 text-right border-l border-border"
+                          >
+                            <NumberCell
+                              value={val}
+                              format={row.format}
+                              className={isSummary ? "font-semibold" : undefined}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

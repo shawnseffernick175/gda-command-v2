@@ -1333,6 +1333,11 @@ export interface IncomeStatementLineItem {
   new_orders: number;
 }
 
+export interface CostDetailItem {
+  label: string;
+  amount: number;
+}
+
 export interface P2FinancialsData {
   kpi: {
     ytd_revenue: number;
@@ -1349,6 +1354,8 @@ export interface P2FinancialsData {
   income_statement: {
     months: IncomeStatementLineItem[];
     quarters: IncomeStatementLineItem[];
+    direct_cost_detail: Record<string, CostDetailItem[]>;
+    indirect_cost_detail: Record<string, CostDetailItem[]>;
   };
   monthly_actuals: P2MonthlyActual[];
   cost_by_pool: CostByPool[];

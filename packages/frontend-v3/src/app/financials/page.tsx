@@ -51,8 +51,8 @@ const TAB_GROUPS: TabGroup[] = [
   {
     label: "Receivables & Payables",
     tabs: [
-      { id: "ap", label: "Accounts Payable" },
       { id: "ar", label: "Accounts Receivable" },
+      { id: "ap", label: "Accounts Payable" },
     ],
   },
   {
@@ -175,14 +175,21 @@ export default function FinancialsPage() {
   return (
     <div className="space-y-4">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
-        {/* Status Strip */}
-        <StatusStrip />
+      <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-3 sticky-page-header">
+        {/* Page title + subtitle */}
+        <div className="flex items-baseline justify-between gap-4">
+          <div className="flex items-baseline gap-3 min-w-0">
+            <h1 className="shrink-0 text-lg font-semibold text-foreground">
+              {tabTitle(activeTab)}
+              {yearControlsActive ? ` \u2014 ${fy}` : ""}
+            </h1>
+            <p className="text-[12px] text-muted-foreground truncate">
+              Envision Innovative Solutions {"\u2014"} Financial Bible
+            </p>
+          </div>
 
-        {/* Tab bar with AI Analyze + Year Selector */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Left: AI Analyze button + grouped tabs */}
-          <div className="flex items-center gap-3">
+          {/* Right: AI Analyze + FY/CY toggle + year buttons */}
+          <div className="flex items-center gap-3 shrink-0">
             <button
               type="button"
               className="rounded px-3 py-1.5 text-[13px] font-medium text-white transition-colors bg-fin-navy hover:bg-fin-navy-hover"
@@ -191,103 +198,89 @@ export default function FinancialsPage() {
               AI Analyze
             </button>
 
-            <nav className="flex items-center gap-1">
-              {TAB_GROUPS.map((group, gi) => (
-                <div key={group.label} className="flex items-center">
-                  {gi > 0 && (
-                    <span className="mx-2 h-4 w-px bg-border" />
-                  )}
-                  {group.tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      className={cn(
-                        "border-b-2 px-2 pb-1 text-[13px] font-medium transition-colors",
-                        activeTab === tab.id
-                          ? "border-gda-cyan text-foreground"
-                          : "border-transparent text-muted-foreground hover:text-foreground",
-                      )}
-                      onClick={() => setActiveTab(tab.id)}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </nav>
-          </div>
-
-          {/* Right: FY/CY toggle + year buttons */}
-          <div
-            className={cn(
-              "flex items-center gap-2",
-              !yearControlsActive && "opacity-40",
-            )}
-            title={
-              yearControlsActive
-                ? undefined
-                : "Year selection applies only to AOP Plan and AOP Execution"
-            }
-          >
-            <div className="flex rounded border border-border">
-              {(["FY", "CY"] as CalendarMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  disabled={!yearControlsActive}
-                  className={cn(
-                    "px-2 py-1 text-[12px] font-medium transition-colors",
-                    calendarMode === mode
-                      ? "bg-card text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                    !yearControlsActive && "cursor-not-allowed",
-                  )}
-                  onClick={() => setCalendarMode(mode)}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-1">
-              {YEARS.map((yr) => (
-                <button
-                  key={yr}
-                  type="button"
-                  disabled={!yearControlsActive}
-                  className={cn(
-                    "rounded px-2 py-1 text-[12px] font-medium transition-colors",
-                    selectedYear === yr
-                      ? "bg-card text-foreground border border-border"
-                      : "text-muted-foreground hover:text-foreground",
-                    !yearControlsActive && "cursor-not-allowed",
-                  )}
-                  onClick={() => setSelectedYear(yr)}
-                >
-                  {yr}
-                </button>
-              ))}
+            <div
+              className={cn(
+                "flex items-center gap-2",
+                !yearControlsActive && "opacity-40",
+              )}
+              title={
+                yearControlsActive
+                  ? undefined
+                  : "Year selection applies only to AOP Plan and AOP Execution"
+              }
+            >
+              <div className="flex rounded border border-border">
+                {(["FY", "CY"] as CalendarMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={!yearControlsActive}
+                    className={cn(
+                      "px-2 py-1 text-[12px] font-medium transition-colors",
+                      calendarMode === mode
+                        ? "bg-card text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                      !yearControlsActive && "cursor-not-allowed",
+                    )}
+                    onClick={() => setCalendarMode(mode)}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1">
+                {YEARS.map((yr) => (
+                  <button
+                    key={yr}
+                    type="button"
+                    disabled={!yearControlsActive}
+                    className={cn(
+                      "rounded px-2 py-1 text-[12px] font-medium transition-colors",
+                      selectedYear === yr
+                        ? "bg-card text-foreground border border-border"
+                        : "text-muted-foreground hover:text-foreground",
+                      !yearControlsActive && "cursor-not-allowed",
+                    )}
+                    onClick={() => setSelectedYear(yr)}
+                  >
+                    {yr}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Page title + subtitle */}
-        <div>
-          <div className="flex items-baseline gap-3">
-            <h1 className="shrink-0 text-lg font-semibold text-foreground">
-              {tabTitle(activeTab)}
-              {yearControlsActive ? ` \u2014 ${fy}` : ""}
-            </h1>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              The Financial Bible \u2014 your single source of truth for plan, forecast,
-              and actuals. Move across the tabs to see the AOP plan, execution
-              against it, contract waterfall, and balance sheet, with every number
-              traceable to its source.
-            </p>
-          </div>
-          <p className="text-[12px] text-muted-foreground">
-            Envision Innovative Solutions {"\u2014"} Financial Bible
-          </p>
-        </div>
+        {/* Status Strip */}
+        <StatusStrip />
+
+        {/* Tab bar — grouped tabs with visible group labels */}
+        <nav className="flex flex-wrap items-start gap-x-5 gap-y-1">
+          {TAB_GROUPS.map((group) => (
+            <div key={group.label} className="flex flex-col gap-0.5">
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60 font-medium select-none">
+                {group.label}
+              </span>
+              <div className="flex items-center gap-0.5">
+                {group.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={cn(
+                      "border-b-2 px-2 pb-1 text-[13px] font-medium transition-colors",
+                      activeTab === tab.id
+                        ? "border-gda-cyan text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
       </div>
 
       {/* Tab content */}

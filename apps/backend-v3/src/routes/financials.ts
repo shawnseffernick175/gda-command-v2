@@ -1799,6 +1799,28 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY SUM(actual_amount) DESC`,
     );
 
+    // Direct cost breakdown by period and cost element (for income statement
+    // detail). Uses pool='DIRECT' to get the pure direct-cost component per
+    // element. Aggregated cost elements are mapped to proper labels in the
+    // frontend; only the DIRECT pool is used here.
+    const { rows: directCostRows } = await pool.query(
+      `SELECT period, cost_element,
+              SUM(actual_amount) AS amount
+       FROM cost_detail_actuals
+       WHERE LOWER(pool) = 'direct'
+       GROUP BY period, cost_element
+       ORDER BY period, cost_element`,
+    );
+
+    // Indirect expense breakdown by period and pool (Fringe, Overhead, G&A).
+    const { rows: indirectRows } = await pool.query(
+      `SELECT period, pool,
+              SUM(current_period_actual) AS amount
+       FROM indirect_expense_actuals
+       GROUP BY period, pool
+       ORDER BY period, pool`,
+    );
+
     // Source documents
     const { rows: srcDocs } = await pool.query(
       `SELECT DISTINCT vd.id AS vault_doc_id, vd.filename, vd.uploaded_at AS ingested_at
@@ -1873,12 +1895,36 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
     });
     const incomeStatementQuarters = quarterRows.map(buildStatementItems);
 
+    // Build direct cost detail map: { period -> { cost_element -> amount } }
+    const directCostByPeriod: Record<string, { label: string; amount: number }[]> = {};
+    for (const r of directCostRows) {
+      const period = r.period as string;
+      if (!directCostByPeriod[period]) directCostByPeriod[period] = [];
+      directCostByPeriod[period].push({
+        label: r.cost_element as string,
+        amount: Number(r.amount),
+      });
+    }
+
+    // Build indirect expense detail map: { period -> { pool -> amount } }
+    const indirectByPeriod: Record<string, { label: string; amount: number }[]> = {};
+    for (const r of indirectRows) {
+      const period = r.period as string;
+      if (!indirectByPeriod[period]) indirectByPeriod[period] = [];
+      indirectByPeriod[period].push({
+        label: r.pool as string,
+        amount: Number(r.amount),
+      });
+    }
+
     return reply.send(successEnvelope({
       kpi: kpiData,
       plan: planData,
       income_statement: {
         months: incomeStatementMonths,
         quarters: incomeStatementQuarters,
+        direct_cost_detail: directCostByPeriod,
+        indirect_cost_detail: indirectByPeriod,
       },
       monthly_actuals: monthlyRows.map((r) => ({
         period: r.period as string,
