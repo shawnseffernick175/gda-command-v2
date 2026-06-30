@@ -8,16 +8,28 @@ function safeMargin(profit: number, revenue: number): number | null {
   return (profit / revenue) * 100;
 }
 
-function ArcGauge({ value, max }: { value: number; max: number }) {
-  const r = 60;
-  const cx = 70;
-  const cy = 70;
+function ArcGauge({
+  value,
+  target,
+  label,
+}: {
+  value: number;
+  target: number | null;
+  label: string;
+}) {
+  const r = 52;
+  const cx = 60;
+  const cy = 60;
+  const strokeW = 8;
   const startAngle = 220;
   const endAngle = -40;
   const totalAngle = startAngle - endAngle;
-
-  const pct = Math.min(Math.max(value / max, 0), 1);
+  const maxPct = Math.max(Math.abs(value) * 1.5, 50);
+  const pct = Math.min(Math.max(value / maxPct, 0), 1);
   const sweepAngle = totalAngle * pct;
+
+  const targetPct =
+    target != null ? Math.min(Math.max(target / maxPct, 0), 1) : null;
 
   function polarToCart(angleDeg: number) {
     const rad = (angleDeg * Math.PI) / 180;
@@ -31,35 +43,65 @@ function ArcGauge({ value, max }: { value: number; max: number }) {
   const bgLargeArc = totalAngle > 180 ? 1 : 0;
   const valLargeArc = sweepAngle > 180 ? 1 : 0;
 
+  const targetAngle =
+    targetPct != null ? startAngle - totalAngle * targetPct : null;
+  const targetPos = targetAngle != null ? polarToCart(targetAngle) : null;
+
+  const atOrAbove = target != null && value >= target;
+
   return (
-    <svg viewBox="0 0 140 100" className="mx-auto w-48">
-      <path
-        d={`M ${bgStart.x} ${bgStart.y} A ${r} ${r} 0 ${bgLargeArc} 0 ${bgEnd.x} ${bgEnd.y}`}
-        fill="none"
-        className="stroke-fin-sand"
-        strokeWidth="10"
-        strokeLinecap="round"
-      />
-      {pct > 0 && (
+    <div className="flex flex-col items-center">
+      <svg viewBox="0 0 120 80" className="w-36">
         <path
-          d={`M ${bgStart.x} ${bgStart.y} A ${r} ${r} 0 ${valLargeArc} 0 ${valEnd.x} ${valEnd.y}`}
+          d={`M ${bgStart.x} ${bgStart.y} A ${r} ${r} 0 ${bgLargeArc} 0 ${bgEnd.x} ${bgEnd.y}`}
           fill="none"
-          className="stroke-fin-teal"
-          strokeWidth="10"
+          className="stroke-fin-sand"
+          strokeWidth={strokeW}
           strokeLinecap="round"
         />
+        {pct > 0 && (
+          <path
+            d={`M ${bgStart.x} ${bgStart.y} A ${r} ${r} 0 ${valLargeArc} 0 ${valEnd.x} ${valEnd.y}`}
+            fill="none"
+            className={atOrAbove ? "stroke-fin-teal" : "stroke-gda-red"}
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+          />
+        )}
+        {targetPos && (
+          <circle
+            cx={targetPos.x}
+            cy={targetPos.y}
+            r="4"
+            className="fill-fin-stone"
+          />
+        )}
+        <text
+          x={cx}
+          y={cy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          className="fill-fin-ink"
+          fontSize="18"
+          fontWeight="600"
+        >
+          {value.toFixed(1)}%
+        </text>
+      </svg>
+      <span className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      {target != null && (
+        <span
+          className={cn(
+            "text-[11px]",
+            atOrAbove ? "text-gda-green" : "text-gda-red",
+          )}
+        >
+          Target: {target.toFixed(1)}%
+        </span>
       )}
-      <text
-        x={cx}
-        y={cy + 4}
-        textAnchor="middle"
-        className="fill-fin-ink text-lg font-semibold"
-        fontSize="20"
-        fontWeight="600"
-      >
-        {value.toFixed(1)}%
-      </text>
-    </svg>
+    </div>
   );
 }
 
@@ -85,56 +127,35 @@ export function ProfitMarginCard({ project }: { project: ProjectFullRow }) {
 
   if (!hasData) {
     return (
-      <div className="flex h-48 items-center justify-center rounded border border-dashed border-border bg-gda-panel/30">
-        <p className="text-sm text-muted-foreground">No margin data for this period yet</p>
+      <div className="flex h-72 items-center justify-center rounded border border-dashed border-border bg-gda-panel/30">
+        <p className="text-sm text-muted-foreground">
+          No margin data for this period yet
+        </p>
       </div>
     );
   }
 
-  const gaugeValue = periodMargin ?? ytdMargin ?? 0;
-  const gaugeMax = Math.max(gaugeValue * 1.5, 50);
-
   return (
     <div className="rounded border border-border bg-white p-4">
-      <h3 className="mb-3 text-sm font-medium text-fin-ink">Profit Margin</h3>
-      <ArcGauge value={gaugeValue} max={gaugeMax} />
-      <div className="mt-2 grid grid-cols-2 gap-4 text-center">
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Period</p>
-          <p className="text-lg font-semibold text-foreground">
-            {periodMargin != null ? `${periodMargin.toFixed(1)}%` : "\u2014"}
-          </p>
-          {targetPeriodMargin != null && (
-            <p
-              className={cn(
-                "text-[11px]",
-                periodMargin != null && periodMargin >= targetPeriodMargin
-                  ? "text-gda-green"
-                  : "text-gda-red",
-              )}
-            >
-              Target: {targetPeriodMargin.toFixed(1)}%
-            </p>
-          )}
-        </div>
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">YTD</p>
-          <p className="text-lg font-semibold text-foreground">
-            {ytdMargin != null ? `${ytdMargin.toFixed(1)}%` : "\u2014"}
-          </p>
-          {targetYtdMargin != null && (
-            <p
-              className={cn(
-                "text-[11px]",
-                ytdMargin != null && ytdMargin >= targetYtdMargin
-                  ? "text-gda-green"
-                  : "text-gda-red",
-              )}
-            >
-              Target: {targetYtdMargin.toFixed(1)}%
-            </p>
-          )}
-        </div>
+      <h3 className="mb-1 text-sm font-medium text-fin-ink">Profit Margin</h3>
+      <p className="mb-4 text-[11px] text-muted-foreground">
+        Period and YTD margin with target markers
+      </p>
+      <div className="flex items-center justify-center gap-8">
+        {periodMargin != null && (
+          <ArcGauge
+            value={periodMargin}
+            target={targetPeriodMargin}
+            label="Period"
+          />
+        )}
+        {ytdMargin != null && (
+          <ArcGauge
+            value={ytdMargin}
+            target={targetYtdMargin}
+            label="YTD"
+          />
+        )}
       </div>
     </div>
   );
