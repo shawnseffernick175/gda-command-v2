@@ -78,6 +78,8 @@ export function useBlackHatAnalysis(competitorName: string | null) {
         `/v3/competitors/${encodeURIComponent(competitorName)}/black-hat`,
       );
     },
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
 
