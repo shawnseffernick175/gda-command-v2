@@ -100,22 +100,50 @@ function shortPeriod(period: string): string {
   return period.replace(/^FY\d{2}\s+/, "");
 }
 
+const QUARTER_MONTHS: Record<string, string[]> = {
+  Q1: ["Oct", "Nov", "Dec"],
+  Q2: ["Jan", "Feb", "Mar"],
+  Q3: ["Apr", "May", "Jun"],
+  Q4: ["Jul", "Aug", "Sep"],
+};
+
 function resolveDetailValue(
   period: string,
   row: StatementRowDef,
   directDetail: Record<string, CostDetailItem[]>,
   indirectDetail: Record<string, CostDetailItem[]>,
 ): number | null {
-  if (row.detailSource && row.detailKey) {
-    const map = row.detailSource === "direct" ? directDetail : indirectDetail;
-    const items = map[period];
-    if (!items) return null;
-    const found = items.find(
-      (i) => i.label.toLowerCase() === row.detailKey!.toLowerCase(),
-    );
-    return found ? found.amount : null;
+  if (!row.detailSource || !row.detailKey) return null;
+
+  const map = row.detailSource === "direct" ? directDetail : indirectDetail;
+  const key = row.detailKey.toLowerCase();
+
+  // Quarter periods (e.g. "FY26 Q1"): sum constituent months
+  const qMatch = period.match(/^(FY\d{2})\s+(Q[1-4])$/);
+  if (qMatch) {
+    const prefix = qMatch[1];
+    const months = QUARTER_MONTHS[qMatch[2]];
+    if (!months) return null;
+    let sum = 0;
+    let hasAny = false;
+    for (const mon of months) {
+      const monthPeriod = `${prefix} ${mon}`;
+      const items = map[monthPeriod];
+      if (!items) continue;
+      const found = items.find((i) => i.label.toLowerCase() === key);
+      if (found) {
+        sum += found.amount;
+        hasAny = true;
+      }
+    }
+    return hasAny ? sum : null;
   }
-  return null;
+
+  // Monthly period: direct lookup
+  const items = map[period];
+  if (!items) return null;
+  const found = items.find((i) => i.label.toLowerCase() === key);
+  return found ? found.amount : null;
 }
 
 function resolveCellValue(

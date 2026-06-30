@@ -1832,6 +1832,8 @@ export async function financialsRoutes(app: FastifyInstance): Promise<void> {
            SELECT source_doc_id FROM balance_sheet_actuals WHERE source_doc_id IS NOT NULL
            UNION
            SELECT source_doc_id FROM financial_actuals WHERE source_doc_id IS NOT NULL
+           UNION
+           SELECT source_doc_id FROM indirect_expense_actuals WHERE source_doc_id IS NOT NULL
          )
        ORDER BY vd.filename`,
     );
