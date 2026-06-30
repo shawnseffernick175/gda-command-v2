@@ -262,6 +262,7 @@ function CompetitorsContent() {
 
       {selectedCompetitor && (
         <CompetitorDetailPanel
+          key={selectedCompetitor.name}
           competitor={selectedCompetitor}
           onClose={() => setSelectedCompetitor(null)}
         />
