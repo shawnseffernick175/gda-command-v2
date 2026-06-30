@@ -1,7 +1,14 @@
 "use client";
 
+import ReactEChartsCore from "echarts-for-react/lib/core";
+import { echarts } from "@/lib/echarts-setup";
 import type { ProjectFullRow } from "@/lib/types";
 import { formatMoney } from "@/lib/format-money";
+
+const TEAL = "var(--color-fin-teal)";
+const STONE = "var(--color-fin-stone)";
+const SAND = "var(--color-fin-sand)";
+const INK = "var(--color-fin-ink)";
 
 export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
   const funded = project.itd_funding;
@@ -14,76 +21,168 @@ export function ItdBurnChart({ project }: { project: ProjectFullRow }) {
 
   if (!hasData) {
     return (
-      <div className="flex h-48 items-center justify-center rounded border border-dashed border-border bg-gda-panel/30">
-        <p className="text-sm text-muted-foreground">No ITD contract data yet</p>
+      <div className="flex h-72 items-center justify-center rounded border border-dashed border-border bg-gda-panel/30">
+        <p className="text-sm text-muted-foreground">
+          No ITD contract data yet
+        </p>
       </div>
     );
   }
 
-  const billedPct = contractValue > 0 ? Math.min((billed / contractValue) * 100, 100) : 0;
-  const fundedPct = contractValue > 0 ? Math.min((funded / contractValue) * 100, 100) : 0;
+  const categories = funded > 0 ? ["Billed vs Value", "Funded"] : ["Billed vs Value"];
+
+  const billedSeries = [billed];
+  const remainingSeries = [remaining];
+  const fundedSeries = funded > 0 ? [funded] : [];
+  const fundedRemainSeries = funded > 0 ? [Math.max(contractValue - funded, 0)] : [];
+
+  const option: Record<string, unknown> = {
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (
+        params: Array<{
+          seriesName: string;
+          value: number;
+          marker: string;
+        }>,
+      ) => {
+        const lines = params
+          .filter((p) => p.value > 0)
+          .map((p) => `${p.marker} ${p.seriesName}: ${formatMoney(p.value)}`);
+        return lines.join("<br/>");
+      },
+    },
+    legend: {
+      data: funded > 0
+        ? ["Billed", "Remaining", "Funded", "Unfunded"]
+        : ["Billed", "Remaining"],
+      bottom: 0,
+      textStyle: { color: STONE, fontSize: 11 },
+      itemWidth: 12,
+      itemHeight: 8,
+      itemGap: 16,
+    },
+    grid: {
+      left: 90,
+      right: 24,
+      top: 12,
+      bottom: 40,
+    },
+    yAxis: {
+      type: "category",
+      data: categories,
+      axisLabel: { color: STONE, fontSize: 11 },
+      axisLine: { lineStyle: { color: SAND } },
+      axisTick: { show: false },
+    },
+    xAxis: {
+      type: "value",
+      axisLabel: {
+        color: STONE,
+        fontSize: 11,
+        formatter: (v: number) => formatMoney(v),
+      },
+      splitLine: { lineStyle: { color: SAND, type: "dashed" } },
+      axisLine: { show: false },
+    },
+    series: [
+      {
+        name: "Billed",
+        type: "bar",
+        stack: "burn",
+        data: billedSeries,
+        itemStyle: { color: TEAL, borderRadius: [2, 0, 0, 2] },
+        barMaxWidth: 32,
+        label: {
+          show: true,
+          position: "inside",
+          formatter: (p: { value: number }) => formatMoney(p.value),
+          color: "var(--color-foreground)",
+          fontSize: 11,
+          fontWeight: 600,
+        },
+      },
+      {
+        name: "Remaining",
+        type: "bar",
+        stack: "burn",
+        data: remainingSeries,
+        itemStyle: { color: SAND, borderRadius: [0, 2, 2, 0] },
+        barMaxWidth: 32,
+        label: {
+          show: remaining > 0,
+          position: "inside",
+          formatter: (p: { value: number }) => formatMoney(p.value),
+          color: INK,
+          fontSize: 11,
+        },
+      },
+      ...(funded > 0
+        ? [
+            {
+              name: "Funded",
+              type: "bar" as const,
+              stack: "funded",
+              data: fundedSeries,
+              itemStyle: { color: STONE, opacity: 0.6, borderRadius: [2, 0, 0, 2] },
+              barMaxWidth: 32,
+              label: {
+                show: true,
+                position: "inside" as const,
+                formatter: (p: { value: number }) => formatMoney(p.value),
+                color: "var(--color-foreground)",
+                fontSize: 11,
+              },
+            },
+            {
+              name: "Unfunded",
+              type: "bar" as const,
+              stack: "funded",
+              data: fundedRemainSeries,
+              itemStyle: { color: SAND, opacity: 0.4, borderRadius: [0, 2, 2, 0] },
+              barMaxWidth: 32,
+            },
+          ]
+        : []),
+    ],
+  };
 
   return (
     <div className="rounded border border-border bg-white p-4">
-      <div className="mb-3 flex items-baseline justify-between">
+      <div className="mb-1 flex items-baseline justify-between">
         <h3 className="text-sm font-medium text-fin-ink">ITD Contract Burn</h3>
-        <span className="text-xs text-muted-foreground">{burnPct.toFixed(1)}% consumed</span>
+        <span className="text-xs text-muted-foreground">
+          {burnPct.toFixed(1)}% consumed
+        </span>
       </div>
-
-      <div className="space-y-3">
-        <div>
-          <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Billed vs Contract Value</span>
-            <span>{formatMoney(billed)} / {formatMoney(contractValue)}</span>
-          </div>
-          <div className="relative h-7 overflow-hidden rounded bg-fin-sand/30">
-            <div
-              className="absolute inset-y-0 left-0 flex items-center rounded-l bg-fin-teal px-2"
-              style={{ width: `${Math.max(billedPct, 1)}%` }}
-            >
-              {billedPct > 15 && (
-                <span className="text-[11px] font-semibold text-white">{formatMoney(billed)}</span>
-              )}
-            </div>
-            {billedPct < 85 && (
-              <div
-                className="absolute inset-y-0 flex items-center px-2 text-[11px] text-fin-ink"
-                style={{ left: `${billedPct + 1}%` }}
-              >
-                {formatMoney(remaining)} remaining
-              </div>
-            )}
-          </div>
-        </div>
-
-        {funded > 0 && (
-          <div>
-            <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>Funded</span>
-              <span>{formatMoney(funded)}</span>
-            </div>
-            <div className="relative h-4 overflow-hidden rounded bg-fin-sand/30">
-              <div
-                className="absolute inset-y-0 left-0 rounded bg-fin-stone/40"
-                style={{ width: `${Math.max(fundedPct, 1)}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
+      <p className="mb-3 text-[11px] text-muted-foreground">
+        Contract value: {formatMoney(contractValue)}
+      </p>
+      <ReactEChartsCore
+        echarts={echarts}
+        option={option}
+        style={{ height: funded > 0 ? 160 : 120 }}
+        notMerge
+      />
       <div className="mt-3 grid grid-cols-3 gap-4 text-center text-xs">
         <div>
           <p className="text-muted-foreground">Contract Value</p>
-          <p className="font-medium text-foreground">{formatMoney(contractValue)}</p>
+          <p className="font-medium text-foreground tabular-nums">
+            {formatMoney(contractValue)}
+          </p>
         </div>
         <div>
           <p className="text-muted-foreground">Funded</p>
-          <p className="font-medium text-foreground">{formatMoney(funded)}</p>
+          <p className="font-medium text-foreground tabular-nums">
+            {formatMoney(funded)}
+          </p>
         </div>
         <div>
           <p className="text-muted-foreground">Billed</p>
-          <p className="font-medium text-foreground">{formatMoney(billed)}</p>
+          <p className="font-medium text-foreground tabular-nums">
+            {formatMoney(billed)}
+          </p>
         </div>
       </div>
     </div>
