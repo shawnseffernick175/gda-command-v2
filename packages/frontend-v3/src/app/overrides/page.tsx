@@ -93,8 +93,8 @@ function OverridesContent() {
             <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
               Override Audit
             </h1>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {"An audit trail of every manual override applied on top of the system's automated decisions and scores — who changed a stage, field, or score away from what the model produced, when, and why. Use it to review human judgment calls and keep automated and manual decisions accountable."}
+            <p className="truncate text-xs text-muted-foreground">
+              An audit trail of every manual override — who changed a stage, field, or score away from what the model produced, when, and why.
             </p>
           </div>
           <div className="flex gap-2">

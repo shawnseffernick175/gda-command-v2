@@ -1090,10 +1090,8 @@ export default function PromptsPage() {
                 {prompts.length} prompts
               </span>
             )}
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              The library of reusable AI prompts that power the analysis across
-              GDA Command. Browse prompts by the surface they drive, edit their
-              wording, and tune how the system reasons about your opportunities.
+            <p className="truncate text-xs text-muted-foreground">
+              Reusable AI prompts that power analysis across GDA Command — browse, edit, and tune system reasoning.
             </p>
           </div>
         </div>

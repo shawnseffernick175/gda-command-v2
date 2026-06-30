@@ -235,10 +235,8 @@ function ActionItemsContent() {
           <h1 className="shrink-0 text-section font-semibold text-foreground">
             Action Items
           </h1>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Your running to-do list of follow-ups generated from opportunities,
-            captures, and reviews. Filter by status, see what is due, and work
-            through the next steps that keep pursuits moving.
+          <p className="truncate text-xs text-muted-foreground">
+            Follow-ups from opportunities, captures, and reviews — filter by status, see what is due, and keep pursuits moving.
           </p>
         </div>
 

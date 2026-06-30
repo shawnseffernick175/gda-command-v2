@@ -56,6 +56,7 @@ export interface PipelineListFilters {
   due_before?: string;
   stage?: string;
   q?: string;
+  is_idiq?: boolean;
   limit: number;
   cursor?: string;
 }

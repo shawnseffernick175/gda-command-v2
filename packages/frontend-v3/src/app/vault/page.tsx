@@ -309,10 +309,8 @@ export default function VaultPage() {
                 {countData.count} documents
               </Badge>
             )}
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Your central document library — proposals, work product, and reference
-              files tied to opportunities and captures. Browse and upload documents,
-              and pull up the source material behind your pursuits.
+            <p className="truncate text-xs text-muted-foreground">
+              Your central document library — proposals, work product, and reference files tied to opportunities and captures.
             </p>
           </div>
           {activeTab === "work_product" && (

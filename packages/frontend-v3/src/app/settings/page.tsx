@@ -573,11 +573,8 @@ export default function SettingsPage() {
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
         <div className="flex items-baseline gap-3">
           <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">SETTINGS</h1>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Configure how GDA Command runs — system health, data ingestion,
-            wheelhouse and scoring rules, users, and integrations. Adjust the
-            settings here that control how the platform finds, scores, and presents
-            your opportunities.
+          <p className="truncate text-xs text-muted-foreground">
+            Configure how GDA Command runs — system health, data ingestion, wheelhouse and scoring rules, users, and integrations.
           </p>
         </div>
       </div>

@@ -1,13 +1,33 @@
 /**
- * IDIQ Operations routes — live TO monitoring across Envision's 16 vehicles.
+ * IDIQ Operations routes — IDIQ pipeline pursuits + live TO monitoring.
  */
 
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../lib/db.js';
 import { successEnvelope } from '../lib/envelope.js';
 import { pollSource, pollAllDueSources } from '../services/idiq-ops/taskOrderIngestService.js';
+import { listPipelineItems } from '../services/pipeline/index.js';
 
 export async function idiqOpsRoutes(fastify: FastifyInstance): Promise<void> {
+
+  /**
+   * GET /v3/idiq-ops/pursuits — IDIQ-tagged pipeline items (the real IDIQ pursuits)
+   */
+  fastify.get('/v3/idiq-ops/pursuits', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+    const rawLimit = parseInt(query.limit ?? '50', 10);
+    const limit = Number.isNaN(rawLimit) ? 50 : Math.min(Math.max(rawLimit, 1), 200);
+
+    const result = await listPipelineItems({
+      limit,
+      cursor: query.cursor,
+      is_idiq: true,
+      q: query.q,
+      stage: query.stage,
+    });
+
+    return reply.send(successEnvelope(result, req.requestId));
+  });
 
   /**
    * GET /v3/idiq-ops/feed — paginated task order feed with filters

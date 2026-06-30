@@ -10,8 +10,8 @@ export default function DataQualityApprovalsPage() {
           <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
             Match Approvals
           </h1>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {"Review and confirm the system's suggested matches between records (such as opportunities, awards, and vehicles) before they are linked. Approve the correct matches and reject the wrong ones to keep your data clean and trustworthy."}
+          <p className="truncate text-xs text-muted-foreground">
+            Review and confirm suggested matches between records before they are linked — approve correct ones, reject wrong ones.
           </p>
         </div>
       </div>

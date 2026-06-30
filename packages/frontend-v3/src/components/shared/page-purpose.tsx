@@ -29,7 +29,7 @@ export function PagePurpose({
     <div className={cn("flex items-start justify-between gap-4", className)}>
       <div className="flex min-w-0 items-baseline gap-3">
         <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">{title}</h1>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="truncate text-xs text-muted-foreground">
           {purpose}
         </p>
       </div>

@@ -236,11 +236,8 @@ function PipelineContent() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-baseline gap-3">
             <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">Pipeline</h1>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Your active pursuits grouped by capture stage, from early interest
-              through submission and win. Track how opportunities move through the
-              funnel, see stage-by-stage value and conversion, and spot where
-              deals are stalling.
+            <p className="truncate text-xs text-muted-foreground">
+              Active pursuits grouped by capture stage — track stage-by-stage value, conversion, and stalls.
             </p>
           </div>
           <button

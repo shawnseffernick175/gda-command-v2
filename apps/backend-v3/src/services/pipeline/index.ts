@@ -240,6 +240,11 @@ export async function listPipelineItems(
     conditions.push(`(o.title ILIKE $${paramIdx} OR o.agency ILIKE $${paramIdx} OR o.solicitation_number ILIKE $${paramIdx})`);
     params.push(`%${filters.q}%`);
   }
+  if (filters.is_idiq === true) {
+    conditions.push(`o.is_idiq = TRUE`);
+  } else if (filters.is_idiq === false) {
+    conditions.push(`(o.is_idiq = FALSE OR o.is_idiq IS NULL)`);
+  }
 
   if (filters.cursor) {
     const cur = decodeCursor(filters.cursor);

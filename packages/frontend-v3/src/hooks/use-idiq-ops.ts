@@ -79,7 +79,52 @@ export interface FeedFilters {
   limit?: number;
 }
 
+/* ── Pipeline pursuit types ────────────────────────────────────── */
+
+export interface IdiqPursuitItem {
+  id: string;
+  opportunity_id: string;
+  opportunity_title: string;
+  opportunity_agency: string | null;
+  opportunity_naics: string | null;
+  opportunity_set_aside: string | null;
+  opportunity_due_at: string | null;
+  capture_owner: string;
+  stage: string;
+  resolved_value: number;
+  resolved_pwin: number | null;
+  resolved_weighted: number;
+  pwin_score: number | null;
+  pwin_band: string | null;
+  solicitation_number: string | null;
+  teaming_partners: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IdiqPursuitsResponse {
+  items: IdiqPursuitItem[];
+  pagination: {
+    limit: number;
+    cursor: string | null;
+    hasMore: boolean;
+  };
+}
+
 /* ── Hooks ─────────────────────────────────────────────────────── */
+
+export function useIdiqOpsPursuits(q?: string) {
+  const params = new URLSearchParams();
+  params.set("limit", "50");
+  if (q) params.set("q", q);
+
+  const qs = params.toString();
+  return useQuery({
+    queryKey: ["idiq-ops-pursuits", qs],
+    queryFn: () =>
+      apiGet<IdiqPursuitsResponse>(`/v3/idiq-ops/pursuits${qs ? `?${qs}` : ""}`),
+  });
+}
 
 export function useIdiqOpsFeed(filters: FeedFilters) {
   const params = new URLSearchParams();
