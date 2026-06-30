@@ -171,7 +171,7 @@ function ChecklistRow({ item }: { item: QaChecklistItem }) {
               href={`https://github.com/shawnseffernick175/gda-command-v2/issues/${item.github_issue.replace("#", "")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-500 underline"
+              className="text-gda-cyan hover:underline"
             >
               {item.github_issue}
             </a>
@@ -181,7 +181,7 @@ function ChecklistRow({ item }: { item: QaChecklistItem }) {
               href={`https://github.com/shawnseffernick175/gda-command-v2/pull/${item.github_pr.replace("#", "")}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-500 underline"
+              className="text-gda-cyan hover:underline"
             >
               PR {item.github_pr}
             </a>
