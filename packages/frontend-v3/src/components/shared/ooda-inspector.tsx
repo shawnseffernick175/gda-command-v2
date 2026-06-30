@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useOodaAnalysis } from "@/hooks/use-llm";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,15 +14,13 @@ export function OodaInspector({
   stage?: string;
   context?: Record<string, unknown>;
 }) {
-  const ooda = useOodaAnalysis();
+  const ooda = useOodaAnalysis({
+    opportunity_id: opportunityId,
+    stage,
+    context,
+  });
 
-  useEffect(() => {
-    if (!ooda.data && !ooda.isPending && !ooda.error) {
-      ooda.mutate({ opportunity_id: opportunityId, stage, context });
-    }
-  }, [opportunityId, stage, context, ooda]);
-
-  if (ooda.isPending) {
+  if (ooda.isLoading) {
     return (
       <div className="space-y-3">
         {OODA_PHASES.map((phase) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api";
 import type { LlmResponse } from "@/lib/types";
 
@@ -19,13 +19,14 @@ export function useLlmRoute() {
 
 const OODA_TIMEOUT_MS = 30_000;
 
-export function useOodaAnalysis() {
-  return useMutation({
-    mutationFn: (params: {
-      opportunity_id: string;
-      stage?: string;
-      context?: Record<string, unknown>;
-    }) => {
+export function useOodaAnalysis(params: {
+  opportunity_id: string;
+  stage?: string;
+  context?: Record<string, unknown>;
+}) {
+  return useQuery({
+    queryKey: ["ooda-analysis", params.opportunity_id, params.stage],
+    queryFn: () => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), OODA_TIMEOUT_MS);
       return apiPost<LlmResponse>(
@@ -36,6 +37,8 @@ export function useOodaAnalysis() {
     },
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 }
 
