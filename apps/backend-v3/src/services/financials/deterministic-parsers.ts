@@ -751,9 +751,12 @@ export function parseTrialBalance(
     if (!/\d/.test(accountCode) && !/^[A-Z]{2,4}-[A-Z]{2,4}$/i.test(accountCode)) continue;
 
     // Get ending balance (primary value for debit/credit mapping)
-    // In pipe format with 7 data cols vs 8 header cols, ending balance is always the LAST column
+    // In pipe format with 7 data cols vs 8 header cols, the colMap maps 'ending balance'
+    // to an out-of-bounds index (8-col header vs 7-col data). Avoid the generic 'balance'
+    // key which substring-matches 'beginning balance' at a valid index, yielding a wrong value.
+    // Fallback to the last data column which is always the ending balance.
     const endingBalance = parseNum(
-      getCol(cols, colMap, 'ending balance', 'ending bal', 'end balance', 'balance') || cols[cols.length - 1] || '0',
+      getCol(cols, colMap, 'ending balance', 'ending bal', 'end balance') || cols[cols.length - 1] || '0',
     );
 
     // Map to debit/credit: positive ending balance → debit, negative → credit
@@ -866,6 +869,19 @@ export function parseTrendSie(
     return null;
   }
 
+  // Find ACT YTD and PROV YTD columns by header name (within left table only)
+  let ytdActColIdx = -1;
+  let provYtdColIdx = -1;
+  for (let c = 2; c < leftTableEnd; c++) {
+    const colLower = headerCols[c].toLowerCase().trim();
+    if (/\bact\b.*\bytd/.test(colLower) && !colLower.includes('wrap')) {
+      ytdActColIdx = c;
+    }
+    if (/\bprov\b.*\bytd/.test(colLower) && !colLower.includes('wrap')) {
+      provYtdColIdx = c;
+    }
+  }
+
   const rows: SieExtractOutput['rows'] = [];
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
@@ -889,6 +905,9 @@ export function parseTrendSie(
       ? parseNum(cols[targetColIdx])
       : 0;
 
+    const ytdActual = ytdActColIdx >= 0 && ytdActColIdx < cols.length ? parseNum(cols[ytdActColIdx]) : 0;
+    const ytdBudget = provYtdColIdx >= 0 && provYtdColIdx < cols.length ? parseNum(cols[provYtdColIdx]) : 0;
+
     rows.push({
       period: periodInfo.period,
       fiscal_year: periodInfo.fiscal_year,
@@ -898,8 +917,8 @@ export function parseTrendSie(
       account_name: poolName || `Pool ${poolNumber}`,
       current_period_actual: rate,
       current_period_budget: 0,
-      ytd_actual: 0,
-      ytd_budget: 0,
+      ytd_actual: ytdActual,
+      ytd_budget: ytdBudget,
     });
   }
 
