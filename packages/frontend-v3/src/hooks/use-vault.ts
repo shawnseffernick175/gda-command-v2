@@ -14,6 +14,7 @@ export interface UseVaultDocumentsParams {
   doc_type?: string;
   q?: string;
   category?: string;
+  status?: string;
   limit?: number;
   page?: number;
 }
@@ -26,6 +27,7 @@ export function useVaultDocuments(params: UseVaultDocumentsParams = {}) {
         doc_type: params.doc_type || undefined,
         q: params.q || undefined,
         category: params.category || undefined,
+        status: params.status || undefined,
         limit: params.limit ?? 50,
         page: params.page ?? 1,
       }),
@@ -254,6 +256,26 @@ export function useResolveAllVault() {
 
   return useMutation({
     mutationFn: () => apiPost<VaultResolveAllResponse>("/v3/vault/resolve-all", {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["vault"] });
+    },
+  });
+}
+
+export interface VaultDismissAllResponse {
+  dismissed: number;
+  docs: Array<{
+    id: number;
+    filename: string;
+    previous_status: string;
+  }>;
+}
+
+export function useDismissAllVault() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => apiPost<VaultDismissAllResponse>("/v3/vault/dismiss-all", {}),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["vault"] });
     },

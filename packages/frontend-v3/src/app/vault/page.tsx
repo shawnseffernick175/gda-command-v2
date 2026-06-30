@@ -18,6 +18,7 @@ import {
   useDismissVaultDocument,
   useVaultUnresolvedCount,
   useResolveAllVault,
+  useDismissAllVault,
   useSendToSitrep,
 } from "@/hooks/use-vault";
 import { Pagination } from "@/components/shared/Pagination";
@@ -192,6 +193,9 @@ export default function VaultPage() {
   const [docTypeFilter, setDocTypeFilter] = useState<string | undefined>(
     undefined,
   );
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(
+    undefined,
+  );
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
@@ -204,6 +208,7 @@ export default function VaultPage() {
     doc_type: docTypeFilter || undefined,
     q: searchQuery || undefined,
     category: activeTab === "regulatory" ? "regulatory" : undefined,
+    status: statusFilter || undefined,
     limit: 50,
     page: currentPage,
   });
@@ -211,6 +216,7 @@ export default function VaultPage() {
   const { data: bucketCounts } = useVaultCountsByBucket();
   const { data: unresolvedData } = useVaultUnresolvedCount();
   const resolveAll = useResolveAllVault();
+  const dismissAll = useDismissAllVault();
   const deleteDoc = useDeleteVaultDocument();
   const [resolveMsg, setResolveMsg] = useState<string | null>(null);
 
@@ -231,6 +237,18 @@ export default function VaultPage() {
       onError: () => setResolveMsg("Resolve failed. Try again."),
     });
   }, [resolveAll]);
+
+  const handleDismissAll = useCallback(() => {
+    if (dismissAll.isPending) return;
+    if (!confirm("Dismiss all failed/pending uploads? They will be marked as cleared and no longer flagged.")) return;
+    setResolveMsg(null);
+    dismissAll.mutate(undefined, {
+      onSuccess: (res) => {
+        setResolveMsg(`Cleared ${res.dismissed} document${res.dismissed === 1 ? "" : "s"}`);
+      },
+      onError: () => setResolveMsg("Dismiss failed. Try again."),
+    });
+  }, [dismissAll]);
 
   const totalCount = useMemo(() => {
     if (!bucketCounts) return countData?.count ?? 0;
@@ -305,16 +323,28 @@ export default function VaultPage() {
                 </span>
               )}
               {unresolvedCount > 0 && (
-                <button
-                  onClick={handleResolveAll}
-                  disabled={resolveAll.isPending}
-                  title="Re-run extraction + AI parse on every unresolved document"
-                  className="rounded border border-gda-amber/40 bg-gda-amber/10 px-4 py-1.5 text-xs font-mono text-gda-amber hover:bg-gda-amber/20 transition-colors disabled:opacity-50"
-                >
-                  {resolveAll.isPending
-                    ? "Resolving…"
-                    : `Resolve All (${unresolvedCount})`}
-                </button>
+                <>
+                  <button
+                    onClick={handleResolveAll}
+                    disabled={resolveAll.isPending || dismissAll.isPending}
+                    title="Re-run extraction + AI parse on every unresolved document"
+                    className="rounded border border-gda-amber/40 bg-gda-amber/10 px-4 py-1.5 text-xs font-mono text-gda-amber hover:bg-gda-amber/20 transition-colors disabled:opacity-50"
+                  >
+                    {resolveAll.isPending
+                      ? "Resolving\u2026"
+                      : `Retry All (${unresolvedCount})`}
+                  </button>
+                  <button
+                    onClick={handleDismissAll}
+                    disabled={dismissAll.isPending || resolveAll.isPending}
+                    title="Clear all failed/pending uploads — marks them as dismissed"
+                    className="rounded border border-border px-4 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-gda-panel transition-colors disabled:opacity-50"
+                  >
+                    {dismissAll.isPending
+                      ? "Clearing\u2026"
+                      : "Dismiss All"}
+                  </button>
+                </>
               )}
               <button
                 onClick={() => setShowUploadModal(true)}
@@ -332,6 +362,7 @@ export default function VaultPage() {
             onClick={() => {
               setActiveTab("work_product");
               setDocTypeFilter(undefined);
+              setStatusFilter(undefined);
               setPage(1);
             }}
             className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
@@ -346,6 +377,7 @@ export default function VaultPage() {
             onClick={() => {
               setActiveTab("regulatory");
               setDocTypeFilter(undefined);
+              setStatusFilter(undefined);
               setPage(1);
             }}
             className={`px-4 py-2 text-xs font-mono font-medium transition-colors border-b-2 -mb-px ${
@@ -365,25 +397,43 @@ export default function VaultPage() {
           <button
             onClick={() => {
               setDocTypeFilter(undefined);
+              setStatusFilter(undefined);
               setPage(1);
             }}
             className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
-              !docTypeFilter
+              !docTypeFilter && !statusFilter
                 ? "border-accent bg-accent/10 text-accent"
                 : "border-border text-muted-foreground hover:text-foreground"
             }`}
           >
             All ({totalCount})
           </button>
+          {unresolvedCount > 0 && (
+            <button
+              onClick={() => {
+                setDocTypeFilter(undefined);
+                setStatusFilter("unresolved");
+                setPage(1);
+              }}
+              className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
+                statusFilter === "unresolved"
+                  ? "border-gda-red bg-gda-red/10 text-gda-red"
+                  : "border-gda-red/40 text-gda-red hover:bg-gda-red/10"
+              }`}
+            >
+              Failed ({unresolvedCount})
+            </button>
+          )}
           {VAULT_BUCKETS.map((b) => (
             <button
               key={b}
               onClick={() => {
                 setDocTypeFilter(b);
+                setStatusFilter(undefined);
                 setPage(1);
               }}
               className={`rounded px-2 py-0.5 text-[11px] font-mono border transition-colors ${
-                docTypeFilter === b
+                docTypeFilter === b && !statusFilter
                   ? "border-accent bg-accent/10 text-accent"
                   : "border-border text-muted-foreground hover:text-foreground"
               }`}
