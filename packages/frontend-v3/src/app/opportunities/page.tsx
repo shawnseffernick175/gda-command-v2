@@ -513,10 +513,10 @@ function OpportunityList() {
           ) : (
             <>
               {/* Table — scroll container with sticky thead */}
-              <div className="flex-1 min-h-0 mt-4 overflow-y-auto overflow-x-clip rounded border border-border">
+              <div className="flex-1 min-h-0 mt-4 overflow-y-auto overflow-x-hidden rounded border border-border">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-gda-bg-base">
-                    <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
+                    <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground [&>th]:sticky [&>th]:top-0 [&>th]:z-10">
                       <th className="w-[3px] p-0 bg-gda-bg-base" />
                       <SortableHeader label="Title" field="title" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                       <SortableHeader label="Agency" field="agency" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width="140px" />
