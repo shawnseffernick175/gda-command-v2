@@ -905,10 +905,11 @@ export interface Competitor {
   total_obligated: number | null;
   largest_award: number | null;
   last_win_date: string | null;
-  agencies: string[];
-  naics_codes: string[];
-  set_asides: string[];
-  contract_types: string[];
+  agencies: string[] | null;
+  naics_codes: string[] | null;
+  naics_count: number | null;
+  set_asides: string[] | null;
+  contract_types: string[] | null;
   competitor_analysis: CompetitorAnalysis | null;
 }
 

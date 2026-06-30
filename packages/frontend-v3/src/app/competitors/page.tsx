@@ -177,6 +177,7 @@ function CompetitorsContent() {
           <thead>
             <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground">
               <SortableHeader label="Company" field="name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader label="NAICS" field="naics_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Wins" field="win_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Total Obligated" field="total_obligated" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
               <SortableHeader label="Largest Award" field="largest_award" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -188,14 +189,14 @@ function CompetitorsContent() {
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i} className="border-b border-border animate-pulse">
-                  <td colSpan={6} className="px-3 py-2">
+                  <td colSpan={7} className="px-3 py-2">
                     <div className="h-3 bg-gda-panel rounded w-3/4" />
                   </td>
                 </tr>
               ))
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-xs text-muted-foreground">
+                <td colSpan={7} className="px-3 py-8 text-center text-xs text-muted-foreground">
                   No competitors match this search
                 </td>
               </tr>
@@ -217,6 +218,23 @@ function CompetitorsContent() {
                       </div>
                       {c.awardee_uei && (
                         <span className="text-[11px] text-muted-foreground font-mono">{c.awardee_uei}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-left text-xs text-muted-foreground max-w-[180px]">
+                      {(c.naics_codes?.length ?? 0) > 0 ? (
+                        <span
+                          title={c.naics_codes!.join(", ")}
+                          className="truncate block"
+                        >
+                          {c.naics_codes!.slice(0, 3).join(", ")}
+                          {c.naics_codes!.length > 3 && (
+                            <span className="text-[11px] text-muted-foreground ml-1">
+                              +{c.naics_codes!.length - 3}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/60">{"\u2014"}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-left">
