@@ -179,8 +179,13 @@ export class PromoteError extends Error {
 }
 
 /**
- * Promote an Ops Tracker opportunity into the pipeline. This is the ONLY new
+ * Promote a relevant opportunity into the pipeline. This is the ONLY new
  * path into pipeline_items. capture_owner is forced to the requesting user.
+ *
+ * Eligible: assessment_status='ops_tracker' OR relevance_status='relevant'.
+ * The owner's bucket shows all relevant items; per doctrine the owner (not AI)
+ * decides what enters the pipeline, so assessment-declined items that are still
+ * relevance-qualified can be promoted as an owner override.
  *
  * @param opportunityId  opportunity to promote
  * @param captureOwner   the requesting user's display identity (NEVER 'system')
@@ -202,8 +207,8 @@ export async function promoteToPipeline(
   try {
     await client.query('BEGIN');
 
-    const oppRes = await client.query<{ id: string; assessment_status: string; source_id: string | null }>(
-      `SELECT id::text, assessment_status, source_id::text
+    const oppRes = await client.query<{ id: string; assessment_status: string; relevance_status: string | null; source_id: string | null }>(
+      `SELECT id::text, assessment_status, relevance_status, source_id::text
          FROM opportunities
         WHERE id = $1 AND deleted_at IS NULL
         FOR UPDATE`,
@@ -213,9 +218,12 @@ export async function promoteToPipeline(
     if (!opp) {
       throw new PromoteError('Opportunity not found', 404);
     }
-    if (opp.assessment_status !== 'ops_tracker') {
+    // F-614: accept items that are either in ops_tracker OR in the owner's
+    // bucket (relevance_status='relevant'). The Opportunities page shows all
+    // relevant items; the owner must be able to promote any of them.
+    if (opp.assessment_status !== 'ops_tracker' && opp.relevance_status !== 'relevant') {
       throw new PromoteError(
-        `Only Ops Tracker opportunities can be promoted (current: ${opp.assessment_status})`,
+        `Only relevant or Ops Tracker opportunities can be promoted (current: assessment_status=${opp.assessment_status}, relevance_status=${opp.relevance_status})`,
         400,
       );
     }
