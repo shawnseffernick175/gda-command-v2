@@ -1058,16 +1058,10 @@ function OpportunityDetail({ id }: { id: string }) {
   const { toast: detailToast } = useToast();
 
   const llmForEffect = opp?.llm_analysis as LlmAnalysis | null | undefined;
-  const relevanceForEffect = opp?.relevance_status;
   useEffect(() => {
-    const isPreAssessed =
-      relevanceForEffect === "off_profile" ||
-      relevanceForEffect === "auto_pass" ||
-      relevanceForEffect === "unknown_naics";
     if (
       opp &&
       !llmForEffect &&
-      !isPreAssessed &&
       !analyzeOpp.isPending &&
       !analyzeOpp.data &&
       !analyzeOpp.isError &&
@@ -1075,7 +1069,7 @@ function OpportunityDetail({ id }: { id: string }) {
     ) {
       analyzeOpp.mutate(id);
     }
-  }, [id, opp, llmForEffect, relevanceForEffect, analyzeOpp]);
+  }, [id, opp, llmForEffect, analyzeOpp]);
 
   if (isLoading) {
     return (
@@ -1455,62 +1449,48 @@ function DecisionBriefPanel({
   relevanceStatus?: string | null;
   relevanceReason?: string | null;
 }) {
+  const isPreAssessed =
+    relevanceStatus === "off_profile" ||
+    relevanceStatus === "auto_pass" ||
+    relevanceStatus === "unknown_naics";
+
+  const preAssessmentBlock = isPreAssessed ? (() => {
+    const preLabel =
+      relevanceStatus === "auto_pass"
+        ? "Auto-passed"
+        : relevanceStatus === "off_profile"
+          ? "Off profile"
+          : "NAICS unverified";
+    const preColor =
+      relevanceStatus === "auto_pass"
+        ? "border-gda-amber/40 text-gda-amber"
+        : "border-gda-red/40 text-gda-red";
+    return (
+      <div className="space-y-1">
+        <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">
+          Pre-Assessment
+        </p>
+        <span className="inline-flex items-center gap-1">
+          <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", preColor)}>
+            {preLabel}
+          </Badge>
+          <ScoreExplain
+            score={preLabel}
+            label="Relevance"
+            scoreType="relevance"
+            inputs={{ status: relevanceStatus, reason: relevanceReason }}
+          />
+        </span>
+        {relevanceReason && (
+          <p className="text-xs text-muted-foreground leading-relaxed font-mono">
+            {relevanceReason}
+          </p>
+        )}
+      </div>
+    );
+  })() : null;
+
   if (!llm) {
-    // Pre-assessment gate: opportunities that failed the cheap relevance
-    // filter are shown as a fast verdict instead of triggering an expensive
-    // full analysis. Only 'relevant' (or null/unknown legacy rows) get the
-    // Run Analysis path below.
-    const isPreAssessed =
-      relevanceStatus === "off_profile" ||
-      relevanceStatus === "auto_pass" ||
-      relevanceStatus === "unknown_naics";
-    if (isPreAssessed) {
-      const preLabel =
-        relevanceStatus === "auto_pass"
-          ? "Auto-passed"
-          : relevanceStatus === "off_profile"
-            ? "Off profile"
-            : "NAICS unverified";
-      const preColor =
-        relevanceStatus === "auto_pass"
-          ? "border-gda-amber/40 text-gda-amber"
-          : "border-gda-red/40 text-gda-red";
-      return (
-        <Card className="border-border bg-gda-panel">
-          <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
-              Decision Brief
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 py-4">
-            <div>
-              <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">
-                Pre-Assessment
-              </p>
-              <span className="inline-flex items-center gap-1">
-                <Badge className={cn("text-sm font-mono font-bold px-3 py-1 border", preColor)}>
-                  {preLabel}
-                </Badge>
-                <ScoreExplain
-                  score={preLabel}
-                  label="Relevance"
-                  scoreType="relevance"
-                  inputs={{ status: relevanceStatus, reason: relevanceReason }}
-                />
-              </span>
-            </div>
-            {relevanceReason && (
-              <p className="text-xs text-muted-foreground leading-relaxed font-mono">
-                {relevanceReason}
-              </p>
-            )}
-            <p className="text-[11px] text-muted-foreground/60 font-mono">
-              Skipped full analysis (not a fit).
-            </p>
-          </CardContent>
-        </Card>
-      );
-    }
     return (
       <Card className="border-border bg-gda-panel">
         <CardHeader className="pb-2">
@@ -1518,7 +1498,8 @@ function DecisionBriefPanel({
             Decision Brief
           </CardTitle>
         </CardHeader>
-        <CardContent className="text-center py-6">
+        <CardContent className={cn("space-y-3", isPreAssessed ? "py-4" : "text-center py-6")}>
+          {preAssessmentBlock}
           {analyzing ? (
             <div className="flex flex-col items-center gap-2">
               <div className="flex items-center gap-2">
@@ -1562,6 +1543,7 @@ function DecisionBriefPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {preAssessmentBlock}
         {/* Recommendation badge */}
         <div>
           <p className="text-[11px] font-mono text-muted-foreground uppercase mb-1">Recommendation</p>
