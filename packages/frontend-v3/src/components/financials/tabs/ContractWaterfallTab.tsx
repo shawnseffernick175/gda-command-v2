@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   useContractWaterfall,
   useCreateTaskOrder,
+  useBulkCreateTaskOrders,
 } from "@/hooks/use-financial-bible";
 import { formatMoney, formatMoneyFull } from "@/lib/format-money";
 import type { ContractWaterfallData, WaterfallContract } from "@/lib/types";
@@ -12,7 +13,8 @@ type ViewMode = "revenue" | "profit" | "both";
 type StatusFilter = "" | "active" | "closeout" | "expired" | "awarded_not_started";
 type RoleFilter = "" | "PRIME" | "SUB";
 
-// allowed-hex
+/* ── Vehicle color lookup ─────────────────────────── */
+
 const VEHICLE_COLORS: Record<string, string> = {
   RS3: "var(--color-fin-teal)",
   TRAYSYS: "#2D6A4F", // allowed-hex
@@ -37,19 +39,26 @@ function getContractColor(c: WaterfallContract, idx: number): string {
   return palette[idx % palette.length];
 }
 
+/* ── Main component ───────────────────────────────── */
+
 export function ContractWaterfallTab() {
   const [viewMode, setViewMode] = useState<ViewMode>("both");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("");
   const [vehicleFilter, setVehicleFilter] = useState<number[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [addFormOpen, setAddFormOpen] = useState(false);
 
   const params = useMemo(
     () => ({
       status: statusFilter || undefined,
       prime_or_sub: roleFilter || undefined,
+      parent_vehicle_id: vehicleFilter.length === 1 ? vehicleFilter[0] : undefined,
+      from: dateFrom || undefined,
+      to: dateTo || undefined,
     }),
-    [statusFilter, roleFilter],
+    [statusFilter, roleFilter, vehicleFilter, dateFrom, dateTo],
   );
 
   const { data, isLoading, error } = useContractWaterfall(params);
@@ -57,7 +66,7 @@ export function ContractWaterfallTab() {
   if (isLoading) {
     return (
       <div className="text-sm text-muted-foreground">
-        Loading contract waterfall…
+        Loading contract waterfall\u2026
       </div>
     );
   }
@@ -82,7 +91,7 @@ export function ContractWaterfallTab() {
 
   return (
     <div className="space-y-4">
-      <WaterfallControls
+      <WaterfallFilterBar
         viewMode={viewMode}
         setViewMode={setViewMode}
         statusFilter={statusFilter}
@@ -92,6 +101,10 @@ export function ContractWaterfallTab() {
         availableVehicles={data.available_vehicles}
         vehicleFilter={vehicleFilter}
         setVehicleFilter={setVehicleFilter}
+        dateFrom={dateFrom}
+        setDateFrom={setDateFrom}
+        dateTo={dateTo}
+        setDateTo={setDateTo}
         onAddTaskOrder={() => setAddFormOpen(true)}
       />
 
@@ -122,25 +135,34 @@ function WaterfallEmptyState({
   onCloseAddForm: () => void;
 }) {
   return (
-    <div className="rounded border border-dashed border-border bg-card p-8 text-center">
-      <p className="text-sm text-muted-foreground mb-3">
-        No signed task orders found. Add a contract to see the revenue forecast waterfall.
-      </p>
-      <button
-        type="button"
-        className="rounded bg-fin-teal px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:opacity-90"
-        onClick={onAddTaskOrder}
-      >
-        + Add Task Order
-      </button>
+    <div className="space-y-4">
+      <div className="rounded border border-dashed border-border bg-card p-8 text-center">
+        <p className="text-[15px] font-medium text-foreground mb-2">
+          No funded task orders
+        </p>
+        <p className="text-[12px] text-muted-foreground mb-4 max-w-md mx-auto">
+          The Contract Waterfall shows funded dollars from awarded Task Orders.
+          Add a task order manually or upload a CSV to populate the forecast.
+        </p>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            className="rounded bg-fin-teal px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:opacity-90"
+            onClick={onAddTaskOrder}
+          >
+            + Add Task Order
+          </button>
+          <CsvUploadButton />
+        </div>
+      </div>
       {addFormOpen && <AddTaskOrderDrawer onClose={onCloseAddForm} />}
     </div>
   );
 }
 
-/* ── Controls ─────────────────────────────────────── */
+/* ── Filter Bar ───────────────────────────────────── */
 
-function WaterfallControls({
+function WaterfallFilterBar({
   viewMode,
   setViewMode,
   statusFilter,
@@ -150,6 +172,10 @@ function WaterfallControls({
   availableVehicles,
   vehicleFilter,
   setVehicleFilter,
+  dateFrom,
+  setDateFrom,
+  dateTo,
+  setDateTo,
   onAddTaskOrder,
 }: {
   viewMode: ViewMode;
@@ -161,82 +187,257 @@ function WaterfallControls({
   availableVehicles: { id: number; short_name: string }[];
   vehicleFilter: number[];
   setVehicleFilter: (v: number[]) => void;
+  dateFrom: string;
+  setDateFrom: (v: string) => void;
+  dateTo: string;
+  setDateTo: (v: string) => void;
   onAddTaskOrder: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      {/* View toggle */}
-      <div className="flex items-center rounded border border-border bg-card">
-        {(["revenue", "profit", "both"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            className={`px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
-              viewMode === m
-                ? "bg-fin-teal text-white"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => setViewMode(m)}
+    <div className="rounded border border-border bg-card p-3">
+      <div className="flex flex-wrap items-end gap-4">
+        {/* View toggle */}
+        <FilterGroup label="View">
+          <div className="flex items-center rounded border border-border">
+            {(["revenue", "profit", "both"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`px-3 py-1.5 text-[12px] font-medium capitalize transition-colors ${
+                  viewMode === m
+                    ? "bg-fin-teal text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setViewMode(m)}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </FilterGroup>
+
+        {/* Date range */}
+        <FilterGroup label="From">
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground w-[130px]"
+          />
+        </FilterGroup>
+
+        <FilterGroup label="To">
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground w-[130px]"
+          />
+        </FilterGroup>
+
+        {/* Status */}
+        <FilterGroup label="Status">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground min-w-[120px]"
           >
-            {m}
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="awarded_not_started">Awarded</option>
+            <option value="closeout">Closeout</option>
+            <option value="expired">Expired</option>
+          </select>
+        </FilterGroup>
+
+        {/* Prime / Sub */}
+        <FilterGroup label="Role">
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+            className="rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground min-w-[100px]"
+          >
+            <option value="">All roles</option>
+            <option value="PRIME">Prime</option>
+            <option value="SUB">Sub</option>
+          </select>
+        </FilterGroup>
+
+        {/* Vehicle */}
+        {availableVehicles.length > 0 && (
+          <FilterGroup label="Vehicle">
+            <select
+              value={vehicleFilter.length === 1 ? String(vehicleFilter[0]) : ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                setVehicleFilter(val ? [Number(val)] : []);
+              }}
+              className="rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground min-w-[130px]"
+            >
+              <option value="">All vehicles</option>
+              {availableVehicles.map((v) => (
+                <option key={v.id} value={String(v.id)}>
+                  {v.short_name}
+                </option>
+              ))}
+            </select>
+          </FilterGroup>
+        )}
+
+        {/* Actions (right-aligned) */}
+        <div className="ml-auto flex items-end gap-2">
+          <CsvUploadButton />
+          <button
+            type="button"
+            className="rounded bg-fin-teal px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:opacity-90"
+            onClick={onAddTaskOrder}
+          >
+            + Add TO
           </button>
-        ))}
-      </div>
-
-      {/* Status filter */}
-      <select
-        value={statusFilter}
-        onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-        className="rounded border border-border bg-card px-2 py-1 text-[11px] text-foreground"
-      >
-        <option value="">All statuses</option>
-        <option value="active">Active</option>
-        <option value="awarded_not_started">Awarded</option>
-        <option value="closeout">Closeout</option>
-        <option value="expired">Expired</option>
-      </select>
-
-      {/* Role filter */}
-      <select
-        value={roleFilter}
-        onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
-        className="rounded border border-border bg-card px-2 py-1 text-[11px] text-foreground"
-      >
-        <option value="">All roles</option>
-        <option value="PRIME">Prime</option>
-        <option value="SUB">Sub</option>
-      </select>
-
-      {/* Vehicle filter */}
-      {availableVehicles.length > 0 && (
-        <select
-          value={vehicleFilter.length === 1 ? String(vehicleFilter[0]) : ""}
-          onChange={(e) => {
-            const val = e.target.value;
-            setVehicleFilter(val ? [Number(val)] : []);
-          }}
-          className="rounded border border-border bg-card px-2 py-1 text-[11px] text-foreground"
-        >
-          <option value="">All vehicles</option>
-          {availableVehicles.map((v) => (
-            <option key={v.id} value={String(v.id)}>
-              {v.short_name}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <div className="ml-auto">
-        <button
-          type="button"
-          className="rounded bg-fin-teal px-3 py-1 text-[11px] font-medium text-white transition-colors hover:opacity-90"
-          onClick={onAddTaskOrder}
-        >
-          + Add TO
-        </button>
+        </div>
       </div>
     </div>
   );
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/* ── CSV Upload Button ────────────────────────────── */
+
+function CsvUploadButton() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const bulkCreate = useBulkCreateTaskOrders();
+  const [parseError, setParseError] = useState<string | null>(null);
+
+  const handleFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setParseError(null);
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const text = ev.target?.result as string;
+          const rows = parseCsvToTaskOrders(text);
+          if (rows.length === 0) {
+            setParseError("No valid rows found in CSV.");
+            return;
+          }
+          bulkCreate.mutate(
+            { task_orders: rows },
+            {
+              onError: () => setParseError("Upload failed. Check data and retry."),
+            },
+          );
+        } catch {
+          setParseError("Could not parse CSV. Check format.");
+        }
+      };
+      reader.readAsText(file);
+      // Reset so re-uploading the same file triggers onChange
+      e.target.value = "";
+    },
+    [bulkCreate],
+  );
+
+  return (
+    <div className="relative">
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv"
+        className="hidden"
+        onChange={handleFile}
+      />
+      <button
+        type="button"
+        className="rounded border border-border bg-background px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-card disabled:opacity-50"
+        onClick={() => fileRef.current?.click()}
+        disabled={bulkCreate.isPending}
+      >
+        {bulkCreate.isPending ? "Uploading\u2026" : "Upload CSV"}
+      </button>
+      {parseError && (
+        <span className="absolute top-full left-0 mt-1 text-[11px] text-fin-plum whitespace-nowrap">
+          {parseError}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function parseCsvToTaskOrders(text: string) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+
+  const headerLine = lines[0];
+  const headers = headerLine.split(",").map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
+
+  const nameIdx = headers.findIndex((h) => h === "to_name" || h === "name" || h === "task_order_name");
+  const numIdx = headers.findIndex((h) => h === "to_number" || h === "contract_number" || h === "number");
+  const roleIdx = headers.findIndex((h) => h === "prime_or_sub" || h === "role");
+  const agencyIdx = headers.findIndex((h) => h === "customer_agency" || h === "agency");
+  const officeIdx = headers.findIndex((h) => h === "contracting_office" || h === "office");
+  const startIdx = headers.findIndex((h) => h === "pop_start" || h === "start");
+  const endIdx = headers.findIndex((h) => h === "pop_end" || h === "end");
+  const ceilingIdx = headers.findIndex((h) => h === "total_ceiling" || h === "ceiling");
+  const fundedIdx = headers.findIndex((h) => h === "funded_to_date" || h === "funded");
+  const statusIdx = headers.findIndex((h) => h === "status");
+  const vehicleIdx = headers.findIndex((h) => h === "vehicle" || h === "parent_vehicle_short_name");
+  const notesIdx = headers.findIndex((h) => h === "notes");
+
+  if (nameIdx < 0 || numIdx < 0) return [];
+
+  const result: Array<{
+    to_name: string;
+    to_number: string;
+    parent_vehicle_short_name?: string | null;
+    prime_or_sub: "PRIME" | "SUB";
+    customer_agency?: string | null;
+    contracting_office?: string | null;
+    pop_start?: string | null;
+    pop_end?: string | null;
+    total_ceiling?: number | null;
+    funded_to_date?: number | null;
+    status?: string;
+    notes?: string | null;
+  }> = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim());
+    const name = cols[nameIdx] ?? "";
+    const num = cols[numIdx] ?? "";
+    if (!name || !num) continue;
+
+    const rawRole = roleIdx >= 0 ? (cols[roleIdx] ?? "").toUpperCase() : "PRIME";
+    const role: "PRIME" | "SUB" = rawRole === "SUB" ? "SUB" : "PRIME";
+
+    result.push({
+      to_name: name,
+      to_number: num,
+      prime_or_sub: role,
+      parent_vehicle_short_name: vehicleIdx >= 0 ? cols[vehicleIdx] || null : null,
+      customer_agency: agencyIdx >= 0 ? cols[agencyIdx] || null : null,
+      contracting_office: officeIdx >= 0 ? cols[officeIdx] || null : null,
+      pop_start: startIdx >= 0 ? cols[startIdx] || null : null,
+      pop_end: endIdx >= 0 ? cols[endIdx] || null : null,
+      total_ceiling: ceilingIdx >= 0 && cols[ceilingIdx] ? Number(cols[ceilingIdx].replace(/[^0-9.-]/g, "")) || null : null,
+      funded_to_date: fundedIdx >= 0 && cols[fundedIdx] ? Number(cols[fundedIdx].replace(/[^0-9.-]/g, "")) || null : null,
+      status: statusIdx >= 0 ? cols[statusIdx] || "active" : "active",
+      notes: notesIdx >= 0 ? cols[notesIdx] || null : null,
+    });
+  }
+  return result;
 }
 
 /* ── Summary Strip ────────────────────────────────── */
@@ -414,10 +615,10 @@ function WaterfallChart({ data, viewMode }: { data: ContractWaterfallData; viewM
     <div className="rounded border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Revenue/Profit Forecast Waterfall
+          Task Order Revenue/Profit Forecast
         </h3>
         <span className="text-[11px] text-muted-foreground">
-          Spread: ceiling ÷ 12 = annual, ÷ 12 = monthly
+          Funded TOs only {"\u2014"} IDIQs excluded
         </span>
       </div>
       <div ref={chartRef} style={{ height: 380, width: "100%" }} />
@@ -433,7 +634,7 @@ function ContractTable({ contracts, portfolioMargin }: { contracts: WaterfallCon
       <table className="w-full text-[12px]">
         <thead>
           <tr className="border-b border-border bg-gda-bg-deep">
-            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Contract</th>
+            <th className="px-3 py-2 text-left font-medium text-muted-foreground">Task Order</th>
             <th className="px-3 py-2 text-left font-medium text-muted-foreground">Vehicle</th>
             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Ceiling</th>
             <th className="px-3 py-2 text-right font-medium text-muted-foreground">Funded</th>
@@ -448,7 +649,7 @@ function ContractTable({ contracts, portfolioMargin }: { contracts: WaterfallCon
           {contracts.map((c) => (
             <tr key={c.id} className="border-b border-border/50 hover:bg-gda-bg-deep/50">
               <td className="px-3 py-2 font-medium text-foreground">{c.to_name}</td>
-              <td className="px-3 py-2 text-muted-foreground">{c.parent_vehicle_short_name ?? "—"}</td>
+              <td className="px-3 py-2 text-muted-foreground">{c.parent_vehicle_short_name ?? "\u2014"}</td>
               <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoneyFull(c.ceiling)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-fin-teal font-medium">{formatMoneyFull(c.funded_to_date)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-foreground">{formatMoneyFull(c.monthly_revenue)}</td>
@@ -458,7 +659,7 @@ function ContractTable({ contracts, portfolioMargin }: { contracts: WaterfallCon
                 {c.margin_source === "actual" ? "Actuals" : `Portfolio (${portfolioMargin.toFixed(1)}%)`}
               </td>
               <td className="px-3 py-2 tabular-nums text-muted-foreground whitespace-nowrap">
-                {c.pop_start.slice(0, 7)} → {c.pop_end.slice(0, 7)}
+                {c.pop_start.slice(0, 7)} {"\u2192"} {c.pop_end.slice(0, 7)}
               </td>
             </tr>
           ))}
@@ -544,7 +745,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
             className="text-muted-foreground hover:text-foreground text-[18px] leading-none"
             onClick={onClose}
           >
-            ×
+            {"\u00D7"}
           </button>
         </div>
 
@@ -572,7 +773,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
                 onChange={(e) =>
                   setField("prime_or_sub", e.target.value)
                 }
-                className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground"
               >
                 <option value="PRIME">Prime</option>
                 <option value="SUB">Sub</option>
@@ -585,7 +786,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
               <select
                 value={form.status}
                 onChange={(e) => setField("status", e.target.value)}
-                className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground"
               >
                 <option value="active">Active</option>
                 <option value="awarded_not_started">Awarded (not started)</option>
@@ -648,7 +849,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
               value={form.notes}
               onChange={(e) => setField("notes", e.target.value)}
               rows={2}
-              className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground resize-none"
+              className="w-full rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground resize-none"
               placeholder="Source reference, context..."
             />
           </div>
@@ -661,7 +862,7 @@ function AddTaskOrderDrawer({ onClose }: { onClose: () => void }) {
             onClick={handleSubmit}
             disabled={!form.to_name || !form.to_number || createTO.isPending}
           >
-            {createTO.isPending ? "Saving…" : "Save task order"}
+            {createTO.isPending ? "Saving\u2026" : "Save task order"}
           </button>
           <button
             type="button"
@@ -706,7 +907,7 @@ function FormField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground"
+        className="w-full rounded border border-border bg-background px-2 py-1.5 text-[12px] text-foreground"
       />
     </div>
   );
