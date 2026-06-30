@@ -76,10 +76,8 @@ function CompetitorsContent() {
               <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
                 Competitor Intelligence
               </h1>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Profiles of the companies you compete against, built from federal
-                award history. Size up incumbents and rivals with automatic black-hat analysis
-                and understand who you are up against on a given pursuit.
+              <p className="truncate text-xs text-muted-foreground">
+                Profiles of the companies you compete against — built from federal award history with automatic black-hat analysis.
               </p>
             </div>
             <p className="text-xs text-muted-foreground">

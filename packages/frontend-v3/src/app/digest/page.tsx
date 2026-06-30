@@ -177,11 +177,8 @@ export default function DigestPage() {
               <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
                 MARKET INTELLIGENCE DIGEST
               </h1>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                A daily briefing of what changed in your market — new
-                solicitations, GAO decisions, regulations, budget moves, and agency
-                intel. Skim the lead stories and filter by category to stay ahead of
-                the signals that affect your pursuits.
+              <p className="truncate text-xs text-muted-foreground">
+                Daily briefing of market changes — solicitations, GAO decisions, regulations, budget moves, and agency intel.
               </p>
             </div>
             <p className="font-mono text-xs text-muted-foreground">

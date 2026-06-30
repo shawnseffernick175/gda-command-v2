@@ -110,11 +110,8 @@ function CaptureList() {
             <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">
               Capture
             </h1>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              The capture workspace where you build the case to win a specific
-              pursuit — color-team reviews, scoring, milestones, and drivers. Run
-              your capture process, track review status, and sharpen PWin before
-              you commit to bid.
+            <p className="truncate text-xs text-muted-foreground">
+              The capture workspace — color-team reviews, scoring, milestones, and drivers for each pursuit.
             </p>
           </div>
           <div className="flex gap-2">

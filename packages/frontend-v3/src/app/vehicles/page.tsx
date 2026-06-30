@@ -127,10 +127,8 @@ export default function VehiclesPage() {
             <h1 className="shrink-0 text-section font-semibold text-foreground">
               Contract Vehicles
             </h1>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              The government contract vehicles (GWACs, IDIQs, schedules, BPAs) you
-              hold or can access. Review which vehicles you are on, their scope and
-              ceiling, and how well each one positions you for upcoming work.
+            <p className="truncate text-xs text-muted-foreground">
+              The contract vehicles (GWACs, IDIQs, schedules, BPAs) you hold or can access — scope, ceiling, and positioning.
             </p>
           </div>
           <button

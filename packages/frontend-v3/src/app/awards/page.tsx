@@ -177,10 +177,8 @@ function AwardsContent() {
               {countData.count.toLocaleString()} wheelhouse awards
             </span>
           )}
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Contracts already awarded in your wheelhouse — a window into incumbents,
-            expiring contracts, and recompetes. Find weak incumbents and upcoming
-            expirations, then turn the best targets into pursuits.
+          <p className="truncate text-xs text-muted-foreground">
+            Contracts already awarded in your wheelhouse — incumbents, expiring contracts, and recompete targets.
           </p>
         </div>
 

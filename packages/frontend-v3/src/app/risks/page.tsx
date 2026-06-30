@@ -626,11 +626,8 @@ function RisksPageInner() {
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 space-y-4 sticky-page-header">
         <div className="flex items-baseline gap-3">
           <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">Risks</h1>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            The risk register for your pursuits — what could go wrong, how likely
-            it is, and how hard it would hit. Log and rate risks by likelihood and
-            impact, assign owners and mitigations, and keep an eye on the highest
-            exposure items.
+          <p className="truncate text-xs text-muted-foreground">
+            The risk register for your pursuits — what could go wrong, how likely it is, and how hard it would hit.
           </p>
         </div>
         <div className="flex gap-2">
