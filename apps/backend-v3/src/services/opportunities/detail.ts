@@ -283,7 +283,7 @@ export async function getUnifiedOpportunityDetail(
  */
 export const STAGE_GROUPS: Record<string, readonly string[]> = {
   active: ['solicitation'],
-  pipeline: ['forecast', 'pre_sol'],
+  pipeline: ['qualified', 'forecast', 'pre_sol'],
   fast_track: ['signal'],
   awarded: ['awarded', 'post_award'],
 };
