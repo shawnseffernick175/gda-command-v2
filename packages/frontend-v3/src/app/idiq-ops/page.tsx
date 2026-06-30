@@ -5,7 +5,9 @@ import type { IdiqPursuitItem } from "@/hooks/use-idiq-ops";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const STAGE_LABELS: Record<string, string> = {
+  interest: "Interest",
   qualify: "Qualify",
+  qualified: "Qualified",
   pursue: "Pursue",
   solicitation: "Solicitation",
   post_submittal: "Post-Submittal",
