@@ -710,7 +710,7 @@ export async function workshopRoutes(app: FastifyInstance): Promise<void> {
     recordAuditLog(pool, {
       action: 'workshop_upload_delete',
       table_name: 'document_uploads',
-      record_id: Number(id),
+      record_ref: id,
       old_values: { storage_path: storagePath },
       new_values: null,
       actor: 'user',
