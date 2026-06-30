@@ -2,10 +2,9 @@
 
 import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useCompetitorsPaged, useCompetitorsCount, useBlackHatAnalysis } from "@/hooks/use-competitors";
+import { useCompetitorsPaged, useCompetitorsCount } from "@/hooks/use-competitors";
 import { Pagination } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
-import { CollapseSection } from "@/components/shared/collapse-section";
 import { formatMoney } from "@/lib/format-money";
 import CompetitorDetailPanel, { SizeBadge } from "@/components/CompetitorDetailPanel";
 import { SortableHeader } from "@/components/shared/SortableHeader";
@@ -261,16 +260,9 @@ function CompetitorsContent() {
         />
       )}
 
-      <CollapseSection
-        id="comp-black-hat"
-        title="Black Hat Analysis"
-        defaultOpen={false}
-      >
-        <BlackHatSection />
-      </CollapseSection>
-
       {selectedCompetitor && (
         <CompetitorDetailPanel
+          key={selectedCompetitor.name}
           competitor={selectedCompetitor}
           onClose={() => setSelectedCompetitor(null)}
         />
@@ -279,126 +271,4 @@ function CompetitorsContent() {
   );
 }
 
-function BlackHatSection() {
-  const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
-  const blackHat = useBlackHatAnalysis(selectedCompetitor);
 
-  useEffect(() => {
-    if (selectedCompetitor && !blackHat.isPending && !blackHat.data && !blackHat.isError) {
-      blackHat.mutate();
-    }
-  }, [selectedCompetitor, blackHat]);
-
-  // Source the picker from the top competitors by win count across the whole
-  // dataset, not just whoever happens to be on the current page.
-  const { data: topData } = useCompetitorsPaged({
-    limit: 20,
-    page: 1,
-    sort_by: "win_count",
-    sort_dir: "desc",
-  });
-  const top20 = topData?.items ?? [];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <label className="text-[11px] uppercase tracking-wide text-muted-foreground">
-          Select competitor for analysis
-        </label>
-        <select
-          value={selectedCompetitor ?? ""}
-          onChange={(e) => setSelectedCompetitor(e.target.value || null)}
-          className="rounded border border-border bg-gda-panel px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-gda-green/50"
-        >
-          <option value="">-- Select --</option>
-          {top20.map((c) => (
-            <option key={c.name} value={c.name}>
-              {c.name} ({c.win_count} wins)
-            </option>
-          ))}
-        </select>
-        {blackHat.isPending && (
-          <span className="text-xs font-mono text-gda-cyan animate-pulse">Analyzing...</span>
-        )}
-      </div>
-
-      {blackHat.isPending && (
-        <div className="h-32 rounded bg-gda-panel animate-pulse" />
-      )}
-
-      {blackHat.isError && (
-        <p className="text-xs text-red-400">
-          {blackHat.error instanceof Error ? blackHat.error.message : "Analysis failed"}
-        </p>
-      )}
-
-      {blackHat.data && (
-        <div className="rounded border border-border bg-gda-bg-base p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="font-mono font-bold text-sm text-foreground">
-              {blackHat.data.competitor}
-            </span>
-            <Badge variant="outline" className="text-[11px]">Black Hat Analysis</Badge>
-            {blackHat.data.from_cache && (
-              <span className="text-[11px] text-muted-foreground">Cached</span>
-            )}
-          </div>
-
-          <div className="border-t border-border" />
-
-          <div>
-            <h4 className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
-              Likely Approach
-            </h4>
-            <p className="text-xs text-foreground">{blackHat.data.likely_approach}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-[11px] text-gda-green mb-1">Strengths</h4>
-              <ul className="space-y-0.5">
-                {blackHat.data.strengths.map((s, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-xs text-foreground">
-                    <span className="mt-1.5 h-1 w-1 rounded-full bg-gda-green shrink-0" />
-                    {s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-[11px] text-red-400 mb-1">Weaknesses</h4>
-              <ul className="space-y-0.5">
-                {blackHat.data.weaknesses.map((w, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-xs text-foreground">
-                    <span className="mt-1.5 h-1 w-1 rounded-full bg-red-400 shrink-0" />
-                    {w}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
-              Counter Strategy
-            </h4>
-            <div className="border-l-2 border-gda-cyan pl-3 bg-gda-panel/50 rounded-r p-2">
-              <p className="text-xs text-foreground">{blackHat.data.counter_strategy}</p>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
-              Intel Summary
-            </h4>
-            <p className="text-xs text-muted-foreground">{blackHat.data.intel_summary}</p>
-          </div>
-
-          <p className="text-[11px] text-muted-foreground">
-            Generated: {new Date(blackHat.data.generated_at).toLocaleString()}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}

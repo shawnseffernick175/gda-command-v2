@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useCompetitorAnalysis } from "@/hooks/use-competitors";
+import { useCompetitorAnalysis, useBlackHatAnalysis } from "@/hooks/use-competitors";
 import type { Competitor, CompetitorAnalysis } from "@/lib/types";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
@@ -80,6 +80,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
   const analyzeMutation = useCompetitorAnalysis(competitor.name);
   const analysis: CompetitorAnalysis | null = analyzeMutation.data ?? competitor.competitor_analysis ?? null;
   const isLoading = analyzeMutation.isPending;
+  const blackHat = useBlackHatAnalysis(competitor.name);
   const { sortBy, sortDir, handleSort } = useTableSort("recomp");
 
   const sortedRecompetes = useMemo(() => {
@@ -94,6 +95,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
     if (!competitor.competitor_analysis) {
       analyzeMutation.mutate();
     }
+    blackHat.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitor.name]);
 
@@ -244,6 +246,60 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
             <span className={`inline-flex items-center px-3 py-1.5 rounded text-sm font-bold border ${actionColor(analysis.recommended_action)}`}>
               {analysis.recommended_action}
             </span>
+          ) : null}
+        </div>
+
+        {/* Black Hat Analysis */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Black Hat Analysis</h3>
+          {blackHat.isPending ? (
+            <SkeletonBlock />
+          ) : blackHat.data ? (
+            <div className="space-y-3">
+              <div>
+                <span className="text-xs uppercase tracking-wide text-gray-500">Likely Approach</span>
+                <p className="text-sm text-gray-800 leading-relaxed">{blackHat.data.likely_approach}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-xs text-green-700">Strengths</span>
+                  <ul className="mt-1 space-y-0.5">
+                    {blackHat.data.strengths.map((s, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-gray-800">
+                        <span className="mt-1.5 h-1 w-1 rounded-full bg-green-600 shrink-0" />
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <span className="text-xs text-red-700">Weaknesses</span>
+                  <ul className="mt-1 space-y-0.5">
+                    {blackHat.data.weaknesses.map((w, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-xs text-gray-800">
+                        <span className="mt-1.5 h-1 w-1 rounded-full bg-red-500 shrink-0" />
+                        {w}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs uppercase tracking-wide text-gray-500">Counter Strategy</span>
+                <p className="text-sm text-gray-800 leading-relaxed">{blackHat.data.counter_strategy}</p>
+              </div>
+              <div>
+                <span className="text-xs uppercase tracking-wide text-gray-500">Intel Summary</span>
+                <p className="text-sm text-gray-600 leading-relaxed">{blackHat.data.intel_summary}</p>
+              </div>
+              {blackHat.data.from_cache && (
+                <span className="text-[11px] text-gray-400">Cached</span>
+              )}
+            </div>
+          ) : blackHat.isError ? (
+            <p className="text-sm text-gray-400">
+              {blackHat.error instanceof Error ? blackHat.error.message : "Black hat analysis unavailable"}
+            </p>
           ) : null}
         </div>
 
