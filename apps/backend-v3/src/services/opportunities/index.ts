@@ -194,8 +194,8 @@ function buildOrderByClause(
 ): string {
   const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
   const nulls = 'NULLS LAST';
-  // Resolved via the latest_pwin LEFT JOIN on the data query (see
-  // listOpportunitiesPaged), not a correlated subquery.
+  // Resolved via the latest_pwin LEFT JOIN present in both
+  // listOpportunities and listOpportunitiesPaged data queries.
   const pwinExpr = `latest_pwin.pwin`;
   const stageExpr =
     `COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest')`;
@@ -412,7 +412,12 @@ export async function listOpportunities(
     );
   }
 
-  if (filters.cursor) {
+  // Cursor keyset (id < cursor_id) only works with the default id-based sort.
+  // For non-default sorts the route layer redirects to listOpportunitiesPaged;
+  // but as defense-in-depth the cursor is silently ignored here when the sort
+  // is non-default so the ORDER BY stays correct.
+  const isDefaultSort = !filters.sort_by || filters.sort_by === 'recency';
+  if (filters.cursor && isDefaultSort) {
     try {
       const decoded = JSON.parse(Buffer.from(filters.cursor, 'base64').toString('utf-8')) as {
         id: number;
@@ -425,12 +430,9 @@ export async function listOpportunities(
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const orderBy = buildOrderByClause(filters.sort_by, filters.sort_dir);
 
-  // Cursor pagination relies on `id < cursor_id` keyset — ORDER BY must stay
-  // o.id DESC.  Custom sort_by/sort_dir is handled by the offset-based
-  // listOpportunitiesPaged path (the route layer auto-redirects there when a
-  // non-default sort_by is requested).
-  const sql = `SELECT o.*, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage, COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage, latest_pwin.pwin AS pwin_score FROM opportunities o LEFT JOIN ( SELECT DISTINCT ON (opportunity_id) opportunity_id, pwin FROM opportunity_analysis_cache ORDER BY opportunity_id, generated_at DESC ) latest_pwin ON latest_pwin.opportunity_id = o.id ${where} ORDER BY o.id DESC LIMIT $${paramIdx}`;
+  const sql = `SELECT o.*, (EXISTS(SELECT 1 FROM pipeline_items pi WHERE pi.opportunity_id = o.id)) AS has_pipeline_stage, COALESCE((SELECT pi.stage FROM pipeline_items pi WHERE pi.opportunity_id = o.id ORDER BY pi.id DESC LIMIT 1), 'interest') AS pipeline_stage, latest_pwin.pwin AS pwin_score FROM opportunities o LEFT JOIN ( SELECT DISTINCT ON (opportunity_id) opportunity_id, pwin FROM opportunity_analysis_cache ORDER BY opportunity_id, generated_at DESC ) latest_pwin ON latest_pwin.opportunity_id = o.id ${where} ${orderBy} LIMIT $${paramIdx}`;
   params.push(limit + 1);
 
   const res = await pool.query<OpportunityRow & { has_pipeline_stage: boolean; pipeline_stage: string; pwin_score: string | number | null }>(sql, params);

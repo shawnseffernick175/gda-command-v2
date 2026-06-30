@@ -580,8 +580,10 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
     };
 
     // Use the paged path when page is explicitly provided OR when a
-    // non-default sort is requested — cursor pagination hardcodes
-    // ORDER BY o.id DESC and silently ignores sort_by/sort_dir.
+    // non-default sort is requested. Both paths now honor
+    // buildOrderByClause, but cursor keyset pagination only works for
+    // recency (id-based) sort, so the paged path is canonical for all
+    // other sort fields.
     if (filters.page || (filters.sort_by && filters.sort_by !== 'recency')) {
       const result = await listOpportunitiesPaged(filters);
       return reply.status(200).send(successEnvelope(result, req.requestId));
