@@ -588,6 +588,7 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     const docType = query.doc_type;
     const category = query.category;
     const search = query.q;
+    const status = query.status;
     const limit = Math.min(Math.max(Number(query.limit) || 50, 1), 200);
     const page = Math.max(Number(query.page) || 1, 1);
     const offset = (page - 1) * limit;
@@ -604,6 +605,10 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
     if (docType && VALID_DOC_TYPES.includes(docType as DocType)) {
       conditions.push(`d.doc_type = $${idx++}`);
       params.push(docType);
+    }
+
+    if (status === 'unresolved') {
+      conditions.push(`d.extraction_status IN ('failed', 'pending')`);
     }
 
     if (search) {
@@ -1365,6 +1370,46 @@ export async function vaultRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send(
       successEnvelope(updated.rows[0], req.requestId),
+    );
+  });
+
+  // POST /v3/vault/dismiss-all — bulk dismiss every unresolved document
+  // (extraction_status IN ('failed', 'pending')). Owner is acknowledging all
+  // stuck items so they no longer linger. Idempotent — already-dismissed or
+  // successful docs are untouched.
+  app.post('/v3/vault/dismiss-all', async (req, reply) => {
+    const { rows: docs } = await pool.query<{ id: number; filename: string; extraction_status: string }>(
+      `SELECT id, filename, extraction_status FROM vault_documents
+        WHERE deleted_at IS NULL
+          AND extraction_status IN ('failed', 'pending')
+        ORDER BY id`,
+    );
+
+    if (docs.length === 0) {
+      return reply.send(
+        successEnvelope({ dismissed: 0, docs: [] }, req.requestId),
+      );
+    }
+
+    const ids = docs.map((d) => d.id);
+    await pool.query(
+      `UPDATE vault_documents SET extraction_status = 'dismissed', updated_at = NOW()
+        WHERE id = ANY($1)`,
+      [ids],
+    );
+
+    for (const doc of docs) {
+      await insertAudit(doc.id, 'dismissed', 'admin', `Bulk dismiss: previous status=${doc.extraction_status}`);
+    }
+
+    return reply.send(
+      successEnvelope(
+        {
+          dismissed: docs.length,
+          docs: docs.map((d) => ({ id: d.id, filename: d.filename, previous_status: d.extraction_status })),
+        },
+        req.requestId,
+      ),
     );
   });
 
