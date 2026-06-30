@@ -10,6 +10,7 @@ import {
   useUpdateStage,
   type OpportunityMeta,
 } from "@/hooks/use-opportunities";
+import { usePipelineList, type PipelineListItem } from "@/hooks/use-pipeline";
 import { useToast } from "@/components/ui/toast";
 import { Pagination } from "@/components/shared/Pagination";
 import { useVehicles, useVehicleOpportunities, type VehicleSummary, type VehicleOpportunity } from "@/hooks/use-vehicles";
@@ -194,6 +195,7 @@ function OpportunityList() {
   const [stageTab, setStageTab] = useState("all");
   const [groupBy, setGroupBy] = useState<"none" | "vehicle">("none");
   const [selectedOppId, setSelectedOppId] = useState<string | null>(null);
+  const [showQualifyQueue, setShowQualifyQueue] = useState(false);
   const qualifyStage = useUpdateStage();
   const { toast } = useToast();
   const [page, setPage] = useState(1);
@@ -431,27 +433,32 @@ function OpportunityList() {
           <div className="ml-auto flex items-center gap-2 pl-3">
             <button
               type="button"
-              disabled={!selectedOppId || qualifyStage.isPending}
+              disabled={qualifyStage.isPending}
               onClick={() => {
-                if (!selectedOppId) return;
-                qualifyStage.mutate(
-                  { id: selectedOppId, stage: "qualify" },
-                  {
-                    onSuccess: () => {
-                      toast("Moved to Qualify staging", "success");
-                      setSelectedOppId(null);
+                if (selectedOppId) {
+                  qualifyStage.mutate(
+                    { id: selectedOppId, stage: "qualify" },
+                    {
+                      onSuccess: () => {
+                        toast("Moved to Qualify staging", "success");
+                        setSelectedOppId(null);
+                      },
+                      onError: (err) =>
+                        toast(`Failed to qualify: ${err.message}`, "error"),
                     },
-                    onError: (err) =>
-                      toast(`Failed to qualify: ${err.message}`, "error"),
-                  },
-                );
+                  );
+                } else {
+                  setShowQualifyQueue((prev) => !prev);
+                }
               }}
-              title={selectedOppId ? "Move selected opportunity to Qualify staging" : "Select a row first"}
+              title={selectedOppId ? "Move selected opportunity to Qualify staging" : "Toggle Qualify staging queue"}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors",
-                selectedOppId
-                  ? "border-gda-green text-gda-green bg-gda-green/10 hover:bg-gda-green/20 cursor-pointer"
-                  : "border-border text-muted-foreground/50 cursor-not-allowed",
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded border transition-colors cursor-pointer",
+                showQualifyQueue && !selectedOppId
+                  ? "border-gda-green text-gda-green bg-gda-green/10"
+                  : selectedOppId
+                    ? "border-gda-green text-gda-green bg-gda-green/10 hover:bg-gda-green/20"
+                    : "border-border text-muted-foreground hover:border-gda-green/50",
               )}
             >
               Qualify
@@ -484,8 +491,10 @@ function OpportunityList() {
         </div>
       )}
 
-      {/* Vehicle-grouped view */}
-      {groupBy === "vehicle" ? (
+      {/* Qualify staging queue */}
+      {showQualifyQueue && !selectedOppId ? (
+        <QualifyStagingQueue />
+      ) : groupBy === "vehicle" ? (
         vehiclesLoading ? (
           <div className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -1026,6 +1035,165 @@ function OpportunityRow({
           sourceUri={opp.source_uri ?? null}
           currentTags={opp.tags ?? []}
         />
+      </td>
+    </tr>
+  );
+}
+
+/* ── Qualify staging queue ───────────────────────────────────────── */
+
+function QualifyStagingQueue() {
+  const { data, isLoading } = usePipelineList({ stage: "qualify", limit: 200 });
+  const updateStage = useUpdateStage();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const items = data?.items ?? [];
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto mt-4 space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 bg-gda-panel" />
+        ))}
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex-1 min-h-0 mt-4 flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">
+          No opportunities in the Qualify staging queue.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 min-h-0 mt-4 overflow-y-auto overflow-x-clip rounded border border-border">
+      <table className="w-full text-sm">
+        <thead className="sticky top-0 z-10 bg-gda-bg-base">
+          <tr className="border-b border-border bg-gda-bg-base text-xs text-muted-foreground uppercase tracking-wider">
+            <th className="px-3 py-2 text-left font-medium">Opportunity</th>
+            <th className="px-3 py-2 text-left font-medium w-[140px]">Agency</th>
+            <th className="px-3 py-2 text-left font-medium w-[80px]">Pwin</th>
+            <th className="px-3 py-2 text-left font-medium w-[100px]">Source</th>
+            <th className="px-3 py-2 text-left font-medium w-[120px]">Date Staged</th>
+            <th className="px-3 py-2 text-left font-medium w-[160px]">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <QualifyStagingRow
+              key={item.id}
+              item={item}
+              onPromote={(id) => {
+                updateStage.mutate(
+                  { id, stage: "qualified" },
+                  {
+                    onSuccess: () => toast("Promoted to Qualified", "success"),
+                    onError: (err) => toast(`Promote failed: ${err.message}`, "error"),
+                  },
+                );
+              }}
+              onReturn={(id) => {
+                updateStage.mutate(
+                  { id, stage: "interest" },
+                  {
+                    onSuccess: () => toast("Returned to Interest", "success"),
+                    onError: (err) => toast(`Return failed: ${err.message}`, "error"),
+                  },
+                );
+              }}
+              onNavigate={(oppId) => router.push(`/opportunities?id=${oppId}`)}
+              isPending={updateStage.isPending}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function QualifyStagingRow({
+  item,
+  onPromote,
+  onReturn,
+  onNavigate,
+  isPending,
+}: {
+  item: PipelineListItem;
+  onPromote: (oppId: string) => void;
+  onReturn: (oppId: string) => void;
+  onNavigate: (oppId: string) => void;
+  isPending: boolean;
+}) {
+  const pwin = item.resolved_pwin;
+  const pwinClass =
+    pwin == null
+      ? "text-muted-foreground"
+      : pwin >= 65
+        ? "text-gda-green"
+        : pwin >= 45
+          ? "text-gda-amber"
+          : "text-red-400";
+
+  const stagedDate = item.updated_at
+    ? new Date(item.updated_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "America/New_York",
+      })
+    : "---";
+
+  return (
+    <tr className="border-b border-border hover:bg-gda-panel/50 transition-colors h-9">
+      <td className="px-3 py-1.5">
+        <button
+          type="button"
+          onClick={() => onNavigate(item.opportunity_id)}
+          className="text-foreground hover:text-gda-green truncate block max-w-xs text-sm text-left"
+        >
+          {item.opportunity_title}
+        </button>
+      </td>
+      <td className="px-3 py-1.5 text-xs text-muted-foreground truncate max-w-[140px]">
+        {item.opportunity_agency ?? "---"}
+      </td>
+      <td className="px-3 py-1.5">
+        {pwin != null ? (
+          <span className={cn("font-mono text-xs tabular-nums", pwinClass)}>{pwin}%</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">---</span>
+        )}
+      </td>
+      <td className="px-3 py-1.5 text-xs text-muted-foreground font-mono">
+        {item.solicitation_number ?? "---"}
+      </td>
+      <td className="px-3 py-1.5 text-xs text-muted-foreground">
+        {stagedDate}
+      </td>
+      <td className="px-3 py-1.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => onPromote(item.opportunity_id)}
+            className="rounded border border-gda-green/40 bg-gda-green/10 px-2 py-0.5 text-[11px] font-mono text-gda-green hover:bg-gda-green/20 transition-colors disabled:opacity-50"
+          >
+            Promote
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => onReturn(item.opportunity_id)}
+            className="rounded border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-50"
+          >
+            Return
+          </button>
+        </div>
       </td>
     </tr>
   );

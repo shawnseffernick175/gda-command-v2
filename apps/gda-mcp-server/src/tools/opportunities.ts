@@ -11,7 +11,7 @@ const SearchInputSchema = z.object({
   agency: z.string().optional(),
   naics: z.string().optional(),
   lifecycle_stage: z
-    .enum(['signal', 'forecast', 'pre_sol', 'solicitation', 'awarded', 'post_award', 'closed'])
+    .enum(['signal', 'qualify', 'qualified', 'forecast', 'pre_sol', 'solicitation', 'awarded', 'post_award', 'closed'])
     .optional(),
   limit: z.number().int().min(1).max(100).optional(),
 });
@@ -70,7 +70,7 @@ export const gdaSearchOpportunities: ToolRegistryEntry = {
       naics: { type: 'string', description: 'Filter by NAICS code (case-insensitive substring)' },
       lifecycle_stage: {
         type: 'string',
-        enum: ['signal', 'forecast', 'pre_sol', 'solicitation', 'awarded', 'post_award', 'closed'],
+        enum: ['signal', 'qualify', 'qualified', 'forecast', 'pre_sol', 'solicitation', 'awarded', 'post_award', 'closed'],
         description: 'Filter by lifecycle stage',
       },
       limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Max results (default 20)' },

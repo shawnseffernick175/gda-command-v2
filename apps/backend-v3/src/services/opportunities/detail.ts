@@ -290,6 +290,8 @@ export const STAGE_GROUPS: Record<string, readonly string[]> = {
 
 const VALID_STAGES = new Set([
   'signal',
+  'qualify',
+  'qualified',
   'forecast',
   'pre_sol',
   'solicitation',
