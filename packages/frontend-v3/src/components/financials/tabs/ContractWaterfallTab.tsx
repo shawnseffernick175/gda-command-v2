@@ -376,12 +376,49 @@ function CsvUploadButton() {
   );
 }
 
+function splitCsvRow(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      fields.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
+function parseNumeric(raw: string): number | null {
+  const cleaned = raw.replace(/[^0-9.-]/g, "");
+  if (cleaned === "") return null;
+  const n = Number(cleaned);
+  return Number.isNaN(n) ? null : n;
+}
+
 function parseCsvToTaskOrders(text: string) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
 
-  const headerLine = lines[0];
-  const headers = headerLine.split(",").map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
+  const headers = splitCsvRow(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
 
   const nameIdx = headers.findIndex((h) => h === "to_name" || h === "name" || h === "task_order_name");
   const numIdx = headers.findIndex((h) => h === "to_number" || h === "contract_number" || h === "number");
@@ -414,7 +451,7 @@ function parseCsvToTaskOrders(text: string) {
   }> = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(",").map((c) => c.trim());
+    const cols = splitCsvRow(lines[i]);
     const name = cols[nameIdx] ?? "";
     const num = cols[numIdx] ?? "";
     if (!name || !num) continue;
@@ -431,8 +468,8 @@ function parseCsvToTaskOrders(text: string) {
       contracting_office: officeIdx >= 0 ? cols[officeIdx] || null : null,
       pop_start: startIdx >= 0 ? cols[startIdx] || null : null,
       pop_end: endIdx >= 0 ? cols[endIdx] || null : null,
-      total_ceiling: ceilingIdx >= 0 && cols[ceilingIdx] ? Number(cols[ceilingIdx].replace(/[^0-9.-]/g, "")) || null : null,
-      funded_to_date: fundedIdx >= 0 && cols[fundedIdx] ? Number(cols[fundedIdx].replace(/[^0-9.-]/g, "")) || null : null,
+      total_ceiling: ceilingIdx >= 0 && cols[ceilingIdx] ? parseNumeric(cols[ceilingIdx]) : null,
+      funded_to_date: fundedIdx >= 0 && cols[fundedIdx] ? parseNumeric(cols[fundedIdx]) : null,
       status: statusIdx >= 0 ? cols[statusIdx] || "active" : "active",
       notes: notesIdx >= 0 ? cols[notesIdx] || null : null,
     });
