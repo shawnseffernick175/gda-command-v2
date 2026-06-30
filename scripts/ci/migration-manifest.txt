@@ -125,3 +125,4 @@ v3_116_force_note_cleanup.sql
 v3_117_task_order_years.sql
 v3_118_lifecycle_stage_qualify.sql
 v3_119_pipeline_stage_qualified.sql
+v3_120_qa_checklist_items.sql
