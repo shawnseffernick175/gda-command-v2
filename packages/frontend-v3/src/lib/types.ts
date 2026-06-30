@@ -1213,7 +1213,7 @@ export interface ContractWaterfallData {
   contracts: WaterfallContract[];
   forecast: WaterfallForecastMonth[];
   pipeline: WaterfallPipelineMonth[];
-  spread_method: "ceiling_div_12_annual" | "ceiling_div_pop_months";
+  spread_method: "ceiling_div_12_annual" | "ceiling_div_pop_months" | "per_year_ceiling";
   portfolio_avg_margin: number;
   today: string;
   available_vehicles: { id: number; short_name: string }[];
