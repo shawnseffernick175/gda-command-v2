@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   useCapabilityMatches,
   useComputeCapabilityMatches,
@@ -141,22 +141,20 @@ export function CapabilityMatchCard({
   const qualifyMutation = useQualifyCheck();
   const { toast } = useToast();
   const [qualifyResult, setQualifyResult] = useState<QualifyResult | null>(null);
+  const autoComputedRef = useRef(false);
+
+  // R2: auto-trigger matching on mount when no cached matches exist
+  useEffect(() => {
+    if (!isLoading && matches?.length === 0 && !autoComputedRef.current && !computeMutation.isPending) {
+      autoComputedRef.current = true;
+      computeMutation.mutate(opportunityId);
+    }
+  }, [isLoading, matches, computeMutation, opportunityId]);
 
   const top3 = matches?.slice(0, 3) ?? [];
-  const hasQualifying = top3.some(
+  const hasQualifying = (matches ?? []).some(
     (m) => m.capability?.ou === "envision" && m.match_score >= 0.5,
   );
-
-  const handleCompute = useCallback(() => {
-    computeMutation.mutate(opportunityId, {
-      onSuccess: () => {
-        toast("Capability matches recomputed", "success");
-      },
-      onError: () => {
-        toast("Failed to compute matches", "error");
-      },
-    });
-  }, [computeMutation, opportunityId, toast]);
 
   const handleQualifyCheck = useCallback(() => {
     qualifyMutation.mutate(opportunityId, {
@@ -188,21 +186,14 @@ export function CapabilityMatchCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm">Capability Matches</CardTitle>
-          <button
-            onClick={handleCompute}
-            disabled={computeMutation.isPending}
-            className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-gda-panel hover:text-foreground disabled:opacity-50"
-          >
-            {computeMutation.isPending ? "Computing..." : "Recompute"}
-          </button>
-        </div>
+        <CardTitle className="text-sm">Capability Matches</CardTitle>
       </CardHeader>
       <CardContent>
         {top3.length === 0 ? (
           <div className="py-4 text-center text-[13px] text-muted-foreground">
-            No capability matches found. Click &ldquo;Recompute&rdquo; to analyze.
+            {computeMutation.isPending
+              ? "Analyzing capability matches\u2026"
+              : "No capability matches found."}
           </div>
         ) : (
           <div className="space-y-0">

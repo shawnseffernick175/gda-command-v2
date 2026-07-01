@@ -47,9 +47,9 @@ export async function qualifyWithCapabilities(
     };
   }
 
-  // Rule 3: C-graded capabilities cannot be the sole basis
+  // Rule 3: C-graded (or ungraded) capabilities cannot be the sole basis
   const nonCMatches = envisionMatches.filter(
-    (m) => m.capability?.evidence_grade !== 'C',
+    (m) => m.capability?.evidence_grade === 'A' || m.capability?.evidence_grade === 'B',
   );
   if (nonCMatches.length === 0) {
     return {

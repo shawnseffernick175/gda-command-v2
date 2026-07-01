@@ -166,31 +166,29 @@ export async function matchOpportunityCapabilities(
   // Sort by score descending
   matches.sort((a, b) => b.match_score - a.match_score);
 
-  // Persist matches (upsert)
-  if (matches.length > 0) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+  // Persist matches (always clear stale rows, then insert new ones)
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'DELETE FROM opportunity_capability_matches WHERE opportunity_id = $1',
+      [opportunityId],
+    );
+    for (const m of matches) {
       await client.query(
-        'DELETE FROM opportunity_capability_matches WHERE opportunity_id = $1',
-        [opportunityId],
+        `INSERT INTO opportunity_capability_matches
+         (opportunity_id, capability_id, match_score, match_reasons, computed_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [m.opportunity_id, m.capability_id, m.match_score, JSON.stringify(m.match_reasons), m.computed_at],
       );
-      for (const m of matches) {
-        await client.query(
-          `INSERT INTO opportunity_capability_matches
-           (opportunity_id, capability_id, match_score, match_reasons, computed_at)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [m.opportunity_id, m.capability_id, m.match_score, JSON.stringify(m.match_reasons), m.computed_at],
-        );
-      }
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      logger.error({ err, opportunityId }, 'Failed to persist capability matches');
-      throw err;
-    } finally {
-      client.release();
     }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error({ err, opportunityId }, 'Failed to persist capability matches');
+    throw err;
+  } finally {
+    client.release();
   }
 
   return matches;

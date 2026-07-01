@@ -201,7 +201,7 @@ function CapabilitiesContent() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-muted-foreground">
-          No capabilities found. Use &ldquo;Seed Catalog&rdquo; to load the Envision offering catalog.
+          No capabilities found. Use Seed Catalog to load the Envision offering catalog.
         </div>
       ) : (
         Object.entries(grouped).map(([ou, caps]) => (
