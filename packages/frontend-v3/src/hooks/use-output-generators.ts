@@ -27,11 +27,6 @@ export interface GeneratedDocListItem {
   download_url: string;
 }
 
-interface Envelope<T> {
-  success: boolean;
-  data: T;
-}
-
 // ---------------------------------------------------------------------------
 // Mutations — generate PDFs
 // ---------------------------------------------------------------------------
@@ -40,11 +35,11 @@ export function useGenerateBriefing() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (opportunityId: string) => {
-      const res = await apiPost<Envelope<GeneratedDocResponse>>(
+      const res = await apiPost<GeneratedDocResponse>(
         "/v3/output-generators/briefing",
         { opportunity_id: opportunityId },
       );
-      return res.data;
+      return res;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["output-generators"] });
@@ -57,11 +52,11 @@ export function useGenerateCapturePlan() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (captureId: string) => {
-      const res = await apiPost<Envelope<GeneratedDocResponse>>(
+      const res = await apiPost<GeneratedDocResponse>(
         "/v3/output-generators/capture-plan",
         { capture_id: captureId },
       );
-      return res.data;
+      return res;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["output-generators"] });
@@ -74,11 +69,11 @@ export function useGenerateWinThemes() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (captureId: string) => {
-      const res = await apiPost<Envelope<GeneratedDocResponse>>(
+      const res = await apiPost<GeneratedDocResponse>(
         "/v3/output-generators/win-themes",
         { capture_id: captureId },
       );
-      return res.data;
+      return res;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["output-generators"] });
@@ -104,10 +99,10 @@ export function useGeneratedDocuments(params: {
       if (params.capture_id) query.set("capture_id", params.capture_id);
       if (params.doc_kind) query.set("doc_kind", params.doc_kind);
       const qs = query.toString();
-      const res = await apiGet<Envelope<{ items: GeneratedDocListItem[] }>>(
+      const res = await apiGet<{ items: GeneratedDocListItem[] }>(
         `/v3/output-generators/list${qs ? `?${qs}` : ""}`,
       );
-      return res.data.items;
+      return res.items;
     },
   });
 }

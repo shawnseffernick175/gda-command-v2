@@ -41,10 +41,9 @@ interface OpportunityRow {
   value_max: number | null;
   naics: string | null;
   set_aside: string | null;
-  due_date: string | null;
-  response_deadline: string | null;
+  response_due_at: string | null;
   description: string | null;
-  source_uri: string | null;
+  source_url: string | null;
 }
 
 interface AnalysisBriefRow {
@@ -54,7 +53,11 @@ interface AnalysisBriefRow {
 
 interface AnalysisCacheRow {
   pwin: number | null;
-  analysis_json: Record<string, unknown> | null;
+  incumbent: string | null;
+  competitors: unknown[];
+  blackhat: Record<string, unknown> | null;
+  wargame: Record<string, unknown> | null;
+  timeline: Record<string, unknown> | null;
 }
 
 interface CaptureJoinRow {
@@ -179,20 +182,6 @@ function extractCitations(brief: Record<string, unknown>): Array<{ label: string
   });
 }
 
-function extractAnalysisCitations(json: Record<string, unknown> | null): Array<{ label: string; url: string }> {
-  if (!json) return [];
-  const chips = json.source_chips;
-  if (!Array.isArray(chips)) return [];
-  const results: Array<{ label: string; url: string }> = [];
-  for (const chip of chips) {
-    const c = chip as Record<string, unknown>;
-    if (typeof c.url === 'string') {
-      results.push({ label: String(c.title ?? c.label ?? 'Source'), url: c.url });
-    }
-  }
-  return results;
-}
-
 // ---------------------------------------------------------------------------
 // Generate Briefing PDF
 // ---------------------------------------------------------------------------
@@ -203,7 +192,7 @@ export async function generateBriefing(
 ): Promise<GeneratedDoc> {
   const oppRes = await pool.query<OpportunityRow>(
     `SELECT id::text, title, agency, solicitation_number, value_min, value_max,
-            naics, set_aside, due_date, response_deadline, description, source_uri
+            naics, set_aside, response_due_at, description, source_url
      FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
     [opportunityId],
   );
@@ -221,7 +210,7 @@ export async function generateBriefing(
 
   // Pull opportunity_analysis_cache for pwin + structured analysis
   const cacheRes = await pool.query<AnalysisCacheRow>(
-    `SELECT pwin, analysis_json
+    `SELECT pwin, incumbent, competitors, blackhat, wargame, timeline
      FROM opportunity_analysis_cache
      WHERE opportunity_id = $1
      ORDER BY generated_at DESC LIMIT 1`,
@@ -229,34 +218,34 @@ export async function generateBriefing(
   );
   const cache = cacheRes.rows[0];
   const pwin = cache?.pwin != null ? Number(cache.pwin) : null;
-  const analysisJson = cache?.analysis_json ?? null;
+  const cacheData = cache
+    ? { incumbent: cache.incumbent, competitors: cache.competitors, blackhat: cache.blackhat, wargame: cache.wargame, timeline: cache.timeline }
+    : null;
 
   // Build sections from cached data
   const execSummary = sectionText(brief, 'executive_summary')
-    || (analysisJson ? String((analysisJson as Record<string, unknown>).executive_summary ?? '') : '')
     || 'Analysis data not yet available. Open this opportunity to trigger auto-analysis.';
 
   const analysisBody = sectionText(brief, 'competitive_landscape')
     || sectionText(brief, 'analysis')
+    || buildCompetitiveText(cacheData)
     || '';
 
   const doctrineSection = sectionText(brief, 'doctrine_alignment')
-    || buildDoctrineText(analysisJson);
+    || buildDoctrineText(cacheData);
 
   const risksSection = sectionText(brief, 'risks')
     || sectionText(brief, 'risk_assessment')
     || '';
 
-  const recommendation = sectionText(brief, 'recommendation')
-    || (analysisJson ? String((analysisJson as Record<string, unknown>).bid_recommendation ?? '') : '');
+  const recommendation = sectionText(brief, 'recommendation') || '';
 
   // Collect all citations (R1)
   const allCitations = [
     ...extractCitations(brief),
-    ...extractAnalysisCitations(analysisJson),
   ];
-  if (opp.source_uri) {
-    allCitations.unshift({ label: 'Original Listing', url: opp.source_uri });
+  if (opp.source_url) {
+    allCitations.unshift({ label: 'Original Listing', url: opp.source_url });
   }
   // Deduplicate
   const seenUrls = new Set<string>();
@@ -288,7 +277,7 @@ export async function generateBriefing(
         { label: 'Value', value: formatMoney(effectiveValue) },
         { label: 'Set-Aside', value: opp.set_aside ?? 'None' },
         { label: 'NAICS', value: opp.naics ?? 'N/A' },
-        { label: 'Due Date', value: formatDate(opp.response_deadline ?? opp.due_date) },
+        { label: 'Due Date', value: formatDate(opp.response_due_at) },
         { label: 'Doctrine Fit', value: doctrineSection ? 'Aligned' : 'Pending Review' },
       ],
       pwin,
@@ -302,34 +291,47 @@ export async function generateBriefing(
   const stat = statSync(filePath);
   const finalSize = stat.size || sizeBytes;
 
-  // Save to vault_documents as first-class doc
-  const vaultRes = await pool.query<VaultDocRow>(
-    `INSERT INTO vault_documents (filename, doc_type, file_size_bytes, file_path, ai_summary,
-       linked_opportunity_id, uploaded_by, uploaded_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-     RETURNING id`,
-    [filename, 'other', finalSize, filePath,
-     `Opportunity Briefing for ${opp.title}`,
-     Number(opportunityId), 'output-generator'],
-  );
-  const vaultDocId = vaultRes.rows[0]?.id ?? null;
+  // Save to vault_documents + generated_documents in a transaction
+  const client = await pool.connect();
+  let vaultDocId: number | null = null;
+  let genDocId: string;
+  try {
+    await client.query('BEGIN');
+    const vaultRes = await client.query<VaultDocRow>(
+      `INSERT INTO vault_documents (filename, doc_type, file_size_bytes, file_path, ai_summary,
+         linked_opportunity_id, uploaded_by, uploaded_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+       RETURNING id`,
+      [filename, 'other', finalSize, filePath,
+       `Opportunity Briefing for ${opp.title}`,
+       Number(opportunityId), 'output-generator'],
+    );
+    vaultDocId = vaultRes.rows[0]?.id ?? null;
 
-  const genRes = await pool.query<GeneratedDocRow>(
-    `INSERT INTO generated_documents
-       (doc_kind, opportunity_id, vault_doc_id, file_path, file_size_bytes,
-        generation_model, generation_input, citations, doctrine_refs, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     RETURNING id`,
-    ['briefing', Number(opportunityId), vaultDocId, filePath, finalSize,
-     'cached-analysis', JSON.stringify({ opportunity_id: opportunityId }),
-     JSON.stringify(dedupedCitations), JSON.stringify(DOCTRINE_PRINCIPLES),
-     'output-generator'],
-  );
+    const genRes = await client.query<GeneratedDocRow>(
+      `INSERT INTO generated_documents
+         (doc_kind, opportunity_id, vault_doc_id, file_path, file_size_bytes,
+          generation_model, generation_input, citations, doctrine_refs, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id`,
+      ['briefing', Number(opportunityId), vaultDocId, filePath, finalSize,
+       'cached-analysis', JSON.stringify({ opportunity_id: opportunityId }),
+       JSON.stringify(dedupedCitations), JSON.stringify(DOCTRINE_PRINCIPLES),
+       'output-generator'],
+    );
+    genDocId = genRes.rows[0]!.id;
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 
-  logger.info({ opportunityId, docId: genRes.rows[0]!.id, vaultDocId }, 'Generated briefing PDF');
+  logger.info({ opportunityId, docId: genDocId, vaultDocId }, 'Generated briefing PDF');
 
   return {
-    id: Number(genRes.rows[0]!.id),
+    id: Number(genDocId),
     docKind: 'briefing',
     filePath,
     fileSizeBytes: finalSize,
@@ -356,14 +358,16 @@ export async function generateCapturePlan(
   const brief = briefRes.rows[0]?.brief ?? {};
 
   const cacheRes = await pool.query<AnalysisCacheRow>(
-    `SELECT pwin, analysis_json
+    `SELECT pwin, incumbent, competitors, blackhat, wargame, timeline
      FROM opportunity_analysis_cache
      WHERE opportunity_id = $1
      ORDER BY generated_at DESC LIMIT 1`,
     [capture.opportunity_id],
   );
   const pwin = cacheRes.rows[0]?.pwin != null ? Number(cacheRes.rows[0].pwin) : null;
-  const analysisJson = cacheRes.rows[0]?.analysis_json ?? null;
+  const cacheData = cacheRes.rows[0]
+    ? { incumbent: cacheRes.rows[0].incumbent, competitors: cacheRes.rows[0].competitors, blackhat: cacheRes.rows[0].blackhat, wargame: cacheRes.rows[0].wargame, timeline: cacheRes.rows[0].timeline }
+    : null;
 
   const plan = (capture.capture_plan ?? {}) as Record<string, unknown>;
 
@@ -372,11 +376,11 @@ export async function generateCapturePlan(
     || sectionText(brief, 'customer_knowledge')
     || String(plan.customer_profile ?? 'Agency intelligence pending.');
 
-  const incumbentAnalysis = buildIncumbentText(analysisJson)
+  const incumbentAnalysis = buildIncumbentText(cacheData)
     || sectionText(brief, 'incumbent_analysis')
     || 'Incumbent analysis pending.';
 
-  const competitiveLandscape = buildCompetitiveText(analysisJson)
+  const competitiveLandscape = buildCompetitiveText(cacheData)
     || sectionText(brief, 'competitive_landscape')
     || 'Competitive analysis pending.';
 
@@ -396,12 +400,9 @@ export async function generateCapturePlan(
     || String(plan.solution_strategy ?? '')
     || 'Decision factors pending analysis.';
 
-  const allCitations = [
-    ...extractCitations(brief),
-    ...extractAnalysisCitations(analysisJson),
-  ];
+  const capturePlanCitations = extractCitations(brief);
   const seenUrls = new Set<string>();
-  const dedupedCitations = allCitations.filter((c) => {
+  const dedupedCitations = capturePlanCitations.filter((c) => {
     if (seenUrls.has(c.url)) return false;
     seenUrls.add(c.url);
     return true;
@@ -444,34 +445,47 @@ export async function generateCapturePlan(
   const stat = statSync(filePath);
   const finalSize = stat.size || sizeBytes;
 
-  const vaultRes = await pool.query<VaultDocRow>(
-    `INSERT INTO vault_documents (filename, doc_type, file_size_bytes, file_path, ai_summary,
-       linked_capture_id, uploaded_by, uploaded_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-     RETURNING id`,
-    [filename, 'other', finalSize, filePath,
-     `Capture Plan for ${capture.title}`,
-     Number(captureId), 'output-generator'],
-  );
-  const vaultDocId = vaultRes.rows[0]?.id ?? null;
+  const client2 = await pool.connect();
+  let vaultDocId: number | null = null;
+  let genDocId: string;
+  try {
+    await client2.query('BEGIN');
+    const vaultRes = await client2.query<VaultDocRow>(
+      `INSERT INTO vault_documents (filename, doc_type, file_size_bytes, file_path, ai_summary,
+         linked_capture_id, uploaded_by, uploaded_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+       RETURNING id`,
+      [filename, 'other', finalSize, filePath,
+       `Capture Plan for ${capture.title}`,
+       Number(captureId), 'output-generator'],
+    );
+    vaultDocId = vaultRes.rows[0]?.id ?? null;
 
-  const genRes = await pool.query<GeneratedDocRow>(
-    `INSERT INTO generated_documents
-       (doc_kind, capture_id, opportunity_id, vault_doc_id, file_path, file_size_bytes,
-        generation_model, generation_input, citations, doctrine_refs, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     RETURNING id`,
-    ['capture_plan', Number(captureId), Number(capture.opportunity_id), vaultDocId,
-     filePath, finalSize, 'cached-analysis',
-     JSON.stringify({ capture_id: captureId }),
-     JSON.stringify(dedupedCitations), JSON.stringify(DOCTRINE_PRINCIPLES),
-     'output-generator'],
-  );
+    const genRes = await client2.query<GeneratedDocRow>(
+      `INSERT INTO generated_documents
+         (doc_kind, capture_id, opportunity_id, vault_doc_id, file_path, file_size_bytes,
+          generation_model, generation_input, citations, doctrine_refs, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
+      ['capture_plan', Number(captureId), Number(capture.opportunity_id), vaultDocId,
+       filePath, finalSize, 'cached-analysis',
+       JSON.stringify({ capture_id: captureId }),
+       JSON.stringify(dedupedCitations), JSON.stringify(DOCTRINE_PRINCIPLES),
+       'output-generator'],
+    );
+    genDocId = genRes.rows[0]!.id;
+    await client2.query('COMMIT');
+  } catch (err) {
+    await client2.query('ROLLBACK');
+    throw err;
+  } finally {
+    client2.release();
+  }
 
-  logger.info({ captureId, docId: genRes.rows[0]!.id, vaultDocId }, 'Generated capture plan PDF');
+  logger.info({ captureId, docId: genDocId, vaultDocId }, 'Generated capture plan PDF');
 
   return {
-    id: Number(genRes.rows[0]!.id),
+    id: Number(genDocId),
     docKind: 'capture_plan',
     filePath,
     fileSizeBytes: finalSize,
@@ -498,22 +512,20 @@ export async function generateWinThemes(
   const brief = briefRes.rows[0]?.brief ?? {};
 
   const cacheRes = await pool.query<AnalysisCacheRow>(
-    `SELECT pwin, analysis_json
+    `SELECT pwin, incumbent, competitors, blackhat, wargame, timeline
      FROM opportunity_analysis_cache
      WHERE opportunity_id = $1
      ORDER BY generated_at DESC LIMIT 1`,
     [capture.opportunity_id],
   );
-  const analysisJson = cacheRes.rows[0]?.analysis_json ?? null;
 
   const plan = (capture.capture_plan ?? {}) as Record<string, unknown>;
 
-  // Build themes from capture plan and analysis
-  const themes = buildThemeCards(plan, capture.win_themes, analysisJson);
+  // Build themes from capture plan
+  const themes = buildThemeCards(plan, capture.win_themes);
 
   const allCitations = [
     ...extractCitations(brief),
-    ...extractAnalysisCitations(analysisJson),
   ];
   const seenUrls = new Set<string>();
   const dedupedCitations = allCitations.filter((c) => {
@@ -554,35 +566,48 @@ export async function generateWinThemes(
   const stat = statSync(filePath);
   const finalSize = stat.size || sizeBytes;
 
-  const vaultRes = await pool.query<VaultDocRow>(
-    `INSERT INTO vault_documents (filename, doc_type, file_size_bytes, file_path, ai_summary,
-       linked_capture_id, uploaded_by, uploaded_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-     RETURNING id`,
-    [filename, 'other', finalSize, filePath,
-     `Win Themes for ${capture.title}`,
-     Number(captureId), 'output-generator'],
-  );
-  const vaultDocId = vaultRes.rows[0]?.id ?? null;
+  const client3 = await pool.connect();
+  let vaultDocId: number | null = null;
+  let genDocId: string;
+  try {
+    await client3.query('BEGIN');
+    const vaultRes = await client3.query<VaultDocRow>(
+      `INSERT INTO vault_documents (filename, doc_type, file_size_bytes, file_path, ai_summary,
+         linked_capture_id, uploaded_by, uploaded_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+       RETURNING id`,
+      [filename, 'other', finalSize, filePath,
+       `Win Themes for ${capture.title}`,
+       Number(captureId), 'output-generator'],
+    );
+    vaultDocId = vaultRes.rows[0]?.id ?? null;
 
-  const genRes = await pool.query<GeneratedDocRow>(
-    `INSERT INTO generated_documents
-       (doc_kind, capture_id, opportunity_id, vault_doc_id, file_path, file_size_bytes,
-        generation_model, generation_input, citations, doctrine_refs, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     RETURNING id`,
-    ['win_themes', Number(captureId), Number(capture.opportunity_id), vaultDocId,
-     filePath, finalSize, 'cached-analysis',
-     JSON.stringify({ capture_id: captureId }),
-     JSON.stringify(dedupedCitations),
-     JSON.stringify(themes.map((t) => t.doctrinePrinciple)),
-     'output-generator'],
-  );
+    const genRes = await client3.query<GeneratedDocRow>(
+      `INSERT INTO generated_documents
+         (doc_kind, capture_id, opportunity_id, vault_doc_id, file_path, file_size_bytes,
+          generation_model, generation_input, citations, doctrine_refs, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
+      ['win_themes', Number(captureId), Number(capture.opportunity_id), vaultDocId,
+       filePath, finalSize, 'cached-analysis',
+       JSON.stringify({ capture_id: captureId }),
+       JSON.stringify(dedupedCitations),
+       JSON.stringify(themes.map((t) => t.doctrinePrinciple)),
+       'output-generator'],
+    );
+    genDocId = genRes.rows[0]!.id;
+    await client3.query('COMMIT');
+  } catch (err) {
+    await client3.query('ROLLBACK');
+    throw err;
+  } finally {
+    client3.release();
+  }
 
-  logger.info({ captureId, docId: genRes.rows[0]!.id, vaultDocId }, 'Generated win themes PDF');
+  logger.info({ captureId, docId: genDocId, vaultDocId }, 'Generated win themes PDF');
 
   return {
-    id: Number(genRes.rows[0]!.id),
+    id: Number(genDocId),
     docKind: 'win_themes',
     filePath,
     fileSizeBytes: finalSize,
@@ -616,45 +641,40 @@ async function loadCapture(pool: Pool, captureId: string): Promise<CaptureJoinRo
 // Content builders (from cached analysis data)
 // ---------------------------------------------------------------------------
 
-function buildDoctrineText(analysisJson: Record<string, unknown> | null): string {
-  if (!analysisJson) return '';
-  const alignment = analysisJson.doctrine_alignment;
-  if (!Array.isArray(alignment)) return '';
-  const lines: string[] = [];
-  for (const item of alignment) {
-    const a = item as Record<string, unknown>;
-    lines.push(`${a.principle_name ?? 'Principle'}: ${a.alignment_score ?? 'N/A'} — ${a.reasoning ?? ''}`);
-  }
-  return lines.join('\n');
+interface CacheDataShape {
+  incumbent: string | null;
+  competitors: unknown[];
+  blackhat: Record<string, unknown> | null;
+  wargame: Record<string, unknown> | null;
+  timeline: Record<string, unknown> | null;
 }
 
-function buildIncumbentText(analysisJson: Record<string, unknown> | null): string {
-  if (!analysisJson) return '';
-  const incumbent = analysisJson.incumbent as Record<string, unknown> | null;
-  if (!incumbent) return 'No incumbent identified in analysis.';
-  const parts: string[] = [];
-  if (incumbent.name) parts.push(`Incumbent: ${incumbent.name}`);
-  if (incumbent.contract_number) parts.push(`Contract: ${incumbent.contract_number}`);
-  if (incumbent.contract_value) parts.push(`Value: ${formatMoney(Number(incumbent.contract_value))}`);
-  if (incumbent.expiration_date) parts.push(`Expires: ${formatDate(String(incumbent.expiration_date))}`);
-  const signals = incumbent.performance_signals;
-  if (Array.isArray(signals) && signals.length > 0) {
-    parts.push(`Performance signals: ${signals.join('; ')}`);
-  }
-  return parts.join('\n');
+function buildDoctrineText(cacheData: CacheDataShape | null): string {
+  if (!cacheData) return '';
+  // Doctrine alignment is derived from brief sections; cache has no direct doctrine_alignment column.
+  return '';
 }
 
-function buildCompetitiveText(analysisJson: Record<string, unknown> | null): string {
-  if (!analysisJson) return '';
-  const landscape = analysisJson.competitive_landscape;
-  if (!Array.isArray(landscape)) return '';
+function buildIncumbentText(cacheData: CacheDataShape | null): string {
+  if (!cacheData) return '';
+  if (!cacheData.incumbent) return 'No incumbent identified in analysis.';
+  return `Incumbent: ${cacheData.incumbent}`;
+}
+
+function buildCompetitiveText(cacheData: CacheDataShape | null): string {
+  if (!cacheData) return '';
+  const competitors = cacheData.competitors;
+  if (!Array.isArray(competitors) || competitors.length === 0) return '';
   const lines: string[] = [];
-  for (const entry of landscape) {
-    const c = entry as Record<string, unknown>;
-    lines.push(`${c.name ?? 'Competitor'}: ${c.positioning ?? ''}`);
-    if (Array.isArray(c.strengths)) lines.push(`  Strengths: ${(c.strengths as string[]).join(', ')}`);
-    if (Array.isArray(c.weaknesses)) lines.push(`  Weaknesses: ${(c.weaknesses as string[]).join(', ')}`);
-    if (c.our_differentiator) lines.push(`  Our differentiator: ${c.our_differentiator}`);
+  for (const entry of competitors) {
+    if (typeof entry === 'string') {
+      lines.push(entry);
+    } else if (entry && typeof entry === 'object') {
+      const c = entry as Record<string, unknown>;
+      lines.push(`${c.name ?? 'Competitor'}: ${c.positioning ?? ''}`);
+      if (Array.isArray(c.strengths)) lines.push(`  Strengths: ${(c.strengths as string[]).join(', ')}`);
+      if (Array.isArray(c.weaknesses)) lines.push(`  Weaknesses: ${(c.weaknesses as string[]).join(', ')}`);
+    }
   }
   return lines.join('\n');
 }
@@ -704,7 +724,6 @@ interface ThemeCard {
 function buildThemeCards(
   plan: Record<string, unknown>,
   existingThemes: string[] | null,
-  analysisJson: Record<string, unknown> | null,
 ): ThemeCard[] {
   const cards: ThemeCard[] = [];
 

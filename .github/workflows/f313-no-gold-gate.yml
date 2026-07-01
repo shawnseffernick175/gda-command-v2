@@ -41,6 +41,8 @@ jobs:
             "apps/backend-v3/src/services/output-generators/"
             "apps/backend-v3/src/routes/output-generators.ts"
             "packages/frontend-v3/src/hooks/use-output-generators.ts"
+            "packages/frontend-v3/src/app/opportunities/page.tsx"
+            "packages/frontend-v3/src/app/capture/page.tsx"
             "db/v3/migrations/v3_127_output_generators.sql"
           )
 
