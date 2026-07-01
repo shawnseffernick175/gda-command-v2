@@ -43,7 +43,7 @@ interface OpportunityRow {
   set_aside: string | null;
   response_due_at: string | null;
   description: string | null;
-  source_url: string | null;
+  listing_url: string | null;
 }
 
 interface AnalysisBriefRow {
@@ -191,9 +191,11 @@ export async function generateBriefing(
   opportunityId: string,
 ): Promise<GeneratedDoc> {
   const oppRes = await pool.query<OpportunityRow>(
-    `SELECT id::text, title, agency, solicitation_number, value_min, value_max,
-            naics, set_aside, response_due_at, description, source_url
-     FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT o.id::text, o.title, o.agency, o.solicitation_number, o.value_min, o.value_max,
+            o.naics, o.set_aside, o.response_due_at, o.description, s.url AS listing_url
+     FROM opportunities o
+     LEFT JOIN sources s ON s.id = o.source_id
+     WHERE o.id = $1 AND o.deleted_at IS NULL`,
     [opportunityId],
   );
   const opp = oppRes.rows[0];
@@ -244,8 +246,8 @@ export async function generateBriefing(
   const allCitations = [
     ...extractCitations(brief),
   ];
-  if (opp.source_url) {
-    allCitations.unshift({ label: 'Original Listing', url: opp.source_url });
+  if (opp.listing_url) {
+    allCitations.unshift({ label: 'Original Listing', url: opp.listing_url });
   }
   // Deduplicate
   const seenUrls = new Set<string>();
