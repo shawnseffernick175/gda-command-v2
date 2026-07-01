@@ -14,7 +14,6 @@ import { StatusPills } from "./StatusPills";
 import { FindingCard } from "./FindingCard";
 import { DoctrineScorecardPanel } from "./DoctrineScorecardPanel";
 import type {
-  ColorTeamColor,
   ColorTeamFinding,
   ColorTeamRun,
 } from "@/lib/types";
@@ -58,8 +57,8 @@ export function ColorTeamsContent() {
   );
   const exportPdf = useExportColorTeamPdf();
 
-  const findings = findingsData?.findings ?? [];
-  const runs = runsData?.runs ?? [];
+  const findings = useMemo(() => findingsData?.findings ?? [], [findingsData]);
+  const runs = useMemo(() => runsData?.runs ?? [], [runsData]);
 
   const priorRuns = useMemo(
     () => runs.filter((r: ColorTeamRun) => r.id !== selectedRunId),
