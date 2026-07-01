@@ -132,4 +132,5 @@ v3_123_ingest_backfill_existing.sql
 v3_124_capabilities.sql
 v3_125_analysis_briefs.sql
 v3_126_sentinel_events.sql
-v3_127_risks_first_class.sql
+v3_127_output_generators.sql
+v3_128_risks_first_class.sql

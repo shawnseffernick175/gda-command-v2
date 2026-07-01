@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #28251D;
+    background: #FFFFFF;
+    padding: 40px 48px;
+  }
+  h1 { font-size: 22px; font-weight: 600; color: #01696F; margin-bottom: 4px; }
+  h2 { font-size: 14px; font-weight: 600; color: #28251D; margin: 20px 0 8px; border-bottom: 1px solid #D4D1CA; padding-bottom: 4px; }
+  h3 { font-size: 12px; font-weight: 600; color: #28251D; margin: 12px 0 4px; }
+  .subtitle { font-size: 12px; color: #7A7974; margin-bottom: 16px; }
+  .header-bar { border-top: 3px solid #01696F; padding-top: 16px; margin-bottom: 24px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 16px; }
+  .meta-item { display: flex; gap: 8px; }
+  .meta-label { font-size: 10px; color: #7A7974; text-transform: uppercase; letter-spacing: 0.04em; min-width: 80px; }
+  .meta-value { font-size: 11px; color: #28251D; }
+  .pwin-badge {
+    display: inline-block;
+    background: #01696F;
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 4px;
+  }
+  .section-body { margin-bottom: 16px; }
+  .risk-item { margin-bottom: 8px; padding-left: 12px; border-left: 2px solid #A12C7B; }
+  .risk-label { font-size: 10px; font-weight: 600; color: #A12C7B; text-transform: uppercase; }
+  .doctrine-tag { font-size: 10px; font-style: italic; color: #7A7974; }
+  .action-box {
+    background: #F7F6F2;
+    border: 1px solid #D4D1CA;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-top: 16px;
+  }
+  .action-label { font-size: 10px; font-weight: 600; color: #01696F; text-transform: uppercase; margin-bottom: 4px; }
+  .footnote { font-size: 9px; color: #7A7974; margin-top: 4px; }
+  .footnote a { color: #01696F; text-decoration: underline; }
+  .citations { margin-top: 24px; border-top: 1px solid #D4D1CA; padding-top: 12px; }
+  .citations h2 { border-bottom: none; }
+  .citation-item { font-size: 9px; color: #7A7974; margin-bottom: 4px; }
+  .citation-item a { color: #01696F; }
+  .footer { margin-top: 32px; border-top: 1px solid #D4D1CA; padding-top: 8px; font-size: 9px; color: #7A7974; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="header-bar">
+    <h1>{{title}}</h1>
+    <p class="subtitle">Opportunity Briefing — Envision Innovative Solutions</p>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-item"><span class="meta-label">Agency</span><span class="meta-value">{{agency}}</span></div>
+    <div class="meta-item"><span class="meta-label">Solicitation</span><span class="meta-value">{{solicitation_number}}</span></div>
+    <div class="meta-item"><span class="meta-label">Value</span><span class="meta-value">{{value}}</span></div>
+    <div class="meta-item"><span class="meta-label">Set-Aside</span><span class="meta-value">{{set_aside}}</span></div>
+    <div class="meta-item"><span class="meta-label">NAICS</span><span class="meta-value">{{naics}}</span></div>
+    <div class="meta-item"><span class="meta-label">Due Date</span><span class="meta-value">{{due_date}}</span></div>
+    <div class="meta-item"><span class="meta-label">PWin</span><span class="meta-value"><span class="pwin-badge">{{pwin}}%</span></span></div>
+    <div class="meta-item"><span class="meta-label">Doctrine Fit</span><span class="meta-value">{{doctrine_fit}}</span></div>
+  </div>
+
+  <h2>Executive Summary</h2>
+  <div class="section-body">{{executive_summary}}</div>
+
+  <h2>R2 Analysis Summary</h2>
+  <div class="section-body">{{analysis_summary}}</div>
+
+  <h2>Doctrine Alignment</h2>
+  <div class="section-body">{{doctrine_alignment}}</div>
+
+  <h2>Key Risks</h2>
+  <div class="section-body">{{key_risks}}</div>
+
+  <div class="action-box">
+    <p class="action-label">Recommended Action</p>
+    <p>{{recommended_action}}</p>
+  </div>
+
+  <div class="citations">
+    <h2>Sources</h2>
+    {{citations_html}}
+  </div>
+
+  <div class="footer">
+    Generated {{generated_at}} — Envision Innovative Solutions — CONFIDENTIAL
+  </div>
+</body>
+</html>
