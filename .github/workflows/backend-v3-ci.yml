@@ -31,4 +31,5 @@ jobs:
         env:
           NODE_ENV: test
           LLM_ROUTER_MODE: mock
+          JWT_SECRET: ci-placeholder-secret-at-least-32-chars
         run: npm run test:integration

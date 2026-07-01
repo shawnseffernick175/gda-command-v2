@@ -26,7 +26,7 @@ export async function setup(): Promise<void> {
   // Set test env vars in globalSetup so they are inherited by worker forks.
   // Vitest 4's Module Runner evaluates config/index.ts eagerly on static
   // import, so these must be in the environment before workers start.
-  process.env['JWT_SECRET'] = 'test-jwt-secret-integration';
+  process.env['JWT_SECRET'] = 'test-jwt-secret-integration-at-least-32-chars-long';
   process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key-integration';
   process.env['NODE_ENV'] = 'test';
   process.env['ANALYSIS_VERSION'] = 'v0.0.1-test';

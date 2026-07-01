@@ -85,6 +85,10 @@ export async function buildApp() {
   await app.register(fastifyRateLimit, {
     max: 300,
     timeWindow: '1 minute',
+    allowList: (req) => {
+      const url = req.url ?? '';
+      return url.startsWith('/v3/health') || url === '/v3/metrics';
+    },
   });
 
   await app.register(fastifySwagger, {
@@ -141,14 +145,19 @@ export async function buildApp() {
   app.setErrorHandler((error, req, reply) => {
     const requestId = req.requestId ?? 'unknown';
     const err = error as Error & { statusCode?: number };
-    logger.error({
+    const statusCode = err.statusCode ?? 500;
+
+    const logPayload = {
       err,
       requestId,
       userId: (req as typeof req & { user?: { sub: string } }).user?.sub,
       stack: err.stack,
-    }, 'Unhandled error');
-
-    const statusCode = err.statusCode ?? 500;
+    };
+    if (statusCode === 429) {
+      logger.warn(logPayload, 'Rate limit exceeded');
+    } else {
+      logger.error(logPayload, 'Unhandled error');
+    }
     const body = errorEnvelope(
       statusCode === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
       err.message || 'An unexpected error occurred',

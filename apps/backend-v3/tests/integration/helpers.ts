@@ -15,7 +15,7 @@ import type { SeedIds } from './seed.js';
 
 const { Pool } = pg;
 
-export const JWT_SECRET = 'test-jwt-secret-integration';
+export const JWT_SECRET = 'test-jwt-secret-integration-at-least-32-chars-long';
 export const WEBHOOK_KEY = 'test-webhook-key-integration';
 
 export function getDbUrl(): string {
