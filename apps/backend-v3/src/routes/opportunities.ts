@@ -704,52 +704,6 @@ export async function opportunityRoutes(app: FastifyInstance): Promise<void> {
       );
   });
 
-  // GET /v3/opportunities/:id/analysis — F-305 auto-analysis SSE stream
-  app.get<{ Params: { id: string } }>(
-    '/v3/opportunities/:id/analysis',
-    async (req, reply) => {
-      const id = await resolveOpportunityId(pool, req.params.id);
-      if (!id) {
-        return reply
-          .status(404)
-          .send(errorEnvelope('NOT_FOUND', 'Opportunity not found', req.requestId));
-      }
-
-      reply.raw.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-        'X-Accel-Buffering': 'no',
-      });
-
-      const sendSSE = (event: string, data: unknown): void => {
-        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      };
-
-      try {
-        const { runAnalysisPipeline } = await import('../services/analysis/pipeline.js');
-        const brief = await runAnalysisPipeline(id, (section) => {
-          sendSSE('section', section);
-        });
-        sendSSE('complete', {
-          opportunity_id: brief.opportunity_id,
-          sources_revision_hash: brief.sources_revision_hash,
-          generated_at: brief.generated_at,
-          cached: brief.cached,
-          section_count: brief.sections.length,
-        });
-      } catch (err) {
-        logger.error({ err, opportunityId: id }, 'Analysis pipeline failed');
-        sendSSE('error', {
-          code: 'ANALYSIS_ERROR',
-          message: err instanceof Error ? err.message : 'Analysis pipeline failed',
-        });
-      }
-
-      reply.raw.end();
-    },
-  );
-
   // POST /v3/opportunities — create (manual entry path)
   app.post('/v3/opportunities', async (req, reply) => {
     const body = req.body as Record<string, unknown> | undefined;
