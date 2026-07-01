@@ -6,6 +6,7 @@ import { PwinWeightsSection } from "@/components/settings/PwinWeightsSection";
 import { PrinciplesSection } from "@/components/settings/PrinciplesSection";
 import { RulesSection } from "@/components/settings/RulesSection";
 import { WheelhouseSection } from "@/components/settings/WheelhouseSection";
+import { ExclusionsSection } from "@/components/settings/ExclusionsSection";
 
 function LoadingSkeleton() {
   return (
@@ -51,14 +52,19 @@ export default function ScoringDoctrinePage() {
         )}
       </CollapseSection>
 
-      {/* Section 3: Doctrine Rules */}
+      {/* Section 3: Strategic Exclusions */}
+      <CollapseSection id="sd-exclusions" title="STRATEGIC EXCLUSIONS" defaultOpen={false}>
+        <ExclusionsSection />
+      </CollapseSection>
+
+      {/* Section 4: Doctrine Rules */}
       <CollapseSection id="sd-rules" title="DOCTRINE RULES" defaultOpen={false}>
         {isLoading || !data ? <LoadingSkeleton /> : (
           <RulesSection rules={data.rules} />
         )}
       </CollapseSection>
 
-      {/* Section 4: Wheelhouse */}
+      {/* Section 5: Wheelhouse */}
       <CollapseSection id="sd-wheelhouse" title="WHEELHOUSE" defaultOpen={false}>
         {isLoading || !data ? <LoadingSkeleton /> : (
           <WheelhouseSection wheelhouse={data.wheelhouse} />
