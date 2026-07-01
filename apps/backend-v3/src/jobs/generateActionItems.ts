@@ -148,28 +148,26 @@ async function findHighPwinItems(): Promise<GeneratedItem[]> {
   }));
 }
 
-/* ── Condition 3: Unowned HIGH/CRITICAL-score risks ────────────── */
+/* ── Condition 3: Unowned HIGH/CRITICAL-severity risks ─────────── */
 
 async function findUnownedRiskItems(): Promise<GeneratedItem[]> {
-  // risks.score = likelihood * impact (1–25)
-  // score >= 20 → CRITICAL, score >= 12 → HIGH
   const res = await pool.query<{
     id: string;
     title: string;
-    score: number;
+    severity: string;
   }>(`
-    SELECT id::TEXT, title, score
+    SELECT id::TEXT, title, severity
     FROM risks
     WHERE owner IS NULL
-      AND score >= 12
-      AND status NOT IN ('mitigated', 'closed')
+      AND severity IN ('critical', 'high')
+      AND status NOT IN ('resolved', 'accepted', 'closed')
   `);
 
   return res.rows.map((r) => ({
     title: `Unowned critical risk: ${r.title}`,
-    description: `Risk "${r.title}" has a score of ${r.score}/25 and no mitigation owner assigned.`,
+    description: `Risk "${r.title}" has severity "${r.severity}" and no mitigation owner assigned.`,
     dueDate: null,
-    priority: r.score >= 20 ? 'CRITICAL' as const : 'HIGH' as const,
+    priority: r.severity === 'critical' ? 'CRITICAL' as const : 'HIGH' as const,
     sourceType: 'risk',
     sourceId: String(r.id),
   }));
