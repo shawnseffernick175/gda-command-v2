@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS generated_documents (
   generation_input JSONB        NOT NULL DEFAULT '{}',
   citations       JSONB         NOT NULL DEFAULT '[]',
   doctrine_refs   JSONB         NOT NULL DEFAULT '[]',
-  stale           BOOLEAN       NOT NULL DEFAULT FALSE,
+  superseded      BOOLEAN       NOT NULL DEFAULT FALSE,
   created_by      TEXT          NOT NULL DEFAULT 'system',
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
