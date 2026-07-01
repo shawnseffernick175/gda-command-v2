@@ -56,6 +56,7 @@ import { useOpportunityAnalysis } from "@/hooks/use-opportunity-analysis";
 import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionBriefStream";
 import { CapabilityMatchCard } from "@/components/CapabilityMatchCard";
 import { PricingScenarioPanel } from "@/components/financials/PricingScenarioPanel";
+import { useGenerateBriefing, useGeneratedDocuments } from "@/hooks/use-output-generators";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
 
@@ -1412,6 +1413,9 @@ function OpportunityDetail({ id }: { id: string }) {
       {/* ─── F-305: Auto-Analysis Brief (10 sections, SSE-streamed) ── */}
       <AnalysisBrief opportunityId={id} />
 
+      {/* ─── F-313: Generate Briefing PDF ────────────────────────────── */}
+      <GenerateBriefingButton opportunityId={id} />
+
       <Separator className="bg-border" />
 
       {/* ─── Two-Column Layout ──────────────────────────────────────── */}
@@ -1822,6 +1826,72 @@ function VaultDocumentsSection({ opportunityId }: { opportunityId: number }) {
             )}
           </Link>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// F-313: Generate Briefing PDF button
+function GenerateBriefingButton({ opportunityId }: { opportunityId: string }) {
+  const generate = useGenerateBriefing();
+  const { data: docs } = useGeneratedDocuments({ opportunity_id: opportunityId, doc_kind: "briefing" });
+  const { toast } = useToast();
+
+  function handleGenerate() {
+    generate.mutate(opportunityId, {
+      onSuccess: (data) => {
+        toast("Briefing PDF generated", "success");
+        // Trigger download
+        const a = document.createElement("a");
+        a.href = `${process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech"}${data.download_url}`;
+        a.download = `briefing-${opportunityId}.pdf`;
+        a.click();
+      },
+      onError: (err) => {
+        toast(
+          `Briefing generation failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+          "error",
+        );
+      },
+    });
+  }
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Output Generators
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={generate.isPending}
+          className="block w-full text-left rounded border border-border px-3 py-1.5 text-xs font-mono text-foreground hover:border-gda-cyan/40 hover:text-gda-cyan transition-colors disabled:opacity-50"
+        >
+          {generate.isPending ? "Generating..." : "Generate Briefing PDF"}
+        </button>
+        {docs && docs.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Previous Briefings</p>
+            {docs.map((doc) => (
+              <a
+                key={doc.id}
+                href={`${process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech"}${doc.download_url}`}
+                className="flex items-center justify-between rounded border border-border bg-gda-bg-base px-3 py-1.5 text-xs hover:border-gda-cyan/40 transition-colors"
+                download
+              >
+                <span className="font-mono text-foreground">
+                  Briefing — {new Date(doc.created_at).toLocaleDateString()}
+                </span>
+                <span className="text-muted-foreground">
+                  {doc.file_size_bytes ? `${Math.round(doc.file_size_bytes / 1024)}KB` : ""}
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
