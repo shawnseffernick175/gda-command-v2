@@ -1578,7 +1578,7 @@ function OpportunityDetail({ id }: { id: string }) {
 
               <div className="space-y-1">
                 {(STAGE_ACTIONS[currentStage] ?? []).map((action) => {
-                  const isQualifyAction = action.label.toLowerCase().includes("qualif");
+                  const isQualifyAction = action.stage === "qualify" || action.stage === "qualified";
                   const blocked = isQualifyAction && (isDoctrineBlocked || isMarginBlocked);
                   return (
                     <button

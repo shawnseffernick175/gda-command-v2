@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EvidenceBadge } from "@/components/shared/EvidenceBadge";
@@ -189,43 +189,52 @@ export function DoctrineAlignmentPanel({ entityId }: { entityId: string }) {
   const [collapsed, setCollapsed] = useState(false);
   const { data: evaluations, isLoading } = useDoctrineEvaluations("opportunity", entityId);
   const runCheck = useDoctrineCheck();
+  const autoTriggered = useRef(false);
 
   const latestEval = evaluations?.[0] ?? null;
+
+  // R2: Auto-trigger doctrine check when page opens and no evaluation exists.
+  // Silent and background — no manual button.
+  useEffect(() => {
+    if (
+      !isLoading &&
+      !latestEval &&
+      !runCheck.isPending &&
+      !runCheck.data &&
+      !autoTriggered.current
+    ) {
+      autoTriggered.current = true;
+      runCheck.mutate({ entity_kind: "opportunity", entity_id: entityId });
+    }
+  }, [isLoading, latestEval, runCheck, entityId]);
 
   return (
     <Card className="border-border bg-gda-panel">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setCollapsed((v) => !v)}
-            className="flex items-center gap-2 text-left"
-          >
-            <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
-              Doctrine Alignment
-            </CardTitle>
-            {latestEval && (
-              <span className="font-mono text-xs text-foreground tabular-nums">
-                {latestEval.alignment_total}/40
-              </span>
-            )}
-            <span className={cn("text-xs text-muted-foreground transition-transform", collapsed && "-rotate-90")}>
-              v
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex items-center gap-2 text-left w-full"
+        >
+          <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+            Doctrine Alignment
+          </CardTitle>
+          {latestEval && (
+            <span className="font-mono text-xs text-foreground tabular-nums">
+              {latestEval.alignment_total}/40
             </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => runCheck.mutate({ entity_kind: "opportunity", entity_id: entityId })}
-            disabled={runCheck.isPending}
-            className="rounded border border-border px-2 py-0.5 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:border-gda-green/40 disabled:opacity-50 transition-colors"
-          >
-            {runCheck.isPending ? "Checking..." : "Re-check"}
-          </button>
-        </div>
+          )}
+          {runCheck.isPending && (
+            <span className="text-[11px] text-muted-foreground italic">analyzing...</span>
+          )}
+          <span className={cn("ml-auto text-xs text-muted-foreground transition-transform", collapsed && "-rotate-90")}>
+            v
+          </span>
+        </button>
       </CardHeader>
       {!collapsed && (
         <CardContent className="pt-0">
-          {isLoading ? (
+          {isLoading || runCheck.isPending ? (
             <div className="space-y-2">
               <Skeleton className="h-6 w-32 bg-gda-bg-base" />
               <Skeleton className="h-20 bg-gda-bg-base" />
@@ -233,18 +242,10 @@ export function DoctrineAlignmentPanel({ entityId }: { entityId: string }) {
           ) : latestEval ? (
             <EvaluationContent evaluation={latestEval} />
           ) : (
-            <div className="text-center py-4">
+            <div className="py-4">
               <p className="text-xs text-muted-foreground">
-                No doctrine evaluation yet.
+                Doctrine evaluation pending.
               </p>
-              <button
-                type="button"
-                onClick={() => runCheck.mutate({ entity_kind: "opportunity", entity_id: entityId })}
-                disabled={runCheck.isPending}
-                className="mt-2 rounded border border-gda-green bg-gda-green/10 px-3 py-1 text-[11px] text-gda-green hover:bg-gda-green/20 disabled:opacity-50"
-              >
-                {runCheck.isPending ? "Running..." : "Run Doctrine Check"}
-              </button>
             </div>
           )}
         </CardContent>
