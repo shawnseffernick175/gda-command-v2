@@ -541,7 +541,11 @@ CREATE TABLE action_item_drafts (
   model_used      TEXT,                        -- e.g., "gpt-4o", "claude-3.5-sonnet"
   approved_by     BIGINT        REFERENCES users(id),
   approved_at     TIMESTAMPTZ,
-  source_id       BIGINT        NOT NULL REFERENCES sources(id),
+  source_id       BIGINT        REFERENCES sources(id),  -- nullable after v3_132 (auto-drafts may lack source)
+  evidence_ids    TEXT[],                     -- F-310: R1 source IDs cited in this draft
+  rejection_reason TEXT,                      -- F-310: why the human rejected (F-302 training)
+  edit_diff       TEXT,                       -- F-310: diff between original and edited draft
+  original_content TEXT,                      -- F-310: snapshot of content before edit
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
@@ -558,7 +562,11 @@ CREATE INDEX idx_drafts_source       ON action_item_drafts (source_id);
 | `content` | The LLM-generated text |
 | `model_used` | Traceability for which LLM produced the draft |
 | `approved_by` / `approved_at` | Audit trail for who approved the AI output |
-| `source_id` | **R1 FK** — cites the source context the LLM used |
+| `source_id` | FK to sources; nullable after v3_132 (auto-drafts may not have a source) |
+| `evidence_ids` | F-310: array of R1 source IDs cited in draft text |
+| `rejection_reason` | F-310: human's reason for rejecting (feeds F-302 voice training) |
+| `edit_diff` | F-310: diff between original and human-edited draft (F-302 training) |
+| `original_content` | F-310: snapshot of draft content before human edit |
 
 **Why this choice:** Legacy `action_item_drafts` (migration 130) used `draft_kind` and `draft_status` enums that never landed in prod. V3 uses CHECK constraints instead of custom enum types — simpler to manage, no migration needed to add values.
 

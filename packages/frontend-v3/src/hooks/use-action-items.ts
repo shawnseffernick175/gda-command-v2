@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPatch } from "@/lib/api";
 import type { ActionItem, ActionItemDraft } from "@/lib/types";
 
+export type { ActionItem, ActionItemDraft };
+
 interface ActionItemsPagedResponse {
   items: ActionItem[];
   pagination: {

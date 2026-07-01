@@ -21,7 +21,7 @@ describe('Launchpad summary citations', () => {
     vi.clearAllMocks();
   });
 
-  it('returns 5 metrics each with a unique, non-placeholder title', async () => {
+  it('returns 6 metrics each with a unique, non-placeholder title', async () => {
     const result = await computeSummary();
 
     const allTitles = [
@@ -30,12 +30,13 @@ describe('Launchpad summary citations', () => {
       ...result.captures_color_review_stale_sources.map((s) => s.title),
       ...result.action_items_open_today_sources.map((s) => s.title),
       ...result.action_items_overdue_sources.map((s) => s.title),
+      ...result.drafts_ready_for_review_sources.map((s) => s.title),
     ];
 
-    expect(allTitles).toHaveLength(5);
+    expect(allTitles).toHaveLength(6);
 
     const unique = new Set(allTitles);
-    expect(unique.size).toBe(5);
+    expect(unique.size).toBe(6);
   });
 
   it('does NOT contain the deprecated placeholder string', async () => {
@@ -47,6 +48,7 @@ describe('Launchpad summary citations', () => {
       ...result.captures_color_review_stale_sources.map((s) => s.title),
       ...result.action_items_open_today_sources.map((s) => s.title),
       ...result.action_items_overdue_sources.map((s) => s.title),
+      ...result.drafts_ready_for_review_sources.map((s) => s.title),
     ];
 
     for (const title of allTitles) {
@@ -64,6 +66,7 @@ describe('Launchpad summary citations', () => {
       ...result.captures_color_review_stale_sources.map((s) => s.kind),
       ...result.action_items_open_today_sources.map((s) => s.kind),
       ...result.action_items_overdue_sources.map((s) => s.kind),
+      ...result.drafts_ready_for_review_sources.map((s) => s.kind),
     ];
 
     for (const kind of allKinds) {
@@ -82,6 +85,7 @@ describe('Launchpad summary citations', () => {
       ...result.captures_color_review_stale_sources.map((s) => s.retrieved_at),
       ...result.action_items_open_today_sources.map((s) => s.retrieved_at),
       ...result.action_items_overdue_sources.map((s) => s.retrieved_at),
+      ...result.drafts_ready_for_review_sources.map((s) => s.retrieved_at),
     ];
 
     for (const ts of allRetrieved) {
@@ -99,6 +103,7 @@ describe('Launchpad summary citations', () => {
       ...result.captures_color_review_stale_sources.map((s) => s.url),
       ...result.action_items_open_today_sources.map((s) => s.url),
       ...result.action_items_overdue_sources.map((s) => s.url),
+      ...result.drafts_ready_for_review_sources.map((s) => s.url),
     ];
 
     for (const url of allUrls) {

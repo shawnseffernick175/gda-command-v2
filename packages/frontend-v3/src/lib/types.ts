@@ -481,6 +481,10 @@ export interface ActionItemDraft {
   content: string;
   model_used: string | null;
   status: "generating" | "done" | "failed";
+  evidence_ids: string[];
+  rejection_reason: string | null;
+  edit_diff: string | null;
+  original_content: string | null;
   created_at: string;
 }
 
