@@ -14,6 +14,16 @@ function scoreBg(score: number): string {
   return "bg-gda-green/10 border-gda-green/30 text-gda-green";
 }
 
+function severityColor(severity: string): string {
+  switch (severity) {
+    case "critical": return "bg-red-500/15 text-red-400 border-red-500/30";
+    case "high": return "bg-amber-400/15 text-amber-400 border-amber-400/30";
+    case "medium": return "bg-blue-400/15 text-blue-400 border-blue-400/30";
+    case "low": return "bg-gda-green/15 text-gda-green border-gda-green/30";
+    default: return "bg-border text-muted-foreground border-border";
+  }
+}
+
 export function RiskDetailPanel({
   risk,
   onClose,
@@ -59,6 +69,14 @@ export function RiskDetailPanel({
               {risk.title}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                className={cn(
+                  "text-[11px] font-mono font-bold uppercase tracking-wide border",
+                  severityColor(risk.severity ?? "medium"),
+                )}
+              >
+                {risk.severity ?? "medium"}
+              </Badge>
               <Badge
                 className={cn(
                   "text-[11px] font-mono font-bold uppercase tracking-wide",
@@ -212,6 +230,16 @@ export function RiskDetailPanel({
               label={risk.source === "ai_generated" ? "AI Generated" : "Manual"}
               kind={risk.source === "ai_generated" ? "heuristic" : "real"}
             />
+          </div>
+
+          {/* ── Full Detail Link ──────────────────────── */}
+          <div className="pt-2">
+            <a
+              href={`/risks/${risk.id}`}
+              className="inline-flex items-center gap-1 rounded border border-gda-green/30 bg-gda-green/10 px-3 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
+            >
+              View Full Detail
+            </a>
           </div>
 
           {/* ── Meta ───────────────────────────────────── */}
