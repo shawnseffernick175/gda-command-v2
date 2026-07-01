@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScoreExplain } from "@/components/shared/score-explainers";
 import { formatMoney } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
+import { AnalysisBrief } from "@/components/analysis/AnalysisBrief";
 import { isSmallBizPlay, sbPlayTooltip } from "@/lib/sb-play";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { SortableHeader } from "@/components/shared/SortableHeader";
@@ -1404,6 +1405,11 @@ function OpportunityDetail({ id }: { id: string }) {
           )}
         </div>
       </div>
+
+      <Separator className="bg-border" />
+
+      {/* ─── F-305: Auto-Analysis Brief (10 sections, SSE-streamed) ── */}
+      <AnalysisBrief opportunityId={id} />
 
       <Separator className="bg-border" />
 
