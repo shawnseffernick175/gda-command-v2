@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useSentinelHandoffs,
   useSentinelRecentWins,
@@ -9,6 +9,7 @@ import {
   useSentinelCreditPacingGovWin,
 } from "@/hooks/use-sentinel-monitor";
 import { cn } from "@/lib/utils";
+import { echarts, ReactEChartsCore } from "@/lib/echarts-setup";
 import type {
   SentinelHandoffCard,
   SentinelRecentWinCard,
@@ -196,6 +197,11 @@ function CreditPacingSection() {
             </div>
           </div>
 
+          {/* Burn rate sparkline */}
+          {govtribe.daily_burn_history.length > 0 && (
+            <BurnRateSparkline data={govtribe.daily_burn_history} />
+          )}
+
           {/* Metrics row */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <MetricCell label="Burn rate (7d avg)" value={`${govtribe.burn_rate_7d}/day`} />
@@ -250,6 +256,67 @@ function CreditPacingSection() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Burn Rate Sparkline ───────────────────────────────────────── */
+
+function BurnRateSparkline({ data }: { data: Array<{ date: string; credits: number }> }) {
+  const option = useMemo(() => ({
+    grid: { top: 4, right: 4, bottom: 16, left: 28 },
+    xAxis: {
+      type: "category" as const,
+      data: data.map((d) => d.date.slice(5)),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { fontSize: 9, color: "#94a3b8" },
+    },
+    yAxis: {
+      type: "value" as const,
+      show: false,
+      min: 0,
+    },
+    tooltip: {
+      trigger: "axis" as const,
+      formatter: (params: Array<{ name: string; value: number }>) => {
+        const p = params[0];
+        return p ? `${p.name}: ${p.value} credits` : "";
+      },
+    },
+    series: [
+      {
+        type: "line",
+        data: data.map((d) => d.credits),
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 4,
+        lineStyle: { width: 2, color: "#3b82f6" },
+        itemStyle: { color: "#3b82f6" },
+        areaStyle: {
+          color: {
+            type: "linear",
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: "rgba(59,130,246,0.15)" },
+              { offset: 1, color: "rgba(59,130,246,0)" },
+            ],
+          },
+        },
+      },
+    ],
+  }), [data]);
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[11px] text-muted-foreground font-medium">Burn rate trend (7 days)</p>
+      <ReactEChartsCore
+        echarts={echarts}
+        option={option}
+        style={{ height: 64, width: "100%" }}
+        opts={{ renderer: "svg" }}
+        notMerge
+      />
     </div>
   );
 }

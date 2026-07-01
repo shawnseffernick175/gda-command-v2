@@ -1742,6 +1742,7 @@ export interface SentinelCreditPacingGovTribe {
   daily_allowance: number;
   today_spent: number;
   top_queries: Array<{ tool_name: string; credits: number; call_count: number }>;
+  daily_burn_history: Array<{ date: string; credits: number }>;
 }
 
 export interface SentinelCreditPacingGovWin {
