@@ -21,6 +21,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "audit:schema": "tsx tests/audit-schema.ts",
     "backfill:unified": "tsx src/scripts/backfill-unified-opportunities.ts",
+    "backfill:unified-full": "tsx scripts/backfill_unified_opportunities.ts",
+    "backfill:unified-validate": "tsx scripts/backfill_unified_opportunities.ts --validate",
     "backfill:validate-opps": "tsx src/scripts/backfill_validate_existing_opps.ts",
     "backfill:incumbent": "tsx src/scripts/backfill_incumbent.ts"
   },
