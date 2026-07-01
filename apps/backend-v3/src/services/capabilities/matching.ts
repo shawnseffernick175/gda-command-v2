@@ -38,7 +38,7 @@ interface OpportunityMatchContext {
   title: string;
   description: string | null;
   naics: string | null;
-  psc_code: string | null;
+  psc: string | null;
   agency: string | null;
   department: string | null;
   set_aside: string | null;
@@ -177,7 +177,7 @@ function computeEvidenceScore(grade: string | null): { score: number; detail: st
 
 function scoreCapability(opp: OpportunityMatchContext, cap: Capability): { score: number; reasons: MatchReason[] } {
   const naics = computeNaicsScore(opp.naics, cap.naics_codes);
-  const psc = computePscScore(opp.psc_code, cap.psc_codes);
+  const psc = computePscScore(opp.psc, cap.psc_codes);
   const agency = computeAgencyScore(opp.agency, opp.department, cap.agencies_strong_in);
   const desc = computeDescriptionScore(opp.title, opp.description, cap.name, cap.description);
   const evidence = computeEvidenceScore(cap.evidence_grade);
@@ -203,7 +203,7 @@ function scoreCapability(opp: OpportunityMatchContext, cap: Capability): { score
 export async function computeCapabilityMatches(opportunityId: string): Promise<CapabilityMatch[]> {
   // Fetch opportunity context
   const oppRes = await pool.query<OpportunityMatchContext>(
-    `SELECT id::text, title, description, naics, psc_code, agency, department, set_aside
+    `SELECT id::text, title, description, naics, psc, agency, department, set_aside
      FROM opportunities WHERE id = $1 AND deleted_at IS NULL`,
     [opportunityId],
   );
