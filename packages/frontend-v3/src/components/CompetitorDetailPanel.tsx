@@ -47,7 +47,10 @@ function actionColor(a: CompetitorAnalysis["recommended_action"]): string {
 }
 
 export function SizeBadge({ analysis }: { analysis: CompetitorAnalysis | null }) {
-  if (!analysis) {
+  const parsed = typeof analysis === 'string'
+    ? (() => { try { return JSON.parse(analysis) as CompetitorAnalysis; } catch { return null; } })()
+    : analysis;
+  if (!parsed || !parsed.size_classification) {
     return (
       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
         ?
@@ -56,7 +59,7 @@ export function SizeBadge({ analysis }: { analysis: CompetitorAnalysis | null })
   }
   return (
     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
-      {analysis.size_classification}
+      {parsed.size_classification}
     </span>
   );
 }
@@ -76,9 +79,17 @@ function SkeletonBlock() {
   );
 }
 
+function parseAnalysis(raw: unknown): CompetitorAnalysis | null {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) as CompetitorAnalysis; } catch { return null; }
+  }
+  return raw as CompetitorAnalysis;
+}
+
 export default function CompetitorDetailPanel({ competitor, onClose }: CompetitorDetailPanelProps) {
   const analyzeMutation = useCompetitorAnalysis(competitor.name);
-  const analysis: CompetitorAnalysis | null = analyzeMutation.data ?? competitor.competitor_analysis ?? null;
+  const analysis: CompetitorAnalysis | null = analyzeMutation.data ?? parseAnalysis(competitor.competitor_analysis);
   const isLoading = analyzeMutation.isPending;
   const blackHat = useBlackHatAnalysis(competitor.name);
   const { sortBy, sortDir, handleSort } = useTableSort("recomp");
@@ -264,7 +275,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
                 <div>
                   <span className="text-xs text-green-700">Strengths</span>
                   <ul className="mt-1 space-y-0.5">
-                    {blackHat.data.strengths.map((s, i) => (
+                    {(Array.isArray(blackHat.data.strengths) ? blackHat.data.strengths : []).map((s, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-xs text-gray-800">
                         <span className="mt-1.5 h-1 w-1 rounded-full bg-green-600 shrink-0" />
                         {s}
@@ -275,7 +286,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
                 <div>
                   <span className="text-xs text-red-700">Weaknesses</span>
                   <ul className="mt-1 space-y-0.5">
-                    {blackHat.data.weaknesses.map((w, i) => (
+                    {(Array.isArray(blackHat.data.weaknesses) ? blackHat.data.weaknesses : []).map((w, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-xs text-gray-800">
                         <span className="mt-1.5 h-1 w-1 rounded-full bg-red-500 shrink-0" />
                         {w}

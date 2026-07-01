@@ -48,14 +48,19 @@ function CompetitorsContent() {
     [searchParams, router, pathname],
   );
 
+  // Keep a ref to setPage so the debounce effect doesn't re-fire on every
+  // URL change (sort, pagination). Only the search query should trigger it.
+  const setPageRef = useRef(setPage);
+  useEffect(() => { setPageRef.current = setPage; });
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setDebouncedQ(q);
-      setPage(1);
+      setPageRef.current(1);
     }, 350);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [q, setPage]);
+  }, [q]);
 
   const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
 

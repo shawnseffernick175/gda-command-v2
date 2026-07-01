@@ -25,7 +25,8 @@ export async function competitorsRoutes(app: FastifyInstance): Promise<void> {
     const sortCol = SORTABLE_COLUMNS[query.sort_by ?? ''] ?? 'win_count';
     const sortDir = query.sort_dir === 'asc' ? 'ASC' : 'DESC';
     const nullsClause = sortDir === 'ASC' ? 'NULLS FIRST' : 'NULLS LAST';
-    const orderBy = `${sortCol} ${sortDir} ${nullsClause}`;
+    // Secondary sort by name for deterministic ordering when primary values tie
+    const orderBy = `${sortCol} ${sortDir} ${nullsClause}, name ASC`;
 
     const conditions: string[] = ['awardee_name IS NOT NULL', "awardee_name <> ''"];
     const params: unknown[] = [];
