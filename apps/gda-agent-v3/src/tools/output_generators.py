@@ -15,9 +15,9 @@ from src.tools.schemas import (
     GenerateBriefingOutput,
     GenerateCapturePlanInput,
     GenerateCapturePlanOutput,
+    GeneratedDocResult,
     GenerateWinThemesInput,
     GenerateWinThemesOutput,
-    GeneratedDocResult,
 )
 
 BACKEND_BASE = os.getenv("BACKEND_V3_URL", "http://localhost:3001")
