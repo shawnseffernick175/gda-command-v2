@@ -20,7 +20,7 @@ beforeAll(async () => {
   const dbUrl = getDbUrl();
   ids = getSeedIds();
 
-  process.env['JWT_SECRET'] = 'test-jwt-secret-integration';
+  process.env['JWT_SECRET'] = 'test-jwt-secret-integration-at-least-32-chars-long';
   process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key-integration';
   process.env['DATABASE_URL'] = dbUrl;
   process.env['NODE_ENV'] = 'test';

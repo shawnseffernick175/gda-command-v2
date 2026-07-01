@@ -234,7 +234,7 @@ describe('GovTribe API endpoints', () => {
     const jwt = (await import('jsonwebtoken')).default;
     const token = jwt.sign(
       { sub: 'viewer-user', email: 'viewer@gda.local', role: 'viewer' },
-      'test-jwt-secret-integration',
+      'test-jwt-secret-integration-at-least-32-chars-long',
       { algorithm: 'HS256', expiresIn: '1h' },
     );
 

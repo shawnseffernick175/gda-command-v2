@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-process.env['JWT_SECRET'] = 'test-jwt-secret';
+process.env['JWT_SECRET'] = 'test-jwt-secret-that-is-at-least-32-characters-long';
 process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
 process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
 process.env['NODE_ENV'] = 'test';

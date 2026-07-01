@@ -3,6 +3,8 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyCors from '@fastify/cors';
 import fastifyCookie from '@fastify/cookie';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { config } from './config/index.js';
 import { logger } from './lib/logger.js';
 import { requestIdHook } from './middleware/requestId.js';
@@ -68,8 +70,27 @@ export async function buildApp() {
     trustProxy: true,
   });
 
-  await app.register(fastifyCors, { origin: true, credentials: true });
+  const corsOrigins = (process.env['CORS_ALLOWED_ORIGINS'] || 'https://gda.csr-llc.tech')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  await app.register(fastifyCors, { origin: corsOrigins, credentials: true });
   await app.register(fastifyCookie);
+
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  });
+
+  await app.register(fastifyRateLimit, {
+    max: 300,
+    timeWindow: '1 minute',
+    allowList: (req) => {
+      const url = req.url ?? '';
+      return url.startsWith('/v3/health') || url === '/v3/metrics';
+    },
+  });
 
   await app.register(fastifySwagger, {
     openapi: {
@@ -125,14 +146,19 @@ export async function buildApp() {
   app.setErrorHandler((error, req, reply) => {
     const requestId = req.requestId ?? 'unknown';
     const err = error as Error & { statusCode?: number };
-    logger.error({
+    const statusCode = err.statusCode ?? 500;
+
+    const logPayload = {
       err,
       requestId,
       userId: (req as typeof req & { user?: { sub: string } }).user?.sub,
       stack: err.stack,
-    }, 'Unhandled error');
-
-    const statusCode = err.statusCode ?? 500;
+    };
+    if (statusCode === 429) {
+      logger.warn(logPayload, 'Rate limit exceeded');
+    } else {
+      logger.error(logPayload, 'Unhandled error');
+    }
     const body = errorEnvelope(
       statusCode === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
       err.message || 'An unexpected error occurred',

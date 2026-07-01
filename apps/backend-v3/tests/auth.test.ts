@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { createHmac } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 
-process.env['JWT_SECRET'] = 'test-jwt-secret';
+process.env['JWT_SECRET'] = 'test-jwt-secret-that-is-at-least-32-characters-long';
 process.env['GDA_WEBHOOK_KEY'] = 'test-webhook-key';
 process.env['DATABASE_URL'] ??= 'postgresql://gda:gda_dev_password@localhost:5432/gda_command';
 process.env['NODE_ENV'] = 'test';
@@ -44,7 +44,7 @@ describe('JWT auth middleware', () => {
   it('returns 401 for expired JWT on protected endpoints', async () => {
     const token = jwt.sign(
       { sub: 'user-1', email: 'test@gda.local' },
-      'test-jwt-secret',
+      'test-jwt-secret-that-is-at-least-32-characters-long',
       { algorithm: 'HS256', expiresIn: '-10s' }
     );
     const res = await app.inject({
@@ -94,7 +94,7 @@ describe('JWT auth middleware', () => {
   it('allows valid JWT through to endpoint (not 401)', async () => {
     const token = jwt.sign(
       { sub: 'user-1', email: 'test@gda.local', role: 'admin' },
-      'test-jwt-secret',
+      'test-jwt-secret-that-is-at-least-32-characters-long',
       { algorithm: 'HS256', expiresIn: '1h' }
     );
     const res = await app.inject({

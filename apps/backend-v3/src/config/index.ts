@@ -37,7 +37,16 @@ export const config = {
 
   databaseUrl: env('DATABASE_URL', 'postgresql://gda:gda_dev_password@localhost:5432/gda_command'),
 
-  jwtSecret: env('JWT_SECRET', 'dev-jwt-secret-change-in-production'),
+  jwtSecret: (() => {
+    const secret = process.env['JWT_SECRET'];
+    if (!secret || secret.length < 32) {
+      throw new Error(
+        'JWT_SECRET must be set and at least 32 characters long. ' +
+        'Set the JWT_SECRET environment variable before starting the server.'
+      );
+    }
+    return secret;
+  })(),
   jwtAlgorithm: 'HS256' as const,
 
   webhookKey: env('GDA_WEBHOOK_KEY', 'dev-webhook-key'),

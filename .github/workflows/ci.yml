@@ -64,7 +64,7 @@ jobs:
         working-directory: apps/backend-v3
         env:
           DATABASE_URL: postgresql://gda:gda_ci_password@localhost:5432/gda_command
-          JWT_SECRET: ci-jwt-secret
+          JWT_SECRET: ci-placeholder-secret-at-least-32-chars
           GDA_WEBHOOK_KEY: ci-webhook-key
           NODE_ENV: test
         run: npx vitest run tests/auth.test.ts
@@ -242,6 +242,8 @@ jobs:
         run: npm run build --workspace=@gda/backend-v3
       - name: Verify @gda/backend-v3 modules resolve
         working-directory: apps/gda-mcp-server
+        env:
+          JWT_SECRET: ci-placeholder-secret-at-least-32-chars
         run: npx vitest run tests/backend-v3-resolve.test.ts
 
   llm-router-gates:
@@ -262,6 +264,7 @@ jobs:
           MOCK_LLM: '1'
           ANTHROPIC_API_KEY: ci-fake
           OPENAI_API_KEY: ci-fake
+          JWT_SECRET: ci-placeholder-secret-at-least-32-chars
           NODE_ENV: test
         run: npx vitest run tests/llm-router.test.ts --reporter=verbose
 

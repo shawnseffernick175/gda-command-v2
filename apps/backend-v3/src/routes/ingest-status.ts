@@ -204,7 +204,7 @@ export async function ingestStatusRoutes(app: FastifyInstance): Promise<void> {
   /**
    * POST /v3/ingest/trigger/:source — fire named ingest job immediately (admin only).
    */
-  app.post('/v3/ingest/trigger/:source', async (req, reply) => {
+  app.post('/v3/ingest/trigger/:source', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
 
     const { source } = req.params as { source: string };
