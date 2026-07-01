@@ -65,7 +65,7 @@ export function EntityRisksTab({ entityType, entityId }: EntityRisksTabProps) {
         return (
           <a
             key={risk.id}
-            href={`/risks/${risk.id}`}
+            href={`/risks/detail?id=${risk.id}`}
             className="flex items-center gap-3 rounded border border-border bg-gda-panel p-3 hover:border-gda-green/30 transition-colors"
           >
             <div className="flex-1 min-w-0">

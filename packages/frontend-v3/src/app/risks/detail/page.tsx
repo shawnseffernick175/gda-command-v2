@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useRisk, useRiskEvents, useUpdateRisk } from "@/hooks/use-risks";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -75,10 +75,10 @@ function EventTimeline({ events }: { events: RiskEvent[] }) {
   );
 }
 
-export default function RiskDetailPage() {
-  const params = useParams();
+function RiskDetailInner() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const riskId = params.id ? Number(params.id) : null;
+  const riskId = searchParams.get("id") ? Number(searchParams.get("id")) : null;
   const { data: risk, isLoading } = useRisk(riskId);
   const { data: eventsData } = useRiskEvents(riskId);
   const updateRisk = useUpdateRisk();
@@ -326,5 +326,13 @@ export default function RiskDetailPage() {
         <p>Source: {risk.source === "ai_generated" ? "AI Generated" : "Manual"}</p>
       </div>
     </div>
+  );
+}
+
+export default function RiskDetailPage() {
+  return (
+    <Suspense fallback={<div className="p-6 animate-pulse"><div className="h-6 bg-gda-panel rounded w-1/3" /></div>}>
+      <RiskDetailInner />
+    </Suspense>
   );
 }

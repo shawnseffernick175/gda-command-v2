@@ -235,7 +235,7 @@ export function RiskDetailPanel({
           {/* ── Full Detail Link ──────────────────────── */}
           <div className="pt-2">
             <a
-              href={`/risks/${risk.id}`}
+              href={`/risks/detail?id=${risk.id}`}
               className="inline-flex items-center gap-1 rounded border border-gda-green/30 bg-gda-green/10 px-3 py-1.5 text-xs font-mono text-gda-green hover:bg-gda-green/20 transition-colors"
             >
               View Full Detail
