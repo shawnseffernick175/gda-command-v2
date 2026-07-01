@@ -55,6 +55,7 @@ import { useDoctrineEvaluations } from "@/hooks/use-doctrine-evaluation";
 import { useOpportunityAnalysis } from "@/hooks/use-opportunity-analysis";
 import { DecisionBriefStream } from "@/components/opportunity-analysis/DecisionBriefStream";
 import { CapabilityMatchCard } from "@/components/CapabilityMatchCard";
+import { PricingScenarioPanel } from "@/components/financials/PricingScenarioPanel";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
 
@@ -1637,6 +1638,21 @@ function OpportunityDetail({ id }: { id: string }) {
               onSuccess={() => setShowOverrideModal(false)}
             />
           )}
+
+          {/* Pricing Scenarios */}
+          <Card className="border-border bg-gda-panel">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+                Pricing Scenarios
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PricingScenarioPanel
+                opportunityId={Number(id)}
+                opportunityTitle={opp.title}
+              />
+            </CardContent>
+          </Card>
 
           {/* Vault Documents */}
           <VaultDocumentsSection opportunityId={Number(id)} />

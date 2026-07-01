@@ -34,6 +34,7 @@ import { ReviewColorDots } from "@/components/capture/ReviewColorDots";
 import { MyOpenReviews } from "@/components/capture/MyOpenReviews";
 import { CapturePlanDrawer } from "@/components/capture/CapturePlanDrawer";
 import { ScoringWorkspace } from "@/components/capture/ScoringWorkspace";
+import { PricingScenarioPanel } from "@/components/financials/PricingScenarioPanel";
 import { useCaptureReviews } from "@/hooks/use-capture-reviews";
 import type {
   CaptureColorStage,
@@ -462,6 +463,21 @@ function CaptureDetail({ oppId }: { oppId: string }) {
       </div>
 
       <ColorTeamWorkflow captureId={oppId} />
+
+      {/* Pricing Scenarios */}
+      <Card className="border-border bg-gda-panel">
+        <CardHeader>
+          <CardTitle className="font-mono text-sm text-muted-foreground">
+            Pricing Scenarios
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PricingScenarioPanel
+            captureId={Number(oppId)}
+            opportunityTitle={capture.title}
+          />
+        </CardContent>
+      </Card>
 
       <AskAiPanel objectType="capture" objectId={oppId} />
 

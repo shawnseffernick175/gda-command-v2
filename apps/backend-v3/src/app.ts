@@ -63,6 +63,7 @@ import { qaChecklistRoutes } from './routes/qa-checklist.js';
 import { universalIngestRoutes } from './routes/universal-ingest.js';
 import { opportunityAnalysisRoutes } from './routes/opportunity-analysis.js';
 import { capabilityRoutes } from './routes/capabilities.js';
+import { financialBibleRoutes } from './routes/financial-bible.js';
 import { errorEnvelope } from './lib/envelope.js';
 import { httpRequestsTotal } from './lib/metrics.js';
 
@@ -224,6 +225,7 @@ export async function buildApp() {
   await app.register(universalIngestRoutes);
   await app.register(opportunityAnalysisRoutes);
   await app.register(capabilityRoutes);
+  await app.register(financialBibleRoutes);
   await app.register(async (instance) => {
     await instance.register(webhookRoutes);
   });

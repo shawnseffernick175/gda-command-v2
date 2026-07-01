@@ -1684,6 +1684,115 @@ export type AnalysisSectionDataMap = {
 
 export type AnalysisSectionId = keyof AnalysisSectionDataMap;
 
+/* ── Financial Bible (F-311) ──────────────────────────────────── */
+
+export interface FinancialBibleVersion {
+  id: string;
+  uploaded_at: string;
+  uploaded_by: string;
+  notes: string | null;
+  active: boolean;
+  format_version: string;
+  source_files: Record<string, string>;
+  validation_warnings: string[];
+  rates_count: number;
+  indirects_count: number;
+  odcs_count: number;
+  history_count: number;
+}
+
+export interface FinancialBibleActiveResponse {
+  active: FinancialBibleVersion | null;
+  message?: string;
+}
+
+export interface FinancialBibleUploadResponse {
+  version_id: string;
+  uploaded_at: string;
+  summary: {
+    rates: number;
+    indirects: number;
+    odcs: number;
+    history: number;
+  };
+  warnings: string[];
+}
+
+export interface FinancialRate {
+  labor_category: string;
+  clearance: string;
+  rate: number;
+  effective_from: string;
+  effective_to: string | null;
+}
+
+export interface FinancialIndirect {
+  contract_type: string;
+  fringe_pct: number;
+  overhead_pct: number;
+  ga_pct: number;
+  fee_band_low: number;
+  fee_band_high: number;
+}
+
+export interface FinancialHistoryItem {
+  pursuit_id: string;
+  agency: string | null;
+  outcome: string | null;
+  bid_price: number | null;
+  winner_price: number | null;
+  notes: string | null;
+}
+
+export interface PricingScenarioSummary {
+  id: string;
+  version_id: string;
+  opportunity_id: number | null;
+  capture_id: number | null;
+  opportunity_title: string | null;
+  capture_title: string | null;
+  title: string;
+  contract_type: string;
+  period_months: number;
+  total_cost: number;
+  total_price: number;
+  margin_pct: number;
+  doctrine_pass: boolean;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface PricingScenarioCreateResponse {
+  id: string;
+  version_id: string;
+  title: string;
+  contract_type: string;
+  period_months: number;
+  labor_detail: {
+    labor_category: string;
+    clearance: string;
+    hours: number;
+    rate: number;
+    cost: number;
+  }[];
+  odc_detail: { category: string; amount: number; description?: string }[];
+  cost_breakdown: {
+    direct_labor: number;
+    fringe: number;
+    overhead: number;
+    ga: number;
+    total_odcs: number;
+    total_cost: number;
+    fee: number;
+    total_price: number;
+  };
+  margin_pct: number;
+  doctrine_pass: boolean;
+  margin_floor: number;
+  created_at: string;
+}
+
 export type AnalysisSection<K extends AnalysisSectionId = AnalysisSectionId> =
   AnalysisSectionBase & {
     section_id: K;
