@@ -47,6 +47,10 @@ import type {
   ShipleyDimension,
   OpportunitySummary,
 } from "@/lib/types";
+import { DoctrineAlignmentPanel } from "@/components/shared/DoctrineAlignmentPanel";
+import { MarginFloorBanner } from "@/components/shared/MarginFloorBanner";
+import { DoctrineOverrideModal } from "@/components/shared/DoctrineOverrideModal";
+import { useDoctrineEvaluations } from "@/hooks/use-doctrine-evaluation";
 
 const IDIQ_BADGE_CLS = "rounded border border-gda-green/40 bg-gda-green/10 px-1.5 py-0.5 text-[11px] font-mono text-gda-green";
 
@@ -1224,6 +1228,8 @@ function OpportunityDetail({ id }: { id: string }) {
   const analyzeOpp = useAnalyzeOpportunity();
   const updateStage = useUpdateStage();
   const { toast: detailToast } = useToast();
+  const { data: doctrineEvals } = useDoctrineEvaluations("opportunity", id);
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
 
   const llmForEffect = opp?.llm_analysis as LlmAnalysis | null | undefined;
   useEffect(() => {
@@ -1267,6 +1273,12 @@ function OpportunityDetail({ id }: { id: string }) {
   const timeline = opp.analysis?.timeline;
   const doctrine = opp.doctrine_badge;
   const doctrineScore = opp.doctrine_score;
+
+  // Doctrine evaluation for hard-block enforcement
+  const latestDoctrineEval = doctrineEvals?.[0] ?? null;
+  const triggeredExclusions = latestDoctrineEval?.exclusion_triggers.filter((e) => e.triggered) ?? [];
+  const isDoctrineBlocked = triggeredExclusions.length > 0;
+  const isMarginBlocked = latestDoctrineEval?.margin_check?.passed === false && latestDoctrineEval?.margin_check?.margin_pct != null;
 
   return (
     <div className="space-y-4">
@@ -1405,6 +1417,18 @@ function OpportunityDetail({ id }: { id: string }) {
 
           {/* Ask AI — inline, always open */}
           <AskAiInline id={id} title={opp.title} agency={opp.agency} pwin={opp.pwin?.score} />
+
+          {/* Doctrine Alignment Panel */}
+          <DoctrineAlignmentPanel entityId={id} />
+
+          {/* Margin Floor Banner */}
+          {latestDoctrineEval?.margin_check && (
+            <MarginFloorBanner
+              marginCheck={latestDoctrineEval.margin_check}
+              entityId={id}
+              entityKind="opportunity"
+            />
+          )}
         </div>
 
         {/* ═══ COLUMN B ═══ */}
@@ -1515,35 +1539,93 @@ function OpportunityDetail({ id }: { id: string }) {
               <p className="text-xs text-muted-foreground">
                 Current: <span className="text-gda-green font-mono">{currentStage}</span>
               </p>
-              <div className="space-y-1">
-                {(STAGE_ACTIONS[currentStage] ?? []).map((action) => (
+
+              {/* Doctrine hard-block: disable Qualify when exclusion triggered */}
+              {isDoctrineBlocked && (
+                <div className="rounded border border-gda-red/30 bg-gda-red/5 px-3 py-2 space-y-1">
+                  <p className="text-[11px] font-semibold text-gda-red">
+                    Qualify blocked — strategic exclusion triggered
+                  </p>
+                  {triggeredExclusions.map((excl) => (
+                    <p key={excl.id} className="text-[11px] text-muted-foreground">
+                      {excl.name}: {excl.evidence.join("; ")}
+                    </p>
+                  ))}
                   <button
-                    key={action.label}
                     type="button"
-                    onClick={() =>
-                      action.stage &&
-                      updateStage.mutate(
-                        { id, stage: action.stage },
-                        {
-                          onSuccess: () =>
-                            detailToast(`Moved to ${action.label}`, "success"),
-                          onError: (err) =>
-                            detailToast(
-                              `Stage change failed: ${err instanceof Error ? err.message : "Unknown error"}`,
-                              "error",
-                            ),
-                        },
-                      )
-                    }
-                    disabled={updateStage.isPending}
-                    className="block w-full text-left rounded border border-border px-3 py-1.5 text-xs font-mono text-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors disabled:opacity-50"
+                    onClick={() => setShowOverrideModal(true)}
+                    className="mt-1 text-[11px] font-mono text-gda-green hover:underline"
                   >
-                    → {action.label}
+                    Override with rationale
                   </button>
-                ))}
+                </div>
+              )}
+
+              {isMarginBlocked && !isDoctrineBlocked && (
+                <div className="rounded border border-gda-red/30 bg-gda-red/5 px-3 py-2 space-y-1">
+                  <p className="text-[11px] font-semibold text-gda-red">
+                    Qualify blocked — margin below {latestDoctrineEval?.margin_check.threshold}% floor
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOverrideModal(true)}
+                    className="mt-1 text-[11px] font-mono text-gda-green hover:underline"
+                  >
+                    Override with rationale
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                {(STAGE_ACTIONS[currentStage] ?? []).map((action) => {
+                  const isQualifyAction = action.label.toLowerCase().includes("qualif");
+                  const blocked = isQualifyAction && (isDoctrineBlocked || isMarginBlocked);
+                  return (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={() =>
+                        !blocked && action.stage &&
+                        updateStage.mutate(
+                          { id, stage: action.stage },
+                          {
+                            onSuccess: () =>
+                              detailToast(`Moved to ${action.label}`, "success"),
+                            onError: (err) =>
+                              detailToast(
+                                `Stage change failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+                                "error",
+                              ),
+                          },
+                        )
+                      }
+                      disabled={updateStage.isPending || blocked}
+                      title={blocked ? "Blocked by doctrine exclusion or margin floor — override required" : undefined}
+                      className={cn(
+                        "block w-full text-left rounded border border-border px-3 py-1.5 text-xs font-mono text-foreground hover:border-gda-green/40 hover:text-gda-green transition-colors disabled:opacity-50",
+                        blocked && "cursor-not-allowed opacity-40",
+                      )}
+                    >
+                      → {action.label}
+                      {blocked && " (blocked)"}
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
+
+          {/* Override Modal */}
+          {showOverrideModal && (
+            <DoctrineOverrideModal
+              entityId={id}
+              entityKind="opportunity"
+              kind={isDoctrineBlocked ? "exclusion_override" : "margin_override"}
+              exclusionIds={triggeredExclusions.map((e) => e.id)}
+              onClose={() => setShowOverrideModal(false)}
+              onSuccess={() => setShowOverrideModal(false)}
+            />
+          )}
 
           {/* Vault Documents */}
           <VaultDocumentsSection opportunityId={Number(id)} />
