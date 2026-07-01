@@ -2,13 +2,14 @@
 
 import { Popover } from "@base-ui/react/popover";
 import { cn } from "@/lib/utils";
-import { getExplainer, type ScoreType, type ScoreInputs } from "./registry";
+import { getExplainer, type ScoreType, type ScoreInputs, type PeriodMode } from "./registry";
 
 export interface ScoreExplainProps {
   score: number | string | null;
   label: string;
   scoreType: ScoreType;
   inputs?: ScoreInputs;
+  periodMode?: PeriodMode;
   className?: string;
 }
 
@@ -17,9 +18,15 @@ export function ScoreExplain({
   label,
   scoreType,
   inputs,
+  periodMode,
   className,
 }: ScoreExplainProps) {
   const explainer = getExplainer(scoreType);
+
+  const description =
+    typeof explainer.description === "function"
+      ? explainer.description(periodMode)
+      : explainer.description;
 
   return (
     <Popover.Root>
@@ -52,21 +59,32 @@ export function ScoreExplain({
             <div className="mt-2 space-y-2">
               <div>
                 <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
-                  What this measures
+                  Definition
                 </p>
                 <p className="mt-0.5 text-foreground leading-relaxed">
-                  {explainer.description}
+                  {description}
                 </p>
               </div>
 
               <div>
                 <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
-                  {"How it\u2019s calculated"}
+                  Calculation Method
                 </p>
                 <div className="mt-0.5 text-foreground leading-relaxed">
-                  {explainer.renderFormula(inputs)}
+                  {explainer.renderFormula(inputs, periodMode)}
                 </div>
               </div>
+
+              {explainer.renderDataSources && (
+                <div>
+                  <p className="text-[11px] font-mono text-muted-foreground uppercase tracking-wide">
+                    Input Data
+                  </p>
+                  <div className="mt-0.5 text-foreground leading-relaxed">
+                    {explainer.renderDataSources(periodMode)}
+                  </div>
+                </div>
+              )}
 
               {inputs && explainer.renderInputs && (
                 <div>
