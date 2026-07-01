@@ -483,8 +483,7 @@ CREATE TABLE action_items (
   draft_text      TEXT,                        -- F-310: AI-generated draft response text
   draft_evidence_ids JSONB      DEFAULT '[]'::jsonb, -- F-310: R1 evidence citation refs (array of {kind,title,url,retrieved_at})
   draft_generated_at TIMESTAMPTZ,              -- F-310: when draft was last generated
-  draft_status    TEXT          DEFAULT 'pending'
-                                CHECK (draft_status IS NULL OR draft_status IN (
+  draft_status    TEXT          CHECK (draft_status IS NULL OR draft_status IN (
                                   'pending', 'ready', 'approved', 'sent', 'rejected', 'no_context')),
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()

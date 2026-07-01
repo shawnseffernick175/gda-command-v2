@@ -42,8 +42,10 @@ export function useActionItems(params: {
       }),
     refetchInterval: (query) => {
       const items = query.state.data?.items ?? [];
-      const hasGenerating = items.some((i) =>
-        i.drafts?.some((d) => d.status === "generating"),
+      const hasGenerating = items.some(
+        (i) =>
+          i.drafts?.some((d) => d.status === "generating") ||
+          i.draft_status === "pending",
       );
       return hasGenerating ? 5000 : false;
     },

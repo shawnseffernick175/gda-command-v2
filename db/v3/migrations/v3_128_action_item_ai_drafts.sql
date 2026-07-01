@@ -10,7 +10,7 @@
 ALTER TABLE action_items ADD COLUMN IF NOT EXISTS draft_text TEXT;
 ALTER TABLE action_items ADD COLUMN IF NOT EXISTS draft_evidence_ids JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE action_items ADD COLUMN IF NOT EXISTS draft_generated_at TIMESTAMPTZ;
-ALTER TABLE action_items ADD COLUMN IF NOT EXISTS draft_status TEXT DEFAULT 'pending';
+ALTER TABLE action_items ADD COLUMN IF NOT EXISTS draft_status TEXT;
 
 -- Add CHECK constraint for allowed draft_status values
 ALTER TABLE action_items DROP CONSTRAINT IF EXISTS action_items_draft_status_check;

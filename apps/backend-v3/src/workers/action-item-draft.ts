@@ -12,7 +12,6 @@
  */
 
 import PgBoss from 'pg-boss';
-import pg from 'pg';
 import { config } from '../config/index.js';
 import { logger } from '../lib/logger.js';
 import { QUEUE_NAMES, registerQueues } from '../lib/queue.js';
@@ -23,13 +22,6 @@ import {
   type ActionItemRow,
 } from '../services/action-items/index.js';
 import type { ActionItemDraftOutput } from '../lib/llm-router.types.js';
-
-const { Pool } = pg;
-
-const pool = new Pool({
-  connectionString: config.databaseUrl,
-  max: 3,
-});
 
 export interface DraftGenerationJobData {
   actionItemId: string;
