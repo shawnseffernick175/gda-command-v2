@@ -571,7 +571,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
-        <div className="flex items-baseline gap-3">
+        <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="shrink-0 font-mono text-lg font-bold text-foreground">SETTINGS</h1>
           <p className="truncate text-xs text-muted-foreground">
             Configure how GDA Command runs — system health, data ingestion, wheelhouse and scoring rules, users, and integrations.

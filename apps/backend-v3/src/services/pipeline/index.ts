@@ -232,7 +232,7 @@ export async function listPipelineItems(
     paramIdx++;
     conditions.push(`pi.stage = $${paramIdx}`);
     params.push(normalized);
-  } else {
+  } else if (!filters.is_idiq) {
     conditions.push(`pi.stage <> 'qualify'`);
   }
   if (filters.q) {

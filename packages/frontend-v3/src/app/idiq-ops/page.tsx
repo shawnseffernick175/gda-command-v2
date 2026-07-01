@@ -36,7 +36,7 @@ export default function IdiqOpsPage() {
   return (
     <div className="space-y-4">
       <div className="sticky top-0 z-20 bg-gda-bg-deep border-b border-border pb-3 pt-6 sticky-page-header">
-        <div className="flex items-baseline gap-3">
+        <div className="flex min-w-0 items-baseline gap-3">
           <h1 className="shrink-0 text-lg font-semibold text-foreground">
             IDIQ Operations
           </h1>
