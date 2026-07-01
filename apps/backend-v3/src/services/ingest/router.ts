@@ -84,7 +84,7 @@ export async function routeToSurface(
     ? ` (low confidence: ${Math.round(classification.confidence * 100)}%)`
     : '';
 
-  const description = [
+  const detail = [
     `Auto-classified as "${classification.entity_type}" for ${surfaceLabel}${confidenceNote}.`,
     classification.rationale,
     isTeamingContext ? `Doctrine flag: ${classification.doctrine_flag} — read-only teaming context, not a qualified pursuit.` : null,
@@ -93,12 +93,12 @@ export async function routeToSurface(
 
   try {
     const aiRes = await pool.query<{ id: number }>(
-      `INSERT INTO action_items (title, description, status, priority, source, linked_record_type, linked_record_id, owner, assignee_id)
+      `INSERT INTO action_items (title, detail, status, priority, source, linked_record_type, linked_record_id, owner, assignee_id)
        VALUES ($1, $2, 'open', $3, 'ingest', 'ingest_job', $4, 'system', NULL)
        RETURNING id`,
       [
         triageTitle,
-        description,
+        detail,
         classification.confidence < 0.7 ? 'high' : 'medium',
         jobId,
       ],
