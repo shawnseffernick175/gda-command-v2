@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
-import { downloadGeneratedDoc } from "@/hooks/use-output-generators";
+import { downloadGeneratedDoc, fetchPreviewHtml } from "@/hooks/use-output-generators";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -69,15 +69,7 @@ function DocumentsContent() {
 
   const handlePreview = (docId: number, title: string) => {
     setPreviewTitle(title);
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech"}/v3/output-generators/${docId}/html`,
-      {
-        headers: {
-          Authorization: `Bearer ${document.cookie.replace(/(?:(?:^|.*;\s*)token\s*=\s*([^;]*).*$)|^.*$/, "$1") || ""}`,
-        },
-      },
-    )
-      .then((r) => r.text())
+    fetchPreviewHtml(docId)
       .then(setPreviewHtml)
       .catch(() => setPreviewHtml(null));
   };
@@ -221,7 +213,7 @@ function DocumentsContent() {
                 srcDoc={previewHtml}
                 title="Document Preview"
                 className="w-full h-full min-h-[600px] border-0"
-                sandbox="allow-same-origin"
+                sandbox=""
               />
             </div>
           </div>

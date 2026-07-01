@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiPost, apiGet, apiDownload } from "@/lib/api";
+import { apiPost, apiGet, apiDownload, apiFetchText } from "@/lib/api";
 
 interface GeneratedDocSummary {
   id: number;
@@ -92,4 +92,8 @@ export function downloadGeneratedDoc(docId: number, title: string): void {
     `/v3/output-generators/${docId}/html`,
     `${title.replace(/[^a-zA-Z0-9\s-]/g, "")}.html`,
   );
+}
+
+export async function fetchPreviewHtml(docId: number): Promise<string> {
+  return apiFetchText(`/v3/output-generators/${docId}/html`);
 }

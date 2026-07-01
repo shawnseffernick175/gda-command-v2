@@ -6,6 +6,7 @@ import {
   useGenerateWinThemes,
   useGeneratedDocs,
   downloadGeneratedDoc,
+  fetchPreviewHtml,
 } from "@/hooks/use-output-generators";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -31,15 +32,7 @@ export function CaptureOutputGenerators({
 
   const handlePreview = (docId: number, title: string) => {
     setPreviewTitle(title);
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech"}/v3/output-generators/${docId}/html`,
-      {
-        headers: {
-          Authorization: `Bearer ${document.cookie.replace(/(?:(?:^|.*;\s*)token\s*=\s*([^;]*).*$)|^.*$/, "$1") || ""}`,
-        },
-      },
-    )
-      .then((r) => r.text())
+    fetchPreviewHtml(docId)
       .then(setPreviewHtml)
       .catch(() => setPreviewHtml(null));
   };
@@ -235,7 +228,7 @@ function PreviewModal({
             srcDoc={html}
             title="Document Preview"
             className="w-full h-full min-h-[600px] border-0"
-            sandbox="allow-same-origin"
+            sandbox=""
           />
         </div>
       </div>

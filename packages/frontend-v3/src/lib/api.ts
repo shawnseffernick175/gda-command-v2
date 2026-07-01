@@ -357,6 +357,41 @@ export async function apiDownload(
   window.URL.revokeObjectURL(objectUrl);
 }
 
+/* ── Raw text fetch (HTML preview) ────────────────────────────── */
+
+/**
+ * Fetch raw text (e.g. HTML) from a /v3/* endpoint using the same
+ * Bearer auth + one-shot refresh-on-401 flow as apiFetch/apiDownload.
+ */
+export async function apiFetchText(path: string): Promise<string> {
+  if (typeof window === "undefined") return "";
+
+  const buildHeaders = (): Record<string, string> => {
+    const h: Record<string, string> = {};
+    if (accessToken) h["Authorization"] = `Bearer ${accessToken}`;
+    return h;
+  };
+
+  let res = await fetch(`${API_BASE}${path}`, { method: "GET", headers: buildHeaders() });
+
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      res = await fetch(`${API_BASE}${path}`, { method: "GET", headers: buildHeaders() });
+    } else {
+      accessToken = null;
+      redirectToLogin();
+      throw new ApiError("UNAUTHORIZED", "Session expired", 401);
+    }
+  }
+
+  if (!res.ok) {
+    throw new ApiError("UPSTREAM_ERROR", `Fetch failed (${res.status})`, res.status);
+  }
+
+  return res.text();
+}
+
 /* ── Auth helpers ─────────────────────────────────────────────── */
 
 export interface AuthUser {

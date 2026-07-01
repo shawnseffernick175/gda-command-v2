@@ -25,7 +25,8 @@ function escapeHtml(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function formatMoney(value: number | null): string {
@@ -160,14 +161,14 @@ export function generateBriefingHtml(data: BriefingData): string {
   <div class="kv"><span class="kv-label">Title</span><span class="kv-value">${escapeHtml(data.title)}</span></div>
   <div class="kv"><span class="kv-label">Agency</span><span class="kv-value">${escapeHtml(data.agency ?? 'N/A')}</span></div>
   <div class="kv"><span class="kv-label">Department</span><span class="kv-value">${escapeHtml(data.department ?? 'N/A')}</span></div>
-  <div class="kv"><span class="kv-label">NAICS</span><span class="kv-value" style="font-family:monospace;">${escapeHtml(data.naics ?? 'N/A')}</span></div>
+  <div class="kv"><span class="kv-label">NAICS</span><span class="kv-value" style="font-variant-numeric:tabular-nums;">${escapeHtml(data.naics ?? 'N/A')}</span></div>
   <div class="kv"><span class="kv-label">Set-Aside</span><span class="kv-value">${escapeHtml(data.set_aside ?? 'None')}</span></div>
-  <div class="kv"><span class="kv-label">Estimated Value</span><span class="kv-value" style="font-family:monospace;">${valueDisplay}</span></div>
-  <div class="kv"><span class="kv-label">Solicitation</span><span class="kv-value" style="font-family:monospace;">${escapeHtml(data.solicitation_number ?? 'N/A')}</span></div>
+  <div class="kv"><span class="kv-label">Estimated Value</span><span class="kv-value" style="font-variant-numeric:tabular-nums;">${valueDisplay}</span></div>
+  <div class="kv"><span class="kv-label">Solicitation</span><span class="kv-value" style="font-variant-numeric:tabular-nums;">${escapeHtml(data.solicitation_number ?? 'N/A')}</span></div>
   <div class="kv"><span class="kv-label">Response Due</span><span class="kv-value">${formatDate(data.response_due_at)}</span></div>
   <div class="kv"><span class="kv-label">Posted</span><span class="kv-value">${formatDate(data.posted_at)}</span></div>
   <div class="kv"><span class="kv-label">Place of Performance</span><span class="kv-value">${escapeHtml(data.place_of_performance ?? 'N/A')}</span></div>
-  <div class="kv"><span class="kv-label">PWin</span><span class="kv-value" style="font-family:monospace;font-weight:600;color:${HYDRA_TEAL};">${data.pwin != null ? `${data.pwin}%` : 'N/A'}</span></div>
+  <div class="kv"><span class="kv-label">PWin</span><span class="kv-value" style="font-variant-numeric:tabular-nums;font-weight:600;color:${HYDRA_TEAL};">${data.pwin != null ? `${data.pwin}%` : 'N/A'}</span></div>
   ${data.source_uri ? `<div class="kv"><span class="kv-label">Source</span><span class="kv-value"><a href="${escapeHtml(data.source_uri)}">${escapeHtml(data.source_uri)}</a></span></div>` : ''}
 </div>
 
@@ -258,9 +259,9 @@ export function generateCapturePlanHtml(data: CapturePlanData): string {
   <h2 style="margin-top:0;">Pursuit Overview</h2>
   <div class="kv"><span class="kv-label">Program</span><span class="kv-value">${escapeHtml(data.title)}</span></div>
   <div class="kv"><span class="kv-label">Agency</span><span class="kv-value">${escapeHtml(data.agency ?? 'N/A')}</span></div>
-  <div class="kv"><span class="kv-label">Value</span><span class="kv-value" style="font-family:monospace;">${formatMoney(data.value)}</span></div>
+  <div class="kv"><span class="kv-label">Value</span><span class="kv-value" style="font-variant-numeric:tabular-nums;">${formatMoney(data.value)}</span></div>
   <div class="kv"><span class="kv-label">Stage</span><span class="kv-value">${escapeHtml(data.stage)}</span></div>
-  <div class="kv"><span class="kv-label">PWin</span><span class="kv-value" style="font-family:monospace;font-weight:600;color:${HYDRA_TEAL};">${data.pwin != null ? `${data.pwin}%` : 'N/A'}</span></div>
+  <div class="kv"><span class="kv-label">PWin</span><span class="kv-value" style="font-variant-numeric:tabular-nums;font-weight:600;color:${HYDRA_TEAL};">${data.pwin != null ? `${data.pwin}%` : 'N/A'}</span></div>
   ${data.incumbent ? `<div class="kv"><span class="kv-label">Incumbent</span><span class="kv-value">${escapeHtml(data.incumbent)}</span></div>` : ''}
 </div>
 
@@ -345,7 +346,7 @@ export function generateWinThemesHtml(data: WinThemeData): string {
 <div class="section">
   <div class="kv"><span class="kv-label">Program</span><span class="kv-value">${escapeHtml(data.title)}</span></div>
   <div class="kv"><span class="kv-label">Agency</span><span class="kv-value">${escapeHtml(data.agency ?? 'N/A')}</span></div>
-  <div class="kv"><span class="kv-label">Themes</span><span class="kv-value" style="font-family:monospace;">${data.themes.length}</span></div>
+  <div class="kv"><span class="kv-label">Themes</span><span class="kv-value" style="font-variant-numeric:tabular-nums;">${data.themes.length}</span></div>
 </div>
 
 ${themesHtml || `<p style="font-size:13px;color:${MUTED};">No win themes defined for this capture.</p>`}

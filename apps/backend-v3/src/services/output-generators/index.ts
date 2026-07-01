@@ -33,6 +33,41 @@ const DOCTRINE_PRINCIPLES = [
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+function buildSectionsFromCache(cache: Record<string, unknown>): Array<{ heading: string; content: string; citations?: Array<{ source?: string; url?: string }> }> {
+  const sections: Array<{ heading: string; content: string; citations?: Array<{ source?: string; url?: string }> }> = [];
+
+  if (cache.incumbent && typeof cache.incumbent === 'string') {
+    sections.push({ heading: 'Incumbent', content: cache.incumbent });
+  }
+
+  if (cache.competitors && Array.isArray(cache.competitors)) {
+    const names = (cache.competitors as Array<{ name?: string }>).map((c) => c.name ?? 'Unknown').join(', ');
+    sections.push({ heading: 'Competitors', content: names || 'No competitors identified' });
+  }
+
+  if (cache.blackhat && typeof cache.blackhat === 'object') {
+    const bh = cache.blackhat as Record<string, unknown>;
+    const summary = typeof bh.summary === 'string' ? bh.summary : JSON.stringify(bh);
+    sections.push({ heading: 'Black Hat Analysis', content: summary });
+  }
+
+  if (cache.wargame && typeof cache.wargame === 'object') {
+    const wg = cache.wargame as Record<string, unknown>;
+    const strategy = typeof wg.strategy === 'string' ? wg.strategy : '';
+    const themes = Array.isArray(wg.win_themes) ? (wg.win_themes as string[]).join('; ') : '';
+    const content = [strategy, themes].filter(Boolean).join(' — ');
+    if (content) sections.push({ heading: 'Win Strategy', content });
+  }
+
+  if (cache.timeline && typeof cache.timeline === 'object') {
+    const tl = cache.timeline as Record<string, unknown>;
+    const summary = typeof tl.summary === 'string' ? tl.summary : '';
+    if (summary) sections.push({ heading: 'Timeline', content: summary });
+  }
+
+  return sections;
+}
+
 async function insertGeneratedDoc(
   docType: GeneratedDocType,
   opportunityId: string | null,
@@ -227,23 +262,30 @@ export async function generateBriefing(
   if (!opp) throw new Error(`Opportunity ${opportunityId} not found`);
 
   // Fetch cached analysis (R2: auto-populate, no re-running)
-  const analysisRes = await pool.query<{ result: Record<string, unknown>; pwin: number | null }>(
-    `SELECT result, pwin FROM opportunity_analysis_cache
+  const analysisRes = await pool.query<{
+    pwin: number | null;
+    incumbent: string | null;
+    competitors: unknown;
+    blackhat: unknown;
+    wargame: unknown;
+    timeline: unknown;
+  }>(
+    `SELECT pwin, incumbent, competitors, blackhat, wargame, timeline
+     FROM opportunity_analysis_cache
      WHERE opportunity_id = $1 ORDER BY generated_at DESC LIMIT 1`,
     [opportunityId],
   );
   const analysisCache = analysisRes.rows[0] ?? null;
-  const analysisJson = analysisCache?.result ?? null;
+  const analysisJson = analysisCache
+    ? {
+        sections: buildSectionsFromCache(analysisCache),
+        incumbent: analysisCache.incumbent,
+        competitors: analysisCache.competitors,
+        wargame: analysisCache.wargame,
+      }
+    : null;
 
-  // Fetch pwin from pwin cache if not in analysis cache
-  let pwin = analysisCache?.pwin ?? null;
-  if (pwin === null) {
-    const pwinRes = await pool.query<{ score: number }>(
-      `SELECT score FROM pwin_cache WHERE opportunity_id = $1 ORDER BY scored_at DESC LIMIT 1`,
-      [opportunityId],
-    );
-    pwin = pwinRes.rows[0]?.score ?? null;
-  }
+  const pwin = analysisCache?.pwin ?? null;
 
   const analysisSections = extractAnalysisSections(analysisJson);
   const doctrineRefs = extractDoctrineRefsFromAnalysis(analysisJson);
@@ -354,19 +396,33 @@ export async function generateCapturePlan(
   pwin = pwinRes.rows[0]?.pwin ?? null;
 
   if (pwin === null) {
-    const oppPwinRes = await pool.query<{ score: number }>(
-      'SELECT score FROM pwin_cache WHERE opportunity_id = $1 ORDER BY scored_at DESC LIMIT 1',
+    const oppPwinRes = await pool.query<{ pwin: number }>(
+      'SELECT pwin FROM opportunity_analysis_cache WHERE opportunity_id = $1 ORDER BY generated_at DESC LIMIT 1',
       [pi.opportunity_id],
     );
-    pwin = oppPwinRes.rows[0]?.score ?? null;
+    pwin = oppPwinRes.rows[0]?.pwin ?? null;
   }
 
   // Fetch cached analysis
-  const analysisRes = await pool.query<{ result: Record<string, unknown> }>(
-    'SELECT result FROM opportunity_analysis_cache WHERE opportunity_id = $1 ORDER BY generated_at DESC LIMIT 1',
+  const analysisRes = await pool.query<{
+    incumbent: string | null;
+    competitors: unknown;
+    blackhat: unknown;
+    wargame: unknown;
+    timeline: unknown;
+  }>(
+    'SELECT incumbent, competitors, blackhat, wargame, timeline FROM opportunity_analysis_cache WHERE opportunity_id = $1 ORDER BY generated_at DESC LIMIT 1',
     [pi.opportunity_id],
   );
-  const analysisJson = analysisRes.rows[0]?.result ?? null;
+  const cacheRow = analysisRes.rows[0] ?? null;
+  const analysisJson = cacheRow
+    ? {
+        sections: buildSectionsFromCache(cacheRow),
+        incumbent: cacheRow.incumbent,
+        competitors: cacheRow.competitors,
+        wargame: cacheRow.wargame,
+      }
+    : null;
   const analysisSections = extractAnalysisSections(analysisJson);
   const doctrineRefs = extractDoctrineRefsFromAnalysis(analysisJson);
   const citations = extractCitationsFromAnalysis(analysisJson);
@@ -404,8 +460,8 @@ export async function generateCapturePlan(
   const risks: string[] = [];
   try {
     const riskRes = await pool.query<{ title: string; description: string | null }>(
-      `SELECT title, description FROM risks WHERE entity_type = 'capture' AND entity_id = $1`,
-      [captureId],
+      `SELECT title, description FROM risks WHERE opportunity_id = $1`,
+      [pi.opportunity_id],
     );
     for (const r of riskRes.rows) {
       risks.push(r.description ? `${r.title}: ${r.description}` : r.title);
@@ -484,11 +540,20 @@ export async function generateWinThemesPdf(
   if (!opp) throw new Error(`Opportunity for capture ${captureId} not found`);
 
   // Fetch analysis for doctrine refs
-  const analysisRes = await pool.query<{ result: Record<string, unknown> }>(
-    'SELECT result FROM opportunity_analysis_cache WHERE opportunity_id = $1 ORDER BY generated_at DESC LIMIT 1',
+  const winAnalysisRes = await pool.query<{
+    wargame: unknown;
+    competitors: unknown;
+  }>(
+    'SELECT wargame, competitors FROM opportunity_analysis_cache WHERE opportunity_id = $1 ORDER BY generated_at DESC LIMIT 1',
     [pi.opportunity_id],
   );
-  const analysisJson = analysisRes.rows[0]?.result ?? null;
+  const winCacheRow = winAnalysisRes.rows[0] ?? null;
+  const analysisJson = winCacheRow
+    ? {
+        sections: buildSectionsFromCache(winCacheRow as Record<string, unknown>),
+        wargame: winCacheRow.wargame,
+      }
+    : null;
   const doctrineRefs = extractDoctrineRefsFromAnalysis(analysisJson);
 
   // Build themes from capture data

@@ -217,10 +217,18 @@ export async function outputGeneratorRoutes(app: FastifyInstance): Promise<void>
       offset?: string;
     };
   }>('/v3/output-generators', async (req, reply) => {
+    const VALID_DOC_TYPES = ['briefing', 'capture_plan', 'win_themes'];
+    const docType = req.query.doc_type;
+    if (docType && !VALID_DOC_TYPES.includes(docType)) {
+      return reply.status(400).send(
+        errorEnvelope('VALIDATION_ERROR', `Invalid doc_type: must be one of ${VALID_DOC_TYPES.join(', ')}`, req.requestId),
+      );
+    }
+
     const result = await listGeneratedDocs({
       opportunity_id: req.query.opportunity_id,
       capture_id: req.query.capture_id,
-      doc_type: req.query.doc_type,
+      doc_type: docType,
       limit: parseInt(req.query.limit ?? '50', 10),
       offset: parseInt(req.query.offset ?? '0', 10),
     });
