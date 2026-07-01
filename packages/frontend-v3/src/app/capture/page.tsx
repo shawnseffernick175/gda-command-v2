@@ -473,7 +473,7 @@ function CaptureDetail({ oppId }: { oppId: string }) {
         </CardHeader>
         <CardContent>
           <PricingScenarioPanel
-            captureId={Number(oppId)}
+            captureId={capture.id}
             opportunityTitle={capture.title}
           />
         </CardContent>

@@ -69,3 +69,11 @@ prevent_pipeline_item_delete
 # F-612: sitrep_items.source_document_id + source_document_url added by v3_112
 sitrep_items.source_document_id
 sitrep_items.source_document_url
+
+# F-311: Financial Bible tables added by v3_126
+financial_bible_versions
+financial_rates
+financial_indirects
+financial_odc_escalation
+financial_history
+pricing_scenarios

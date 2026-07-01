@@ -110,7 +110,7 @@ async function parseRatesXlsx(buf: Buffer): Promise<{ rows: RateRow[]; warnings:
   ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
     const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
     const first = cellStr(vals[0]).toLowerCase();
-    if (first.includes('labor') || first.includes('category')) {
+    if (!headerRow && rowNum <= 5 && (first.includes('labor') || first.includes('category'))) {
       headerRow = rowNum;
       return;
     }
@@ -146,7 +146,7 @@ async function parseIndirectsXlsx(buf: Buffer): Promise<{ rows: IndirectRow[]; w
   ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
     const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
     const first = cellStr(vals[0]).toLowerCase();
-    if (first.includes('contract') || first.includes('type')) {
+    if (!headerRow && rowNum <= 5 && (first.includes('contract') || first.includes('type'))) {
       headerRow = rowNum;
       return;
     }
@@ -183,7 +183,7 @@ async function parseOdcsXlsx(buf: Buffer): Promise<{ rows: OdcRow[]; warnings: s
   ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
     const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
     const first = cellStr(vals[0]).toLowerCase();
-    if (first.includes('category') || first.includes('odc') || first.includes('cost')) {
+    if (!headerRow && rowNum <= 5 && (first.includes('category') || first.includes('odc'))) {
       headerRow = rowNum;
       return;
     }
@@ -219,7 +219,7 @@ async function parseHistoryXlsx(buf: Buffer): Promise<{ rows: HistoryRow[]; warn
   ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
     const vals = Array.isArray(row.values) ? row.values.slice(1) : [];
     const first = cellStr(vals[0]).toLowerCase();
-    if (first.includes('pursuit') || first.includes('id') || first.includes('solicitation')) {
+    if (!headerRow && rowNum <= 5 && (first.includes('pursuit') || first.includes('solicitation'))) {
       headerRow = rowNum;
       return;
     }
