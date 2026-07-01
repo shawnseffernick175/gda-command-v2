@@ -218,6 +218,13 @@ export const ROUTING_TABLE: readonly RoutingTableEntry[] = [
     timeout_ms: 90_000,
     fallback: { provider: 'anthropic', model: 'claude-haiku-4-5', min_remaining_budget_ms: 30_000 },
   },
+  {
+    task: 'sitrep_document_analyze',
+    provider: 'anthropic',
+    model: 'claude-haiku-4-5',
+    timeout_ms: 20_000,
+    fallback: null,
+  },
 ] as const;
 
 /** Lookup helper — O(1) via pre-built map. */
