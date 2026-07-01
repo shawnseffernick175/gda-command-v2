@@ -58,7 +58,7 @@ export default function PartnersPage() {
                           variant="outline"
                           className="text-[11px] font-normal border-critical/40 text-critical px-1.5 py-0"
                         >
-                          Stale (&gt;90d)
+                          Stale ({">"}90d)
                         </Badge>
                       )}
                       {!partner.active && (
