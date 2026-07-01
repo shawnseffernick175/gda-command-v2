@@ -6,6 +6,9 @@ import {
   useUpdateActionItem,
   useCreateDraft,
   useUsers,
+  useApproveDraft,
+  useRejectDraft,
+  useEditDraft,
 } from "@/hooks/use-action-items";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +23,7 @@ import type {
   ActionItem,
   ActionItemDraft,
   ActionItemPriority,
+  ActionItemDraftStatus,
   DoctrineSource,
 } from "@/lib/types";
 import Link from "next/link";
@@ -450,47 +454,228 @@ function ActionItemRow({
       </div>
 
       {expanded && (
-        <DraftPanel itemId={item.id} drafts={item.drafts ?? []} />
+        <AiDraftSidePanel item={item} />
       )}
     </div>
   );
 }
 
-/* ── Draft panel (shown when an item row is expanded) ────────── */
+/* ── AI Draft Side Panel (F-310) ─────────────────────────────── */
 
-function DraftPanel({
-  itemId,
-  drafts,
-}: {
-  itemId: number;
-  drafts: ActionItemDraft[];
-}) {
+const DRAFT_STATUS_LABELS: Record<ActionItemDraftStatus, string> = {
+  pending: "Generating...",
+  ready: "Draft Ready",
+  approved: "Approved",
+  sent: "Sent",
+  rejected: "Rejected",
+  no_context: "No draft — needs human",
+};
+
+const DRAFT_STATUS_COLORS: Record<ActionItemDraftStatus, string> = {
+  pending: "text-[#B45309]",
+  ready: "text-[#01696F]",
+  approved: "text-[#01696F]",
+  sent: "text-[#01696F]",
+  rejected: "text-[#A12C7B]",
+  no_context: "text-[#7A7974]",
+};
+
+function AiDraftSidePanel({ item }: { item: ActionItem }) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(item.draft_text ?? "");
+  const [rejectMode, setRejectMode] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const approveMutation = useApproveDraft();
+  const rejectMutation = useRejectDraft();
+  const editMutation = useEditDraft();
   const createDraft = useCreateDraft();
 
+  const draftStatus = item.draft_status ?? "pending";
+  const hasDraft = draftStatus === "ready" || draftStatus === "approved" || draftStatus === "sent";
+  const isPending = draftStatus === "pending";
+
   return (
-    <div className="ml-9 mr-2 mb-2 rounded bg-[#F7F6F2] p-2 space-y-2">
-      <div className="flex gap-1.5">
-        {DRAFT_KINDS.map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            disabled={createDraft.isPending}
-            onClick={() => createDraft.mutate({ id: itemId, kind })}
-            className="text-caption px-2 py-0.5 rounded border border-[#D4D1CA] hover:border-[#01696F] transition-colors disabled:opacity-50"
-          >
-            {kind === "reply"
-              ? "Reply Draft"
-              : kind === "research"
-                ? "Research"
-                : "Milestone"}
-          </button>
-        ))}
+    <div className="ml-9 mr-2 mb-2 rounded bg-[#F7F6F2] p-3 space-y-3">
+      {/* Draft status header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-caption font-semibold text-[#28251D]">AI Draft</span>
+          <span className={cn("text-caption", DRAFT_STATUS_COLORS[draftStatus])}>
+            {isPending && (
+              <span className="inline-flex items-center gap-1">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#B45309] border-t-transparent" />
+              </span>
+            )}
+            {DRAFT_STATUS_LABELS[draftStatus]}
+          </span>
+        </div>
+        {item.draft_generated_at && (
+          <span className="text-[11px] text-[#7A7974]">
+            Generated {formatDate(item.draft_generated_at)}
+          </span>
+        )}
       </div>
 
-      {drafts.length > 0 && (
+      {/* Draft content */}
+      {hasDraft && item.draft_text && !editing && (
+        <pre className="text-body whitespace-pre-wrap bg-white rounded border border-[#D4D1CA]/50 p-3 text-[#28251D]">
+          {item.draft_text}
+        </pre>
+      )}
+
+      {/* No context message */}
+      {draftStatus === "no_context" && item.draft_text && (
+        <div className="rounded border border-[#D4D1CA]/50 bg-white p-3 text-caption text-[#7A7974]">
+          {item.draft_text}
+        </div>
+      )}
+
+      {/* Edit mode */}
+      {editing && (
+        <div className="space-y-2">
+          <textarea
+            className="w-full rounded border border-[#D4D1CA] bg-white p-3 text-body text-[#28251D] min-h-[200px] resize-y focus:outline-none focus:border-[#01696F]"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={editMutation.isPending || !editText.trim()}
+              onClick={() => {
+                editMutation.mutate(
+                  { id: item.id, edited_text: editText },
+                  { onSuccess: () => setEditing(false) },
+                );
+              }}
+              className="text-caption px-3 py-1 rounded bg-[#01696F] text-white hover:bg-[#01696F]/90 transition-colors disabled:opacity-50"
+            >
+              {editMutation.isPending ? "Saving..." : "Save Edit"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(false);
+                setEditText(item.draft_text ?? "");
+              }}
+              className="text-caption px-3 py-1 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Reject mode */}
+      {rejectMode && (
+        <div className="space-y-2">
+          <textarea
+            className="w-full rounded border border-[#D4D1CA] bg-white p-3 text-body text-[#28251D] min-h-[80px] resize-y focus:outline-none focus:border-[#A12C7B]"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Why is this draft not acceptable? (captured for training)"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={rejectMutation.isPending || !rejectReason.trim()}
+              onClick={() => {
+                rejectMutation.mutate(
+                  { id: item.id, reason: rejectReason.trim() },
+                  {
+                    onSuccess: () => {
+                      setRejectMode(false);
+                      setRejectReason("");
+                    },
+                  },
+                );
+              }}
+              className="text-caption px-3 py-1 rounded bg-[#A12C7B] text-white hover:bg-[#A12C7B]/90 transition-colors disabled:opacity-50"
+            >
+              {rejectMutation.isPending ? "Rejecting..." : "Confirm Reject"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRejectMode(false);
+                setRejectReason("");
+              }}
+              className="text-caption px-3 py-1 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {draftStatus === "ready" && !editing && !rejectMode && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={approveMutation.isPending}
+            onClick={() => approveMutation.mutate({ id: item.id })}
+            className="text-caption px-3 py-1 rounded bg-[#01696F] text-white hover:bg-[#01696F]/90 transition-colors disabled:opacity-50"
+          >
+            {approveMutation.isPending ? "Approving..." : "Approve"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRejectMode(true)}
+            className="text-caption px-3 py-1 rounded border border-[#A12C7B]/30 text-[#A12C7B] hover:bg-[#A12C7B]/10 transition-colors"
+          >
+            Reject
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditText(item.draft_text ?? "");
+              setEditing(true);
+            }}
+            className="text-caption px-3 py-1 rounded border border-[#D4D1CA] text-[#7A7974] hover:text-[#28251D] hover:border-[#01696F] transition-colors"
+          >
+            Edit
+          </button>
+        </div>
+      )}
+
+      {/* R1 evidence citations */}
+      {item.draft_evidence_ids && item.draft_evidence_ids.length > 0 && (
         <div className="space-y-1">
-          {drafts.map((draft) => (
-            <DraftRow key={draft.id} draft={draft} />
+          <span className="text-[11px] text-[#7A7974] uppercase tracking-wider">Sources</span>
+          <div className="flex flex-wrap gap-1">
+            {item.draft_evidence_ids.map((ref, idx) => (
+              <Link
+                key={idx}
+                href={ref.url}
+                className="text-[11px] px-1.5 py-0.5 rounded bg-[#01696F]/10 text-[#01696F] border border-[#01696F]/20 hover:bg-[#01696F]/20 transition-colors"
+              >
+                {ref.title}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Legacy drafts section */}
+      {item.drafts && item.drafts.length > 0 && (
+        <div className="space-y-1 border-t border-[#D4D1CA]/30 pt-2">
+          <span className="text-[11px] text-[#7A7974] uppercase tracking-wider">Additional Drafts</span>
+          <div className="flex gap-1.5 mb-1">
+            {DRAFT_KINDS.map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                disabled={createDraft.isPending}
+                onClick={() => createDraft.mutate({ id: item.id, kind })}
+                className="text-caption px-2 py-0.5 rounded border border-[#D4D1CA] hover:border-[#01696F] transition-colors disabled:opacity-50"
+              >
+                {kind === "reply" ? "Reply Draft" : kind === "research" ? "Research" : "Milestone"}
+              </button>
+            ))}
+          </div>
+          {item.drafts.map((draft) => (
+            <LegacyDraftRow key={draft.id} draft={draft} />
           ))}
         </div>
       )}
@@ -498,9 +683,9 @@ function DraftPanel({
   );
 }
 
-/* ── Single draft row (expandable) ───────────────────────────── */
+/* ── Legacy draft row (expandable) ───────────────────────────── */
 
-function DraftRow({ draft }: { draft: ActionItemDraft }) {
+function LegacyDraftRow({ draft }: { draft: ActionItemDraft }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -516,7 +701,7 @@ function DraftRow({ draft }: { draft: ActionItemDraft }) {
         <DraftStatusChip status={draft.status} />
         <span className="text-caption text-[#7A7974] line-clamp-2 flex-1">
           {draft.status === "generating"
-            ? "Generating…"
+            ? "Generating..."
             : draft.content.slice(0, 120)}
         </span>
       </button>

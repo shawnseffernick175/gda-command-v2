@@ -10,6 +10,15 @@ import {
 } from '../services/launchpad/cache.js';
 import { pool } from '../lib/db.js';
 import type { JwtPayload } from '../middleware/auth.js';
+import {
+  getActionItemsWithReadyDrafts,
+  getAssignee,
+  toApiShape,
+} from '../services/action-items/index.js';
+import {
+  getDraftsByActionItem,
+  toDraftApiShape,
+} from '../services/drafts/index.js';
 
 function getUserId(req: FastifyRequest): string {
   return (req as FastifyRequest & { user?: JwtPayload }).user?.sub ?? 'anonymous';
@@ -123,5 +132,27 @@ export async function launchpadRoutes(app: FastifyInstance): Promise<void> {
     }));
 
     return reply.status(200).send(successEnvelope({ items }, req.requestId));
+  });
+
+  // F-310: GET /v3/launchpad/what-needs-me — action items with drafts, ranked by priority x due
+  app.get<{
+    Querystring: { limit?: string };
+  }>('/v3/launchpad/what-needs-me', async (req, reply) => {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 7;
+    const items = await getActionItemsWithReadyDrafts(limit);
+
+    const shaped = await Promise.all(
+      items.map(async (item) => {
+        const [drafts, assignee] = await Promise.all([
+          getDraftsByActionItem(item.id),
+          getAssignee(item.assignee_id),
+        ]);
+        return toApiShape(item, drafts.map(toDraftApiShape), assignee);
+      })
+    );
+
+    return reply.status(200).send(
+      successEnvelope({ items: shaped, generated_at: new Date().toISOString() }, req.requestId)
+    );
   });
 }

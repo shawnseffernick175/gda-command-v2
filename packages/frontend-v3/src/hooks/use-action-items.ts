@@ -106,6 +106,61 @@ export function useTopActionItems(limit: number = 5) {
   });
 }
 
+export function useApproveDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) =>
+      apiPost<ActionItem>(`/v3/action-items/${id}/approve-draft`, {}),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["action-items"] });
+      void qc.invalidateQueries({ queryKey: ["top-action-items"] });
+      void qc.invalidateQueries({ queryKey: ["what-needs-me"] });
+    },
+  });
+}
+
+export function useRejectDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      apiPost<ActionItem>(`/v3/action-items/${id}/reject-draft`, { reason }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["action-items"] });
+      void qc.invalidateQueries({ queryKey: ["top-action-items"] });
+      void qc.invalidateQueries({ queryKey: ["what-needs-me"] });
+    },
+  });
+}
+
+export function useEditDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, edited_text }: { id: number; edited_text: string }) =>
+      apiPost<ActionItem>(`/v3/action-items/${id}/edit-draft`, { edited_text }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["action-items"] });
+      void qc.invalidateQueries({ queryKey: ["top-action-items"] });
+      void qc.invalidateQueries({ queryKey: ["what-needs-me"] });
+    },
+  });
+}
+
+export function useWhatNeedsMe(limit: number = 7) {
+  return useQuery({
+    queryKey: ["what-needs-me", limit],
+    queryFn: () =>
+      apiGet<{ items: ActionItem[]; generated_at: string }>(
+        "/v3/launchpad/what-needs-me",
+        { limit },
+      ),
+    refetchInterval: (query) => {
+      const items = query.state.data?.items ?? [];
+      const hasPending = items.some((i) => i.draft_status === "pending");
+      return hasPending ? 5000 : false;
+    },
+  });
+}
+
 export function useUsers() {
   return useQuery({
     queryKey: ["users"],
