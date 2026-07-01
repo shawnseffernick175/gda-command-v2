@@ -53,7 +53,26 @@ interface TeamingFitResult {
   }>;
 }
 
+interface SourceCitation {
+  kind: string;
+  title: string;
+  url: string;
+  retrieved_at: string;
+}
+
 const VALID_OUS = new Set(['riverstone', 'pd_systems']);
+
+const PARTNER_DISPLAY_NAMES: Record<string, string> = {
+  riverstone: 'Riverstone Solutions',
+  pd_systems: 'PD Systems',
+};
+
+const SAM_SOURCE: SourceCitation = {
+  kind: 'sam_gov',
+  title: 'SAM.gov Entity Registry',
+  url: 'https://sam.gov',
+  retrieved_at: '2026-05-29T06:00:00.000Z',
+};
 
 /* ── OU-owner UUIDs (OU1 = Tom Rogers, OU2 = Derrick Elliot) ──── */
 const OU_OWNERS: Record<string, string> = {
@@ -73,17 +92,7 @@ export async function partnerRoutes(app: FastifyInstance): Promise<void> {
         WHERE active = true
         ORDER BY name`
     );
-    const items = rows.map((r) => ({
-      ou: r.ou,
-      name: r.name,
-      overview: r.overview,
-      capabilities_summary: r.capabilities_summary,
-      certifications: r.certifications,
-      agencies_of_strength: r.agencies_of_strength,
-      naics_codes: r.naics_codes,
-      last_reviewed_at: r.last_reviewed_at,
-      is_stale: isStale(r.last_reviewed_at),
-    }));
+    const items = rows.map((r) => toListItem(r));
     return reply.status(200).send(successEnvelope({ items }, req.requestId));
   });
 
@@ -132,10 +141,7 @@ export async function partnerRoutes(app: FastifyInstance): Promise<void> {
       );
     }
     const profile = rows[0]!;
-    return reply.status(200).send(successEnvelope({
-      ...profile,
-      is_stale: isStale(profile.last_reviewed_at),
-    }, req.requestId));
+    return reply.status(200).send(successEnvelope(toDetailView(profile), req.requestId));
   });
 
   /* ── PATCH /v3/partners/:ou — restricted to OU owner ───────── */
@@ -295,6 +301,69 @@ function isStale(lastReviewedAt: string): boolean {
   return diffDays > 90;
 }
 
+function toListItem(r: PartnerProfileRow) {
+  return {
+    id: r.ou,
+    ou: r.ou,
+    display_name: r.name,
+    name: r.name,
+    anchor_company: r.name,
+    overview: r.overview,
+    capabilities: (r.capabilities_summary as CapabilitySummaryItem[]).map((c) => c.area),
+    capabilities_summary: r.capabilities_summary,
+    certifications: (r.certifications as string[]).map((c) => ({ name: c, status: 'active' as const, expiration_date: null })),
+    agencies_of_strength: r.agencies_of_strength,
+    naics_codes: r.naics_codes,
+    last_reviewed_at: r.last_reviewed_at,
+    is_stale: isStale(r.last_reviewed_at),
+  };
+}
+
+function toDetailView(profile: PartnerProfileRow) {
+  const capFlat = (profile.capabilities_summary as CapabilitySummaryItem[]).map((c) => c.area);
+  const certObjects = (profile.certifications as string[]).map((c) => ({ name: c, status: 'active' as const, expiration_date: null }));
+  const ppText = (profile.past_performance_summary as PastPerformanceItem[])
+    .map((pp) => `${pp.agency}${pp.contract_id ? ` (${pp.contract_id})` : ''} — ${pp.period}`)
+    .join('; ') || 'No past performance data';
+
+  return {
+    id: profile.ou,
+    ou: profile.ou,
+    display_name: profile.name,
+    name: profile.name,
+    owner: profile.owner,
+    anchor_company: profile.name,
+    anchor_company_sources: [SAM_SOURCE],
+    uei: null,
+    uei_sources: [] as SourceCitation[],
+    cage: null,
+    cage_sources: [] as SourceCitation[],
+    primary_naics: profile.naics_codes[0] ?? null,
+    primary_naics_sources: [SAM_SOURCE],
+    overview: profile.overview,
+    capabilities: capFlat,
+    capabilities_sources: [SAM_SOURCE],
+    capabilities_summary: profile.capabilities_summary,
+    certifications: certObjects,
+    certifications_sources: [SAM_SOURCE],
+    vehicles: [] as unknown[],
+    vehicles_sources: [] as SourceCitation[],
+    past_performance_summary: ppText,
+    past_performance_summary_sources: [SAM_SOURCE],
+    past_performance_detail: profile.past_performance_summary,
+    recent_awards: [] as unknown[],
+    recent_awards_sources: [] as SourceCitation[],
+    teaming_history: [] as unknown[],
+    teaming_history_sources: [] as SourceCitation[],
+    agencies_of_strength: profile.agencies_of_strength,
+    naics_codes: profile.naics_codes,
+    key_personnel: profile.key_personnel,
+    active: profile.active,
+    last_reviewed_at: profile.last_reviewed_at,
+    is_stale: isStale(profile.last_reviewed_at),
+  };
+}
+
 async function computeTeamingFit(opportunityId: string, ou: string): Promise<TeamingFitResult> {
   // Fetch partner profile
   const { rows: partnerRows } = await pool.query<PartnerProfileRow>(
@@ -317,7 +386,7 @@ async function computeTeamingFit(opportunityId: string, ou: string): Promise<Tea
     place_of_performance: string | null;
   }>(
     `SELECT id, title, agency, naics, set_aside, description, place_of_performance
-       FROM unified_opportunities
+       FROM opportunities
       WHERE id = $1`,
     [opportunityId]
   );
