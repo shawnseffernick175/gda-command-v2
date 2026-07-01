@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   FolderKanban,
   Palette,
+  Crosshair,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -48,6 +49,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Workshop", href: "/workshop", icon: Hammer },
   { label: "Overrides", href: "/overrides", icon: GitCompare },
   { label: "Contacts", href: "/contacts", icon: Users },
+  { label: "Capabilities", href: "/capabilities", icon: Crosshair },
   { label: "Competitors", href: "/competitors", icon: Shield },
   { label: "Risks", href: "/risks", icon: AlertTriangle },
   { label: "Prompts", href: "/prompts", icon: Terminal },
