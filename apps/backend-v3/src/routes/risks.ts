@@ -153,7 +153,7 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
       next_step: body.next_step ?? null,
     };
 
-    const result = await createRisk(input, body.source === 'manual');
+    const result = await createRisk(input, input.source === 'manual');
 
     // Fetch the created/existing row
     const { rows } = await pool.query(
@@ -218,9 +218,11 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'No valid fields to update', req.requestId));
     }
 
-    // Set resolved_at when transitioning to resolved
+    // Set resolved_at when transitioning to resolved; clear it when reopening
     if (body.status === 'resolved' && current.status !== 'resolved') {
       sets.push('resolved_at = NOW()');
+    } else if (body.status && body.status !== 'resolved' && current.status === 'resolved') {
+      sets.push('resolved_at = NULL');
     }
 
     sets.push('updated_at = NOW()');
@@ -297,8 +299,13 @@ export async function risksRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     const body = req.body as { event_type?: string; detail?: Record<string, unknown>; actor?: string };
 
-    if (!body.event_type) {
-      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'event_type is required', req.requestId));
+    const VALID_EVENT_TYPES: RiskEventType[] = [
+      'created', 'status_change', 'duplicate_fire', 'mitigation_update',
+      'owner_change', 'evidence_added', 'severity_change', 'note',
+    ];
+
+    if (!body.event_type || !VALID_EVENT_TYPES.includes(body.event_type as RiskEventType)) {
+      return reply.status(400).send(errorEnvelope('VALIDATION_ERROR', 'event_type is required and must be one of: ' + VALID_EVENT_TYPES.join(', '), req.requestId));
     }
 
     await logRiskEvent(

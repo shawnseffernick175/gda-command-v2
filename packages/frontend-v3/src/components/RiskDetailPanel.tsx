@@ -9,7 +9,7 @@ import type { Risk, RiskSeverity, RiskStatus } from "@/lib/types";
 import { XIcon, ArrowRightIcon } from "lucide-react";
 
 const SEVERITIES: RiskSeverity[] = ["critical", "high", "medium", "low"];
-const STATUSES: RiskStatus[] = ["open", "mitigating", "resolved", "accepted"];
+const STATUSES: RiskStatus[] = ["open", "mitigating", "resolved", "accepted", "mitigated", "closed"];
 
 function severityBadge(severity: string) {
   switch (severity) {
@@ -68,6 +68,8 @@ export function RiskDetailPanel({
   const [owner, setOwner] = useState(risk.owner ?? "");
   const [dueAt, setDueAt] = useState(risk.due_at ? risk.due_at.slice(0, 10) : "");
   const [mitPlan, setMitPlan] = useState(risk.mitigation_plan ?? "");
+  const [severity, setSeverity] = useState<RiskSeverity>(risk.severity);
+  const [status, setStatus] = useState<RiskStatus>(risk.status);
   const [noteText, setNoteText] = useState("");
 
   const isNegative = risk.risk_type !== "positive";
@@ -143,8 +145,12 @@ export function RiskDetailPanel({
             <div>
               <label className="block text-caption text-muted mb-1">Severity</label>
               <select
-                value={risk.severity}
-                onChange={(e) => updateRisk.mutate({ id: risk.id, severity: e.target.value as RiskSeverity })}
+                value={severity}
+                onChange={(e) => {
+                  const v = e.target.value as RiskSeverity;
+                  setSeverity(v);
+                  updateRisk.mutate({ id: risk.id, severity: v });
+                }}
                 className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
               >
                 {SEVERITIES.map((s) => (
@@ -155,8 +161,12 @@ export function RiskDetailPanel({
             <div>
               <label className="block text-caption text-muted mb-1">Status</label>
               <select
-                value={risk.status}
-                onChange={(e) => updateRisk.mutate({ id: risk.id, status: e.target.value as RiskStatus })}
+                value={status}
+                onChange={(e) => {
+                  const v = e.target.value as RiskStatus;
+                  setStatus(v);
+                  updateRisk.mutate({ id: risk.id, status: v });
+                }}
                 className="w-full rounded border border-border bg-bg px-2.5 py-1.5 text-caption text-ink focus:outline-none focus:ring-1 focus:ring-accent/50"
               >
                 {STATUSES.map((s) => (
