@@ -286,7 +286,7 @@ export default function VehiclesPage() {
                         <Link
                           href="/opportunities"
                           className="text-xs font-mono text-gda-green hover:underline"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
                           title="View opportunities"
                         >
                           {v.opportunity_count}

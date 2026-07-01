@@ -144,7 +144,7 @@ export function RowActionsMenu({
       <DropdownMenu>
         <DropdownMenuTrigger
           className="inline-flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:bg-gda-panel transition-colors text-base leading-none"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
           aria-label="Row actions"
         >
           ⋮
