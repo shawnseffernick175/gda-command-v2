@@ -25,7 +25,7 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
 
 export async function adminIngestRoutes(app: FastifyInstance): Promise<void> {
   // POST /v3/admin/ingest/run/:source — manual trigger
-  app.post('/v3/admin/ingest/run/:source', async (req, reply) => {
+  app.post('/v3/admin/ingest/run/:source', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     if (!requireAdmin(req, reply)) return;
 
     const { source } = req.params as { source: string };

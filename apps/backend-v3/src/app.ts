@@ -3,6 +3,8 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import fastifyCors from '@fastify/cors';
 import fastifyCookie from '@fastify/cookie';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { config } from './config/index.js';
 import { logger } from './lib/logger.js';
 import { requestIdHook } from './middleware/requestId.js';
@@ -67,8 +69,23 @@ export async function buildApp() {
     trustProxy: true,
   });
 
-  await app.register(fastifyCors, { origin: true, credentials: true });
+  const corsOrigins = (process.env['CORS_ALLOWED_ORIGINS'] || 'https://gda.csr-llc.tech')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
+  await app.register(fastifyCors, { origin: corsOrigins, credentials: true });
   await app.register(fastifyCookie);
+
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  });
+
+  await app.register(fastifyRateLimit, {
+    max: 300,
+    timeWindow: '1 minute',
+  });
 
   await app.register(fastifySwagger, {
     openapi: {

@@ -77,7 +77,7 @@ async function revokeTokenFamily(userId: number): Promise<void> {
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const isSecure = config.nodeEnv === 'production';
 
-  app.post('/v3/auth/login', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/v3/auth/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req: FastifyRequest, reply: FastifyReply) => {
     const { email, password } = req.body as LoginBody;
 
     if (!email || !password) {
