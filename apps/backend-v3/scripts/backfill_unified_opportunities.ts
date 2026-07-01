@@ -10,6 +10,7 @@
  *   npx tsx scripts/backfill_unified_opportunities.ts              # live run
  *   npx tsx scripts/backfill_unified_opportunities.ts --dry-run    # counts only
  *   npx tsx scripts/backfill_unified_opportunities.ts --resume     # pick up mid-run
+ *   npx tsx scripts/backfill_unified_opportunities.ts --validate   # post-run integrity check
  *
  * Idempotent: re-running is a no-op (ON CONFLICT ... DO NOTHING + link-check).
  */
@@ -36,6 +37,7 @@ const SUPPORTED_SOURCES = ['sam', 'sam.gov', 'govtribe', 'govwin'];
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const RESUME = process.argv.includes('--resume');
+const VALIDATE = process.argv.includes('--validate');
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -583,6 +585,15 @@ function printReport(stats: BackfillStats): void {
   console.log(`MEDIUM links:                ${stats.totalMediumLinks}`);
   console.log(`Skipped (dup/unresolvable):  ${stats.totalSkipped}`);
 
+  const crossSourceMatches = stats.totalHighLinks + stats.totalMediumLinks - stats.totalUnifiedCreated;
+  console.log(`Cross-source matches:        ${crossSourceMatches}`);
+  const expectedUnified = stats.totalSourceRows - stats.totalSkipped - crossSourceMatches;
+  console.log(`Expected unified (src - skip - xmatch): ${expectedUnified}`);
+  console.log(`Actual unified created:      ${stats.totalUnifiedCreated}`);
+  if (expectedUnified !== stats.totalUnifiedCreated) {
+    console.log(`  ** COUNT MISMATCH ** expected=${expectedUnified} actual=${stats.totalUnifiedCreated}`);
+  }
+
   console.log('\n--- By Source ---');
   for (const [source, s] of stats.bySource) {
     console.log(
@@ -593,7 +604,140 @@ function printReport(stats: BackfillStats): void {
   console.log('\n=== Done ===');
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+// ─── Validate ────────────────────────────────────────────────────────────────
+
+const VALIDATE_SAMPLE_SIZE = 50;
+
+async function validate(): Promise<void> {
+  const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 3 });
+
+  console.log('=== F-404 Post-Backfill Validation ===\n');
+
+  try {
+    // 1. Count totals
+    const { rows: [{ cnt: totalSource }] } = await pool.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt FROM opportunities
+       WHERE LOWER(data_source) = ANY($1) AND deleted_at IS NULL`,
+      [SUPPORTED_SOURCES],
+    );
+    const { rows: [{ cnt: totalUnified }] } = await pool.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt FROM unified_opportunities`,
+    );
+    const { rows: [{ cnt: totalLinks }] } = await pool.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt FROM unified_opportunity_links`,
+    );
+
+    console.log(`Legacy source rows (sam/govtribe/govwin): ${totalSource}`);
+    console.log(`Unified opportunities:                    ${totalUnified}`);
+    console.log(`Opportunity links:                        ${totalLinks}`);
+    console.log(`Cross-source matches (links - unified):   ${totalLinks - totalUnified}`);
+
+    // 2. Orphan checks
+    const { rows: [{ cnt: orphanLinks }] } = await pool.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt FROM unified_opportunity_links l
+       LEFT JOIN unified_opportunities o ON o.internal_id = l.internal_id
+       WHERE o.internal_id IS NULL`,
+    );
+    console.log(`\nOrphan links (no parent opp):             ${orphanLinks}`);
+    if (orphanLinks > 0) {
+      console.log('  ** INTEGRITY ERROR: orphan links found **');
+    }
+
+    const { rows: [{ cnt: unlinkOpps }] } = await pool.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt FROM unified_opportunities o
+       LEFT JOIN unified_opportunity_links l ON l.internal_id = o.internal_id
+       WHERE l.id IS NULL`,
+    );
+    console.log(`Unlinked unified opps (no links at all):  ${unlinkOpps}`);
+    if (unlinkOpps > 0) {
+      console.log('  ** INTEGRITY ERROR: unified opps without any links **');
+    }
+
+    // 3. Source coverage check
+    const { rows: sourceBreakdown } = await pool.query<{ source: string; cnt: number }>(
+      `SELECT source, COUNT(*)::int AS cnt
+       FROM unified_opportunity_links
+       GROUP BY source
+       ORDER BY cnt DESC`,
+    );
+    console.log('\n--- Link count by source ---');
+    for (const row of sourceBreakdown) {
+      console.log(`  ${row.source}: ${row.cnt}`);
+    }
+
+    // 4. Confidence distribution
+    const { rows: confBreakdown } = await pool.query<{ confidence: string | null; cnt: number }>(
+      `SELECT confidence::text, COUNT(*)::int AS cnt
+       FROM unified_opportunity_links
+       GROUP BY confidence
+       ORDER BY cnt DESC`,
+    );
+    console.log('\n--- Link confidence distribution ---');
+    for (const row of confBreakdown) {
+      console.log(`  ${row.confidence ?? '(null)'}: ${row.cnt}`);
+    }
+
+    // 5. Sample 50 random unified opportunities
+    console.log(`\n--- Sample ${VALIDATE_SAMPLE_SIZE} random unified opportunities ---`);
+    const { rows: samples } = await pool.query<{
+      internal_id: string;
+      lifecycle_stage: string;
+      primary_source: string | null;
+      title: string | null;
+      agency: string | null;
+      naics: string | null;
+      link_count: number;
+      sources: string;
+    }>(
+      `SELECT o.internal_id, o.lifecycle_stage, o.primary_source,
+              o.title, o.agency, o.naics,
+              COUNT(l.id)::int AS link_count,
+              STRING_AGG(DISTINCT l.source, ', ' ORDER BY l.source) AS sources
+       FROM unified_opportunities o
+       LEFT JOIN unified_opportunity_links l ON l.internal_id = o.internal_id
+       GROUP BY o.internal_id
+       ORDER BY RANDOM()
+       LIMIT $1`,
+      [VALIDATE_SAMPLE_SIZE],
+    );
+
+    let sampleFails = 0;
+    for (const s of samples) {
+      const titleSnippet = (s.title ?? '(no title)').slice(0, 60);
+      const ok = s.link_count > 0;
+      if (!ok) sampleFails++;
+      console.log(
+        `  ${ok ? 'OK' : 'FAIL'} | links=${s.link_count} | ${s.lifecycle_stage} | ` +
+        `${s.primary_source ?? '?'} | ${s.agency ?? '?'} | ${s.naics ?? '-'} | ${titleSnippet}`,
+      );
+    }
+
+    // 6. Summary
+    console.log('\n=== Validation Summary ===');
+    const allOk = orphanLinks === 0 && unlinkOpps === 0 && sampleFails === 0;
+    if (allOk) {
+      console.log('PASS: All integrity checks passed.');
+    } else {
+      if (orphanLinks > 0) console.log(`FAIL: ${orphanLinks} orphan links`);
+      if (unlinkOpps > 0) console.log(`FAIL: ${unlinkOpps} unlinked opportunities`);
+      if (sampleFails > 0) console.log(`FAIL: ${sampleFails}/${VALIDATE_SAMPLE_SIZE} samples missing links`);
+      process.exitCode = 1;
+    }
+  } finally {
+    await pool.end();
+  }
+}
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
+
+if (VALIDATE) {
+  validate().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+} else {
+  main().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
