@@ -52,6 +52,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Contacts", href: "/contacts", icon: Users },
   { label: "Competitors", href: "/competitors", icon: Shield },
   { label: "Risks", href: "/risks", icon: AlertTriangle },
+  { label: "Sentinel", href: "/sentinel", icon: Activity },
   { label: "Prompts", href: "/prompts", icon: Terminal },
 ];
 
