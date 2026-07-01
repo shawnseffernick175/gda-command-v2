@@ -15,13 +15,17 @@
  */
 
 import type { FastifyInstance } from 'fastify';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import pg from 'pg';
 import { config } from '../config/index.js';
 import { successEnvelope, errorEnvelope } from '../lib/envelope.js';
+import { llmRouter } from '../lib/llm-router.js';
 import { logger } from '../lib/logger.js';
 import { generateDigestLead } from '../services/digest/lead-generator.js';
 import { ENVISION_NAICS } from '../constants/envision-naics.js';
 import { recordAuditLog } from '../services/audit/audit-log.js';
+import { extractTextFromBuffer } from './vault.js';
 
 const { Pool } = pg;
 
@@ -205,8 +209,8 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
-    const docRes = await pool.query<{ id: number; filename: string; file_path: string | null }>(
-      `SELECT id, filename, file_path FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
+    const docRes = await pool.query<{ id: number; filename: string; file_path: string | null; extracted_text: string | null }>(
+      `SELECT id, filename, file_path, extracted_text FROM vault_documents WHERE id = $1 AND deleted_at IS NULL`,
       [body.document_id],
     );
     if (docRes.rows.length === 0) {
@@ -216,6 +220,46 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
     }
     const doc = docRes.rows[0]!;
 
+    // ── Extract text from document ──────────────────────────────────
+    let extractedText = doc.extracted_text ?? '';
+
+    if (!extractedText && doc.file_path) {
+      try {
+        const filePath = join(process.cwd(), 'data', doc.file_path);
+        const buf = readFileSync(filePath);
+        extractedText = await extractTextFromBuffer(buf, doc.filename);
+      } catch (err) {
+        logger.warn({ error: err instanceof Error ? err.message : String(err), docId: doc.id }, 'sitrep_from_document: text extraction failed');
+      }
+    }
+
+    // ── Analyze with LLM to draft Topic / Discussion / Action Items ─
+    let topic = doc.filename;
+    let discussion = '';
+    let actionItems = '';
+    let analysisMessage: string | null = null;
+
+    if (extractedText.trim().length > 0) {
+      try {
+        const llmResult = await llmRouter.route({
+          task: 'sitrep_document_analyze',
+          input: { filename: doc.filename, extracted_text: extractedText },
+        });
+        if (llmResult.ok && llmResult.output) {
+          const out = llmResult.output as { topic?: string; discussion?: string; action_items?: string };
+          if (out.topic && out.topic.trim().length > 0) topic = out.topic.trim();
+          if (out.discussion) discussion = out.discussion.trim();
+          if (out.action_items) actionItems = out.action_items.trim();
+        }
+      } catch (err) {
+        logger.warn({ error: err instanceof Error ? err.message : String(err), docId: doc.id }, 'sitrep_from_document: LLM analysis failed — using filename as topic');
+      }
+    } else {
+      // No text could be extracted — graceful fallback
+      analysisMessage = 'Could not extract text from this file type. Row created with filename; add details manually.';
+    }
+
+    // ── Create SITREP row ───────────────────────────────────────────
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -272,16 +316,16 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
 
       const itemRes = await client.query<{ id: number; sitrep_id: number; topic: string; discussion: string; action_items: string; sort_order: number; source_document_id: number; source_document_url: string | null; created_at: string }>(
         `INSERT INTO sitrep_items (sitrep_id, topic, discussion, action_items, sort_order, source_document_id, source_document_url)
-         VALUES ($1, $2, '', '', $3, $4, $5)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, sitrep_id, topic, discussion, action_items, sort_order, source_document_id, source_document_url, created_at::text`,
-        [sitrepId, doc.filename, nextSort, doc.id, sourceUrl],
+        [sitrepId, topic, discussion, actionItems, nextSort, doc.id, sourceUrl],
       );
 
       await recordAuditLog(client, {
         action: 'send_to_sitrep',
         table_name: 'sitrep_items',
         record_id: itemRes.rows[0]!.id,
-        new_values: { document_id: doc.id, filename: doc.filename, sitrep_id: sitrepId },
+        new_values: { document_id: doc.id, filename: doc.filename, sitrep_id: sitrepId, topic, analyzed: extractedText.length > 0 },
         source: 'user',
         request_id: req.requestId,
       });
@@ -292,6 +336,7 @@ export async function digestRoutes(app: FastifyInstance): Promise<void> {
         item: itemRes.rows[0],
         sitrep_id: sitrepId,
         week_ending: weekEnding,
+        ...(analysisMessage ? { message: analysisMessage } : {}),
       }, req.requestId));
     } catch (err) {
       await client.query('ROLLBACK');

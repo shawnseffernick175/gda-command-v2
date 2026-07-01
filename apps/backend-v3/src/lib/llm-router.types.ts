@@ -49,7 +49,8 @@ export type Task =
   | 'financial_analyze'
   | 'vault_vehicle_extract'
   | 'workshop_teardown'
-  | 'workshop_generate';
+  | 'workshop_generate'
+  | 'sitrep_document_analyze';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -254,6 +255,17 @@ export interface WorkshopGenerateInput {
 
 export interface WorkshopGenerateOutput {
   raw_text: string;
+}
+
+export interface SitrepDocumentAnalyzeInput {
+  filename: string;
+  extracted_text: string;
+}
+
+export interface SitrepDocumentAnalyzeOutput {
+  topic: string;
+  discussion: string;
+  action_items: string;
 }
 
 export interface BlackHatAnalysisInput {
@@ -955,6 +967,7 @@ export interface TaskInputMap {
   financial_analyze: FinancialAnalyzeInput;
   workshop_teardown: WorkshopTeardownInput;
   workshop_generate: WorkshopGenerateInput;
+  sitrep_document_analyze: SitrepDocumentAnalyzeInput;
 }
 
 export interface TaskOutputMap {
@@ -988,6 +1001,7 @@ export interface TaskOutputMap {
   financial_analyze: FinancialAnalyzeOutput;
   workshop_teardown: WorkshopTeardownOutput;
   workshop_generate: WorkshopGenerateOutput;
+  sitrep_document_analyze: SitrepDocumentAnalyzeOutput;
 }
 
 // ---------------------------------------------------------------------------

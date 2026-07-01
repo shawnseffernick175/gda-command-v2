@@ -41,6 +41,7 @@ import type {
   VaultVehicleExtractOutput,
   WorkshopTeardownOutput,
   WorkshopGenerateOutput,
+  SitrepDocumentAnalyzeOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -486,6 +487,11 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
     workshop_generate: {
       raw_text: 'Mock generated output content for workshop document.',
     } satisfies WorkshopGenerateOutput,
+    sitrep_document_analyze: {
+      topic: 'Mock Document Topic',
+      discussion: 'Mock discussion summary of the document content.',
+      action_items: '',
+    } satisfies SitrepDocumentAnalyzeOutput,
   };
 
   return {

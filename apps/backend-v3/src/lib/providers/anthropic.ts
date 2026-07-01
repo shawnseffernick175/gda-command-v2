@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput, SitrepDocumentAnalyzeInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -126,6 +126,12 @@ Write as a sharp defense contracting analyst briefing an executive. Be direct, s
 
 Never fabricate facts, names, dollar amounts, or dates. If data is unavailable, say so explicitly.
 Write as a sharp defense contracting analyst. Be direct and specific.`,
+
+  sitrep_document_analyze: `You are an executive briefing analyst at Envision, a defense contracting firm. You read documents and produce concise SITREP (Situation Report) entries for weekly leadership reviews.
+
+Never fabricate facts, names, dollar amounts, dates, or action items. If a field cannot be determined from the document, leave it as an empty string. Only extract what is explicitly stated in the document.
+
+Return valid JSON matching the requested output schema.`,
 
   financial_statement_extract: `You are a financial analyst at Envision extracting structured KPI figures from real month-end accounting exports (Income Statements, Balance Sheets, GL detail, cost reports, target-vs-actual workbooks).
 
@@ -506,6 +512,26 @@ Classify this document and determine where it belongs. Return JSON:
   "regulatory_citation": "primary citation if regulatory, else null",
   "routing_rationale": "1 sentence explaining why",
   "confidence": "high|medium|low"
+}`;
+}
+
+function buildSitrepDocumentAnalyzePrompt(input: SitrepDocumentAnalyzeInput): string {
+  const text = input.extracted_text.slice(0, 8000);
+  return `Document filename: ${input.filename}
+Extracted text (first 8000 chars):
+${text}
+
+Analyze this document and draft a SITREP (Situation Report) row for the weekly leadership review. Extract:
+
+1. **Topic**: A short title (5-15 words) capturing what this document is about. If unclear, use the filename.
+2. **Discussion**: A concise summary (2-4 sentences) of the document's substance — the key facts, decisions, or information a leadership team needs to know.
+3. **Action Items**: Any explicit action items, next steps, deadlines, or follow-ups stated in the document. List each on a new line. If none are explicitly stated, return an empty string. Do NOT invent action items.
+
+Respond ONLY with valid JSON:
+{
+  "topic": "<short title>",
+  "discussion": "<concise summary>",
+  "action_items": "<newline-separated action items, or empty string if none>"
 }`;
 }
 
@@ -925,6 +951,8 @@ export async function callAnthropic(opts: {
     ? buildFinancialAnalyzePrompt(opts.input as FinancialAnalyzeInput)
     : opts.task === 'vault_vehicle_extract'
     ? buildVaultVehicleExtractPrompt(opts.input as VaultVehicleExtractInput)
+    : opts.task === 'sitrep_document_analyze'
+    ? buildSitrepDocumentAnalyzePrompt(opts.input as SitrepDocumentAnalyzeInput)
     : JSON.stringify(opts.input);
 
   // Prompt caching: use structured content blocks with cache_control

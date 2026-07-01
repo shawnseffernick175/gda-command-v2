@@ -152,7 +152,7 @@ interface RegulatoryCatalogRow {
   created_at: string;
 }
 
-async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<string> {
+export async function extractTextFromBuffer(buf: Buffer, filename: string): Promise<string> {
   const ext = filename.toLowerCase().split('.').pop();
 
   if (ext === 'pdf') {
