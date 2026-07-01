@@ -37,28 +37,45 @@ async def with_retries(
             if exc.response.status_code not in RETRYABLE_STATUS_CODES:
                 raise
             last_exc = exc
-            delay = base_delay * (2 ** (attempt - 1))
-            logger.warning(
-                "%s attempt %d/%d failed (HTTP %d), retrying in %.1fs",
-                operation,
-                attempt,
-                max_retries,
-                exc.response.status_code,
-                delay,
-            )
+            if attempt < max_retries:
+                delay = base_delay * (2 ** (attempt - 1))
+                logger.warning(
+                    "%s attempt %d/%d failed (HTTP %d), retrying in %.1fs",
+                    operation,
+                    attempt,
+                    max_retries,
+                    exc.response.status_code,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.warning(
+                    "%s attempt %d/%d failed (HTTP %d), no retries left",
+                    operation,
+                    attempt,
+                    max_retries,
+                    exc.response.status_code,
+                )
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             last_exc = exc
-            delay = base_delay * (2 ** (attempt - 1))
-            logger.warning(
-                "%s attempt %d/%d failed (%s), retrying in %.1fs",
-                operation,
-                attempt,
-                max_retries,
-                type(exc).__name__,
-                delay,
-            )
-
-        if attempt < max_retries:
-            await asyncio.sleep(delay)
+            if attempt < max_retries:
+                delay = base_delay * (2 ** (attempt - 1))
+                logger.warning(
+                    "%s attempt %d/%d failed (%s), retrying in %.1fs",
+                    operation,
+                    attempt,
+                    max_retries,
+                    type(exc).__name__,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            else:
+                logger.warning(
+                    "%s attempt %d/%d failed (%s), no retries left",
+                    operation,
+                    attempt,
+                    max_retries,
+                    type(exc).__name__,
+                )
 
     raise last_exc  # type: ignore[misc]
