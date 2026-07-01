@@ -91,7 +91,7 @@ function VersionHistoryDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-gda-bg-base border-l border-border overflow-y-auto">
+      <div className="relative w-full bg-gda-bg-base border-x border-border overflow-y-auto">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-gda-bg-base px-4 py-3">
           <div>
             <h2 className="font-mono text-sm font-semibold text-foreground">Version History</h2>
