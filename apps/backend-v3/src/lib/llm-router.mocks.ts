@@ -42,6 +42,7 @@ import type {
   WorkshopTeardownOutput,
   WorkshopGenerateOutput,
   SitrepDocumentAnalyzeOutput,
+  IngestClassifyOutput,
 } from './llm-router.types.js';
 
 /** Deterministic hash of input for mock lookup. Deep-sorts all object keys. */
@@ -492,6 +493,14 @@ export function getDefaultMock<T extends Task>(task: T, traceId: string): RouteR
       discussion: 'Mock discussion summary of the document content.',
       action_items: '',
     } satisfies SitrepDocumentAnalyzeOutput,
+
+    ingest_classify: {
+      entity_type: 'other',
+      surface: 'vault',
+      confidence: 0.8,
+      evidence: 'Mock classification — no clear entity type detected.',
+      doctrine_flag: null,
+    } satisfies IngestClassifyOutput,
   };
 
   return {

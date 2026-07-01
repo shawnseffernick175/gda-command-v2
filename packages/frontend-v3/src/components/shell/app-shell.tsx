@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { TopBar } from "./top-bar";
@@ -9,6 +9,8 @@ import { QaChecklistProvider } from "@/components/qa-checklist/qa-checklist-cont
 import { QaChecklistLauncher } from "@/components/qa-checklist/QaChecklistLauncher";
 import { QaChecklistDrawer } from "@/components/qa-checklist/QaChecklistDrawer";
 import { UniversalDropZone } from "@/components/UniversalDropZone";
+import { IngestJobsPanel } from "@/components/shared/IngestJobsPanel";
+import { Inbox } from "lucide-react";
 
 const PATH_TO_SURFACE: Record<string, string> = {
   "/digest": "digest",
@@ -30,6 +32,7 @@ const PATH_TO_SURFACE: Record<string, string> = {
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const surface = PATH_TO_SURFACE[pathname ?? ""] ?? "vault";
+  const [ingestPanelOpen, setIngestPanelOpen] = useState(false);
 
   return (
     <QaChecklistProvider>
@@ -44,6 +47,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <QaChecklistLauncher />
         <QaChecklistDrawer />
+        {/* Ingest panel toggle */}
+        <button
+          type="button"
+          onClick={() => setIngestPanelOpen(!ingestPanelOpen)}
+          title="Ingestion Queue"
+          className="fixed bottom-4 left-4 z-30 flex h-8 w-8 items-center justify-center rounded-full bg-gda-bg-raised ring-1 ring-foreground/10 transition-colors hover:bg-gda-panel"
+        >
+          <Inbox className="h-4 w-4 text-muted-foreground" />
+        </button>
+        <IngestJobsPanel
+          open={ingestPanelOpen}
+          onClose={() => setIngestPanelOpen(false)}
+        />
       </div>
     </QaChecklistProvider>
   );

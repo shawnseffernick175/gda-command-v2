@@ -50,7 +50,8 @@ export type Task =
   | 'vault_vehicle_extract'
   | 'workshop_teardown'
   | 'workshop_generate'
-  | 'sitrep_document_analyze';
+  | 'sitrep_document_analyze'
+  | 'ingest_classify';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -255,6 +256,21 @@ export interface WorkshopGenerateInput {
 
 export interface WorkshopGenerateOutput {
   raw_text: string;
+}
+
+export interface IngestClassifyInput {
+  filename: string;
+  source_surface: string;
+  extracted_text_preview: string;
+  entity_types: readonly string[];
+}
+
+export interface IngestClassifyOutput {
+  entity_type: string;
+  surface: string;
+  confidence: number;
+  evidence: string;
+  doctrine_flag: string | null;
 }
 
 export interface SitrepDocumentAnalyzeInput {
@@ -968,6 +984,7 @@ export interface TaskInputMap {
   workshop_teardown: WorkshopTeardownInput;
   workshop_generate: WorkshopGenerateInput;
   sitrep_document_analyze: SitrepDocumentAnalyzeInput;
+  ingest_classify: IngestClassifyInput;
 }
 
 export interface TaskOutputMap {
@@ -1002,6 +1019,7 @@ export interface TaskOutputMap {
   workshop_teardown: WorkshopTeardownOutput;
   workshop_generate: WorkshopGenerateOutput;
   sitrep_document_analyze: SitrepDocumentAnalyzeOutput;
+  ingest_classify: IngestClassifyOutput;
 }
 
 // ---------------------------------------------------------------------------

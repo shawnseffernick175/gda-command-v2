@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput, SitrepDocumentAnalyzeInput } from '../llm-router.types.js';
+import type { Task, TaskInputMap, TaskOutputMap, BlackHatAnalysisInput, RiskGenerationInput, AwardAnalysisInput, CompetitorAnalysisInput, ContactEnrichInput, MatchAnalysisInput, VaultDocumentParseInput, VaultSmartRouteInput, VaultVehicleExtractInput, FinancialStatementExtractInput, BalanceSheetExtractInput, CostDetailExtractInput, SieExtractInput, ApExtractInput, ArExtractInput, TrialBalanceExtractInput, ProjectRevenueExtractInput, FinancialAnalyzeInput, SitrepDocumentAnalyzeInput, IngestClassifyInput } from '../llm-router.types.js';
 import { getStoredPrompt } from '../prompt-store.js';
 import { buildRegulatoryContext } from '../../utils/regulatory-context.js';
 import type { RegulatoryContextOptions } from '../../utils/regulatory-context.js';
@@ -132,6 +132,14 @@ Write as a sharp defense contracting analyst. Be direct and specific.`,
 Never fabricate facts, names, dollar amounts, dates, or action items. If a field cannot be determined from the document, leave it as an empty string. Only extract what is explicitly stated in the document.
 
 Return valid JSON matching the requested output schema.`,
+
+  ingest_classify: `You are a document classification engine for Envision, a defense/DoD services company (NAICS 541330/541512/541611). Given a filename and text preview, classify the document into one of these entity types: opportunity, capture_doc, partner_doc, action_item, regulatory_notice, news_item, financial_doc, cpar, doctrine_doc, other.
+
+Also determine the correct target surface: opportunities, pipeline, capture, partner_intel, action_items, daily_news, sentinel, vault.
+
+If the document relates to a company outside Envision's direct pursuit (OU-II Riverstone or OU-III PD Systems), set doctrine_flag to "teaming_context".
+
+Return strict JSON: { "entity_type": string, "surface": string, "confidence": number (0-1), "evidence": string (1-2 sentences), "doctrine_flag": string|null }.`,
 
   financial_statement_extract: `You are a financial analyst at Envision extracting structured KPI figures from real month-end accounting exports (Income Statements, Balance Sheets, GL detail, cost reports, target-vs-actual workbooks).
 
@@ -532,6 +540,24 @@ Respond ONLY with valid JSON:
   "topic": "<short title>",
   "discussion": "<concise summary>",
   "action_items": "<newline-separated action items, or empty string if none>"
+}`;
+}
+
+function buildIngestClassifyPrompt(input: IngestClassifyInput): string {
+  return `Filename: ${input.filename}
+Source surface: ${input.source_surface}
+Valid entity types: ${input.entity_types.join(', ')}
+
+Extracted text preview (first 4000 chars):
+${input.extracted_text_preview}
+
+Classify this document. Return strict JSON:
+{
+  "entity_type": "<one of the valid entity types>",
+  "surface": "<target surface: opportunities|pipeline|capture|partner_intel|action_items|daily_news|sentinel|vault>",
+  "confidence": <0.0 to 1.0>,
+  "evidence": "<1-2 sentence explanation>",
+  "doctrine_flag": <null or "teaming_context" if doc is for OU-II/OU-III>
 }`;
 }
 
@@ -953,6 +979,8 @@ export async function callAnthropic(opts: {
     ? buildVaultVehicleExtractPrompt(opts.input as VaultVehicleExtractInput)
     : opts.task === 'sitrep_document_analyze'
     ? buildSitrepDocumentAnalyzePrompt(opts.input as SitrepDocumentAnalyzeInput)
+    : opts.task === 'ingest_classify'
+    ? buildIngestClassifyPrompt(opts.input as IngestClassifyInput)
     : JSON.stringify(opts.input);
 
   // Prompt caching: use structured content blocks with cache_control
