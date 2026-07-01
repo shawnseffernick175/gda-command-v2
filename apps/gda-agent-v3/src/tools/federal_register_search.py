@@ -1,8 +1,10 @@
 """Federal Register notice search tool."""
+
 from __future__ import annotations
 
 import httpx
 
+from src.retry import with_retries
 from src.tools.schemas import (
     FederalRegisterSearchInput,
     FederalRegisterSearchOutput,
@@ -26,10 +28,13 @@ async def federal_register_search(
     if inp.posted_after:
         params["conditions[publication_date][gte]"] = inp.posted_after
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.get(FR_API_BASE, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    async def _do_request() -> dict:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(FR_API_BASE, params=params)
+            resp.raise_for_status()
+            return resp.json()
+
+    data = await with_retries(_do_request, operation="federal_register_search")
 
     notices: list[FrNotice] = []
     for doc in data.get("results", []):

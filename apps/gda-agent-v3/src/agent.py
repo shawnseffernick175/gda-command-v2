@@ -1,4 +1,5 @@
 """LangGraph-based agent runtime with SSE streaming and audit logging."""
+
 from __future__ import annotations
 
 import asyncio
@@ -7,30 +8,30 @@ import logging
 import time
 import traceback
 import uuid
-from typing import Any, AsyncGenerator, Annotated
+from typing import Annotated, Any, AsyncGenerator
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage, BaseMessage
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel
 
 from src.config import (
-    OPENAI_API_KEY,
     ANTHROPIC_API_KEY,
     DEFAULT_MODEL,
-    MAX_STEPS_DEFAULT,
-    WALL_TIMEOUT_DEFAULT_S,
     HOURLY_COST_LIMIT_USD,
+    MAX_STEPS_DEFAULT,
+    OPENAI_API_KEY,
+    WALL_TIMEOUT_DEFAULT_S,
 )
 from src.db import (
-    insert_agent_run,
-    update_agent_run,
-    insert_tool_call,
     get_hourly_cost,
+    insert_agent_run,
+    insert_tool_call,
+    update_agent_run,
 )
 from src.tools.registry import TOOL_REGISTRY, ToolDef
 
@@ -77,10 +78,12 @@ def _build_llm(model_spec: str) -> ChatOpenAI | ChatAnthropic:
 
 def _make_tool_coroutine(tool_def: ToolDef):
     """Factory that returns a coroutine with *tool_def* correctly bound."""
+
     async def _invoke(**kwargs: Any) -> str:
         inp = tool_def.input_schema(**kwargs)
         result = await tool_def.fn(inp)
         return result.model_dump_json()
+
     return _invoke
 
 
@@ -258,7 +261,11 @@ async def run_agent(
                                 },
                             }
                     elif output.content:
-                        final_output = output.content if isinstance(output.content, str) else str(output.content)
+                        final_output = (
+                            output.content
+                            if isinstance(output.content, str)
+                            else str(output.content)
+                        )
 
             elif kind == "on_tool_end":
                 tool_output = event.get("data", {}).get("output")
@@ -310,9 +317,7 @@ async def run_agent(
         "cost_usd": round(cost_usd, 6),
     }
 
-    await update_agent_run(
-        run_id, status, final_output or None, error_msg, step_count, token_usage
-    )
+    await update_agent_run(run_id, status, final_output or None, error_msg, step_count, token_usage)
 
     if status == "timeout":
         yield {

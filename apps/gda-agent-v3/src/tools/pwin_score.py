@@ -1,7 +1,8 @@
 """Probability of Win scoring tool (F-302 dependency)."""
+
 from __future__ import annotations
 
-from src.tools.schemas import PwinScoreInput, PwinScoreOutput, PwinResult
+from src.tools.schemas import PwinResult, PwinScoreInput, PwinScoreOutput
 
 
 async def pwin_score(inp: PwinScoreInput) -> PwinScoreOutput:

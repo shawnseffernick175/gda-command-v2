@@ -1,4 +1,5 @@
 """File read tool — retrieves document content from gda-backend-v3 file store."""
+
 from __future__ import annotations
 
 import httpx

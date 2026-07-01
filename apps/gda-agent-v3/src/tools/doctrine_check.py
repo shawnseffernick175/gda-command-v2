@@ -1,4 +1,5 @@
 """Doctrine alignment check tool (F-303 rules engine stub)."""
+
 from __future__ import annotations
 
 from src.tools.schemas import (

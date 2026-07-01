@@ -4,15 +4,16 @@ Calls POST /v3/govtribe/search on backend-v3, which internally invokes
 the GovTribe MCP client (Search_Federal_Contract_Opportunities) with
 credit-budget, cache, and cycle/monthly cap enforcement from F-323.
 """
+
 from __future__ import annotations
 
 import httpx
 
 from src.config import BACKEND_V3_URL
 from src.tools.schemas import (
+    GovtribeOpportunity,
     GovtribeSearchInput,
     GovtribeSearchOutput,
-    GovtribeOpportunity,
 )
 
 SEARCH_URL = f"{BACKEND_V3_URL}/v3/govtribe/search"

@@ -1,4 +1,5 @@
 """GDA Agent V3 — FastAPI HTTP surface."""
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -14,7 +15,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from src.agent import cancel_run, run_agent
-from src.config import OPENAI_API_KEY, ANTHROPIC_API_KEY
+from src.config import ANTHROPIC_API_KEY, OPENAI_API_KEY
 from src.db import check_db, check_rag, close_pool, get_daily_usage, get_run_trace
 from src.middleware.auth import require_service_token
 from src.tools.registry import get_tool_schemas, list_tools
@@ -26,11 +27,13 @@ def _pkg_version(name: str) -> str:
     except importlib.metadata.PackageNotFoundError:
         return "unknown"
 
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 logger = logging.getLogger("gda-agent")
+
 
 # Filter secrets from logs
 class SecretFilter(logging.Filter):
@@ -40,6 +43,7 @@ class SecretFilter(logging.Filter):
             if key_var and key_var in msg:
                 record.msg = str(record.msg).replace(key_var, "***REDACTED***")
         return True
+
 
 logging.getLogger().addFilter(SecretFilter())
 

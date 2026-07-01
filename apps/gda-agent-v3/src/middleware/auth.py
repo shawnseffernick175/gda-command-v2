@@ -1,7 +1,8 @@
 """Service-token auth middleware. Public endpoints bypass."""
+
 from __future__ import annotations
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 
 from src.config import AGENT_SERVICE_TOKEN
 

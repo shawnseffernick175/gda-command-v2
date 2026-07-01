@@ -1,10 +1,12 @@
 """SAM.gov opportunity search tool."""
+
 from __future__ import annotations
 
 import httpx
 
 from src.config import SAM_GOV_API_KEY
-from src.tools.schemas import SamSearchInput, SamSearchOutput, SamOpportunity
+from src.retry import with_retries
+from src.tools.schemas import SamOpportunity, SamSearchInput, SamSearchOutput
 
 SAM_API_BASE = "https://api.sam.gov/opportunities/v2/search"
 
@@ -25,10 +27,13 @@ async def sam_search(inp: SamSearchInput) -> SamSearchOutput:
 
     params = {k: v for k, v in params.items() if v}
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.get(SAM_API_BASE, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    async def _do_request() -> dict:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(SAM_API_BASE, params=params)
+            resp.raise_for_status()
+            return resp.json()
+
+    data = await with_retries(_do_request, operation="sam_search")
 
     opps: list[SamOpportunity] = []
     for opp in data.get("opportunitiesData", []):

@@ -9,7 +9,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
-from src.config import AGENT_DB_URL, AGENT_DB_RO_URL
+from src.config import AGENT_DB_RO_URL, AGENT_DB_URL
 
 # Two pools: _pool (read-write, for audit tables) and _ro_pool (read-only, for db_query tool)
 _pool: AsyncConnectionPool | None = None
@@ -81,9 +81,7 @@ async def check_rag() -> tuple[bool, int]:
             ext = await row.fetchone()
             pgvector_ok: bool = ext["pgvector_ok"] if ext else False
 
-            row = await conn.execute(
-                "SELECT COUNT(*)::int AS cnt FROM v3_rag_chunks"
-            )
+            row = await conn.execute("SELECT COUNT(*)::int AS cnt FROM v3_rag_chunks")
             cnt_row = await row.fetchone()
             chunk_count: int = cnt_row["cnt"] if cnt_row else 0
 
@@ -183,9 +181,7 @@ async def insert_tool_call(
 async def get_run_trace(run_id: uuid.UUID) -> dict[str, Any] | None:
     pool = await get_pool()
     async with pool.connection() as conn:
-        row = await conn.execute(
-            "SELECT * FROM agent_runs WHERE id = %s", (str(run_id),)
-        )
+        row = await conn.execute("SELECT * FROM agent_runs WHERE id = %s", (str(run_id),))
         run = await row.fetchone()
         if run is None:
             return None

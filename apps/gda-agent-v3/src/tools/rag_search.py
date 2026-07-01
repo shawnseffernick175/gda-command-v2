@@ -1,7 +1,8 @@
 """RAG search tool (F-301 pgvector). Stub until F-301 is deployed."""
+
 from __future__ import annotations
 
-from src.tools.schemas import RagSearchInput, RagSearchOutput, RagChunk
+from src.tools.schemas import RagChunk, RagSearchInput, RagSearchOutput
 
 # When F-301 is deployed this will call the pgvector-backed search.
 # For now returns empty with a note.

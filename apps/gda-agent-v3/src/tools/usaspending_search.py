@@ -1,12 +1,14 @@
 """USAspending award search tool."""
+
 from __future__ import annotations
 
 import httpx
 
+from src.retry import with_retries
 from src.tools.schemas import (
+    UsaSpendingAward,
     UsaSpendingSearchInput,
     UsaSpendingSearchOutput,
-    UsaSpendingAward,
 )
 
 USASPENDING_API_BASE = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
@@ -17,9 +19,7 @@ async def usaspending_search(inp: UsaSpendingSearchInput) -> UsaSpendingSearchOu
     if inp.recipient_uei:
         filters["recipient_search_text"] = [inp.recipient_uei]
     if inp.agency:
-        filters["agencies"] = [
-            {"type": "awarding", "tier": "toptier", "name": inp.agency}
-        ]
+        filters["agencies"] = [{"type": "awarding", "tier": "toptier", "name": inp.agency}]
     if inp.naics:
         filters["naics_codes"] = {"require": [inp.naics]}
     if inp.posted_after:
@@ -42,10 +42,13 @@ async def usaspending_search(inp: UsaSpendingSearchInput) -> UsaSpendingSearchOu
         "order": "desc",
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(USASPENDING_API_BASE, json=body)
-        resp.raise_for_status()
-        data = resp.json()
+    async def _do_request() -> dict:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(USASPENDING_API_BASE, json=body)
+            resp.raise_for_status()
+            return resp.json()
+
+    data = await with_retries(_do_request, operation="usaspending_search")
 
     awards: list[UsaSpendingAward] = []
     for row in data.get("results", []):
