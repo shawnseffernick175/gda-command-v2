@@ -48,14 +48,18 @@ function CompetitorsContent() {
     [searchParams, router, pathname],
   );
 
+  // Stable ref so the debounce effect doesn't re-run when sort changes the URL
+  const setPageRef = useRef(setPage);
+  useEffect(() => { setPageRef.current = setPage; }, [setPage]);
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setDebouncedQ(q);
-      setPage(1);
+      setPageRef.current(1);
     }, 350);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [q, setPage]);
+  }, [q]);
 
   const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
 

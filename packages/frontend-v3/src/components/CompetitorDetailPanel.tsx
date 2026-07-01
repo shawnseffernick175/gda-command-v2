@@ -264,7 +264,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
                 <div>
                   <span className="text-xs text-green-700">Strengths</span>
                   <ul className="mt-1 space-y-0.5">
-                    {blackHat.data.strengths.map((s, i) => (
+                    {(blackHat.data.strengths ?? []).map((s, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-xs text-gray-800">
                         <span className="mt-1.5 h-1 w-1 rounded-full bg-green-600 shrink-0" />
                         {s}
@@ -275,7 +275,7 @@ export default function CompetitorDetailPanel({ competitor, onClose }: Competito
                 <div>
                   <span className="text-xs text-red-700">Weaknesses</span>
                   <ul className="mt-1 space-y-0.5">
-                    {blackHat.data.weaknesses.map((w, i) => (
+                    {(blackHat.data.weaknesses ?? []).map((w, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-xs text-gray-800">
                         <span className="mt-1.5 h-1 w-1 rounded-full bg-red-500 shrink-0" />
                         {w}
