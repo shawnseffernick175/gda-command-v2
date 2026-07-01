@@ -87,7 +87,7 @@ export function UniversalDropZone({ target, children }: UniversalDropZoneProps) 
 
   return (
     <div
-      className="relative"
+      className="relative flex-1 min-h-0"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}

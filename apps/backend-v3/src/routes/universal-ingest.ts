@@ -11,7 +11,7 @@
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import fastifyMultipart from '@fastify/multipart';
-import { createWriteStream, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { randomUUID } from 'node:crypto';
@@ -61,16 +61,16 @@ export async function universalIngestRoutes(app: FastifyInstance): Promise<void>
     const filePath = join('ingest', `${jobId}_${filename}`);
     const fullPath = join(process.cwd(), 'data', filePath);
 
-    // Stream to disk
+    // Stream to memory, then persist to disk
     const chunks: Buffer[] = [];
-    const writeStream = createWriteStream(fullPath);
     const tee = new (await import('node:stream')).PassThrough();
     tee.on('data', (chunk: Buffer) => chunks.push(chunk));
 
     await pipeline(data.file, tee);
     const buf = Buffer.concat(chunks);
-    writeStream.write(buf);
-    writeStream.end();
+
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(fullPath, buf);
 
     const fileSizeBytes = buf.length;
 

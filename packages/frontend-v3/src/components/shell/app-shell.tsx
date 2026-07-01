@@ -21,7 +21,7 @@ const PATH_TO_SURFACE: Record<string, string> = {
   "/regulatory": "regulatory",
   "/fastrac": "fastrac",
   "/vehicles": "vehicles",
-  "/awards": "awards",
+  "/awards": "vault",
   "/risks": "sentinel",
   "/contacts": "vault",
   "/competitors": "vault",

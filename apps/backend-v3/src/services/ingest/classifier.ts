@@ -130,6 +130,12 @@ const KEYWORD_RULES: KeywordRule[] = [
   },
 ];
 
+const VALID_SURFACES = new Set([
+  'opportunities', 'pipeline', 'capture', 'partner_intel', 'action_items',
+  'daily_news', 'sentinel', 'vault', 'financials', 'regulatory',
+  'fastrac', 'vehicles', 'digest', 'inbox',
+]);
+
 const OU_PATTERNS = [
   { pattern: /\b(OU-?II|Riverstone|RSI|Intelligence\s+&\s+Cyber)\b/i, flag: 'OU2' },
   { pattern: /\b(OU-?III|PD\s+Systems|TBF\s+Group|Training.*Simulation)\b/i, flag: 'OU3' },
@@ -186,8 +192,8 @@ export async function classifyDocument(
   // Step 1: keyword-based classification
   const kwResult = keywordClassify(text, filename);
 
-  // If source surface hint is provided and matches a known surface, boost confidence
-  if (sourceSurfaceHint && kwResult.surface === 'inbox') {
+  // If source surface hint is provided and is a valid enum value, use it as fallback
+  if (sourceSurfaceHint && kwResult.surface === 'inbox' && VALID_SURFACES.has(sourceSurfaceHint)) {
     kwResult.surface = sourceSurfaceHint;
     kwResult.confidence = 0.6;
     kwResult.rationale = `Routed to upload source surface: ${sourceSurfaceHint}`;
