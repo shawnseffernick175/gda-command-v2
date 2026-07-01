@@ -26,6 +26,7 @@ import { PendingState } from "@/components/shared/pending-state";
 import { CollapseSection } from "@/components/shared/collapse-section";
 import { AskAiPanel } from "@/components/shared/ask-ai-panel";
 import { useVaultDocuments } from "@/hooks/use-vault";
+import { useGenerateCapturePlan, useGenerateWinThemes, useGeneratedDocuments } from "@/hooks/use-output-generators";
 import { formatMoney } from "@/lib/format-money";
 import { SortableHeader } from "@/components/shared/SortableHeader";
 import { useTableSort } from "@/hooks/use-table-sort";
@@ -460,6 +461,9 @@ function CaptureDetail({ oppId }: { oppId: string }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* F-313: Output Generators — Capture Plan & Win Themes PDFs */}
+      <CaptureOutputGenerators captureId={oppId} />
 
       <ColorTeamWorkflow captureId={oppId} />
 
@@ -906,5 +910,118 @@ function CaptureVaultDocs({ captureId }: { captureId: number }) {
         ))}
       </div>
     </CollapseSection>
+  );
+}
+
+// F-313: Output Generators for Capture — Capture Plan & Win Themes PDFs
+function CaptureOutputGenerators({ captureId }: { captureId: string }) {
+  const genCapturePlan = useGenerateCapturePlan();
+  const genWinThemes = useGenerateWinThemes();
+  const { data: docs } = useGeneratedDocuments({ capture_id: captureId });
+
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "https://gda-v3.csr-llc.tech";
+
+  function handleGenerateCapturePlan() {
+    genCapturePlan.mutate(captureId, {
+      onSuccess: (data) => {
+        const a = document.createElement("a");
+        a.href = `${apiBase}${data.download_url}`;
+        a.download = `capture-plan-${captureId}.pdf`;
+        a.click();
+      },
+    });
+  }
+
+  function handleGenerateWinThemes() {
+    genWinThemes.mutate(captureId, {
+      onSuccess: (data) => {
+        const a = document.createElement("a");
+        a.href = `${apiBase}${data.download_url}`;
+        a.download = `win-themes-${captureId}.pdf`;
+        a.click();
+      },
+    });
+  }
+
+  const capturePlanDocs = (docs ?? []).filter((d) => d.doc_kind === "capture_plan");
+  const winThemeDocs = (docs ?? []).filter((d) => d.doc_kind === "win_themes");
+
+  return (
+    <Card className="border-border bg-gda-panel">
+      <CardHeader>
+        <CardTitle className="font-mono text-xs text-muted-foreground uppercase">
+          Output Generators (F-313)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleGenerateCapturePlan}
+            disabled={genCapturePlan.isPending}
+            className="rounded border border-border px-3 py-1.5 text-xs font-mono text-foreground hover:border-gda-cyan/40 hover:text-gda-cyan transition-colors disabled:opacity-50"
+          >
+            {genCapturePlan.isPending ? "Generating..." : "Generate Capture Plan PDF"}
+          </button>
+          <button
+            type="button"
+            onClick={handleGenerateWinThemes}
+            disabled={genWinThemes.isPending}
+            className="rounded border border-border px-3 py-1.5 text-xs font-mono text-foreground hover:border-gda-cyan/40 hover:text-gda-cyan transition-colors disabled:opacity-50"
+          >
+            {genWinThemes.isPending ? "Generating..." : "Generate Win Themes PDF"}
+          </button>
+        </div>
+
+        {genCapturePlan.isError && (
+          <p className="text-xs text-gda-red">{(genCapturePlan.error as Error).message}</p>
+        )}
+        {genWinThemes.isError && (
+          <p className="text-xs text-gda-red">{(genWinThemes.error as Error).message}</p>
+        )}
+
+        {capturePlanDocs.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Previous Capture Plans</p>
+            {capturePlanDocs.map((doc) => (
+              <a
+                key={doc.id}
+                href={`${apiBase}${doc.download_url}`}
+                className="flex items-center justify-between rounded border border-border bg-gda-bg-base px-3 py-1.5 text-xs hover:border-gda-cyan/40 transition-colors"
+                download
+              >
+                <span className="font-mono text-foreground">
+                  Capture Plan — {new Date(doc.created_at).toLocaleDateString()}
+                </span>
+                <span className="text-muted-foreground">
+                  {doc.file_size_bytes ? `${Math.round(doc.file_size_bytes / 1024)}KB` : ""}
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
+
+        {winThemeDocs.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Previous Win Themes</p>
+            {winThemeDocs.map((doc) => (
+              <a
+                key={doc.id}
+                href={`${apiBase}${doc.download_url}`}
+                className="flex items-center justify-between rounded border border-border bg-gda-bg-base px-3 py-1.5 text-xs hover:border-gda-cyan/40 transition-colors"
+                download
+              >
+                <span className="font-mono text-foreground">
+                  Win Themes — {new Date(doc.created_at).toLocaleDateString()}
+                </span>
+                <span className="text-muted-foreground">
+                  {doc.file_size_bytes ? `${Math.round(doc.file_size_bytes / 1024)}KB` : ""}
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

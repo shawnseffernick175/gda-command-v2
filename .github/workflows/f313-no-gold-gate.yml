@@ -1,0 +1,74 @@
+# F-313 Gold-Free Gate
+#
+# Enforces the canonical 6-color review constraint: Pink / Red / Black / Blue / White / Green.
+# NO "Gold Team" or "Gold Review" references are allowed in F-313 output-generator codepaths.
+#
+# This is additive to the existing forbidden-token scan (which covers R2 tokens).
+# Patterns: (?i)gold.team, (?i)gold.review
+
+name: F-313 No-Gold Gate
+
+on:
+  pull_request:
+    paths:
+      - 'apps/backend-v3/src/output-generators/**'
+      - 'apps/backend-v3/src/services/output-generators/**'
+      - 'apps/backend-v3/src/routes/output-generators.ts'
+      - 'packages/frontend-v3/src/hooks/use-output-generators.ts'
+      - 'packages/frontend-v3/src/app/opportunities/page.tsx'
+      - 'packages/frontend-v3/src/app/capture/page.tsx'
+      - 'db/v3/migrations/v3_127_output_generators.sql'
+      - '.github/workflows/f313-no-gold-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  no-gold:
+    name: F-313 Gold-Free Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan F-313 codepaths for gold references
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          F313_PATHS=(
+            "apps/backend-v3/src/output-generators/"
+            "apps/backend-v3/src/services/output-generators/"
+            "apps/backend-v3/src/routes/output-generators.ts"
+            "packages/frontend-v3/src/hooks/use-output-generators.ts"
+            "db/v3/migrations/v3_127_output_generators.sql"
+          )
+
+          VIOLATIONS=0
+          for p in "${F313_PATHS[@]}"; do
+            if [ ! -e "$p" ]; then
+              continue
+            fi
+            GOLD_MATCHES=$(grep -rniE 'gold.team|gold.review' "$p" \
+              | grep -v '\.github/' \
+              | grep -v '# F-313' \
+              || true)
+            if [ -n "$GOLD_MATCHES" ]; then
+              echo "::error::Gold reference found in F-313 codepath:"
+              echo "$GOLD_MATCHES"
+              VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+          done
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "FAILED: Gold team/review references found"
+            echo "in F-313 output generator codepaths."
+            echo "Only 6 colors are allowed: Pink, Red,"
+            echo "Black, Blue, White, Green."
+            echo "=========================================="
+            exit 1
+          fi
+
+          echo "PASSED: No gold references in F-313 codepaths."
